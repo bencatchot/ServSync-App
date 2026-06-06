@@ -108,6 +108,7 @@ export interface HomeownerProfile {
   city: string;
   state: string;
   zip_code: string;
+  profile_photo_path: string;
   created_at: string;
   updated_at: string;
 }
@@ -125,6 +126,7 @@ export interface HomeProfile {
   year_built: string;
   square_feet: string;
   notes: string;
+  home_photo_path: string;
   created_at: string;
   updated_at: string;
 }

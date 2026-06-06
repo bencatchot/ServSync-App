@@ -3708,6 +3708,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'support'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
   const [home, setHome] = useState<HomeProfile | null>(null);
+  const [homeownerProfilePhotoUrl, setHomeownerProfilePhotoUrl] = useState('');
+  const [homePhotoUrl, setHomePhotoUrl] = useState('');
+  const [uploadingHomeownerProfilePhoto, setUploadingHomeownerProfilePhoto] = useState(false);
+  const [uploadingHomePhoto, setUploadingHomePhoto] = useState(false);
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
@@ -3795,6 +3799,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     city: '',
     state: '',
     zip_code: '',
+    profile_photo_path: '',
     created_at: '',
     updated_at: '',
   };
@@ -3812,9 +3817,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     year_built: '',
     square_feet: '',
     notes: '',
+    home_photo_path: '',
     created_at: '',
     updated_at: '',
   };
+
+  const signedHomeAssetUrl = useCallback(async (path?: string | null) => {
+    if (!supabase || !path) return '';
+    const { data, error } = await supabase.storage.from('home-documents').createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) return '';
+    return data.signedUrl;
+  }, []);
 
   const loadHomeowner = useCallback(async () => {
     if (!supabase) return;
@@ -3839,8 +3852,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (connectionsRes.error) throw connectionsRes.error;
       if (serviceRequestsRes.error) throw serviceRequestsRes.error;
 
-      setHomeowner((profileRes.data as HomeownerProfile | null) || null);
-      setHome((homeRes.data as HomeProfile | null) || null);
+      const loadedHomeowner = (profileRes.data as HomeownerProfile | null) || null;
+      const loadedHome = (homeRes.data as HomeProfile | null) || null;
+      const [profilePhotoUrl, homePhotoSignedUrl] = await Promise.all([
+        signedHomeAssetUrl(loadedHomeowner?.profile_photo_path),
+        signedHomeAssetUrl(loadedHome?.home_photo_path),
+      ]);
+
+      setHomeowner(loadedHomeowner);
+      setHome(loadedHome);
+      setHomeownerProfilePhotoUrl(profilePhotoUrl);
+      setHomePhotoUrl(homePhotoSignedUrl);
       setDirectoryContractors((directoryRes.data || []) as ContractorProfile[]);
       const loadedConnections = (connectionsRes.data || []) as HomeownerConnection[];
       const connectionIds = loadedConnections.map(connection => connection.connection_id);
@@ -3870,7 +3892,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     } finally {
       setLoading(false);
     }
-  }, [profile.id]);
+  }, [profile.id, signedHomeAssetUrl]);
 
   useEffect(() => {
     void loadHomeowner();
@@ -4122,6 +4144,93 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
+  const uploadHomeownerProfilePhoto = async (file: File | null) => {
+    if (!supabase || !file) return;
+    setNotice('');
+    setError('');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Please upload a PNG, JPG, or WebP image.');
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setError('Photo file is too large. Please use an image under 6 MB.');
+      return;
+    }
+    setUploadingHomeownerProfilePhoto(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const storagePath = `${profile.id}/profile/profile-photo-${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('home-documents')
+        .upload(storagePath, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const payload = {
+        user_id: profile.id,
+        display_name: profileDraft.display_name || profile.full_name || '',
+        phone: profileDraft.phone || '',
+        city: profileDraft.city || '',
+        state: profileDraft.state || '',
+        zip_code: profileDraft.zip_code || '',
+        profile_photo_path: storagePath,
+      };
+      const { error: updateError } = await supabase.from('homeowner_profiles').upsert(payload);
+      if (updateError) throw updateError;
+
+      const signedUrl = await signedHomeAssetUrl(storagePath);
+      setHomeowner(prev => prev ? { ...prev, profile_photo_path: storagePath } : { ...profileDraft, profile_photo_path: storagePath });
+      setHomeownerProfilePhotoUrl(signedUrl);
+      setNotice('Profile photo uploaded.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to upload profile photo.'));
+    } finally {
+      setUploadingHomeownerProfilePhoto(false);
+    }
+  };
+
+  const uploadHomePhoto = async (file: File | null) => {
+    if (!supabase || !file) return;
+    setNotice('');
+    setError('');
+    if (!homeDraft.id) {
+      setError('Save the home profile once before uploading a home photo.');
+      return;
+    }
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Please upload a PNG, JPG, or WebP image.');
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setError('Photo file is too large. Please use an image under 6 MB.');
+      return;
+    }
+    setUploadingHomePhoto(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const storagePath = `${profile.id}/home/home-photo-${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('home-documents')
+        .upload(storagePath, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from('homes')
+        .update({ home_photo_path: storagePath })
+        .eq('id', homeDraft.id)
+        .eq('homeowner_user_id', profile.id);
+      if (updateError) throw updateError;
+
+      const signedUrl = await signedHomeAssetUrl(storagePath);
+      setHome(prev => prev ? { ...prev, home_photo_path: storagePath } : { ...homeDraft, home_photo_path: storagePath });
+      setHomePhotoUrl(signedUrl);
+      setNotice('Home photo uploaded.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to upload home photo.'));
+    } finally {
+      setUploadingHomePhoto(false);
+    }
+  };
+
   const saveHomeownerProfile = async () => {
     if (!supabase) return;
     setNotice('');
@@ -4134,6 +4243,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         city: profileDraft.city,
         state: profileDraft.state,
         zip_code: profileDraft.zip_code,
+        profile_photo_path: profileDraft.profile_photo_path || '',
       };
       const { error: profileError } = await supabase.from('homeowner_profiles').upsert(homeownerPayload);
       if (profileError) throw profileError;
@@ -4151,6 +4261,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         year_built: homeDraft.year_built,
         square_feet: homeDraft.square_feet,
         notes: homeDraft.notes,
+        home_photo_path: homeDraft.home_photo_path || '',
       };
       const { error: homeError } = await supabase.from('homes').upsert(homePayload).select('*').single();
       if (homeError) throw homeError;
@@ -4824,6 +4935,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         }}
       />}
       profile={profile}
+      profileLogoUrl={homeownerProfilePhotoUrl || homePhotoUrl}
+      profileLogoFit="cover"
       onSignOut={onSignOut}
     >
       {loading && <Notice tone="info" text="Loading homeowner profile..." />}
@@ -5147,6 +5260,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'home' && (
         <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card title="My profile" icon={<UserRound size={18} />}>
+          <PhotoUploadPanel
+            title="Profile photo"
+            helper="This can replace your initials in the homeowner sidebar."
+            imageUrl={homeownerProfilePhotoUrl}
+            fallback={<UserRound size={24} className="text-[#223D67]/45" />}
+            uploading={uploadingHomeownerProfilePhoto}
+            buttonLabel={homeownerProfilePhotoUrl ? 'Replace photo' : 'Upload photo'}
+            onUpload={file => void uploadHomeownerProfilePhoto(file)}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Email">
               <input className={`${inputClass()} cursor-not-allowed opacity-60`} value={profile.email} readOnly disabled />
@@ -5176,6 +5298,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </Card>
 
         <Card title="My home" icon={<Home size={18} />}>
+          <PhotoUploadPanel
+            title="Home photo"
+            helper="This can be used as your home image when no profile photo is uploaded."
+            imageUrl={homePhotoUrl}
+            fallback={<Home size={24} className="text-[#223D67]/45" />}
+            uploading={uploadingHomePhoto}
+            buttonLabel={homePhotoUrl ? 'Replace home photo' : 'Upload home photo'}
+            onUpload={file => void uploadHomePhoto(file)}
+            footer={!homeDraft.id ? 'Save the home profile once before uploading a home photo.' : undefined}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Home nickname">
               <input className={inputClass()} value={homeDraft.nickname} onChange={event => setHome({ ...homeDraft, nickname: event.target.value })} />
@@ -8852,6 +8984,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       />}
       profile={profile}
       profileLogoUrl={contractorDraft.logo_url}
+      profileLogoFit="contain"
       onSignOut={onSignOut}
     >
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
@@ -15683,6 +15816,7 @@ function SidebarLayout({
   brand,
   profile,
   profileLogoUrl,
+  profileLogoFit = 'contain',
   onSignOut,
 }: {
   tabs: { id: string; label: string; icon: React.ReactNode; badge?: number; group?: string }[];
@@ -15693,6 +15827,7 @@ function SidebarLayout({
   brand: { name: string; subtitle: string };
   profile: Profile;
   profileLogoUrl?: string | null;
+  profileLogoFit?: 'contain' | 'cover';
   onSignOut: () => Promise<void>;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -15759,7 +15894,11 @@ function SidebarLayout({
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 transition-colors group">
           <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#1B85FB]/15 text-blue-50 text-xs font-bold shrink-0">
             {profileLogoUrl ? (
-              <img src={profileLogoUrl} alt={`${brand.name} logo`} className="h-full w-full bg-white object-contain p-1" />
+              <img
+                src={profileLogoUrl}
+                alt={`${brand.name} profile`}
+                className={profileLogoFit === 'cover' ? 'h-full w-full object-cover' : 'h-full w-full bg-white object-contain p-1'}
+              />
             ) : (
               (profile.full_name || profile.email || '?').charAt(0).toUpperCase()
             )}
@@ -15819,6 +15958,63 @@ function SidebarLayout({
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+
+function PhotoUploadPanel({
+  title,
+  helper,
+  imageUrl,
+  fallback,
+  uploading,
+  buttonLabel,
+  footer,
+  onUpload,
+}: {
+  title: string;
+  helper: string;
+  imageUrl: string;
+  fallback: React.ReactNode;
+  uploading: boolean;
+  buttonLabel: string;
+  footer?: string;
+  onUpload: (file: File | null) => void;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#E1E3E7] bg-white">
+            {imageUrl ? (
+              <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+            ) : (
+              fallback
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#02132D]">{title}</p>
+            <p className="mt-0.5 max-w-xl text-xs leading-5 text-[#223D67]">{helper}</p>
+          </div>
+        </div>
+        <label className={`${buttonClass('secondary')} cursor-pointer`}>
+          <Upload size={15} />
+          {uploading ? 'Uploading...' : buttonLabel}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            disabled={uploading}
+            onChange={event => {
+              const file = event.target.files?.[0] || null;
+              event.currentTarget.value = '';
+              onUpload(file);
+            }}
+          />
+        </label>
+      </div>
+      {footer && <p className="mt-2 text-xs font-medium text-amber-700">{footer}</p>}
     </div>
   );
 }
