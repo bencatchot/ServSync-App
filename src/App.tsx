@@ -15528,8 +15528,8 @@ function SidebarLayout({
   const sidebarContent = (
     <div className="flex h-full min-h-0 flex-col bg-slate-800 border-r border-slate-700">
       <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-700 shrink-0">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shrink-0">
-          <ShieldCheck size={18} />
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[#02132D] shadow-sm shrink-0">
+          <img src="/servsync-mark-white.png" alt="ServSync" className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white leading-tight text-sm truncate">{brand.name}</p>
