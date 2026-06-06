@@ -7166,6 +7166,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => {
+      setNotice(current => current === notice ? '' : current);
+    }, 6000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    setNotice('');
+  }, [contractorTab]);
   const [loading, setLoading] = useState(true);
   const restoredFieldWorkRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
