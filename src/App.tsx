@@ -8551,6 +8551,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInspectionTemplates(prev => prev.filter(t => t.id !== tplId));
   };
 
+  const addChecklistSection = (roomName: string) => {
+    const name = roomName.trim();
+    if (!name) return;
+    const existingRoom = activeRooms.find(room => room.room.toLowerCase() === name.toLowerCase());
+    const nextSelectedRoom = existingRoom?.room ?? name;
+    setActiveRooms(prev => (
+      prev.some(room => room.room.toLowerCase() === name.toLowerCase())
+        ? prev
+        : [...prev, { room: name, items: [] }]
+    ));
+    setSelectedChecklistRoom(nextSelectedRoom);
+    setInspectionSubTab('checklist');
+    setCustomRoomInput('');
+    setShowAddRoom(false);
+  };
+
   const createLocalContact = async (options?: { autoStartFieldWork?: boolean }) => {
     if (!supabase || !contractor) return;
     if (!localContactDraft.display_name.trim()) {
@@ -12259,15 +12275,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <button
                                         key={r}
                                         type="button"
-                                        onClick={() => {
-                                          const template = DEFAULT_INSPECTION_ROOMS.find(d => d.room === r);
-                                          setActiveRooms(prev => [...prev, { room: r, items: [] }]);
-                                          setSelectedChecklistRoom(r);
-                                          setShowAddRoom(false);
-                                          if (template && template.items.length > 0) {
-                                            // Don't auto-add items; user can use "Add all" in the recommended card
-                                          }
-                                        }}
+                                        onClick={() => addChecklistSection(r)}
                                         className="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
                                       >
                                         <span className="mr-1">{getRoomInspectionIcon(r)}</span>{r}
@@ -12289,10 +12297,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     if (e.key === 'Enter' && customRoomInput.trim()) {
                                       const name = customRoomInput.trim();
                                       if (activeRooms.some(r => r.room.toLowerCase() === name.toLowerCase())) return;
-                                      setActiveRooms(prev => [...prev, { room: name, items: [] }]);
-                                      setSelectedChecklistRoom(name);
-                                      setCustomRoomInput('');
-                                      setShowAddRoom(false);
+                                      addChecklistSection(name);
                                     }
                                   }}
                                 />
@@ -12302,10 +12307,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   onClick={() => {
                                     const name = customRoomInput.trim();
                                     if (!name) return;
-                                    setActiveRooms(prev => [...prev, { room: name, items: [] }]);
-                                    setSelectedChecklistRoom(name);
-                                    setCustomRoomInput('');
-                                    setShowAddRoom(false);
+                                    addChecklistSection(name);
                                   }}
                                   className="bg-blue-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
                                 >
