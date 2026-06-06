@@ -3054,17 +3054,17 @@ function readableError(err: unknown, fallback: string) {
 }
 
 function inputClass() {
-  return 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15';
+  return 'w-full rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm text-[#02132D] placeholder:text-slate-400 outline-none transition focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/15';
 }
 
 function buttonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary') {
   if (kind === 'secondary') {
-    return 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700';
+    return 'inline-flex items-center justify-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-4 py-2 text-sm font-semibold text-[#223D67] shadow-sm transition hover:border-[#1B85FB] hover:bg-[#F7F9FC] hover:text-[#0078FF]';
   }
   if (kind === 'danger') {
     return 'inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700';
   }
-  return 'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700';
+  return 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]';
 }
 
 export default function App() {
@@ -3145,7 +3145,7 @@ export default function App() {
   if (loading) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        <div className="rounded-2xl border border-slate-700 bg-slate-800 p-8 text-center text-sm font-semibold text-slate-400 shadow-lg">
+        <div className="rounded-2xl border border-[#E1E3E7] bg-white p-8 text-center text-sm font-semibold text-[#223D67] shadow-sm">
           Loading ServSync...
         </div>
       </PublicShell>
@@ -3210,7 +3210,7 @@ function PublicShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-[#F7F9FC]">
       <TopBar route={route} profile={profile} onSignOut={onSignOut} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
     </div>
@@ -3228,14 +3228,14 @@ function TopBar({
   onSignOut: () => Promise<void>;
 }) {
   return (
-    <header className="border-b border-slate-700/50 bg-slate-900">
+    <header className="border-b border-[#E1E3E7] bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <button type="button" onClick={() => updateRoute('home')} className="flex items-center gap-3 text-left">
-          <div className="flex h-12 w-44 items-center rounded-xl bg-white px-3 py-2 shadow-sm sm:w-52">
-            <img src="/servsync-logo.png" alt="ServSync" className="h-full w-full object-contain" />
+          <div className="flex h-12 w-44 items-center overflow-hidden rounded-xl bg-[#02132D] shadow-sm sm:h-14 sm:w-56">
+            <img src="/servsync-logo-header.png" alt="ServSync" className="h-full w-full object-contain" />
           </div>
-          <div>
-            <p className="text-xs font-medium text-slate-400">Homeowner-contractor connections</p>
+          <div className="hidden sm:block">
+            <p className="text-xs font-medium text-[#223D67]">Homeowner-contractor connections</p>
           </div>
         </button>
         <nav className="hidden items-center gap-2 md:flex">
@@ -3249,16 +3249,16 @@ function TopBar({
         <div className="flex items-center gap-2">
           {profile ? (
             <>
-              <span className="hidden rounded-full bg-slate-700 px-3 py-1 text-xs font-semibold text-slate-300 sm:inline">
+              <span className="hidden rounded-full bg-[#F7F9FC] px-3 py-1 text-xs font-semibold text-[#223D67] sm:inline">
                 {ROLE_LABEL[profile.role]}
               </span>
-              <button type="button" onClick={() => void onSignOut()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">
+              <button type="button" onClick={() => void onSignOut()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-4 py-2 text-sm font-semibold text-[#223D67] transition hover:border-[#1B85FB] hover:text-[#0078FF]">
                 <LogOut size={16} />
                 Logout
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => updateRoute('contractor')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700">
+            <button type="button" onClick={() => updateRoute('contractor')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]">
               Sign in
             </button>
           )}
@@ -3274,7 +3274,7 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
       type="button"
       onClick={onClick}
       className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-        active ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+        active ? 'bg-[#0078FF] text-white' : 'text-[#223D67] hover:bg-[#F7F9FC] hover:text-[#0078FF]'
       }`}
     >
       {children}
@@ -3416,13 +3416,13 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 function LandingPage() {
   return (
     <div className="space-y-8">
-      <section className="grid gap-8 rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-lg lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+      <section className="grid gap-8 rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Connect · Manage · Protect</p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">Connect · Manage · Protect</p>
+          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-[#02132D] sm:text-5xl">
             One place for homeowners and contractors to connect with permission.
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#223D67]">
             Homeowners own their home profile. Contractors own their business profile. ServSync manages the connection,
             referral, and sharing rules between them.
           </p>
@@ -3448,11 +3448,11 @@ function LandingPage() {
 
 function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="flex gap-3 rounded-2xl bg-slate-800 p-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-900/30 text-blue-400">{icon}</div>
+    <div className="flex gap-3 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
       <div>
-        <p className="text-sm font-bold text-white">{title}</p>
-        <p className="mt-1 text-sm text-slate-400">{text}</p>
+        <p className="text-sm font-bold text-[#02132D]">{title}</p>
+        <p className="mt-1 text-sm text-[#223D67]">{text}</p>
       </div>
     </div>
   );
@@ -3517,12 +3517,12 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
 
   return (
     <div className="mx-auto max-w-xl">
-      <div className="rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-lg">
+      <div className="rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm">
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">{ROLE_LABEL[role]}</p>
-          <h1 className="mt-2 text-3xl font-bold text-white">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">{ROLE_LABEL[role]}</p>
+          <h1 className="mt-2 text-3xl font-bold text-[#02132D]">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1>
           {inviteCode && (
-            <p className="mt-2 rounded-xl bg-blue-900/20 px-3 py-2 text-sm font-medium text-blue-400">
+            <p className="mt-2 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] px-3 py-2 text-sm font-medium text-[#223D67]">
               Contractor referral link detected. You can create your homeowner account without automatically sharing any private information.
             </p>
           )}
@@ -3554,11 +3554,11 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
           </button>
           {message && <Notice tone="info" text={message} />}
         </form>
-        <div className="mt-6 border-t border-slate-700 pt-4">
+        <div className="mt-6 border-t border-[#E1E3E7] pt-4">
           <button
             type="button"
             onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-            className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+            className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
           >
             {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
           </button>
@@ -3603,9 +3603,9 @@ function MissingProfile({
   };
 
   return (
-    <div className="mx-auto max-w-xl rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-lg">
-      <h1 className="text-2xl font-bold text-white">Finish profile setup</h1>
-      <p className="mt-2 text-sm text-slate-400">Your login exists, but ServSync needs a role profile before continuing.</p>
+    <div className="mx-auto max-w-xl rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm">
+      <h1 className="text-2xl font-bold text-[#02132D]">Finish profile setup</h1>
+      <p className="mt-2 text-sm text-[#223D67]">Your login exists, but ServSync needs a role profile before continuing.</p>
       <div className="mt-5 space-y-4">
         <Field label="Full name">
           <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} />
