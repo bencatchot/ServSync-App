@@ -138,6 +138,7 @@ export interface ContractorProfile {
   email: string;
   phone: string;
   website_url: string;
+  logo_url: string;
   city: string;
   state: string;
   zip_code: string;
@@ -165,6 +166,7 @@ export interface HomeownerConnection {
   contact_name: string;
   email: string;
   phone: string;
+  logo_url: string;
   city: string;
   state: string;
   status: ConnectionStatus;
@@ -323,6 +325,7 @@ export interface PublicContractorListing {
   contractor_id: string;
   business_name: string;
   slug: string;
+  logo_url: string;
   city: string;
   state: string;
   categories: string[];
@@ -341,6 +344,7 @@ export interface ContractorPublicProfile {
   state: string;
   zip_code: string;
   website_url: string;
+  logo_url: string;
   categories: string[];
   business_summary: string;
   license_number: string;

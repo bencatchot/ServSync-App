@@ -1750,12 +1750,65 @@ function getRoomInspectionIcon(room: string): string {
   return '🔍';
 }
 
+type PdfImageAsset = {
+  dataUrl: string;
+  format: 'PNG' | 'JPEG';
+  width: number;
+  height: number;
+};
+
+function dataUrlFromBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Unable to read image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function imageSizeFromDataUrl(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth || image.width || 1, height: image.naturalHeight || image.height || 1 });
+    image.onerror = () => reject(new Error('Unable to load logo image.'));
+    image.src = dataUrl;
+  });
+}
+
+async function loadPdfImageAsset(url?: string | null): Promise<PdfImageAsset | null> {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    const dataUrl = await dataUrlFromBlob(blob);
+    const size = await imageSizeFromDataUrl(dataUrl);
+    const mime = dataUrl.slice(5, dataUrl.indexOf(';')).toLowerCase();
+    if (mime.includes('webp')) return null;
+    const format: PdfImageAsset['format'] = mime.includes('jpeg') || mime.includes('jpg') ? 'JPEG' : 'PNG';
+    return { dataUrl, format, width: size.width, height: size.height };
+  } catch {
+    return null;
+  }
+}
+
+function drawPdfLogo(pdf: jsPDF, image: PdfImageAsset, x: number, y: number, boxW: number, boxH: number) {
+  const padding = 2;
+  const maxW = Math.max(1, boxW - padding * 2);
+  const maxH = Math.max(1, boxH - padding * 2);
+  const scale = Math.min(maxW / image.width, maxH / image.height);
+  const w = image.width * scale;
+  const h = image.height * scale;
+  pdf.addImage(image.dataUrl, image.format, x + (boxW - w) / 2, y + (boxH - h) / 2, w, h);
+}
+
 // PDF generation for inspection reports
 async function generateInspectionPdf(
   inspection: Inspection,
   contractorName: string,
   homeownerName: string,
   homeAddress: string,
+  contractorLogoUrl?: string | null,
 ): Promise<{ blob: Blob; fileName: string }> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -1812,17 +1865,28 @@ async function generateInspectionPdf(
   ];
   const fixedValueFindings = findingsWithRoom.filter(f => f.status === 'Fixed On Site');
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const contractorLogo = await loadPdfImageAsset(contractorLogoUrl);
 
   // Header
-  drawRect(0, 0, pageW, 38, BLUE, 0);
+  drawRect(0, 0, pageW, 44, BLUE, 0);
   txt(contractorName, margin, 13, WHITE, 16, true);
   txt('Field Work Report', margin, 20, [147, 197, 253], 8);
   const statusLabel = urgentCount > 0 ? `${urgentCount} URGENT` : issueCount > 0 ? `${issueCount} ISSUES` : 'ALL CLEAR';
   const statusBg = urgentCount > 0 ? STATUS_PDF['Urgent'].bg : issueCount > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
   const statusTxt = urgentCount > 0 ? STATUS_PDF['Urgent'].text : issueCount > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
-  drawRect(pageW - margin - 36, 8, 36, 8, statusBg, 2);
-  txt(statusLabel, pageW - margin - 18, 13.5, statusTxt, 7, true, 'center');
-  y = 44;
+  if (contractorLogo) {
+    const logoW = 38;
+    const logoH = 22;
+    const logoX = pageW - margin - logoW;
+    drawRect(logoX, 7, logoW, logoH, WHITE, 2);
+    drawPdfLogo(pdf, contractorLogo, logoX, 7, logoW, logoH);
+    drawRect(pageW - margin - 36, 32, 36, 8, statusBg, 2);
+    txt(statusLabel, pageW - margin - 18, 37.5, statusTxt, 7, true, 'center');
+  } else {
+    drawRect(pageW - margin - 36, 8, 36, 8, statusBg, 2);
+    txt(statusLabel, pageW - margin - 18, 13.5, statusTxt, 7, true, 'center');
+  }
+  y = 50;
 
   // Property info
   txt(homeownerName, margin, y, DARK, 15, true); y += 6;
@@ -2642,9 +2706,9 @@ function safeFileName(value: string) {
   return value.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'servsync';
 }
 
-function createEstimatePdf(
+async function createEstimatePdf(
   estimate: Estimate,
-  context: { contractorName: string; customerName: string; customerAddress?: string },
+  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -2652,6 +2716,7 @@ function createEstimatePdf(
   const margin = 15;
   const contentW = pageW - margin * 2;
   let y = 18;
+  const contractorLogo = await loadPdfImageAsset(context.contractorLogoUrl);
 
   const addPageIfNeeded = (height = 12) => {
     if (y + height <= pageH - margin) return;
@@ -2679,16 +2744,24 @@ function createEstimatePdf(
     pdf.setFont('helvetica', 'normal');
   };
 
-  pdf.setFillColor(37, 99, 235);
-  pdf.rect(0, 0, pageW, 34, 'F');
+  pdf.setFillColor(0, 120, 255);
+  pdf.rect(0, 0, pageW, 38, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(20);
   pdf.text('Estimate', margin, 18);
   pdf.setFontSize(10);
   pdf.text(context.contractorName || 'Contractor', margin, 27);
+  if (contractorLogo) {
+    const logoW = 38;
+    const logoH = 22;
+    const logoX = pageW - margin - logoW;
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(logoX, 8, logoW, logoH, 2, 2, 'F');
+    drawPdfLogo(pdf, contractorLogo, logoX, 8, logoW, logoH);
+  }
 
-  y = 45;
+  y = 48;
   pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(16);
@@ -2772,11 +2845,11 @@ function createEstimatePdf(
   return { blob: pdf.output('blob'), fileName };
 }
 
-function downloadEstimatePdf(
+async function downloadEstimatePdf(
   estimate: Estimate,
-  context: { contractorName: string; customerName: string; customerAddress?: string },
+  context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
-  const { blob, fileName } = createEstimatePdf(estimate, context);
+  const { blob, fileName } = await createEstimatePdf(estimate, context);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -4431,10 +4504,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setError('');
     setFilingEstimateId(estimate.id);
     try {
-      const { blob, fileName } = createEstimatePdf(estimate, {
+      const contractorLogoUrl = connections.find(connection => connection.contractor_id === estimate.contractor_id)?.logo_url
+        || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.logo_url
+        || null;
+      const { blob, fileName } = await createEstimatePdf(estimate, {
         contractorName,
         customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
         customerAddress: home?.address_line1 || '',
+        contractorLogoUrl,
       });
       const document = await createHomeDocumentFromBlob(
         blob,
@@ -6507,11 +6584,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => downloadEstimatePdf(estimate, {
+                        onClick={() => void downloadEstimatePdf(estimate, {
                           contractorName,
                           customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
                           customerAddress: home?.address_line1 || '',
-                        })}
+                          contractorLogoUrl: connections.find(connection => connection.contractor_id === estimate.contractor_id)?.logo_url
+                            || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.logo_url
+                            || null,
+                        }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
                         className={buttonClass('secondary')}
                       >
                         <Download size={16} />
@@ -7010,6 +7090,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorReschedulingId, setContractorReschedulingId] = useState<string | null>(null);
   const [contractorResponseFiles, setContractorResponseFiles] = useState<Record<string, File[]>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [uploadingContractorLogo, setUploadingContractorLogo] = useState(false);
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportDraft, setSupportDraft] = useState<{ category: SupportInquiryCategory; title: string; body: string }>({ category: 'feature_request', title: '', body: '' });
   const [supportReplyDrafts, setSupportReplyDrafts] = useState<Record<string, string>>({});
@@ -7127,6 +7208,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     email: profile.email,
     phone: '',
     website_url: '',
+    logo_url: '',
     city: '',
     state: '',
     zip_code: '',
@@ -7357,6 +7439,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         email: contractorDraft.email,
         phone: contractorDraft.phone,
         website_url: contractorDraft.website_url,
+        logo_url: contractorDraft.logo_url,
         city: contractorDraft.city,
         state: contractorDraft.state,
         zip_code: contractorDraft.zip_code,
@@ -7370,11 +7453,65 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         account_status: contractorDraft.account_status,
       };
       const { error: saveError } = await supabase.from('contractor_profiles').upsert(payload).select('*').single();
-      if (saveError) throw saveError;
+      if (saveError) {
+        const message = readableError(saveError, 'Unable to save contractor profile.');
+        if (/logo_url|schema cache|column/i.test(message)) {
+          const fallbackPayload = { ...payload };
+          delete (fallbackPayload as Record<string, unknown>).logo_url;
+          const { error: fallbackError } = await supabase.from('contractor_profiles').upsert(fallbackPayload).select('*').single();
+          if (fallbackError) throw fallbackError;
+        } else {
+          throw saveError;
+        }
+      }
       setNotice('Contractor profile saved.');
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to save contractor profile.'));
+    }
+  };
+
+  const uploadContractorLogo = async (file: File | null) => {
+    if (!supabase || !file) return;
+    setNotice('');
+    setError('');
+    if (!contractorDraft.id) {
+      setError('Save the business profile first, then upload the contractor logo.');
+      return;
+    }
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setError('Please upload a PNG or JPG image for the contractor logo.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError('Logo file is too large. Please use an image under 4 MB.');
+      return;
+    }
+
+    setUploadingContractorLogo(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const storagePath = `${profile.id}/contractor-logo-${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('contractor-assets')
+        .upload(storagePath, file, { contentType: file.type, upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from('contractor-assets').getPublicUrl(storagePath);
+      const logoUrl = publicUrlData.publicUrl;
+      const { error: updateError } = await supabase
+        .from('contractor_profiles')
+        .update({ logo_url: logoUrl })
+        .eq('id', contractorDraft.id)
+        .eq('owner_user_id', profile.id);
+      if (updateError) throw updateError;
+
+      setContractor(prev => prev ? { ...prev, logo_url: logoUrl } : { ...contractorDraft, logo_url: logoUrl });
+      setNotice('Contractor logo uploaded. It will be used on public profile pages and customer-facing PDFs.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to upload contractor logo.'));
+    } finally {
+      setUploadingContractorLogo(false);
     }
   };
 
@@ -8288,7 +8425,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           ? [localHome.address_line1, localHome.city, localHome.state].filter(Boolean).join(', ')
           : [homeownerConn?.city, homeownerConn?.state].filter(Boolean).join(', ');
 
-      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress);
+      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url);
 
       const storagePath = insp.homeowner_user_id
         ? `${insp.homeowner_user_id}/documents/${crypto.randomUUID()}.pdf`
@@ -8875,6 +9012,45 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       {contractorTab === 'profile' && (
       <Card title="Business profile" icon={<Building2 size={18} />}>
+        <div className="mb-5 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white">
+                {contractorDraft.logo_url ? (
+                  <img src={contractorDraft.logo_url} alt={`${contractorDraft.business_name || 'Contractor'} logo`} className="h-full w-full object-contain p-2" />
+                ) : (
+                  <Building2 size={28} className="text-[#223D67]/45" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#02132D]">Contractor logo</p>
+                <p className="mt-1 max-w-xl text-sm leading-5 text-[#223D67]">
+                  Upload the logo homeowners should see on your public profile, field work reports, estimates, and future customer-facing documents.
+                </p>
+              </div>
+            </div>
+            <label className={`${buttonClass('secondary')} cursor-pointer`}>
+              <Upload size={15} />
+              {uploadingContractorLogo ? 'Uploading...' : contractorDraft.logo_url ? 'Replace logo' : 'Upload logo'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                className="sr-only"
+                disabled={uploadingContractorLogo}
+                onChange={event => {
+                  const file = event.target.files?.[0] || null;
+                  event.currentTarget.value = '';
+                  void uploadContractorLogo(file);
+                }}
+              />
+            </label>
+          </div>
+          {!contractorDraft.id && (
+            <p className="mt-3 text-xs font-medium text-amber-700">
+              Save the business profile once before uploading a logo.
+            </p>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Business name">
             <input className={inputClass()} value={contractorDraft.business_name} onChange={event => setContractor({ ...contractorDraft, business_name: event.target.value })} />
@@ -11107,11 +11283,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             <button
                                               type="button"
-                                              onClick={() => downloadEstimatePdf(estimate, {
+                                              onClick={() => void downloadEstimatePdf(estimate, {
                                                 contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                                 customerName: headerName,
                                                 customerAddress: headerAddress || headerCity,
-                                              })}
+                                                contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                              }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
                                               className={buttonClass('secondary')}
                                             >
                                               <Download size={15} />
@@ -13159,7 +13336,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             const previewInsp: Inspection = activeInspection.status === 'finalized'
                               ? activeInspection
                               : { ...activeInspection, rooms_with_findings: reportRooms, summary: inspectionSummary };
-                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress);
+                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractor?.logo_url || contractorDraft.logo_url || null);
                           }}
                           className="w-full border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
@@ -14889,22 +15066,29 @@ function ContractorPublicProfilePage({
       {/* Header card */}
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Contractor profile</p>
-            <h1 className="mt-2 text-3xl font-bold text-slate-950">{data.business_name}</h1>
-            {location && (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
-                <MapPin size={14} />
-                {location}
-              </p>
-            )}
-            {data.categories.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {data.categories.map(c => (
-                  <span key={c} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{c}</span>
-                ))}
+          <div className="flex min-w-0 flex-1 gap-4">
+            {data.logo_url && (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white shadow-sm">
+                <img src={data.logo_url} alt={`${data.business_name} logo`} className="h-full w-full object-contain p-2" />
               </div>
             )}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Contractor profile</p>
+              <h1 className="mt-2 text-3xl font-bold text-slate-950">{data.business_name}</h1>
+              {location && (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+                  <MapPin size={14} />
+                  {location}
+                </p>
+              )}
+              {data.categories.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {data.categories.map(c => (
+                    <span key={c} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{c}</span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {data.avg_rating !== null && (
