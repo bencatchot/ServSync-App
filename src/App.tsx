@@ -1876,10 +1876,11 @@ async function generateInspectionPdf(
   const statusTxt = urgentCount > 0 ? STATUS_PDF['Urgent'].text : issueCount > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
   if (contractorLogo) {
     const logoW = 38;
-    const logoH = 22;
+    const logoH = 19;
     const logoX = pageW - margin - logoW;
-    drawRect(logoX, 7, logoW, logoH, WHITE, 2);
-    drawPdfLogo(pdf, contractorLogo, logoX, 7, logoW, logoH);
+    drawRect(logoX, 6, logoW, logoH, WHITE, 2);
+    drawPdfLogo(pdf, contractorLogo, logoX, 6, logoW, logoH);
+    txt('Powered by ServSync', logoX + logoW / 2, 29.5, [219, 234, 254], 5.5, false, 'center');
     drawRect(pageW - margin - 36, 32, 36, 8, statusBg, 2);
     txt(statusLabel, pageW - margin - 18, 37.5, statusTxt, 7, true, 'center');
   } else {
@@ -2745,7 +2746,7 @@ async function createEstimatePdf(
   };
 
   pdf.setFillColor(0, 120, 255);
-  pdf.rect(0, 0, pageW, 38, 'F');
+  pdf.rect(0, 0, pageW, 42, 'F');
   pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(20);
@@ -2754,14 +2755,18 @@ async function createEstimatePdf(
   pdf.text(context.contractorName || 'Contractor', margin, 27);
   if (contractorLogo) {
     const logoW = 38;
-    const logoH = 22;
+    const logoH = 20;
     const logoX = pageW - margin - logoW;
     pdf.setFillColor(255, 255, 255);
-    pdf.roundedRect(logoX, 8, logoW, logoH, 2, 2, 'F');
-    drawPdfLogo(pdf, contractorLogo, logoX, 8, logoW, logoH);
+    pdf.roundedRect(logoX, 7, logoW, logoH, 2, 2, 'F');
+    drawPdfLogo(pdf, contractorLogo, logoX, 7, logoW, logoH);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(5.5);
+    pdf.setTextColor(219, 234, 254);
+    pdf.text('Powered by ServSync', logoX + logoW / 2, 32, { align: 'center' });
   }
 
-  y = 48;
+  y = 52;
   pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(16);
@@ -8846,6 +8851,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         }}
       />}
       profile={profile}
+      profileLogoUrl={contractorDraft.logo_url}
       onSignOut={onSignOut}
     >
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
@@ -15676,6 +15682,7 @@ function SidebarLayout({
   children,
   brand,
   profile,
+  profileLogoUrl,
   onSignOut,
 }: {
   tabs: { id: string; label: string; icon: React.ReactNode; badge?: number; group?: string }[];
@@ -15685,6 +15692,7 @@ function SidebarLayout({
   children: React.ReactNode;
   brand: { name: string; subtitle: string };
   profile: Profile;
+  profileLogoUrl?: string | null;
   onSignOut: () => Promise<void>;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -15749,8 +15757,12 @@ function SidebarLayout({
 
       <div className="border-t border-[#1B85FB]/15 px-2 py-3 shrink-0 space-y-1">
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 transition-colors group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B85FB]/15 text-blue-50 text-xs font-bold shrink-0">
-            {(profile.full_name || profile.email || '?').charAt(0).toUpperCase()}
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#1B85FB]/15 text-blue-50 text-xs font-bold shrink-0">
+            {profileLogoUrl ? (
+              <img src={profileLogoUrl} alt={`${brand.name} logo`} className="h-full w-full bg-white object-contain p-1" />
+            ) : (
+              (profile.full_name || profile.email || '?').charAt(0).toUpperCase()
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-white truncate leading-tight">{profile.full_name || profile.email}</p>
