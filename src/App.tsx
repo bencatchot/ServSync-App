@@ -3419,7 +3419,7 @@ function LandingPage() {
     <div className="space-y-8">
       <section className="grid gap-8 rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-lg lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">ServSync foundation</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Connect · Manage · Protect</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
             One place for homeowners and contractors to connect with permission.
           </h1>
@@ -3436,12 +3436,19 @@ function LandingPage() {
             </button>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-700 bg-slate-700 p-5">
-          <div className="grid gap-3">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+            <img
+              src="/servsync-logo.png"
+              alt="ServSync"
+              className="mx-auto h-auto w-full max-w-lg rounded-xl object-contain"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <FeatureRow icon={<UserRound size={18} />} title="Homeowner profile" text="Homeowner controls personal and home details." />
-            <FeatureRow icon={<Building2 size={18} />} title="Contractor profile" text="Business information, service areas, categories, and credentials." />
-            <FeatureRow icon={<Link2 size={18} />} title="Invite links" text="Contractors can invite homeowners without mass-searching or soliciting." />
-            <FeatureRow icon={<Lock size={18} />} title="Permission sharing" text="Each connection can have its own sharing permissions." />
+            <FeatureRow icon={<Building2 size={18} />} title="Contractor profile" text="Business information, services, and credentials." />
+            <FeatureRow icon={<Link2 size={18} />} title="Invite links" text="Contractors can invite homeowners without mass-searching." />
+            <FeatureRow icon={<Lock size={18} />} title="Permission sharing" text="Each connection has its own sharing permissions." />
           </div>
         </div>
       </section>
