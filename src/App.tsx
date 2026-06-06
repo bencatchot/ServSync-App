@@ -7494,7 +7494,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const storagePath = `${profile.id}/contractor-logo-${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('contractor-assets')
-        .upload(storagePath, file, { contentType: file.type, upsert: true });
+        .upload(storagePath, file, { contentType: file.type });
       if (uploadError) throw uploadError;
 
       const { data: publicUrlData } = supabase.storage.from('contractor-assets').getPublicUrl(storagePath);
