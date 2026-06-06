@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   AlertTriangle,
@@ -3511,6 +3512,12 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
     }
   };
 
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!busy && email && password) void submit();
+  };
+
   return (
     <div className="mx-auto max-w-xl">
       <div className="rounded-3xl border border-slate-700 bg-slate-800 p-6 shadow-lg">
@@ -3532,14 +3539,14 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
         >
           {mode === 'signup' && (
             <Field label="Full name">
-              <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} />
+              <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} onKeyDown={submitOnEnter} />
             </Field>
           )}
           <Field label="Email">
-            <input className={inputClass()} type="email" value={email} onChange={event => setEmail(event.target.value)} />
+            <input className={inputClass()} type="email" value={email} onChange={event => setEmail(event.target.value)} onKeyDown={submitOnEnter} />
           </Field>
           <Field label="Password">
-            <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} />
+            <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
           </Field>
           {mode === 'signup' && (
             <p className="text-xs text-slate-400">Use a strong password. Supabase may reject short or weak passwords.</p>
