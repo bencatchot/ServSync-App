@@ -3523,7 +3523,13 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
             </p>
           )}
         </div>
-        <div className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={event => {
+            event.preventDefault();
+            if (!busy && email && password) void submit();
+          }}
+        >
           {mode === 'signup' && (
             <Field label="Full name">
               <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} />
@@ -3538,12 +3544,12 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
           {mode === 'signup' && (
             <p className="text-xs text-slate-400">Use a strong password. Supabase may reject short or weak passwords.</p>
           )}
-          <button type="button" onClick={() => void submit()} disabled={busy || !email || !password} className={buttonClass('primary')}>
+          <button type="submit" disabled={busy || !email || !password} className={buttonClass('primary')}>
             <KeyRound size={16} />
             {busy ? 'Working...' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
           {message && <Notice tone="info" text={message} />}
-        </div>
+        </form>
         <div className="mt-6 border-t border-slate-700 pt-4">
           <button
             type="button"
