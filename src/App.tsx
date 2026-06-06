@@ -4831,18 +4831,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {error && <Notice tone="error" text={error} />}
 
       {homeownerTab === 'overview' && (
-        <div className="space-y-5">
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="p-5 sm:p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Home command center</p>
-                <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+              <div className="p-4 sm:p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Home command center</p>
+                <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
                   {homeDraft.nickname || 'My Home'}
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-600">
                   Request help, track active work, store documents, and keep your home history in one place.
                 </p>
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
                   <button type="button" onClick={() => setHomeownerTab('contractors')} className={buttonClass('primary')}>
                     <MessageSquare size={16} />
                     Request service
@@ -4857,16 +4857,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </button>
                 </div>
               </div>
-              <div className="border-t border-slate-200 bg-slate-50 p-5 sm:p-6 lg:border-l lg:border-t-0">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-5 lg:border-l lg:border-t-0">
+                <div className="grid grid-cols-2 gap-2">
                   <MetricButton label="Open requests" value={String(openServiceRequestCount)} onClick={() => setHomeownerTab('requests')} />
                   <MetricButton label="Connected pros" value={String(activeConnections.length)} onClick={() => setHomeownerTab('contractors')} />
                   <MetricButton label="Home profile" value={`${homeProfileScore}%`} onClick={() => setHomeownerTab('home')} />
                   <MetricButton label="Documents" value={String(homeDocuments.length)} onClick={() => setHomeownerTab('documents')} />
                   <MetricButton label="Support" value={waitingOnHomeownerSupportCount > 0 ? `${waitingOnHomeownerSupportCount} reply` : String(openSupportInquiryCount)} onClick={() => setHomeownerTab('support')} />
                 </div>
-                <button type="button" onClick={() => setHomeownerTab('calendar')} className="mt-4 w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Next appointment</p>
+                <button type="button" onClick={() => setHomeownerTab('calendar')} className="mt-3 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Next appointment</p>
                   {upcomingAppointments.length > 0 ? (
                     <div className="mt-2">
                       <p className="text-sm font-semibold text-slate-950">{upcomingAppointments[0].title}</p>
@@ -4882,11 +4882,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Next best action</p>
-                <h2 className="mt-2 text-lg font-bold text-slate-950">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Next best action</p>
+                <h2 className="mt-1.5 text-base font-bold text-slate-950">
                   {homeownerAttentionRequests[0]
                     ? 'Respond to your contractor'
                     : upcomingAppointments[0]
@@ -4940,7 +4940,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Open next step
               </button>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestView('attention'); setHomeownerTab('requests'); }} />
               <MetricButton label="New requests" value={String(newServiceRequests.length)} onClick={() => { setHomeownerRequestView('new'); setHomeownerTab('requests'); }} />
               <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
@@ -4948,7 +4948,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </section>
 
-          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card title="Start a service request" icon={<MessageSquare size={18} />}>
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -5082,7 +5082,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Card>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             <Card title="My contractors" icon={<Users size={18} />}>
               <div className="space-y-3">
                 {activeConnections.length === 0 ? (
@@ -5145,7 +5145,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       )}
 
       {homeownerTab === 'home' && (
-        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card title="My profile" icon={<UserRound size={18} />}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Email">
@@ -8859,16 +8859,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {error && <Notice tone="error" text={error} />}
 
       {contractorTab === 'overview' && (
-        <div className="space-y-5">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
-              <div className="p-5 sm:p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Contractor command center</p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-950">{contractorDraft.business_name || 'Set up your ServSync workspace'}</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              <div className="p-4 sm:p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Contractor command center</p>
+                <h2 className="mt-1.5 text-xl font-bold text-slate-950 sm:text-2xl">{contractorDraft.business_name || 'Set up your ServSync workspace'}</h2>
+                <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-600">
                   Manage homeowner connections, service requests, appointments, referrals, and your public business profile from one place.
                 </p>
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button type="button" className={buttonClass('primary')} onClick={() => setContractorTab(openServiceRequestCount > 0 ? 'requests' : 'connections')}>
                     <MessageSquare size={16} />
                     {openServiceRequestCount > 0 ? 'Review open requests' : 'View homeowners'}
@@ -8883,9 +8883,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </button>
                 </div>
               </div>
-              <div className="border-t border-slate-200 bg-slate-50 p-5 lg:border-l lg:border-t-0">
+              <div className="border-t border-slate-200 bg-slate-50 p-4 lg:border-l lg:border-t-0">
                 <p className="text-sm font-semibold text-slate-950">Workspace readiness</p>
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2">
                   <MetricButton label="Business profile" value={`${contractorProfileScore}% complete`} onClick={() => setContractorTab('profile')} />
                   <InfoBox label="Subscription" value={contractorDraft.subscription_status || 'trialing'} />
                   <MetricButton label="Public listing" value={contractorDraft.public_profile_enabled ? 'Visible' : 'Hidden'} onClick={() => setContractorTab('profile')} />
@@ -8894,12 +8894,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <OverviewCard icon={<MessageSquare size={20} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
-            <OverviewCard icon={<Users size={20} />} label="Connected homeowners" value={String(connections.length)} helper="Approved connections" onClick={() => setContractorTab('connections')} />
-            <OverviewCard icon={<UserRound size={20} />} label="Connection requests" value={String(connectionRequests.length)} helper="Waiting on your review" onClick={() => setContractorTab('connections')} />
-            <OverviewCard icon={<Calendar size={20} />} label="Calendar" value={String(confirmedAppointments.length)} helper={`${homeownerAppointmentRequests.length} homeowner time request${homeownerAppointmentRequests.length === 1 ? '' : 's'}`} onClick={() => setContractorTab('calendar')} />
-            <OverviewCard icon={<MessageSquare size={20} />} label="ServSync support" value={String(openSupportInquiryCount)} helper={waitingOnContractorSupportCount > 0 ? `${waitingOnContractorSupportCount} waiting on you` : 'Feature requests and help'} onClick={() => setContractorTab('support')} />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <OverviewCard icon={<MessageSquare size={18} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
+            <OverviewCard icon={<Users size={18} />} label="Connected homeowners" value={String(connections.length)} helper="Approved connections" onClick={() => setContractorTab('connections')} />
+            <OverviewCard icon={<UserRound size={18} />} label="Connection requests" value={String(connectionRequests.length)} helper="Waiting on your review" onClick={() => setContractorTab('connections')} />
+            <OverviewCard icon={<Calendar size={18} />} label="Calendar" value={String(confirmedAppointments.length)} helper={`${homeownerAppointmentRequests.length} homeowner time request${homeownerAppointmentRequests.length === 1 ? '' : 's'}`} onClick={() => setContractorTab('calendar')} />
+            <OverviewCard icon={<MessageSquare size={18} />} label="ServSync support" value={String(openSupportInquiryCount)} helper={waitingOnContractorSupportCount > 0 ? `${waitingOnContractorSupportCount} waiting on you` : 'Feature requests and help'} onClick={() => setContractorTab('support')} />
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -9736,25 +9736,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 {activeContractorRequestView === 'overview' ? (
                   <div className="space-y-4">
                     <div className="grid gap-3 lg:grid-cols-3">
-                      <button type="button" onClick={() => setContractorRequestView('new')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">First priority</p>
-                        <p className="mt-1 text-2xl font-bold text-slate-950">{requestSections.find(s => s.id === 'new')?.requests.length ?? 0}</p>
-                        <p className="mt-1 text-sm text-slate-500">New requests need an initial response.</p>
+                      <button type="button" onClick={() => setContractorRequestView('new')} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">First priority</p>
+                        <p className="mt-0.5 text-xl font-bold text-slate-950">{requestSections.find(s => s.id === 'new')?.requests.length ?? 0}</p>
+                        <p className="mt-0.5 text-xs leading-4 text-slate-500">New requests need an initial response.</p>
                       </button>
-                      <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm transition hover:border-amber-300">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Follow-up signals</p>
-                        <p className="mt-1 text-2xl font-bold text-amber-950">{followUpRequests.length}</p>
-                        <p className="mt-1 text-sm text-amber-800">Open requests with homeowner replies, accepted quotes, or requested times.</p>
+                      <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left shadow-sm transition hover:border-amber-300">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-700">Follow-up signals</p>
+                        <p className="mt-0.5 text-xl font-bold text-amber-950">{followUpRequests.length}</p>
+                        <p className="mt-0.5 text-xs leading-4 text-amber-800">Open requests with homeowner replies, accepted quotes, or requested times.</p>
                       </button>
-                      <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Appointment activity</p>
-                        <p className="mt-1 text-2xl font-bold text-slate-950">{serviceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
-                        <p className="mt-1 text-sm text-slate-500">Scheduled and proposed appointments inside open requests.</p>
+                      <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Appointment activity</p>
+                        <p className="mt-0.5 text-xl font-bold text-slate-950">{serviceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
+                        <p className="mt-0.5 text-xs leading-4 text-slate-500">Scheduled and proposed appointments inside open requests.</p>
                       </button>
                     </div>
 
                     <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-                      <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-bold text-slate-950">Needs attention</p>
@@ -9773,7 +9773,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                       </section>
 
-                      <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div>
                             <p className="text-sm font-bold text-slate-950">New requests</p>
@@ -9794,7 +9794,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                   </div>
                 ) : selectedSection ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_18rem] lg:items-end">
                     <div>
                       <p className="text-sm font-bold text-slate-950">{selectedSection.title}</p>
@@ -13706,7 +13706,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         {stats.map(({ label, value, icon: Icon }) => (
           <OverviewCard
             key={label}
-            icon={<Icon size={20} />}
+            icon={<Icon size={18} />}
             label={label}
             value={String(value)}
             helper={label === 'Contractors' ? 'Manage accounts' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
@@ -14819,12 +14819,12 @@ function PermissionChips({ permissions }: { permissions: SharingPermissions }) {
 
 function SharedField({ label, value, allowed }: { label: string; value?: string | null; allowed: boolean }) {
   return (
-    <div className={`rounded-xl border px-3 py-2 ${allowed ? 'border-[#E1E3E7] bg-white' : 'border-[#E1E3E7] bg-[#F7F9FC]'}`}>
+    <div className={`rounded-lg border px-2.5 py-2 ${allowed ? 'border-[#E1E3E7] bg-white' : 'border-[#E1E3E7] bg-[#F7F9FC]'}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#223D67]/70">{label}</p>
         {!allowed && <Lock size={13} className="text-slate-400" />}
       </div>
-      <p className={`mt-1 text-sm font-semibold ${allowed ? 'text-[#02132D]' : 'text-[#223D67]/65'}`}>
+      <p className={`mt-0.5 text-sm font-semibold ${allowed ? 'text-[#02132D]' : 'text-[#223D67]/65'}`}>
         {allowed ? value || 'Not provided' : 'Not shared'}
       </p>
     </div>
@@ -14833,9 +14833,9 @@ function SharedField({ label, value, allowed }: { label: string; value?: string 
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#02132D]">{value}</p>
+    <div className="rounded-lg border border-[#E1E3E7] bg-white px-2.5 py-2 shadow-sm">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#223D67]/70">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-[#02132D]">{value}</p>
     </div>
   );
 }
@@ -14845,10 +14845,10 @@ function MetricButton({ label, value, onClick }: { label: string; value: string;
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-left shadow-sm transition hover:border-[#1B85FB] hover:bg-[#F7F9FC]"
+      className="rounded-lg border border-[#E1E3E7] bg-white px-2.5 py-2 text-left shadow-sm transition hover:border-[#1B85FB] hover:bg-[#F7F9FC]"
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-[#02132D]">{value}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#223D67]/70">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-[#02132D]">{value}</p>
     </button>
   );
 }
@@ -15808,11 +15808,11 @@ function SidebarLayout({
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
-            <div className="hidden items-center justify-between gap-4 md:flex">
+          <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
+            <div className="hidden items-center justify-between gap-3 md:flex">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0078FF]">{activeTabMeta?.group || brand.subtitle}</p>
-                <h1 className="mt-1 text-xl font-bold text-[#02132D]">{activeTabMeta?.label || brand.subtitle}</h1>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0078FF]">{activeTabMeta?.group || brand.subtitle}</p>
+                <h1 className="mt-0.5 text-lg font-bold text-[#02132D]">{activeTabMeta?.label || brand.subtitle}</h1>
               </div>
             </div>
             {children}
@@ -15841,14 +15841,14 @@ function OverviewCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-[#E1E3E7] bg-white p-5 text-left shadow-sm transition hover:border-[#1B85FB] hover:shadow-md"
+      className="rounded-xl border border-[#E1E3E7] bg-white p-3.5 text-left shadow-sm transition hover:border-[#1B85FB] hover:shadow-md"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">
         {icon}
       </div>
-      <p className="mt-4 text-2xl font-bold text-[#02132D]">{value}</p>
-      <p className="mt-1 text-sm font-semibold text-[#223D67]">{label}</p>
-      <p className="mt-1 text-xs text-[#223D67]/70">{helper}</p>
+      <p className="mt-3 text-xl font-bold text-[#02132D]">{value}</p>
+      <p className="mt-0.5 text-sm font-semibold text-[#223D67]">{label}</p>
+      <p className="mt-0.5 text-xs leading-4 text-[#223D67]/70">{helper}</p>
     </button>
   );
 }
@@ -15856,10 +15856,10 @@ function OverviewCard({
 
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[#E1E3E7] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
-        <h2 className="text-base font-bold text-[#02132D]">{title}</h2>
+    <section className="rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
+        <h2 className="text-sm font-bold text-[#02132D]">{title}</h2>
       </div>
       {children}
     </section>
