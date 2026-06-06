@@ -14610,10 +14610,10 @@ function PermissionChips({ permissions }: { permissions: SharingPermissions }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {shared.length === 0 ? (
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">No data shared</span>
+        <span className="rounded-full bg-[#F7F9FC] px-2 py-0.5 text-xs font-semibold text-[#223D67]">No data shared</span>
       ) : (
         shared.map(item => (
-          <span key={item.key} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+          <span key={item.key} className="rounded-full bg-[#0078FF]/10 px-2 py-0.5 text-xs font-semibold text-[#0078FF]">
             {item.label}
           </span>
         ))
@@ -14624,12 +14624,12 @@ function PermissionChips({ permissions }: { permissions: SharingPermissions }) {
 
 function SharedField({ label, value, allowed }: { label: string; value?: string | null; allowed: boolean }) {
   return (
-    <div className={`rounded-xl border px-3 py-2 ${allowed ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`}>
+    <div className={`rounded-xl border px-3 py-2 ${allowed ? 'border-[#E1E3E7] bg-white' : 'border-[#E1E3E7] bg-[#F7F9FC]'}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
         {!allowed && <Lock size={13} className="text-slate-400" />}
       </div>
-      <p className={`mt-1 text-sm font-semibold ${allowed ? 'text-slate-950' : 'text-slate-500'}`}>
+      <p className={`mt-1 text-sm font-semibold ${allowed ? 'text-[#02132D]' : 'text-[#223D67]/65'}`}>
         {allowed ? value || 'Not provided' : 'Not shared'}
       </p>
     </div>
@@ -14638,9 +14638,9 @@ function SharedField({ label, value, allowed }: { label: string; value?: string 
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+    <div className="rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[#02132D]">{value}</p>
     </div>
   );
 }
@@ -14650,10 +14650,10 @@ function MetricButton({ label, value, onClick }: { label: string; value: string;
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+      className="rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-left shadow-sm transition hover:border-[#1B85FB] hover:bg-[#F7F9FC]"
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-[#02132D]">{value}</p>
     </button>
   );
 }
@@ -14727,18 +14727,18 @@ function NotificationBell({
         ref={buttonRef}
         type="button"
         onClick={handleOpen}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-600 bg-slate-800 text-slate-300 transition hover:bg-slate-700"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#1B85FB]/25 bg-[#02132D] text-blue-100 transition hover:border-[#1B85FB] hover:bg-[#05214A]"
       >
         <Bell size={18} />
         {unread > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#0078FF] text-[10px] font-bold text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
       {open && (
         <div
-          className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          className="fixed z-[80] flex flex-col overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white shadow-2xl"
           style={{
             top: panelPosition.top,
             left: panelPosition.left,
@@ -14746,28 +14746,28 @@ function NotificationBell({
             maxHeight: panelPosition.maxHeight,
           }}
         >
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-[#E1E3E7] px-4 py-3">
             <div>
-              <p className="text-sm font-bold text-slate-950">Notifications</p>
-              {unread > 0 && <p className="text-xs text-slate-500">{unread} unread</p>}
+              <p className="text-sm font-bold text-[#02132D]">Notifications</p>
+              {unread > 0 && <p className="text-xs text-[#223D67]/70">{unread} unread</p>}
             </div>
             <div className="flex items-center gap-2">
               {notifications.some(notification => !notification.read_at) && (
                 <button
                   type="button"
                   onClick={() => onMarkRead(notifications.filter(notification => !notification.read_at).map(notification => notification.id))}
-                  className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                  className="text-xs font-semibold text-[#0078FF] hover:text-[#005FD6]"
                 >
                   Mark all read
                 </button>
               )}
-              <button type="button" onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-900"><X size={15} /></button>
+              <button type="button" onClick={() => setOpen(false)} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={15} /></button>
             </div>
           </div>
           {notifications.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">No notifications yet.</p>
+            <p className="px-4 py-6 text-center text-sm text-[#223D67]/70">No notifications yet.</p>
           ) : (
-            <ul className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto">
+            <ul className="min-h-0 flex-1 divide-y divide-[#E1E3E7] overflow-y-auto">
               {notifications.map(n => (
                 <li key={n.id}>
                   <button
@@ -14778,16 +14778,16 @@ function NotificationBell({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          {!n.read_at && <span className="mt-1 h-2 w-2 rounded-full bg-blue-600" />}
-                          <p className="text-sm font-semibold text-slate-950">{n.title}</p>
+                          {!n.read_at && <span className="mt-1 h-2 w-2 rounded-full bg-[#0078FF]" />}
+                          <p className="text-sm font-semibold text-[#02132D]">{n.title}</p>
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] ${notificationCategoryClass(n.type)}`}>
                             {notificationCategoryLabel(n.type)}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-600">{n.body}</p>
-                        <p className="mt-1 text-xs text-slate-500">{formatDateTime(n.created_at)}</p>
+                        <p className="mt-0.5 text-xs text-[#223D67]">{n.body}</p>
+                        <p className="mt-1 text-xs text-[#223D67]/70">{formatDateTime(n.created_at)}</p>
                       </div>
-                      {(n.request_id || n.estimate_id || n.support_inquiry_id || n.type.includes('support')) && <ArrowRight size={14} className="mt-1 shrink-0 text-slate-400" />}
+                      {(n.request_id || n.estimate_id || n.support_inquiry_id || n.type.includes('support')) && <ArrowRight size={14} className="mt-1 shrink-0 text-[#223D67]/55" />}
                     </div>
                   </button>
                 </li>
@@ -15511,14 +15511,14 @@ function SidebarLayout({
       onClick={() => { onChange(tab.id); setMobileOpen(false); }}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
         activeTab === tab.id
-          ? 'bg-blue-600 text-white'
-          : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+          ? 'bg-[#0078FF] text-white'
+          : 'text-blue-100/75 hover:bg-white/10 hover:text-white'
       }`}
     >
       <span className="shrink-0 opacity-80">{tab.icon}</span>
       <span className="flex-1 truncate">{tab.label}</span>
       {tab.badge !== undefined && tab.badge > 0 && (
-        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1 text-xs font-bold text-white">
+        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#1B85FB] px-1 text-xs font-bold text-white">
           {tab.badge > 99 ? '99+' : tab.badge}
         </span>
       )}
@@ -15526,14 +15526,14 @@ function SidebarLayout({
   );
 
   const sidebarContent = (
-    <div className="flex h-full min-h-0 flex-col bg-slate-800 border-r border-slate-700">
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-700 shrink-0">
+    <div className="flex h-full min-h-0 flex-col bg-[#02132D] border-r border-[#1B85FB]/15">
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-[#1B85FB]/15 shrink-0">
         <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[#02132D] shadow-sm shrink-0">
           <img src="/servsync-mark-white.png" alt="ServSync" className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white leading-tight text-sm truncate">{brand.name}</p>
-          <p className="text-xs text-slate-400 truncate">{brand.subtitle}</p>
+          <p className="text-xs text-blue-100/70 truncate">{brand.subtitle}</p>
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
       </div>
@@ -15541,7 +15541,7 @@ function SidebarLayout({
       <nav className="min-h-0 flex-1 overflow-y-auto py-3 px-2 space-y-4">
         {groupedTabs.map(group => (
           <div key={group.group}>
-            <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1B85FB]/70">
               {group.group}
             </p>
             <div className="space-y-0.5">
@@ -15551,19 +15551,19 @@ function SidebarLayout({
         ))}
       </nav>
 
-      <div className="border-t border-slate-700 px-2 py-3 shrink-0 space-y-1">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-700 transition-colors group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold shrink-0">
+      <div className="border-t border-[#1B85FB]/15 px-2 py-3 shrink-0 space-y-1">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 transition-colors group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B85FB]/15 text-blue-50 text-xs font-bold shrink-0">
             {(profile.full_name || profile.email || '?').charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-white truncate leading-tight">{profile.full_name || profile.email}</p>
-            <p className="text-xs text-slate-400 capitalize truncate">{profile.role.replace('_', ' ')}</p>
+            <p className="text-xs text-blue-100/70 capitalize truncate">{profile.role.replace('_', ' ')}</p>
           </div>
           <button
             type="button"
             onClick={() => void onSignOut()}
-            className="shrink-0 text-slate-400 hover:text-white transition-colors"
+            className="shrink-0 text-blue-100/70 hover:text-white transition-colors"
             title="Sign out"
           >
             <LogOut size={16} />
@@ -15574,7 +15574,7 @@ function SidebarLayout({
   );
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-[#F7F9FC] overflow-hidden">
       <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col">
         {sidebarContent}
       </aside>
@@ -15589,13 +15589,13 @@ function SidebarLayout({
       )}
 
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden shrink-0">
-          <button type="button" onClick={() => setMobileOpen(true)} className="text-slate-600 hover:text-blue-700 transition-colors">
+        <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 py-3 md:hidden shrink-0">
+          <button type="button" onClick={() => setMobileOpen(true)} className="text-[#223D67] hover:text-[#0078FF] transition-colors">
             <Menu size={22} />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="font-bold text-slate-950 text-sm leading-tight">{brand.name}</p>
-            <p className="text-xs text-slate-500 truncate">{activeTabMeta?.label || brand.subtitle}</p>
+            <p className="font-bold text-[#02132D] text-sm leading-tight">{brand.name}</p>
+            <p className="text-xs text-[#223D67] truncate">{activeTabMeta?.label || brand.subtitle}</p>
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
@@ -15603,8 +15603,8 @@ function SidebarLayout({
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
             <div className="hidden items-center justify-between gap-4 md:flex">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">{activeTabMeta?.group || brand.subtitle}</p>
-                <h1 className="mt-1 text-xl font-bold text-slate-950">{activeTabMeta?.label || brand.subtitle}</h1>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0078FF]">{activeTabMeta?.group || brand.subtitle}</p>
+                <h1 className="mt-1 text-xl font-bold text-[#02132D]">{activeTabMeta?.label || brand.subtitle}</h1>
               </div>
             </div>
             {children}
@@ -15633,14 +15633,14 @@ function OverviewCard({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+      className="rounded-2xl border border-[#E1E3E7] bg-white p-5 text-left shadow-sm transition hover:border-[#1B85FB] hover:shadow-md"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">
         {icon}
       </div>
-      <p className="mt-4 text-2xl font-bold text-slate-950">{value}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-800">{label}</p>
-      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+      <p className="mt-4 text-2xl font-bold text-[#02132D]">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-[#223D67]">{label}</p>
+      <p className="mt-1 text-xs text-[#223D67]/70">{helper}</p>
     </button>
   );
 }
@@ -15648,10 +15648,10 @@ function OverviewCard({
 
 function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-[#E1E3E7] bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">{icon}</div>
-        <h2 className="text-base font-bold text-slate-950">{title}</h2>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
+        <h2 className="text-base font-bold text-[#02132D]">{title}</h2>
       </div>
       {children}
     </section>
@@ -15717,13 +15717,13 @@ function ServiceCategorySelector({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <div className="space-y-3 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {TRADE_OPTIONS.map(category => (
-          <label key={category} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:border-blue-500 hover:bg-blue-50">
+          <label key={category} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#E1E3E7] bg-white px-3 py-2 text-sm text-[#223D67] hover:border-[#1B85FB] hover:bg-white">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-blue-600"
+              className="h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
               checked={selectedLower.has(category.toLowerCase())}
               onChange={event => setCategory(category, event.target.checked)}
             />
@@ -15739,7 +15739,7 @@ function ServiceCategorySelector({
               key={category}
               type="button"
               onClick={() => setCategory(category, false)}
-              className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+              className="inline-flex items-center gap-1 rounded-full border border-[#1B85FB]/30 bg-[#0078FF]/10 px-3 py-1 text-xs font-semibold text-[#0078FF] hover:border-red-300 hover:bg-red-50 hover:text-red-700"
               title="Remove custom service"
             >
               {category}
@@ -15773,7 +15773,7 @@ function ServiceCategorySelector({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/75">{label}</span>
       {children}
     </label>
   );
@@ -15783,7 +15783,7 @@ function Notice({ tone, text }: { tone: 'success' | 'error' | 'info'; text: stri
   const style = {
     success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     error: 'border-red-200 bg-red-50 text-red-700',
-    info: 'border-blue-200 bg-blue-50 text-blue-700',
+    info: 'border-[#B7D7FF] bg-blue-50 text-[#005FD6]',
   }[tone];
 
   return <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${style}`}>{text}</div>;
@@ -15791,7 +15791,7 @@ function Notice({ tone, text }: { tone: 'success' | 'error' | 'info'; text: stri
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-500">
+    <div className="rounded-xl border border-dashed border-[#E1E3E7] bg-[#F7F9FC] px-4 py-6 text-center text-sm font-medium text-[#223D67]/75">
       {text}
     </div>
   );
