@@ -3231,11 +3231,10 @@ function TopBar({
     <header className="border-b border-slate-700/50 bg-slate-900">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <button type="button" onClick={() => updateRoute('home')} className="flex items-center gap-3 text-left">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white">
-            <ShieldCheck size={22} />
+          <div className="flex h-12 w-44 items-center rounded-xl bg-white px-3 py-2 shadow-sm sm:w-52">
+            <img src="/servsync-logo.png" alt="ServSync" className="h-full w-full object-contain" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight text-white">ServSync</p>
             <p className="text-xs font-medium text-slate-400">Homeowner-contractor connections</p>
           </div>
         </button>
@@ -3436,20 +3435,11 @@ function LandingPage() {
             </button>
           </div>
         </div>
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-            <img
-              src="/servsync-logo.png"
-              alt="ServSync"
-              className="mx-auto h-auto w-full max-w-lg rounded-xl object-contain"
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <FeatureRow icon={<UserRound size={18} />} title="Homeowner profile" text="Homeowner controls personal and home details." />
-            <FeatureRow icon={<Building2 size={18} />} title="Contractor profile" text="Business information, services, and credentials." />
-            <FeatureRow icon={<Link2 size={18} />} title="Invite links" text="Contractors can invite homeowners without mass-searching." />
-            <FeatureRow icon={<Lock size={18} />} title="Permission sharing" text="Each connection has its own sharing permissions." />
-          </div>
+        <div className="grid gap-3">
+          <FeatureRow icon={<UserRound size={18} />} title="Homeowner profile" text="Homeowner controls personal and home details." />
+          <FeatureRow icon={<Building2 size={18} />} title="Contractor profile" text="Business information, services, and credentials." />
+          <FeatureRow icon={<Link2 size={18} />} title="Invite links" text="Contractors can invite homeowners without mass-searching." />
+          <FeatureRow icon={<Lock size={18} />} title="Permission sharing" text="Each connection has its own sharing permissions." />
         </div>
       </section>
     </div>
