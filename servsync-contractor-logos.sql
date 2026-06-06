@@ -19,7 +19,11 @@ create policy "contractor_assets_upload_own_folder"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'contractor-assets'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and exists (
+      select 1
+        from public.contractor_profiles cp
+       where cp.owner_user_id = auth.uid()
+    )
   );
 
 drop policy if exists "contractor_assets_update_own_folder" on storage.objects;
