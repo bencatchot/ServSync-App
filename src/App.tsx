@@ -3210,7 +3210,7 @@ function PublicShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#F7F9FC]">
+    <div className="min-h-screen bg-[#02132D]">
       <TopBar route={route} profile={profile} onSignOut={onSignOut} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
     </div>
@@ -3228,14 +3228,14 @@ function TopBar({
   onSignOut: () => Promise<void>;
 }) {
   return (
-    <header className="border-b border-[#E1E3E7] bg-white">
+    <header className="border-b border-[#1B85FB]/20 bg-[#02132D]">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <button type="button" onClick={() => updateRoute('home')} className="flex items-center gap-3 text-left">
           <div className="flex h-12 w-44 items-center overflow-hidden rounded-xl bg-[#02132D] shadow-sm sm:h-14 sm:w-56">
             <img src="/servsync-logo-header.png" alt="ServSync" className="h-full w-full object-contain" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-xs font-medium text-[#223D67]">Homeowner-contractor connections</p>
+            <p className="text-xs font-medium text-blue-100/80">Homeowner-contractor connections</p>
           </div>
         </button>
         <nav className="hidden items-center gap-2 md:flex">
@@ -3249,10 +3249,10 @@ function TopBar({
         <div className="flex items-center gap-2">
           {profile ? (
             <>
-              <span className="hidden rounded-full bg-[#F7F9FC] px-3 py-1 text-xs font-semibold text-[#223D67] sm:inline">
+              <span className="hidden rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-blue-100 sm:inline">
                 {ROLE_LABEL[profile.role]}
               </span>
-              <button type="button" onClick={() => void onSignOut()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-4 py-2 text-sm font-semibold text-[#223D67] transition hover:border-[#1B85FB] hover:text-[#0078FF]">
+              <button type="button" onClick={() => void onSignOut()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-blue-50 transition hover:border-[#1B85FB] hover:bg-white/15">
                 <LogOut size={16} />
                 Logout
               </button>
@@ -3274,7 +3274,7 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
       type="button"
       onClick={onClick}
       className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-        active ? 'bg-[#0078FF] text-white' : 'text-[#223D67] hover:bg-[#F7F9FC] hover:text-[#0078FF]'
+        active ? 'bg-[#0078FF] text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'
       }`}
     >
       {children}
@@ -3416,13 +3416,13 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 function LandingPage() {
   return (
     <div className="space-y-8">
-      <section className="grid gap-8 rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+      <section className="grid gap-8 rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">Connect · Manage · Protect</p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-[#02132D] sm:text-5xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Connect · Manage · Protect</p>
+          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
             One place for homeowners and contractors to connect with permission.
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[#223D67]">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100/80">
             Homeowners own their home profile. Contractors own their business profile. ServSync manages the connection,
             referral, and sharing rules between them.
           </p>
@@ -3448,11 +3448,11 @@ function LandingPage() {
 
 function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
+    <div className="flex gap-3 rounded-2xl border border-[#1B85FB]/20 bg-white/5 p-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0078FF]/15 text-[#1B85FB]">{icon}</div>
       <div>
-        <p className="text-sm font-bold text-[#02132D]">{title}</p>
-        <p className="mt-1 text-sm text-[#223D67]">{text}</p>
+        <p className="text-sm font-bold text-white">{title}</p>
+        <p className="mt-1 text-sm text-blue-100/75">{text}</p>
       </div>
     </div>
   );
