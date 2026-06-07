@@ -1895,16 +1895,60 @@ function imageSizeFromDataUrl(dataUrl: string): Promise<{ width: number; height:
   });
 }
 
-async function loadPdfImageAsset(url?: string | null): Promise<PdfImageAsset | null> {
+function pdfSafeImageAssetFromBlob(blob: Blob): Promise<PdfImageAsset | null> {
+  return new Promise(resolve => {
+    const objectUrl = URL.createObjectURL(blob);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const maxSide = 1400;
+        const naturalW = image.naturalWidth || image.width || 1;
+        const naturalH = image.naturalHeight || image.height || 1;
+        const scale = Math.min(1, maxSide / Math.max(naturalW, naturalH));
+        const width = Math.max(1, Math.round(naturalW * scale));
+        const height = Math.max(1, Math.round(naturalH * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.84), format: 'JPEG', width, height });
+      } catch {
+        resolve(null);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(null);
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function loadPdfImageAsset(url?: string | null, options?: { normalizeForPdf?: boolean }): Promise<PdfImageAsset | null> {
   if (!url) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
     const blob = await response.blob();
+    if (options?.normalizeForPdf) {
+      const normalized = await pdfSafeImageAssetFromBlob(blob);
+      if (normalized) return normalized;
+    }
     const dataUrl = await dataUrlFromBlob(blob);
     const size = await imageSizeFromDataUrl(dataUrl);
-    const mime = dataUrl.slice(5, dataUrl.indexOf(';')).toLowerCase();
-    if (mime.includes('webp')) return null;
+    const mime = (blob.type || dataUrl.slice(5, dataUrl.indexOf(';'))).toLowerCase();
+    if (mime.includes('webp') || (!mime.includes('png') && !mime.includes('jpeg') && !mime.includes('jpg'))) {
+      return pdfSafeImageAssetFromBlob(blob);
+    }
     const format: PdfImageAsset['format'] = mime.includes('jpeg') || mime.includes('jpg') ? 'JPEG' : 'PNG';
     return { dataUrl, format, width: size.width, height: size.height };
   } catch {
@@ -1926,9 +1970,9 @@ async function loadInspectionPdfPhotoAsset(photo: string): Promise<PdfImageAsset
     const { data, error } = await supabase.storage
       .from('inspection-media')
       .createSignedUrl(storagePath, 60 * 15);
-    if (!error && data?.signedUrl) return loadPdfImageAsset(data.signedUrl);
+    if (!error && data?.signedUrl) return loadPdfImageAsset(data.signedUrl, { normalizeForPdf: true });
   }
-  return photo.startsWith('http') ? loadPdfImageAsset(photo) : null;
+  return photo.startsWith('http') ? loadPdfImageAsset(photo, { normalizeForPdf: true }) : null;
 }
 
 function drawPdfLogo(pdf: jsPDF, image: PdfImageAsset, x: number, y: number, boxW: number, boxH: number) {
