@@ -333,13 +333,28 @@ function cleanSmartEstimateDescription(text: string) {
   return cleaned || text.trim();
 }
 
+function smartEstimateSentence(text: string) {
+  const cleaned = cleanSmartEstimateDescription(text)
+    .replace(/^build\b/i, 'Construct')
+    .replace(/^construct\b/i, 'Construct')
+    .replace(/^install\b/i, 'Install')
+    .replace(/^repair\b/i, 'Repair')
+    .replace(/^replace\b/i, 'Replace')
+    .replace(/^demo\b/i, 'Demolish')
+    .replace(/^material(?:s)?\s*(?:cost)?\s*$/i, 'Materials and supplies')
+    .trim();
+  if (!cleaned) return '';
+  const sentence = `${cleaned.charAt(0).toUpperCase()}${cleaned.slice(1)}`;
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
 function smartEstimateDescription(text: string, lineType: EstimateLineType) {
   const normalized = normalizeText(text);
   if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return 'Billable labor';
-  if (/\b(demo|demolition|removal|remove)\b/.test(normalized)) return cleanSmartEstimateDescription(text) || 'Demolition / removal';
-  if (/\b(disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return cleanSmartEstimateDescription(text) || 'Debris disposal / haul-off';
-  if (lineType === 'material') return cleanSmartEstimateDescription(text).replace(/^material(?:s)?\s*(?:cost)?\s*/i, '') || 'Materials and supplies';
-  return cleanSmartEstimateDescription(text);
+  if (/\b(demo|demolition|removal|remove)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Demolition / removal';
+  if (/\b(disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Debris disposal / haul-off';
+  if (lineType === 'material') return smartEstimateSentence(text).replace(/\.$/, '').replace(/^material(?:s)?\s*(?:cost)?\s*/i, '') || 'Materials and supplies';
+  return smartEstimateSentence(text).replace(/\.$/, '');
 }
 
 function splitSmartEstimateParts(text: string) {
@@ -347,6 +362,25 @@ function splitSmartEstimateParts(text: string) {
     .split(/\n+|;|\.|,\s+|\b(?:plus|and also)\b/i)
     .map(part => part.trim())
     .filter(Boolean);
+}
+
+function buildSmartEstimateScope(parts: string[], lines: EstimateLineDraft[]) {
+  const pricedDescriptions = new Set(lines.filter(line => line.unit_price.trim()).map(line => normalizeText(line.description)));
+  const primaryScopeSentences = parts
+    .filter(part => !extractSmartEstimatePrice(part))
+    .map(smartEstimateSentence)
+    .filter(Boolean);
+  const lineScopeItems = lines
+    .map(line => line.description)
+    .filter(description => description && pricedDescriptions.has(normalizeText(description)));
+
+  const uniquePrimary = Array.from(new Set(primaryScopeSentences));
+  const uniqueLineItems = Array.from(new Set(lineScopeItems));
+  const included = uniqueLineItems.length > 0
+    ? `Includes ${uniqueLineItems.map(item => item.charAt(0).toLowerCase() + item.slice(1)).join(', ').replace(/, ([^,]*)$/, ', and $1')}.`
+    : '';
+
+  return [...uniquePrimary, included].filter(Boolean).join(' ');
 }
 
 function parseSmartEstimateText(text: string) {
@@ -367,7 +401,7 @@ function parseSmartEstimateText(text: string) {
   const lines = pricedLines.length >= 2 ? pricedLines : parsedLines;
 
   return {
-    scope: cleaned,
+    scope: buildSmartEstimateScope(sourceParts, lines) || cleaned,
     lines,
   };
 }
@@ -8393,11 +8427,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ...draft,
       scope: draft.scope.trim() ? `${draft.scope.trim()}\n\n${parsed.scope}` : parsed.scope,
       line_items: currentUsableLines.length === 0 ? parsed.lines : [...draft.line_items, ...parsed.lines],
-      notes: draft.notes.trim()
-        ? draft.notes
-        : 'Smart estimate draft created from contractor notes. Review quantities, pricing, exclusions, and terms before sending.',
     }));
-    setEstimateAssistantNotice(`Added ${parsed.lines.length} editable line item${parsed.lines.length === 1 ? '' : 's'} to this estimate.`);
+    setEstimateAssistantNotice(`Added ${parsed.lines.length} editable line item${parsed.lines.length === 1 ? '' : 's'} and drafted a cleaner scope. Review before sending.`);
   };
 
   const startEstimateAssistantSpeech = () => {
