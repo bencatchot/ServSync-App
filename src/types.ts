@@ -161,6 +161,47 @@ export interface ContractorProfile {
   updated_at: string;
 }
 
+export type ContractorTeamRole = 'admin' | 'office' | 'field_tech' | 'viewer';
+export type ContractorTeamStatus = 'active' | 'disabled';
+export type ContractorTeamInviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
+
+export interface ContractorTeamMember {
+  id: string;
+  contractor_id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  role: ContractorTeamRole;
+  status: ContractorTeamStatus;
+  accepted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractorTeamInvite {
+  id: string;
+  contractor_id: string;
+  email: string;
+  display_name: string;
+  role: ContractorTeamRole;
+  invite_code: string;
+  status: ContractorTeamInviteStatus;
+  expires_at: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractorTeamAccess {
+  contractor_id: string | null;
+  can_manage: boolean;
+  included_seats: number;
+  active_seat_count: number;
+  extra_seat_count: number;
+  members: ContractorTeamMember[];
+  invites: ContractorTeamInvite[];
+}
+
 export interface HomeownerConnection {
   connection_id: string;
   contractor_id: string;

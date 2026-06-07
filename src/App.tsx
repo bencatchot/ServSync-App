@@ -75,6 +75,10 @@ import type {
   ContractorLocalContact,
   ContractorLocalHome,
   ContractorProfile,
+  ContractorTeamAccess,
+  ContractorTeamInvite,
+  ContractorTeamMember,
+  ContractorTeamRole,
   ContractorSubscriptionStatus,
   ContractorInvite,
   HomeProfile,
@@ -188,6 +192,20 @@ type EstimateDraft = {
   service_request_id: string;
   inspection_id: string;
   line_items: EstimateLineDraft[];
+};
+
+const CONTRACTOR_TEAM_ROLE_LABELS: Record<ContractorTeamRole, string> = {
+  admin: 'Admin',
+  office: 'Office',
+  field_tech: 'Field tech',
+  viewer: 'Viewer',
+};
+
+const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
+  admin: 'Can help manage team access and day-to-day workspace activity.',
+  office: 'Good for scheduling, requests, estimates, and customer communication.',
+  field_tech: 'Good for field work, photos, notes, and assigned job activity.',
+  viewer: 'Read-only style access for oversight. Deeper restrictions can be added later.',
 };
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -7228,6 +7246,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorResponseFiles, setContractorResponseFiles] = useState<Record<string, File[]>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [uploadingContractorLogo, setUploadingContractorLogo] = useState(false);
+  const [teamAccess, setTeamAccess] = useState<ContractorTeamAccess | null>(null);
+  const [teamInviteDraft, setTeamInviteDraft] = useState<{ email: string; display_name: string; role: ContractorTeamRole }>({
+    email: '',
+    display_name: '',
+    role: 'field_tech',
+  });
+  const [creatingTeamInvite, setCreatingTeamInvite] = useState(false);
+  const [updatingTeamAccessId, setUpdatingTeamAccessId] = useState<string | null>(null);
+  const [teamInviteAcceptedCode, setTeamInviteAcceptedCode] = useState('');
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportDraft, setSupportDraft] = useState<{ category: SupportInquiryCategory; title: string; body: string }>({ category: 'feature_request', title: '', body: '' });
   const [supportReplyDrafts, setSupportReplyDrafts] = useState<Record<string, string>>({});
@@ -7385,7 +7412,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     try {
       const profileRes = await supabase.from('contractor_profiles').select('*').eq('owner_user_id', profile.id).maybeSingle();
       if (profileRes.error) throw profileRes.error;
-      const loadedContractor = (profileRes.data as ContractorProfile | null) || null;
+      let loadedContractor = (profileRes.data as ContractorProfile | null) || null;
+      if (!loadedContractor) {
+        const currentContractorRes = await supabase.rpc('servsync_current_contractor_profile');
+        if (!currentContractorRes.error) {
+          const data = currentContractorRes.data;
+          loadedContractor = (Array.isArray(data) ? data[0] : data) as ContractorProfile | null;
+        }
+      }
 
       const [connectionsRes, serviceRequestsRes, notifRes, supportRes] = await Promise.all([
         supabase.rpc('servsync_contractor_connected_homeowners'),
@@ -7398,8 +7432,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       let loadedInvites: ContractorInvite[] = [];
       let loadedRequests: ContractorConnectionRequest[] = [];
+      let loadedTeamAccess: ContractorTeamAccess | null = null;
       if (loadedContractor?.id) {
-        const [invitesRes, requestsRes] = await Promise.all([
+        const [invitesRes, requestsRes, teamRes] = await Promise.all([
           supabase
             .from('contractor_invites')
             .select('*')
@@ -7411,11 +7446,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .eq('contractor_id', loadedContractor.id)
             .eq('status', 'pending')
             .order('created_at', { ascending: false }),
+          supabase.rpc('servsync_contractor_team'),
         ]);
         if (invitesRes.error) throw invitesRes.error;
         if (requestsRes.error) throw requestsRes.error;
         loadedInvites = (invitesRes.data || []) as ContractorInvite[];
         loadedRequests = (requestsRes.data || []) as ContractorConnectionRequest[];
+        if (!teamRes.error && teamRes.data) {
+          const rawTeam = teamRes.data as ContractorTeamAccess;
+          loadedTeamAccess = {
+            ...rawTeam,
+            members: rawTeam.members || [],
+            invites: rawTeam.invites || [],
+          };
+        }
       }
 
       const loadedConnections = (connectionsRes.data || []) as ContractorConnectedHomeowner[];
@@ -7438,6 +7482,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
       setInvites(loadedInvites);
       setConnectionRequests(loadedRequests);
+      setTeamAccess(loadedTeamAccess);
       if (!notifRes.error) setNotifications((notifRes.data || []) as AppNotification[]);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
 
@@ -7663,6 +7708,97 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setUploadingContractorLogo(false);
     }
   };
+
+  const createTeamInvite = async () => {
+    if (!supabase) return;
+    if (!teamInviteDraft.email.trim()) {
+      setError('Enter an email address before creating a team invite.');
+      return;
+    }
+    setCreatingTeamInvite(true);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: inviteError } = await supabase.rpc('servsync_create_contractor_team_invite', {
+        p_email: teamInviteDraft.email.trim(),
+        p_role: teamInviteDraft.role,
+        p_display_name: teamInviteDraft.display_name.trim(),
+      });
+      if (inviteError) throw inviteError;
+      const inviteCode = (data as { invite_code?: string } | null)?.invite_code || '';
+      setTeamInviteDraft({ email: '', display_name: '', role: 'field_tech' });
+      setNotice(inviteCode ? `Team invite created. Share code ${inviteCode} with the user.` : 'Team invite created.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create team invite.'));
+    } finally {
+      setCreatingTeamInvite(false);
+    }
+  };
+
+  const updateTeamMember = async (member: ContractorTeamMember, changes: Partial<Pick<ContractorTeamMember, 'role' | 'status'>>) => {
+    if (!supabase) return;
+    setUpdatingTeamAccessId(member.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: updateError } = await supabase.rpc('servsync_update_contractor_team_member', {
+        p_member_id: member.id,
+        p_role: changes.role || member.role,
+        p_status: changes.status || member.status,
+      });
+      if (updateError) throw updateError;
+      setNotice('Team member updated.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update team member.'));
+    } finally {
+      setUpdatingTeamAccessId(null);
+    }
+  };
+
+  const revokeTeamInvite = async (invite: ContractorTeamInvite) => {
+    if (!supabase) return;
+    setUpdatingTeamAccessId(invite.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: revokeError } = await supabase.rpc('servsync_revoke_contractor_team_invite', {
+        p_invite_id: invite.id,
+      });
+      if (revokeError) throw revokeError;
+      setNotice('Team invite revoked.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to revoke team invite.'));
+    } finally {
+      setUpdatingTeamAccessId(null);
+    }
+  };
+
+  const acceptTeamInvite = async (inviteCode: string) => {
+    if (!supabase || !inviteCode.trim()) return;
+    setNotice('');
+    setError('');
+    try {
+      const { error: acceptError } = await supabase.rpc('servsync_accept_contractor_team_invite', {
+        p_invite_code: inviteCode.trim(),
+      });
+      if (acceptError) throw acceptError;
+      setNotice('Team invite accepted. Contractor workspace access is active.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to accept team invite.'));
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const inviteCode = params.get('team_invite') || '';
+    if (!inviteCode || teamInviteAcceptedCode === inviteCode) return;
+    setTeamInviteAcceptedCode(inviteCode);
+    void acceptTeamInvite(inviteCode);
+  }, [teamInviteAcceptedCode]);
 
   const createInvite = async () => {
     if (!supabase) {
@@ -9202,6 +9338,173 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </p>
           )}
         </div>
+
+        <div className="mb-5 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#02132D]">Team access</p>
+              <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
+                Add staff users to this contractor account. The first owner seat is included; extra active seats are tracked here for future add-on billing.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <InfoBox label="Included" value={String(teamAccess?.included_seats ?? 1)} />
+              <InfoBox label="Active seats" value={String(teamAccess?.active_seat_count ?? 1)} />
+              <InfoBox label="Extra seats" value={String(teamAccess?.extra_seat_count ?? 0)} />
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Current owner</p>
+            <p className="mt-1 text-sm font-semibold text-blue-950">{profile.full_name || contractorDraft.contact_name || profile.email}</p>
+            <p className="mt-0.5 text-xs text-blue-800">{profile.email} · Owner seat</p>
+          </div>
+
+          {(teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id) ? (
+            <div className="mt-4 rounded-lg border border-[#E1E3E7] bg-[#F7F9FC] p-3">
+              <div className="grid gap-3 lg:grid-cols-[1fr_1fr_180px_auto] lg:items-end">
+                <Field label="User email">
+                  <input
+                    className={inputClass()}
+                    type="email"
+                    value={teamInviteDraft.email}
+                    onChange={event => setTeamInviteDraft(current => ({ ...current, email: event.target.value }))}
+                    placeholder="employee@example.com"
+                  />
+                </Field>
+                <Field label="Display name">
+                  <input
+                    className={inputClass()}
+                    value={teamInviteDraft.display_name}
+                    onChange={event => setTeamInviteDraft(current => ({ ...current, display_name: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </Field>
+                <Field label="Role">
+                  <select
+                    className={inputClass()}
+                    value={teamInviteDraft.role}
+                    onChange={event => setTeamInviteDraft(current => ({ ...current, role: event.target.value as ContractorTeamRole }))}
+                  >
+                    {(Object.keys(CONTRACTOR_TEAM_ROLE_LABELS) as ContractorTeamRole[]).map(role => (
+                      <option key={role} value={role}>{CONTRACTOR_TEAM_ROLE_LABELS[role]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <button
+                  type="button"
+                  disabled={creatingTeamInvite || !teamInviteDraft.email.trim()}
+                  onClick={() => void createTeamInvite()}
+                  className={buttonClass('primary')}
+                >
+                  <Plus size={16} />
+                  {creatingTeamInvite ? 'Creating...' : 'Create invite'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-[#223D67]/70">
+                Invite links are manual for now. Later we can send these by email automatically and connect billing to active extra seats.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              You can use this contractor workspace, but only the owner or a team admin can add or remove team users.
+            </p>
+          )}
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">Active team members</p>
+              <div className="mt-2 space-y-2">
+                {(teamAccess?.members || []).length === 0 ? (
+                  <EmptyState text="No additional team members yet." />
+                ) : (
+                  (teamAccess?.members || []).map(member => (
+                    <div key={member.id} className="rounded-lg border border-[#E1E3E7] bg-white p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-[#02132D]">{member.display_name || member.email}</p>
+                          <p className="mt-0.5 text-xs text-[#223D67]/70">{member.email}</p>
+                          <p className="mt-1 text-xs text-[#223D67]">{CONTRACTOR_TEAM_ROLE_HELPER[member.role]}</p>
+                        </div>
+                        <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${member.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {member.status}
+                        </span>
+                      </div>
+                      {(teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <select
+                            className={`${inputClass()} max-w-[180px]`}
+                            value={member.role}
+                            disabled={updatingTeamAccessId === member.id}
+                            onChange={event => void updateTeamMember(member, { role: event.target.value as ContractorTeamRole })}
+                          >
+                            {(Object.keys(CONTRACTOR_TEAM_ROLE_LABELS) as ContractorTeamRole[]).map(role => (
+                              <option key={role} value={role}>{CONTRACTOR_TEAM_ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={updatingTeamAccessId === member.id}
+                            onClick={() => void updateTeamMember(member, { status: member.status === 'active' ? 'disabled' : 'active' })}
+                            className={buttonClass('secondary')}
+                          >
+                            {member.status === 'active' ? 'Disable' : 'Reactivate'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">Pending invites</p>
+              <div className="mt-2 space-y-2">
+                {(teamAccess?.invites || []).filter(invite => invite.status === 'pending').length === 0 ? (
+                  <EmptyState text="No pending team invites." />
+                ) : (
+                  (teamAccess?.invites || []).filter(invite => invite.status === 'pending').map(invite => {
+                    const inviteUrl = `${window.location.origin}${window.location.pathname}#/contractor?team_invite=${encodeURIComponent(invite.invite_code)}`;
+                    return (
+                      <div key={invite.id} className="rounded-lg border border-[#E1E3E7] bg-white p-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[#02132D]">{invite.display_name || invite.email}</p>
+                            <p className="mt-0.5 text-xs text-[#223D67]/70">{invite.email} · {CONTRACTOR_TEAM_ROLE_LABELS[invite.role]}</p>
+                            <p className="mt-1 break-all rounded bg-[#F7F9FC] px-2 py-1 text-xs text-[#223D67]">{inviteUrl}</p>
+                          </div>
+                          <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Pending</span>
+                        </div>
+                        {(teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id) && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className={buttonClass('secondary')}
+                              onClick={() => void navigator.clipboard?.writeText(inviteUrl).then(() => setNotice('Team invite link copied.'))}
+                            >
+                              <Link2 size={15} />
+                              Copy link
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingTeamAccessId === invite.id}
+                              className={buttonClass('secondary')}
+                              onClick={() => void revokeTeamInvite(invite)}
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Business name">
             <input className={inputClass()} value={contractorDraft.business_name} onChange={event => setContractor({ ...contractorDraft, business_name: event.target.value })} />
