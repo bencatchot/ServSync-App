@@ -1622,7 +1622,7 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
 
 const FIELD_WORK_KIND_LABEL: Record<FieldWorkflowKind, string> = {
   inspection: 'Inspection',
-  work_order: 'Work Order',
+  work_order: 'Service Visit',
   maintenance: 'Maintenance Visit',
   assessment: 'Assessment',
 };
@@ -10126,22 +10126,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => beginFieldWorkForHomeowner(requestConnection, {
-                          name: `${request.category} work order — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
-                          serviceRequestId: request.id,
-                          workflowKind: 'work_order',
-                        })}
+                        onClick={() => openHomeownerWorkspaceForRequest(request)}
                         className={buttonClass('primary')}
                       >
-                        <ClipboardCheck size={15} />
-                        Create work order
+                        Review / respond
                       </button>
                       <button
                         type="button"
-                        onClick={() => openHomeownerWorkspaceForRequest(request)}
+                        onClick={() => beginFieldWorkForHomeowner(requestConnection, {
+                          name: `${request.category} service visit — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
+                          serviceRequestId: request.id,
+                          workflowKind: 'work_order',
+                          templateSource: 'blank',
+                        })}
                         className={buttonClass('secondary')}
                       >
-                        Manage request
+                        <ClipboardCheck size={15} />
+                        Create service visit
                       </button>
                     </div>
                   )}
@@ -12799,15 +12800,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       type="button"
                                       onClick={() => {
                                         beginFieldWorkForHomeowner(conn, {
-                                          name: `${selectedWorkspaceRequest.category} work order — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
+                                          name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
                                           serviceRequestId: selectedWorkspaceRequest.id,
                                           workflowKind: 'work_order',
+                                          templateSource: 'blank',
                                         });
                                       }}
                                       className={buttonClass('secondary')}
                                     >
                                       <ClipboardCheck size={15} />
-                                      Create work order
+                                      Create service visit
                                     </button>
                                   </div>
                                   <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
