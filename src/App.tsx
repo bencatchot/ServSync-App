@@ -7516,6 +7516,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspectionSummary, setInspectionSummary] = useState('');
   const [savingInspection, setSavingInspection] = useState(false);
   const [finalizingInspection, setFinalizingInspection] = useState(false);
+  const [sendingInspectionReportId, setSendingInspectionReportId] = useState<string | null>(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [templateLibraryView, setTemplateLibraryView] = useState<'workflow' | 'estimate' | 'generic'>('workflow');
@@ -9014,6 +9015,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const finalizeInspection = async (insp: Inspection) => {
     if (!supabase || !contractor) return;
+    setNotice('');
+    setError('');
     const confirmed = window.confirm(insp.homeowner_user_id
       ? 'Finalize and file this field work report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
       : 'Finalize this new customer field work report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
@@ -9022,7 +9025,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setFinalizingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
-      const finalInsp: Inspection = { ...insp, rooms_with_findings: updatedRooms, summary: inspectionSummary };
+      const summaryText = inspectionSummary.trim() || buildInspectionSummaryText(updatedRooms);
+      const finalInsp: Inspection = { ...insp, rooms_with_findings: updatedRooms, summary: summaryText };
 
       const homeownerConn = connections.find(c => c.homeowner_user_id === insp.homeowner_user_id);
       const localContact = insp.local_contact_id ? localContacts.find(contact => contact.id === insp.local_contact_id) : null;
@@ -9037,15 +9041,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url);
 
       const storagePath = insp.homeowner_user_id
-        ? `${insp.homeowner_user_id}/documents/${crypto.randomUUID()}.pdf`
-        : `local-field-work/${contractor.id}/${crypto.randomUUID()}.pdf`;
+        ? `${insp.homeowner_user_id}/field-work/${insp.id}/${crypto.randomUUID()}.pdf`
+        : `contractor-field-work/${contractor.id}/${insp.id}/${crypto.randomUUID()}.pdf`;
       const { error: uploadErr } = await supabase.storage.from('home-documents').upload(storagePath, blob, { contentType: 'application/pdf' });
       if (uploadErr) throw uploadErr;
 
       const { error: finalizeError } = await supabase.rpc('servsync_finalize_field_work', {
         p_inspection_id: insp.id,
         p_rooms_with_findings: updatedRooms,
-        p_summary: inspectionSummary,
+        p_summary: summaryText,
         p_storage_path: storagePath,
         p_file_name: fileName,
         p_file_size_bytes: blob.size,
@@ -9054,22 +9058,47 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       const finalized = { ...finalInsp, status: 'finalized' as const, report_storage_path: storagePath, report_file_name: fileName };
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
+      setActiveInspection(finalized);
+      setInspectionSummary(summaryText);
+      setInspectionClosedForReview(true);
+      setInspectionView('detail');
+      setInspectionSubTab('report');
       setNotice(insp.homeowner_user_id
         ? 'Field work report finalized, saved to homeowner Documents, and added to their maintenance log.'
         : 'New customer field work report finalized.'
       );
-      // Clear back to list
-      setActiveInspection(null);
-      setLocalFindings({});
-      setActiveRooms([]);
-      setInspectionSummary('');
-      setInspectionClosedForReview(false);
-      setInspectionView('list');
-      persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
+      persistFieldWorkState({ inspectionId: finalized.id, view: 'detail', subTab: 'report', selectedRoom: selectedChecklistRoom });
     } catch (err) {
       setError(readableError(err, 'Failed to finalize field work report.'));
     } finally {
       setFinalizingInspection(false);
+    }
+  };
+
+  const sendInspectionReportToHomeowner = async (insp: Inspection) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    if (!insp.homeowner_user_id) {
+      setError('This report is for a new customer who does not have a ServSync homeowner profile yet.');
+      return;
+    }
+    if (insp.status !== 'finalized' || !insp.report_storage_path) {
+      setError('Finalize and file the report before sending it to the homeowner.');
+      return;
+    }
+    setSendingInspectionReportId(insp.id);
+    try {
+      const { error: notifyError } = await supabase.rpc('servsync_notify_field_work_report', {
+        p_inspection_id: insp.id,
+      });
+      if (notifyError) throw notifyError;
+      setNotice('Homeowner notified. The report is available in their Documents and maintenance log.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to send report notification to homeowner.'));
+    } finally {
+      setSendingInspectionReportId(null);
     }
   };
 
@@ -15190,17 +15219,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
                         <button
                           type="button"
-                          disabled={activeInspection.status !== 'finalized'}
-                          title={activeInspection.status !== 'finalized' ? 'Finalize the report first to send it to the homeowner.' : 'Send report to homeowner'}
+                          disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || sendingInspectionReportId === activeInspection.id}
+                          title={
+                            activeInspection.status !== 'finalized'
+                              ? 'Finalize the report first to send it to the homeowner.'
+                              : !activeInspection.homeowner_user_id
+                                ? 'This report belongs to a new customer who does not have a ServSync homeowner profile yet.'
+                                : 'Send report notification to homeowner'
+                          }
+                          onClick={() => void sendInspectionReportToHomeowner(activeInspection)}
                           className="w-full bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Send size={14} /> Send to Homeowner
+                          <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Sending...' : 'Send to Homeowner'}
                         </button>
 
                         {activeInspection.status === 'draft' ? (
                           <button
                             type="button"
-                            disabled={!inspectionClosedForReview || finalizingInspection || !inspectionSummary.trim()}
+                            disabled={!inspectionClosedForReview || finalizingInspection}
                             onClick={() => void finalizeInspection(activeInspection)}
                             className="w-full bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -15215,7 +15251,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
 
                         <p className="text-[11px] leading-relaxed text-slate-400 px-1">
-                          Finalize saves this report to the homeowner's Documents and fires a notification. Send to Homeowner is enabled after filing.
+                          Finalize saves this report to the homeowner's Documents and maintenance log. Send to Homeowner can notify them again after filing.
                         </p>
 
                         <button
