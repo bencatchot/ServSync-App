@@ -294,9 +294,10 @@ function inferSmartEstimateLineType(text: string): EstimateLineType {
 }
 
 function extractSmartEstimateQuantity(text: string) {
+  const laborHoursMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:billable\s*)?(?:hours?|hrs?)\b/i);
+  if (laborHoursMatch) return laborHoursMatch[1];
   const quantityMatch =
     text.match(/\b(?:qty|quantity)\s*[:x]?\s*(\d+(?:\.\d+)?)/i)
-    || text.match(/\bx\s*(\d+(?:\.\d+)?)/i)
     || text.match(/\b(\d+(?:\.\d+)?)\s+(?:hours?|hrs?|outlets?|fixtures?|filters?|valves?|faucets?|fans?|cabinets?|sheets?|sq\s*ft|sqft|sf)\b/i);
   return quantityMatch?.[1] || '1';
 }
@@ -306,10 +307,14 @@ function extractSmartEstimateUnit(text: string) {
   if (/\b(hours?|hrs?)\b/.test(normalized)) return 'hour';
   if (/\b(sq ft|sqft|sf)\b/.test(normalized)) return 'sq ft';
   if (/\b(linear ft|lf)\b/.test(normalized)) return 'linear ft';
+  if (/\b(material|materials|supplies|parts|lumber|decking)\b/.test(normalized)) return 'lot';
+  if (/\b(demo|demolition|removal|disposal|debris|haul|haul-off)\b/.test(normalized)) return 'job';
   return 'each';
 }
 
 function extractSmartEstimatePrice(text: string) {
+  const rateMatch = text.match(/\b(?:at|@)\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr)\b/i);
+  if (rateMatch) return rateMatch[1]?.replace(/,/g, '') || '';
   const priceMatch =
     text.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/)
     || text.match(/\b(?:at|for|rate|price|cost)\s+\$?\s*([\d,]+(?:\.\d{1,2})?)/i)
@@ -319,28 +324,47 @@ function extractSmartEstimatePrice(text: string) {
 
 function cleanSmartEstimateDescription(text: string) {
   const cleaned = text
+    .replace(/\b\d+(?:\.\d+)?\s*(?:billable\s*)?(?:hours?|hrs?)\b/gi, '')
     .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, '')
-    .replace(/\b(?:at|for|rate|price|cost)\s+\$?\s*[\d,]+(?:\.\d{1,2})?/gi, '')
+    .replace(/\b(?:at|@|for|rate|price|cost)\s+\$?\s*[\d,]+(?:\.\d{1,2})?(?:\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr))?/gi, '')
     .replace(/\b[\d,]+(?:\.\d{1,2})?\s*(?:dollars|each|ea|per)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
   return cleaned || text.trim();
 }
 
-function parseSmartEstimateText(text: string) {
-  const cleaned = text.trim();
-  const parts = cleaned
-    .split(/\n+|;|\.|\b(?:plus|and also)\b/i)
+function smartEstimateDescription(text: string, lineType: EstimateLineType) {
+  const normalized = normalizeText(text);
+  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return 'Billable labor';
+  if (/\b(demo|demolition|removal|remove)\b/.test(normalized)) return cleanSmartEstimateDescription(text) || 'Demolition / removal';
+  if (/\b(disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return cleanSmartEstimateDescription(text) || 'Debris disposal / haul-off';
+  if (lineType === 'material') return cleanSmartEstimateDescription(text).replace(/^material(?:s)?\s*(?:cost)?\s*/i, '') || 'Materials and supplies';
+  return cleanSmartEstimateDescription(text);
+}
+
+function splitSmartEstimateParts(text: string) {
+  return text
+    .split(/\n+|;|\.|,\s+|\b(?:plus|and also)\b/i)
     .map(part => part.trim())
     .filter(Boolean);
+}
+
+function parseSmartEstimateText(text: string) {
+  const cleaned = text.trim();
+  const parts = splitSmartEstimateParts(cleaned);
   const sourceParts = parts.length ? parts : [cleaned];
-  const lines = sourceParts.map(part => createEstimateLineDraft({
-    line_type: inferSmartEstimateLineType(part),
-    description: cleanSmartEstimateDescription(part),
-    quantity: extractSmartEstimateQuantity(part),
-    unit: extractSmartEstimateUnit(part),
-    unit_price: extractSmartEstimatePrice(part),
-  }));
+  const parsedLines = sourceParts.map(part => {
+    const lineType = inferSmartEstimateLineType(part);
+    return createEstimateLineDraft({
+      line_type: lineType,
+      description: smartEstimateDescription(part, lineType),
+      quantity: extractSmartEstimateQuantity(part),
+      unit: extractSmartEstimateUnit(part),
+      unit_price: extractSmartEstimatePrice(part),
+    });
+  });
+  const pricedLines = parsedLines.filter(line => line.unit_price.trim());
+  const lines = pricedLines.length >= 2 ? pricedLines : parsedLines;
 
   return {
     scope: cleaned,
