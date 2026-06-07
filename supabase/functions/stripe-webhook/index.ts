@@ -102,12 +102,26 @@ Deno.serve(async (req) => {
   }
 
   const event = JSON.parse(body);
-  console.log('[stripe-webhook] Event:', event.type);
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  const { error: eventInsertError } = await supabase
+    .from('stripe_webhook_events')
+    .insert({ id: event.id, event_type: event.type });
+
+  if (eventInsertError?.code === '23505') {
+    return new Response(JSON.stringify({ handled: true, duplicate: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (eventInsertError) {
+    console.error('[stripe-webhook] Unable to record webhook event:', eventInsertError);
+    return new Response('Unable to record webhook event', { status: 500 });
+  }
 
   // ── checkout.session.completed — link Stripe customer to contractor ─────────
   if (event.type === 'checkout.session.completed') {
@@ -119,7 +133,6 @@ Deno.serve(async (req) => {
         p_contractor_id:      contractorId,
         p_stripe_customer_id: customerId,
       });
-      console.log(`[stripe-webhook] Linked customer ${customerId} → contractor ${contractorId}`);
     }
     return new Response(JSON.stringify({ handled: true }), { headers: { 'Content-Type': 'application/json' } });
   }
@@ -145,8 +158,6 @@ Deno.serve(async (req) => {
       p_subscription_status:    status,
       p_monthly_price_cents:    event.type === 'customer.subscription.deleted' ? 0 : unitAmount,
     });
-
-    console.log(`[stripe-webhook] Synced subscription ${subscriptionId} → status: ${status}`);
     return new Response(JSON.stringify({ handled: true }), { headers: { 'Content-Type': 'application/json' } });
   }
 

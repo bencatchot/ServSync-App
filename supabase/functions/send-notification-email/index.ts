@@ -129,17 +129,30 @@ Deno.serve(async (req) => {
   });
 });
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function buildEmailHtml(name: string, title: string, body: string): string {
+  const safeName = escapeHtml(name);
+  const safeTitle = escapeHtml(title);
+  const safeBody = escapeHtml(body).replaceAll('\n', '<br />');
+
   return `<!DOCTYPE html>
 <html>
-<body style="font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:32px;">
-  <div style="max-width:520px;margin:0 auto;background:#1e293b;border-radius:16px;padding:32px;">
-    <p style="font-size:13px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:#3b82f6;margin:0 0 8px;">ServSync</p>
-    <h1 style="font-size:20px;font-weight:700;color:#fff;margin:0 0 12px;">${title}</h1>
-    <p style="font-size:14px;color:#94a3b8;margin:0 0 24px;">${body}</p>
-    <a href="https://servsync.app" style="display:inline-block;background:#3b82f6;color:#fff;font-size:14px;font-weight:600;padding:10px 20px;border-radius:10px;text-decoration:none;">Open ServSync</a>
-    <hr style="border:none;border-top:1px solid #334155;margin:24px 0;" />
-    <p style="font-size:11px;color:#475569;margin:0;">Hi ${name} — you're receiving this because you have email notifications enabled. You can turn them off in your ServSync profile settings.</p>
+<body style="font-family:Arial,sans-serif;background:#f7f9fc;color:#223d67;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e1e3e7;border-radius:14px;padding:32px;">
+    <p style="font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#0078ff;margin:0 0 8px;">ServSync</p>
+    <h1 style="font-size:21px;font-weight:700;color:#02132d;margin:0 0 12px;">${safeTitle}</h1>
+    <p style="font-size:15px;line-height:1.55;color:#223d67;margin:0 0 24px;">${safeBody}</p>
+    <a href="https://servsync.app" style="display:inline-block;background:#0078ff;color:#fff;font-size:14px;font-weight:600;padding:10px 20px;border-radius:10px;text-decoration:none;">Open ServSync</a>
+    <hr style="border:none;border-top:1px solid #e1e3e7;margin:24px 0;" />
+    <p style="font-size:12px;line-height:1.45;color:#64748b;margin:0;">Hi ${safeName}, you're receiving this because you have email notifications enabled. You can turn them off in your ServSync profile settings.</p>
   </div>
 </body>
 </html>`;

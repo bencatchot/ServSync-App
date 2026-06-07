@@ -1,16 +1,38 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const ALLOWED_ORIGINS = new Set([
+  'https://servsync.app',
+  'https://www.servsync.app',
+  'https://serv-sync-app-refresh.vercel.app',
+  'https://serv-sync-app.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+]);
+
+function corsHeadersFor(req: Request) {
+  const origin = req.headers.get('Origin') ?? '';
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'https://servsync.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+}
+
+const baseCorsHeaders = {
+  'Access-Control-Allow-Origin': 'https://servsync.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  Vary: 'Origin',
 };
 
 type FindingStatus = 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
 type Priority = 'Urgent' | 'High' | 'Medium' | 'Low';
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, headers = baseCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
   });
 }
 
@@ -19,14 +41,15 @@ function cleanString(value: unknown, fallback = '') {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
+  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
 
   const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) return jsonResponse({ error: 'OPENAI_API_KEY is not configured.' }, 500);
+  if (!apiKey) return jsonResponse({ error: 'OPENAI_API_KEY is not configured.' }, 500, corsHeaders);
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401);
+  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401, corsHeaders);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -40,7 +63,7 @@ Deno.serve(async (req) => {
       });
       const profiles = await profileRes.json();
       const role = Array.isArray(profiles) ? profiles[0]?.role : undefined;
-      if (role !== 'admin') return jsonResponse({ error: 'Only admin users can use the AI field assistant.' }, 403);
+      if (role !== 'platform_admin') return jsonResponse({ error: 'Only platform admins can use the AI field assistant.' }, 403, corsHeaders);
     }
 
     const body = await req.json();
@@ -50,8 +73,8 @@ Deno.serve(async (req) => {
       ? body.availableChecklistItems.filter((item: unknown) => typeof item === 'string' && item.trim()).slice(0, 40)
       : [];
 
-    if (!note) return jsonResponse({ error: 'Missing field note.' }, 400);
-    if (availableChecklistItems.length === 0) return jsonResponse({ error: 'No checklist items were provided.' }, 400);
+    if (!note) return jsonResponse({ error: 'Missing field note.' }, 400, corsHeaders);
+    if (availableChecklistItems.length === 0) return jsonResponse({ error: 'No checklist items were provided.' }, 400, corsHeaders);
 
     const customer = body.customer || {};
     const schema = {
@@ -95,11 +118,11 @@ Deno.serve(async (req) => {
     const openAiJson = await openAiRes.json();
     if (!openAiRes.ok) {
       console.error('OpenAI error', openAiJson);
-      return jsonResponse({ error: 'AI drafting failed.', details: openAiJson }, 502);
+      return jsonResponse({ error: 'AI drafting failed.', details: openAiJson }, 502, corsHeaders);
     }
 
     const outputText = openAiJson.output_text || openAiJson.output?.flatMap((item: any) => item.content || [])?.find((part: any) => part.type === 'output_text')?.text;
-    if (!outputText) return jsonResponse({ error: 'AI returned no output.' }, 502);
+    if (!outputText) return jsonResponse({ error: 'AI returned no output.' }, 502, corsHeaders);
 
     const draft = JSON.parse(outputText) as {
       checklistItem: string;
@@ -111,9 +134,9 @@ Deno.serve(async (req) => {
       confidence: number;
     };
 
-    return jsonResponse(draft);
+    return jsonResponse(draft, 200, corsHeaders);
   } catch (error) {
     console.error(error);
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500, corsHeaders);
   }
 });

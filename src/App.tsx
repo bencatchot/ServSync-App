@@ -4065,7 +4065,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const signedHomeAssetUrl = useCallback(async (path?: string | null) => {
     if (!supabase || !path) return '';
-    const { data, error } = await supabase.storage.from('home-documents').createSignedUrl(path, 60 * 60);
+    const { data, error } = await supabase.storage.from('home-documents').createSignedUrl(path, 60 * 2);
     if (error || !data?.signedUrl) return '';
     return data.signedUrl;
   }, []);
@@ -17512,6 +17512,9 @@ function DiscoverFeed({
             <button type="button" onClick={() => postFileInput?.click()} className={buttonClass('secondary')}>
               <Paperclip size={15} /> Add photos
             </button>
+            <span className="max-w-xl text-xs leading-5 text-slate-500">
+              Discover photos are public marketing images. Only upload photos you are comfortable showing on ServSync.
+            </span>
             {postFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {postFiles.map((f, i) => (

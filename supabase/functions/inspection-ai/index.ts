@@ -3,10 +3,32 @@
 // Deploy: supabase functions deploy inspection-ai
 // Env var required: ANTHROPIC_API_KEY
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const ALLOWED_ORIGINS = new Set([
+  'https://servsync.app',
+  'https://www.servsync.app',
+  'https://serv-sync-app-refresh.vercel.app',
+  'https://serv-sync-app.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+]);
+
+function corsHeadersFor(req: Request) {
+  const origin = req.headers.get('Origin') ?? '';
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'https://servsync.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+}
+
+const baseCorsHeaders = {
+  'Access-Control-Allow-Origin': 'https://servsync.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  Vary: 'Origin',
 };
 
 type FindingStatus = 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
@@ -24,34 +46,78 @@ interface FindingSuggestion {
   action: string;
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, headers = baseCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
   });
 }
 
+async function enforceAiRateLimit(supabaseUrl: string, serviceRoleKey: string, userId: string, headers: Record<string, string>) {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const query = new URLSearchParams({
+    select: 'id',
+    user_id: `eq.${userId}`,
+    function_name: 'eq.inspection-ai',
+    called_at: `gte.${since}`,
+  });
+
+  const countRes = await fetch(`${supabaseUrl}/rest/v1/ai_call_log?${query.toString()}`, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      Prefer: 'count=exact',
+    },
+  });
+  const contentRange = countRes.headers.get('content-range') ?? '0/0';
+  const count = Number(contentRange.split('/')[1] ?? 0);
+  if (Number.isFinite(count) && count >= 50) {
+    return jsonResponse({ error: 'AI assistant usage is temporarily limited. Try again in a little while.' }, 429, headers);
+  }
+
+  await fetch(`${supabaseUrl}/rest/v1/ai_call_log`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ user_id: userId, function_name: 'inspection-ai' }),
+  });
+
+  return null;
+}
+
 Deno.serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
+  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401);
+  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401, corsHeaders);
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return jsonResponse({ error: 'ANTHROPIC_API_KEY is not configured.' }, 500);
+  if (!apiKey) return jsonResponse({ error: 'ANTHROPIC_API_KEY is not configured.' }, 500, corsHeaders);
 
   // Verify caller is a contractor
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  let userId = '';
   if (supabaseUrl && supabaseAnonKey) {
-    const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles?select=role&limit=1`, {
+    const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles?select=id,role&limit=1`, {
       headers: { apikey: supabaseAnonKey, Authorization: authHeader },
     });
     const profiles = await profileRes.json();
-    const role = Array.isArray(profiles) ? profiles[0]?.role : undefined;
+    const profile = Array.isArray(profiles) ? profiles[0] : null;
+    const role = profile?.role;
+    userId = typeof profile?.id === 'string' ? profile.id : '';
     if (role !== 'contractor') {
-      return jsonResponse({ error: 'Only contractor accounts can use the AI inspection assistant.' }, 403);
+      return jsonResponse({ error: 'Only contractor accounts can use the AI inspection assistant.' }, 403, corsHeaders);
+    }
+    if (supabaseServiceRoleKey && userId) {
+      const rateLimitResponse = await enforceAiRateLimit(supabaseUrl, supabaseServiceRoleKey, userId, corsHeaders);
+      if (rateLimitResponse) return rateLimitResponse;
     }
   }
 
@@ -59,12 +125,12 @@ Deno.serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ error: 'Invalid request body.' }, 400);
+    return jsonResponse({ error: 'Invalid request body.' }, 400, corsHeaders);
   }
 
   const { notes, rooms } = body;
-  if (!notes?.trim()) return jsonResponse({ error: 'Missing notes.' }, 400);
-  if (!Array.isArray(rooms) || rooms.length === 0) return jsonResponse({ error: 'Missing rooms.' }, 400);
+  if (!notes?.trim()) return jsonResponse({ error: 'Missing notes.' }, 400, corsHeaders);
+  if (!Array.isArray(rooms) || rooms.length === 0) return jsonResponse({ error: 'Missing rooms.' }, 400, corsHeaders);
 
   const checklistSummary = rooms
     .map(r => `${r.room}: ${r.items.slice(0, 15).join(', ')}`)
@@ -121,7 +187,7 @@ Respond ONLY with valid JSON array, no markdown, no explanation:
     if (!response.ok) {
       const err = await response.text();
       console.error('Anthropic API error:', err);
-      return jsonResponse({ error: 'AI service error. Try again.' }, 502);
+      return jsonResponse({ error: 'AI service error. Try again.' }, 502, corsHeaders);
     }
 
     const claudeRes = await response.json();
@@ -146,12 +212,12 @@ Respond ONLY with valid JSON array, no markdown, no explanation:
       }
     } catch {
       console.error('Failed to parse Claude response:', rawText);
-      return jsonResponse({ error: 'Failed to parse AI response. Try again.' }, 502);
+      return jsonResponse({ error: 'Failed to parse AI response. Try again.' }, 502, corsHeaders);
     }
 
-    return jsonResponse(suggestions);
+    return jsonResponse(suggestions, 200, corsHeaders);
   } catch (err) {
     console.error('inspection-ai error:', err);
-    return jsonResponse({ error: 'Unexpected error.' }, 500);
+    return jsonResponse({ error: 'Unexpected error.' }, 500, corsHeaders);
   }
 });

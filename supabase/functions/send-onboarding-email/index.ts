@@ -1,13 +1,35 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const ALLOWED_ORIGINS = new Set([
+  'https://servsync.app',
+  'https://www.servsync.app',
+  'https://serv-sync-app-refresh.vercel.app',
+  'https://serv-sync-app.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+]);
+
+function corsHeadersFor(req: Request) {
+  const origin = req.headers.get('Origin') ?? '';
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'https://servsync.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+}
+
+const baseCorsHeaders = {
+  'Access-Control-Allow-Origin': 'https://servsync.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  Vary: 'Origin',
 };
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, headers = baseCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
   });
 }
 
@@ -16,21 +38,22 @@ function cleanString(value: unknown, fallback = '') {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
+  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405, corsHeaders);
 
   const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  if (!resendApiKey) return jsonResponse({ error: 'RESEND_API_KEY is not configured.' }, 500);
+  if (!resendApiKey) return jsonResponse({ error: 'RESEND_API_KEY is not configured.' }, 500, corsHeaders);
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401);
+  if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401, corsHeaders);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-      return jsonResponse({ error: 'Supabase environment is not configured.' }, 500);
+      return jsonResponse({ error: 'Supabase environment is not configured.' }, 500, corsHeaders);
     }
 
     const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
@@ -38,7 +61,7 @@ Deno.serve(async (req) => {
     });
     const user = await userRes.json();
     const userId = typeof user?.id === 'string' ? user.id : '';
-    if (!userRes.ok || !userId) return jsonResponse({ error: 'Not authenticated.' }, 401);
+    if (!userRes.ok || !userId) return jsonResponse({ error: 'Not authenticated.' }, 401, corsHeaders);
 
     const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles?select=role,email&id=eq.${userId}&limit=1`, {
       headers: {
@@ -48,11 +71,11 @@ Deno.serve(async (req) => {
     });
     const profiles = await profileRes.json();
     const role = Array.isArray(profiles) ? profiles[0]?.role : undefined;
-    if (role !== 'admin') {
+    if (role !== 'platform_admin') {
       return jsonResponse({
-        error: 'Only admin users can send onboarding emails.',
+        error: 'Only platform admins can send onboarding emails.',
         details: { signedInEmail: user?.email || null, profileRole: role || null },
-      }, 403);
+      }, 403, corsHeaders);
     }
 
     const body = await req.json();
@@ -61,8 +84,8 @@ Deno.serve(async (req) => {
     const ownerName = cleanString(body.ownerName, 'there');
     const onboardingLink = cleanString(body.onboardingLink);
 
-    if (!email || !email.includes('@')) return jsonResponse({ error: 'Missing valid customer email.' }, 400);
-    if (!onboardingLink.startsWith('https://')) return jsonResponse({ error: 'Missing valid onboarding link.' }, 400);
+    if (!email || !email.includes('@')) return jsonResponse({ error: 'Missing valid customer email.' }, 400, corsHeaders);
+    if (!onboardingLink.startsWith('https://')) return jsonResponse({ error: 'Missing valid onboarding link.' }, 400, corsHeaders);
 
     const replyToEmail = cleanString(Deno.env.get('REPLY_TO_EMAIL'));
     const brandLogoUrl = cleanString(Deno.env.get('BRAND_LOGO_URL'));
@@ -121,12 +144,12 @@ Terms of Use: https://preventionpros.app/#/terms`;
     const resendJson = await resendRes.json();
     if (!resendRes.ok) {
       console.error('Resend error', resendJson);
-      return jsonResponse({ error: 'Email sending failed.', details: resendJson }, 502);
+      return jsonResponse({ error: 'Email sending failed.', details: resendJson }, 502, corsHeaders);
     }
 
-    return jsonResponse({ ok: true, id: resendJson.id });
+    return jsonResponse({ ok: true, id: resendJson.id }, 200, corsHeaders);
   } catch (error) {
     console.error(error);
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : 'Unknown error' }, 500, corsHeaders);
   }
 });
