@@ -9093,8 +9093,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_inspection_id: insp.id,
       });
       if (notifyError) throw notifyError;
-      setNotice('Homeowner notified. The report is available in their Documents and maintenance log.');
       await loadContractor();
+      setContractorJobsView('closed_jobs');
+      setNotice(insp.service_request_id
+        ? 'Job completed, report sent, and linked service request closed for the homeowner.'
+        : 'Homeowner notified. The report is available in their Documents and maintenance log.'
+      );
     } catch (err) {
       setError(readableError(err, 'Unable to send report notification to homeowner.'));
     } finally {
@@ -14834,6 +14838,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     }));
                   };
                   const finalSummaryText = inspectionSummary.trim() || buildInspectionSummaryText(reportRooms);
+                  const linkedServiceRequest = activeInspection.service_request_id
+                    ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
+                    : null;
+                  const reportSentAndCompleted = activeInspection.status === 'finalized'
+                    && (activeInspection.service_request_id ? linkedServiceRequest?.status === 'closed' : true);
                   return (
                   <div className="grid gap-4 xl:grid-cols-[1fr_260px] items-start">
                     {/* Main report area */}
@@ -15217,21 +15226,35 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
 
                       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
-                        <button
-                          type="button"
-                          disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || sendingInspectionReportId === activeInspection.id}
-                          title={
-                            activeInspection.status !== 'finalized'
-                              ? 'Finalize the report first to send it to the homeowner.'
-                              : !activeInspection.homeowner_user_id
-                                ? 'This report belongs to a new customer who does not have a ServSync homeowner profile yet.'
-                                : 'Send report notification to homeowner'
-                          }
-                          onClick={() => void sendInspectionReportToHomeowner(activeInspection)}
-                          className="w-full bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Sending...' : 'Send to Homeowner'}
-                        </button>
+                        {reportSentAndCompleted ? (
+                          <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <CheckCircle2 size={15} className="text-emerald-600" />
+                              <span className="text-sm font-semibold text-emerald-700">Report sent · Job complete</span>
+                            </div>
+                            {linkedServiceRequest && (
+                              <p className="mt-1 text-center text-[11px] leading-5 text-emerald-700">
+                                The linked service request is closed for the homeowner.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || sendingInspectionReportId === activeInspection.id}
+                            title={
+                              activeInspection.status !== 'finalized'
+                                ? 'Finalize the report first before completing the job.'
+                                : !activeInspection.homeowner_user_id
+                                  ? 'This report belongs to a new customer who does not have a ServSync homeowner profile yet.'
+                                  : 'Send the report and close the linked service request'
+                            }
+                            onClick={() => void sendInspectionReportToHomeowner(activeInspection)}
+                            className="w-full bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Completing...' : 'Complete job & send report'}
+                          </button>
+                        )}
 
                         {activeInspection.status === 'draft' ? (
                           <button
@@ -15251,7 +15274,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
 
                         <p className="text-[11px] leading-relaxed text-slate-400 px-1">
-                          Finalize saves this report to the homeowner's Documents and maintenance log. Send to Homeowner can notify them again after filing.
+                          Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.
                         </p>
 
                         <button

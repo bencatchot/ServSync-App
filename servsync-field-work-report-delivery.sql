@@ -227,6 +227,7 @@ as $$
 declare
   v_insp public.inspections;
   v_contractor_name text;
+  v_request public.service_requests;
 begin
   select i.*
     into v_insp
@@ -252,6 +253,39 @@ begin
     from public.contractor_profiles
    where id = v_insp.contractor_id
    limit 1;
+
+  if v_insp.service_request_id is not null then
+    select *
+      into v_request
+      from public.service_requests
+     where id = v_insp.service_request_id
+     limit 1;
+
+    if v_request.id is not null and v_request.status not in ('closed', 'declined') then
+      insert into public.service_request_messages (
+        request_id,
+        actor_user_id,
+        actor_role,
+        message_type,
+        body
+      ) values (
+        v_request.id,
+        auth.uid(),
+        'contractor',
+        'contractor_closed',
+        coalesce(v_contractor_name, 'Your contractor') || ' completed the job and sent the final field work report. The report is saved in Documents and your maintenance log.'
+      );
+
+      update public.service_requests
+         set status = 'closed',
+             closing_summary = coalesce(
+               nullif(trim(closing_summary), ''),
+               'Job completed and final field work report sent to homeowner.'
+             ),
+             updated_at = now()
+       where id = v_request.id;
+    end if;
+  end if;
 
   insert into public.notifications (user_id, type, title, body, request_id)
   values (
