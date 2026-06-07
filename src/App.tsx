@@ -10067,11 +10067,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 connection.connection_id === request.connection_id
                 || connection.homeowner_user_id === request.homeowner_user_id
               );
+              const toggleInlineRequest = () => {
+                setContractorExpandedRequestIds(current => {
+                  const next = new Set(current);
+                  if (next.has(request.id)) next.delete(request.id);
+                  else next.add(request.id);
+                  return next;
+                });
+              };
               return (
                 <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
                   <button
                     type="button"
-                    onClick={() => openHomeownerWorkspaceForRequest(request)}
+                    onClick={() => {
+                      if (requestConnection) openHomeownerWorkspaceForRequest(request);
+                      else toggleInlineRequest();
+                    }}
                     className="w-full text-left px-4 py-3.5 transition-colors hover:bg-blue-50"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -10105,11 +10116,88 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
                       </div>
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
-                        Open workspace
+                        {requestConnection ? 'Open workspace' : isExpanded ? 'Hide details' : 'View details'}
                         <ArrowRight size={14} />
                       </span>
                     </div>
                   </button>
+
+                  {requestConnection && !['closed', 'declined'].includes(request.status) && (
+                    <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => beginFieldWorkForHomeowner(requestConnection, {
+                          name: `${request.category} work order — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
+                          serviceRequestId: request.id,
+                          workflowKind: 'work_order',
+                        })}
+                        className={buttonClass('primary')}
+                      >
+                        <ClipboardCheck size={15} />
+                        Create work order
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openHomeownerWorkspaceForRequest(request)}
+                        className={buttonClass('secondary')}
+                      >
+                        Manage request
+                      </button>
+                    </div>
+                  )}
+
+                  {isExpanded && !requestConnection && (
+                    <div className="border-t border-slate-200 bg-slate-50 px-4 pb-4 pt-4">
+                      <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-sm font-semibold text-amber-950">Homeowner connection not loaded</p>
+                        <p className="mt-1 text-xs leading-5 text-amber-800">
+                          You can still review and respond to this request here. Create work order will appear once this request is matched to a connected homeowner workspace.
+                        </p>
+                      </div>
+                      <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                        {request.description || 'No request description provided.'}
+                      </p>
+                      <details className="mt-4" open>
+                        <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Thread · {request.messages.length} {request.messages.length === 1 ? 'message' : 'messages'}
+                        </summary>
+                        <div className="mt-3">
+                          <ServiceRequestMessages messages={request.messages} media={request.media ?? []} />
+                        </div>
+                      </details>
+                      {!['closed', 'declined'].includes(request.status) && (
+                        <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                          <Field label="Respond to homeowner">
+                            <textarea
+                              className={inputClass()}
+                              rows={3}
+                              value={contractorResponseDrafts[request.id] ?? ''}
+                              onChange={event => setContractorResponseDrafts(current => ({ ...current, [request.id]: event.target.value }))}
+                              placeholder="Type an update, next step, or question..."
+                            />
+                          </Field>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void updateContractorServiceRequest(request, 'respond')}
+                              disabled={isUpdating}
+                              className={buttonClass('primary')}
+                            >
+                              {isUpdating ? 'Sending...' : 'Send response'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void updateContractorServiceRequest(request, 'decline')}
+                              disabled={isUpdating}
+                              className={buttonClass('secondary')}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {false && isExpanded && (() => {
                     const requestConnectionForExpanded = requestConnection;
