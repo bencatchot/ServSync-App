@@ -9058,16 +9058,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       const finalized = { ...finalInsp, status: 'finalized' as const, report_storage_path: storagePath, report_file_name: fileName };
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
-      setActiveInspection(finalized);
-      setInspectionSummary(summaryText);
-      setInspectionClosedForReview(true);
-      setInspectionView('detail');
-      setInspectionSubTab('report');
+      if (insp.homeowner_user_id) {
+        setActiveInspection(finalized);
+        setInspectionSummary(summaryText);
+        setInspectionClosedForReview(true);
+        setInspectionView('detail');
+        setInspectionSubTab('report');
+        persistFieldWorkState({ inspectionId: finalized.id, view: 'detail', subTab: 'report', selectedRoom: selectedChecklistRoom });
+      } else {
+        setActiveInspection(null);
+        setLocalFindings({});
+        setActiveRooms([]);
+        setInspectionSummary('');
+        setInspectionClosedForReview(false);
+        setInspectionView('list');
+        setContractorJobsView('closed_jobs');
+        setContractorTab('inspections');
+        persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
+      }
       setNotice(insp.homeowner_user_id
         ? 'Field work report finalized, saved to homeowner Documents, and added to their maintenance log.'
         : 'New customer field work report finalized.'
       );
-      persistFieldWorkState({ inspectionId: finalized.id, view: 'detail', subTab: 'report', selectedRoom: selectedChecklistRoom });
     } catch (err) {
       setError(readableError(err, 'Failed to finalize field work report.'));
     } finally {
@@ -9094,7 +9106,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       });
       if (notifyError) throw notifyError;
       await loadContractor();
+      setActiveInspection(null);
+      setLocalFindings({});
+      setActiveRooms([]);
+      setInspectionSummary('');
+      setInspectionClosedForReview(false);
+      setInspectionView('list');
       setContractorJobsView('closed_jobs');
+      setContractorTab('inspections');
+      persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       setNotice(insp.service_request_id
         ? 'Job completed, report sent, and linked service request closed for the homeowner.'
         : 'Homeowner notified. The report is available in their Documents and maintenance log.'
