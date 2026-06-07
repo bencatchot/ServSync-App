@@ -261,12 +261,35 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
   };
 }
 
+function createCompletedWorkInvoiceDraft(subjectName: string, overrides: Partial<EstimateDraft> = {}): EstimateDraft {
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return createBlankEstimateDraft({
+    title: `Invoice — ${subjectName || 'Customer'} — ${dateLabel}`,
+    scope: 'Completed work performed for the customer.',
+    notes: 'Final invoice for completed work. Contractor should confirm all labor, materials, disposal, taxes, and payment terms before sending.',
+    terms: 'Payment is due upon receipt unless otherwise agreed in writing.',
+    line_items: [
+      createEstimateLineDraft({ line_type: 'labor', description: 'Labor for completed work', quantity: '1', unit: 'job' }),
+      createEstimateLineDraft({ line_type: 'material', description: 'Materials and supplies', quantity: '1', unit: 'lot' }),
+      createEstimateLineDraft({ line_type: 'labor', description: 'Demolition / removal of existing material', quantity: '1', unit: 'job' }),
+      createEstimateLineDraft({ line_type: 'fee', description: 'Debris disposal / haul-off', quantity: '1', unit: 'job' }),
+    ],
+    ...overrides,
+  });
+}
+
+function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'notes'>) {
+  const haystack = normalizeText(`${estimate.title || ''} ${estimate.scope || ''} ${estimate.notes || ''}`);
+  if (/\b(invoice|completed work|payment due|paid|final invoice|billable work)\b/.test(haystack)) return 'Invoice';
+  return 'Estimate';
+}
+
 function inferSmartEstimateLineType(text: string): EstimateLineType {
   const normalized = normalizeText(text);
-  if (/\b(trip|service call|diagnostic|permit|fee)\b/.test(normalized)) return 'fee';
-  if (/\b(material|materials|parts|supplies|fixture|filter|valve|fitting|faucet|fan|outlet|cabinet|drywall|sheetrock)\b/.test(normalized)) return 'material';
+  if (/\b(trip|service call|diagnostic|permit|fee|disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return 'fee';
+  if (/\b(material|materials|parts|supplies|fixture|filter|valve|fitting|faucet|fan|outlet|cabinet|drywall|sheetrock|lumber|decking|fasteners|concrete)\b/.test(normalized)) return 'material';
   if (/\b(equipment|machine|rental|lift|pump|tool)\b/.test(normalized)) return 'equipment';
-  if (/\b(labor|repair|replace|install|remove|tighten|seal|patch|paint|inspect|service|clean)\b/.test(normalized)) return 'labor';
+  if (/\b(labor|repair|replace|install|remove|demo|demolition|build|construct|tighten|seal|patch|paint|inspect|service|clean)\b/.test(normalized)) return 'labor';
   return 'other';
 }
 
@@ -2737,6 +2760,7 @@ async function createEstimatePdf(
   const contentW = pageW - margin * 2;
   let y = 18;
   const contractorLogo = await loadPdfImageAsset(context.contractorLogoUrl);
+  const documentLabel = estimateDocumentLabel(estimate);
 
   const addPageIfNeeded = (height = 12) => {
     if (y + height <= pageH - margin) return;
@@ -2769,7 +2793,7 @@ async function createEstimatePdf(
   pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(20);
-  pdf.text('Estimate', margin, 18);
+  pdf.text(documentLabel, margin, 18);
   pdf.setFontSize(10);
   pdf.text(context.contractorName || 'Contractor', margin, 27);
   if (contractorLogo) {
@@ -2789,7 +2813,7 @@ async function createEstimatePdf(
   pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(16);
-  addWrappedText(estimate.title || 'Estimate', margin, contentW - 45, 16, 7);
+  addWrappedText(estimate.title || documentLabel, margin, contentW - 45, 16, 7);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.setTextColor(71, 85, 105);
@@ -4920,7 +4944,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
         { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
         { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
-        { id: 'estimates',    label: 'Estimates',         icon: <Receipt size={17} />, badge: pendingEstimateCount, group: 'Contractors' },
+        { id: 'estimates',    label: 'Estimates / invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount, group: 'Contractors' },
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
@@ -6702,12 +6726,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       )}
 
       {homeownerTab === 'estimates' && (
-        <Card title="Estimates" icon={<Receipt size={18} />}>
+        <Card title="Estimates and invoices" icon={<Receipt size={18} />}>
           <div className="space-y-3">
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-semibold text-blue-900">Review estimates from connected contractors</p>
+              <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
               <p className="mt-1 text-sm text-blue-800">
-                Draft estimates stay private to the contractor. Anything shown here has been sent to you for review.
+                Drafts stay private to the contractor. Anything shown here has been sent to you for review.
               </p>
             </div>
             {estimates.length === 0 ? (
@@ -8132,6 +8156,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('connections');
   };
 
+  const beginCompletedWorkInvoice = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string } = {}) => {
+    setEditingEstimateId(null);
+    setEstimateDraft(createCompletedWorkInvoiceDraft(subjectName, {
+      service_request_id: options.serviceRequestId ?? '',
+      inspection_id: options.inspectionId ?? '',
+    }));
+    setEstimateAssistantText('');
+    setEstimateAssistantNotice('');
+    setEstimateComposerOpen(true);
+    setHomeownerWorkspaceEstimateView('draft');
+    setHomeownerDetailTab('estimates');
+  };
+
   const saveEstimateDraft = async (subject: {
     homeownerUserId?: string | null;
     localContactId?: string | null;
@@ -8139,13 +8176,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !contractor?.id) return;
     setNotice('');
     setError('');
+    const draftDocumentLabel = estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes });
     if (!estimateDraft.title.trim()) {
-      setError('Add an estimate title before saving.');
+      setError(`Add a ${draftDocumentLabel.toLowerCase()} title before saving.`);
       return;
     }
     const usableLines = estimateDraft.line_items.filter(line => line.description.trim());
     if (usableLines.length === 0) {
-      setError('Add at least one line item before saving the estimate.');
+      setError(`Add at least one line item before saving the ${draftDocumentLabel.toLowerCase()}.`);
       return;
     }
     setSavingEstimate(true);
@@ -8200,7 +8238,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         })));
       if (linesError) throw linesError;
 
-      setNotice(editingEstimateId ? 'Estimate draft updated.' : 'Estimate draft saved.');
+      setNotice(editingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved.`);
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
@@ -8208,7 +8246,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateAssistantNotice('');
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to save estimate. If this is the first estimate, run the ServSync estimates SQL first.'));
+      setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
     } finally {
       setSavingEstimate(false);
     }
@@ -10804,7 +10842,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       { id: 'profile', label: 'Profile' },
                       { id: 'home', label: 'Home' },
                       { id: 'fieldwork', label: 'Work Orders', badge: fwDraftCount },
-                      { id: 'estimates', label: 'Estimates', badge: draftEstimateCount },
+                      { id: 'estimates', label: 'Estimates / Invoices', badge: draftEstimateCount },
                       ...(isConn ? [
                         { id: 'requests' as const, label: 'Requests', badge: activeReqs.length },
                         { id: 'schedule' as const, label: 'Schedule', badge: upcomingAppts.length },
@@ -10845,7 +10883,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         onClick: () => setHomeownerDetailTab('fieldwork'),
                       },
                       {
-                        label: 'Estimates',
+                        label: 'Estimates / invoices',
                         value: String(subjectEstimates.length),
                         helper: `${draftEstimateCount} draft${draftEstimateCount === 1 ? '' : 's'} · ${subjectEstimates.filter(estimate => estimate.status === 'accepted').length} accepted`,
                         icon: <Receipt size={16} />,
@@ -10886,16 +10924,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                             <div className="flex items-center gap-2 flex-wrap justify-end">
                               {isConn && conn && (
-                                <button type="button" onClick={() => { beginFieldWorkForHomeowner(conn); setHomeownerDetailTab('fieldwork'); }} className={buttonClass('primary')}>
-                                  <ClipboardCheck size={14} />
-                                  Create work order
-                                </button>
+                                <>
+                                  <button type="button" onClick={() => { beginFieldWorkForHomeowner(conn); setHomeownerDetailTab('fieldwork'); }} className={buttonClass('primary')}>
+                                    <ClipboardCheck size={14} />
+                                    Create work order
+                                  </button>
+                                  <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
+                                    <Receipt size={14} />
+                                    Create invoice
+                                  </button>
+                                </>
                               )}
                               {!isConn && localCustomer && (
                                 <>
                                   <button type="button" onClick={() => { beginFieldWorkForLocalContact(localCustomer); setHomeownerDetailTab('fieldwork'); }} className={buttonClass('primary')}>
                                     <ClipboardCheck size={14} />
                                     Create work order
+                                  </button>
+                                  <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
+                                    <Receipt size={14} />
+                                    Create invoice
                                   </button>
                                   <button type="button" disabled className={buttonClass('secondary')} title="Invite-to-claim flow coming soon.">
                                     Invite to claim
@@ -11315,43 +11363,55 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <h3 className="font-bold text-slate-950">Estimates</h3>
+                                    <h3 className="font-bold text-slate-950">Estimates and invoices</h3>
                                     <p className="mt-1 text-xs text-slate-500">
-                                      Draft flexible estimates now. Trade-specific templates can build on this later.
+                                      Draft future work estimates or invoice-style records for completed work without starting an inspection.
                                     </p>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                      setEditingEstimateId(null);
-                                      setEstimateDraft(createBlankEstimateDraft({
-                                        title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-                                      }));
-                                      setEstimateAssistantText('');
-                                      setEstimateAssistantNotice('');
-                                      setEstimateComposerOpen(true);
-                                    }}
-                                    className={buttonClass('primary')}
-                                  >
-                                    <Plus size={14} />
-                                    Create estimate
-                                  </button>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
+                                        setEditingEstimateId(null);
+                                        setEstimateDraft(createBlankEstimateDraft({
+                                          title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                                        }));
+                                        setEstimateAssistantText('');
+                                        setEstimateAssistantNotice('');
+                                        setEstimateComposerOpen(true);
+                                      }}
+                                      className={buttonClass('primary')}
+                                    >
+                                      <Plus size={14} />
+                                      Create estimate
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => beginCompletedWorkInvoice(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      <Receipt size={14} />
+                                      Create invoice
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {estimateComposerOpen && (
                                   <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
                                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                       <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">{editingEstimateId ? 'Edit estimate draft' : 'Estimate draft'}</p>
-                                        <p className="mt-1 text-sm text-blue-900">Start with simple line items. This can become HVAC, plumbing, electrical, or custom templates later.</p>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+                                          {editingEstimateId ? `Edit ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} draft`}
+                                        </p>
+                                        <p className="mt-1 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
                                       </div>
                                       <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
                                         Cancel
                                       </button>
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2">
-                                      <Field label="Estimate title">
+                                      <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
                                         <input className={inputClass()} value={estimateDraft.title} onChange={e => setEstimateDraft(d => ({ ...d, title: e.target.value }))} />
                                       </Field>
                                       {connReqs.length > 0 && (
@@ -11379,7 +11439,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <p className="text-sm font-bold text-slate-950">Smart estimate assistant</p>
                                           </div>
                                           <p className="mt-1 text-xs text-slate-500">
-                                            Type or speak the work needed. ServSync will draft scope and line items for you to review.
+                                            Type or speak the work performed or work needed. ServSync will draft scope and line items for you to review.
                                           </p>
                                         </div>
                                         <button
@@ -11398,7 +11458,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             className={`${inputClass()} min-h-[96px] resize-y`}
                                             value={estimateAssistantText}
                                             onChange={event => setEstimateAssistantText(event.target.value)}
-                                            placeholder="Example: Replace 2 bathroom outlets at $85 each, add trip fee $75, patch sheetrock damage in bedroom for $350."
+                                            placeholder="Example: Built deck, labor $2400, materials $3100, demo old deck $650, debris disposal $225."
                                           />
                                         </Field>
                                       </div>
@@ -11427,7 +11487,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <div className="mt-3">
                                       <Field label="Scope of work">
-                                        <textarea className={inputClass()} rows={3} value={estimateDraft.scope} onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))} placeholder="Describe what this estimate covers." />
+                                        <textarea className={inputClass()} rows={3} value={estimateDraft.scope} onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))} placeholder="Describe what this estimate or invoice covers." />
                                       </Field>
                                     </div>
 
@@ -11550,7 +11610,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         className={buttonClass('primary')}
                                       >
                                         <Receipt size={15} />
-                                        {savingEstimate ? 'Saving...' : editingEstimateId ? 'Update estimate draft' : 'Save estimate draft'}
+                                        {savingEstimate ? 'Saving...' : editingEstimateId ? `Update ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                                       </button>
                                       <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
                                         Cancel
