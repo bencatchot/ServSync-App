@@ -32,32 +32,20 @@ contractor payments.
   - Requires `NOTIFICATION_WEBHOOK_SECRET` when email sending is enabled.
   - Requires database webhooks to send `x-servsync-webhook-secret`.
 
+- Added `servsync-private-media-storage.sql`.
+  - Creates a public `discover-media` bucket for contractor showcase posts.
+  - Makes `service-request-media` private for homeowner/contractor request attachments.
+  - Makes `inspection-media` private for inspection photos.
+  - Adds storage policies so only connected parties, authorized contractor users, or admins can sign private media URLs.
+
+- Updated app media previews.
+  - Service request attachments now use signed URLs.
+  - Inspection photos now use signed URLs, including older saved Supabase public URLs that can be converted back into storage paths.
+  - Discover feed uploads now use the public `discover-media` bucket instead of the private service request bucket.
+
 ## Blockers Before Go-Live
 
-### 1. Public service-request media
-
-`service-request-media` is currently public so the app can use `getPublicUrl()`.
-That is convenient, but not ideal for sensitive homeowner photos or contractor
-attachments. Anyone with a file URL could view the file.
-
-Recommended fix:
-- Make the bucket private.
-- Replace public URLs with signed URLs.
-- Keep metadata access controlled through `service_request_media` RLS.
-
-### 2. Public inspection media with broad storage policies
-
-`inspection-media` is public and currently lets any authenticated user upload or
-delete objects in that bucket. The metadata/inspection records are protected, but
-the raw storage bucket needs tighter ownership rules.
-
-Recommended fix:
-- Make the bucket private.
-- Store files under a contractor-owned folder path.
-- Restrict upload/delete to that contractor or authorized team member.
-- Use signed URLs in reports and app previews.
-
-### 3. Stripe checkout is not complete
+### 1. Stripe checkout is not complete
 
 The webhook can sync subscription status after Stripe events happen, but the app
 does not yet create Stripe Checkout sessions or expose a Stripe Customer Portal.
@@ -69,7 +57,7 @@ Required before charging contractors:
 - Add Customer Portal for card updates/cancellations.
 - Test trialing, active, past_due, canceled, unpaid, and paused states.
 
-### 4. Dependency audit issue
+### 2. Dependency audit issue
 
 `npm audit --audit-level=moderate` reports 2 moderate vulnerabilities through
 Vite/esbuild. The issue is related to the development server. The audit suggests
@@ -80,7 +68,7 @@ Recommended fix:
 - Test locally and on Vercel after upgrade.
 - Do not run `npm audit fix --force` blindly.
 
-### 5. SQL deployment is still manual
+### 3. SQL deployment is still manual
 
 The project has many SQL files. Manually pasting SQL into Supabase is workable
 for development, but risky before go-live because it is hard to know which SQL
@@ -90,6 +78,30 @@ Recommended fix:
 - Convert the active SQL files into Supabase migrations.
 - Keep old/archive SQL out of the active migration path.
 - Use one documented migration order for production.
+
+## Recently Reduced Risks
+
+### Private service-request media
+
+`service-request-media` is now prepared to be private. The app requests signed
+URLs for previews instead of using public links.
+
+Before launch:
+- Run `servsync-private-media-storage.sql` in the correct Supabase project.
+- Test upload/view from the homeowner account.
+- Test upload/view from the contractor owner account.
+- Test upload/view from a contractor team member account.
+- Confirm a different homeowner cannot view the signed URL.
+
+### Private inspection media
+
+`inspection-media` is now prepared to be private with contractor-owned paths and
+signed preview URLs.
+
+Remaining improvement:
+- Add a dedicated inspection media metadata table later. The current policy can
+  authorize homeowner reads for finalized inspections, but a metadata table will
+  be cleaner for audits and future document retention rules.
 
 ## High-Priority Before Go-Live
 
@@ -194,12 +206,12 @@ Recommended guardrails:
 
 ## Recommended Next Work Order
 
-1. Make `service-request-media` private and migrate app previews to signed URLs.
-2. Make `inspection-media` private and restrict ownership policies.
-3. Add Stripe Checkout and Customer Portal Edge Functions.
-4. Convert active SQL into Supabase migrations.
-5. Upgrade Vite safely and rerun `npm audit`.
-6. Add sign-out cleanup for sensitive local draft storage.
+1. Run and verify `servsync-private-media-storage.sql` in Supabase.
+2. Add Stripe Checkout and Customer Portal Edge Functions.
+3. Convert active SQL into Supabase migrations.
+4. Upgrade Vite safely and rerun `npm audit`.
+5. Add sign-out cleanup for sensitive local draft storage.
+6. Add storage usage reporting for homeowner documents and contractor media.
 
 ## References
 

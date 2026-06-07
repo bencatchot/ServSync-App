@@ -12,6 +12,16 @@ create policy "contractor_upload_media"
   with check (
     bucket_id = 'service-request-media'
     and (storage.foldername(name))[1] = auth.uid()::text
+    and exists (
+      select 1
+        from public.service_requests sr
+        join public.contractor_profiles cp on cp.id = sr.contractor_id
+       where sr.id::text = (storage.foldername(name))[2]
+         and (
+           cp.owner_user_id = auth.uid()
+           or public.current_user_can_access_contractor(cp.id)
+         )
+    )
   );
 
 -- Allow contractors to insert media rows for their own requests
@@ -25,7 +35,10 @@ create policy "media_insert_contractor"
         from public.service_requests sr
         join public.contractor_profiles cp on cp.id = sr.contractor_id
        where sr.id = request_id
-         and cp.owner_user_id = auth.uid()
+         and (
+           cp.owner_user_id = auth.uid()
+           or public.current_user_can_access_contractor(cp.id)
+         )
     )
   );
 

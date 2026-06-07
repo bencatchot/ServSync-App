@@ -1,12 +1,16 @@
 -- ServSync media attachments.
 -- Paste this into the Supabase SQL Editor for the ServSync project.
 -- Run after servsync-request-lifecycle.sql.
--- Requires a Storage bucket named 'service-request-media' (already created in the dashboard).
+-- Creates a private Storage bucket named 'service-request-media'.
 
 begin;
 
--- Make bucket public so getPublicUrl() works without signed URLs
-update storage.buckets set public = true where id = 'service-request-media';
+-- Keep bucket private. The app uses signed URLs for authorized parties.
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('service-request-media', 'service-request-media', false, 20971520)
+on conflict (id) do update
+set public = false,
+    file_size_limit = 20971520;
 
 -- Homeowners upload to a folder named after their own user ID
 drop policy if exists "homeowner_upload_media" on storage.objects;
@@ -15,6 +19,12 @@ create policy "homeowner_upload_media"
   with check (
     bucket_id = 'service-request-media'
     and (storage.foldername(name))[1] = auth.uid()::text
+    and exists (
+      select 1
+        from public.service_requests sr
+       where sr.id::text = (storage.foldername(name))[2]
+         and sr.homeowner_user_id = auth.uid()
+    )
   );
 
 -- Media table
@@ -58,12 +68,34 @@ create policy "media_read_parties"
          and (
            sr.homeowner_user_id = auth.uid()
            or cp.owner_user_id = auth.uid()
+           or public.current_user_can_access_contractor(cp.id)
            or public.current_user_is_platform_admin()
          )
     )
   );
 
 grant select, insert on public.service_request_media to authenticated;
+
+drop policy if exists "service_request_media_read_parties" on storage.objects;
+create policy "service_request_media_read_parties"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'service-request-media'
+    and exists (
+      select 1
+        from public.service_request_media med
+        join public.service_requests sr on sr.id = med.request_id
+        join public.contractor_profiles cp on cp.id = sr.contractor_id
+       where med.storage_path = storage.objects.name
+         and (
+           med.uploader_user_id = auth.uid()
+           or sr.homeowner_user_id = auth.uid()
+           or cp.owner_user_id = auth.uid()
+           or public.current_user_can_access_contractor(cp.id)
+           or public.current_user_is_platform_admin()
+         )
+    )
+  );
 
 -- Update homeowner reply RPC to return message_id so the UI can link media
 create or replace function public.servsync_homeowner_update_service_request(

@@ -4,6 +4,49 @@
 
 begin;
 
+-- ── Public Discover feed media ──────────────────────────────────────────────
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('discover-media', 'discover-media', true, 20971520)
+on conflict (id) do update
+set public = true,
+    file_size_limit = 20971520;
+
+drop policy if exists "discover_media_upload_contractor" on storage.objects;
+drop policy if exists "discover_media_update_own_folder" on storage.objects;
+drop policy if exists "discover_media_delete_own_folder" on storage.objects;
+
+create policy "discover_media_upload_contractor"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'discover-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and exists (
+      select 1
+        from public.contractor_profiles cp
+       where cp.owner_user_id = auth.uid()
+         and cp.account_status = 'active'
+    )
+  );
+
+create policy "discover_media_update_own_folder"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'discover-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'discover-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "discover_media_delete_own_folder"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'discover-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
 -- ── Contractor posts table ───────────────────────────────────────────────────
 
 create table if not exists public.contractor_posts (

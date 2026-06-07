@@ -9108,10 +9108,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const path = `${contractor.id}/${activeInspection.id}/${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('inspection-media').upload(path, file, { contentType: file.type });
       if (uploadErr) throw uploadErr;
-      const { data: { publicUrl } } = supabase.storage.from('inspection-media').getPublicUrl(path);
       setLocalFindings(prev => {
         const current = prev[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
-        return { ...prev, [key]: { ...current, photos: [...(current.photos ?? []), publicUrl] } };
+        return { ...prev, [key]: { ...current, photos: [...(current.photos ?? []), path] } };
       });
     } catch (err) {
       setError(readableError(err, 'Failed to upload photo.'));
@@ -14293,7 +14292,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div className="grid grid-cols-4 gap-2 mt-1">
                                             {(current.photos ?? []).map((url, pi) => (
                                               <div key={pi} className="relative group rounded-lg overflow-hidden">
-                                                <img src={url} alt="finding" className="w-full h-20 object-cover" />
+                                                <InspectionPhotoImage photo={url} alt="finding" className="w-full h-20 object-cover" />
                                                 <button
                                                   type="button"
                                                   onClick={() => removeInspectionPhoto(key, url)}
@@ -14903,7 +14902,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {(f.photos ?? []).length > 0 && (
                                       <div className="grid grid-cols-4 gap-2 mt-3">
                                         {(f.photos ?? []).map((url, pi) => (
-                                          <img key={pi} src={url} alt={f.title} className="w-full h-20 object-cover rounded-lg" />
+                                          <InspectionPhotoImage key={pi} photo={url} alt={f.title} className="w-full h-20 object-cover rounded-lg" />
                                         ))}
                                       </div>
                                     )}
@@ -16356,14 +16355,49 @@ function StarDisplay({ rating }: { rating: number }) {
 
 function MediaThumbnails({ items }: { items: ServiceRequestMedia[] }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadUrls = async () => {
+      if (!supabase || items.length === 0) {
+        if (!cancelled) setSignedUrls({});
+        return;
+      }
+
+      const client = supabase;
+      const entries = await Promise.all(items.map(async item => {
+        const { data, error } = await client.storage
+          .from('service-request-media')
+          .createSignedUrl(item.storage_path, 60 * 15);
+        return [item.id, error ? '' : data?.signedUrl ?? ''] as const;
+      }));
+
+      if (!cancelled) {
+        setSignedUrls(Object.fromEntries(entries.filter(([, url]) => Boolean(url))));
+      }
+    };
+
+    void loadUrls();
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
   if (items.length === 0) return null;
   return (
     <>
       <div className="mt-2 flex flex-wrap gap-2">
         {items.map(item => {
-          const { data } = supabase!.storage.from('service-request-media').getPublicUrl(item.storage_path);
-          const url = data.publicUrl;
+          const url = signedUrls[item.id];
           const isVideo = item.content_type.startsWith('video/');
+          if (!url) {
+            return (
+              <div key={item.id} className="flex h-24 w-24 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500">
+                Loading attachment
+              </div>
+            );
+          }
           return isVideo ? (
             <video
               key={item.id}
@@ -16392,6 +16426,53 @@ function MediaThumbnails({ items }: { items: ServiceRequestMedia[] }) {
       )}
     </>
   );
+}
+
+function InspectionPhotoImage({ photo, alt, className }: { photo: string; alt: string; className: string }) {
+  const inspectionPhotoPath = (value: string) => {
+    if (!value.startsWith('http')) return value;
+    const marker = '/storage/v1/object/public/inspection-media/';
+    const markerIndex = value.indexOf(marker);
+    if (markerIndex < 0) return '';
+    return decodeURIComponent(value.slice(markerIndex + marker.length).split('?')[0]);
+  };
+
+  const [src, setSrc] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const storagePath = inspectionPhotoPath(photo);
+    if (!storagePath) {
+      setSrc(photo);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadUrl = async () => {
+      if (!supabase) return;
+      const { data, error } = await supabase.storage
+        .from('inspection-media')
+        .createSignedUrl(storagePath, 60 * 15);
+      if (!cancelled) setSrc(error ? '' : data?.signedUrl ?? '');
+    };
+
+    setSrc('');
+    void loadUrl();
+    return () => {
+      cancelled = true;
+    };
+  }, [photo]);
+
+  if (!src) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-slate-100 text-[10px] font-medium text-slate-500`}>
+        Loading
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} />;
 }
 
 function ServiceRequestMessages({ messages, media }: { messages: ServiceRequestSummary['messages']; media: ServiceRequestMedia[] }) {
@@ -16922,10 +17003,10 @@ function DiscoverFeed({
       const ext = file.name.split('.').pop() ?? 'jpg';
       const storagePath = `${userId}/posts/${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from('service-request-media')
+        .from('discover-media')
         .upload(storagePath, file, { contentType: file.type });
       if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('service-request-media').getPublicUrl(storagePath);
+      const { data: urlData } = supabase.storage.from('discover-media').getPublicUrl(storagePath);
       urls.push(urlData.publicUrl);
     }
     return urls;
