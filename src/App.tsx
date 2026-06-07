@@ -154,6 +154,7 @@ type HomeownerServiceRequestDraft = {
   description: string;
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
+type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
 type ServSyncFieldWorkTemplate = {
   id: string;
   name: string;
@@ -7278,8 +7279,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     service_request_id: '',
     name: '',
     template_id: '',
+    template_source: 'blank' as FieldWorkTemplateSource,
     starter_template_id: 'starter-general-maintenance-field-work',
-    workflow_kind: 'inspection' as FieldWorkflowKind,
+    workflow_kind: 'work_order' as FieldWorkflowKind,
   });
   const [localFindings, setLocalFindings] = useState<Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>>({});
   const [inspectionClosedForReview, setInspectionClosedForReview] = useState(false);
@@ -8471,8 +8473,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     service_request_id: '',
     name: '',
     template_id: '',
+    template_source: 'blank' as FieldWorkTemplateSource,
     starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work',
-    workflow_kind: sortedServSyncFieldWorkTemplates[0]?.kind ?? 'inspection' as FieldWorkflowKind,
+    workflow_kind: 'work_order' as FieldWorkflowKind,
   });
   const fieldWorkDrafts = inspections.filter(insp => insp.status === 'draft');
   const finalizedFieldWork = inspections.filter(insp => insp.status === 'finalized');
@@ -8483,46 +8486,52 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const fieldWorkForLocalContact = (localContactId: string) => inspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind) => {
-    const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId);
+  const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
+    const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
     const homeownerName = connection.display_name || connection.home?.nickname || 'Homeowner';
     return `${starter?.name || workflowLabel} — ${homeownerName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
-  const buildLocalFieldWorkName = (contact: ContractorLocalContact, starterId: string, kind: FieldWorkflowKind) => {
-    const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId);
+  const buildLocalFieldWorkName = (contact: ContractorLocalContact, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
+    const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
     return `${starter?.name || workflowLabel} — ${contact.display_name || 'Local customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
-  const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: { templateId?: string; starterTemplateId?: string; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string }) => {
+  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string };
+  const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
+    const templateSource: FieldWorkTemplateSource = options?.templateSource ?? (options?.templateId ? 'custom' : options?.starterTemplateId ? 'starter' : 'blank');
     const starterTemplateId = options?.starterTemplateId ?? sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work';
-    const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterTemplateId);
-    const workflowKind = options?.workflowKind ?? starter?.kind ?? 'inspection';
+    const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterTemplateId) : null;
+    const workflowKind = options?.workflowKind ?? starter?.kind ?? 'work_order';
+    return { templateSource, starterTemplateId, workflowKind };
+  };
+  const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
+    const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
       local_contact_id: '',
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
-      name: options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind),
+      name: options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource),
       template_id: options?.templateId ?? '',
+      template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
     });
     setInspectionView('new');
   };
-  const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: { templateId?: string; starterTemplateId?: string; workflowKind?: FieldWorkflowKind; name?: string }) => {
-    const starterTemplateId = options?.starterTemplateId ?? sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work';
-    const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterTemplateId);
-    const workflowKind = options?.workflowKind ?? starter?.kind ?? 'inspection';
+  const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
+    const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
       local_contact_id: contact.id,
       local_home_id: contact.homes?.[0]?.id ?? '',
       service_request_id: '',
-      name: options?.name ?? buildLocalFieldWorkName(contact, starterTemplateId, workflowKind),
+      name: options?.name ?? buildLocalFieldWorkName(contact, starterTemplateId, workflowKind, templateSource),
       template_id: options?.templateId ?? '',
+      template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
     });
@@ -8605,11 +8614,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
     setSavingInspection(true);
     try {
-      const selectedTemplate = inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id);
-      const selectedStarterTemplate = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id);
+      const selectedTemplate = inspectionNewDraft.template_source === 'custom'
+        ? inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id)
+        : null;
+      const selectedStarterTemplate = inspectionNewDraft.template_source === 'starter'
+        ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
+        : null;
       const rooms: InspectionTemplateRoom[] = selectedTemplate
         ? selectedTemplate.rooms
-        : selectedStarterTemplate?.rooms ?? DEFAULT_INSPECTION_ROOMS;
+        : selectedStarterTemplate?.rooms ?? [];
       const seedFindings: InspectionRoomData[] = rooms.map(r => ({
         room: r.room,
         findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
@@ -8622,7 +8635,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_service_request_id: inspectionNewDraft.service_request_id || null,
         p_name: inspectionNewDraft.name.trim(),
         p_rooms_with_findings: seedFindings,
-        p_template_id: inspectionNewDraft.template_id || null,
+        p_template_id: selectedTemplate?.id ?? null,
       });
       if (rpcErr) throw rpcErr;
       const newInspection: Inspection = {
@@ -8632,7 +8645,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
         local_home_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_home_id || null : null,
         service_request_id: inspectionNewDraft.service_request_id || null,
-        template_id: inspectionNewDraft.template_id || null,
+        template_id: selectedTemplate?.id ?? null,
         name: inspectionNewDraft.name.trim(),
         summary: '',
         status: 'draft',
@@ -8962,6 +8975,43 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setNotice('Template saved.');
     } catch (err) {
       setError(readableError(err, 'Failed to save template.'));
+    } finally {
+      setSavingInspection(false);
+    }
+  };
+
+  const saveActiveFieldWorkAsTemplate = async () => {
+    if (!supabase || !contractor || !activeInspection) return;
+    const rooms: InspectionTemplateRoom[] = buildInspectionRoomsSnapshot()
+      .map(room => ({
+        room: room.room,
+        items: room.findings.map(finding => finding.title.trim()).filter(Boolean),
+      }))
+      .filter(room => room.room.trim() && room.items.length > 0);
+
+    if (rooms.length === 0) {
+      setError('Add at least one section and checklist item before saving this work order as a template.');
+      return;
+    }
+
+    const fallbackName = activeInspection.name
+      .split('—')[0]
+      ?.trim() || 'New work order template';
+    const templateName = window.prompt('Name this reusable template:', fallbackName);
+    if (!templateName?.trim()) return;
+
+    setSavingInspection(true);
+    try {
+      const { data, error: err } = await supabase
+        .from('inspection_templates')
+        .insert({ contractor_id: contractor.id, name: templateName.trim(), rooms })
+        .select()
+        .single();
+      if (err) throw err;
+      setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
+      setNotice('Work order saved as a reusable template.');
+    } catch (err) {
+      setError(readableError(err, 'Failed to save work order as a template.'));
     } finally {
       setSavingInspection(false);
     }
@@ -11158,7 +11208,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                       <div>
                                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New work order</p>
-                                        <p className="mt-1 text-sm text-blue-900">Choose the work type and template before creating the draft for this workspace.</p>
+                                        <p className="mt-1 text-sm text-blue-900">Start blank for on-site work, or use a template when a repeatable checklist helps.</p>
                                       </div>
                                       <button type="button" onClick={() => setInspectionView('list')} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
                                         Cancel
@@ -11173,8 +11223,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           setInspectionNewDraft(d => ({
                                             ...d,
                                             workflow_kind: nextKind,
-                                            starter_template_id: d.template_id ? d.starter_template_id : nextStarter?.id ?? d.starter_template_id,
-                                            name: `${nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind]} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
+                                            starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
+                                            name: `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
                                           }));
                                         }}>
                                           {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -11185,17 +11235,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </Field>
                                     </div>
                                     <div className="mt-3">
-                                      <Field label="Template">
-                                        <select className={inputClass()} value={inspectionNewDraft.template_id ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
-                                          const [source, id] = e.target.value.split(':');
+                                      <Field label="Start from">
+                                        <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
+                                          if (e.target.value === 'blank') {
+                                            setInspectionNewDraft(d => ({ ...d, template_source: 'blank', template_id: '' }));
+                                            return;
+                                          }
+                                          const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
                                           const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === id);
                                           setInspectionNewDraft(d => ({
                                             ...d,
+                                            template_source: source,
                                             template_id: source === 'custom' ? id : '',
                                             starter_template_id: source === 'starter' ? id : d.starter_template_id,
                                             workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
                                           }));
                                         }}>
+                                          <option value="blank">Blank work order — build on site</option>
                                           <optgroup label="ServSync starter templates">
                                             {sortedServSyncFieldWorkTemplates.map(t => (
                                               <option key={t.id} value={`starter:${t.id}`}>
@@ -12399,7 +12455,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setInspectionNewDraft({ ...resetInspectionNewDraft(), template_id: tpl.id, starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work' });
+                                      setInspectionNewDraft({ ...resetInspectionNewDraft(), template_source: 'custom', template_id: tpl.id, starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work' });
                                       setInspectionView('new');
                                     }}
                                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
@@ -12439,7 +12495,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setInspectionNewDraft({ ...resetInspectionNewDraft(), template_id: '', starter_template_id: tpl.id, workflow_kind: tpl.kind });
+                                        setInspectionNewDraft({ ...resetInspectionNewDraft(), template_source: 'starter', template_id: '', starter_template_id: tpl.id, workflow_kind: tpl.kind });
                                         setInspectionView('new');
                                       }}
                                       className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
@@ -12513,7 +12569,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const [subjectType, id] = e.target.value.split(':') as ['connected' | 'local', string];
                     const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
                     const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
-                    const selectedTemplate = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id);
+                    const selectedTemplate = inspectionNewDraft.template_source === 'starter'
+                      ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
+                      : null;
                     const workflowLabel = FIELD_WORK_KIND_LABEL[inspectionNewDraft.workflow_kind];
                     const subjectName = conn?.display_name || local?.display_name || '';
                     const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
@@ -12544,9 +12602,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       setInspectionNewDraft(d => ({
                         ...d,
                         workflow_kind: nextKind,
-                        starter_template_id: d.template_id ? d.starter_template_id : nextStarter?.id ?? d.starter_template_id,
+                        starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
                         name: d.homeowner_user_id || d.local_contact_id
-                          ? `${nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind]} — ${
+                          ? `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${
                               d.subject_type === 'local'
                                 ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'Local customer'
                                 : connections.find(c => c.homeowner_user_id === d.homeowner_user_id)?.display_name ?? 'Homeowner'
@@ -12561,17 +12619,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC seasonal inspection" />
                   </Field>
                 </div>
-                <Field label="Workflow template">
-                  <select className={inputClass()} value={inspectionNewDraft.template_id ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
-                    const [source, id] = e.target.value.split(':');
+                <Field label="Start from">
+                  <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
+                    if (e.target.value === 'blank') {
+                      setInspectionNewDraft(d => ({ ...d, template_source: 'blank', template_id: '' }));
+                      return;
+                    }
+                    const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
                     const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === id);
                     setInspectionNewDraft(d => ({
                       ...d,
+                      template_source: source,
                       template_id: source === 'custom' ? id : '',
                       starter_template_id: source === 'starter' ? id : d.starter_template_id,
                       workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
                     }));
                   }}>
+                    <option value="blank">Blank work order — build on site</option>
                     <optgroup label="ServSync starter templates">
                       {sortedServSyncFieldWorkTemplates.map(t => (
                         <option key={t.id} value={`starter:${t.id}`}>
@@ -12664,6 +12728,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="flex flex-wrap items-center gap-2 justify-end">
                         <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft'} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
                           {savingInspection ? 'Saving...' : 'Save'}
+                        </button>
+                        <button type="button" onClick={() => void saveActiveFieldWorkAsTemplate()} disabled={savingInspection} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
+                          Save as template
                         </button>
                         <button type="button" onClick={goToReportReview} className={buttonClass('primary')}>
                           Review report
