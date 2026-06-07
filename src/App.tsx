@@ -175,6 +175,7 @@ type StarterEstimateTemplate = {
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'support';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'support';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
+type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type EstimateLineDraft = {
@@ -7315,6 +7316,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['overview', 'profile', 'home', 'fieldwork', 'inspections', 'estimates', 'invoices', 'requests', 'schedule'] as const, 'overview'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
+  const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>('overview');
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
   const [estimateComposerOpen, setEstimateComposerOpen] = useState(false);
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
@@ -8243,7 +8245,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateAssistantNotice('');
     setEstimateComposerOpen(true);
     setHomeownerWorkspaceEstimateView('draft');
-    setHomeownerDetailTab('estimates');
+    setContractorJobsView('new_financial');
+    setContractorTab('inspections');
+  };
+
+  const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string } = {}) => {
+    setEditingEstimateId(null);
+    setEstimateDraft(createBlankEstimateDraft({
+      title: `Estimate — ${subjectName || 'Customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      service_request_id: options.serviceRequestId ?? '',
+      inspection_id: options.inspectionId ?? '',
+    }));
+    setEstimateAssistantText('');
+    setEstimateAssistantNotice('');
+    setEstimateComposerOpen(true);
+    setHomeownerWorkspaceEstimateView('draft');
+    setContractorJobsView('new_financial');
+    setContractorTab('inspections');
   };
 
   const saveEstimateDraft = async (subject: {
@@ -8598,6 +8616,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const fieldWorkForLocalContact = (localContactId: string) => inspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const selectedJobsConnection = selectedHomeownerSubjectId
+    ? connections.find(connection =>
+      connection.connection_id === selectedHomeownerSubjectId
+      || connection.homeowner_user_id === selectedHomeownerSubjectId
+    ) ?? null
+    : null;
+  const selectedJobsLocalContact = selectedHomeownerSubjectId?.startsWith('local:')
+    ? localContacts.find(contact => `local:${contact.id}` === selectedHomeownerSubjectId) ?? null
+    : null;
+  const selectedJobsCustomerName = selectedJobsConnection?.display_name || selectedJobsLocalContact?.display_name || '';
+  const selectedJobsCustomerAddress = selectedJobsConnection
+    ? selectedJobsConnection.home?.address_line1 || selectedJobsConnection.city || ''
+    : selectedJobsLocalContact?.homes?.[0]?.address_line1 || selectedJobsLocalContact?.homes?.[0]?.city || '';
+  const selectedJobsCustomerWork = selectedJobsConnection
+    ? fieldWorkForHomeowner(selectedJobsConnection.homeowner_user_id)
+    : selectedJobsLocalContact
+      ? fieldWorkForLocalContact(selectedJobsLocalContact.id)
+      : inspections;
+  const selectedJobsCustomerEstimates = selectedJobsConnection
+    ? estimates.filter(estimate => estimate.homeowner_user_id === selectedJobsConnection.homeowner_user_id)
+    : selectedJobsLocalContact
+      ? estimates.filter(estimate => estimate.local_contact_id === selectedJobsLocalContact.id)
+      : estimates;
+  const openJobs = inspections.filter(insp => insp.status === 'draft');
+  const closedJobs = inspections.filter(insp => insp.status === 'finalized');
+  const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
+  const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
+  const selectedJobsSubject = {
+    homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
+    localContactId: selectedJobsLocalContact?.id ?? null,
+  };
+  const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(insp => insp.status === 'draft');
+  const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(insp => insp.status === 'finalized');
   const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
@@ -8632,6 +8683,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       workflow_kind: workflowKind,
     });
     setInspectionView('new');
+    setContractorJobsView('new_jobs');
+    setContractorTab('inspections');
   };
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
@@ -8648,6 +8701,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       workflow_kind: workflowKind,
     });
     setInspectionView('new');
+    setContractorJobsView('new_jobs');
+    setContractorTab('inspections');
   };
   const fieldWorkSubjectLabel = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
@@ -8777,15 +8832,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setSelectedChecklistRoom(rooms[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
       setInspectionSubTab('checklist');
-      if (contractorTab === 'connections') {
-        setInspectionView('detail');
-        setHomeownerDetailTab('fieldwork');
-        persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: 'checklist', selectedRoom: rooms[0]?.room ?? null });
-      } else {
-        setInspectionView('detail');
-        setContractorTab('inspections');
-        persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: 'checklist', selectedRoom: rooms[0]?.room ?? null });
-      }
+      setInspectionView('detail');
+      setContractorJobsView('open_jobs');
+      setContractorTab('inspections');
+      persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: 'checklist', selectedRoom: rooms[0]?.room ?? null });
     } catch (err) {
       setError(readableError(err, 'Failed to create inspection.'));
     } finally {
@@ -8937,8 +8987,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setSelectedHomeownerSubjectId(`local:${insp.local_contact_id}`);
         setHomeownerFilter('active');
       }
-      setHomeownerDetailTab('fieldwork');
+      setContractorJobsView('open_jobs');
+      setContractorTab('inspections');
     } else {
+      setContractorJobsView(insp.status === 'draft' ? 'open_jobs' : 'closed_jobs');
       setContractorTab('inspections');
     }
     persistFieldWorkState({ inspectionId: insp.id, view: 'detail', subTab: nextSubTab, selectedRoom: nextSelectedRoom });
@@ -9232,7 +9284,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: homeownerAppointmentRequests.length, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
-        { id: 'inspections',  label: 'Work Orders',        icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
+        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
       activeTab={contractorTab}
@@ -9250,8 +9302,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 setSelectedHomeownerSubjectId(connection.connection_id);
                 setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
                 setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
-                setHomeownerDetailTab('estimates');
-                setContractorTab('connections');
+                setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+                setContractorTab('inspections');
                 return;
               }
             }
@@ -9259,11 +9311,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               setSelectedHomeownerSubjectId(`local:${estimate.local_contact_id}`);
               setHomeownerFilter('active');
               setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
-              setHomeownerDetailTab('estimates');
-              setContractorTab('connections');
+              setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+              setContractorTab('inspections');
               return;
             }
-            setContractorTab('connections');
+            setContractorJobsView('open_financial');
+            setContractorTab('inspections');
             return;
           }
           if (notification.support_inquiry_id || notification.type.includes('support')) {
@@ -9272,7 +9325,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }
           if (!notification.request_id) {
             const category = notificationCategoryLabel(notification.type);
-            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'connections' : category === 'Field Work' ? 'inspections' : category === 'Connection' ? 'connections' : 'requests');
+            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'inspections' : category === 'Field Work' ? 'inspections' : category === 'Connection' ? 'connections' : 'requests');
             return;
           }
           const request = serviceRequests.find(item => item.id === notification.request_id);
@@ -10951,10 +11004,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       { id: 'overview', label: 'Overview' },
                       { id: 'profile', label: 'Profile' },
                       { id: 'home', label: 'Home' },
-                      { id: 'fieldwork', label: 'Work Orders', badge: workOrderDraftCount },
-                      { id: 'inspections', label: 'Inspections', badge: inspectionDraftCount },
-                      { id: 'estimates', label: 'Estimates', badge: draftEstimateCount },
-                      { id: 'invoices', label: 'Invoices', badge: draftInvoiceCount },
                       ...(isConn ? [
                         { id: 'requests' as const, label: 'Requests', badge: activeReqs.length },
                         { id: 'schedule' as const, label: 'Schedule', badge: upcomingAppts.length },
@@ -10993,7 +11042,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         helper: `${workOrderDraftCount} draft${workOrderDraftCount === 1 ? '' : 's'} · ${workOrderFinalCount} filed`,
                         icon: <ClipboardCheck size={16} />,
                         tone: workOrderDraftCount > 0 ? 'amber' : 'emerald',
-                        onClick: () => setHomeownerDetailTab('fieldwork'),
+                        onClick: () => {
+                          setContractorJobsView(workOrderDraftCount > 0 ? 'open_jobs' : 'new_jobs');
+                          setContractorTab('inspections');
+                        },
                       },
                       {
                         label: 'Inspections',
@@ -11001,7 +11053,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         helper: `${inspectionDraftCount} draft${inspectionDraftCount === 1 ? '' : 's'} · ${inspectionFinalCount} filed`,
                         icon: <ClipboardList size={16} />,
                         tone: inspectionDraftCount > 0 ? 'amber' : 'slate',
-                        onClick: () => setHomeownerDetailTab('inspections'),
+                        onClick: () => {
+                          setContractorJobsView(inspectionDraftCount > 0 ? 'open_jobs' : 'new_jobs');
+                          setContractorTab('inspections');
+                        },
                       },
                       {
                         label: 'Estimates',
@@ -11011,7 +11066,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         tone: estimateRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftEstimateCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
                           setHomeownerWorkspaceEstimateView(estimateRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftEstimateCount > 0 ? 'draft' : 'sent');
-                          setHomeownerDetailTab('estimates');
+                          setContractorJobsView(estimateRecords.length > 0 ? 'open_financial' : 'new_financial');
+                          setContractorTab('inspections');
                         },
                       },
                       {
@@ -11022,7 +11078,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         tone: invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftInvoiceCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
                           setHomeownerWorkspaceEstimateView(invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftInvoiceCount > 0 ? 'draft' : 'sent');
-                          setHomeownerDetailTab('invoices');
+                          setContractorJobsView(invoiceRecords.length > 0 ? 'open_financial' : 'new_financial');
+                          setContractorTab('inspections');
                         },
                       },
                       ...(isConn ? [
@@ -11061,9 +11118,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div className="flex items-center gap-2 flex-wrap justify-end">
                               {isConn && conn && (
                                 <>
-                                  <button type="button" onClick={() => { beginFieldWorkForHomeowner(conn); setHomeownerDetailTab('fieldwork'); }} className={buttonClass('primary')}>
+                                  <button type="button" onClick={() => beginEstimateDraftForCustomer(headerName)} className={buttonClass('primary')}>
+                                    <Receipt size={14} />
+                                    Create estimate
+                                  </button>
+                                  <button type="button" onClick={() => beginFieldWorkForHomeowner(conn)} className={buttonClass('secondary')}>
                                     <ClipboardCheck size={14} />
-                                    Create work order
+                                    Create job
                                   </button>
                                   <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
                                     <Receipt size={14} />
@@ -11073,9 +11134,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               )}
                               {!isConn && localCustomer && (
                                 <>
-                                  <button type="button" onClick={() => { beginFieldWorkForLocalContact(localCustomer); setHomeownerDetailTab('fieldwork'); }} className={buttonClass('primary')}>
+                                  <button type="button" onClick={() => beginEstimateDraftForCustomer(headerName)} className={buttonClass('primary')}>
+                                    <Receipt size={14} />
+                                    Create estimate
+                                  </button>
+                                  <button type="button" onClick={() => beginFieldWorkForLocalContact(localCustomer)} className={buttonClass('secondary')}>
                                     <ClipboardCheck size={14} />
-                                    Create work order
+                                    Create job
                                   </button>
                                   <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
                                     <Receipt size={14} />
@@ -11176,10 +11241,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setHomeownerDetailTab('schedule');
                                       } else if (conn) {
                                         beginFieldWorkForHomeowner(conn);
-                                        setHomeownerDetailTab('fieldwork');
                                       } else if (localCustomer) {
                                         beginFieldWorkForLocalContact(localCustomer);
-                                        setHomeownerDetailTab('fieldwork');
                                       }
                                     }}
                                     className={buttonClass('primary')}
@@ -11235,7 +11298,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <h3 className="font-bold text-slate-950">Recent work orders</h3>
                                       <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => setHomeownerDetailTab('fieldwork')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View all</button>
+                                    <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentWorkOrders.length === 0 ? (
                                     <EmptyState text="No work orders yet for this workspace." />
@@ -11267,7 +11330,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <h3 className="font-bold text-slate-950">Recent inspections</h3>
                                       <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => setHomeownerDetailTab('inspections')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View all</button>
+                                    <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentInspections.length === 0 ? (
                                     <EmptyState text="No inspections yet for this workspace." />
@@ -11542,7 +11605,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       } else if (localCustomer) {
                                         beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection' });
                                       }
-                                      setHomeownerDetailTab('fieldwork');
                                     }}
                                     className={buttonClass('primary')}
                                   >
@@ -12147,7 +12209,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                       workflowKind: 'work_order',
                                                     });
                                                   }
-                                                  setHomeownerDetailTab('fieldwork');
                                                 }}
                                                 className={buttonClass('primary')}
                                               >
@@ -12263,7 +12324,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           serviceRequestId: selectedWorkspaceRequest.id,
                                           workflowKind: 'work_order',
                                         });
-                                        setHomeownerDetailTab('fieldwork');
                                       }}
                                       className={buttonClass('secondary')}
                                     >
@@ -12485,6 +12545,473 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </div>
               </section>
 
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Jobs workspace</p>
+                    <h3 className="mt-1 text-lg font-bold text-slate-950">Choose what you want to manage</h3>
+                  </div>
+                  <div className="min-w-[240px]">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Customer filter</label>
+                    <select
+                      className={inputClass()}
+                      value={selectedHomeownerSubjectId ?? ''}
+                      onChange={event => {
+                        setSelectedHomeownerSubjectId(event.target.value || null);
+                      }}
+                    >
+                      <option value="">All customers</option>
+                      {connections.filter(c => c.status === 'active').map(c => (
+                        <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                      ))}
+                      {localContacts.map(contact => (
+                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Local customer'} — Local customer</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-7">
+                  {([
+                    { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Inspection or service work', icon: <Plus size={15} /> },
+                    { id: 'open_jobs', label: 'Open Jobs', value: String(selectedHomeownerSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
+                    { id: 'closed_jobs', label: 'Closed Jobs', value: String(selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
+                    { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
+                    { id: 'open_financial', label: 'Open Estimates', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length), helper: 'Draft, sent, accepted', icon: <FileText size={15} /> },
+                    { id: 'closed_financial', label: 'Closed/Billed', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length), helper: 'Closed financial records', icon: <Receipt size={15} /> },
+                    { id: 'templates', label: 'Templates', value: String(inspectionTemplates.length + estimateTemplates.length), helper: 'Workflow starters', icon: <ClipboardList size={15} /> },
+                  ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
+                    const active = contractorJobsView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setContractorJobsView(item.id);
+                          if (item.id === 'new_jobs') setInspectionView('new');
+                          if (item.id !== 'new_jobs') setInspectionView('list');
+                        }}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          active
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
+                          <span className="text-lg font-bold">{item.value}</span>
+                        </div>
+                        <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+                        <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {contractorJobsView === 'overview' && (
+                <section className="grid gap-3 md:grid-cols-3">
+                  <button type="button" onClick={() => { setContractorJobsView('new_jobs'); setInspectionView('new'); }} className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left shadow-sm transition hover:border-blue-300">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Start work</p>
+                    <h3 className="mt-1 font-bold text-slate-950">Create a job or inspection</h3>
+                    <p className="mt-1 text-sm text-blue-900">Choose the customer, work type, and whether to start blank or from a template.</p>
+                  </button>
+                  <button type="button" onClick={() => setContractorJobsView('new_financial')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Money flow</p>
+                    <h3 className="mt-1 font-bold text-slate-950">Create estimate or invoice</h3>
+                    <p className="mt-1 text-sm text-slate-600">Build an estimate first, then create an invoice from accepted work, or make a standalone invoice.</p>
+                  </button>
+                  <button type="button" onClick={() => setContractorJobsView('open_jobs')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current workload</p>
+                    <h3 className="mt-1 font-bold text-slate-950">Review open items</h3>
+                    <p className="mt-1 text-sm text-slate-600">{openJobs.length} open job{openJobs.length === 1 ? '' : 's'} and {openFinancialRecords.length} open estimate/invoice record{openFinancialRecords.length === 1 ? '' : 's'}.</p>
+                  </button>
+                </section>
+              )}
+
+              {contractorJobsView === 'new_financial' && (
+                <Card title="New estimate or invoice" icon={<Receipt size={18} />}>
+                  <div className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+                      <Field label="Customer">
+                        <select
+                          className={inputClass()}
+                          value={selectedHomeownerSubjectId ?? ''}
+                          onChange={event => setSelectedHomeownerSubjectId(event.target.value || null)}
+                        >
+                          <option value="">Choose customer...</option>
+                          {connections.filter(c => c.status === 'active').map(c => (
+                            <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                          ))}
+                          {localContacts.map(contact => (
+                            <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Local customer'} — Local customer</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <button
+                        type="button"
+                        disabled={!selectedJobsCustomerName}
+                        onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                        className={buttonClass('primary')}
+                      >
+                        <Plus size={15} />
+                        Create estimate
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!selectedJobsCustomerName}
+                        onClick={() => beginCompletedWorkInvoice(selectedJobsCustomerName || 'Customer')}
+                        className={buttonClass('secondary')}
+                      >
+                        <Receipt size={15} />
+                        Create invoice
+                      </button>
+                    </div>
+
+                    {!selectedJobsCustomerName && (
+                      <Notice tone="info" text="Choose a connected homeowner or local customer before creating an estimate or invoice." />
+                    )}
+
+                    {estimateComposerOpen && selectedJobsCustomerName && (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
+                              {editingEstimateId ? `Edit ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} draft`}
+                            </p>
+                            <p className="mt-1 text-sm text-blue-900">{selectedJobsCustomerName}{selectedJobsCustomerAddress ? ` · ${selectedJobsCustomerAddress}` : ''}</p>
+                          </div>
+                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
+                            <input className={inputClass()} value={estimateDraft.title} onChange={event => setEstimateDraft(d => ({ ...d, title: event.target.value }))} />
+                          </Field>
+                          {selectedJobsCustomerWork.length > 0 && (
+                            <Field label="Attach to job (optional)">
+                              <select className={inputClass()} value={estimateDraft.inspection_id} onChange={event => setEstimateDraft(d => ({ ...d, inspection_id: event.target.value }))}>
+                                <option value="">No job attached</option>
+                                {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
+                              </select>
+                            </Field>
+                          )}
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Sparkles size={16} className="text-blue-700" />
+                                <p className="text-sm font-bold text-slate-950">Smart estimate assistant</p>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">Describe rough work and pricing. ServSync will draft cleaner scope and editable line items.</p>
+                            </div>
+                            <button type="button" onClick={startEstimateAssistantSpeech} disabled={estimateAssistantListening} className={buttonClass('secondary')}>
+                              <Mic size={14} />
+                              {estimateAssistantListening ? 'Listening...' : 'Speak'}
+                            </button>
+                          </div>
+                          <div className="mt-3">
+                            <textarea
+                              className={`${inputClass()} min-h-[96px] resize-y`}
+                              value={estimateAssistantText}
+                              onChange={event => setEstimateAssistantText(event.target.value)}
+                              placeholder="Example: Build 20x40 deck with railing, 40 billable hours at $50/hr, demo and removal $500, materials $3,000."
+                            />
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <button type="button" onClick={applySmartEstimateDraft} className={buttonClass('primary')}>
+                              <Sparkles size={14} />
+                              Generate draft
+                            </button>
+                            <button type="button" onClick={() => { setEstimateAssistantText(''); setEstimateAssistantNotice(''); }} className={buttonClass('secondary')}>
+                              Clear
+                            </button>
+                            <p className="text-xs text-slate-500">Everything remains editable before saving or sending.</p>
+                          </div>
+                          {estimateAssistantNotice && (
+                            <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">{estimateAssistantNotice}</p>
+                          )}
+                        </div>
+
+                        <div className="mt-4">
+                          <Field label="Scope of work">
+                            <textarea className={inputClass()} rows={3} value={estimateDraft.scope} onChange={event => setEstimateDraft(d => ({ ...d, scope: event.target.value }))} placeholder="Professional summary of the work." />
+                          </Field>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-slate-950">Line items</p>
+                            <button type="button" onClick={() => setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
+                              <Plus size={14} />
+                              Add line
+                            </button>
+                          </div>
+                          {estimateDraft.line_items.map((line, index) => (
+                            <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                              <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
+                                <Field label="Type">
+                                  <select className={inputClass()} value={line.line_type} onChange={event => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
+                                  }))}>
+                                    {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => <option key={type} value={type}>{type}</option>)}
+                                  </select>
+                                </Field>
+                                <Field label="Description">
+                                  <input className={inputClass()} value={line.description} onChange={event => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
+                                  }))} placeholder="Labor, materials, disposal..." />
+                                </Field>
+                                <Field label="Qty">
+                                  <input className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
+                                  }))} />
+                                </Field>
+                                <Field label="Unit">
+                                  <input className={inputClass()} value={line.unit} onChange={event => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
+                                  }))} />
+                                </Field>
+                                <Field label="Unit price">
+                                  <input className={inputClass()} value={line.unit_price} onChange={event => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
+                                  }))} placeholder="$0.00" />
+                                </Field>
+                                <div>
+                                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">${(estimateLineTotalCents(line) / 100).toFixed(2)}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
+                                  }))}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+                                  aria-label={`Remove estimate line ${index + 1}`}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <Field label="Notes / exclusions">
+                            <textarea className={inputClass()} rows={3} value={estimateDraft.notes} onChange={event => setEstimateDraft(d => ({ ...d, notes: event.target.value }))} />
+                          </Field>
+                          <Field label="Terms">
+                            <textarea className={inputClass()} rows={3} value={estimateDraft.terms} onChange={event => setEstimateDraft(d => ({ ...d, terms: event.target.value }))} />
+                          </Field>
+                        </div>
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                          <p className="text-sm font-semibold text-slate-600">Draft total</p>
+                          <p className="text-2xl font-bold text-slate-950">${(estimateTotalCents(estimateDraft.line_items) / 100).toFixed(2)}</p>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void saveEstimateDraft(selectedJobsSubject)} disabled={savingEstimate} className={buttonClass('primary')}>
+                            <Receipt size={15} />
+                            {savingEstimate ? 'Saving...' : editingEstimateId ? 'Update draft' : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
+                          </button>
+                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (
+                <Card title={contractorJobsView === 'open_financial' ? 'Open estimates and invoices' : 'Closed / billed records'} icon={<Receipt size={18} />}>
+                  {(() => {
+                    const records = contractorJobsView === 'open_financial'
+                      ? (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)) : openFinancialRecords)
+                      : (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)) : closedFinancialRecords);
+                    if (records.length === 0) {
+                      return <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />;
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {records.map(estimate => {
+                          const isInvoice = estimateDocumentLabel(estimate) === 'Invoice';
+                          const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
+                          const local = estimate.local_contact_id ? localContacts.find(c => c.id === estimate.local_contact_id) : null;
+                          const customerName = connection?.display_name || local?.display_name || 'Customer';
+                          const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
+                          return (
+                            <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isInvoice ? 'bg-slate-900 text-white' : 'bg-blue-100 text-blue-700'}`}>{isInvoice ? 'Invoice' : 'Estimate'}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimate.status === 'draft' ? 'bg-amber-100 text-amber-700' : estimate.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{estimate.status}</span>
+                                  </div>
+                                  <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
+                                  {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
+                                </div>
+                                <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void downloadEstimatePdf(estimate, {
+                                    contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                    customerName,
+                                    customerAddress,
+                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                  }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
+                                  className={buttonClass('secondary')}
+                                >
+                                  <Download size={15} />
+                                  Download PDF
+                                </button>
+                                <button type="button" onClick={() => void saveEstimateAsTemplate(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={buttonClass('secondary')}>
+                                  <Receipt size={15} />
+                                  {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
+                                </button>
+                                {estimate.status === 'draft' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                        setEditingEstimateId(estimate.id);
+                                        setEstimateDraft(estimateDraftFromEstimate(estimate));
+                                        setEstimateAssistantText('');
+                                        setEstimateAssistantNotice('');
+                                        setEstimateComposerOpen(true);
+                                        setContractorJobsView('new_financial');
+                                      }}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      Edit draft
+                                    </button>
+                                    <button type="button" onClick={() => void sendEstimateToHomeowner(estimate)} disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id} className={buttonClass('primary')}>
+                                      <Send size={15} />
+                                      {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
+                                    </button>
+                                  </>
+                                )}
+                                {estimate.status === 'accepted' && !isInvoice && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                        beginCompletedWorkInvoice(customerName, {
+                                          serviceRequestId: estimate.service_request_id || undefined,
+                                          inspectionId: estimate.inspection_id || undefined,
+                                        });
+                                      }}
+                                      className={buttonClass('primary')}
+                                    >
+                                      <Receipt size={15} />
+                                      Create invoice
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const workOrderName = `Work order from accepted estimate — ${customerName} — ${estimate.title}`;
+                                        if (connection) {
+                                          beginFieldWorkForHomeowner(connection, {
+                                            name: workOrderName,
+                                            serviceRequestId: estimate.service_request_id || undefined,
+                                            workflowKind: 'work_order',
+                                          });
+                                        } else if (local) {
+                                          beginFieldWorkForLocalContact(local, {
+                                            name: workOrderName,
+                                            workflowKind: 'work_order',
+                                          });
+                                        }
+                                      }}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      <ClipboardCheck size={15} />
+                                      Create job
+                                    </button>
+                                  </>
+                                )}
+                                {estimate.status === 'sent' && (
+                                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Waiting on homeowner</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </Card>
+              )}
+
+              {(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (
+                <Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'} icon={<ClipboardCheck size={18} />}>
+                  {(() => {
+                    const records = contractorJobsView === 'open_jobs'
+                      ? (selectedHomeownerSubjectId ? openJobsForSelectedCustomer : openJobs)
+                      : (selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.slice(0, 10) : closedJobs.slice(0, 10));
+                    if (records.length === 0) {
+                      return <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} />;
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {records.map(insp => {
+                          const urgentCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length;
+                          const issueCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+                          const subjectLabel = fieldWorkSubjectLabel(insp);
+                          const subjectAddress = fieldWorkSubjectAddress(insp);
+                          return (
+                            <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${insp.status === 'draft' ? 'border-amber-200' : 'border-slate-200'}`}>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="truncate text-sm font-medium text-slate-950">{insp.name}</p>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                      {insp.status === 'draft' ? 'Open' : 'Closed'}
+                                    </span>
+                                    {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
+                                    {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
+                                  </div>
+                                  <p className="mt-0.5 text-xs text-slate-500">
+                                    {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatDateTime(insp.updated_at)}
+                                  </p>
+                                </div>
+                                {insp.status === 'draft' && (
+                                  <button type="button" onClick={() => void deleteInspection(insp)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700">
+                                    Delete
+                                  </button>
+                                )}
+                                <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
+                                  {insp.status === 'draft' ? 'Continue' : 'View report'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {contractorJobsView === 'closed_jobs' && (selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
+                          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                            Showing the 10 most recent closed jobs. Search and deeper filters can be added as this list grows.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </Card>
+              )}
+
               {showLocalContactForm && (
                 <Card title="Add local customer" icon={<UserRound size={18} />}>
                   <div className="space-y-4">
@@ -12542,6 +13069,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </Card>
               )}
 
+              {contractorJobsView === 'templates' && (
+              <>
               <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -12803,13 +13332,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 )}
               </Card>
 
-              {/* Field work list */}
-              <Card title="All work orders" icon={<ClipboardCheck size={18} />}>
+              </>
+              )}
+
+              {contractorJobsView === 'overview' && (
+              <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {inspections.length === 0 ? (
                   <EmptyState text="No work orders yet. Create an inspection, repair visit, maintenance visit, or assessment to get started." />
                 ) : (
                   <div className="space-y-2">
-                    {inspections.map(insp => {
+                    {inspections.slice(0, 5).map(insp => {
                       const urgentCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length;
                       const issueCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
                       const subjectLabel = fieldWorkSubjectLabel(insp);
@@ -12843,6 +13375,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </div>
                 )}
               </Card>
+              )}
             </>
           )}
 
@@ -12990,13 +13523,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   type="button"
                   onClick={() => {
                     setInspectionView('list');
-                    if (contractorTab === 'connections') {
-                      setHomeownerDetailTab('fieldwork');
-                    }
+                    setContractorJobsView(activeInspection.status === 'draft' ? 'open_jobs' : 'closed_jobs');
+                    setContractorTab('inspections');
                   }}
                   className="text-xs font-medium text-slate-500 hover:text-slate-700"
                 >
-                  {contractorTab === 'connections' ? '← Back to homeowner workspace' : '← Back to work orders'}
+                  ← Back to Jobs
                 </button>
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
