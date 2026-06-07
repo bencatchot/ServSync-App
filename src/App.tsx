@@ -1912,11 +1912,37 @@ async function loadPdfImageAsset(url?: string | null): Promise<PdfImageAsset | n
   }
 }
 
+function inspectionMediaStoragePath(value: string) {
+  if (!value.startsWith('http')) return value;
+  const marker = '/storage/v1/object/public/inspection-media/';
+  const markerIndex = value.indexOf(marker);
+  if (markerIndex < 0) return '';
+  return decodeURIComponent(value.slice(markerIndex + marker.length).split('?')[0]);
+}
+
+async function loadInspectionPdfPhotoAsset(photo: string): Promise<PdfImageAsset | null> {
+  const storagePath = inspectionMediaStoragePath(photo);
+  if (storagePath && supabase) {
+    const { data, error } = await supabase.storage
+      .from('inspection-media')
+      .createSignedUrl(storagePath, 60 * 15);
+    if (!error && data?.signedUrl) return loadPdfImageAsset(data.signedUrl);
+  }
+  return photo.startsWith('http') ? loadPdfImageAsset(photo) : null;
+}
+
 function drawPdfLogo(pdf: jsPDF, image: PdfImageAsset, x: number, y: number, boxW: number, boxH: number) {
   const padding = 2;
   const maxW = Math.max(1, boxW - padding * 2);
   const maxH = Math.max(1, boxH - padding * 2);
   const scale = Math.min(maxW / image.width, maxH / image.height);
+  const w = image.width * scale;
+  const h = image.height * scale;
+  pdf.addImage(image.dataUrl, image.format, x + (boxW - w) / 2, y + (boxH - h) / 2, w, h);
+}
+
+function drawPdfImageCover(pdf: jsPDF, image: PdfImageAsset, x: number, y: number, boxW: number, boxH: number) {
+  const scale = Math.min(boxW / image.width, boxH / image.height);
   const w = image.width * scale;
   const h = image.height * scale;
   pdf.addImage(image.dataUrl, image.format, x + (boxW - w) / 2, y + (boxH - h) / 2, w, h);
@@ -1986,6 +2012,36 @@ async function generateInspectionPdf(
   const fixedValueFindings = findingsWithRoom.filter(f => f.status === 'Fixed On Site');
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const contractorLogo = await loadPdfImageAsset(contractorLogoUrl);
+  const uniquePhotoPaths = Array.from(new Set(allFindings.flatMap(f => f.photos ?? []).filter(Boolean)));
+  const photoAssetEntries = await Promise.all(uniquePhotoPaths.map(async photo => [photo, await loadInspectionPdfPhotoAsset(photo)] as const));
+  const photoAssets = new Map(photoAssetEntries.filter((entry): entry is readonly [string, PdfImageAsset] => Boolean(entry[1])));
+
+  function photosForFinding(finding: InspectionRoomFinding) {
+    return (finding.photos ?? [])
+      .map(photo => photoAssets.get(photo))
+      .filter((asset): asset is PdfImageAsset => Boolean(asset));
+  }
+  function photoRowHeight(finding: InspectionRoomFinding) {
+    return photosForFinding(finding).length > 0 ? 25 : 0;
+  }
+  function drawFindingPhotos(finding: InspectionRoomFinding, x: number, yy: number, maxW: number) {
+    const assets = photosForFinding(finding).slice(0, 3);
+    if (assets.length === 0) return 0;
+    const gap = 2.5;
+    const thumbW = Math.min(34, (maxW - gap * (assets.length - 1)) / assets.length);
+    const thumbH = 22;
+    assets.forEach((asset, index) => {
+      const px = x + index * (thumbW + gap);
+      drawRect(px, yy, thumbW, thumbH, WHITE, 1.5);
+      drawPdfImageCover(pdf, asset, px + 0.8, yy + 0.8, thumbW - 1.6, thumbH - 1.6);
+      pdf.setDrawColor(BORDER[0], BORDER[1], BORDER[2]);
+      pdf.roundedRect(px, yy, thumbW, thumbH, 1.5, 1.5, 'S');
+    });
+    if ((finding.photos ?? []).length > assets.length) {
+      txt(`+${(finding.photos ?? []).length - assets.length} more`, x + assets.length * (thumbW + gap), yy + 13, GRAY, 7);
+    }
+    return thumbH + 3;
+  }
 
   // Header
   drawRect(0, 0, pageW, 44, BLUE, 0);
@@ -2063,7 +2119,7 @@ async function generateInspectionPdf(
         const descriptionLines = pdf.splitTextToSize(description, contentW - 16);
         const actionLines = f.action ? pdf.splitTextToSize(`Action: ${f.action}`, contentW - 16) : [];
         const dueLines = f.due ? pdf.splitTextToSize(`Due: ${f.due}`, contentW - 16) : [];
-        const cardH = 11 + descriptionLines.length * 4.2 + actionLines.length * 4.2 + dueLines.length * 4.2;
+        const cardH = 11 + descriptionLines.length * 4.2 + actionLines.length * 4.2 + dueLines.length * 4.2 + photoRowHeight(f);
         checkPageBreak(cardH + 3);
         pdf.setFillColor(sc.text[0], sc.text[1], sc.text[2]);
         pdf.rect(margin, y, 2, cardH, 'F');
@@ -2080,6 +2136,10 @@ async function generateInspectionPdf(
         }
         if (f.due) {
           txt(`Due: ${f.due}`, margin + 6, y + yOff, STATUS_PDF['Needs Repair'].text, 7.2, false, 'left', contentW - 16);
+          yOff += dueLines.length * 4.2;
+        }
+        if (photosForFinding(f).length > 0) {
+          drawFindingPhotos(f, margin + 6, y + yOff + 1, contentW - 16);
         }
         y += cardH + 3;
       }
@@ -2142,7 +2202,7 @@ async function generateInspectionPdf(
         const notesLines = f.notes ? pdf.splitTextToSize(f.notes, contentW - 10).length : 0;
         const actionLine = f.action ? 1 : 0;
         const dueLine = f.due ? 1 : 0;
-        const fH = 10 + notesLines * 4.5 + (actionLine + dueLine) * 5 + 8;
+        const fH = 10 + notesLines * 4.5 + (actionLine + dueLine) * 5 + 8 + photoRowHeight(f);
         checkPageBreak(fH);
         pdf.setFillColor(sc.text[0], sc.text[1], sc.text[2]);
         pdf.rect(margin, y, 2, fH, 'F');
@@ -2161,6 +2221,10 @@ async function generateInspectionPdf(
         }
         if (f.due) {
           txt(`Due: ${f.due}`, margin + 6, y + yOff, [217, 119, 6], 7.5, false, 'left', contentW - 10);
+          yOff += 5;
+        }
+        if (photosForFinding(f).length > 0) {
+          drawFindingPhotos(f, margin + 6, y + yOff, contentW - 10);
         }
         y += fH + 3;
       }
@@ -2170,14 +2234,26 @@ async function generateInspectionPdf(
       checkPageBreak(12);
       txt('PASSED', margin, y, GRAY, 7, true); y += 5;
       for (const f of passFindings) {
-        checkPageBreak(10);
+        const notesLines = f.notes ? pdf.splitTextToSize(f.notes, contentW - 10).length : 0;
+        const documentedH = f.notes || photosForFinding(f).length > 0
+          ? 10 + notesLines * 4.5 + photoRowHeight(f) + 4
+          : 8;
+        checkPageBreak(documentedH + 2);
         pdf.setFillColor(STATUS_PDF['Pass'].text[0], STATUS_PDF['Pass'].text[1], STATUS_PDF['Pass'].text[2]);
-        pdf.rect(margin, y, 2, 8, 'F');
-        drawRect(margin + 2, y, contentW - 2, 8, LIGHT, 0);
+        pdf.rect(margin, y, 2, documentedH, 'F');
+        drawRect(margin + 2, y, contentW - 2, documentedH, LIGHT, 0);
         txt(f.title, margin + 6, y + 5.5, DARK, 8, false, 'left', contentW - 40);
         drawRect(pageW - margin - 18, y + 1, 18, 6, STATUS_PDF['Pass'].bg, 2);
         txt('Pass', pageW - margin - 9, y + 5.5, STATUS_PDF['Pass'].text, 7, true, 'center');
-        y += 11;
+        let yOff = 11;
+        if (f.notes) {
+          txt(f.notes, margin + 6, y + yOff, GRAY, 7.5, false, 'left', contentW - 10);
+          yOff += notesLines * 4.5;
+        }
+        if (photosForFinding(f).length > 0) {
+          drawFindingPhotos(f, margin + 6, y + yOff, contentW - 10);
+        }
+        y += documentedH + 3;
       }
       y += 3;
     }
@@ -8732,11 +8808,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return home ? [home.address_line1, home.city, home.state].filter(Boolean).join(', ') : '';
   };
 
-  const buildInspectionRoomsSnapshot = (): InspectionRoomData[] => activeRooms.map(r => ({
+  const buildInspectionRoomsSnapshot = (
+    findingsByKey: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = localFindings,
+  ): InspectionRoomData[] => activeRooms.map(r => ({
     room: r.room,
     findings: r.items.map(item => {
       const key = `${r.room}||${item}`;
-      const local = localFindings[key];
+      const local = findingsByKey[key];
       return {
         title: item,
         status: (local?.status ?? 'Pass') as FindingStatus,
@@ -8747,6 +8825,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
     }),
   }));
+
+  const persistInspectionRooms = async (
+    insp: Inspection,
+    rooms: InspectionRoomData[],
+    summary = inspectionSummary,
+    options?: { silent?: boolean },
+  ) => {
+    if (!supabase) return;
+    const { error: updateError } = await supabase.rpc('servsync_update_inspection', {
+      p_inspection_id: insp.id,
+      p_rooms_with_findings: rooms,
+      p_summary: summary,
+    });
+    if (updateError) throw updateError;
+    setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: rooms, summary } : prev);
+    setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: rooms, summary } : i));
+    if (!options?.silent) setNotice('Progress saved.');
+  };
 
   const persistFieldWorkState = (next?: Partial<{ inspectionId: string | null; view: InspectionView; subTab: InspectionSubTab; selectedRoom: string | null }>) => {
     const current = (() => {
@@ -8853,15 +8949,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!options?.silent) setSavingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
-      const { error: updateError } = await supabase.rpc('servsync_update_inspection', {
-        p_inspection_id: insp.id,
-        p_rooms_with_findings: updatedRooms,
-        p_summary: inspectionSummary,
-      });
-      if (updateError) throw updateError;
-      setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: updatedRooms, summary: inspectionSummary } : prev);
-      setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: updatedRooms, summary: inspectionSummary } : i));
-      if (!options?.silent) setNotice('Progress saved.');
+      await persistInspectionRooms(insp, updatedRooms, inspectionSummary, options);
       return updatedRooms;
     } finally {
       if (!options?.silent) setSavingInspection(false);
@@ -9108,9 +9196,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const path = `${contractor.id}/${activeInspection.id}/${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from('inspection-media').upload(path, file, { contentType: file.type });
       if (uploadErr) throw uploadErr;
-      setLocalFindings(prev => {
-        const current = prev[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
-        return { ...prev, [key]: { ...current, photos: [...(current.photos ?? []), path] } };
+      const current = localFindings[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+      const nextFindings = { ...localFindings, [key]: { ...current, photos: [...(current.photos ?? []), path] } };
+      const nextRooms = buildInspectionRoomsSnapshot(nextFindings);
+      setLocalFindings(nextFindings);
+      await persistInspectionRooms(activeInspection, nextRooms, inspectionSummary, { silent: true });
+      lastAutoSaveSignatureRef.current = JSON.stringify({
+        id: activeInspection.id,
+        rooms: activeRooms,
+        findings: nextFindings,
+        summary: inspectionSummary,
       });
     } catch (err) {
       setError(readableError(err, 'Failed to upload photo.'));
@@ -9119,12 +9214,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const removeInspectionPhoto = (key: string, url: string) => {
-    setLocalFindings(prev => {
-      const current = prev[key];
-      if (!current) return prev;
-      return { ...prev, [key]: { ...current, photos: (current.photos ?? []).filter(p => p !== url) } };
-    });
+  const removeInspectionPhoto = async (key: string, url: string) => {
+    const current = localFindings[key];
+    if (!current) return;
+    const nextFindings = { ...localFindings, [key]: { ...current, photos: (current.photos ?? []).filter(p => p !== url) } };
+    setLocalFindings(nextFindings);
+    if (activeInspection) {
+      try {
+        await persistInspectionRooms(activeInspection, buildInspectionRoomsSnapshot(nextFindings), inspectionSummary, { silent: true });
+      } catch (err) {
+        setError(readableError(err, 'Unable to save photo removal.'));
+      }
+    }
   };
 
   const saveTemplate = async () => {
@@ -14295,7 +14396,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 <InspectionPhotoImage photo={url} alt="finding" className="w-full h-20 object-cover" />
                                                 <button
                                                   type="button"
-                                                  onClick={() => removeInspectionPhoto(key, url)}
+                                                  onClick={() => void removeInspectionPhoto(key, url)}
                                                   className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
                                                   <X size={10} />
@@ -16429,19 +16530,11 @@ function MediaThumbnails({ items }: { items: ServiceRequestMedia[] }) {
 }
 
 function InspectionPhotoImage({ photo, alt, className }: { photo: string; alt: string; className: string }) {
-  const inspectionPhotoPath = (value: string) => {
-    if (!value.startsWith('http')) return value;
-    const marker = '/storage/v1/object/public/inspection-media/';
-    const markerIndex = value.indexOf(marker);
-    if (markerIndex < 0) return '';
-    return decodeURIComponent(value.slice(markerIndex + marker.length).split('?')[0]);
-  };
-
   const [src, setSrc] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    const storagePath = inspectionPhotoPath(photo);
+    const storagePath = inspectionMediaStoragePath(photo);
     if (!storagePath) {
       setSrc(photo);
       return () => {
