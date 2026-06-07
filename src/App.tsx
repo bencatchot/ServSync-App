@@ -8352,7 +8352,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setNotice('');
     setError('');
     if (!estimate.homeowner_user_id) {
-      setError('This estimate is attached to a local customer. Connect the homeowner before sending it through the portal.');
+      setError('This estimate is attached to a new customer. Connect the homeowner before sending it through the portal.');
       return;
     }
     setSendingEstimateId(estimate.id);
@@ -8655,7 +8655,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const buildLocalFieldWorkName = (contact: ContractorLocalContact, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
-    return `${starter?.name || workflowLabel} — ${contact.display_name || 'Local customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+    return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
   type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
@@ -8708,7 +8708,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     if (insp.local_contact_id) {
       const contact = localContacts.find(c => c.id === insp.local_contact_id);
-      return contact?.display_name || 'Local customer';
+      return contact?.display_name || 'New customer';
     }
     return 'Customer';
   };
@@ -8864,7 +8864,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !contractor) return;
     const confirmed = window.confirm(insp.homeowner_user_id
       ? 'Finalize and file this field work report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
-      : 'Finalize this local customer field work report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
+      : 'Finalize this new customer field work report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
     );
     if (!confirmed) return;
     setFinalizingInspection(true);
@@ -8904,7 +8904,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
       setNotice(insp.homeowner_user_id
         ? 'Field work report finalized, saved to homeowner Documents, and added to their maintenance log.'
-        : 'Local customer field work report finalized.'
+        : 'New customer field work report finalized.'
       );
       // Clear back to list
       setActiveInspection(null);
@@ -9203,7 +9203,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const createLocalContact = async (options?: { autoStartFieldWork?: boolean }) => {
     if (!supabase || !contractor) return;
     if (!localContactDraft.display_name.trim()) {
-      setError('Enter a customer name before saving a local customer.');
+      setError('Enter a customer name before saving a new customer.');
       return;
     }
     const autoStart = options?.autoStartFieldWork ?? true;
@@ -9261,10 +9261,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         home_notes: '',
       });
       setShowLocalContactForm(false);
-      setNotice(autoStart ? 'Local customer saved. You can start field work now.' : 'Local customer saved.');
+      setNotice(autoStart ? 'New customer saved. You can start field work now.' : 'New customer saved.');
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to save local customer.'));
+      setError(readableError(err, 'Unable to save new customer.'));
     } finally {
       setSavingInspection(false);
     }
@@ -10665,7 +10665,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             home?.city,
             home?.state,
             home?.zip_code,
-            'local customer',
+            'new customer',
           ].filter(Boolean).join(' '));
         };
         const homeownerSearchTerms = normalizeText(homeownerWorkspaceSearch).split(' ').filter(Boolean);
@@ -10747,10 +10747,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       const subjectWorkOrders = fieldWorkForLocalContact(subject.contact.id);
                       const draftWorkOrderCount = subjectWorkOrders.filter(work => work.status === 'draft').length;
                       const filedReportCount = subjectWorkOrders.filter(work => work.status === 'finalized').length;
-                      rowName = subject.contact.display_name || 'Local customer';
+                      rowName = subject.contact.display_name || 'New customer';
                       const home = subject.contact.homes?.[0];
                       subtitle = home?.address_line1 || home?.nickname || subject.contact.phone || subject.contact.email || '';
-                      pills.push({ label: 'Local', tone: 'slate' });
+                      pills.push({ label: 'New customer', tone: 'slate' });
                       if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
                       if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
                     } else {
@@ -10786,7 +10786,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5 max-w-3xl mx-auto">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h3 className="text-lg font-bold text-slate-950">Add local customer</h3>
+                          <h3 className="text-lg font-bold text-slate-950">Add new customer</h3>
                           <p className="mt-1 text-xs text-slate-500">Save someone who's not on ServSync yet. You can invite them to claim their data later.</p>
                         </div>
                         <button type="button" onClick={() => setShowLocalContactForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
@@ -10812,7 +10812,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
                         <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: false })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
-                          {savingInspection ? 'Saving...' : 'Save local customer'}
+                          {savingInspection ? 'Saving...' : 'Save new customer'}
                         </button>
                         <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
                       </div>
@@ -10865,7 +10865,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const conn = isConn ? selectedSubject.connection : null;
                     const localCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
-                    const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'Local customer');
+                    const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'New customer');
                     const localHome = localCustomer?.homes?.[0] ?? null;
                     const headerAddress = conn ? (perm!.share_address ? (conn.home?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
                     const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
@@ -11090,9 +11090,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         },
                       ] : []),
                       {
-                        label: isConn ? 'Home profile' : 'Local profile',
+                        label: isConn ? 'Home profile' : 'Customer profile',
                         value: isConn && conn?.home ? 'Shared' : localHome ? 'Saved' : 'Basic',
-                        helper: isConn ? 'Contact and home details' : 'Local customer details',
+                        helper: isConn ? 'Contact and home details' : 'New customer details',
                         icon: <Home size={16} />,
                         tone: 'slate',
                         onClick: () => setHomeownerDetailTab(isConn ? 'home' : 'profile'),
@@ -11168,34 +11168,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6">
-                          <div className="mb-5 grid gap-3 max-w-5xl sm:grid-cols-2 xl:grid-cols-4">
-                            {workspaceCards.map(card => {
-                              const toneClass = card.tone === 'amber'
-                                ? 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300'
-                                : card.tone === 'emerald'
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300'
-                                  : card.tone === 'blue'
-                                    ? 'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300'
-                                    : 'border-slate-200 bg-white text-slate-800 hover:border-blue-300';
-                              return (
-                                <button
-                                  key={card.label}
-                                  type="button"
-                                  onClick={card.onClick}
-                                  className={`rounded-2xl border p-4 text-left shadow-sm transition hover:shadow-md ${toneClass}`}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">{card.label}</p>
-                                      <p className="mt-1 text-2xl font-bold">{card.value}</p>
+                          {activeTabId === 'overview' && (
+                            <div className="mb-5 grid gap-3 max-w-5xl sm:grid-cols-2 xl:grid-cols-4">
+                              {workspaceCards.map(card => {
+                                const toneClass = card.tone === 'amber'
+                                  ? 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300'
+                                  : card.tone === 'emerald'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300'
+                                    : card.tone === 'blue'
+                                      ? 'border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300'
+                                      : 'border-slate-200 bg-white text-slate-800 hover:border-blue-300';
+                                return (
+                                  <button
+                                    key={card.label}
+                                    type="button"
+                                    onClick={card.onClick}
+                                    className={`rounded-2xl border p-4 text-left shadow-sm transition hover:shadow-md ${toneClass}`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">{card.label}</p>
+                                        <p className="mt-1 text-2xl font-bold">{card.value}</p>
+                                      </div>
+                                      <span className="rounded-xl bg-white/75 p-2 shadow-sm">{card.icon}</span>
                                     </div>
-                                    <span className="rounded-xl bg-white/75 p-2 shadow-sm">{card.icon}</span>
-                                  </div>
-                                  <p className="mt-2 text-xs font-medium opacity-80">{card.helper}</p>
-                                </button>
-                              );
-                            })}
-                          </div>
+                                    <p className="mt-2 text-xs font-medium opacity-80">{card.helper}</p>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
 
                           {activeTabId === 'overview' && (
                             <div className="space-y-4 max-w-5xl">
@@ -11404,7 +11406,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
                                     <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{localCustomer.phone || '—'}</p></div>
                                     <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Status</p><p className="text-sm text-slate-800 font-medium">Local (not connected)</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Status</p><p className="text-sm text-slate-800 font-medium">New customer (not connected)</p></div>
                                     {localCustomer.notes && (
                                       <div className="col-span-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
                                         <p className="text-xs font-semibold text-yellow-700 mb-1">Customer notes</p>
@@ -11461,7 +11463,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {localHome.notes && <div className="sm:col-span-2"><p className="text-xs text-slate-400 font-medium mb-0.5">Home notes</p><p className="text-sm text-slate-800 whitespace-pre-wrap">{localHome.notes}</p></div>}
                                   </div>
                                 )}
-                                {localCustomer && !localHome && <EmptyState text="No home details on file for this local customer." />}
+                                {localCustomer && !localHome && <EmptyState text="No home details on file for this new customer." />}
                               </div>
                             </div>
                           )}
@@ -12507,7 +12509,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
                       ))}
                       {localContacts.map(contact => (
-                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Local customer'} — Local customer</option>
+                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
                       ))}
                     </select>
                   </div>
@@ -12635,7 +12637,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
                           ))}
                           {localContacts.map(contact => (
-                            <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'Local customer'} — Local customer</option>
+                            <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
                           ))}
                         </select>
                       </Field>
@@ -12660,7 +12662,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
 
                     {!selectedJobsCustomerName && (
-                      <Notice tone="info" text="Choose a connected homeowner or local customer before creating an estimate or invoice." />
+                      <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
                     )}
 
                     {estimateComposerOpen && selectedJobsCustomerName && (
@@ -13005,7 +13007,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               )}
 
               {showLocalContactForm && (
-                <Card title="Add local customer" icon={<UserRound size={18} />}>
+              <Card title="Add new customer" icon={<UserRound size={18} />}>
                   <div className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-3">
                       <Field label="Customer name">
@@ -13053,7 +13055,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => void createLocalContact()} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
-                        {savingInspection ? 'Saving...' : 'Save local customer'}
+                        {savingInspection ? 'Saving...' : 'Save new customer'}
                       </button>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
                     </div>
@@ -13069,7 +13071,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Connected homeowner work</p>
                     <h3 className="mt-2 font-bold text-slate-950">Use the Homeowners workspace for connected profiles</h3>
                     <p className="mt-1 max-w-2xl text-sm leading-6 text-blue-900">
-                      Service requests, profile-linked work orders, reports, and appointments stay centered on the homeowner file. This tab is for templates, local customers, and broader work-order management.
+                      Service requests, profile-linked work orders, reports, and appointments stay centered on the homeowner file. This area is for templates, new customers, and broader job management.
                     </p>
                   </div>
                   <button
@@ -13083,9 +13085,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </div>
               </section>
 
-              <Card title="Local customers" icon={<UserRound size={18} />}>
+              <Card title="New customers" icon={<UserRound size={18} />}>
                 {localContacts.length === 0 ? (
-                  <EmptyState text="No local customers yet. Add one when you need field work for someone who does not have a ServSync homeowner profile." />
+                  <EmptyState text="No new customers yet. Add one when you need work for someone who does not have a ServSync homeowner profile." />
                 ) : (
                   <div className="grid gap-3 xl:grid-cols-2">
                     {localContacts.map(contact => {
@@ -13098,7 +13100,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div key={contact.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-slate-950">{contact.display_name || 'Local customer'}</p>
+                              <p className="truncate text-sm font-bold text-slate-950">{contact.display_name || 'New customer'}</p>
                               <p className="mt-1 text-xs text-slate-500">
                                 {home?.nickname || 'Home'}{home?.address_line1 ? ` · ${home.address_line1}` : ''}
                               </p>
@@ -13106,7 +13108,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 {[home?.city, home?.state].filter(Boolean).join(', ') || contact.phone || contact.email || 'Contact details not added'}
                               </p>
                             </div>
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Local</span>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">New customer</span>
                           </div>
                           <div className="mt-4 grid grid-cols-3 gap-2">
                             <InfoBox label="Drafts" value={String(draftCount)} />
@@ -13376,38 +13378,90 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <Card title="New work order" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
                 <Field label="Customer">
-                  <select
-                    className={inputClass()}
-                    value={inspectionNewDraft.subject_type === 'local' ? `local:${inspectionNewDraft.local_contact_id}` : `connected:${inspectionNewDraft.homeowner_user_id}`}
-                    onChange={e => {
-                    const [subjectType, id] = e.target.value.split(':') as ['connected' | 'local', string];
-                    const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
-                    const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
-                    const selectedTemplate = inspectionNewDraft.template_source === 'starter'
-                      ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
-                      : null;
-                    const workflowLabel = FIELD_WORK_KIND_LABEL[inspectionNewDraft.workflow_kind];
-                    const subjectName = conn?.display_name || local?.display_name || '';
-                    const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
-                    setInspectionNewDraft(d => ({
-                      ...d,
-                      subject_type: subjectType,
-                      homeowner_user_id: subjectType === 'connected' ? id : '',
-                      local_contact_id: subjectType === 'local' ? id : '',
-                      local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
-                      service_request_id: subjectType === 'connected' ? d.service_request_id : '',
-                      name: autoName || d.name,
-                    }));
-                  }}>
-                    <option value="connected:">Select customer…</option>
-                    {connections.filter(c => c.status === 'active').map(c => (
-                      <option key={c.homeowner_user_id} value={`connected:${c.homeowner_user_id}`}>{c.display_name} — ServSync homeowner</option>
-                    ))}
-                    {localContacts.map(contact => (
-                      <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name} — Local customer</option>
-                    ))}
-                  </select>
+                  <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                    <select
+                      className={inputClass()}
+                      value={inspectionNewDraft.subject_type === 'local' ? `local:${inspectionNewDraft.local_contact_id}` : `connected:${inspectionNewDraft.homeowner_user_id}`}
+                      onChange={e => {
+                        const [subjectType, id] = e.target.value.split(':') as ['connected' | 'local', string];
+                        const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
+                        const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
+                        const selectedTemplate = inspectionNewDraft.template_source === 'starter'
+                          ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
+                          : null;
+                        const workflowLabel = FIELD_WORK_KIND_LABEL[inspectionNewDraft.workflow_kind];
+                        const subjectName = conn?.display_name || local?.display_name || '';
+                        const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
+                        setInspectionNewDraft(d => ({
+                          ...d,
+                          subject_type: subjectType,
+                          homeowner_user_id: subjectType === 'connected' ? id : '',
+                          local_contact_id: subjectType === 'local' ? id : '',
+                          local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
+                          service_request_id: subjectType === 'connected' ? d.service_request_id : '',
+                          name: autoName || d.name,
+                        }));
+                      }}
+                    >
+                      <option value="connected:">Select customer...</option>
+                      {connections.filter(c => c.status === 'active').map(c => (
+                        <option key={c.homeowner_user_id} value={`connected:${c.homeowner_user_id}`}>{c.display_name} — ServSync homeowner</option>
+                      ))}
+                      {localContacts.map(contact => (
+                        <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name} — New customer</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowLocalContactForm(true)}
+                      className={buttonClass('secondary')}
+                    >
+                      <Plus size={15} />
+                      Add new customer
+                    </button>
+                  </div>
                 </Field>
+                {showLocalContactForm && (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New customer</p>
+                        <p className="mt-1 text-sm text-blue-900">Save the customer once, then this work order can be tied to them.</p>
+                      </div>
+                      <button type="button" onClick={() => setShowLocalContactForm(false)} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <Field label="Customer name">
+                        <input className={inputClass()} value={localContactDraft.display_name} onChange={event => setLocalContactDraft(d => ({ ...d, display_name: event.target.value }))} placeholder="e.g. Becky Thomas" />
+                      </Field>
+                      <Field label="Phone">
+                        <input className={inputClass()} value={localContactDraft.phone} onChange={event => setLocalContactDraft(d => ({ ...d, phone: event.target.value }))} placeholder="(555) 555-5555" />
+                      </Field>
+                      <Field label="Email">
+                        <input className={inputClass()} value={localContactDraft.email} onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))} placeholder="customer@example.com" />
+                      </Field>
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <Field label="Address">
+                        <input className={inputClass()} value={localContactDraft.address_line1} onChange={event => setLocalContactDraft(d => ({ ...d, address_line1: event.target.value }))} placeholder="Street address" />
+                      </Field>
+                      <Field label="City">
+                        <input className={inputClass()} value={localContactDraft.city} onChange={event => setLocalContactDraft(d => ({ ...d, city: event.target.value }))} />
+                      </Field>
+                      <Field label="State">
+                        <input className={inputClass()} value={localContactDraft.state} onChange={event => setLocalContactDraft(d => ({ ...d, state: event.target.value }))} />
+                      </Field>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: true })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
+                        {savingInspection ? 'Saving...' : 'Save and use customer'}
+                      </button>
+                      <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Workflow type">
                     <select className={inputClass()} value={inspectionNewDraft.workflow_kind} onChange={e => {
@@ -13420,7 +13474,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         name: d.homeowner_user_id || d.local_contact_id
                           ? `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${
                               d.subject_type === 'local'
-                                ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'Local customer'
+                                ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'New customer'
                                 : connections.find(c => c.homeowner_user_id === d.homeowner_user_id)?.display_name ?? 'Homeowner'
                             } — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
                           : d.name,
