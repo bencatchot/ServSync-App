@@ -8595,18 +8595,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
   const filteredCustomTemplates = inspectionTemplates.filter(templateMatchesSearch);
-  const resetInspectionNewDraft = () => ({
-    subject_type: 'connected' as 'connected' | 'local',
-    homeowner_user_id: '',
-    local_contact_id: '',
-    local_home_id: '',
-    service_request_id: '',
-    name: '',
-    template_id: '',
-    template_source: 'blank' as FieldWorkTemplateSource,
-    starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work',
-    workflow_kind: 'work_order' as FieldWorkflowKind,
-  });
+  const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<{ description: string; line_type: string; unit: string }> }) => {
+    if (!normalizedTemplateSearch) return true;
+    const haystack = normalizeText([
+      template.name,
+      template.trade,
+      template.scope,
+      template.notes,
+      template.terms,
+      ...(template.line_items || []).map(line => `${line.description} ${line.line_type} ${line.unit}`),
+    ].filter(Boolean).join(' '));
+    return normalizedTemplateSearch.split(' ').every(term => haystack.includes(term));
+  };
+  const filteredStarterEstimateTemplates = sortedStarterEstimateTemplates.filter(estimateTemplateMatchesSearch);
+  const filteredCustomEstimateTemplates = estimateTemplates.filter(estimateTemplateMatchesSearch);
   const fieldWorkForHomeowner = (homeownerUserId: string) => inspections
     .filter(insp => insp.homeowner_user_id === homeownerUserId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -9138,6 +9140,52 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Failed to save template.'));
     } finally {
       setSavingInspection(false);
+    }
+  };
+
+  const copyStarterTemplateToLibrary = async (starter: ServSyncFieldWorkTemplate) => {
+    if (!supabase || !contractor) return;
+    setSavingInspection(true);
+    try {
+      const { data, error: err } = await supabase
+        .from('inspection_templates')
+        .insert({ contractor_id: contractor.id, name: starter.name, rooms: starter.rooms })
+        .select()
+        .single();
+      if (err) throw err;
+      setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
+      setNotice('Starter template copied to your templates.');
+    } catch (err) {
+      setError(readableError(err, 'Failed to copy starter template.'));
+    } finally {
+      setSavingInspection(false);
+    }
+  };
+
+  const copyStarterEstimateTemplateToLibrary = async (starter: StarterEstimateTemplate) => {
+    if (!supabase || !contractor) return;
+    setSavingEstimateTemplateId(starter.id);
+    try {
+      const { data, error: err } = await supabase
+        .from('estimate_templates')
+        .insert({
+          contractor_id: contractor.id,
+          name: starter.name,
+          trade: starter.trade,
+          scope: starter.scope,
+          notes: starter.notes,
+          terms: starter.terms,
+          line_items: starter.line_items,
+        })
+        .select()
+        .single();
+      if (err) throw err;
+      setEstimateTemplates(prev => [data as EstimateTemplate, ...prev]);
+      setNotice('Starter estimate copied to your templates.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to copy starter estimate template.'));
+    } finally {
+      setSavingEstimateTemplateId(null);
     }
   };
 
@@ -13257,87 +13305,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
               {contractorJobsView === 'templates' && (
               <>
-              <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Connected homeowner work</p>
-                    <h3 className="mt-2 font-bold text-slate-950">Use the Homeowners workspace for connected profiles</h3>
-                    <p className="mt-1 max-w-2xl text-sm leading-6 text-blue-900">
-                      Service requests, profile-linked work orders, reports, and appointments stay centered on the homeowner file. This area is for templates, new customers, and broader job management.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setContractorTab('connections')}
-                    className={buttonClass('primary')}
-                  >
-                    <Users size={16} />
-                    Open Homeowners
-                  </button>
-                </div>
-              </section>
-
-              <Card title="New customers" icon={<UserRound size={18} />}>
-                {localContacts.length === 0 ? (
-                  <EmptyState text="No new customers yet. Add one when you need work for someone who does not have a ServSync homeowner profile." />
-                ) : (
-                  <div className="grid gap-3 xl:grid-cols-2">
-                    {localContacts.map(contact => {
-                      const localWork = fieldWorkForLocalContact(contact.id);
-                      const draftCount = localWork.filter(insp => insp.status === 'draft').length;
-                      const finalizedCount = localWork.filter(insp => insp.status === 'finalized').length;
-                      const lastWork = localWork[0];
-                      const home = contact.homes?.[0];
-                      return (
-                        <div key={contact.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-slate-950">{contact.display_name || 'New customer'}</p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {home?.nickname || 'Home'}{home?.address_line1 ? ` · ${home.address_line1}` : ''}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {[home?.city, home?.state].filter(Boolean).join(', ') || contact.phone || contact.email || 'Contact details not added'}
-                              </p>
-                            </div>
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">New customer</span>
-                          </div>
-                          <div className="mt-4 grid grid-cols-3 gap-2">
-                            <InfoBox label="Drafts" value={String(draftCount)} />
-                            <InfoBox label="Filed" value={String(finalizedCount)} />
-                            <InfoBox label="ServSync" value="Not linked" />
-                          </div>
-                          {lastWork && (
-                            <button
-                              type="button"
-                              onClick={() => openInspection(lastWork)}
-                              className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                            >
-                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Most recent</p>
-                              <p className="mt-1 truncate text-sm font-semibold text-slate-950">{lastWork.name}</p>
-                              <p className="mt-1 text-xs text-slate-500">{lastWork.status === 'draft' ? 'Draft' : 'Finalized'} · {formatDateTime(lastWork.updated_at)}</p>
-                            </button>
-                          )}
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <button type="button" onClick={() => beginFieldWorkForLocalContact(contact)} className={buttonClass('primary')}>
-                              <Plus size={16} />
-                              Create work order
-                            </button>
-                            <button type="button" disabled className={buttonClass('secondary')} title="Claim/invite flow can be added after this foundation is stable.">
-                              Invite to claim
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-
-              {/* Templates section */}
-              <Card title="Workflow templates" icon={<ClipboardList size={18} />}>
+              <Card title="Templates" icon={<ClipboardList size={18} />}>
                 <p className="text-sm text-slate-600 mb-4">
-                  Create reusable checklists or search ServSync templates by trade, workflow, room, or checklist item.
+                  Manage the templates your company has created, search ServSync generic templates by trade, or create a new workflow template.
                 </p>
                 <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
                   <div>
@@ -13349,7 +13319,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         setTemplateSearch(e.target.value);
                         setShowTemplateLibrary(true);
                       }}
-                      placeholder="Search electrical, plumbing, HVAC, work order..."
+                      placeholder="Search plumber, electrical, cleaner, HVAC, deck, roofing..."
                     />
                   </div>
                   <button
@@ -13370,6 +13340,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   >
                     <Plus size={16} /> Create template
                   </button>
+                </div>
+
+                <div className="mb-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">Your workflow templates</p>
+                        <p className="mt-1 text-xs text-slate-500">Work orders, inspections, and checklist-style templates.</p>
+                      </div>
+                      <span className="text-xl font-bold text-slate-950">{inspectionTemplates.length}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">Your estimate templates</p>
+                        <p className="mt-1 text-xs text-slate-500">Reusable pricing, scope, and line item templates.</p>
+                      </div>
+                      <span className="text-xl font-bold text-slate-950">{estimateTemplates.length}</span>
+                    </div>
+                  </div>
                 </div>
 
                 {showTemplateForm && (
@@ -13435,20 +13426,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         {templateSearch.trim() ? 'Search results' : 'Template library'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {filteredCustomTemplates.length + filteredStarterTemplates.length} match{filteredCustomTemplates.length + filteredStarterTemplates.length !== 1 ? 'es' : ''}
+                        {filteredCustomTemplates.length + filteredCustomEstimateTemplates.length + filteredStarterTemplates.length + filteredStarterEstimateTemplates.length} match{filteredCustomTemplates.length + filteredCustomEstimateTemplates.length + filteredStarterTemplates.length + filteredStarterEstimateTemplates.length !== 1 ? 'es' : ''}
                       </p>
                     </div>
 
-                    {filteredCustomTemplates.length === 0 && filteredStarterTemplates.length === 0 ? (
+                    {filteredCustomTemplates.length === 0 && filteredCustomEstimateTemplates.length === 0 && filteredStarterTemplates.length === 0 && filteredStarterEstimateTemplates.length === 0 ? (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                         <p className="text-sm font-semibold text-slate-950">No templates found.</p>
-                        <p className="mt-1 text-xs text-slate-500">Try a trade like plumbing, electrical, HVAC, roofing, or work order.</p>
+                        <p className="mt-1 text-xs text-slate-500">Try a trade like plumbing, electrical, cleaning, HVAC, roofing, concrete, gutters, or deck.</p>
                       </div>
                     ) : (
                       <>
                         {filteredCustomTemplates.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your templates</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your workflow templates</p>
                             {filteredCustomTemplates.map(tpl => (
                               <div key={tpl.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                                 <div className="min-w-0">
@@ -13456,16 +13447,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <p className="mt-0.5 text-xs text-slate-500">{tpl.rooms.length} sections · {tpl.rooms.reduce((n, r) => n + r.items.length, 0)} items</p>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setInspectionNewDraft({ ...resetInspectionNewDraft(), template_source: 'custom', template_id: tpl.id, starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work' });
-                                      setInspectionView('new');
-                                    }}
-                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                                  >
-                                    Use
-                                  </button>
                                   <button type="button" onClick={() => void deleteTemplate(tpl.id)} className="text-slate-500 hover:text-red-400 transition-colors" title="Delete template">
                                     <Trash2 size={15} />
                                   </button>
@@ -13475,9 +13456,48 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
 
+                        {filteredCustomEstimateTemplates.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your estimate templates</p>
+                            {filteredCustomEstimateTemplates.map(template => (
+                              <div key={template.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-slate-950">{template.name}</p>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                      {template.line_items?.length ?? 0} line item{(template.line_items?.length ?? 0) === 1 ? '' : 's'}
+                                      {template.trade ? ` · ${template.trade}` : ''}
+                                    </p>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void renameEstimateTemplate(template)}
+                                      disabled={renamingEstimateTemplateId === template.id || deletingEstimateTemplateId === template.id}
+                                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                    >
+                                      {renamingEstimateTemplateId === template.id ? 'Renaming...' : 'Rename'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void deleteEstimateTemplate(template)}
+                                      disabled={deletingEstimateTemplateId === template.id || renamingEstimateTemplateId === template.id}
+                                      className="text-slate-500 transition-colors hover:text-red-400 disabled:opacity-60"
+                                      title="Delete estimate template"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                </div>
+                                {template.scope && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{template.scope}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {filteredStarterTemplates.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">ServSync starter templates</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">ServSync workflow starters</p>
                             <div className="grid gap-3 md:grid-cols-2">
                               {filteredStarterTemplates.map(tpl => {
                                 const recommended = starterTemplateRecommendedForContractor(tpl.trade);
@@ -13498,13 +13518,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setInspectionNewDraft({ ...resetInspectionNewDraft(), template_source: 'starter', template_id: '', starter_template_id: tpl.id, workflow_kind: tpl.kind });
-                                        setInspectionView('new');
-                                      }}
+                                      onClick={() => void copyStarterTemplateToLibrary(tpl)}
+                                      disabled={savingInspection}
                                       className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                                     >
-                                      Use template
+                                      Copy to my templates
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {filteredStarterEstimateTemplates.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">ServSync estimate starters</p>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {filteredStarterEstimateTemplates.map(template => {
+                                const recommended = starterTemplateRecommendedForContractor(template.trade);
+                                return (
+                                  <div key={template.id} className={`rounded-xl border px-4 py-3 shadow-sm ${recommended ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-medium text-slate-950">{template.name}</p>
+                                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{template.scope}</p>
+                                        <p className="mt-2 text-xs text-slate-500">{template.line_items.length} starter line item{template.line_items.length === 1 ? '' : 's'}</p>
+                                      </div>
+                                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${recommended ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                        {recommended ? 'Recommended' : template.trade}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => void copyStarterEstimateTemplateToLibrary(template)}
+                                      disabled={savingEstimateTemplateId === template.id}
+                                      className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                                    >
+                                      {savingEstimateTemplateId === template.id ? 'Copying...' : 'Copy to my templates'}
                                     </button>
                                   </div>
                                 );
