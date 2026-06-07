@@ -31,9 +31,13 @@ returns void
 language plpgsql security definer set search_path = public
 as $$
 begin
+  if p_subscription_status not in ('trialing', 'active', 'past_due', 'paused', 'canceled', 'unpaid') then
+    raise exception 'Invalid subscription status: %', p_subscription_status;
+  end if;
+
   update public.contractor_profiles
      set stripe_subscription_id = p_stripe_subscription_id,
-         subscription_status     = p_subscription_status::public.contractor_subscription_status,
+         subscription_status     = p_subscription_status,
          monthly_price_cents      = p_monthly_price_cents,
          updated_at               = now()
    where stripe_customer_id = p_stripe_customer_id;
@@ -56,6 +60,13 @@ begin
    where id = p_contractor_id;
 end;
 $$;
+
+-- These RPCs are for Stripe webhooks only. Do not allow browser clients to
+-- call them through PostgREST with the anon/authenticated keys.
+revoke all on function public.servsync_sync_stripe_subscription(text, text, text, int) from public, anon, authenticated;
+revoke all on function public.servsync_set_stripe_customer(uuid, text) from public, anon, authenticated;
+grant execute on function public.servsync_sync_stripe_subscription(text, text, text, int) to service_role;
+grant execute on function public.servsync_set_stripe_customer(uuid, text) to service_role;
 
 -- ── How to activate Stripe when ready ───────────────────────────────────────
 --

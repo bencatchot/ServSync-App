@@ -5,9 +5,11 @@
 //   1. Deploy:  supabase functions deploy send-notification-email
 //   2. Set env vars in Supabase dashboard (Project Settings → Edge Functions):
 //        EMAIL_ENABLED=true
+//        NOTIFICATION_WEBHOOK_SECRET=<long-random-secret>
 //        RESEND_API_KEY=re_xxxxx        ← or swap for any provider below
 //        EMAIL_FROM=noreply@yourapp.com
 //   3. Create a database webhook on public.notifications INSERT pointing here.
+//      Add header: x-servsync-webhook-secret: <same long-random-secret>
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -31,12 +33,23 @@ Deno.serve(async (req) => {
   }
 
   const EMAIL_ENABLED = Deno.env.get('EMAIL_ENABLED') === 'true';
+  const WEBHOOK_SECRET = Deno.env.get('NOTIFICATION_WEBHOOK_SECRET') ?? '';
 
   if (!EMAIL_ENABLED) {
     console.log('[send-notification-email] Disabled — set EMAIL_ENABLED=true to activate.');
     return new Response(JSON.stringify({ sent: false, reason: 'disabled' }), {
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  if (!WEBHOOK_SECRET) {
+    console.error('[send-notification-email] Missing NOTIFICATION_WEBHOOK_SECRET.');
+    return new Response('Webhook secret is not configured', { status: 500 });
+  }
+
+  if (req.headers.get('x-servsync-webhook-secret') !== WEBHOOK_SECRET) {
+    console.error('[send-notification-email] Invalid webhook secret.');
+    return new Response('Unauthorized', { status: 401 });
   }
 
   const payload: WebhookPayload = await req.json();

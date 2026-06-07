@@ -27,6 +27,53 @@ const STATUS_MAP: Record<string, string> = {
   incomplete_expired: 'canceled',
 };
 
+const WEBHOOK_TOLERANCE_SECONDS = 300;
+
+function parseStripeSignature(header: string) {
+  const parts = header.split(',').map(part => part.trim());
+  const timestamp = parts.find(part => part.startsWith('t='))?.slice(2) ?? '';
+  const signatures = parts
+    .filter(part => part.startsWith('v1='))
+    .map(part => part.slice(3))
+    .filter(Boolean);
+  return { timestamp, signatures };
+}
+
+function timingSafeEqualHex(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+async function verifyStripeSignature(body: string, signatureHeader: string, secret: string) {
+  const { timestamp, signatures } = parseStripeSignature(signatureHeader);
+  const timestampSeconds = Number(timestamp);
+  if (!timestamp || !Number.isFinite(timestampSeconds) || signatures.length === 0) {
+    return false;
+  }
+
+  const ageSeconds = Math.abs(Math.floor(Date.now() / 1000) - timestampSeconds);
+  if (ageSeconds > WEBHOOK_TOLERANCE_SECONDS) {
+    return false;
+  }
+
+  const signedPayload = `${timestamp}.${body}`;
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const mac = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(signedPayload));
+  const computed = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return signatures.some(signature => timingSafeEqualHex(computed, signature));
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
@@ -47,17 +94,9 @@ Deno.serve(async (req) => {
 
   const body = await req.text();
 
-  // Stripe signature verification using the Web Crypto API (no Stripe SDK needed)
-  const [, tsStr, , v1Sig] = signature.split(',').flatMap(p => p.split('='));
-  const ts = tsStr;
-  const signed = `${ts}.${body}`;
-  const keyData = new TextEncoder().encode(STRIPE_WEBHOOK_SECRET);
-  const msgData = new TextEncoder().encode(signed);
-  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const mac = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
-  const computed = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-  if (computed !== v1Sig) {
+  // Stripe signature verification using the Web Crypto API (no Stripe SDK needed).
+  // Accepts any v1 signature in the header and rejects stale replay attempts.
+  if (!(await verifyStripeSignature(body, signature, STRIPE_WEBHOOK_SECRET))) {
     console.error('[stripe-webhook] Signature mismatch');
     return new Response('Invalid signature', { status: 400 });
   }
