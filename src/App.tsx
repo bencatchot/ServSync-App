@@ -7398,6 +7398,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [finalizingInspection, setFinalizingInspection] = useState(false);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+  const [templateLibraryView, setTemplateLibraryView] = useState<'workflow' | 'estimate' | 'generic'>('workflow');
   const [showLocalContactForm, setShowLocalContactForm] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [localContactDraft, setLocalContactDraft] = useState({
@@ -8609,6 +8610,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const filteredStarterEstimateTemplates = sortedStarterEstimateTemplates.filter(estimateTemplateMatchesSearch);
   const filteredCustomEstimateTemplates = estimateTemplates.filter(estimateTemplateMatchesSearch);
+  const templateLibraryMatchCount = templateLibraryView === 'workflow'
+    ? filteredCustomTemplates.length
+    : templateLibraryView === 'estimate'
+      ? filteredCustomEstimateTemplates.length
+      : filteredStarterTemplates.length + filteredStarterEstimateTemplates.length;
   const fieldWorkForHomeowner = (homeownerUserId: string) => inspections
     .filter(insp => insp.homeowner_user_id === homeownerUserId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -13309,27 +13315,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <p className="text-sm text-slate-600 mb-4">
                   Manage the templates your company has created, search ServSync generic templates by trade, or create a new workflow template.
                 </p>
-                <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+                <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Search templates</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">Search generic templates</label>
                     <input
                       className={inputClass()}
                       value={templateSearch}
                       onChange={e => {
                         setTemplateSearch(e.target.value);
                         setShowTemplateLibrary(true);
+                        setTemplateLibraryView('generic');
                       }}
                       placeholder="Search plumber, electrical, cleaner, HVAC, deck, roofing..."
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowTemplateLibrary(prev => !prev)}
-                    className={`${buttonClass('secondary')} self-end`}
-                  >
-                    {showTemplateLibrary ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    {showTemplateLibrary ? 'Hide templates' : 'Browse templates'}
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -13343,7 +13342,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </div>
 
                 <div className="mb-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateSearch('');
+                      setTemplateLibraryView('workflow');
+                      setShowTemplateLibrary(true);
+                      setShowTemplateForm(false);
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-950">Your workflow templates</p>
@@ -13351,8 +13359,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                       <span className="text-xl font-bold text-slate-950">{inspectionTemplates.length}</span>
                     </div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateSearch('');
+                      setTemplateLibraryView('estimate');
+                      setShowTemplateLibrary(true);
+                      setShowTemplateForm(false);
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'estimate' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-950">Your estimate templates</p>
@@ -13360,7 +13377,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                       <span className="text-xl font-bold text-slate-950">{estimateTemplates.length}</span>
                     </div>
-                  </div>
+                  </button>
                 </div>
 
                 {showTemplateForm && (
@@ -13423,21 +13440,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        {templateSearch.trim() ? 'Search results' : 'Template library'}
+                        {templateLibraryView === 'workflow'
+                          ? 'Your workflow templates'
+                          : templateLibraryView === 'estimate'
+                            ? 'Your estimate templates'
+                            : templateSearch.trim()
+                              ? 'Generic template search results'
+                              : 'Generic template library'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {filteredCustomTemplates.length + filteredCustomEstimateTemplates.length + filteredStarterTemplates.length + filteredStarterEstimateTemplates.length} match{filteredCustomTemplates.length + filteredCustomEstimateTemplates.length + filteredStarterTemplates.length + filteredStarterEstimateTemplates.length !== 1 ? 'es' : ''}
+                        {templateLibraryMatchCount} match{templateLibraryMatchCount !== 1 ? 'es' : ''}
                       </p>
                     </div>
 
-                    {filteredCustomTemplates.length === 0 && filteredCustomEstimateTemplates.length === 0 && filteredStarterTemplates.length === 0 && filteredStarterEstimateTemplates.length === 0 ? (
+                    {templateLibraryMatchCount === 0 ? (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                         <p className="text-sm font-semibold text-slate-950">No templates found.</p>
-                        <p className="mt-1 text-xs text-slate-500">Try a trade like plumbing, electrical, cleaning, HVAC, roofing, concrete, gutters, or deck.</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {templateLibraryView === 'generic'
+                            ? 'Try a trade like plumbing, electrical, cleaning, HVAC, roofing, concrete, gutters, or deck.'
+                            : 'Create a template or copy one from the generic template search.'}
+                        </p>
                       </div>
                     ) : (
                       <>
-                        {filteredCustomTemplates.length > 0 && (
+                        {templateLibraryView === 'workflow' && filteredCustomTemplates.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your workflow templates</p>
                             {filteredCustomTemplates.map(tpl => (
@@ -13456,7 +13483,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
 
-                        {filteredCustomEstimateTemplates.length > 0 && (
+                        {templateLibraryView === 'estimate' && filteredCustomEstimateTemplates.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your estimate templates</p>
                             {filteredCustomEstimateTemplates.map(template => (
@@ -13495,7 +13522,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
 
-                        {filteredStarterTemplates.length > 0 && (
+                        {templateLibraryView === 'generic' && filteredStarterTemplates.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">ServSync workflow starters</p>
                             <div className="grid gap-3 md:grid-cols-2">
@@ -13531,7 +13558,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
 
-                        {filteredStarterEstimateTemplates.length > 0 && (
+                        {templateLibraryView === 'generic' && filteredStarterEstimateTemplates.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">ServSync estimate starters</p>
                             <div className="grid gap-3 md:grid-cols-2">
