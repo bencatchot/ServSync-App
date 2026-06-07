@@ -7313,7 +7313,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
-  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['overview', 'profile', 'home', 'fieldwork', 'inspections', 'estimates', 'invoices', 'requests', 'schedule'] as const, 'overview'));
+  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'fieldwork', 'schedule'] as const, 'profile'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>('overview');
@@ -8203,7 +8203,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const openHomeownerWorkspaceForConnection = (connection: ContractorConnectedHomeowner, tab: HomeownerWorkspaceTab = 'overview') => {
+  const openHomeownerWorkspaceForConnection = (connection: ContractorConnectedHomeowner, tab: HomeownerWorkspaceTab = 'profile') => {
     setSelectedHomeownerSubjectId(connection.connection_id);
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
     setHomeownerDetailTab(tab);
@@ -8223,7 +8223,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     setSelectedHomeownerSubjectId(connection.connection_id);
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
-    setHomeownerDetailTab(options.tab ?? 'requests');
+    setHomeownerDetailTab(options.tab ?? 'fieldwork');
     setHomeownerWorkspaceRequestView(
       ['closed', 'declined'].includes(request.status)
         ? 'closed'
@@ -9240,7 +9240,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           beginFieldWorkForLocalContact(contactWithHome);
         } else {
           setSelectedHomeownerSubjectId(`local:${contactWithHome.id}`);
-          setHomeownerDetailTab('overview');
+          setHomeownerDetailTab('profile');
         }
       }
 
@@ -10762,7 +10762,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <button
                         key={subject.id}
                         type="button"
-                        onClick={() => { setSelectedHomeownerSubjectId(subject.id); setShowLocalContactForm(false); setHomeownerDetailTab('overview'); }}
+                        onClick={() => { setSelectedHomeownerSubjectId(subject.id); setShowLocalContactForm(false); setHomeownerDetailTab('profile'); }}
                         className={`w-full px-4 py-4 text-left transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                       >
                         <p className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-slate-800'}`}>{rowName}</p>
@@ -10997,16 +10997,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       .filter(r => r.appointment && (r.appointment.status === 'confirmed' || r.appointment.status === 'proposed'))
                       .sort((a, b) => new Date(a.appointment!.proposed_at).getTime() - new Date(b.appointment!.proposed_at).getTime()) : [];
 
-                    const tabs: { id: HomeownerWorkspaceTab; label: string; badge?: number }[] = [
-                      { id: 'overview', label: 'Overview' },
-                      { id: 'profile', label: 'Profile' },
-                      { id: 'home', label: 'Home' },
-                      ...(isConn ? [
-                        { id: 'requests' as const, label: 'Requests', badge: activeReqs.length },
-                        { id: 'schedule' as const, label: 'Schedule', badge: upcomingAppts.length },
-                      ] : []),
+                    const openJobCount = workOrderRecords.filter(item => item.status === 'draft').length + inspectionRecords.filter(item => item.status === 'draft').length;
+                    const openFinancialCount = estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length + invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length;
+                    const jobsAttentionCount = openJobCount + openFinancialCount + followUpReqs.length;
+                    const tabs: Array<{ id: HomeownerWorkspaceTab; label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'slate' }> = [
+                      {
+                        id: 'profile',
+                        label: 'Profile',
+                        value: isConn && conn?.home ? 'Shared' : localHome ? 'Saved' : 'Basic',
+                        helper: 'Contact and home details',
+                        icon: <Home size={15} />,
+                        tone: 'slate',
+                      },
+                      {
+                        id: 'fieldwork',
+                        label: 'Jobs',
+                        value: String(jobsAttentionCount),
+                        helper: jobsAttentionCount > 0 ? 'Items in progress' : 'Create work for this customer',
+                        icon: <ClipboardCheck size={15} />,
+                        tone: jobsAttentionCount > 0 ? 'amber' : 'blue',
+                      },
+                      {
+                        id: 'schedule',
+                        label: 'Calendar',
+                        value: String(upcomingAppts.length),
+                        helper: 'Shared appointments only',
+                        icon: <Calendar size={15} />,
+                        tone: upcomingAppts.length > 0 ? 'blue' : 'slate',
+                      },
                     ];
-                    const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'overview';
+                    const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
                     const isStartingWorkOrderForThisSubject = inspectionView === 'new' && (
                       (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
                       || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
@@ -11112,56 +11132,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <p className="mt-1 text-sm text-slate-500">{headerAddress || (conn ? 'Address not shared' : 'No address on file')}</p>
                               {headerCity && <p className="text-xs text-slate-400">{headerCity}</p>}
                             </div>
-                            <div className="flex items-center gap-2 flex-wrap justify-end">
-                              {isConn && conn && (
-                                <>
-                                  <button type="button" onClick={() => beginEstimateDraftForCustomer(headerName)} className={buttonClass('primary')}>
-                                    <Receipt size={14} />
-                                    Create estimate
-                                  </button>
-                                  <button type="button" onClick={() => beginFieldWorkForHomeowner(conn)} className={buttonClass('secondary')}>
-                                    <ClipboardCheck size={14} />
-                                    Create job
-                                  </button>
-                                  <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
-                                    <Receipt size={14} />
-                                    Create invoice
-                                  </button>
-                                </>
-                              )}
-                              {!isConn && localCustomer && (
-                                <>
-                                  <button type="button" onClick={() => beginEstimateDraftForCustomer(headerName)} className={buttonClass('primary')}>
-                                    <Receipt size={14} />
-                                    Create estimate
-                                  </button>
-                                  <button type="button" onClick={() => beginFieldWorkForLocalContact(localCustomer)} className={buttonClass('secondary')}>
-                                    <ClipboardCheck size={14} />
-                                    Create job
-                                  </button>
-                                  <button type="button" onClick={() => beginCompletedWorkInvoice(headerName)} className={buttonClass('secondary')}>
-                                    <Receipt size={14} />
-                                    Create invoice
-                                  </button>
-                                  <button type="button" disabled className={buttonClass('secondary')} title="Invite-to-claim flow coming soon.">
-                                    Invite to claim
-                                  </button>
-                                </>
-                              )}
-                            </div>
                           </div>
-                          <div className="flex gap-1 mt-4 flex-wrap">
+                          <div className="mt-4 grid gap-2 sm:grid-cols-3">
                             {tabs.map(t => (
                               <button
                                 key={t.id}
                                 type="button"
                                 onClick={() => setHomeownerDetailTab(t.id)}
-                                className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTabId === t.id ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
+                                className={`rounded-xl border p-3 text-left transition ${
+                                  activeTabId === t.id
+                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                    : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300 hover:bg-blue-50'
+                                }`}
                               >
-                                {t.label}
-                                {t.badge && t.badge > 0 ? (
-                                  <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTabId === t.id ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-700'}`}>{t.badge}</span>
-                                ) : null}
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className={`rounded-lg p-1.5 ${activeTabId === t.id ? 'bg-blue-500 text-white' : t.tone === 'amber' ? 'bg-amber-100 text-amber-700' : t.tone === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{t.icon}</span>
+                                  <span className="text-lg font-bold">{t.value}</span>
+                                </div>
+                                <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${activeTabId === t.id ? 'text-blue-50' : 'text-slate-700'}`}>{t.label}</p>
+                                <p className={`mt-1 text-xs ${activeTabId === t.id ? 'text-blue-50' : 'text-slate-500'}`}>{t.helper}</p>
                               </button>
                             ))}
                           </div>
@@ -11384,37 +11373,74 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                           {activeTabId === 'profile' && (
                             <div className="space-y-4 max-w-3xl">
-                              <div className="bg-white rounded-2xl border border-slate-200 p-5 grid grid-cols-2 gap-4">
-                                {conn && perm && (
-                                  <>
-                                    <SharedField label="Homeowner name" value={conn.display_name} allowed={perm.share_contact} />
-                                    <SharedField label="Phone" value={conn.phone} allowed={perm.share_contact} />
-                                    <SharedField label="City" value={conn.city} allowed={perm.share_contact} />
-                                    <SharedField label="State" value={conn.state} allowed={perm.share_contact} />
-                                    <div>
-                                      <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
-                                      <p className="text-sm text-slate-800 font-medium capitalize">{conn.status}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs text-slate-400 font-medium mb-0.5">Source</p>
-                                      <p className="text-sm text-slate-800 font-medium">{connectionSourceLabel(conn.source)}</p>
-                                    </div>
-                                  </>
-                                )}
-                                {localCustomer && (
-                                  <>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{localCustomer.phone || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Status</p><p className="text-sm text-slate-800 font-medium">New customer (not connected)</p></div>
-                                    {localCustomer.notes && (
-                                      <div className="col-span-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
-                                        <p className="text-xs font-semibold text-yellow-700 mb-1">Customer notes</p>
-                                        <p className="text-sm text-yellow-800 whitespace-pre-wrap">{localCustomer.notes}</p>
+                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                <div className="mb-4 flex items-center gap-2">
+                                  <Home size={18} className="text-blue-700" />
+                                  <h3 className="font-bold text-slate-950">Profile</h3>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {conn && perm && (
+                                    <>
+                                      <SharedField label="Homeowner name" value={conn.display_name} allowed={perm.share_contact} />
+                                      <SharedField label="Phone" value={conn.phone} allowed={perm.share_contact} />
+                                      <SharedField label="City" value={conn.city} allowed={perm.share_contact} />
+                                      <SharedField label="State" value={conn.state} allowed={perm.share_contact} />
+                                      <div>
+                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Status</p>
+                                        <p className="text-sm text-slate-800 font-medium capitalize">{conn.status}</p>
                                       </div>
-                                    )}
-                                  </>
+                                      <div>
+                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Original source</p>
+                                        <p className="text-sm text-slate-800 font-medium">{connectionSourceLabel(conn.source)}</p>
+                                      </div>
+                                    </>
+                                  )}
+                                  {localCustomer && (
+                                    <>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{localCustomer.phone || '—'}</p></div>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Status</p><p className="text-sm text-slate-800 font-medium">New customer (not connected)</p></div>
+                                      {localCustomer.notes && (
+                                        <div className="sm:col-span-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3">
+                                          <p className="text-xs font-semibold text-yellow-700 mb-1">Customer notes</p>
+                                          <p className="text-sm text-yellow-800 whitespace-pre-wrap">{localCustomer.notes}</p>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                <div className="mb-4 flex items-center gap-2">
+                                  <Home size={18} className="text-blue-700" />
+                                  <h3 className="font-bold text-slate-950">Home</h3>
+                                </div>
+                                {conn && perm && (
+                                  <div className="grid gap-4 sm:grid-cols-2">
+                                    <SharedField label="Home nickname" value={conn.home?.nickname} allowed={perm.share_home_overview} />
+                                    <SharedField label="Home type" value={conn.home?.home_type} allowed={perm.share_home_overview} />
+                                    <SharedField label="Year built" value={conn.home?.year_built} allowed={perm.share_home_overview} />
+                                    <SharedField label="Square feet" value={conn.home?.square_feet} allowed={perm.share_home_overview} />
+                                    <SharedField label="Address" value={conn.home?.address_line1} allowed={perm.share_address} />
+                                    <SharedField label="ZIP" value={conn.home?.zip_code} allowed={perm.share_home_overview} />
+                                    <div className="sm:col-span-2">
+                                      <SharedField label="Home notes" value={conn.home?.notes} allowed={perm.share_home_overview} />
+                                    </div>
+                                  </div>
                                 )}
+                                {localCustomer && localHome && (
+                                  <div className="grid gap-4 sm:grid-cols-2">
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home nickname</p><p className="text-sm text-slate-800 font-medium">{localHome.nickname || '—'}</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home type</p><p className="text-sm text-slate-800 font-medium">{localHome.home_type || '—'}</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Year built</p><p className="text-sm text-slate-800 font-medium">{localHome.year_built || '—'}</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Square feet</p><p className="text-sm text-slate-800 font-medium">{localHome.square_feet || '—'}</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Address</p><p className="text-sm text-slate-800 font-medium">{localHome.address_line1 || '—'}</p></div>
+                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{localHome.zip_code || '—'}</p></div>
+                                    {localHome.notes && <div className="sm:col-span-2"><p className="text-xs text-slate-400 font-medium mb-0.5">Home notes</p><p className="text-sm text-slate-800 whitespace-pre-wrap">{localHome.notes}</p></div>}
+                                  </div>
+                                )}
+                                {localCustomer && !localHome && <EmptyState text="No home details on file for this new customer." />}
                               </div>
                               {conn && perm && (
                                 <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -11469,6 +11495,160 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           )}
 
                           {activeTabId === 'fieldwork' && (
+                            <div className="space-y-4 max-w-4xl">
+                              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <h3 className="font-bold text-slate-950">Jobs dashboard</h3>
+                                    <p className="mt-1 text-sm text-slate-500">Quick view for this customer. Create and manage the actual workflow in Jobs.</p>
+                                  </div>
+                                  {!isConn && localCustomer && (
+                                    <button type="button" disabled className={buttonClass('secondary')} title="Invite-to-claim flow coming soon.">
+                                      Invite to claim
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="mt-4 grid gap-2 md:grid-cols-4">
+                                  {[
+                                    { label: 'Open jobs', value: String(openJobCount), helper: `${workOrderDraftCount + inspectionDraftCount} draft` },
+                                    { label: 'Open estimates', value: String(estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length), helper: `${draftEstimateCount} draft` },
+                                    { label: 'Open invoices', value: String(invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length), helper: `${draftInvoiceCount} draft` },
+                                    { label: 'Follow-up', value: String(followUpReqs.length), helper: isConn ? 'Service requests' : 'Connected requests only' },
+                                  ].map(item => (
+                                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{item.label}</p>
+                                      <p className="mt-1 text-xl font-bold text-slate-950">{item.value}</p>
+                                      <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isConn && conn) beginFieldWorkForHomeowner(conn);
+                                      else if (localCustomer) beginFieldWorkForLocalContact(localCustomer);
+                                    }}
+                                    className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
+                                  >
+                                    <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
+                                    <p className="mt-2 text-sm font-bold">Create job</p>
+                                    <p className="mt-1 text-xs text-blue-700">Inspection, work order, or service workflow</p>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => beginEstimateDraftForCustomer(headerName)}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
+                                  >
+                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                    <p className="mt-2 text-sm font-bold">Create estimate</p>
+                                    <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => beginCompletedWorkInvoice(headerName)}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
+                                  >
+                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                    <p className="mt-2 text-sm font-bold">Create invoice</p>
+                                    <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
+                                  </button>
+                                </div>
+
+                                <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                      <div>
+                                        <h4 className="text-sm font-bold text-slate-950">Jobs in progress</h4>
+                                        <p className="mt-1 text-xs text-slate-500">{workOrderRecords.length + inspectionRecords.length} total job record{workOrderRecords.length + inspectionRecords.length === 1 ? '' : 's'}</p>
+                                      </div>
+                                      <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Jobs</button>
+                                    </div>
+                                    {[...workOrderRecords, ...inspectionRecords].slice(0, 5).length === 0 ? (
+                                      <EmptyState text="No job records yet for this customer." />
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {[...workOrderRecords, ...inspectionRecords].slice(0, 5).map(work => (
+                                          <button key={work.id} type="button" onClick={() => openInspection(work, { stayInHomeownerWorkspace: true })} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-slate-900">{work.name}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{work.status === 'draft' ? 'Draft' : 'Filed'} · Updated {formatDateTime(work.updated_at)}</p>
+                                              </div>
+                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                      <div>
+                                        <h4 className="text-sm font-bold text-slate-950">Estimates and invoices</h4>
+                                        <p className="mt-1 text-xs text-slate-500">{estimateRecords.length + invoiceRecords.length} financial record{estimateRecords.length + invoiceRecords.length === 1 ? '' : 's'}</p>
+                                      </div>
+                                      <button type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open financials</button>
+                                    </div>
+                                    {[...estimateRecords, ...invoiceRecords].slice(0, 5).length === 0 ? (
+                                      <EmptyState text="No estimates or invoices yet for this customer." />
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {[...estimateRecords, ...invoiceRecords].slice(0, 5).map(record => (
+                                          <button key={record.id} type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {record.status}</p>
+                                              </div>
+                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {isConn && (
+                                    <div className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+                                      <div className="mb-3 flex items-center justify-between gap-3">
+                                        <div>
+                                          <h4 className="text-sm font-bold text-slate-950">Service requests</h4>
+                                          <p className="mt-1 text-xs text-slate-500">{activeReqs.length} open request{activeReqs.length === 1 ? '' : 's'} · {followUpReqs.length} need follow-up</p>
+                                        </div>
+                                        <button type="button" onClick={() => setContractorTab('requests')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open requests</button>
+                                      </div>
+                                      {connReqs.slice(0, 4).length === 0 ? (
+                                        <EmptyState text="No service requests from this homeowner yet." />
+                                      ) : (
+                                        <div className="grid gap-2 md:grid-cols-2">
+                                          {connReqs.slice(0, 4).map(request => (
+                                            <button
+                                              key={request.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedHomeownerRequestId(request.id);
+                                                setContractorTab('requests');
+                                              }}
+                                              className={`rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                                            >
+                                              <p className="truncate text-sm font-semibold text-slate-900">{request.title}</p>
+                                              <p className="mt-1 text-xs text-slate-500">{serviceRequestStatusLabel(request.status)} · {request.category}</p>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {false && activeTabId === 'fieldwork' && (
                             <div className="space-y-4 max-w-3xl">
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="flex items-center justify-between mb-3">
@@ -12424,10 +12604,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="flex items-center gap-2 mb-3">
                                   <Calendar size={18} className="text-blue-700" />
-                                  <h3 className="font-bold text-slate-950">Appointments</h3>
+                                  <h3 className="font-bold text-slate-950">Calendar</h3>
                                 </div>
+                                <p className="mb-4 text-sm text-slate-500">Only shared appointments between your business and this homeowner appear here.</p>
                                 {upcomingAppts.length === 0 ? (
-                                  <EmptyState text="No upcoming or proposed appointments." />
+                                  <EmptyState text="No shared upcoming or proposed appointments." />
                                 ) : (
                                   <div className="space-y-2">
                                     {upcomingAppts.map(req => (
@@ -12445,6 +12626,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     ))}
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          )}
+                          {activeTabId === 'schedule' && !conn && (
+                            <div className="space-y-4 max-w-3xl">
+                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Calendar size={18} className="text-blue-700" />
+                                  <h3 className="font-bold text-slate-950">Calendar</h3>
+                                </div>
+                                <EmptyState text="Shared calendar appointments will appear here after this customer connects through ServSync." />
                               </div>
                             </div>
                           )}
