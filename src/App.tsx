@@ -7433,7 +7433,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
-  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'fieldwork', 'schedule'] as const, 'profile'));
+  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'schedule'] as const, 'profile'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>('overview');
@@ -8344,7 +8344,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     setSelectedHomeownerSubjectId(connection.connection_id);
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
-    setHomeownerDetailTab(options.tab ?? 'fieldwork');
+    setHomeownerDetailTab(options.tab ?? 'requests');
     setHomeownerWorkspaceRequestView(
       ['closed', 'declined'].includes(request.status)
         ? 'closed'
@@ -11190,7 +11190,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       },
                     ];
                     const selectedWorkspaceRequestSection = workspaceRequestSections.find(section => section.id === homeownerWorkspaceRequestView) ?? workspaceRequestSections[1];
-                    const selectedWorkspaceRequest = connReqs.find(request => request.id === selectedHomeownerRequestId) ?? connReqs[0] ?? null;
+                    const selectedWorkspaceRequest = selectedWorkspaceRequestSection.requests.find(request => request.id === selectedHomeownerRequestId)
+                      ?? connReqs.find(request => request.id === selectedHomeownerRequestId)
+                      ?? selectedWorkspaceRequestSection.requests[0]
+                      ?? connReqs[0]
+                      ?? null;
                     const upcomingAppts = conn ? connReqs
                       .filter(r => r.appointment && (r.appointment.status === 'confirmed' || r.appointment.status === 'proposed'))
                       .sort((a, b) => new Date(a.appointment!.proposed_at).getTime() - new Date(b.appointment!.proposed_at).getTime()) : [];
@@ -11207,6 +11211,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         icon: <Home size={15} />,
                         tone: 'slate',
                       },
+                      ...(isConn ? [
+                        {
+                          id: 'requests' as const,
+                          label: 'Requests',
+                          value: String(activeReqs.length),
+                          helper: followUpReqs.length > 0 ? `${followUpReqs.length} need follow-up` : 'Service request thread',
+                          icon: <MessageSquare size={15} />,
+                          tone: followUpReqs.length > 0 ? 'amber' as const : activeReqs.length > 0 ? 'blue' as const : 'slate' as const,
+                        },
+                      ] : []),
                       {
                         id: 'fieldwork',
                         label: 'Jobs',
