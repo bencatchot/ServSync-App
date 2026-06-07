@@ -174,7 +174,7 @@ type StarterEstimateTemplate = {
 };
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'support';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'support';
-type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'estimates' | 'requests' | 'schedule';
+type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type EstimateLineDraft = {
@@ -284,8 +284,14 @@ function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'not
   return 'Estimate';
 }
 
+function isInspectionLikeFieldWork(work: Pick<Inspection, 'name' | 'summary'>) {
+  const haystack = normalizeText(`${work.name || ''} ${work.summary || ''}`);
+  return /\b(inspection|assessment|inspect|report)\b/.test(haystack);
+}
+
 function inferSmartEstimateLineType(text: string): EstimateLineType {
   const normalized = normalizeText(text);
+  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return 'labor';
   if (/\b(trip|service call|diagnostic|permit|fee|disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return 'fee';
   if (/\b(material|materials|parts|supplies|fixture|filter|valve|fitting|faucet|fan|outlet|cabinet|drywall|sheetrock|lumber|decking|fasteners|concrete)\b/.test(normalized)) return 'material';
   if (/\b(equipment|machine|rental|lift|pump|tool)\b/.test(normalized)) return 'equipment';
@@ -348,12 +354,24 @@ function smartEstimateSentence(text: string) {
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
 
-function smartEstimateDescription(text: string, lineType: EstimateLineType) {
+function smartEstimateSubject(parts: string[]) {
+  const primary = parts.find(part => !extractSmartEstimatePrice(part)) || parts[0] || '';
+  const cleaned = cleanSmartEstimateDescription(primary)
+    .replace(/\b(?:build|construct|install|repair|replace|demo|demolish|remove)\b/gi, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:x|by)\s*\d+(?:\.\d+)?\s*(?:'|ft|feet)?\b/gi, '')
+    .replace(/\bwith\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || 'project';
+}
+
+function smartEstimateDescription(text: string, lineType: EstimateLineType, projectSubject = 'project') {
   const normalized = normalizeText(text);
-  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return 'Billable labor';
+  const subjectLabel = `${projectSubject.charAt(0).toUpperCase()}${projectSubject.slice(1)}`;
+  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return `${subjectLabel} labor`;
   if (/\b(demo|demolition|removal|remove)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Demolition / removal';
   if (/\b(disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Debris disposal / haul-off';
-  if (lineType === 'material') return smartEstimateSentence(text).replace(/\.$/, '').replace(/^material(?:s)?\s*(?:cost)?\s*/i, '') || 'Materials and supplies';
+  if (lineType === 'material') return 'Materials and supplies';
   return smartEstimateSentence(text).replace(/\.$/, '');
 }
 
@@ -387,11 +405,12 @@ function parseSmartEstimateText(text: string) {
   const cleaned = text.trim();
   const parts = splitSmartEstimateParts(cleaned);
   const sourceParts = parts.length ? parts : [cleaned];
+  const projectSubject = smartEstimateSubject(sourceParts);
   const parsedLines = sourceParts.map(part => {
     const lineType = inferSmartEstimateLineType(part);
     return createEstimateLineDraft({
       line_type: lineType,
-      description: smartEstimateDescription(part, lineType),
+      description: smartEstimateDescription(part, lineType, projectSubject),
       quantity: extractSmartEstimateQuantity(part),
       unit: extractSmartEstimateUnit(part),
       unit_price: extractSmartEstimatePrice(part),
@@ -7293,7 +7312,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
-  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['overview', 'profile', 'home', 'fieldwork', 'estimates', 'requests', 'schedule'] as const, 'overview'));
+  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['overview', 'profile', 'home', 'fieldwork', 'inspections', 'estimates', 'invoices', 'requests', 'schedule'] as const, 'overview'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
@@ -10801,39 +10820,75 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const headerAddress = conn ? (perm!.share_address ? (conn.home?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
                     const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
                     const fieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id) : (localCustomer ? fieldWorkForLocalContact(localCustomer.id) : []);
+                    const inspectionRecords = fieldWork.filter(isInspectionLikeFieldWork);
+                    const workOrderRecords = fieldWork.filter(work => !isInspectionLikeFieldWork(work));
                     const subjectEstimates = conn
                       ? estimates.filter(estimate => estimate.homeowner_user_id === conn.homeowner_user_id)
                       : localCustomer
                         ? estimates.filter(estimate => estimate.local_contact_id === localCustomer.id)
                         : [];
-                    const draftEstimateCount = subjectEstimates.filter(estimate => estimate.status === 'draft').length;
+                    const invoiceRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) === 'Invoice');
+                    const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
+                    const draftEstimateCount = estimateRecords.filter(estimate => estimate.status === 'draft').length;
+                    const draftInvoiceCount = invoiceRecords.filter(estimate => estimate.status === 'draft').length;
+                    const workOrderDraftCount = workOrderRecords.filter(insp => insp.status === 'draft').length;
+                    const workOrderFinalCount = workOrderRecords.filter(insp => insp.status === 'finalized').length;
+                    const inspectionDraftCount = inspectionRecords.filter(insp => insp.status === 'draft').length;
+                    const inspectionFinalCount = inspectionRecords.filter(insp => insp.status === 'finalized').length;
                     const estimateSections: Array<{ id: HomeownerWorkspaceEstimateView; title: string; helper: string; estimates: Estimate[] }> = [
                       {
                         id: 'draft',
                         title: 'Drafts',
                         helper: 'Private estimates you can edit before sending.',
-                        estimates: subjectEstimates.filter(estimate => estimate.status === 'draft'),
+                        estimates: estimateRecords.filter(estimate => estimate.status === 'draft'),
                       },
                       {
                         id: 'sent',
                         title: 'Sent',
                         helper: 'Estimates waiting on homeowner review.',
-                        estimates: subjectEstimates.filter(estimate => estimate.status === 'sent'),
+                        estimates: estimateRecords.filter(estimate => estimate.status === 'sent'),
                       },
                       {
                         id: 'accepted',
                         title: 'Accepted',
                         helper: 'Approved estimates that are ready to schedule or turn into work orders.',
-                        estimates: subjectEstimates.filter(estimate => estimate.status === 'accepted'),
+                        estimates: estimateRecords.filter(estimate => estimate.status === 'accepted'),
                       },
                       {
                         id: 'closed',
                         title: 'Closed',
                         helper: 'Declined, expired, or revised estimates.',
-                        estimates: subjectEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)),
+                        estimates: estimateRecords.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)),
+                      },
+                    ];
+                    const invoiceSections: Array<{ id: HomeownerWorkspaceEstimateView; title: string; helper: string; estimates: Estimate[] }> = [
+                      {
+                        id: 'draft',
+                        title: 'Draft invoices',
+                        helper: 'Private invoice drafts for completed or billable work.',
+                        estimates: invoiceRecords.filter(estimate => estimate.status === 'draft'),
+                      },
+                      {
+                        id: 'sent',
+                        title: 'Sent invoices',
+                        helper: 'Invoices sent to the homeowner for review.',
+                        estimates: invoiceRecords.filter(estimate => estimate.status === 'sent'),
+                      },
+                      {
+                        id: 'accepted',
+                        title: 'Accepted / filed',
+                        helper: 'Invoices the homeowner has accepted or can file to their home records.',
+                        estimates: invoiceRecords.filter(estimate => estimate.status === 'accepted'),
+                      },
+                      {
+                        id: 'closed',
+                        title: 'Closed',
+                        helper: 'Declined, expired, or revised invoice records.',
+                        estimates: invoiceRecords.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)),
                       },
                     ];
                     const selectedEstimateSection = estimateSections.find(section => section.id === homeownerWorkspaceEstimateView) ?? estimateSections[0];
+                    const selectedInvoiceSection = invoiceSections.find(section => section.id === homeownerWorkspaceEstimateView) ?? invoiceSections[0];
                     const estimateTemplateSearchTerms = normalizeText(estimateTemplateSearch).split(' ').filter(Boolean);
                     const visibleEstimateTemplates = estimateTemplates.filter(template => {
                       if (estimateTemplateSearchTerms.length === 0) return true;
@@ -10859,8 +10914,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       ].filter(Boolean).join(' '));
                       return estimateTemplateSearchTerms.every(term => haystack.includes(term));
                     });
-                    const fwDraftCount = fieldWork.filter(insp => insp.status === 'draft').length;
-                    const fwFinalCount = fieldWork.filter(insp => insp.status === 'finalized').length;
+                    const fwDraftCount = workOrderDraftCount;
+                    const fwFinalCount = workOrderFinalCount;
                     const connReqs = conn ? serviceRequests.filter(r => r.connection_id === conn.connection_id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) : [];
                     const activeReqs = connReqs.filter(r => !['closed', 'declined'].includes(r.status));
                     const followUpReqs = activeReqs.filter(contractorRequestNeedsFollowUp);
@@ -10896,8 +10951,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       { id: 'overview', label: 'Overview' },
                       { id: 'profile', label: 'Profile' },
                       { id: 'home', label: 'Home' },
-                      { id: 'fieldwork', label: 'Work Orders', badge: fwDraftCount },
-                      { id: 'estimates', label: 'Estimates / Invoices', badge: draftEstimateCount },
+                      { id: 'fieldwork', label: 'Work Orders', badge: workOrderDraftCount },
+                      { id: 'inspections', label: 'Inspections', badge: inspectionDraftCount },
+                      { id: 'estimates', label: 'Estimates', badge: draftEstimateCount },
+                      { id: 'invoices', label: 'Invoices', badge: draftInvoiceCount },
                       ...(isConn ? [
                         { id: 'requests' as const, label: 'Requests', badge: activeReqs.length },
                         { id: 'schedule' as const, label: 'Schedule', badge: upcomingAppts.length },
@@ -10908,11 +10965,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
                       || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
                     );
-                    const recentFieldWork = fieldWork.slice(0, 3);
+                    const recentWorkOrders = workOrderRecords.slice(0, 3);
+                    const recentInspections = inspectionRecords.slice(0, 3);
                     const recentRequests = connReqs.slice(0, 3);
                     const nextFollowUpRequest = followUpReqs[0] ?? null;
                     const nextOpenRequest = activeReqs[0] ?? null;
-                    const nextDraftWorkOrder = fieldWork.find(insp => insp.status === 'draft') ?? null;
+                    const nextDraftWorkOrder = workOrderRecords.find(insp => insp.status === 'draft') ?? null;
                     const nextAppointmentRequest = upcomingAppts[0] ?? null;
                     const workspaceCards: Array<{ label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'emerald' | 'slate'; onClick: () => void }> = [
                       ...(isConn ? [
@@ -10931,21 +10989,40 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       ] : []),
                       {
                         label: 'Work orders',
-                        value: String(fieldWork.length),
-                        helper: `${fwDraftCount} draft${fwDraftCount === 1 ? '' : 's'} · ${fwFinalCount} filed`,
+                        value: String(workOrderRecords.length),
+                        helper: `${workOrderDraftCount} draft${workOrderDraftCount === 1 ? '' : 's'} · ${workOrderFinalCount} filed`,
                         icon: <ClipboardCheck size={16} />,
-                        tone: fwDraftCount > 0 ? 'amber' : 'emerald',
+                        tone: workOrderDraftCount > 0 ? 'amber' : 'emerald',
                         onClick: () => setHomeownerDetailTab('fieldwork'),
                       },
                       {
-                        label: 'Estimates / invoices',
-                        value: String(subjectEstimates.length),
-                        helper: `${draftEstimateCount} draft${draftEstimateCount === 1 ? '' : 's'} · ${subjectEstimates.filter(estimate => estimate.status === 'accepted').length} accepted`,
+                        label: 'Inspections',
+                        value: String(inspectionRecords.length),
+                        helper: `${inspectionDraftCount} draft${inspectionDraftCount === 1 ? '' : 's'} · ${inspectionFinalCount} filed`,
+                        icon: <ClipboardList size={16} />,
+                        tone: inspectionDraftCount > 0 ? 'amber' : 'slate',
+                        onClick: () => setHomeownerDetailTab('inspections'),
+                      },
+                      {
+                        label: 'Estimates',
+                        value: String(estimateRecords.length),
+                        helper: `${draftEstimateCount} draft${draftEstimateCount === 1 ? '' : 's'} · ${estimateRecords.filter(estimate => estimate.status === 'accepted').length} accepted`,
                         icon: <Receipt size={16} />,
-                        tone: subjectEstimates.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftEstimateCount > 0 ? 'amber' : 'slate',
+                        tone: estimateRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftEstimateCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
-                          setHomeownerWorkspaceEstimateView(subjectEstimates.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftEstimateCount > 0 ? 'draft' : 'sent');
+                          setHomeownerWorkspaceEstimateView(estimateRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftEstimateCount > 0 ? 'draft' : 'sent');
                           setHomeownerDetailTab('estimates');
+                        },
+                      },
+                      {
+                        label: 'Invoices',
+                        value: String(invoiceRecords.length),
+                        helper: `${draftInvoiceCount} draft${draftInvoiceCount === 1 ? '' : 's'} · ${invoiceRecords.filter(estimate => estimate.status === 'accepted').length} accepted`,
+                        icon: <Receipt size={16} />,
+                        tone: invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftInvoiceCount > 0 ? 'amber' : 'slate',
+                        onClick: () => {
+                          setHomeownerWorkspaceEstimateView(invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftInvoiceCount > 0 ? 'draft' : 'sent');
+                          setHomeownerDetailTab('invoices');
                         },
                       },
                       ...(isConn ? [
@@ -10967,6 +11044,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         onClick: () => setHomeownerDetailTab(isConn ? 'home' : 'profile'),
                       },
                     ];
+                    const isInvoiceWorkspaceTab = activeTabId === 'invoices';
+                    const activeDocumentRecords = isInvoiceWorkspaceTab ? invoiceRecords : estimateRecords;
+                    const activeDocumentSections = isInvoiceWorkspaceTab ? invoiceSections : estimateSections;
+                    const selectedDocumentSection = isInvoiceWorkspaceTab ? selectedInvoiceSection : selectedEstimateSection;
 
                     return (
                       <>
@@ -11156,11 +11237,43 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <button type="button" onClick={() => setHomeownerDetailTab('fieldwork')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View all</button>
                                   </div>
-                                  {recentFieldWork.length === 0 ? (
+                                  {recentWorkOrders.length === 0 ? (
                                     <EmptyState text="No work orders yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
-                                      {recentFieldWork.map(insp => (
+                                      {recentWorkOrders.map(insp => (
+                                        <button
+                                          key={insp.id}
+                                          type="button"
+                                          onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })}
+                                          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <p className="font-semibold text-slate-900">{insp.name}</p>
+                                              <p className="mt-1 text-xs text-slate-500">{insp.status === 'draft' ? 'Draft' : 'Filed'} · Updated {formatDateTime(insp.updated_at)}</p>
+                                            </div>
+                                            <ArrowRight size={15} className="shrink-0 text-slate-400" />
+                                          </div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                  <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                      <h3 className="font-bold text-slate-950">Recent inspections</h3>
+                                      <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed</p>
+                                    </div>
+                                    <button type="button" onClick={() => setHomeownerDetailTab('inspections')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View all</button>
+                                  </div>
+                                  {recentInspections.length === 0 ? (
+                                    <EmptyState text="No inspections yet for this workspace." />
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {recentInspections.map(insp => (
                                         <button
                                           key={insp.id}
                                           type="button"
@@ -11383,11 +11496,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                   </div>
                                 )}
-                                {fieldWork.length === 0 ? (
-                                  <EmptyState text="No field work yet for this homeowner." />
+                                {workOrderRecords.length === 0 ? (
+                                  <EmptyState text="No work orders yet for this homeowner." />
                                 ) : (
                                   <div className="space-y-2">
-                                    {fieldWork.map(insp => {
+                                    {workOrderRecords.map(insp => {
                                       const issues = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
                                       return (
                                         <button key={insp.id} type="button" onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm">
@@ -11413,42 +11526,101 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           )}
 
-                          {activeTabId === 'estimates' && (
+                          {activeTabId === 'inspections' && (
+                            <div className="space-y-4 max-w-3xl">
+                              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <h3 className="font-bold text-slate-950">Inspections</h3>
+                                    <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed report{inspectionFinalCount === 1 ? '' : 's'}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isConn && conn) {
+                                        beginFieldWorkForHomeowner(conn, { workflowKind: 'inspection' });
+                                      } else if (localCustomer) {
+                                        beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection' });
+                                      }
+                                      setHomeownerDetailTab('fieldwork');
+                                    }}
+                                    className={buttonClass('primary')}
+                                  >
+                                    <Plus size={14} />
+                                    Create inspection
+                                  </button>
+                                </div>
+                                {inspectionRecords.length === 0 ? (
+                                  <EmptyState text="No inspections yet for this homeowner." />
+                                ) : (
+                                  <div className="space-y-2">
+                                    {inspectionRecords.map(insp => {
+                                      const issues = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
+                                      return (
+                                        <button key={insp.id} type="button" onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm">
+                                          <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                  {insp.status === 'draft' ? 'Draft' : 'Filed'}
+                                                </span>
+                                                {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
+                                              </div>
+                                              <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(insp.updated_at)}</p>
+                                            </div>
+                                            <ArrowRight size={16} className="shrink-0 text-slate-400" />
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {(activeTabId === 'estimates' || activeTabId === 'invoices') && (
                             <div className="space-y-4 max-w-4xl">
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <h3 className="font-bold text-slate-950">Estimates and invoices</h3>
+                                    <h3 className="font-bold text-slate-950">{isInvoiceWorkspaceTab ? 'Invoices' : 'Estimates'}</h3>
                                     <p className="mt-1 text-xs text-slate-500">
-                                      Draft future work estimates or invoice-style records for completed work without starting an inspection.
+                                      {isInvoiceWorkspaceTab
+                                        ? 'Create invoice-style records for completed or billable work without starting an inspection.'
+                                        : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                        setEditingEstimateId(null);
-                                        setEstimateDraft(createBlankEstimateDraft({
-                                          title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-                                        }));
-                                        setEstimateAssistantText('');
-                                        setEstimateAssistantNotice('');
-                                        setEstimateComposerOpen(true);
-                                      }}
-                                      className={buttonClass('primary')}
-                                    >
-                                      <Plus size={14} />
-                                      Create estimate
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => beginCompletedWorkInvoice(conn?.display_name || localCustomer?.display_name || 'Customer')}
-                                      className={buttonClass('secondary')}
-                                    >
-                                      <Receipt size={14} />
-                                      Create invoice
-                                    </button>
+                                    {isInvoiceWorkspaceTab ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => beginCompletedWorkInvoice(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        className={buttonClass('primary')}
+                                      >
+                                        <Receipt size={14} />
+                                        Create invoice
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
+                                          setEditingEstimateId(null);
+                                          setEstimateDraft(createBlankEstimateDraft({
+                                            title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                                          }));
+                                          setEstimateAssistantText('');
+                                          setEstimateAssistantNotice('');
+                                          setEstimateComposerOpen(true);
+                                        }}
+                                        className={buttonClass('primary')}
+                                      >
+                                        <Plus size={14} />
+                                        Create estimate
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
@@ -11674,6 +11846,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                 )}
 
+                                {!isInvoiceWorkspaceTab && (
                                 <div className="mt-5 space-y-2">
                                   <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3">
                                     <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_18rem] lg:items-end">
@@ -11854,12 +12027,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       )}
                                     </div>
                                   )}
-                                  {subjectEstimates.length === 0 ? (
-                                    <EmptyState text="No estimates have been created for this workspace yet." />
+                                </div>
+                                )}
+                                  {activeDocumentRecords.length === 0 ? (
+                                    <EmptyState text={`No ${isInvoiceWorkspaceTab ? 'invoices' : 'estimates'} have been created for this workspace yet.`} />
                                   ) : (
                                     <>
                                       <div className="grid gap-2 sm:grid-cols-4">
-                                        {estimateSections.map(section => {
+                                        {activeDocumentSections.map(section => {
                                           const active = homeownerWorkspaceEstimateView === section.id;
                                           return (
                                             <button
@@ -11881,12 +12056,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         })}
                                       </div>
                                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{selectedEstimateSection.title}</p>
-                                        <p className="mt-1 text-sm text-slate-600">{selectedEstimateSection.helper}</p>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{selectedDocumentSection.title}</p>
+                                        <p className="mt-1 text-sm text-slate-600">{selectedDocumentSection.helper}</p>
                                       </div>
-                                      {selectedEstimateSection.estimates.length === 0 ? (
-                                        <EmptyState text={`No ${selectedEstimateSection.title.toLowerCase()} for this workspace.`} />
-                                      ) : selectedEstimateSection.estimates.map(estimate => {
+                                      {selectedDocumentSection.estimates.length === 0 ? (
+                                        <EmptyState text={`No ${selectedDocumentSection.title.toLowerCase()} for this workspace.`} />
+                                      ) : selectedDocumentSection.estimates.map(estimate => {
                                       const lineCount = estimate.line_items?.length ?? 0;
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
@@ -11993,7 +12168,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                 </div>
                               </div>
-                            </div>
                           )}
 
                           {activeTabId === 'requests' && conn && (
