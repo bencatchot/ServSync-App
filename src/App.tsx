@@ -8356,6 +8356,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('connections');
   };
 
+  const openContractorRequestInRequestsTab = (request: ServiceRequestSummary) => {
+    setContractorRequestView(contractorRequestQueueFor(request));
+    setContractorExpandedRequestIds(new Set([request.id]));
+    setContractorTab('requests');
+  };
+
   const beginCompletedWorkInvoice = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string } = {}) => {
     setEditingEstimateId(null);
     setEstimateDraft(createCompletedWorkInvoiceDraft(subjectName, {
@@ -8650,14 +8656,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     recognition.start();
   };
 
-  const openServiceRequests = serviceRequests.filter(request => !['closed', 'declined'].includes(request.status));
+  const serviceRequestIdsWithJobs = new Set(
+    inspections
+      .map(work => work.service_request_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const requestPhaseServiceRequests = serviceRequests.filter(request => !serviceRequestIdsWithJobs.has(request.id));
+  const openServiceRequests = requestPhaseServiceRequests.filter(request => !['closed', 'declined'].includes(request.status));
   const openServiceRequestCount = openServiceRequests.length;
   const urgentServiceRequests = openServiceRequests.filter(request => request.urgency === 'urgent');
-  const homeownerAppointmentRequests = serviceRequests.filter(
+  const homeownerAppointmentRequests = requestPhaseServiceRequests.filter(
     request => request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'homeowner',
   );
   const contractorUnreadNotificationCount = notifications.filter(notification => !notification.read_at).length;
-  const contractorFollowUpCount = serviceRequests.filter(contractorRequestNeedsFollowUp).length;
+  const contractorFollowUpCount = requestPhaseServiceRequests.filter(contractorRequestNeedsFollowUp).length;
   const confirmedAppointments = serviceRequests
     .filter(request => request.appointment?.status === 'confirmed')
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
@@ -10079,10 +10091,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (requestConnection) openHomeownerWorkspaceForRequest(request);
-                      else toggleInlineRequest();
-                    }}
+                    onClick={toggleInlineRequest}
                     className="w-full text-left px-4 py-3.5 transition-colors hover:bg-blue-50"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -10116,7 +10125,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
                       </div>
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
-                        {requestConnection ? 'Open workspace' : isExpanded ? 'Hide details' : 'View details'}
+                        {isExpanded ? 'Hide request' : 'Open request'}
                         <ArrowRight size={14} />
                       </span>
                     </div>
@@ -10126,7 +10135,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => openHomeownerWorkspaceForRequest(request)}
+                        onClick={toggleInlineRequest}
                         className={buttonClass('primary')}
                       >
                         Review / respond
@@ -10147,14 +10156,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                   )}
 
-                  {isExpanded && !requestConnection && (
+                  {isExpanded && (
                     <div className="border-t border-slate-200 bg-slate-50 px-4 pb-4 pt-4">
-                      <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                        <p className="text-sm font-semibold text-amber-950">Homeowner connection not loaded</p>
-                        <p className="mt-1 text-xs leading-5 text-amber-800">
-                          You can still review and respond to this request here. Create work order will appear once this request is matched to a connected homeowner workspace.
-                        </p>
-                      </div>
+                      {!requestConnection && (
+                        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm font-semibold text-amber-950">Homeowner connection not loaded</p>
+                          <p className="mt-1 text-xs leading-5 text-amber-800">
+                            You can still review and respond to this request here. Service visit creation will appear once this request is matched to a connected homeowner.
+                          </p>
+                        </div>
+                      )}
                       <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
                         {request.description || 'No request description provided.'}
                       </p>
@@ -10166,17 +10177,309 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <ServiceRequestMessages messages={request.messages} media={request.media ?? []} />
                         </div>
                       </details>
+                      {request.quote && (
+                        <div className="mt-4">
+                          <ServiceRequestQuoteCard quote={request.quote} showActions={false} isUpdating={false} />
+                        </div>
+                      )}
+                      {request.appointment && (
+                        <div className="mt-4">
+                          <ServiceRequestAppointmentCard
+                            appointment={request.appointment}
+                            proposedByLabel={request.appointment.proposed_by === 'homeowner' ? 'Homeowner proposed' : 'You proposed'}
+                            nextActionLabel={appointmentNextActionText(request.appointment, 'contractor')}
+                          />
+                        </div>
+                      )}
                       {!['closed', 'declined'].includes(request.status) && (
                         <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-                          <Field label="Respond to homeowner">
+                          {request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'homeowner' && (
+                            <>
+                              {contractorCounterProposeDrafts[request.id]?.open ? (
+                                <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field label="Your proposed date & time">
+                                      <input
+                                        className={inputClass()}
+                                        type="datetime-local"
+                                        value={contractorCounterProposeDrafts[request.id]?.proposedAt ?? ''}
+                                        onChange={event => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, notes: '' }), proposedAt: event.target.value } }))}
+                                      />
+                                    </Field>
+                                    <Field label="Notes (optional)">
+                                      <input
+                                        className={inputClass()}
+                                        placeholder="What to expect, access needed, etc."
+                                        value={contractorCounterProposeDrafts[request.id]?.notes ?? ''}
+                                        onChange={event => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
+                                      />
+                                    </Field>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      className={buttonClass('primary')}
+                                      disabled={!contractorCounterProposeDrafts[request.id]?.proposedAt || respondingToHomeownerApptId === request.id}
+                                      onClick={() => void respondToHomeownerAppointment(request, 'counter', contractorCounterProposeDrafts[request.id]?.proposedAt, contractorCounterProposeDrafts[request.id]?.notes)}
+                                    >
+                                      {respondingToHomeownerApptId === request.id ? 'Sending...' : 'Send counter-proposal'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={buttonClass('secondary')}
+                                      disabled={respondingToHomeownerApptId === request.id}
+                                      onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                                  <button
+                                    type="button"
+                                    className={buttonClass('primary')}
+                                    disabled={respondingToHomeownerApptId === request.id}
+                                    onClick={() => void respondToHomeownerAppointment(request, 'confirm')}
+                                  >
+                                    <CheckCircle2 size={16} />
+                                    {respondingToHomeownerApptId === request.id ? 'Updating...' : 'Confirm appointment'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonClass('secondary')}
+                                    disabled={respondingToHomeownerApptId === request.id}
+                                    onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
+                                  >
+                                    Propose new time
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonClass('secondary')}
+                                    disabled={respondingToHomeownerApptId === request.id}
+                                    onClick={() => void respondToHomeownerAppointment(request, 'decline')}
+                                  >
+                                    Decline time
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor' && (
+                            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
+                              {appointmentResponseText(request.appointment, 'contractor')}
+                            </p>
+                          )}
+
+                          {request.appointment?.status === 'confirmed' && (
+                            <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                              {contractorRescheduleDrafts[request.id]?.open ? (
+                                <>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field label="New date & time">
+                                      <input
+                                        className={inputClass()}
+                                        type="datetime-local"
+                                        value={contractorRescheduleDrafts[request.id]?.proposedAt ?? ''}
+                                        onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, notes: '' }), proposedAt: event.target.value } }))}
+                                      />
+                                    </Field>
+                                    <Field label="Reason (optional)">
+                                      <input
+                                        className={inputClass()}
+                                        placeholder="Why you need to reschedule..."
+                                        value={contractorRescheduleDrafts[request.id]?.notes ?? ''}
+                                        onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
+                                      />
+                                    </Field>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      className={buttonClass('primary')}
+                                      disabled={!contractorRescheduleDrafts[request.id]?.proposedAt || contractorReschedulingId === request.id}
+                                      onClick={() => void rescheduleAsContractor(request)}
+                                    >
+                                      {contractorReschedulingId === request.id ? 'Sending...' : 'Send reschedule proposal'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={buttonClass('secondary')}
+                                      disabled={contractorReschedulingId === request.id}
+                                      onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    className={buttonClass('primary')}
+                                    onClick={() => void completeAppointment(request)}
+                                    disabled={proposingAppointmentId === request.id}
+                                  >
+                                    <CheckCircle2 size={16} />
+                                    {proposingAppointmentId === request.id ? 'Updating...' : 'Mark appointment complete'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={buttonClass('secondary')}
+                                    onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
+                                  >
+                                    <Calendar size={15} />
+                                    Reschedule
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <Field label="Response">
                             <textarea
                               className={inputClass()}
                               rows={3}
                               value={contractorResponseDrafts[request.id] ?? ''}
                               onChange={event => setContractorResponseDrafts(current => ({ ...current, [request.id]: event.target.value }))}
-                              placeholder="Type an update, next step, or question..."
+                              placeholder="Send an update, ask a question, or explain next steps. Optional if you are only proposing an appointment."
                             />
                           </Field>
+
+                          <div>
+                            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50">
+                              <Paperclip size={15} className="shrink-0 text-slate-500" />
+                              Attach photos / videos
+                              <input
+                                type="file"
+                                multiple
+                                accept="image/*,video/*"
+                                className="sr-only"
+                                onChange={event => {
+                                  const picked = Array.from(event.target.files ?? []);
+                                  setContractorResponseFiles(prev => ({ ...prev, [request.id]: [...(prev[request.id] ?? []), ...picked] }));
+                                  event.target.value = '';
+                                }}
+                              />
+                            </label>
+                            {(contractorResponseFiles[request.id] ?? []).length > 0 && (
+                              <ul className="mt-2 space-y-1">
+                                {(contractorResponseFiles[request.id] ?? []).map((file, index) => (
+                                  <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                                    <span className="truncate">{file.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setContractorResponseFiles(prev => ({ ...prev, [request.id]: (prev[request.id] ?? []).filter((_, idx) => idx !== index) }))}
+                                      className="ml-2 text-slate-500 hover:text-red-600"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                              checked={contractorQuoteDrafts[request.id]?.enabled ?? false}
+                              onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { amount: '', scope: '' }), enabled: event.target.checked } }))}
+                            />
+                            Attach a quote
+                          </label>
+                          {contractorQuoteDrafts[request.id]?.enabled && (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <Field label="Amount ($)">
+                                <input
+                                  className={inputClass()}
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={contractorQuoteDrafts[request.id]?.amount ?? ''}
+                                  onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, scope: '' }), amount: event.target.value } }))}
+                                />
+                              </Field>
+                              <Field label="What the quote covers">
+                                <input
+                                  className={inputClass()}
+                                  placeholder="Parts, labor, etc."
+                                  value={contractorQuoteDrafts[request.id]?.scope ?? ''}
+                                  onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, amount: '' }), scope: event.target.value } }))}
+                                />
+                              </Field>
+                            </div>
+                          )}
+
+                          {!['proposed', 'confirmed', 'completed'].includes(request.appointment?.status ?? '') && (
+                            <>
+                              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                                  checked={appointmentDrafts[request.id]?.enabled ?? false}
+                                  onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { proposedAt: '', notes: '' }), enabled: event.target.checked } }))}
+                                />
+                                Schedule appointment
+                              </label>
+                              {appointmentDrafts[request.id]?.enabled && (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <Field label="Date & time">
+                                    <input
+                                      className={inputClass()}
+                                      type="datetime-local"
+                                      value={appointmentDrafts[request.id]?.proposedAt ?? ''}
+                                      onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, notes: '' }), proposedAt: event.target.value } }))}
+                                    />
+                                  </Field>
+                                  <Field label="Notes (optional)">
+                                    <input
+                                      className={inputClass()}
+                                      placeholder="What to expect, access needed, etc."
+                                      value={appointmentDrafts[request.id]?.notes ?? ''}
+                                      onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, proposedAt: '' }), notes: event.target.value } }))}
+                                    />
+                                  </Field>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {closingExpandedId === request.id && (
+                            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                              <Field label="Closing summary (what was done)">
+                                <textarea
+                                  className={inputClass()}
+                                  rows={3}
+                                  value={closingSummaryDrafts[request.id] ?? ''}
+                                  onChange={event => setClosingSummaryDrafts(current => ({ ...current, [request.id]: event.target.value }))}
+                                  placeholder="Describe the work completed, parts used, next steps, etc."
+                                />
+                              </Field>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  className={buttonClass('primary')}
+                                  disabled={isUpdating}
+                                  onClick={() => void updateContractorServiceRequest(request, 'close')}
+                                >
+                                  {isUpdating ? 'Closing...' : 'Close request'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={buttonClass('secondary')}
+                                  disabled={isUpdating}
+                                  onClick={() => setClosingExpandedId(null)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -10184,7 +10487,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               disabled={isUpdating}
                               className={buttonClass('primary')}
                             >
-                              {isUpdating ? 'Sending...' : 'Send response'}
+                              {isUpdating
+                                ? 'Sending...'
+                                : appointmentDrafts[request.id]?.enabled && appointmentDrafts[request.id]?.proposedAt
+                                  ? contractorResponseDrafts[request.id]?.trim() ? 'Send response + appointment' : 'Send appointment'
+                                  : 'Send response'}
                             </button>
                             <button
                               type="button"
@@ -10194,399 +10501,89 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             >
                               Decline
                             </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {false && isExpanded && (() => {
-                    const requestConnectionForExpanded = requestConnection;
-                    const requestQuoteForExpanded = request.quote;
-                    const requestAppointmentForExpanded = request.appointment;
-                    const requestReviewForExpanded = request.review;
-                    if (!requestConnectionForExpanded || !requestQuoteForExpanded || !requestAppointmentForExpanded || !requestReviewForExpanded) return null;
-                    const expandedRequest: ServiceRequestSummary & {
-                      quote: ServiceRequestQuote;
-                      appointment: ServiceRequestAppointment;
-                      review: NonNullable<ServiceRequestSummary['review']>;
-                    } = {
-                      ...request,
-                      quote: requestQuoteForExpanded!,
-                      appointment: requestAppointmentForExpanded!,
-                      review: requestReviewForExpanded!,
-                    };
-                    return ((
-                      request: ServiceRequestSummary & {
-                        quote: ServiceRequestQuote;
-                        appointment: ServiceRequestAppointment;
-                        review: NonNullable<ServiceRequestSummary['review']>;
-                      },
-                      requestConnection: ContractorConnectedHomeowner,
-                    ) => (
-                    <div className="border-t border-slate-700 px-4 pb-4 pt-4 space-y-4">
-                      {/* Description */}
-                      <p className="whitespace-pre-wrap text-sm text-slate-300">{request.description}</p>
-                      {requestConnection && !isClosedCard && (
-                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-900/40 bg-blue-950/20 p-3">
-                          <button
-                            type="button"
-                            onClick={() => beginFieldWorkForHomeowner(requestConnection, {
-                              name: `${request.category} field work — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
-                              serviceRequestId: request.id,
-                            })}
-                            className={buttonClass('primary')}
-                          >
-                            <ClipboardCheck size={16} />
-                            Start field work from request
-                          </button>
-                          <p className="text-xs text-slate-400">This will connect the report to {request.homeowner_name || requestConnection.display_name || 'the homeowner'}.</p>
-                        </div>
-                      )}
-
-                      {/* Closed: summary + invoice */}
-                      {isClosedCard && request.closing_summary && (
-                        <div className="rounded-lg border border-emerald-700/50 bg-emerald-900/20 p-3">
-                          <p className="mb-1 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-400">
-                            <FileText size={11} />
-                            Closing Summary
-                          </p>
-                          <p className="text-sm text-emerald-300">{request.closing_summary}</p>
-                        </div>
-                      )}
-                      {isClosedCard && request.quote && (
-                        <div className="rounded-lg border border-slate-700 bg-slate-700 p-3">
-                          <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-                            <Receipt size={11} />
-                            Invoice
-                          </p>
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p className="flex-1 text-sm text-slate-300">{request.quote.scope || 'Services rendered'}</p>
-                            <p className="shrink-0 text-lg font-bold text-white">${(request.quote.amount_cents / 100).toFixed(2)}</p>
-                          </div>
-                          <p className={`mt-1 text-xs ${request.quote.status === 'accepted' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {request.quote.status === 'accepted' ? '✓ Accepted' : `Quote ${request.quote.status}`}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Thread */}
-                      <details open={!isClosedCard}>
-                        <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-400">
-                          Thread · {request.messages.length} {request.messages.length === 1 ? 'message' : 'messages'}
-                        </summary>
-                        <div className="mt-3">
-                          <ServiceRequestMessages messages={request.messages} media={request.media ?? []} />
-                        </div>
-                      </details>
-
-                      {/* Active-only: quote display, appointment, response form */}
-                      {!isClosedCard && (
-                        <>
-                          {request.quote && (
-                            <ServiceRequestQuoteCard quote={request.quote} showActions={false} isUpdating={false} />
-                          )}
-                          {request.appointment && (
-                            <>
-                              <ServiceRequestAppointmentCard
-                                appointment={request.appointment}
-                                proposedByLabel={request.appointment.proposed_by === 'homeowner' ? 'Homeowner proposed' : 'You proposed'}
-                                nextActionLabel={appointmentNextActionText(request.appointment, 'contractor')}
-                              />
-                              {request.appointment.status === 'proposed' && request.appointment.proposed_by === 'homeowner' && (
-                                <>
-                                  {contractorCounterProposeDrafts[request.id]?.open ? (
-                                    <div className="space-y-3">
-                                      <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label="Your proposed date & time">
-                                          <input className={inputClass()} type="datetime-local"
-                                            value={contractorCounterProposeDrafts[request.id]?.proposedAt ?? ''}
-                                            onChange={event => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, notes: '' }), proposedAt: event.target.value } }))}
-                                          />
-                                        </Field>
-                                        <Field label="Notes (optional)">
-                                          <input className={inputClass()} placeholder="What to expect, access needed, etc."
-                                            value={contractorCounterProposeDrafts[request.id]?.notes ?? ''}
-                                            onChange={event => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
-                                          />
-                                        </Field>
-                                      </div>
-                                      <div className="flex flex-wrap gap-2">
-                                        <button type="button" className={buttonClass('primary')}
-                                          disabled={!contractorCounterProposeDrafts[request.id]?.proposedAt || respondingToHomeownerApptId === request.id}
-                                          onClick={() => void respondToHomeownerAppointment(request, 'counter', contractorCounterProposeDrafts[request.id]?.proposedAt, contractorCounterProposeDrafts[request.id]?.notes)}
-                                        >
-                                          {respondingToHomeownerApptId === request.id ? 'Sending...' : 'Send counter-proposal'}
-                                        </button>
-                                        <button type="button" className={buttonClass('secondary')}
-                                          disabled={respondingToHomeownerApptId === request.id}
-                                          onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
-                                        >Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-wrap gap-2">
-                                      <button type="button" className={buttonClass('primary')}
-                                        disabled={respondingToHomeownerApptId === request.id}
-                                        onClick={() => void respondToHomeownerAppointment(request, 'confirm')}
-                                      >
-                                        <CheckCircle2 size={16} />
-                                        {respondingToHomeownerApptId === request.id ? 'Updating...' : 'Confirm appointment'}
-                                      </button>
-                                      <button type="button" className={buttonClass('secondary')}
-                                        disabled={respondingToHomeownerApptId === request.id}
-                                        onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
-                                      >Propose new time</button>
-                                      <button type="button" className={buttonClass('secondary')}
-                                        disabled={respondingToHomeownerApptId === request.id}
-                                        onClick={() => void respondToHomeownerAppointment(request, 'decline')}
-                                      >Decline</button>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                              {request.appointment.status === 'proposed' && request.appointment.proposed_by === 'contractor' && (
-                                <p className="text-sm font-medium text-slate-500">{appointmentResponseText(request.appointment, 'contractor')}</p>
-                              )}
-                              {request.appointment.status === 'confirmed' && (
-                                <div className="space-y-3">
-                                  {contractorRescheduleDrafts[request.id]?.open ? (
-                                    <div className="space-y-3">
-                                      <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label="New date & time">
-                                          <input className={inputClass()} type="datetime-local"
-                                            value={contractorRescheduleDrafts[request.id]?.proposedAt ?? ''}
-                                            onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, notes: '' }), proposedAt: event.target.value } }))}
-                                          />
-                                        </Field>
-                                        <Field label="Reason (optional)">
-                                          <input className={inputClass()} placeholder="Why you need to reschedule..."
-                                            value={contractorRescheduleDrafts[request.id]?.notes ?? ''}
-                                            onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
-                                          />
-                                        </Field>
-                                      </div>
-                                      <div className="flex flex-wrap gap-2">
-                                        <button type="button" className={buttonClass('primary')}
-                                          disabled={!contractorRescheduleDrafts[request.id]?.proposedAt || contractorReschedulingId === request.id}
-                                          onClick={() => void rescheduleAsContractor(request)}
-                                        >{contractorReschedulingId === request.id ? 'Sending...' : 'Send reschedule proposal'}</button>
-                                        <button type="button" className={buttonClass('secondary')}
-                                          disabled={contractorReschedulingId === request.id}
-                                          onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
-                                        >Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-wrap gap-2">
-                                      <button type="button" className={buttonClass('primary')}
-                                        onClick={() => void completeAppointment(request)}
-                                        disabled={proposingAppointmentId === request.id}
-                                      >
-                                        <CheckCircle2 size={16} />
-                                        {proposingAppointmentId === request.id ? 'Updating...' : 'Mark appointment complete'}
-                                      </button>
-                                      <button type="button" className={buttonClass('secondary')}
-                                        onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
-                                      >
-                                        <Calendar size={15} />
-                                        Reschedule
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          )}
-                          <div className="space-y-3">
-                            <Field label="Response">
-                              <textarea className={inputClass()} rows={3}
-                                value={contractorResponseDrafts[request.id] || ''}
-                                onChange={event => setContractorResponseDrafts(current => ({ ...current, [request.id]: event.target.value }))}
-                                placeholder="Send an update, ask a question, or explain next steps. Optional if you are only proposing an appointment."
-                              />
-                            </Field>
-                            <div>
-                              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600">
-                                <Paperclip size={15} className="shrink-0 text-slate-400" />
-                                Attach photos / videos
-                                <input
-                                  type="file"
-                                  multiple
-                                  accept="image/*,video/*"
-                                  className="sr-only"
-                                  onChange={e => {
-                                    const picked = Array.from(e.target.files ?? []);
-                                    setContractorResponseFiles(prev => ({ ...prev, [request.id]: [...(prev[request.id] ?? []), ...picked] }));
-                                    e.target.value = '';
-                                  }}
-                                />
-                              </label>
-                              {(contractorResponseFiles[request.id] ?? []).length > 0 && (
-                                <ul className="mt-2 space-y-1">
-                                  {(contractorResponseFiles[request.id] ?? []).map((file, i) => (
-                                    <li key={i} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                                      <span className="truncate">{file.name}</span>
-                                      <button type="button" onClick={() => setContractorResponseFiles(prev => ({ ...prev, [request.id]: (prev[request.id] ?? []).filter((_, idx) => idx !== i) }))} className="ml-2 text-slate-400 hover:text-red-400"><X size={13} /></button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-                            <label className="flex cursor-pointer items-center gap-2">
-                              <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600"
-                                checked={contractorQuoteDrafts[request.id]?.enabled ?? false}
-                                onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { amount: '', scope: '' }), enabled: event.target.checked } }))}
-                              />
-                              <span className="text-sm font-semibold text-slate-300">Attach a quote</span>
-                            </label>
-                            {contractorQuoteDrafts[request.id]?.enabled && (
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <Field label="Amount ($)">
-                                  <input className={inputClass()} type="number" min="0" step="0.01" placeholder="0.00"
-                                    value={contractorQuoteDrafts[request.id]?.amount ?? ''}
-                                    onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, scope: '' }), amount: event.target.value } }))}
-                                  />
-                                </Field>
-                                <Field label="What the quote covers">
-                                  <input className={inputClass()} placeholder="Parts, labor, etc."
-                                    value={contractorQuoteDrafts[request.id]?.scope ?? ''}
-                                    onChange={event => setContractorQuoteDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, amount: '' }), scope: event.target.value } }))}
-                                  />
-                                </Field>
-                              </div>
-                            )}
-                            {!['proposed', 'confirmed', 'completed'].includes(request.appointment?.status ?? '') && (
-                              <>
-                                <label className="flex cursor-pointer items-center gap-2">
-                                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600"
-                                    checked={appointmentDrafts[request.id]?.enabled ?? false}
-                                    onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { proposedAt: '', notes: '' }), enabled: event.target.checked } }))}
-                                  />
-                                  <span className="text-sm font-semibold text-slate-300">Schedule appointment</span>
-                                </label>
-                                <p className="text-xs text-slate-500">You can send an appointment proposal by itself, or include a typed response with it.</p>
-                                {appointmentDrafts[request.id]?.enabled && (
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <Field label="Date & time">
-                                      <input className={inputClass()} type="datetime-local"
-                                        value={appointmentDrafts[request.id]?.proposedAt ?? ''}
-                                        onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, notes: '' }), proposedAt: event.target.value } }))}
-                                      />
-                                    </Field>
-                                    <Field label="Notes (optional)">
-                                      <input className={inputClass()} placeholder="What to expect, access needed, etc."
-                                        value={appointmentDrafts[request.id]?.notes ?? ''}
-                                        onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, proposedAt: '' }), notes: event.target.value } }))}
-                                      />
-                                    </Field>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {/* Close with summary — expands inline */}
-                            {closingExpandedId === request.id ? (
-                              <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-700 p-3">
-                                <Field label="Closing summary (what was done)">
-                                  <textarea className={inputClass()} rows={3}
-                                    value={closingSummaryDrafts[request.id] ?? ''}
-                                    onChange={event => setClosingSummaryDrafts(current => ({ ...current, [request.id]: event.target.value }))}
-                                    placeholder="Describe the work completed, parts used, next steps, etc."
-                                  />
-                                </Field>
-                                <div className="flex flex-wrap gap-2">
-                                  <button type="button" className={buttonClass('primary')}
-                                    disabled={isUpdating}
-                                    onClick={() => void updateContractorServiceRequest(request, 'close')}
-                                  >
-                                    {isUpdating ? 'Closing...' : 'Close request'}
-                                  </button>
-                                  <button type="button" className={buttonClass('secondary')}
-                                    disabled={isUpdating}
-                                    onClick={() => setClosingExpandedId(null)}
-                                  >Cancel</button>
-                                </div>
-                              </div>
-                            ) : null}
-                            <div className="flex flex-wrap gap-2">
-                              <button type="button" className={buttonClass('primary')}
-                                onClick={() => void updateContractorServiceRequest(request, 'respond')}
+                            {closingExpandedId !== request.id && (
+                              <button
+                                type="button"
+                                onClick={() => setClosingExpandedId(request.id)}
                                 disabled={isUpdating}
+                                className={buttonClass('secondary')}
                               >
-                                {isUpdating
-                                  ? 'Sending...'
-                                  : appointmentDrafts[request.id]?.enabled && appointmentDrafts[request.id]?.proposedAt
-                                    ? contractorResponseDrafts[request.id]?.trim() ? 'Send response + appointment' : 'Send appointment'
-                                    : 'Send response'}
+                                Close
                               </button>
-                              <button type="button" className={buttonClass('secondary')}
-                                onClick={() => void updateContractorServiceRequest(request, 'decline')}
-                                disabled={isUpdating}
-                              >Decline</button>
-                              {closingExpandedId !== request.id && (
-                                <button type="button" className={buttonClass('secondary')}
-                                  onClick={() => setClosingExpandedId(request.id)}
-                                  disabled={isUpdating}
-                                >Close</button>
-                              )}
-                            </div>
+                            )}
                           </div>
-                        </>
-                      )}
-
-                      {/* Closed-only: review display + reopen */}
-                      {isClosedCard && request.review && (
-                        <div className="rounded-xl border border-slate-700 bg-slate-700/40 px-3 py-2">
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Homeowner review</p>
-                          <StarDisplay rating={request.review.rating} />
-                          {request.review.kudos.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {request.review.kudos.map(k => (
-                                <span key={k} className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{k}</span>
-                              ))}
-                            </div>
-                          )}
-                          {request.review.body && <p className="mt-2 text-sm text-slate-300 italic">"{request.review.body}"</p>}
                         </div>
                       )}
                       {isClosedCard && (
-                        <>
+                        <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                          {request.closing_summary && (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                              <p className="mb-1 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
+                                <FileText size={11} />
+                                Closing summary
+                              </p>
+                              <p className="text-sm text-emerald-900">{request.closing_summary}</p>
+                            </div>
+                          )}
+                          {request.review && (
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Homeowner review</p>
+                              <StarDisplay rating={request.review.rating} />
+                              {request.review.kudos.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {request.review.kudos.map(k => (
+                                    <span key={k} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">{k}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {request.review.body && <p className="mt-2 text-sm italic text-slate-700">"{request.review.body}"</p>}
+                            </div>
+                          )}
                           {contractorReopenDrafts[request.id]?.open ? (
                             <div className="space-y-3">
                               <Field label="Reason for reopening (optional)">
-                                <textarea className={inputClass()} rows={2}
+                                <textarea
+                                  className={inputClass()}
+                                  rows={2}
                                   value={contractorReopenDrafts[request.id]?.body ?? ''}
                                   onChange={event => setContractorReopenDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true }), body: event.target.value } }))}
                                   placeholder="Describe what needs follow-up..."
                                 />
                               </Field>
                               <div className="flex flex-wrap gap-2">
-                                <button type="button" className={buttonClass('primary')}
+                                <button
+                                  type="button"
+                                  className={buttonClass('primary')}
                                   disabled={contractorReopeningRequestId === request.id}
                                   onClick={() => void reopenContractorRequest(request)}
                                 >
                                   <RotateCcw size={15} />
                                   {contractorReopeningRequestId === request.id ? 'Reopening...' : 'Reopen request'}
                                 </button>
-                                <button type="button" className={buttonClass('secondary')}
+                                <button
+                                  type="button"
+                                  className={buttonClass('secondary')}
                                   disabled={contractorReopeningRequestId === request.id}
                                   onClick={() => setContractorReopenDrafts(current => ({ ...current, [request.id]: { open: false, body: '' } }))}
-                                >Cancel</button>
+                                >
+                                  Cancel
+                                </button>
                               </div>
                             </div>
                           ) : (
-                            <button type="button" className={buttonClass('secondary')}
+                            <button
+                              type="button"
+                              className={buttonClass('secondary')}
                               onClick={() => setContractorReopenDrafts(current => ({ ...current, [request.id]: { open: true, body: '' } }))}
                             >
                               <RotateCcw size={15} />
                               Reopen for follow-up
                             </button>
                           )}
-                        </>
+                        </div>
                       )}
                     </div>
-                    ))(expandedRequest, requestConnectionForExpanded!);
-                  })()}
+                  )}
                 </div>
               );
             };
@@ -10606,13 +10603,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 id: 'new',
                 title: 'New requests',
                 helper: 'Fresh homeowner requests that need your first response.',
-                requests: sortContractorRequests(serviceRequests.filter(r => r.status === 'open')),
+                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r => r.status === 'open')),
               },
               {
                 id: 'open',
                 title: 'Open',
                 helper: 'Active requests after the first response, including appointment scheduling and follow-up.',
-                requests: sortContractorRequests(serviceRequests.filter(r =>
+                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r =>
                   !['closed', 'declined'].includes(r.status)
                   && r.status !== 'open'
                 )),
@@ -10621,10 +10618,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 id: 'closed',
                 title: 'Closed',
                 helper: 'Completed, declined, cancelled, or invoiced requests.',
-                requests: sortContractorRequests(serviceRequests.filter(r => r.status === 'closed' || r.status === 'declined')),
+                requests: sortContractorRequests(requestPhaseServiceRequests.filter(r => r.status === 'closed' || r.status === 'declined')),
               },
             ];
-            const followUpRequests = sortContractorRequests(serviceRequests.filter(isContractorAttention));
+            const followUpRequests = sortContractorRequests(requestPhaseServiceRequests.filter(isContractorAttention));
             const activeContractorRequestView = contractorRequestView === 'overview'
               ? 'overview'
               : requestSections.find(section => section.id === contractorRequestView)?.id
@@ -10647,7 +10644,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     }`}
                   >
                     <p className={`text-xs font-semibold uppercase tracking-[0.12em] ${activeContractorRequestView === 'overview' ? 'text-blue-50' : 'text-slate-500'}`}>Dashboard</p>
-                    <p className="mt-1 text-xl font-bold">{serviceRequests.filter(r => !['closed', 'declined'].includes(r.status)).length}</p>
+                    <p className="mt-1 text-xl font-bold">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status)).length}</p>
                   </button>
                   {requestSections.map(section => {
                     const active = section.id === activeContractorRequestView;
@@ -10683,7 +10680,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </button>
                       <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Appointment activity</p>
-                        <p className="mt-0.5 text-xl font-bold text-slate-950">{serviceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
+                        <p className="mt-0.5 text-xl font-bold text-slate-950">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
                         <p className="mt-0.5 text-xs leading-4 text-slate-500">Scheduled and proposed appointments inside open requests.</p>
                       </button>
                     </div>
@@ -11348,9 +11345,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           icon: <MessageSquare size={16} />,
                           tone: followUpReqs.length > 0 ? 'amber' as const : 'blue' as const,
                           onClick: () => {
-                            setSelectedHomeownerRequestId(followUpReqs[0]?.id ?? activeReqs[0]?.id ?? connReqs[0]?.id ?? null);
-                            setHomeownerWorkspaceRequestView(followUpReqs.length > 0 ? 'attention' : 'active');
-                            setHomeownerDetailTab('requests');
+                            const targetRequest = followUpReqs[0] ?? activeReqs[0] ?? connReqs[0] ?? null;
+                            if (targetRequest) openContractorRequestInRequestsTab(targetRequest);
+                            else setHomeownerDetailTab('profile');
                           },
                         },
                       ] : []),
@@ -11522,8 +11519,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     type="button"
                                     onClick={() => {
                                       if (nextFollowUpRequest || nextOpenRequest) {
-                                        setSelectedHomeownerRequestId((nextFollowUpRequest ?? nextOpenRequest)!.id);
-                                        setHomeownerDetailTab('requests');
+                                        openContractorRequestInRequestsTab((nextFollowUpRequest ?? nextOpenRequest)!);
                                       } else if (nextDraftWorkOrder) {
                                         openInspection(nextDraftWorkOrder, { stayInHomeownerWorkspace: true });
                                       } else if (nextAppointmentRequest) {
@@ -11550,7 +11546,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <h3 className="font-bold text-slate-950">Recent requests</h3>
                                         <p className="mt-1 text-xs text-slate-500">{activeReqs.length} active request{activeReqs.length === 1 ? '' : 's'}</p>
                                       </div>
-                                      <button type="button" onClick={() => setHomeownerDetailTab('requests')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View all</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const targetRequest = followUpReqs[0] ?? activeReqs[0] ?? connReqs[0] ?? null;
+                                          if (targetRequest) openContractorRequestInRequestsTab(targetRequest);
+                                          else setContractorTab('requests');
+                                        }}
+                                        className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                                      >
+                                        View all
+                                      </button>
                                     </div>
                                     {recentRequests.length === 0 ? (
                                       <EmptyState text="No service requests from this homeowner yet." />
@@ -11561,9 +11567,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             key={request.id}
                                             type="button"
                                             onClick={() => {
-                                              setSelectedHomeownerRequestId(request.id);
-                                              setHomeownerWorkspaceRequestView(['closed', 'declined'].includes(request.status) ? 'closed' : contractorRequestNeedsFollowUp(request) ? 'attention' : 'active');
-                                              setHomeownerDetailTab('requests');
+                                              openContractorRequestInRequestsTab(request);
                                             }}
                                             className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
                                           >
@@ -11920,7 +11924,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <h4 className="text-sm font-bold text-slate-950">Service requests</h4>
                                           <p className="mt-1 text-xs text-slate-500">{activeReqs.length} open request{activeReqs.length === 1 ? '' : 's'} · {followUpReqs.length} need follow-up</p>
                                         </div>
-                                        <button type="button" onClick={() => setContractorTab('requests')} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open requests</button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const targetRequest = followUpReqs[0] ?? activeReqs[0] ?? connReqs[0] ?? null;
+                                            if (targetRequest) openContractorRequestInRequestsTab(targetRequest);
+                                            else setContractorTab('requests');
+                                          }}
+                                          className="text-xs font-semibold text-blue-700 hover:text-blue-800"
+                                        >
+                                          Open requests
+                                        </button>
                                       </div>
                                       {connReqs.slice(0, 4).length === 0 ? (
                                         <EmptyState text="No service requests from this homeowner yet." />
@@ -11930,10 +11944,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <button
                                               key={request.id}
                                               type="button"
-                                              onClick={() => {
-                                                setSelectedHomeownerRequestId(request.id);
-                                                setContractorTab('requests');
-                                              }}
+                                              onClick={() => openContractorRequestInRequestsTab(request)}
                                               className={`rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
                                             >
                                               <p className="truncate text-sm font-semibold text-slate-900">{request.title}</p>
@@ -12759,7 +12770,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {selectedWorkspaceRequestSection.requests.map(request => {
                                       const needsFollowUp = contractorRequestNeedsFollowUp(request);
                                       return (
-                                        <button key={request.id} type="button" onClick={() => setSelectedHomeownerRequestId(request.id)} className={`w-full rounded-xl border bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm border-l-4 ${selectedHomeownerRequestId === request.id ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} ${serviceRequestStatusAccent(request.status)}`}>
+                                        <button key={request.id} type="button" onClick={() => openContractorRequestInRequestsTab(request)} className={`w-full rounded-xl border bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm border-l-4 border-slate-200 ${serviceRequestStatusAccent(request.status)}`}>
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
@@ -12838,60 +12849,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                   )}
                                   {!['closed', 'declined'].includes(selectedWorkspaceRequest.status) && (
-                                    <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                      <Field label="Respond to homeowner">
-                                        <textarea
-                                          className={inputClass()}
-                                          rows={3}
-                                          value={contractorResponseDrafts[selectedWorkspaceRequest.id] ?? ''}
-                                          onChange={event => setContractorResponseDrafts(current => ({ ...current, [selectedWorkspaceRequest.id]: event.target.value }))}
-                                          placeholder="Type an update, next step, or question..."
-                                        />
-                                      </Field>
-                                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                        <input
-                                          type="checkbox"
-                                          checked={appointmentDrafts[selectedWorkspaceRequest.id]?.enabled ?? false}
-                                          onChange={event => setAppointmentDrafts(current => ({ ...current, [selectedWorkspaceRequest.id]: { ...(current[selectedWorkspaceRequest.id] || { proposedAt: '', notes: '' }), enabled: event.target.checked } }))}
-                                        />
-                                        Propose an appointment time
-                                      </label>
-                                      {appointmentDrafts[selectedWorkspaceRequest.id]?.enabled && (
-                                        <div className="grid gap-3 sm:grid-cols-2">
-                                          <Field label="Date & time">
-                                            <input
-                                              className={inputClass()}
-                                              type="datetime-local"
-                                              value={appointmentDrafts[selectedWorkspaceRequest.id]?.proposedAt ?? ''}
-                                              onChange={event => setAppointmentDrafts(current => ({ ...current, [selectedWorkspaceRequest.id]: { ...(current[selectedWorkspaceRequest.id] || { enabled: true, notes: '' }), proposedAt: event.target.value } }))}
-                                            />
-                                          </Field>
-                                          <Field label="Appointment notes">
-                                            <input
-                                              className={inputClass()}
-                                              value={appointmentDrafts[selectedWorkspaceRequest.id]?.notes ?? ''}
-                                              onChange={event => setAppointmentDrafts(current => ({ ...current, [selectedWorkspaceRequest.id]: { ...(current[selectedWorkspaceRequest.id] || { enabled: true, proposedAt: '' }), notes: event.target.value } }))}
-                                              placeholder="Access notes, time window, etc."
-                                            />
-                                          </Field>
-                                        </div>
-                                      )}
+                                    <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                                      <p className="text-sm font-semibold text-blue-950">Handle this request in Service Requests</p>
+                                      <p className="mt-1 text-xs leading-5 text-blue-800">
+                                        Replies, appointment proposals, declines, and closeout stay in the Service Requests tab. Create a service visit only after this request becomes a job.
+                                      </p>
                                       <div className="flex flex-wrap gap-2">
                                         <button
                                           type="button"
-                                          onClick={() => void updateContractorServiceRequest(selectedWorkspaceRequest, 'respond')}
-                                          disabled={updatingServiceRequestId === selectedWorkspaceRequest.id}
+                                          onClick={() => openContractorRequestInRequestsTab(selectedWorkspaceRequest)}
                                           className={buttonClass('primary')}
                                         >
-                                          {updatingServiceRequestId === selectedWorkspaceRequest.id ? 'Sending...' : 'Send response'}
+                                          Open in Service Requests
                                         </button>
                                         <button
                                           type="button"
-                                          onClick={() => void updateContractorServiceRequest(selectedWorkspaceRequest, 'decline')}
-                                          disabled={updatingServiceRequestId === selectedWorkspaceRequest.id}
+                                          onClick={() => {
+                                            beginFieldWorkForHomeowner(conn, {
+                                              name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
+                                              serviceRequestId: selectedWorkspaceRequest.id,
+                                              workflowKind: 'work_order',
+                                              templateSource: 'blank',
+                                            });
+                                          }}
                                           className={buttonClass('secondary')}
                                         >
-                                          Decline
+                                          Create service visit
                                         </button>
                                       </div>
                                     </div>
