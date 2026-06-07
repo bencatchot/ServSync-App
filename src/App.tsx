@@ -8607,9 +8607,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     starter_template_id: sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work',
     workflow_kind: 'work_order' as FieldWorkflowKind,
   });
-  const fieldWorkDrafts = inspections.filter(insp => insp.status === 'draft');
-  const finalizedFieldWork = inspections.filter(insp => insp.status === 'finalized');
-  const activeFieldWorkConnections = connections.filter(connection => connection.status === 'active');
   const fieldWorkForHomeowner = (homeownerUserId: string) => inspections
     .filter(insp => insp.homeowner_user_id === homeownerUserId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -12490,66 +12487,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="p-5 sm:p-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Work order command center</p>
-                    <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">Templates, local customers, and unassigned work</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      Use this area for local customers who are not connected yet, reusable templates, and work that does not start inside a homeowner workspace.
-                    </p>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setContractorTab('connections')}
-                        className={buttonClass('primary')}
-                      >
-                        <Users size={16} />
-                        Open Homeowners
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowTemplateLibrary(true);
-                          setShowTemplateForm(false);
-                        }}
-                        className={buttonClass('secondary')}
-                      >
-                        <ClipboardList size={16} />
-                        Browse templates
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowLocalContactForm(true)}
-                        className={buttonClass('secondary')}
-                      >
-                        <Plus size={16} />
-                        Add local customer
-                      </button>
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-200 bg-slate-50 p-5 sm:p-6 lg:border-l lg:border-t-0">
-                    <div className="grid grid-cols-2 gap-3">
-                      <InfoBox label="Connected homeowners" value={String(activeFieldWorkConnections.length)} />
-                      <InfoBox label="Local customers" value={String(localContacts.length)} />
-                      <InfoBox label="Drafts" value={String(fieldWorkDrafts.length)} />
-                      <InfoBox label="Finalized reports" value={String(finalizedFieldWork.length)} />
-                    </div>
-                    <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Clean workflow</p>
-                      <p className="mt-1 text-sm text-blue-800">
-                        Connected homeowners can receive filed reports in ServSync. Local customer work stays in the contractor workspace until that customer joins later.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Jobs workspace</p>
-                    <h3 className="mt-1 text-lg font-bold text-slate-950">Choose what you want to manage</h3>
+                    <h2 className="text-xl font-bold text-slate-950">Jobs</h2>
+                    <p className="mt-1 text-sm text-slate-500">Create, track, and close work without mixing it into the homeowner profile page.</p>
                   </div>
                   <div className="min-w-[240px]">
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Customer filter</label>
@@ -12570,63 +12512,113 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </select>
                   </div>
                 </div>
-                <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-7">
-                  {([
-                    { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Inspection or service work', icon: <Plus size={15} /> },
-                    { id: 'open_jobs', label: 'Open Jobs', value: String(selectedHomeownerSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
-                    { id: 'closed_jobs', label: 'Closed Jobs', value: String(selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
-                    { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
-                    { id: 'open_financial', label: 'Open Estimates', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length), helper: 'Draft, sent, accepted', icon: <FileText size={15} /> },
-                    { id: 'closed_financial', label: 'Closed/Billed', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length), helper: 'Closed financial records', icon: <Receipt size={15} /> },
-                    { id: 'templates', label: 'Templates', value: String(inspectionTemplates.length + estimateTemplates.length), helper: 'Workflow starters', icon: <ClipboardList size={15} /> },
-                  ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
-                    const active = contractorJobsView === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setContractorJobsView(item.id);
-                          if (item.id === 'new_jobs') setInspectionView('new');
-                          if (item.id !== 'new_jobs') setInspectionView('list');
-                        }}
-                        className={`rounded-xl border p-3 text-left transition ${
-                          active
-                            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
-                          <span className="text-lg font-bold">{item.value}</span>
-                        </div>
-                        <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
-                        <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
-                      </button>
-                    );
-                  })}
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <ClipboardCheck size={16} className="text-blue-700" />
+                      <h3 className="text-sm font-bold text-slate-950">Jobs</h3>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {([
+                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Inspection or service work', icon: <Plus size={15} /> },
+                        { id: 'open_jobs', label: 'Open Jobs', value: String(selectedHomeownerSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
+                        { id: 'closed_jobs', label: 'Closed Jobs', value: String(selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
+                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
+                        const active = contractorJobsView === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setContractorJobsView(item.id);
+                              if (item.id === 'new_jobs') setInspectionView('new');
+                              if (item.id !== 'new_jobs') setInspectionView('list');
+                            }}
+                            className={`rounded-xl border p-3 text-left transition ${
+                              active
+                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
+                              <span className="text-lg font-bold">{item.value}</span>
+                            </div>
+                            <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+                            <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Receipt size={16} className="text-blue-700" />
+                      <h3 className="text-sm font-bold text-slate-950">Estimates / Invoices</h3>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {([
+                        { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
+                        { id: 'open_financial', label: 'Open Estimates', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length), helper: 'Draft, sent, accepted', icon: <FileText size={15} /> },
+                        { id: 'closed_financial', label: 'Closed/Billed', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length), helper: 'Closed financial records', icon: <Receipt size={15} /> },
+                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
+                        const active = contractorJobsView === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setContractorJobsView(item.id);
+                              setInspectionView('list');
+                            }}
+                            className={`rounded-xl border p-3 text-left transition ${
+                              active
+                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
+                              <span className="text-lg font-bold">{item.value}</span>
+                            </div>
+                            <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+                            <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <ClipboardList size={16} className="text-blue-700" />
+                      <h3 className="text-sm font-bold text-slate-950">Templates</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContractorJobsView('templates');
+                        setInspectionView('list');
+                        setShowTemplateLibrary(true);
+                      }}
+                      className={`w-full rounded-xl border p-3 text-left transition ${
+                        contractorJobsView === 'templates'
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`rounded-lg p-1.5 ${contractorJobsView === 'templates' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}><ClipboardList size={15} /></span>
+                        <span className="text-lg font-bold">{inspectionTemplates.length + estimateTemplates.length}</span>
+                      </div>
+                      <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-600'}`}>Templates</p>
+                      <p className={`mt-1 text-xs ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-500'}`}>Workflow and estimate starters</p>
+                    </button>
+                  </div>
                 </div>
               </section>
-
-              {contractorJobsView === 'overview' && (
-                <section className="grid gap-3 md:grid-cols-3">
-                  <button type="button" onClick={() => { setContractorJobsView('new_jobs'); setInspectionView('new'); }} className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-left shadow-sm transition hover:border-blue-300">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Start work</p>
-                    <h3 className="mt-1 font-bold text-slate-950">Create a job or inspection</h3>
-                    <p className="mt-1 text-sm text-blue-900">Choose the customer, work type, and whether to start blank or from a template.</p>
-                  </button>
-                  <button type="button" onClick={() => setContractorJobsView('new_financial')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Money flow</p>
-                    <h3 className="mt-1 font-bold text-slate-950">Create estimate or invoice</h3>
-                    <p className="mt-1 text-sm text-slate-600">Build an estimate first, then create an invoice from accepted work, or make a standalone invoice.</p>
-                  </button>
-                  <button type="button" onClick={() => setContractorJobsView('open_jobs')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current workload</p>
-                    <h3 className="mt-1 font-bold text-slate-950">Review open items</h3>
-                    <p className="mt-1 text-sm text-slate-600">{openJobs.length} open job{openJobs.length === 1 ? '' : 's'} and {openFinancialRecords.length} open estimate/invoice record{openFinancialRecords.length === 1 ? '' : 's'}.</p>
-                  </button>
-                </section>
-              )}
 
               {contractorJobsView === 'new_financial' && (
                 <Card title="New estimate or invoice" icon={<Receipt size={18} />}>
