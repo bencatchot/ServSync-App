@@ -11023,19 +11023,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ).map((room, index) => normalizeTemplateRoom(room, index));
       const trimmedScope = inspectionNewDraft.scope.trim();
       const seedFindings: InspectionRoomData[] = isSimpleJobDraft
-        ? trimmedScope
-          ? [{
-              ...roomIdentityFields({ room: 'Approved Scope', display_name: 'Approved Scope' }, 0),
-              findings: [{
-                title: inspectionNewDraft.name.trim(),
-                status: 'Monitor' as FindingStatus,
-                notes: trimmedScope,
-                action: 'Complete the approved work.',
-                due: '',
-                photos: [],
-              }],
-            }]
-          : []
+        ? []
         : rooms.map((r, index) => ({
             ...roomIdentityFields(r, index),
             findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
@@ -11100,7 +11088,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const init: Record<string, LocalFindingState> = {};
       seedFindings.forEach(rd => rd.findings.forEach(f => { init[findingStateKey(rd, f.title)] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
       setLocalFindings(init);
-      setInspectionSummary('');
+      setInspectionSummary(isSimpleJobDraft ? trimmedScope : '');
       setIncludeReportSummary(true);
       setIncludeReportValueAdd(true);
       setReportValueAddText(buildValueAddText(seedFindings));

@@ -164,6 +164,7 @@ declare
   v_invoice public.invoices;
   v_subtotal_cents integer := 0;
   v_total_cents integer := 0;
+  v_scope_from_approved text;
   v_task_scope text;
 begin
   perform pg_advisory_xact_lock(hashtext('servsync-invoice-job-' || p_inspection_id::text));
@@ -222,17 +223,34 @@ begin
   end if;
 
   if v_estimate.id is null then
+    select string_agg(task_notes, E'\n' order by room_ord, finding_ord)
+      into v_scope_from_approved
+      from (
+        select
+          room_data.room_ord,
+          finding_data.finding_ord,
+          nullif(trim(finding_data.finding->>'notes'), '') as task_notes,
+          lower(trim(coalesce(room_data.room_json->>'display_name', room_data.room_json->>'room', ''))) as room_label
+        from jsonb_array_elements(coalesce(v_job.rooms_with_findings, '[]'::jsonb)) with ordinality as room_data(room_json, room_ord)
+        cross join lateral jsonb_array_elements(coalesce(room_data.room_json->'findings', '[]'::jsonb)) with ordinality as finding_data(finding, finding_ord)
+      ) approved_rows
+     where task_notes is not null
+       and room_label = 'approved scope';
+
     select string_agg('- ' || task_title, E'\n' order by room_ord, finding_ord)
       into v_task_scope
       from (
         select
           room_data.room_ord,
           finding_data.finding_ord,
-          nullif(trim(finding_data.finding->>'title'), '') as task_title
+          nullif(trim(finding_data.finding->>'title'), '') as task_title,
+          lower(trim(coalesce(room_data.room_json->>'display_name', room_data.room_json->>'room', ''))) as room_label
         from jsonb_array_elements(coalesce(v_job.rooms_with_findings, '[]'::jsonb)) with ordinality as room_data(room_json, room_ord)
         cross join lateral jsonb_array_elements(coalesce(room_data.room_json->'findings', '[]'::jsonb)) with ordinality as finding_data(finding, finding_ord)
       ) task_rows
-     where task_title is not null;
+     where task_title is not null
+       and room_label <> 'approved scope'
+       and lower(task_title) <> lower(trim(coalesce(v_job.name, '')));
   end if;
 
   insert into public.invoices (
@@ -264,11 +282,12 @@ begin
     coalesce(
       nullif(trim(v_estimate.scope), ''),
       nullif(trim(v_job.summary), ''),
+      nullif(trim(v_scope_from_approved), ''),
       case when nullif(trim(coalesce(v_task_scope, '')), '') is not null
         then 'Completed work items:' || E'\n' || v_task_scope
         else null
       end,
-      'Completed work for this job.'
+      'Completed service work.'
     ),
     coalesce(v_estimate.notes, ''),
     coalesce(v_estimate.terms, 'Payment is due upon receipt unless otherwise agreed in writing.'),
@@ -324,11 +343,14 @@ begin
       select
         room_data.room_ord,
         finding_data.finding_ord,
-        nullif(trim(finding_data.finding->>'title'), '') as task_title
+        nullif(trim(finding_data.finding->>'title'), '') as task_title,
+        lower(trim(coalesce(room_data.room_json->>'display_name', room_data.room_json->>'room', ''))) as room_label
       from jsonb_array_elements(coalesce(v_job.rooms_with_findings, '[]'::jsonb)) with ordinality as room_data(room_json, room_ord)
       cross join lateral jsonb_array_elements(coalesce(room_data.room_json->'findings', '[]'::jsonb)) with ordinality as finding_data(finding, finding_ord)
     ) task_rows
     where task_title is not null
+      and room_label <> 'approved scope'
+      and lower(task_title) <> lower(trim(coalesce(v_job.name, '')))
     order by room_ord, finding_ord;
   end if;
 
