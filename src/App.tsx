@@ -615,11 +615,12 @@ const SERVICE_TASK_ACTION_STARTERS = [
 ];
 
 function cleanServiceTaskTitle(value: string) {
-  return value
+  const cleaned = value
     .replace(/^\s*[-*\d.)]+/g, '')
     .replace(/\s+/g, ' ')
     .replace(/^[,;:\s]+|[,;:\s.]+$/g, '')
     .trim();
+  return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : '';
 }
 
 function splitScopeIntoServiceTaskCandidates(scope: string) {
@@ -11133,12 +11134,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .update({
           job_type: requestedJobType,
           summary: trimmedScope,
+          rooms_with_findings: seedFindings,
           updated_at: new Date().toISOString(),
         })
         .eq('id', newInspectionId)
         .select('*')
         .single();
       if (jobTypeError) throw jobTypeError;
+      const savedRooms = ((updatedJobData as Partial<Inspection> | null)?.rooms_with_findings ?? seedFindings)
+        .map((room, index) => normalizeInspectionRoomData(room, index));
       const newInspection: Inspection = {
         id: newInspectionId,
         contractor_id: contractor?.id || '',
@@ -11155,15 +11159,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         estimate_id: null,
         completed_at: null,
         closed_at: null,
-        rooms_with_findings: seedFindings,
         report_storage_path: null,
         report_file_name: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...(updatedJobData as Partial<Inspection>),
+        rooms_with_findings: savedRooms,
       };
       const activeRoomSeed: InspectionTemplateRoom[] = isSimpleJobDraft
-        ? seedFindings.map((room, index) => ({
+        ? savedRooms.map((room, index) => ({
             ...roomIdentityFields(room, index),
             items: room.findings.map(finding => finding.title),
           }))
