@@ -10510,7 +10510,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
   const filteredCustomTemplates = contractorScopedInspectionTemplates.filter(templateMatchesSearch);
   const inspectionHomeTemplatesForNewJob = homeScopedInspectionTemplatesForSelectedSubject
-    .filter(customTemplateLooksInspectionLike)
     .filter(templateMatchesSearch);
   const inspectionContractorTemplatesForNewJob = contractorScopedInspectionTemplates
     .filter(customTemplateLooksInspectionLike)
@@ -10856,6 +10855,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .single();
         if (updateError) throw updateError;
         setInspectionTemplates(prev => prev.map(template => template.id === templateId ? data as InspectionTemplate : template));
+        setNotice('Home inspection template updated.');
       } else {
         const hasExistingDefault = prompt.existingTemplates.some(template => template.is_default_for_home);
         const { data, error: insertError } = await supabase
@@ -10876,6 +10876,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .single();
         if (insertError) throw insertError;
         setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
+        setNotice('Home inspection template saved.');
       }
       await continueHomeTemplatePromptAction(prompt);
     } catch (err) {
