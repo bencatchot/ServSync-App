@@ -215,6 +215,9 @@ type StoredFieldWorkDraft = {
   rooms_with_findings: InspectionRoomData[];
   available_rooms?: InspectionTemplateRoom[];
   summary: string;
+  include_summary?: boolean;
+  include_value_add?: boolean;
+  value_add_text?: string;
   savedAt: string;
 };
 type StoredFieldWorkState = {
@@ -2001,6 +2004,11 @@ async function generateInspectionPdf(
   homeownerName: string,
   homeAddress: string,
   contractorLogoUrl?: string | null,
+  options?: {
+    includeSummary?: boolean;
+    includeValueAdd?: boolean;
+    valueAddText?: string;
+  },
 ): Promise<{ blob: Blob; fileName: string }> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth();
@@ -2061,6 +2069,9 @@ async function generateInspectionPdf(
   const uniquePhotoPaths = Array.from(new Set(allFindings.flatMap(f => f.photos ?? []).filter(Boolean)));
   const photoAssetEntries = await Promise.all(uniquePhotoPaths.map(async photo => [photo, await loadInspectionPdfPhotoAsset(photo)] as const));
   const photoAssets = new Map(photoAssetEntries.filter((entry): entry is readonly [string, PdfImageAsset] => Boolean(entry[1])));
+  const includeSummary = options?.includeSummary ?? true;
+  const includeValueAdd = options?.includeValueAdd ?? true;
+  const valueAddText = options?.valueAddText?.trim() || buildValueAddText(inspection.rooms_with_findings);
 
   function photosForFinding(finding: InspectionRoomFinding) {
     return (finding.photos ?? [])
@@ -2136,7 +2147,7 @@ async function generateInspectionPdf(
   sectionLine(y); y += 8;
 
   // Professional summary
-  if (inspection.summary) {
+  if (includeSummary && inspection.summary) {
     txt('INSPECTION SUMMARY', margin, y, GRAY, 8, true); y += 5;
     const summaryLines = pdf.splitTextToSize(inspection.summary, contentW - 6);
     const summaryH = summaryLines.length * 4.5 + 10;
@@ -2194,10 +2205,10 @@ async function generateInspectionPdf(
     sectionLine(y); y += 8;
   }
 
-  if (fixedValueFindings.length > 0) {
+  if (includeValueAdd && fixedValueFindings.length > 0) {
     const sc = STATUS_PDF['Fixed On Site'];
     txt('VALUE DELIVERED ON SITE', margin, y, sc.text, 8, true); y += 5;
-    const intro = `${fixedValueFindings.length} item${fixedValueFindings.length !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes represent immediate value from the field work and may help prevent repeat service calls or additional damage.`;
+    const intro = valueAddText;
     const introLines = pdf.splitTextToSize(intro, contentW - 8);
     const boxH = 10 + introLines.length * 4.3;
     checkPageBreak(boxH + 8);
@@ -2830,6 +2841,12 @@ function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSumm
 function buildInspectionSummaryText(rooms: InspectionRoomData[]): string {
   const { intro, urgentText, fixedText, followUpText } = buildProfessionalReportSummary(rooms);
   return [intro, urgentText, fixedText, followUpText].filter(Boolean).join(' ');
+}
+
+function buildValueAddText(rooms: InspectionRoomData[]): string {
+  const fixedCount = rooms.flatMap(room => room.findings).filter(finding => finding.status === 'Fixed On Site').length;
+  if (fixedCount === 0) return '';
+  return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes represent immediate value from the field work and may help prevent repeat service calls or additional damage.`;
 }
 
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
@@ -7668,6 +7685,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [activeRooms, setActiveRooms] = useState<InspectionTemplateRoom[]>([]);
   const [availableChecklistRooms, setAvailableChecklistRooms] = useState<InspectionTemplateRoom[]>([]);
   const [inspectionSummary, setInspectionSummary] = useState('');
+  const [includeReportSummary, setIncludeReportSummary] = useState(true);
+  const [includeReportValueAdd, setIncludeReportValueAdd] = useState(true);
+  const [reportValueAddText, setReportValueAddText] = useState('');
   const [savingInspection, setSavingInspection] = useState(false);
   const [finalizingInspection, setFinalizingInspection] = useState(false);
   const [sendingInspectionReportId, setSendingInspectionReportId] = useState<string | null>(null);
@@ -9116,6 +9136,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             rooms_with_findings: buildInspectionRoomsSnapshot(),
             available_rooms: availableChecklistRooms.length > 0 ? availableChecklistRooms : activeRooms,
             summary: inspectionSummary,
+            include_summary: includeReportSummary,
+            include_value_add: includeReportValueAdd,
+            value_add_text: reportValueAddText,
             savedAt: new Date().toISOString(),
           }
         : current.draftSnapshot ?? null;
@@ -9186,6 +9209,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       seedFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
       setLocalFindings(init);
       setInspectionSummary('');
+      setIncludeReportSummary(true);
+      setIncludeReportValueAdd(true);
+      setReportValueAddText(buildValueAddText(seedFindings));
       setInspectionClosedForReview(false);
       setSelectedChecklistRoom(rooms[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
@@ -9238,7 +9264,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           ? [localHome.address_line1, localHome.city, localHome.state].filter(Boolean).join(', ')
           : [homeownerConn?.city, homeownerConn?.state].filter(Boolean).join(', ');
 
-      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url);
+      const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url, {
+        includeSummary: includeReportSummary,
+        includeValueAdd: includeReportValueAdd,
+        valueAddText: reportValueAddText,
+      });
 
       const storagePath = insp.homeowner_user_id
         ? `${insp.homeowner_user_id}/field-work/${insp.id}/${crypto.randomUUID()}.pdf`
@@ -9271,6 +9301,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setActiveRooms([]);
         setAvailableChecklistRooms([]);
         setInspectionSummary('');
+        setIncludeReportSummary(true);
+        setIncludeReportValueAdd(true);
+        setReportValueAddText('');
         setInspectionClosedForReview(false);
         setInspectionView('list');
         setContractorJobsView('closed_jobs');
@@ -9312,6 +9345,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setActiveRooms([]);
       setAvailableChecklistRooms([]);
       setInspectionSummary('');
+      setIncludeReportSummary(true);
+      setIncludeReportValueAdd(true);
+      setReportValueAddText('');
       setInspectionClosedForReview(false);
       setInspectionView('list');
       setContractorJobsView('closed_jobs');
@@ -9343,6 +9379,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setActiveRooms([]);
       setAvailableChecklistRooms([]);
       setInspectionSummary('');
+      setIncludeReportSummary(true);
+      setIncludeReportValueAdd(true);
+      setReportValueAddText('');
       setInspectionClosedForReview(false);
       setInspectionView('list');
       persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
@@ -9368,6 +9407,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const rooms: InspectionTemplateRoom[] = roomsWithFindings.map(r => ({ room: r.room, items: r.findings.map(f => f.title) }));
     setActiveRooms(rooms);
     setAvailableChecklistRooms(storedDraft?.available_rooms ?? rooms);
+    setIncludeReportSummary(storedDraft?.include_summary ?? true);
+    setIncludeReportValueAdd(storedDraft?.include_value_add ?? true);
+    setReportValueAddText(storedDraft?.value_add_text ?? buildValueAddText(roomsWithFindings));
     const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
     roomsWithFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: f.photos ?? [] }; }));
     setLocalFindings(init);
@@ -9458,7 +9500,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   useEffect(() => {
     if (!activeInspection) return;
     persistFieldWorkState();
-  }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, availableChecklistRooms, localFindings, inspectionSummary]);
+  }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, availableChecklistRooms, localFindings, inspectionSummary, includeReportSummary, includeReportValueAdd, reportValueAddText]);
 
   useEffect(() => {
     if (contractorTab !== 'inspections' || loading || restoredFieldWorkRef.current || activeInspection || inspections.length === 0) return;
@@ -14377,6 +14419,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             const goToReportReview = () => {
               if (activeInspection.status === 'draft') {
                 setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(workingRooms));
+                setReportValueAddText(prev => prev.trim() ? prev : buildValueAddText(workingRooms));
                 setInspectionClosedForReview(true);
               }
               setInspectionSubTab('report');
@@ -15294,6 +15337,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     }));
                   };
                   const finalSummaryText = inspectionSummary.trim() || buildInspectionSummaryText(reportRooms);
+                  const defaultValueAddText = buildValueAddText(reportRooms);
+                  const effectiveValueAddText = reportValueAddText.trim() || defaultValueAddText;
                   const linkedServiceRequest = activeInspection.service_request_id
                     ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
                     : null;
@@ -15367,6 +15412,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   return;
                                 }
                                 setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(reportRooms));
+                                setReportValueAddText(prev => prev.trim() ? prev : buildValueAddText(reportRooms));
                                 setInspectionClosedForReview(true);
                               }} className="text-xs font-semibold bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors flex-shrink-0">
                                 Close for Review
@@ -15513,6 +15559,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </div>
                               )}
                             </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* PDF output options */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                        <div className="mb-4">
+                          <h3 className="font-semibold text-slate-800 text-sm">PDF Output Options</h3>
+                          <p className="text-xs text-slate-400 mt-0.5">Choose which narrative sections should appear on the homeowner-facing PDF.</p>
+                        </div>
+                        <div className="space-y-3">
+                          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={includeReportSummary}
+                              onChange={event => {
+                                const checked = event.target.checked;
+                                setIncludeReportSummary(checked);
+                                if (checked) setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(reportRooms));
+                              }}
+                              className="mt-0.5 h-4 w-4 accent-blue-600"
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-800">Include executive summary</span>
+                              <span className="mt-0.5 block text-xs leading-5 text-slate-500">Adds the plain-language summary near the top of the PDF.</span>
+                            </span>
+                          </label>
+                          <label className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${fixedFindings.length > 0 ? 'border-slate-200 bg-slate-50' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
+                            <input
+                              type="checkbox"
+                              checked={includeReportValueAdd}
+                              disabled={fixedFindings.length === 0}
+                              onChange={event => {
+                                const checked = event.target.checked;
+                                setIncludeReportValueAdd(checked);
+                                if (checked) setReportValueAddText(prev => prev.trim() ? prev : defaultValueAddText);
+                              }}
+                              className="mt-0.5 h-4 w-4 accent-blue-600 disabled:opacity-50"
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-800">Include value-add section</span>
+                              <span className="mt-0.5 block text-xs leading-5 text-slate-500">Highlights items marked Fixed On Site so the homeowner can quickly see what was completed.</span>
+                            </span>
+                          </label>
+                          {includeReportValueAdd && fixedFindings.length > 0 && (
+                            <Field label="Value-add wording">
+                              <textarea
+                                className={`${inputClass()} min-h-[92px] resize-y`}
+                                value={reportValueAddText}
+                                onChange={event => setReportValueAddText(event.target.value)}
+                                placeholder={defaultValueAddText || 'Describe the value delivered during this visit...'}
+                              />
+                            </Field>
                           )}
                         </div>
                       </div>
@@ -15740,7 +15839,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             const previewInsp: Inspection = activeInspection.status === 'finalized'
                               ? activeInspection
                               : { ...activeInspection, rooms_with_findings: reportRooms, summary: inspectionSummary };
-                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractor?.logo_url || contractorDraft.logo_url || null);
+                            await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractor?.logo_url || contractorDraft.logo_url || null, {
+                              includeSummary: includeReportSummary,
+                              includeValueAdd: includeReportValueAdd,
+                              valueAddText: effectiveValueAddText,
+                            });
                           }}
                           className="w-full border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
