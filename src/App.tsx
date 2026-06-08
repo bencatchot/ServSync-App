@@ -10070,6 +10070,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
     setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
     setContractorTab('inspections');
+    setInspectionView('list');
     setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
     if (invoice.status === 'draft') {
       setEditingInvoiceId(invoice.id);
