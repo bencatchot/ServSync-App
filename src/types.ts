@@ -519,6 +519,13 @@ export interface AppNotification {
   created_at: string;
 }
 
+export interface SupportAttachment {
+  storage_path: string;
+  file_name: string;
+  content_type: string;
+  file_size_bytes: number | null;
+}
+
 export interface SupportInquiryMessage {
   id: string;
   inquiry_id: string;
@@ -526,6 +533,7 @@ export interface SupportInquiryMessage {
   actor_role: UserRole;
   message_type: 'user_message' | 'admin_reply' | 'status_update';
   body: string;
+  attachments?: SupportAttachment[];
   created_at: string;
 }
 

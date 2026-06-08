@@ -89,6 +89,7 @@ import type {
   Profile,
   SharingPermissions,
   SupportInquiry,
+  SupportAttachment,
   SupportInquiryCategory,
   SupportInquiryStatus,
   UserRole,
@@ -3324,6 +3325,23 @@ const SUPPORT_STATUS_OPTIONS: { value: SupportInquiryStatus; label: string }[] =
   { value: 'closed', label: 'Closed' },
 ];
 
+const SUPPORT_ATTACHMENT_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+const SUPPORT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+function safeSupportFileName(name: string) {
+  return name
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90) || 'attachment';
+}
+
+function supportAttachmentSizeLabel(bytes: number | null | undefined) {
+  if (!bytes) return '';
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 function supportCategoryLabel(category: SupportInquiryCategory | string) {
   return SUPPORT_CATEGORY_OPTIONS.find(option => option.value === category)?.label ?? 'Other';
 }
@@ -3984,6 +4002,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportDraft, setSupportDraft] = useState<{ category: SupportInquiryCategory; title: string; body: string }>({ category: 'feature_request', title: '', body: '' });
   const [supportReplyDrafts, setSupportReplyDrafts] = useState<Record<string, string>>({});
+  const [supportDraftFiles, setSupportDraftFiles] = useState<File[]>([]);
+  const [supportReplyFiles, setSupportReplyFiles] = useState<Record<string, File[]>>({});
   const [savingSupport, setSavingSupport] = useState(false);
   const [homeDocuments, setHomeDocuments] = useState<HomeDocument[]>([]);
   const [docUploadType, setDocUploadType] = useState<HomeDocumentType>('other');
@@ -4160,9 +4180,46 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     await supabase.rpc('servsync_mark_notifications_read', { p_ids: ids });
   };
 
+  const uploadSupportAttachments = async (inquiryId: string, files: File[]): Promise<SupportAttachment[]> => {
+    if (!supabase || files.length === 0) return [];
+    const attachments: SupportAttachment[] = [];
+    for (const file of files) {
+      if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
+        throw new Error(`${file.name} is too large. Support attachments must be 10 MB or smaller.`);
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+        throw new Error(`${file.name} is not supported. Upload a JPG, PNG, WebP, or PDF.`);
+      }
+      const storagePath = `${inquiryId}/${profile.id}/${crypto.randomUUID()}-${safeSupportFileName(file.name)}`;
+      const { error: uploadError } = await supabase.storage
+        .from('support-attachments')
+        .upload(storagePath, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+      attachments.push({
+        storage_path: storagePath,
+        file_name: file.name,
+        content_type: file.type,
+        file_size_bytes: file.size,
+      });
+    }
+    return attachments;
+  };
+
+  const openSupportAttachment = async (attachment: SupportAttachment) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.storage
+      .from('support-attachments')
+      .createSignedUrl(attachment.storage_path, 60 * 5);
+    if (error) {
+      setError(readableError(error, 'Unable to open support attachment.'));
+      return;
+    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const createSupportInquiry = async () => {
     if (!supabase) return;
-    if (!supportDraft.title.trim() || !supportDraft.body.trim()) {
+    if (!supportDraft.title.trim() || (!supportDraft.body.trim() && supportDraftFiles.length === 0)) {
       setError('Please add a short title and message before sending support.');
       return;
     }
@@ -4182,15 +4239,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         .select('*')
         .single();
       if (inquiryError) throw inquiryError;
+      const attachments = await uploadSupportAttachments(inquiry.id, supportDraftFiles);
       const { error: messageError } = await supabase.from('support_inquiry_messages').insert({
         inquiry_id: inquiry.id,
         actor_user_id: profile.id,
         actor_role: 'homeowner',
         message_type: 'user_message',
-        body: supportDraft.body.trim(),
+        body: supportDraft.body.trim() || 'Screenshot attached.',
+        attachments,
       });
       if (messageError) throw messageError;
       setSupportDraft({ category: 'feature_request', title: '', body: '' });
+      setSupportDraftFiles([]);
       setNotice('ServSync received your inquiry. You can track replies in Support.');
       await loadHomeowner();
     } catch (err) {
@@ -4203,20 +4263,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const replyToSupportInquiry = async (inquiry: SupportInquiry) => {
     if (!supabase) return;
     const body = (supportReplyDrafts[inquiry.id] || '').trim();
-    if (!body) return;
+    const files = supportReplyFiles[inquiry.id] || [];
+    if (!body && files.length === 0) return;
     setSavingSupport(true);
     setNotice('');
     setError('');
     try {
+      const attachments = await uploadSupportAttachments(inquiry.id, files);
       const { error: messageError } = await supabase.from('support_inquiry_messages').insert({
         inquiry_id: inquiry.id,
         actor_user_id: profile.id,
         actor_role: 'homeowner',
         message_type: 'user_message',
-        body,
+        body: body || 'Screenshot attached.',
+        attachments,
       });
       if (messageError) throw messageError;
       setSupportReplyDrafts(current => ({ ...current, [inquiry.id]: '' }));
+      setSupportReplyFiles(current => ({ ...current, [inquiry.id]: [] }));
       setNotice('Reply sent to ServSync.');
       await loadHomeowner();
     } catch (err) {
@@ -7411,6 +7475,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           onDraftChange={setSupportDraft}
           replyDrafts={supportReplyDrafts}
           onReplyDraftChange={(inquiryId, body) => setSupportReplyDrafts(current => ({ ...current, [inquiryId]: body }))}
+          draftFiles={supportDraftFiles}
+          onDraftFilesChange={setSupportDraftFiles}
+          replyFiles={supportReplyFiles}
+          onReplyFilesChange={(inquiryId, files) => setSupportReplyFiles(current => ({ ...current, [inquiryId]: files }))}
+          onOpenAttachment={attachment => void openSupportAttachment(attachment)}
           onCreate={() => void createSupportInquiry()}
           onReply={inquiry => void replyToSupportInquiry(inquiry)}
           saving={savingSupport}
@@ -7483,6 +7552,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportDraft, setSupportDraft] = useState<{ category: SupportInquiryCategory; title: string; body: string }>({ category: 'feature_request', title: '', body: '' });
   const [supportReplyDrafts, setSupportReplyDrafts] = useState<Record<string, string>>({});
+  const [supportDraftFiles, setSupportDraftFiles] = useState<File[]>([]);
+  const [supportReplyFiles, setSupportReplyFiles] = useState<Record<string, File[]>>({});
   const [savingSupport, setSavingSupport] = useState(false);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
   const [updatingServiceRequestId, setUpdatingServiceRequestId] = useState<string | null>(null);
@@ -7773,9 +7844,46 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     await supabase.rpc('servsync_mark_notifications_read', { p_ids: ids });
   };
 
+  const uploadContractorSupportAttachments = async (inquiryId: string, files: File[]): Promise<SupportAttachment[]> => {
+    if (!supabase || files.length === 0) return [];
+    const attachments: SupportAttachment[] = [];
+    for (const file of files) {
+      if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
+        throw new Error(`${file.name} is too large. Support attachments must be 10 MB or smaller.`);
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+        throw new Error(`${file.name} is not supported. Upload a JPG, PNG, WebP, or PDF.`);
+      }
+      const storagePath = `${inquiryId}/${profile.id}/${crypto.randomUUID()}-${safeSupportFileName(file.name)}`;
+      const { error: uploadError } = await supabase.storage
+        .from('support-attachments')
+        .upload(storagePath, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+      attachments.push({
+        storage_path: storagePath,
+        file_name: file.name,
+        content_type: file.type,
+        file_size_bytes: file.size,
+      });
+    }
+    return attachments;
+  };
+
+  const openContractorSupportAttachment = async (attachment: SupportAttachment) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.storage
+      .from('support-attachments')
+      .createSignedUrl(attachment.storage_path, 60 * 5);
+    if (error) {
+      setError(readableError(error, 'Unable to open support attachment.'));
+      return;
+    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const createContractorSupportInquiry = async () => {
     if (!supabase) return;
-    if (!supportDraft.title.trim() || !supportDraft.body.trim()) {
+    if (!supportDraft.title.trim() || (!supportDraft.body.trim() && supportDraftFiles.length === 0)) {
       setError('Please add a short title and message before sending support.');
       return;
     }
@@ -7795,15 +7903,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .select('*')
         .single();
       if (inquiryError) throw inquiryError;
+      const attachments = await uploadContractorSupportAttachments(inquiry.id, supportDraftFiles);
       const { error: messageError } = await supabase.from('support_inquiry_messages').insert({
         inquiry_id: inquiry.id,
         actor_user_id: profile.id,
         actor_role: 'contractor',
         message_type: 'user_message',
-        body: supportDraft.body.trim(),
+        body: supportDraft.body.trim() || 'Screenshot attached.',
+        attachments,
       });
       if (messageError) throw messageError;
       setSupportDraft({ category: 'feature_request', title: '', body: '' });
+      setSupportDraftFiles([]);
       setNotice('ServSync received your inquiry. You can track replies in Support.');
       await loadContractor();
     } catch (err) {
@@ -7816,20 +7927,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const replyToContractorSupportInquiry = async (inquiry: SupportInquiry) => {
     if (!supabase) return;
     const body = (supportReplyDrafts[inquiry.id] || '').trim();
-    if (!body) return;
+    const files = supportReplyFiles[inquiry.id] || [];
+    if (!body && files.length === 0) return;
     setSavingSupport(true);
     setNotice('');
     setError('');
     try {
+      const attachments = await uploadContractorSupportAttachments(inquiry.id, files);
       const { error: messageError } = await supabase.from('support_inquiry_messages').insert({
         inquiry_id: inquiry.id,
         actor_user_id: profile.id,
         actor_role: 'contractor',
         message_type: 'user_message',
-        body,
+        body: body || 'Screenshot attached.',
+        attachments,
       });
       if (messageError) throw messageError;
       setSupportReplyDrafts(current => ({ ...current, [inquiry.id]: '' }));
+      setSupportReplyFiles(current => ({ ...current, [inquiry.id]: [] }));
       setNotice('Reply sent to ServSync.');
       await loadContractor();
     } catch (err) {
@@ -13028,6 +13143,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           onDraftChange={setSupportDraft}
           replyDrafts={supportReplyDrafts}
           onReplyDraftChange={(inquiryId, body) => setSupportReplyDrafts(current => ({ ...current, [inquiryId]: body }))}
+          draftFiles={supportDraftFiles}
+          onDraftFilesChange={setSupportDraftFiles}
+          replyFiles={supportReplyFiles}
+          onReplyFilesChange={(inquiryId, files) => setSupportReplyFiles(current => ({ ...current, [inquiryId]: files }))}
+          onOpenAttachment={attachment => void openContractorSupportAttachment(attachment)}
           onCreate={() => void createContractorSupportInquiry()}
           onReply={inquiry => void replyToContractorSupportInquiry(inquiry)}
           saving={savingSupport}
@@ -15761,6 +15881,18 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
+  const openAdminSupportAttachment = async (attachment: SupportAttachment) => {
+    if (!supabase) return;
+    const { data, error } = await supabase.storage
+      .from('support-attachments')
+      .createSignedUrl(attachment.storage_path, 60 * 5);
+    if (error) {
+      setError(readableError(error, 'Unable to open support attachment.'));
+      return;
+    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const replyToSupportInquiryAsAdmin = async (inquiry: SupportInquiry) => {
     if (!supabase) return;
     const body = (adminSupportReplyDrafts[inquiry.id] || '').trim();
@@ -16125,6 +16257,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
           onSearchChange={setSupportSearch}
           replyDrafts={adminSupportReplyDrafts}
           onReplyDraftChange={(inquiryId, body) => setAdminSupportReplyDrafts(current => ({ ...current, [inquiryId]: body }))}
+          onOpenAttachment={attachment => void openAdminSupportAttachment(attachment)}
           onReply={inquiry => void replyToSupportInquiryAsAdmin(inquiry)}
           onStatusChange={(inquiry, status) => void updateSupportInquiryStatus(inquiry, status)}
           savingInquiryId={savingSupportInquiryId}
@@ -16459,6 +16592,11 @@ function SupportInboxPanel({
   onDraftChange,
   replyDrafts,
   onReplyDraftChange,
+  draftFiles,
+  onDraftFilesChange,
+  replyFiles,
+  onReplyFilesChange,
+  onOpenAttachment,
   onCreate,
   onReply,
   saving,
@@ -16470,6 +16608,11 @@ function SupportInboxPanel({
   onDraftChange: (draft: { category: SupportInquiryCategory; title: string; body: string }) => void;
   replyDrafts: Record<string, string>;
   onReplyDraftChange: (inquiryId: string, body: string) => void;
+  draftFiles: File[];
+  onDraftFilesChange: (files: File[]) => void;
+  replyFiles: Record<string, File[]>;
+  onReplyFilesChange: (inquiryId: string, files: File[]) => void;
+  onOpenAttachment: (attachment: SupportAttachment) => void;
   onCreate: () => void;
   onReply: (inquiry: SupportInquiry) => void;
   saving: boolean;
@@ -16482,6 +16625,48 @@ function SupportInboxPanel({
     : supportView === 'resolved'
       ? resolvedInquiries
       : inquiries;
+  const appendFiles = (current: File[], incoming: FileList | null) => {
+    if (!incoming) return current;
+    const accepted = Array.from(incoming).filter(file =>
+      file.size <= SUPPORT_ATTACHMENT_MAX_BYTES
+      && ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)
+    );
+    return [...current, ...accepted].slice(0, 5);
+  };
+  const attachmentChips = (files: File[], onRemove: (index: number) => void) => (
+    files.length > 0 ? (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {files.map((file, index) => (
+          <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+            <Paperclip size={12} />
+            <span className="truncate">{file.name}</span>
+            <span className="text-slate-400">{supportAttachmentSizeLabel(file.size)}</span>
+            <button type="button" onClick={() => onRemove(index)} className="text-slate-400 hover:text-red-600">
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+      </div>
+    ) : null
+  );
+  const attachmentList = (attachments: SupportAttachment[] | undefined) => (
+    attachments && attachments.length > 0 ? (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {attachments.map((attachment, index) => (
+          <button
+            key={`${attachment.storage_path}-${index}`}
+            type="button"
+            onClick={() => onOpenAttachment(attachment)}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50"
+          >
+            <Paperclip size={12} />
+            <span className="truncate">{attachment.file_name}</span>
+            <span className="font-normal text-slate-400">{supportAttachmentSizeLabel(attachment.file_size_bytes)}</span>
+          </button>
+        ))}
+      </div>
+    ) : null
+  );
 
   return (
     <div className="space-y-4">
@@ -16517,9 +16702,27 @@ function SupportInboxPanel({
                 placeholder="Tell us what you want changed, what you expected, or what would make this easier."
               />
             </Field>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                <Paperclip size={14} />
+                Attach screenshot
+                <input
+                  type="file"
+                  multiple
+                  accept={SUPPORT_ATTACHMENT_ACCEPT}
+                  className="hidden"
+                  onChange={event => {
+                    onDraftFilesChange(appendFiles(draftFiles, event.target.files));
+                    event.target.value = '';
+                  }}
+                />
+              </label>
+              <p className="text-xs text-slate-500">JPG, PNG, WebP, or PDF up to 10 MB.</p>
+            </div>
+            {attachmentChips(draftFiles, index => onDraftFilesChange(draftFiles.filter((_, fileIndex) => fileIndex !== index)))}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onCreate} disabled={saving || !draft.title.trim() || !draft.body.trim()} className={buttonClass('primary')}>
+            <button type="button" onClick={onCreate} disabled={saving || !draft.title.trim() || (!draft.body.trim() && draftFiles.length === 0)} className={buttonClass('primary')}>
               <Send size={15} />
               {saving ? 'Sending...' : 'Send to ServSync'}
             </button>
@@ -16589,6 +16792,7 @@ function SupportInboxPanel({
                             <p className="text-xs text-slate-400">{formatDateTime(message.created_at)}</p>
                           </div>
                           <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{message.body}</p>
+                          {attachmentList(message.attachments)}
                         </div>
                       );
                     })}
@@ -16604,7 +16808,33 @@ function SupportInboxPanel({
                       />
                     </Field>
                     {!disabled && (
-                      <button type="button" onClick={() => onReply(inquiry)} disabled={saving || !(replyDrafts[inquiry.id] || '').trim()} className={`${buttonClass('secondary')} mt-2`}>
+                      <>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+                            <Paperclip size={14} />
+                            Attach screenshot
+                            <input
+                              type="file"
+                              multiple
+                              accept={SUPPORT_ATTACHMENT_ACCEPT}
+                              className="hidden"
+                              onChange={event => {
+                                const current = replyFiles[inquiry.id] || [];
+                                onReplyFilesChange(inquiry.id, appendFiles(current, event.target.files));
+                                event.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <p className="text-xs text-slate-500">Screenshots or PDFs up to 10 MB.</p>
+                        </div>
+                        {attachmentChips(replyFiles[inquiry.id] || [], index => {
+                          const current = replyFiles[inquiry.id] || [];
+                          onReplyFilesChange(inquiry.id, current.filter((_, fileIndex) => fileIndex !== index));
+                        })}
+                      </>
+                    )}
+                    {!disabled && (
+                      <button type="button" onClick={() => onReply(inquiry)} disabled={saving || (!(replyDrafts[inquiry.id] || '').trim() && (replyFiles[inquiry.id] || []).length === 0)} className={`${buttonClass('secondary')} mt-2`}>
                         <Send size={14} />
                         Send reply
                       </button>
@@ -16629,6 +16859,7 @@ function AdminSupportInbox({
   onSearchChange,
   replyDrafts,
   onReplyDraftChange,
+  onOpenAttachment,
   onReply,
   onStatusChange,
   savingInquiryId,
@@ -16641,6 +16872,7 @@ function AdminSupportInbox({
   onSearchChange: (search: string) => void;
   replyDrafts: Record<string, string>;
   onReplyDraftChange: (inquiryId: string, body: string) => void;
+  onOpenAttachment: (attachment: SupportAttachment) => void;
   onReply: (inquiry: SupportInquiry) => void;
   onStatusChange: (inquiry: SupportInquiry, status: SupportInquiryStatus) => void;
   savingInquiryId: string | null;
@@ -16650,6 +16882,24 @@ function AdminSupportInbox({
     counts[inquiry.status] = (counts[inquiry.status] || 0) + 1;
     return counts;
   }, {});
+  const attachmentList = (attachments: SupportAttachment[] | undefined) => (
+    attachments && attachments.length > 0 ? (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {attachments.map((attachment, index) => (
+          <button
+            key={`${attachment.storage_path}-${index}`}
+            type="button"
+            onClick={() => onOpenAttachment(attachment)}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:border-blue-400 hover:bg-blue-900/40"
+          >
+            <Paperclip size={12} />
+            <span className="truncate">{attachment.file_name}</span>
+            <span className="font-normal text-slate-400">{supportAttachmentSizeLabel(attachment.file_size_bytes)}</span>
+          </button>
+        ))}
+      </div>
+    ) : null
+  );
 
   return (
     <Card title="Support inbox" icon={<MessageSquare size={18} />}>
@@ -16717,6 +16967,7 @@ function AdminSupportInbox({
                         <p className="text-xs text-slate-500">{formatDateTime(message.created_at)}</p>
                       </div>
                       <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">{message.body}</p>
+                      {attachmentList(message.attachments)}
                     </div>
                   ))}
                 </div>
