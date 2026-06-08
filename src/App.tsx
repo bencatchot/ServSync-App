@@ -351,6 +351,83 @@ function isInspectionLikeFieldWork(work: Pick<Inspection, 'name' | 'summary'>) {
 const SIMPLE_SERVICE_JOB_TYPES = new Set(['service_visit', 'repair', 'install', 'estimate_visit']);
 const CHECKLIST_JOB_TYPES = new Set(['inspection', 'maintenance_visit']);
 const SIMPLE_WORK_ITEMS_ROOM = 'Work Items';
+const FINDING_KEY_SEPARATOR = '||';
+
+type RoomIdentitySource = Pick<InspectionRoomData, 'room' | 'room_id' | 'display_name' | 'room_type' | 'location_note' | 'reference_photo_storage_path' | 'sort_order' | 'last_edited_by' | 'last_edited_at'>;
+type LocalFindingState = { status: FindingStatus; notes: string; action: string; due: string; photos: string[] };
+
+function createClientRoomId(label?: string) {
+  const seed = (label || 'room')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32) || 'room';
+  try {
+    return `local-${seed}-${crypto.randomUUID()}`;
+  } catch {
+    return `local-${seed}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
+function roomDisplayLabel(room?: Partial<RoomIdentitySource> | null) {
+  return (room?.display_name || room?.room || '').trim() || 'Unnamed Room';
+}
+
+function roomIdentityKey(room?: Partial<RoomIdentitySource> | null) {
+  return (room?.room_id || room?.room || roomDisplayLabel(room)).trim() || 'unnamed-room';
+}
+
+function roomIdentityFields(room: Partial<RoomIdentitySource>, index?: number): RoomIdentitySource {
+  const displayName = roomDisplayLabel(room);
+  return {
+    room: (room.room || displayName).trim() || 'Unnamed Room',
+    room_id: room.room_id || createClientRoomId(displayName),
+    display_name: (room.display_name || room.room || displayName).trim() || 'Unnamed Room',
+    room_type: room.room_type || '',
+    location_note: room.location_note || '',
+    reference_photo_storage_path: room.reference_photo_storage_path || '',
+    sort_order: typeof room.sort_order === 'number' ? room.sort_order : index,
+    last_edited_by: room.last_edited_by || '',
+    last_edited_at: room.last_edited_at || '',
+  };
+}
+
+function normalizeInspectionRoomData(room: InspectionRoomData, index: number): InspectionRoomData {
+  return {
+    ...roomIdentityFields(room, index),
+    findings: Array.isArray(room.findings) ? room.findings : [],
+  };
+}
+
+function normalizeTemplateRoom(room: InspectionTemplateRoom, index: number): InspectionTemplateRoom {
+  return {
+    ...roomIdentityFields(room, index),
+    items: Array.isArray(room.items) ? room.items : [],
+  };
+}
+
+function findingStateKey(room: Partial<RoomIdentitySource>, item: string) {
+  return `${roomIdentityKey(room)}${FINDING_KEY_SEPARATOR}${item}`;
+}
+
+function splitFindingStateKey(key: string) {
+  const [roomPart, ...itemParts] = key.split(FINDING_KEY_SEPARATOR);
+  return {
+    roomKey: roomPart ?? '',
+    item: itemParts.join(FINDING_KEY_SEPARATOR),
+  };
+}
+
+function findRoomByIdentity<T extends RoomIdentitySource>(rooms: T[], selection?: string | null) {
+  if (!selection) return null;
+  const normalizedSelection = normalizeText(selection);
+  return rooms.find(room =>
+    roomIdentityKey(room) === selection
+    || normalizeText(roomIdentityKey(room)) === normalizedSelection
+    || normalizeText(room.room || '') === normalizedSelection
+    || normalizeText(roomDisplayLabel(room)) === normalizedSelection
+  ) ?? null;
+}
 
 function roomIsApprovedScope(roomName: string) {
   return normalizeText(roomName) === 'approved scope' || normalizeText(roomName) === 'approved work';
@@ -10414,11 +10491,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const buildInspectionRoomsSnapshot = (
-    findingsByKey: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = localFindings,
-  ): InspectionRoomData[] => activeRooms.map(r => ({
-    room: r.room,
+    findingsByKey: Record<string, LocalFindingState> = localFindings,
+  ): InspectionRoomData[] => activeRooms.map((r, index) => ({
+    ...roomIdentityFields(r, index),
     findings: r.items.map(item => {
-      const key = `${r.room}||${item}`;
+      const key = findingStateKey(r, item);
       const local = findingsByKey[key];
       return {
         title: item,
@@ -10503,14 +10580,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const selectedStarterTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'starter'
         ? inspectionStarterTemplatesForNewJob.find(t => t.id === inspectionNewDraft.starter_template_id)
         : null;
-      const rooms: InspectionTemplateRoom[] = selectedTemplate
+      const rooms: InspectionTemplateRoom[] = (selectedTemplate
         ? selectedTemplate.rooms
-        : selectedStarterTemplate?.rooms ?? [];
+        : selectedStarterTemplate?.rooms ?? []
+      ).map((room, index) => normalizeTemplateRoom(room, index));
       const trimmedScope = inspectionNewDraft.scope.trim();
       const seedFindings: InspectionRoomData[] = isSimpleJobDraft
         ? trimmedScope
           ? [{
-              room: 'Approved Scope',
+              ...roomIdentityFields({ room: 'Approved Scope', display_name: 'Approved Scope' }, 0),
               findings: [{
                 title: inspectionNewDraft.name.trim(),
                 status: 'Monitor' as FindingStatus,
@@ -10521,8 +10599,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               }],
             }]
           : []
-        : rooms.map(r => ({
-            room: r.room,
+        : rooms.map((r, index) => ({
+            ...roomIdentityFields(r, index),
             findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
           }));
 
@@ -10572,13 +10650,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ...(updatedJobData as Partial<Inspection>),
       };
       const activeRoomSeed: InspectionTemplateRoom[] = isSimpleJobDraft
-        ? seedFindings.map(room => ({ room: room.room, items: room.findings.map(finding => finding.title) }))
+        ? seedFindings.map((room, index) => ({
+            ...roomIdentityFields(room, index),
+            items: room.findings.map(finding => finding.title),
+          }))
         : rooms;
       setActiveInspection(newInspection);
       setActiveRooms(activeRoomSeed);
       setAvailableChecklistRooms(activeRoomSeed);
-      const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
-      seedFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
+      const init: Record<string, LocalFindingState> = {};
+      seedFindings.forEach(rd => rd.findings.forEach(f => { init[findingStateKey(rd, f.title)] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
       setLocalFindings(init);
       setInspectionSummary('');
       setIncludeReportSummary(true);
@@ -10832,23 +10913,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ? stored.draftSnapshot
       : null;
     const roomsWithFindings = storedDraft?.rooms_with_findings ?? insp.rooms_with_findings;
+    const normalizedRoomsWithFindings = roomsWithFindings.map((room, index) => normalizeInspectionRoomData(room, index));
     const summary = storedDraft?.summary ?? insp.summary;
 
-    setActiveInspection(insp);
+    setActiveInspection({ ...insp, rooms_with_findings: normalizedRoomsWithFindings });
     setInspectionSummary(summary);
-    const rooms: InspectionTemplateRoom[] = roomsWithFindings.map(r => ({ room: r.room, items: r.findings.map(f => f.title) }));
+    const rooms: InspectionTemplateRoom[] = normalizedRoomsWithFindings.map((r, index) => ({
+      ...roomIdentityFields(r, index),
+      items: r.findings.map(f => f.title),
+    }));
     setActiveRooms(rooms);
-    setAvailableChecklistRooms(storedDraft?.available_rooms ?? rooms);
+    setAvailableChecklistRooms((storedDraft?.available_rooms ?? rooms).map((room, index) => normalizeTemplateRoom(room, index)));
     setIncludeReportSummary(storedDraft?.include_summary ?? true);
     setIncludeReportValueAdd(storedDraft?.include_value_add ?? true);
-    setReportValueAddText(storedDraft?.value_add_text ?? buildValueAddText(roomsWithFindings));
-    const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
-    roomsWithFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: f.photos ?? [] }; }));
+    setReportValueAddText(storedDraft?.value_add_text ?? buildValueAddText(normalizedRoomsWithFindings));
+    const init: Record<string, LocalFindingState> = {};
+    normalizedRoomsWithFindings.forEach(rd => rd.findings.forEach(f => { init[findingStateKey(rd, f.title)] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: f.photos ?? [] }; }));
     setLocalFindings(init);
     setInspectionClosedForReview(false);
-    const nextSelectedRoom = options?.selectedRoom && rooms.some(room => room.room === options.selectedRoom)
-      ? options.selectedRoom
-      : rooms[0]?.room ?? null;
+    const selectedRoom = findRoomByIdentity(rooms, options?.selectedRoom);
+    const nextSelectedRoom = selectedRoom ? roomIdentityKey(selectedRoom) : rooms[0] ? roomIdentityKey(rooms[0]) : null;
     setSelectedChecklistRoom(nextSelectedRoom);
     setWalkthroughSuggestions([]);
     setWalkthroughText('');
@@ -10877,15 +10961,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const resolveSuggestionTarget = (suggestion: WalkthroughSuggestion): { room: string; item: string } | null => {
-    const roomNames = activeRooms.map(room => room.room);
+    const roomNames = activeRooms.map(room => roomDisplayLabel(room));
+    const selectedRoomLabel = findRoomByIdentity(activeRooms, selectedChecklistRoom)?.display_name
+      ?? findRoomByIdentity(activeRooms, selectedChecklistRoom)?.room
+      ?? selectedChecklistRoom;
     const possibleRoomText = [suggestion.detectedRoom, suggestion.rawText, suggestion.notes].filter(Boolean).join(' ');
     const roomName = suggestion.detectedRoom
-      ? activeRooms.find(room => room.room.toLowerCase() === suggestion.detectedRoom?.toLowerCase())?.room
-        ?? detectRoomFromNote(possibleRoomText, roomNames, selectedChecklistRoom)
-      : detectRoomFromNote(possibleRoomText, roomNames, selectedChecklistRoom);
+      ? activeRooms.find(room => roomDisplayLabel(room).toLowerCase() === suggestion.detectedRoom?.toLowerCase())?.display_name
+        ?? detectRoomFromNote(possibleRoomText, roomNames, selectedRoomLabel)
+      : detectRoomFromNote(possibleRoomText, roomNames, selectedRoomLabel);
 
     if (!roomName) return null;
-    const room = activeRooms.find(candidate => candidate.room === roomName);
+    const room = activeRooms.find(candidate => roomDisplayLabel(candidate) === roomName || candidate.room === roomName);
     if (!room) return null;
 
     const possibleItemText = [suggestion.detectedItem, suggestion.newChecklistItem, suggestion.rawText, suggestion.notes].filter(Boolean).join(' ');
@@ -10893,21 +10980,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const exactItem = explicitItem
       ? room.items.find(item => item.toLowerCase() === explicitItem.toLowerCase())
       : null;
-    if (exactItem) return { room: roomName, item: exactItem };
+    if (exactItem) return { room: roomIdentityKey(room), item: exactItem };
 
     const bestExistingItem = detectItemFromNote(possibleItemText, room.items);
-    if (bestExistingItem) return { room: roomName, item: bestExistingItem };
+    if (bestExistingItem) return { room: roomIdentityKey(room), item: bestExistingItem };
 
     const newChecklistItem = suggestion.newChecklistItem || suggestion.detectedItem || suggestedChecklistItemFromNote(possibleItemText, roomName);
-    return newChecklistItem ? { room: roomName, item: newChecklistItem } : null;
+    return newChecklistItem ? { room: roomIdentityKey(room), item: newChecklistItem } : null;
   };
 
   const applySuggestionToFinding = (suggestion: WalkthroughSuggestion): { room: string; item: string } | null => {
     const target = resolveSuggestionTarget(suggestion);
     if (!target) return null;
-    const key = `${target.room}||${target.item}`;
+    const targetRoom = findRoomByIdentity(activeRooms, target.room);
+    if (!targetRoom) return null;
+    const key = findingStateKey(targetRoom, target.item);
     setActiveRooms(prev => prev.map(room => (
-      room.room === target.room && !room.items.includes(target.item)
+      roomIdentityKey(room) === roomIdentityKey(targetRoom) && !room.items.includes(target.item)
         ? { ...room, items: [...room.items, target.item] }
         : room
     )));
@@ -10925,7 +11014,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         },
       };
     });
-    setSelectedChecklistRoom(target.room);
+    setSelectedChecklistRoom(roomIdentityKey(targetRoom));
     return target;
   };
 
@@ -11128,17 +11217,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const addChecklistSection = (roomName: string) => {
     const name = roomName.trim();
     if (!name) return;
-    const existingRoom = activeRooms.find(room => room.room.toLowerCase() === name.toLowerCase());
-    const nextSelectedRoom = existingRoom?.room ?? name;
+    const existingRoom = activeRooms.find(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase());
+    const newRoom = roomIdentityFields({ room: name, display_name: name }, activeRooms.length);
+    const nextSelectedRoom = existingRoom ? roomIdentityKey(existingRoom) : roomIdentityKey(newRoom);
     setActiveRooms(prev => (
-      prev.some(room => room.room.toLowerCase() === name.toLowerCase())
+      prev.some(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase())
         ? prev
-        : [...prev, { room: name, items: [] }]
+        : [...prev, { ...newRoom, items: [] }]
     ));
     setAvailableChecklistRooms(prev => (
-      prev.some(room => room.room.toLowerCase() === name.toLowerCase())
+      prev.some(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase())
         ? prev
-        : [...prev, { room: name, items: [] }]
+        : [...prev, { ...newRoom, items: [] }]
     ));
     setSelectedChecklistRoom(nextSelectedRoom);
     setInspectionSubTab('checklist');
@@ -16229,10 +16319,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {inspectionView === 'detail' && activeInspection && (() => {
             const homeownerLabel = fieldWorkSubjectLabel(activeInspection);
             const homeAddress = fieldWorkSubjectAddress(activeInspection);
-            const workingRooms: InspectionRoomData[] = activeRooms.map(rm => ({
-              room: rm.room,
+            const workingRooms: InspectionRoomData[] = activeRooms.map((rm, index) => ({
+              ...roomIdentityFields(rm, index),
               findings: rm.items.map(item => {
-                const key = `${rm.room}||${item}`;
+                const key = findingStateKey(rm, item);
                 const local = localFindings[key];
                 return { title: item, status: (local?.status ?? 'Pass') as FindingStatus, notes: local?.notes ?? '', action: local?.action ?? '', due: local?.due ?? '', photos: local?.photos ?? [] };
               }),
@@ -16276,22 +16366,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const simpleTaskRows = simpleWorkRooms.flatMap(room =>
                 room.findings.map(finding => ({
                   room: room.room,
-                  key: `${room.room}||${finding.title}`,
+                  roomKey: roomIdentityKey(room),
+                  key: findingStateKey(room, finding.title),
                   finding,
                 }))
               );
               const allSimpleTaskRows = [
-                ...approvedScopeRooms.flatMap(room => room.findings.map(finding => ({ room: room.room, key: `${room.room}||${finding.title}`, finding }))),
+                ...approvedScopeRooms.flatMap(room => room.findings.map(finding => ({
+                  room: room.room,
+                  roomKey: roomIdentityKey(room),
+                  key: findingStateKey(room, finding.title),
+                  finding,
+                }))),
                 ...simpleTaskRows,
               ];
               const completeTaskCount = allSimpleTaskRows.filter(row => row.finding.status === 'Fixed On Site').length;
               const incompleteTaskCount = allSimpleTaskRows.length - completeTaskCount;
               const setSimpleTaskValue = (
-                room: string,
+                room: Partial<RoomIdentitySource>,
                 title: string,
                 updates: Partial<{ status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>,
               ) => {
-                const key = `${room}||${title}`;
+                const key = findingStateKey(room, title);
                 setLocalFindings(prev => {
                   const current = prev[key] ?? { status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] };
                   return { ...prev, [key]: { ...current, ...updates } };
@@ -16305,15 +16401,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   setError('That task is already on this job.');
                   return;
                 }
-                const key = `${SIMPLE_WORK_ITEMS_ROOM}||${title}`;
+                const workItemsRoom = activeRooms.find(room => roomIsSimpleWorkItems(room.room))
+                  ?? roomIdentityFields({ room: SIMPLE_WORK_ITEMS_ROOM, display_name: SIMPLE_WORK_ITEMS_ROOM });
+                const key = findingStateKey(workItemsRoom, title);
                 setActiveRooms(prev => {
                   const hasRoom = prev.some(room => roomIsSimpleWorkItems(room.room));
-                  if (!hasRoom) return [...prev, { room: SIMPLE_WORK_ITEMS_ROOM, items: [title] }];
+                  if (!hasRoom) return [...prev, { ...workItemsRoom, items: [title] }];
                   return prev.map(room => roomIsSimpleWorkItems(room.room) ? { ...room, items: [...room.items, title] } : room);
                 });
                 setAvailableChecklistRooms(prev => {
                   const hasRoom = prev.some(room => roomIsSimpleWorkItems(room.room));
-                  if (!hasRoom) return [...prev, { room: SIMPLE_WORK_ITEMS_ROOM, items: [title] }];
+                  if (!hasRoom) return [...prev, { ...workItemsRoom, items: [title] }];
                   return prev.map(room => roomIsSimpleWorkItems(room.room) ? { ...room, items: [...room.items, title] } : room);
                 });
                 setLocalFindings(prev => ({
@@ -16325,8 +16423,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const updateSimpleTaskTitle = (room: string, title: string, nextTitle: string) => {
                 const trimmed = nextTitle.trim();
                 if (!trimmed || trimmed === title) return;
+                const roomRecord = activeRooms.find(candidate => roomIdentityKey(candidate) === room || candidate.room === room)
+                  ?? { room, room_id: room };
                 const duplicate = simpleTaskRows.some(row =>
-                  row.room === room
+                  row.roomKey === roomIdentityKey(roomRecord)
                   && row.finding.title !== title
                   && normalizeText(row.finding.title) === normalizeText(trimmed)
                 );
@@ -16334,15 +16434,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   setError('Another task already uses that title.');
                   return;
                 }
-                const oldKey = `${room}||${title}`;
-                const nextKey = `${room}||${trimmed}`;
+                const oldKey = findingStateKey(roomRecord, title);
+                const nextKey = findingStateKey(roomRecord, trimmed);
                 setActiveRooms(prev => prev.map(itemRoom =>
-                  itemRoom.room === room
+                  roomIdentityKey(itemRoom) === roomIdentityKey(roomRecord)
                     ? { ...itemRoom, items: itemRoom.items.map(item => item === title ? trimmed : item) }
                     : itemRoom
                 ));
                 setAvailableChecklistRooms(prev => prev.map(itemRoom =>
-                  itemRoom.room === room
+                  roomIdentityKey(itemRoom) === roomIdentityKey(roomRecord)
                     ? { ...itemRoom, items: itemRoom.items.map(item => item === title ? trimmed : item) }
                     : itemRoom
                 ));
@@ -16355,14 +16455,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 });
               };
               const removeSimpleTask = (room: string, title: string) => {
-                const key = `${room}||${title}`;
+                const roomRecord = activeRooms.find(candidate => roomIdentityKey(candidate) === room || candidate.room === room)
+                  ?? { room, room_id: room };
+                const key = findingStateKey(roomRecord, title);
                 setActiveRooms(prev => prev.map(itemRoom =>
-                  itemRoom.room === room
+                  roomIdentityKey(itemRoom) === roomIdentityKey(roomRecord)
                     ? { ...itemRoom, items: itemRoom.items.filter(item => item !== title) }
                     : itemRoom
                 ).filter(itemRoom => !roomIsSimpleWorkItems(itemRoom.room) || itemRoom.items.length > 0));
                 setAvailableChecklistRooms(prev => prev.map(itemRoom =>
-                  itemRoom.room === room
+                  roomIdentityKey(itemRoom) === roomIdentityKey(roomRecord)
                     ? { ...itemRoom, items: itemRoom.items.filter(item => item !== title) }
                     : itemRoom
                 ).filter(itemRoom => !roomIsSimpleWorkItems(itemRoom.room) || itemRoom.items.length > 0));
@@ -16479,7 +16581,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="checkbox"
                                         checked={taskComplete}
                                         disabled={simpleJobReadonly}
-                                        onChange={event => setSimpleTaskValue(room.room, item.title, {
+                                        onChange={event => setSimpleTaskValue(room, item.title, {
                                           status: event.target.checked ? 'Fixed On Site' : 'Monitor',
                                           action: event.target.checked ? 'Completed approved work.' : item.action,
                                         })}
@@ -16527,7 +16629,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           type="checkbox"
                                           checked={taskComplete}
                                           disabled={simpleJobReadonly}
-                                          onChange={event => setSimpleTaskValue(row.room, row.finding.title, {
+                                          onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, {
                                             status: event.target.checked ? 'Fixed On Site' : 'Monitor',
                                             action: event.target.checked ? 'Completed.' : row.finding.action,
                                           })}
@@ -16542,13 +16644,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           className={`${inputClass()} mt-1`}
                                           defaultValue={row.finding.title}
                                           disabled={simpleJobReadonly}
-                                          onBlur={event => updateSimpleTaskTitle(row.room, row.finding.title, event.target.value)}
+                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, event.target.value)}
                                         />
                                       </div>
                                       <button
                                         type="button"
                                         disabled={simpleJobReadonly}
-                                        onClick={() => removeSimpleTask(row.room, row.finding.title)}
+                                        onClick={() => removeSimpleTask(row.roomKey, row.finding.title)}
                                         className="mt-6 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
                                       >
                                         Remove
@@ -16559,7 +16661,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
                                       value={row.finding.notes}
                                       disabled={simpleJobReadonly}
-                                      onChange={event => setSimpleTaskValue(row.room, row.finding.title, { notes: event.target.value })}
+                                      onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, { notes: event.target.value })}
                                       placeholder="Add parts used, location, completion detail, or follow-up notes..."
                                     />
                                   </div>
@@ -16738,33 +16840,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs text-slate-400 text-center py-8 px-4">No sections yet. Click + Add to start.</p>
                           ) : activeRooms.map(rm => {
                             const flagged = rm.items.filter(item => {
-                              const f = localFindings[`${rm.room}||${item}`];
+                              const f = localFindings[findingStateKey(rm, item)];
                               return f && !['Pass', 'Fixed On Site'].includes(f.status);
                             }).length;
-                            const isSelected = selectedChecklistRoom === rm.room;
+                            const roomKey = roomIdentityKey(rm);
+                            const roomLabel = roomDisplayLabel(rm);
+                            const isSelected = selectedChecklistRoom === roomKey || findRoomByIdentity([rm], selectedChecklistRoom)?.room_id === rm.room_id;
                             return (
                               <div
-                                key={rm.room}
-                                onClick={() => setSelectedChecklistRoom(rm.room)}
+                                key={roomKey}
+                                onClick={() => setSelectedChecklistRoom(roomKey)}
                                 className={`flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
                               >
-                                <span className="text-sm leading-none">{getRoomInspectionIcon(rm.room)}</span>
+                                <span className="text-sm leading-none">{getRoomInspectionIcon(roomLabel)}</span>
                                 <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>{rm.room}</p>
+                                  <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>{roomLabel}</p>
                                   <p className="text-xs text-slate-400">{rm.items.length} items{flagged > 0 ? ` · ${flagged} flagged` : ''}</p>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={e => {
                                     e.stopPropagation();
-                                    if (!window.confirm(`Remove section "${rm.room}" and its items?`)) return;
+                                    if (!window.confirm(`Remove section "${roomLabel}" and its items?`)) return;
                                     const updated = { ...localFindings };
-                                    rm.items.forEach(item => { delete updated[`${rm.room}||${item}`]; });
+                                    rm.items.forEach(item => { delete updated[findingStateKey(rm, item)]; });
                                     setLocalFindings(updated);
-                                    setActiveRooms(prev => prev.filter(r => r.room !== rm.room));
-                                    setAvailableChecklistRooms(prev => prev.filter(r => r.room !== rm.room));
-                                    if (selectedChecklistRoom === rm.room) {
-                                      setSelectedChecklistRoom(activeRooms.find(r => r.room !== rm.room)?.room ?? null);
+                                    setActiveRooms(prev => prev.filter(r => roomIdentityKey(r) !== roomKey));
+                                    setAvailableChecklistRooms(prev => prev.filter(r => roomIdentityKey(r) !== roomKey));
+                                    if (selectedChecklistRoom === roomKey) {
+                                      const nextRoom = activeRooms.find(r => roomIdentityKey(r) !== roomKey);
+                                      setSelectedChecklistRoom(nextRoom ? roomIdentityKey(nextRoom) : null);
                                     }
                                   }}
                                   className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
@@ -16792,17 +16897,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const normalizeChecklistItem = (value: string) => normalizeChecklistString(value);
                         const normalizeChecklistRoom = (value: string) => normalizeChecklistString(value);
                         const isChecklistItemMatch = (a: string, b: string) => normalizeChecklistItem(a) === normalizeChecklistItem(b);
-                        const makeChecklistKey = (room: string, item: string) => `${room}||${item}`;
-                        const splitFindingKey = (key: string) => {
-                          const [roomPart, ...itemParts] = key.split('||');
-                          return {
-                            room: roomPart ?? '',
-                            item: itemParts.join('||'),
-                          };
-                        };
+                        const makeChecklistKey = (room: InspectionTemplateRoom, item: string) => findingStateKey(room, item);
+                        const splitFindingKey = splitFindingStateKey;
                         const isFindingKeyMatch = (key: string, room: string, item: string) => {
                           const parsed = splitFindingKey(key);
-                          return normalizeChecklistRoom(parsed.room) === normalizeChecklistRoom(room)
+                          const targetRoom = findRoomByIdentity(activeRooms, room) ?? findRoomByIdentity(availableChecklistRooms, room);
+                          return Boolean(targetRoom)
+                            && parsed.roomKey === roomIdentityKey(targetRoom)
                             && normalizeChecklistItem(parsed.item) === normalizeChecklistItem(item);
                         };
                         const matchingFindingKey = (
@@ -16811,80 +16912,85 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           item: string,
                         ) => Object.keys(findings).find(key => isFindingKeyMatch(key, room, item));
 
-                        const roomData = activeRooms.find(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom));
-                        const availableRoomData = availableChecklistRooms.find(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)) ?? roomData;
+                        const roomData = findRoomByIdentity(activeRooms, selectedChecklistRoom);
+                        const availableRoomData = findRoomByIdentity(availableChecklistRooms, selectedChecklistRoom) ?? roomData;
                         if (!roomData || !availableRoomData) return null;
+                        const selectedRoomKey = roomIdentityKey(roomData);
+                        const selectedRoomLabel = roomDisplayLabel(roomData);
 
-                        const recommended = recommendedItemsForRoom(selectedChecklistRoom);
+                        const recommended = recommendedItemsForRoom(selectedRoomLabel);
                         const currentSet = new Set(roomData.items.map(item => normalizeChecklistItem(item)));
                         const isRecommendedItem = (item: string) => recommended.some(rec => isChecklistItemMatch(rec, item));
                         const customItems = availableRoomData.items.filter(item => !isRecommendedItem(item));
 
                         const addItem = (item: string, room?: string) => {
-                          const roomName = room ?? selectedChecklistRoom ?? roomData.room;
+                          const targetRoom = findRoomByIdentity(activeRooms, room ?? selectedChecklistRoom) ?? roomData;
                           const trimmedItem = item.trim();
-                          if (!normalizeChecklistRoom(roomName) || !normalizeChecklistItem(trimmedItem)) return;
+                          if (!normalizeChecklistRoom(roomDisplayLabel(targetRoom)) || !normalizeChecklistItem(trimmedItem)) return;
 
                           setActiveRooms(prev => prev.map(r =>
-                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                            roomIdentityKey(r) === roomIdentityKey(targetRoom)
                               && !r.items.some(existing => isChecklistItemMatch(existing, trimmedItem))
                               ? { ...r, items: [...r.items, trimmedItem] }
                               : r
                           ));
                           setAvailableChecklistRooms(prev => {
-                            const hasRoom = prev.some(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName));
-                            if (!hasRoom) return [...prev, { room: roomName, items: [trimmedItem] }];
+                            const hasRoom = prev.some(r => roomIdentityKey(r) === roomIdentityKey(targetRoom));
+                            if (!hasRoom) return [...prev, { ...targetRoom, items: [trimmedItem] }];
                             return prev.map(r =>
-                              normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                              roomIdentityKey(r) === roomIdentityKey(targetRoom)
                                 && !r.items.some(existing => isChecklistItemMatch(existing, trimmedItem))
                                 ? { ...r, items: [...r.items, trimmedItem] }
                                 : r
                             );
                           });
                           setLocalFindings(prev => {
-                            const existingKey = matchingFindingKey(prev, roomName, trimmedItem);
+                            const existingKey = matchingFindingKey(prev, roomIdentityKey(targetRoom), trimmedItem);
                             if (existingKey) return prev;
-                            const key = makeChecklistKey(roomName, trimmedItem);
+                            const key = makeChecklistKey(targetRoom, trimmedItem);
                             return { ...prev, [key]: { status: 'Pass', notes: '', action: '', due: '', photos: [] } };
                           });
                         };
                         const removeItem = (room: string, item: string) => {
-                          const roomName = room || selectedChecklistRoom || roomData.room;
-                          if (!normalizeChecklistRoom(roomName) || !normalizeChecklistItem(item)) return;
+                          const targetRoom = findRoomByIdentity(activeRooms, room || selectedChecklistRoom) ?? roomData;
+                          if (!normalizeChecklistRoom(roomDisplayLabel(targetRoom)) || !normalizeChecklistItem(item)) return;
 
                           setActiveRooms(prev => prev.map(r =>
-                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                            roomIdentityKey(r) === roomIdentityKey(targetRoom)
                               ? { ...r, items: r.items.filter(existing => !isChecklistItemMatch(existing, item)) }
                               : r
                           ));
                           setLocalFindings(prev => {
                             const updated = { ...prev };
                             Object.keys(updated)
-                              .filter(key => isFindingKeyMatch(key, roomName, item))
+                              .filter(key => isFindingKeyMatch(key, roomIdentityKey(targetRoom), item))
                               .forEach(key => delete updated[key]);
                             return updated;
                           });
                         };
                         const deleteAvailableItem = (room: string, item: string) => {
                           removeItem(room, item);
+                          const targetRoom = findRoomByIdentity(availableChecklistRooms, room) ?? findRoomByIdentity(activeRooms, room);
+                          if (!targetRoom) return;
                           setAvailableChecklistRooms(prev => prev.map(r =>
-                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(room)
+                            roomIdentityKey(r) === roomIdentityKey(targetRoom)
                               ? { ...r, items: r.items.filter(existing => !isChecklistItemMatch(existing, item)) }
                               : r
                           ));
                         };
                         const hasItemInRoom = (room: string, item: string) => {
-                          const roomFound = activeRooms.find(candidate => normalizeChecklistRoom(candidate.room) === normalizeChecklistRoom(room));
+                          const roomFound = findRoomByIdentity(activeRooms, room);
                           return Boolean(roomFound?.items.some(currentItem => isChecklistItemMatch(currentItem, item)));
                         };
                         const toggleChecklistItem = (room: string, item: string, checked: boolean) => {
-                          if (normalizeChecklistRoom(room) !== normalizeChecklistRoom(selectedChecklistRoom || '')) {
-                            setSelectedChecklistRoom(room);
+                          const targetRoom = findRoomByIdentity(activeRooms, room) ?? roomData;
+                          if (roomIdentityKey(targetRoom) !== roomIdentityKey(roomData)) {
+                            setSelectedChecklistRoom(roomIdentityKey(targetRoom));
                           }
                           if (checked) {
-                            addItem(item, room);
+                            addItem(item, roomIdentityKey(targetRoom));
                           } else {
-                            removeItem(room, item);
+                            removeItem(roomIdentityKey(targetRoom), item);
                           }
                         };
                         return (
@@ -16894,8 +17000,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
                                     <h2 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
-                                      <span>{getRoomInspectionIcon(selectedChecklistRoom)}</span>
-                                      {selectedChecklistRoom}
+                                      <span>{getRoomInspectionIcon(selectedRoomLabel)}</span>
+                                      {selectedRoomLabel}
                                     </h2>
                                     <p className="text-slate-500 text-sm">{roomData.items.length} items selected</p>
                                   </div>
@@ -16903,16 +17009,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const roomName = selectedChecklistRoom;
+                                        const roomKey = selectedRoomKey;
                                         setLocalFindings(prev => {
                                           const updated = { ...prev };
                                           Object.keys(updated)
-                                            .filter(key => normalizeChecklistRoom(splitFindingKey(key).room) === normalizeChecklistRoom(roomName))
+                                            .filter(key => splitFindingKey(key).roomKey === roomKey)
                                             .forEach(key => delete updated[key]);
                                           return updated;
                                         });
                                         setActiveRooms(prev => prev.map(r => (
-                                          normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                                          roomIdentityKey(r) === roomKey
                                             ? { ...r, items: [] }
                                             : r
                                         )));
@@ -16957,18 +17063,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         key={item}
                                         role="button"
                                         tabIndex={0}
-                                        onClick={() => selectedChecklistRoom && toggleChecklistItem(selectedChecklistRoom, item, !hasItemInRoom(selectedChecklistRoom, item))}
+                                        onClick={() => toggleChecklistItem(selectedRoomKey, item, !hasItemInRoom(selectedRoomKey, item))}
                                         onKeyDown={e => {
-                                          if ((e.key === 'Enter' || e.key === ' ') && selectedChecklistRoom) {
+                                          if (e.key === 'Enter' || e.key === ' ') {
                                             e.preventDefault();
-                                            toggleChecklistItem(selectedChecklistRoom, item, !hasItemInRoom(selectedChecklistRoom, item));
+                                            toggleChecklistItem(selectedRoomKey, item, !hasItemInRoom(selectedRoomKey, item));
                                           }
                                         }}
                                         className="flex items-center gap-3 px-4 py-3 text-left cursor-pointer hover:bg-slate-50"
                                       >
                                   <input
                                     type="checkbox"
-                                    checked={hasItemInRoom(selectedChecklistRoom, item)}
+                                    checked={hasItemInRoom(selectedRoomKey, item)}
                                     readOnly
                                     tabIndex={-1}
                                     className="w-4 h-4 accent-blue-600 flex-shrink-0"
@@ -16979,8 +17085,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            if (!selectedChecklistRoom) return;
-                                            deleteAvailableItem(selectedChecklistRoom, item);
+                                            deleteAvailableItem(selectedRoomKey, item);
                                           }}
                                           className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                         >
@@ -16995,7 +17100,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 {recommended.length > 0 && (
                                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
-                                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Recommended for {selectedChecklistRoom}</p>
+                                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Recommended for {selectedRoomLabel}</p>
                                     <div className="flex gap-3">
                                       <button
                                         type="button"
@@ -17003,14 +17108,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           const toAdd = recommended.filter(item => !currentSet.has(normalizeChecklistItem(item)));
                                           if (toAdd.length === 0) return;
                                           setActiveRooms(prev => prev.map(r => (
-                                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)
+                                            roomIdentityKey(r) === selectedRoomKey
                                               ? { ...r, items: [...r.items, ...toAdd.filter(item => !r.items.some(i => isChecklistItemMatch(i, item)))] }
                                               : r
                                           )));
-                                          const updates: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
+                                          const updates: Record<string, LocalFindingState> = {};
                                           toAdd.forEach(item => {
-                                            const key = makeChecklistKey(selectedChecklistRoom, item);
-                                            const normalizedKey = matchingFindingKey(localFindings, selectedChecklistRoom, item);
+                                            const key = makeChecklistKey(roomData, item);
+                                            const normalizedKey = matchingFindingKey(localFindings, selectedRoomKey, item);
                                             if (!normalizedKey && !updates[key]) {
                                               updates[key] = { status: 'Pass', notes: '', action: '', due: '', photos: [] };
                                             }
@@ -17025,14 +17130,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="button"
                                           onClick={() => {
                                             const deleteKeys = Object.keys(localFindings).filter(key => {
-                                              const [roomPart] = key.split('||');
-                                              return normalizeChecklistRoom(roomPart) === normalizeChecklistRoom(selectedChecklistRoom);
+                                              const { roomKey } = splitFindingKey(key);
+                                              return roomKey === selectedRoomKey;
                                             });
                                             const updated = { ...localFindings };
                                             deleteKeys.forEach(key => delete updated[key]);
                                             setLocalFindings(updated);
                                             setActiveRooms(prev => prev.map(r => (
-                                              normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)
+                                              roomIdentityKey(r) === selectedRoomKey
                                                 ? { ...r, items: [] }
                                                 : r
                                             )));
@@ -17045,12 +17150,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                   <div className="divide-y divide-slate-100">
                                     {recommended.map(item => {
-                                      const isChecked = hasItemInRoom(selectedChecklistRoom, item);
+                                      const isChecked = hasItemInRoom(selectedRoomKey, item);
                                       return (
                                         <button
                                           key={item}
                                           type="button"
-                                          onClick={() => selectedChecklistRoom && toggleChecklistItem(selectedChecklistRoom, item, !isChecked)}
+                                          onClick={() => toggleChecklistItem(selectedRoomKey, item, !isChecked)}
                                           className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
                                         >
                                           <input
@@ -17087,7 +17192,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                           <div className="p-6 space-y-4">
                             {(() => {
-                              const existing = new Set(activeRooms.map(r => r.room.toLowerCase()));
+                              const existing = new Set(activeRooms.flatMap(r => [r.room.toLowerCase(), roomDisplayLabel(r).toLowerCase()]));
                               const available = INSPECTION_SECTION_QUICK_ADD_ROOMS.filter(r => !existing.has(r.toLowerCase()));
                               return available.length > 0 ? (
                                 <div>
@@ -17118,14 +17223,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   onKeyDown={e => {
                                     if (e.key === 'Enter' && customRoomInput.trim()) {
                                       const name = customRoomInput.trim();
-                                      if (activeRooms.some(r => r.room.toLowerCase() === name.toLowerCase())) return;
+                                      if (activeRooms.some(r => r.room.toLowerCase() === name.toLowerCase() || roomDisplayLabel(r).toLowerCase() === name.toLowerCase())) return;
                                       addChecklistSection(name);
                                     }
                                   }}
                                 />
                                 <button
                                   type="button"
-                                  disabled={!customRoomInput.trim() || activeRooms.some(r => r.room.toLowerCase() === customRoomInput.trim().toLowerCase())}
+                                  disabled={!customRoomInput.trim() || activeRooms.some(r => roomDisplayLabel(r).toLowerCase() === customRoomInput.trim().toLowerCase() || r.room.toLowerCase() === customRoomInput.trim().toLowerCase())}
                                   onClick={() => {
                                     const name = customRoomInput.trim();
                                     if (!name) return;
@@ -17146,10 +17251,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                 {/* ── INSPECT SUB-TAB ── */}
                 {inspectionSubTab === 'inspect' && (() => {
-                  const activeWorkRoomName = selectedChecklistRoom && activeRooms.some(room => room.room === selectedChecklistRoom)
-                    ? selectedChecklistRoom
-                    : activeRooms[0]?.room ?? null;
-                  const activeWorkRoom = activeRooms.find(room => room.room === activeWorkRoomName) ?? null;
+                  const activeWorkRoom = findRoomByIdentity(activeRooms, selectedChecklistRoom) ?? activeRooms[0] ?? null;
+                  const activeWorkRoomKey = activeWorkRoom ? roomIdentityKey(activeWorkRoom) : null;
                   return (
                     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                       <div className="flex flex-col" style={{ height: 'calc(100vh - 360px)', minHeight: '600px' }}>
@@ -17159,20 +17262,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {activeRooms.length === 0 ? (
                               <p className="text-xs text-slate-400 py-1">No sections yet. Go to Checklist to add sections.</p>
                             ) : activeRooms.map(room => {
-                              const findings = room.items.map(item => localFindings[`${room.room}||${item}`]);
+                              const roomKey = roomIdentityKey(room);
+                              const roomLabel = roomDisplayLabel(room);
+                              const findings = room.items.map(item => localFindings[findingStateKey(room, item)]);
                               const issueCount = findings.filter(f => f && !['Pass', 'Fixed On Site'].includes(f.status)).length;
-                              const isActive = room.room === activeWorkRoomName;
+                              const isActive = roomKey === activeWorkRoomKey;
                               return (
                                 <button
-                                  key={room.room}
+                                  key={roomKey}
                                   type="button"
-                                  onClick={() => setSelectedChecklistRoom(room.room)}
+                                  onClick={() => setSelectedChecklistRoom(roomKey)}
                                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                                     isActive ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
                                   }`}
                                 >
-                                  <span>{getRoomInspectionIcon(room.room)}</span>
-                                  {room.room}
+                                  <span>{getRoomInspectionIcon(roomLabel)}</span>
+                                  {roomLabel}
                                   {issueCount > 0 && (
                                     <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                       {issueCount}
@@ -17195,7 +17300,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </div>
                             ) : (
                               activeWorkRoom.items.map(item => {
-                                const key = `${activeWorkRoom.room}||${item}`;
+                                const key = findingStateKey(activeWorkRoom, item);
                                 const current = localFindings[key] ?? { status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] };
                                 const status = current.status;
                                 const isUploading = uploadingInspectionPhotoKey === key;
@@ -17337,22 +17442,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       value={singleNoteRoom}
                                       onChange={e => { setSingleNoteRoom(e.target.value); setSingleNoteItem(''); }}>
                                       <option value="">Select room…</option>
-                                      {activeRooms.map(r => <option key={r.room} value={r.room}>{r.room}</option>)}
+                                      {activeRooms.map(r => <option key={roomIdentityKey(r)} value={roomIdentityKey(r)}>{roomDisplayLabel(r)}</option>)}
                                     </select>
                                     <select className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-500 bg-white disabled:opacity-50"
                                       value={singleNoteItem}
                                       onChange={e => setSingleNoteItem(e.target.value)} disabled={!singleNoteRoom}>
                                       <option value="">Select item…</option>
-                                      {activeRooms.find(r => r.room === singleNoteRoom)?.items.map(item => (
+                                      {findRoomByIdentity(activeRooms, singleNoteRoom)?.items.map(item => (
                                         <option key={item} value={item}>{item}</option>
                                       ))}
                                     </select>
                                     <button type="button" disabled={!singleNoteText.trim() || !singleNoteRoom || !singleNoteItem}
                                       onClick={() => {
-                                        const key = `${singleNoteRoom}||${singleNoteItem}`;
+                                        const room = findRoomByIdentity(activeRooms, singleNoteRoom);
+                                        if (!room) return;
+                                        const key = findingStateKey(room, singleNoteItem);
                                         const suggested = localDraftFromNote(singleNoteText);
                                         setLocalFindings(prev => ({ ...prev, [key]: { status: suggested, notes: singleNoteText.trim(), action: '', due: '', photos: [] } }));
-                                        setSelectedChecklistRoom(singleNoteRoom);
+                                        setSelectedChecklistRoom(roomIdentityKey(room));
                                         setSingleNoteText(''); setSingleNoteRoom(''); setSingleNoteItem('');
                                       }}
                                       className="w-full bg-blue-600 text-white rounded-lg px-3 py-2 text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
@@ -17371,11 +17478,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       value={walkthroughText} onChange={e => setWalkthroughText(e.target.value)} />
                                     <button type="button" disabled={!walkthroughText.trim()}
                                       onClick={() => {
-                                        const roomNames = activeRooms.map(r => r.room);
+                                        const roomNames = activeRooms.map(r => roomDisplayLabel(r));
+                                        const selectedRoomLabel = findRoomByIdentity(activeRooms, selectedChecklistRoom)
+                                          ? roomDisplayLabel(findRoomByIdentity(activeRooms, selectedChecklistRoom))
+                                          : activeRooms[0] ? roomDisplayLabel(activeRooms[0]) : null;
                                         const lines = splitWalkthroughNotes(walkthroughText);
                                         const suggestions: WalkthroughSuggestion[] = lines.map(line => {
-                                          const detectedRoom = detectRoomFromNote(line, roomNames, selectedChecklistRoom ?? activeRooms[0]?.room ?? null);
-                                          const roomItems = detectedRoom ? (activeRooms.find(r => r.room === detectedRoom)?.items ?? []) : [];
+                                          const detectedRoom = detectRoomFromNote(line, roomNames, selectedRoomLabel);
+                                          const detectedRoomRecord = detectedRoom ? activeRooms.find(r => roomDisplayLabel(r) === detectedRoom || r.room === detectedRoom) : null;
+                                          const roomItems = detectedRoomRecord?.items ?? [];
                                           const bestItem = roomItems.length > 0 ? findBestChecklistItem(line, roomItems) : null;
                                           const matchedExistingItem = bestItem ? checklistMatchConfidence(line, bestItem) > 0 : false;
                                           const detectedItem = matchedExistingItem && bestItem ? bestItem : suggestedChecklistItemFromNote(line, detectedRoom ?? 'General');
@@ -17466,14 +17577,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setAiProcessing(true);
                                         try {
                                           const { data, error: fnErr } = await supabase.functions.invoke('inspection-ai', {
-                                            body: { notes: aiNoteText, rooms: activeRooms.map(r => ({ room: r.room, items: r.items })) },
+                                            body: { notes: aiNoteText, rooms: activeRooms.map(r => ({ room: roomDisplayLabel(r), items: r.items })) },
                                           });
                                           if (fnErr) throw fnErr;
-                                          const roomNames = activeRooms.map(r => r.room);
+                                          const roomNames = activeRooms.map(r => roomDisplayLabel(r));
+                                          const selectedRoomLabel = findRoomByIdentity(activeRooms, selectedChecklistRoom)
+                                            ? roomDisplayLabel(findRoomByIdentity(activeRooms, selectedChecklistRoom))
+                                            : activeRooms[0] ? roomDisplayLabel(activeRooms[0]) : null;
                                           const aiResults = (data as Array<{ room: string; item: string; status: FindingStatus; notes: string; action: string }> || []).map(s => {
-                                            const detectedRoom = activeRooms.find(r => r.room.toLowerCase() === s.room?.toLowerCase())?.room
-                                              ?? detectRoomFromNote(`${s.room ?? ''} ${s.notes}`, roomNames, selectedChecklistRoom ?? activeRooms[0]?.room ?? null);
-                                            const roomItems = detectedRoom ? (activeRooms.find(r => r.room === detectedRoom)?.items ?? []) : [];
+                                            const detectedRoom = activeRooms.find(r => roomDisplayLabel(r).toLowerCase() === s.room?.toLowerCase())?.display_name
+                                              ?? detectRoomFromNote(`${s.room ?? ''} ${s.notes}`, roomNames, selectedRoomLabel);
+                                            const detectedRoomRecord = detectedRoom ? activeRooms.find(r => roomDisplayLabel(r) === detectedRoom || r.room === detectedRoom) : null;
+                                            const roomItems = detectedRoomRecord?.items ?? [];
                                             const exactItem = s.item
                                               ? roomItems.find(item => item.toLowerCase() === s.item.toLowerCase())
                                               : null;
@@ -17520,10 +17635,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                 {/* ── REPORT SUB-TAB ── */}
                 {inspectionSubTab === 'report' && (() => {
-                  const reportRooms: InspectionRoomData[] = activeRooms.map(rm => ({
-                    room: rm.room,
+                  const reportRooms: InspectionRoomData[] = activeRooms.map((rm, index) => ({
+                    ...roomIdentityFields(rm, index),
                     findings: rm.items.map(item => {
-                      const key = `${rm.room}||${item}`;
+                      const key = findingStateKey(rm, item);
                       const local = localFindings[key];
                       return { title: item, status: (local?.status ?? 'Pass') as FindingStatus, notes: local?.notes ?? '', action: local?.action ?? '', due: local?.due ?? '', photos: local?.photos ?? [] };
                     }),

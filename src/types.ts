@@ -494,12 +494,23 @@ export interface InspectionRoomFinding {
   photos: string[];
 }
 
-export interface InspectionRoomData {
+export interface RoomIdentityFields {
+  room_id?: string;
+  display_name?: string;
+  room_type?: string;
+  location_note?: string;
+  reference_photo_storage_path?: string;
+  sort_order?: number;
+  last_edited_by?: string;
+  last_edited_at?: string;
+}
+
+export interface InspectionRoomData extends RoomIdentityFields {
   room: string;
   findings: InspectionRoomFinding[];
 }
 
-export interface InspectionTemplateRoom {
+export interface InspectionTemplateRoom extends RoomIdentityFields {
   room: string;
   items: string[];
 }
