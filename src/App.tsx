@@ -14266,40 +14266,131 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                       {/* Right: Items panel */}
                       {selectedChecklistRoom ? (() => {
-                        const roomData = activeRooms.find(r => r.room === selectedChecklistRoom);
-                        if (!roomData) return null;
-                        const recommended = recommendedItemsForRoom(selectedChecklistRoom);
-                        const currentSet = new Set(roomData.items);
-                        const customItems = roomData.items.filter(item => !recommended.includes(item));
-                        const addItem = (item: string) => {
-                          if (!item || roomData.items.includes(item)) return;
-                          setActiveRooms(prev => prev.map(r => r.room === selectedChecklistRoom ? { ...r, items: [...r.items, item] } : r));
-                          setLocalFindings(prev => ({ ...prev, [`${selectedChecklistRoom}||${item}`]: { status: 'Pass', notes: '', action: '', due: '', photos: [] } }));
+                        const normalizeChecklistString = (value: string) => value
+                          .normalize('NFKD')
+                          .trim()
+                          .replace(/\u00A0/g, ' ')
+                          .replace(/\u200B/g, '')
+                          .replace(/[\u2010-\u2015]/g, '-')
+                          .replace(/[‘’]/g, "'")
+                          .replace(/[“”]/g, '"')
+                          .replace(/\s+/g, ' ')
+                          .toLowerCase();
+                        const normalizeChecklistItem = (value: string) => normalizeChecklistString(value);
+                        const normalizeChecklistRoom = (value: string) => normalizeChecklistString(value);
+                        const isChecklistItemMatch = (a: string, b: string) => normalizeChecklistItem(a) === normalizeChecklistItem(b);
+                        const makeChecklistKey = (room: string, item: string) => `${room}||${item}`;
+                        const splitFindingKey = (key: string) => {
+                          const [roomPart, ...itemParts] = key.split('||');
+                          return {
+                            room: roomPart ?? '',
+                            item: itemParts.join('||'),
+                          };
                         };
-                        const removeItem = (item: string) => {
-                          setActiveRooms(prev => prev.map(r => r.room === selectedChecklistRoom ? { ...r, items: r.items.filter(i => i !== item) } : r));
+                        const isFindingKeyMatch = (key: string, room: string, item: string) => {
+                          const parsed = splitFindingKey(key);
+                          return normalizeChecklistRoom(parsed.room) === normalizeChecklistRoom(room)
+                            && normalizeChecklistItem(parsed.item) === normalizeChecklistItem(item);
+                        };
+                        const matchingFindingKey = (
+                          findings: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>,
+                          room: string,
+                          item: string,
+                        ) => Object.keys(findings).find(key => isFindingKeyMatch(key, room, item));
+
+                        const roomData = activeRooms.find(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom));
+                        if (!roomData) return null;
+
+                        const recommended = recommendedItemsForRoom(selectedChecklistRoom);
+                        const currentSet = new Set(roomData.items.map(item => normalizeChecklistItem(item)));
+                        const isRecommendedItem = (item: string) => recommended.some(rec => isChecklistItemMatch(rec, item));
+                        const customItems = roomData.items.filter(item => !isRecommendedItem(item));
+
+                        const addItem = (item: string, room?: string) => {
+                          const roomName = room ?? selectedChecklistRoom ?? roomData.room;
+                          const trimmedItem = item.trim();
+                          if (!normalizeChecklistRoom(roomName) || !normalizeChecklistItem(trimmedItem)) return;
+
+                          setActiveRooms(prev => prev.map(r =>
+                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                              && !r.items.some(existing => isChecklistItemMatch(existing, trimmedItem))
+                              ? { ...r, items: [...r.items, trimmedItem] }
+                              : r
+                          ));
+                          setLocalFindings(prev => {
+                            const existingKey = matchingFindingKey(prev, roomName, trimmedItem);
+                            if (existingKey) return prev;
+                            const key = makeChecklistKey(roomName, trimmedItem);
+                            return { ...prev, [key]: { status: 'Pass', notes: '', action: '', due: '', photos: [] } };
+                          });
+                        };
+                        const removeItem = (room: string, item: string) => {
+                          const roomName = room || selectedChecklistRoom || roomData.room;
+                          if (!normalizeChecklistRoom(roomName) || !normalizeChecklistItem(item)) return;
+
+                          setActiveRooms(prev => prev.map(r =>
+                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                              ? { ...r, items: r.items.filter(existing => !isChecklistItemMatch(existing, item)) }
+                              : r
+                          ));
                           setLocalFindings(prev => {
                             const updated = { ...prev };
-                            delete updated[`${selectedChecklistRoom}||${item}`];
+                            Object.keys(updated)
+                              .filter(key => isFindingKeyMatch(key, roomName, item))
+                              .forEach(key => delete updated[key]);
                             return updated;
                           });
                         };
-                        const toggleChecklistItem = (item: string) => {
-                          if (currentSet.has(item)) {
-                            removeItem(item);
+                        const hasItemInRoom = (room: string, item: string) => {
+                          const roomFound = activeRooms.find(candidate => normalizeChecklistRoom(candidate.room) === normalizeChecklistRoom(room));
+                          return Boolean(roomFound?.items.some(currentItem => isChecklistItemMatch(currentItem, item)));
+                        };
+                        const toggleChecklistItem = (room: string, item: string, checked: boolean) => {
+                          if (normalizeChecklistRoom(room) !== normalizeChecklistRoom(selectedChecklistRoom || '')) {
+                            setSelectedChecklistRoom(room);
+                          }
+                          if (checked) {
+                            addItem(item, room);
                           } else {
-                            addItem(item);
+                            removeItem(room, item);
                           }
                         };
                         return (
                           <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
                             <div className="max-w-2xl space-y-4">
                               <div>
-                                <h2 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
-                                  <span>{getRoomInspectionIcon(selectedChecklistRoom)}</span>
-                                  {selectedChecklistRoom}
-                                </h2>
-                                <p className="text-slate-500 text-sm">{roomData.items.length} items selected</p>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <h2 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
+                                      <span>{getRoomInspectionIcon(selectedChecklistRoom)}</span>
+                                      {selectedChecklistRoom}
+                                    </h2>
+                                    <p className="text-slate-500 text-sm">{roomData.items.length} items selected</p>
+                                  </div>
+                                  {roomData.items.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const roomName = selectedChecklistRoom;
+                                        setLocalFindings(prev => {
+                                          const updated = { ...prev };
+                                          Object.keys(updated)
+                                            .filter(key => normalizeChecklistRoom(splitFindingKey(key).room) === normalizeChecklistRoom(roomName))
+                                            .forEach(key => delete updated[key]);
+                                          return updated;
+                                        });
+                                        setActiveRooms(prev => prev.map(r => (
+                                          normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                                            ? { ...r, items: [] }
+                                            : r
+                                        )));
+                                      }}
+                                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      Clear all
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               <div className="bg-white rounded-2xl border border-slate-200 p-4">
@@ -14323,17 +14414,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </div>
                               </div>
 
-                              {customItems.length > 0 && (
-                                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-                                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Custom Items</p>
-                                  </div>
-                                  <div className="divide-y divide-slate-100">
-                                    {customItems.map(item => (
-                                      <div key={item} className="flex items-center gap-3 px-4 py-3">
-                                        <input type="checkbox" checked readOnly className="w-4 h-4 accent-blue-600 flex-shrink-0" />
+                                    {customItems.length > 0 && (
+                                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                      <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                                        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Custom Items</p>
+                                      </div>
+                                      <div className="divide-y divide-slate-100">
+                                        {customItems.map(item => (
+                                      <div
+                                        key={item}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => selectedChecklistRoom && toggleChecklistItem(selectedChecklistRoom, item, !hasItemInRoom(selectedChecklistRoom, item))}
+                                        onKeyDown={e => {
+                                          if ((e.key === 'Enter' || e.key === ' ') && selectedChecklistRoom) {
+                                            e.preventDefault();
+                                            toggleChecklistItem(selectedChecklistRoom, item, !hasItemInRoom(selectedChecklistRoom, item));
+                                          }
+                                        }}
+                                        className="flex items-center gap-3 px-4 py-3 text-left cursor-pointer hover:bg-slate-50"
+                                      >
+                                  <input
+                                    type="checkbox"
+                                    checked={hasItemInRoom(selectedChecklistRoom, item)}
+                                    readOnly
+                                    tabIndex={-1}
+                                    className="w-4 h-4 accent-blue-600 flex-shrink-0"
+                                  />
                                         <span className="flex-1 text-sm text-slate-700">{item}</span>
-                                        <button type="button" onClick={() => removeItem(item)} className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (!selectedChecklistRoom) return;
+                                            removeItem(selectedChecklistRoom, item);
+                                          }}
+                                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                        >
                                           <Trash2 size={13} />
                                         </button>
                                       </div>
@@ -14342,7 +14460,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </div>
                               )}
 
-                              {recommended.length > 0 && (
+                                {recommended.length > 0 && (
                                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
                                     <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Recommended for {selectedChecklistRoom}</p>
@@ -14350,11 +14468,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const toAdd = recommended.filter(item => !currentSet.has(item));
+                                          const toAdd = recommended.filter(item => !currentSet.has(normalizeChecklistItem(item)));
                                           if (toAdd.length === 0) return;
-                                          setActiveRooms(prev => prev.map(r => r.room === selectedChecklistRoom ? { ...r, items: [...r.items, ...toAdd] } : r));
+                                          setActiveRooms(prev => prev.map(r => (
+                                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)
+                                              ? { ...r, items: [...r.items, ...toAdd.filter(item => !r.items.some(i => isChecklistItemMatch(i, item)))] }
+                                              : r
+                                          )));
                                           const updates: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
-                                          toAdd.forEach(item => { updates[`${selectedChecklistRoom}||${item}`] = { status: 'Pass', notes: '', action: '', due: '', photos: [] }; });
+                                          toAdd.forEach(item => {
+                                            const key = makeChecklistKey(selectedChecklistRoom, item);
+                                            const normalizedKey = matchingFindingKey(localFindings, selectedChecklistRoom, item);
+                                            if (!normalizedKey && !updates[key]) {
+                                              updates[key] = { status: 'Pass', notes: '', action: '', due: '', photos: [] };
+                                            }
+                                          });
                                           setLocalFindings(prev => ({ ...prev, ...updates }));
                                         }}
                                         className="text-xs font-semibold text-blue-600 hover:text-blue-700"
@@ -14363,11 +14491,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          const updated = { ...localFindings };
-                                          roomData.items.forEach(item => { delete updated[`${selectedChecklistRoom}||${item}`]; });
-                                          setLocalFindings(updated);
-                                          setActiveRooms(prev => prev.map(r => r.room === selectedChecklistRoom ? { ...r, items: [] } : r));
+                                          onClick={() => {
+                                            const deleteKeys = Object.keys(localFindings).filter(key => {
+                                              const [roomPart] = key.split('||');
+                                              return normalizeChecklistRoom(roomPart) === normalizeChecklistRoom(selectedChecklistRoom);
+                                            });
+                                            const updated = { ...localFindings };
+                                            deleteKeys.forEach(key => delete updated[key]);
+                                            setLocalFindings(updated);
+                                            setActiveRooms(prev => prev.map(r => (
+                                              normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)
+                                                ? { ...r, items: [] }
+                                                : r
+                                            )));
                                         }}
                                         className="text-xs font-semibold text-slate-500 hover:text-red-600"
                                       >
@@ -14377,12 +14513,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                   <div className="divide-y divide-slate-100">
                                     {recommended.map(item => {
-                                      const isChecked = currentSet.has(item);
+                                      const isChecked = hasItemInRoom(selectedChecklistRoom, item);
                                       return (
                                         <button
                                           key={item}
                                           type="button"
-                                          onClick={() => toggleChecklistItem(item)}
+                                          onClick={() => selectedChecklistRoom && toggleChecklistItem(selectedChecklistRoom, item, !isChecked)}
                                           className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
                                         >
                                           <input
