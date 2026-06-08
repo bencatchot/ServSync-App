@@ -3291,6 +3291,27 @@ function formatMoney(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function invoiceStatusLabel(status: Invoice['status']) {
+  return status.replace(/_/g, ' ');
+}
+
+function invoiceStatusClass(status: Invoice['status']) {
+  if (status === 'draft') return 'bg-amber-100 text-amber-700';
+  if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'void') return 'bg-slate-100 text-slate-600';
+  if (status === 'overdue') return 'bg-red-100 text-red-700';
+  if (status === 'sent' || status === 'viewed') return 'bg-blue-100 text-blue-700';
+  return 'bg-violet-100 text-violet-700';
+}
+
+function invoiceCanMarkPaid(status: Invoice['status']) {
+  return ['sent', 'viewed', 'overdue', 'partially_paid'].includes(status);
+}
+
+function invoiceCanVoid(status: Invoice['status']) {
+  return ['draft', 'sent', 'viewed'].includes(status);
+}
+
 function cleanInvoiceFileStem(fileName: string) {
   return fileName
     .replace(/\.[a-z0-9]+$/i, '')
@@ -4498,7 +4519,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
-  const [, setInvoices] = useState<Invoice[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [directoryCategory, setDirectoryCategory] = useState('');
   const [directoryLocation, setDirectoryLocation] = useState('');
@@ -4551,6 +4572,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [updatingServiceRequestId, setUpdatingServiceRequestId] = useState<string | null>(null);
   const [updatingQuoteRequestId, setUpdatingQuoteRequestId] = useState<string | null>(null);
   const [updatingEstimateId, setUpdatingEstimateId] = useState<string | null>(null);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [filingEstimateId, setFilingEstimateId] = useState<string | null>(null);
   const [updatingAppointmentRequestId, setUpdatingAppointmentRequestId] = useState<string | null>(null);
   const [counterProposeDrafts, setCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
@@ -5497,6 +5520,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to respond to estimate.'));
     } finally {
       setUpdatingEstimateId(null);
+    }
+  };
+
+  const viewHomeownerInvoice = async (invoice: Invoice) => {
+    if (!supabase) return;
+    setViewingInvoiceId(current => current === invoice.id ? null : invoice.id);
+    if (invoice.status !== 'sent') return;
+    setUpdatingInvoiceId(invoice.id);
+    setError('');
+    try {
+      const { error: viewError } = await supabase.rpc('servsync_homeowner_view_invoice', {
+        p_invoice_id: invoice.id,
+      });
+      if (viewError) throw viewError;
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to mark invoice viewed.'));
+    } finally {
+      setUpdatingInvoiceId(null);
     }
   };
 
@@ -7604,10 +7646,95 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Drafts stay private to the contractor. Anything shown here has been sent to you for review.
               </p>
             </div>
-            {estimates.length === 0 ? (
-              <EmptyState text="No estimates have been sent to you yet." />
+            {estimates.length === 0 && invoices.length === 0 ? (
+              <EmptyState text="No estimates or invoices have been sent to you yet." />
             ) : (
-              estimates.map(estimate => {
+              <>
+                {invoices.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Invoices</p>
+                    {invoices.map(invoice => {
+                      const contractorName = connections.find(connection => connection.contractor_id === invoice.contractor_id)?.business_name
+                        || directoryContractors.find(contractor => contractor.id === invoice.contractor_id)?.business_name
+                        || 'Contractor';
+                      const isOpen = viewingInvoiceId === invoice.id;
+                      return (
+                        <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>
+                                  {invoiceStatusLabel(invoice.status)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {contractorName}
+                                {invoice.issued_at ? ` · Issued ${formatDateTime(invoice.issued_at)}` : ''}
+                                {invoice.due_at ? ` · Due ${formatDateTime(invoice.due_at)}` : ''}
+                              </p>
+                            </div>
+                            <p className="text-2xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
+                          </div>
+                          {invoice.scope && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void viewHomeownerInvoice(invoice)}
+                              disabled={updatingInvoiceId === invoice.id}
+                              className={buttonClass('secondary')}
+                            >
+                              <Receipt size={16} />
+                              {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide details' : 'View invoice'}
+                            </button>
+                          </div>
+                          {isOpen && (
+                            <div className="mt-3 space-y-3">
+                              {invoice.line_items && invoice.line_items.length > 0 && (
+                                <div className="overflow-hidden rounded-xl border border-slate-200">
+                                  {[...invoice.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
+                                    <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
+                                      <span className="text-slate-700">{line.description}</span>
+                                      <span className="text-slate-500">{line.quantity} {line.unit}</span>
+                                      <span className="font-semibold text-slate-950 sm:text-right">{formatMoney(Math.round(line.quantity * line.unit_price_cents))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-4">
+                                <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(invoice.subtotal_cents)}</strong></span>
+                                <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(invoice.tax_cents)}</strong></span>
+                                <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
+                                <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
+                              </div>
+                              {(invoice.notes || invoice.terms) && (
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  {invoice.notes && (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
+                                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.notes}</p>
+                                    </div>
+                                  )}
+                                  {invoice.terms && (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
+                                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.terms}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {estimates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estimates</p>
+                    {estimates.map(estimate => {
                 const contractorName = connections.find(connection => connection.contractor_id === estimate.contractor_id)?.business_name
                   || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.business_name
                   || 'Contractor';
@@ -7719,7 +7846,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     )}
                   </div>
                 );
-              })
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </Card>
@@ -8124,6 +8254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
@@ -9326,6 +9457,68 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to save invoice draft. Make sure the ServSync invoices SQL has been applied.'));
     } finally {
       setSavingInvoice(false);
+    }
+  };
+
+  const sendInvoiceToHomeowner = async (invoice: Invoice) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    if (!invoice.homeowner_user_id) {
+      setError('Local-only invoices cannot be sent to a homeowner yet. Connect this customer to a ServSync homeowner before sending.');
+      return;
+    }
+    setUpdatingInvoiceId(invoice.id);
+    try {
+      const { error: sendError } = await supabase.rpc('servsync_send_invoice', {
+        p_invoice_id: invoice.id,
+      });
+      if (sendError) throw sendError;
+      setNotice('Invoice sent to homeowner.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to send invoice.'));
+    } finally {
+      setUpdatingInvoiceId(null);
+    }
+  };
+
+  const markInvoicePaid = async (invoice: Invoice) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setUpdatingInvoiceId(invoice.id);
+    try {
+      const { error: paidError } = await supabase.rpc('servsync_mark_invoice_paid', {
+        p_invoice_id: invoice.id,
+      });
+      if (paidError) throw paidError;
+      setNotice('Invoice marked paid.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to mark invoice paid.'));
+    } finally {
+      setUpdatingInvoiceId(null);
+    }
+  };
+
+  const voidInvoice = async (invoice: Invoice) => {
+    if (!supabase) return;
+    if (!window.confirm('Void this invoice? This will remove it from active billing lists.')) return;
+    setNotice('');
+    setError('');
+    setUpdatingInvoiceId(invoice.id);
+    try {
+      const { error: voidError } = await supabase.rpc('servsync_void_invoice', {
+        p_invoice_id: invoice.id,
+      });
+      if (voidError) throw voidError;
+      setNotice('Invoice voided.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to void invoice.'));
+    } finally {
+      setUpdatingInvoiceId(null);
     }
   };
 
@@ -14630,7 +14823,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
                                           <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">Invoice</span>
-                                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${invoice.status === 'draft' ? 'bg-amber-100 text-amber-700' : invoice.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : invoice.status === 'void' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'}`}>{invoice.status}</span>
+                                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>{invoiceStatusLabel(invoice.status)}</span>
                                         </div>
                                         <p className="mt-2 font-semibold text-slate-950">{invoice.title || 'Invoice draft'}</p>
                                         <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
@@ -14640,6 +14833,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     {invoice.status === 'draft' && (
                                       <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => void sendInvoiceToHomeowner(invoice)}
+                                          disabled={updatingInvoiceId === invoice.id}
+                                          className={buttonClass('primary')}
+                                        >
+                                          <Send size={15} />
+                                          {updatingInvoiceId === invoice.id ? 'Sending...' : 'Send Invoice'}
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -14654,6 +14856,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         >
                                           Edit draft
                                         </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void voidInvoice(invoice)}
+                                          disabled={updatingInvoiceId === invoice.id}
+                                          className={buttonClass('secondary')}
+                                        >
+                                          <X size={15} />
+                                          Void
+                                        </button>
+                                      </div>
+                                    )}
+                                    {invoiceCanMarkPaid(invoice.status) && (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => void markInvoicePaid(invoice)}
+                                          disabled={updatingInvoiceId === invoice.id}
+                                          className={buttonClass('primary')}
+                                        >
+                                          <CheckCircle2 size={15} />
+                                          {updatingInvoiceId === invoice.id ? 'Updating...' : 'Mark Paid'}
+                                        </button>
+                                        {invoiceCanVoid(invoice.status) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => void voidInvoice(invoice)}
+                                            disabled={updatingInvoiceId === invoice.id}
+                                            className={buttonClass('secondary')}
+                                          >
+                                            <X size={15} />
+                                            Void
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>
