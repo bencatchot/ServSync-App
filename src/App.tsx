@@ -3363,6 +3363,17 @@ function safeFileName(value: string) {
   return value.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'servsync';
 }
 
+type InvoicePdfContext = {
+  contractorName: string;
+  contractorLogoUrl?: string | null;
+  contractorEmail?: string;
+  contractorPhone?: string;
+  contractorAddress?: string;
+  customerName: string;
+  customerAddress?: string;
+  serviceLabel?: string;
+};
+
 async function createEstimatePdf(
   estimate: Estimate,
   context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
@@ -3512,6 +3523,225 @@ async function downloadEstimatePdf(
   context: { contractorName: string; customerName: string; customerAddress?: string; contractorLogoUrl?: string | null },
 ) {
   const { blob, fileName } = await createEstimatePdf(estimate, context);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function invoiceBalanceDueCents(invoice: Pick<Invoice, 'status' | 'total_cents' | 'amount_paid_cents'>) {
+  if (invoice.status === 'void') return 0;
+  return Math.max(0, invoice.total_cents - invoice.amount_paid_cents);
+}
+
+async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentW = pageW - margin * 2;
+  let y = 18;
+  const contractorLogo = await loadPdfImageAsset(context.contractorLogoUrl);
+  const balanceDue = invoiceBalanceDueCents(invoice);
+
+  const formatPdfDate = (value?: string | null) => {
+    if (!value) return 'Not specified';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const addPageIfNeeded = (height = 12) => {
+    if (y + height <= pageH - margin) return;
+    pdf.addPage();
+    y = margin;
+  };
+  const addWrappedText = (text: string, x: number, maxW: number, fontSize = 10, lineGap = 5) => {
+    if (!text.trim()) return;
+    pdf.setFontSize(fontSize);
+    const lines = pdf.splitTextToSize(text, maxW);
+    lines.forEach((line: string) => {
+      addPageIfNeeded(lineGap);
+      pdf.text(line, x, y);
+      y += lineGap;
+    });
+  };
+  const sectionTitle = (title: string) => {
+    addPageIfNeeded(10);
+    y += 2;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text(title, margin, y);
+    y += 7;
+    pdf.setFont('helvetica', 'normal');
+  };
+  const moneyRow = (label: string, amount: number, bold = false) => {
+    addPageIfNeeded(7);
+    pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+    pdf.setFontSize(bold ? 12 : 10);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text(label, pageW - margin - 58, y);
+    pdf.text(formatMoney(amount), pageW - margin, y, { align: 'right' });
+    y += bold ? 7 : 6;
+  };
+
+  pdf.setFillColor(2, 19, 45);
+  pdf.rect(0, 0, pageW, 45, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(22);
+  pdf.text('Invoice', margin, 18);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(10);
+  pdf.text(context.contractorName || 'Contractor', margin, 27);
+  const contractorContact = [context.contractorPhone, context.contractorEmail, context.contractorAddress].filter(Boolean).join(' · ');
+  if (contractorContact) {
+    pdf.setFontSize(8);
+    pdf.setTextColor(219, 234, 254);
+    pdf.text(pdf.splitTextToSize(contractorContact, 105)[0] || '', margin, 34);
+  }
+  if (contractorLogo) {
+    const logoW = 38;
+    const logoH = 20;
+    const logoX = pageW - margin - logoW;
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(logoX, 7, logoW, logoH, 2, 2, 'F');
+    drawPdfLogo(pdf, contractorLogo, logoX, 7, logoW, logoH);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(5.5);
+    pdf.setTextColor(219, 234, 254);
+    pdf.text('Powered by ServSync', logoX + logoW / 2, 32, { align: 'center' });
+  }
+
+  y = 55;
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(16);
+  addWrappedText(invoice.title || 'Invoice', margin, contentW - 60, 16, 7);
+  const amountLabel = invoice.status === 'paid' ? 'Paid' : invoice.status === 'void' ? 'Void' : 'Amount Due';
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(9);
+  pdf.setTextColor(71, 85, 105);
+  pdf.text(amountLabel, pageW - margin, 55, { align: 'right' });
+  pdf.setFontSize(18);
+  pdf.setTextColor(15, 23, 42);
+  pdf.text(formatMoney(balanceDue), pageW - margin, 63, { align: 'right' });
+  y = Math.max(y, 73);
+
+  pdf.setDrawColor(226, 232, 240);
+  pdf.line(margin, y, pageW - margin, y);
+  y += 8;
+
+  const metaRows = [
+    ['Invoice #', invoice.invoice_number || 'Not assigned'],
+    ['Status', invoiceStatusLabel(invoice.status)],
+    ['Issued', formatPdfDate(invoice.issued_at)],
+    ['Due', formatPdfDate(invoice.due_at)],
+  ];
+  pdf.setFontSize(9);
+  metaRows.forEach(([label, value], index) => {
+    const colW = contentW / 4;
+    const x = margin + index * colW;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(label, x, y);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(15, 23, 42);
+    pdf.text(pdf.splitTextToSize(value, colW - 4)[0] || value, x, y + 5);
+  });
+  y += 17;
+
+  sectionTitle('Bill To');
+  pdf.setTextColor(51, 65, 85);
+  addWrappedText(context.customerName || 'Customer', margin, contentW, 10, 5);
+  if (context.customerAddress || context.serviceLabel) {
+    addWrappedText(context.serviceLabel || context.customerAddress || '', margin, contentW, 10, 5);
+  }
+
+  if (invoice.scope) {
+    sectionTitle('Description');
+    pdf.setTextColor(51, 65, 85);
+    addWrappedText(invoice.scope, margin, contentW, 10, 5);
+  }
+
+  sectionTitle('Line Items');
+  const lines = [...(invoice.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  addPageIfNeeded(10);
+  pdf.setFillColor(241, 245, 249);
+  pdf.roundedRect(margin, y - 4, contentW, 9, 1.5, 1.5, 'F');
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(8);
+  pdf.setTextColor(51, 65, 85);
+  pdf.text('Description', margin + 3, y);
+  pdf.text('Qty', pageW - margin - 72, y, { align: 'right' });
+  pdf.text('Unit', pageW - margin - 54, y, { align: 'right' });
+  pdf.text('Unit price', pageW - margin - 25, y, { align: 'right' });
+  pdf.text('Total', pageW - margin - 3, y, { align: 'right' });
+  y += 10;
+
+  if (lines.length === 0) {
+    addWrappedText('No line items were listed for this invoice.', margin, contentW, 10, 5);
+  } else {
+    lines.forEach(line => {
+      const lineTotal = Math.round(Number(line.quantity || 0) * line.unit_price_cents);
+      const descriptionLines = pdf.splitTextToSize(line.description || 'Line item', contentW - 88);
+      const rowH = Math.max(12, descriptionLines.length * 4 + 7);
+      addPageIfNeeded(rowH);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(margin, y - 3, pageW - margin, y - 3);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(descriptionLines, margin + 3, y);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(String(line.quantity), pageW - margin - 72, y, { align: 'right' });
+      pdf.text(line.unit || 'each', pageW - margin - 54, y, { align: 'right' });
+      pdf.text(formatMoney(line.unit_price_cents), pageW - margin - 25, y, { align: 'right' });
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(formatMoney(lineTotal), pageW - margin - 3, y, { align: 'right' });
+      y += rowH;
+    });
+  }
+
+  addPageIfNeeded(42);
+  pdf.setDrawColor(226, 232, 240);
+  pdf.line(pageW - margin - 62, y, pageW - margin, y);
+  y += 7;
+  moneyRow('Subtotal', invoice.subtotal_cents);
+  moneyRow('Tax', invoice.tax_cents);
+  moneyRow('Discount', -invoice.discount_cents);
+  moneyRow('Total', invoice.total_cents, true);
+  moneyRow('Amount paid', invoice.amount_paid_cents);
+  moneyRow('Balance due', balanceDue, true);
+
+  sectionTitle('Payment Instructions');
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(51, 65, 85);
+  addWrappedText('Payment processing through ServSync is coming soon. Please follow the contractor payment instructions provided outside this invoice.', margin, contentW, 10, 5);
+
+  if (invoice.notes) {
+    sectionTitle('Notes');
+    pdf.setTextColor(51, 65, 85);
+    addWrappedText(invoice.notes, margin, contentW, 10, 5);
+  }
+
+  if (invoice.terms) {
+    sectionTitle('Terms');
+    pdf.setTextColor(51, 65, 85);
+    addWrappedText(invoice.terms, margin, contentW, 10, 5);
+  }
+
+  const fileName = `${safeFileName(`${context.contractorName}-invoice-${invoice.invoice_number || invoice.title || invoice.id}`)}.pdf`;
+  return { blob: pdf.output('blob'), fileName };
+}
+
+async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
+  const { blob, fileName } = await createInvoicePdf(invoice, context);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -7654,8 +7884,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div className="space-y-2">
                     <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Invoices</p>
                     {invoices.map(invoice => {
-                      const contractorName = connections.find(connection => connection.contractor_id === invoice.contractor_id)?.business_name
-                        || directoryContractors.find(contractor => contractor.id === invoice.contractor_id)?.business_name
+                      const invoiceConnection = connections.find(connection => connection.contractor_id === invoice.contractor_id) ?? null;
+                      const invoiceDirectoryContractor = directoryContractors.find(contractor => contractor.id === invoice.contractor_id) ?? null;
+                      const contractorName = invoiceConnection?.business_name
+                        || invoiceDirectoryContractor?.business_name
                         || 'Contractor';
                       const isOpen = viewingInvoiceId === invoice.id;
                       return (
@@ -7686,6 +7918,23 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             >
                               <Receipt size={16} />
                               {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide details' : 'View invoice'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void downloadInvoicePdf(invoice, {
+                                contractorName,
+                                contractorLogoUrl: invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url || null,
+                                contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
+                                contractorPhone: invoiceConnection?.phone || invoiceDirectoryContractor?.phone || '',
+                                contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
+                                customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
+                                customerAddress: home?.address_line1 || '',
+                                serviceLabel: home?.nickname || home?.address_line1 || '',
+                              }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
+                              className={buttonClass('secondary')}
+                            >
+                              <Download size={16} />
+                              Download PDF
                             </button>
                           </div>
                           {isOpen && (
@@ -14816,6 +15065,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const local = invoice.local_contact_id ? localContacts.find(c => c.id === invoice.local_contact_id) : null;
                                 const customerName = connection?.display_name || local?.display_name || 'Customer';
                                 const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
+                                const customerServiceLabel = connection?.home?.nickname || local?.homes?.[0]?.nickname || customerAddress;
                                 const lineCount = invoice.line_items?.length ?? 0;
                                 return (
                                   <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -14830,6 +15080,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         {invoice.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{invoice.scope}</p>}
                                       </div>
                                       <p className="text-xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => void downloadInvoicePdf(invoice, {
+                                          contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                          contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                          contractorEmail: contractor?.email || contractorDraft.email || '',
+                                          contractorPhone: contractor?.phone || contractorDraft.phone || '',
+                                          contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
+                                          customerName,
+                                          customerAddress,
+                                          serviceLabel: customerServiceLabel,
+                                        }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
+                                        className={buttonClass('secondary')}
+                                      >
+                                        <Download size={15} />
+                                        Download PDF
+                                      </button>
                                     </div>
                                     {invoice.status === 'draft' && (
                                       <div className="mt-3 flex flex-wrap gap-2">
