@@ -11139,7 +11139,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <Field label="City"><input className={inputClass()} value={localContactDraft.city} onChange={e => setLocalContactDraft(d => ({ ...d, city: e.target.value }))} /></Field>
                       </div>
                       <div className="grid gap-4 md:grid-cols-3">
-                        <Field label="State"><input className={inputClass()} value={localContactDraft.state} onChange={e => setLocalContactDraft(d => ({ ...d, state: e.target.value }))} /></Field>
+                        <Field label="State">
+                          <AutocompleteInput
+                            id="contractor-local-customer-state"
+                            value={localContactDraft.state}
+                            onChange={state => setLocalContactDraft(d => ({ ...d, state }))}
+                            options={US_STATE_OPTIONS}
+                            placeholder="Start typing a state..."
+                          />
+                        </Field>
                         <Field label="ZIP"><input className={inputClass()} value={localContactDraft.zip_code} onChange={e => setLocalContactDraft(d => ({ ...d, zip_code: e.target.value }))} /></Field>
                         <Field label="Home type"><input className={inputClass()} value={localContactDraft.home_type} onChange={e => setLocalContactDraft(d => ({ ...d, home_type: e.target.value }))} placeholder="Single family" /></Field>
                       </div>
@@ -13566,7 +13574,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <input className={inputClass()} value={localContactDraft.city} onChange={event => setLocalContactDraft(d => ({ ...d, city: event.target.value }))} />
                       </Field>
                       <Field label="State">
-                        <input className={inputClass()} value={localContactDraft.state} onChange={event => setLocalContactDraft(d => ({ ...d, state: event.target.value }))} />
+                        <AutocompleteInput
+                          id="jobs-local-customer-state"
+                          value={localContactDraft.state}
+                          onChange={state => setLocalContactDraft(d => ({ ...d, state }))}
+                          options={US_STATE_OPTIONS}
+                          placeholder="Start typing a state..."
+                        />
                       </Field>
                       <Field label="ZIP">
                         <input className={inputClass()} value={localContactDraft.zip_code} onChange={event => setLocalContactDraft(d => ({ ...d, zip_code: event.target.value }))} />
@@ -14005,7 +14019,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <input className={inputClass()} value={localContactDraft.city} onChange={event => setLocalContactDraft(d => ({ ...d, city: event.target.value }))} />
                       </Field>
                       <Field label="State">
-                        <input className={inputClass()} value={localContactDraft.state} onChange={event => setLocalContactDraft(d => ({ ...d, state: event.target.value }))} />
+                        <AutocompleteInput
+                          id="field-work-local-customer-state"
+                          value={localContactDraft.state}
+                          onChange={state => setLocalContactDraft(d => ({ ...d, state }))}
+                          options={US_STATE_OPTIONS}
+                          placeholder="Start typing a state..."
+                        />
                       </Field>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -14258,9 +14278,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         };
                         const removeItem = (item: string) => {
                           setActiveRooms(prev => prev.map(r => r.room === selectedChecklistRoom ? { ...r, items: r.items.filter(i => i !== item) } : r));
-                          const updated = { ...localFindings };
-                          delete updated[`${selectedChecklistRoom}||${item}`];
-                          setLocalFindings(updated);
+                          setLocalFindings(prev => {
+                            const updated = { ...prev };
+                            delete updated[`${selectedChecklistRoom}||${item}`];
+                            return updated;
+                          });
+                        };
+                        const toggleChecklistItem = (item: string) => {
+                          if (currentSet.has(item)) {
+                            removeItem(item);
+                          } else {
+                            addItem(item);
+                          }
                         };
                         return (
                           <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
@@ -14350,15 +14379,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {recommended.map(item => {
                                       const isChecked = currentSet.has(item);
                                       return (
-                                        <label key={item} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                                        <button
+                                          key={item}
+                                          type="button"
+                                          onClick={() => toggleChecklistItem(item)}
+                                          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                                        >
                                           <input
                                             type="checkbox"
                                             checked={isChecked}
-                                            onChange={() => isChecked ? removeItem(item) : addItem(item)}
-                                            className="w-4 h-4 accent-blue-600 flex-shrink-0"
+                                            readOnly
+                                            tabIndex={-1}
+                                            className="h-4 w-4 flex-shrink-0 accent-blue-600"
                                           />
                                           <span className="text-sm text-slate-700">{item}</span>
-                                        </label>
+                                        </button>
                                       );
                                     })}
                                   </div>
