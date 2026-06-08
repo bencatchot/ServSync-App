@@ -390,12 +390,12 @@ function jobTypeLabel(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' 
     return job.job_type === 'maintenance_visit' ? 'Maintenance / checklist job' : 'Inspection / checklist job';
   }
   const labels: Record<string, string> = {
-    service_visit: 'Simple service job',
+    service_visit: 'Service job',
     repair: 'Repair job',
     install: 'Install job',
     estimate_visit: 'Estimate visit',
   };
-  return labels[(job.job_type || 'service_visit').trim()] ?? 'Simple service job';
+  return labels[(job.job_type || 'service_visit').trim()] ?? 'Service job';
 }
 
 const OPEN_JOB_STATUSES: JobLifecycleStatus[] = ['draft', 'scheduled', 'in_progress'];
@@ -16481,7 +16481,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
-                            <p className="mt-1 text-xs text-slate-500">Simple service jobs track the work without forcing an inspection checklist.</p>
+                            <p className="mt-1 text-xs text-slate-500">Service jobs track the work without forcing an inspection checklist.</p>
                           </div>
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
@@ -16637,7 +16637,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-950">Work Notes</h3>
-                        <p className="mt-1 text-xs text-slate-500">Use this for the contractor-facing scope, progress notes, or completion summary. Full simple-job photo notes can be expanded in a later PR without changing this workflow.</p>
+                        <p className="mt-1 text-xs text-slate-500">Use this for the contractor-facing scope, progress notes, or completion summary. Full service job photo notes can be expanded in a later PR without changing this workflow.</p>
                         <textarea
                           className={`${inputClass()} mt-3 min-h-[150px] resize-y`}
                           value={inspectionSummary}
@@ -16651,7 +16651,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="space-y-4 self-start xl:sticky xl:top-4">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-950">Completion</h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">Simple jobs can be completed without generating an inspection-style report.</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Service jobs can be completed without generating an inspection-style report.</p>
                         {completed ? (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
                             <CheckCircle2 size={18} className="mx-auto text-emerald-600" />
