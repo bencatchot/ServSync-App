@@ -66,6 +66,7 @@ import type {
   InspectionRoomData,
   InspectionTemplate,
   InspectionTemplateRoom,
+  Invoice,
   JobLifecycleStatus,
   MaintenanceLogEntry,
   PublicReview,
@@ -197,6 +198,20 @@ type EstimateDraft = {
   inspection_id: string;
   line_items: EstimateLineDraft[];
 };
+type InvoiceDraftForm = {
+  invoice_number: string;
+  title: string;
+  scope: string;
+  notes: string;
+  terms: string;
+  service_request_id: string;
+  job_id: string;
+  estimate_id: string;
+  due_at: string;
+  tax: string;
+  discount: string;
+  line_items: EstimateLineDraft[];
+};
 type TradeToolInputType = 'number' | 'text' | 'select';
 type TradeToolInput = {
   id: string;
@@ -232,6 +247,7 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
 };
 
 const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
+const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, discount_cents, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -290,13 +306,20 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
   };
 }
 
-function createCompletedWorkInvoiceDraft(subjectName: string, overrides: Partial<EstimateDraft> = {}): EstimateDraft {
+function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
   const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return createBlankEstimateDraft({
+  return {
+    invoice_number: '',
     title: `Invoice — ${subjectName || 'Customer'} — ${dateLabel}`,
     scope: 'Completed work performed for the customer.',
     notes: 'Final invoice for completed work. Contractor should confirm all labor, materials, disposal, taxes, and payment terms before sending.',
     terms: 'Payment is due upon receipt unless otherwise agreed in writing.',
+    service_request_id: '',
+    job_id: '',
+    estimate_id: '',
+    due_at: '',
+    tax: '',
+    discount: '',
     line_items: [
       createEstimateLineDraft({ line_type: 'labor', description: 'Labor for completed work', quantity: '1', unit: 'job' }),
       createEstimateLineDraft({ line_type: 'material', description: 'Materials and supplies', quantity: '1', unit: 'lot' }),
@@ -304,7 +327,7 @@ function createCompletedWorkInvoiceDraft(subjectName: string, overrides: Partial
       createEstimateLineDraft({ line_type: 'fee', description: 'Debris disposal / haul-off', quantity: '1', unit: 'job' }),
     ],
     ...overrides,
-  });
+  };
 }
 
 function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'notes'>) {
@@ -757,6 +780,34 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
     inspection_id: estimate.inspection_id || '',
     line_items: estimate.line_items?.length
       ? [...estimate.line_items]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map(line => createEstimateLineDraft({
+            id: line.id,
+            line_type: line.line_type,
+            description: line.description,
+            quantity: String(line.quantity),
+            unit: line.unit,
+            unit_price: centsToDollars(line.unit_price_cents),
+          }))
+      : [createEstimateLineDraft()],
+  };
+}
+
+function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
+  return {
+    invoice_number: invoice.invoice_number,
+    title: invoice.title,
+    scope: invoice.scope,
+    notes: invoice.notes,
+    terms: invoice.terms,
+    service_request_id: invoice.service_request_id || '',
+    job_id: invoice.job_id || '',
+    estimate_id: invoice.estimate_id || '',
+    due_at: invoice.due_at ? invoice.due_at.slice(0, 10) : '',
+    tax: centsToDollars(invoice.tax_cents),
+    discount: centsToDollars(invoice.discount_cents),
+    line_items: invoice.line_items?.length
+      ? [...invoice.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
             id: line.id,
@@ -3227,6 +3278,10 @@ function estimateTotalCents(lines: EstimateLineDraft[]) {
   return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
 }
 
+function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount'>) {
+  return Math.max(0, estimateTotalCents(draft.line_items) + dollarsToCents(draft.tax) - dollarsToCents(draft.discount));
+}
+
 function formatMoney(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -4438,6 +4493,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [, setInvoices] = useState<Invoice[]>([]);
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [directoryCategory, setDirectoryCategory] = useState('');
   const [directoryLocation, setDirectoryLocation] = useState('');
@@ -4560,13 +4616,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setLoading(true);
     setError('');
     try {
-      const [profileRes, homeRes, connectionsRes, directoryRes, serviceRequestsRes, estimatesRes, notifRes, logRes, docsRes, supportRes] = await Promise.all([
+      const [profileRes, homeRes, connectionsRes, directoryRes, serviceRequestsRes, estimatesRes, invoicesRes, notifRes, logRes, docsRes, supportRes] = await Promise.all([
         supabase.from('homeowner_profiles').select('*').eq('user_id', profile.id).maybeSingle(),
         supabase.from('homes').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: true }).limit(1).maybeSingle(),
         supabase.rpc('servsync_get_homeowner_connections'),
         supabase.from('contractor_profiles').select('*').eq('public_profile_enabled', true).eq('account_status', 'active').order('business_name', { ascending: true }),
         supabase.rpc('servsync_homeowner_service_requests'),
         supabase.from('estimates').select(ESTIMATE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
+        supabase.from('invoices').select(INVOICE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
         supabase.from('notifications').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('home_maintenance_log').select('*').eq('homeowner_user_id', profile.id).order('performed_at', { ascending: false }),
         supabase.from('home_documents').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: false }),
@@ -4604,6 +4661,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setConnections(loadedConnections);
       setServiceRequests(((serviceRequestsRes.data || []) as ServiceRequestSummary[]).map(normalizeServiceRequestSummary));
       if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
+      if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
       setPermissionDrafts(loadedConnections.reduce<Record<string, SharingPermissions>>((drafts, connection) => {
         drafts[connection.connection_id] = normalizeSharingPermissions(connection.permissions);
@@ -8040,6 +8098,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [connectionRequests, setConnectionRequests] = useState<ContractorConnectionRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
@@ -8056,6 +8115,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
   const [estimateDraft, setEstimateDraft] = useState<EstimateDraft>(() => createBlankEstimateDraft());
   const [savingEstimate, setSavingEstimate] = useState(false);
+  const [invoiceComposerOpen, setInvoiceComposerOpen] = useState(false);
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
+  const [savingInvoice, setSavingInvoice] = useState(false);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
@@ -8340,7 +8403,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, localContactsRes, estimatesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, localContactsRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -8354,6 +8417,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .eq('contractor_id', loadedContractor.id)
             .order('updated_at', { ascending: false }),
           supabase
+            .from('invoices')
+            .select(INVOICE_WITH_LINES_SELECT)
+            .eq('contractor_id', loadedContractor.id)
+            .order('updated_at', { ascending: false }),
+          supabase
             .from('estimate_templates')
             .select('*')
             .eq('contractor_id', loadedContractor.id)
@@ -8363,6 +8431,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
         if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
+        if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
       }
     } catch (err) {
@@ -9032,15 +9101,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('requests');
   };
 
-  const beginCompletedWorkInvoice = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string } = {}) => {
-    setEditingEstimateId(null);
-    setEstimateDraft(createCompletedWorkInvoiceDraft(subjectName, {
-      service_request_id: options.serviceRequestId ?? '',
-      inspection_id: options.inspectionId ?? '',
+  const beginInvoiceDraftForCustomer = (
+    subjectName: string,
+    options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate } = {},
+  ) => {
+    setEditingInvoiceId(null);
+    setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
+      service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id ?? '',
+      job_id: options.jobId ?? options.sourceEstimate?.inspection_id ?? '',
+      estimate_id: options.estimateId ?? options.sourceEstimate?.id ?? '',
+      scope: options.sourceEstimate?.scope || 'Completed work performed for the customer.',
+      line_items: options.sourceEstimate?.line_items?.length
+        ? [...options.sourceEstimate.line_items]
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map(line => createEstimateLineDraft({
+              line_type: line.line_type,
+              description: line.description,
+              quantity: String(line.quantity),
+              unit: line.unit,
+              unit_price: centsToDollars(line.unit_price_cents),
+            }))
+        : undefined,
     }));
-    setEstimateAssistantText('');
-    setEstimateAssistantNotice('');
-    setEstimateComposerOpen(true);
+    setInvoiceComposerOpen(true);
+    setEstimateComposerOpen(false);
     setHomeownerWorkspaceEstimateView('draft');
     setContractorJobsView('new_financial');
     setContractorTab('inspections');
@@ -9056,6 +9140,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateAssistantText('');
     setEstimateAssistantNotice('');
     setEstimateComposerOpen(true);
+    setInvoiceComposerOpen(false);
     setHomeownerWorkspaceEstimateView('draft');
     setContractorJobsView('new_financial');
     setContractorTab('inspections');
@@ -9141,6 +9226,101 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
     } finally {
       setSavingEstimate(false);
+    }
+  };
+
+  const saveInvoiceDraft = async (subject: {
+    homeownerUserId?: string | null;
+    localContactId?: string | null;
+  }) => {
+    if (!supabase || !contractor?.id) return;
+    setNotice('');
+    setError('');
+    if (!invoiceDraft.title.trim()) {
+      setError('Add an invoice title before saving.');
+      return;
+    }
+    const usableLines = invoiceDraft.line_items.filter(line => line.description.trim());
+    if (usableLines.length === 0) {
+      setError('Add at least one line item before saving the invoice.');
+      return;
+    }
+    const currentInvoice = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) : null;
+    if (currentInvoice && currentInvoice.status !== 'draft') {
+      setError('Only draft invoices can be edited in this version.');
+      return;
+    }
+    setSavingInvoice(true);
+    try {
+      const subtotalCents = estimateTotalCents(usableLines);
+      const taxCents = dollarsToCents(invoiceDraft.tax);
+      const discountCents = dollarsToCents(invoiceDraft.discount);
+      const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+      const invoicePayload = {
+        contractor_id: contractor.id,
+        homeowner_user_id: subject.homeownerUserId || currentInvoice?.homeowner_user_id || null,
+        local_contact_id: subject.localContactId || currentInvoice?.local_contact_id || null,
+        service_request_id: invoiceDraft.service_request_id || null,
+        job_id: invoiceDraft.job_id || null,
+        estimate_id: invoiceDraft.estimate_id || null,
+        invoice_number: invoiceDraft.invoice_number.trim(),
+        title: invoiceDraft.title.trim(),
+        scope: invoiceDraft.scope.trim(),
+        notes: invoiceDraft.notes.trim(),
+        terms: invoiceDraft.terms.trim(),
+        status: 'draft',
+        subtotal_cents: subtotalCents,
+        tax_cents: taxCents,
+        discount_cents: discountCents,
+        total_cents: totalCents,
+        amount_paid_cents: 0,
+        due_at: invoiceDraft.due_at ? `${invoiceDraft.due_at}T12:00:00.000Z` : null,
+      };
+      const { data: invoiceData, error: invoiceError } = editingInvoiceId
+        ? await supabase
+            .from('invoices')
+            .update(invoicePayload)
+            .eq('id', editingInvoiceId)
+            .eq('status', 'draft')
+            .select('*')
+            .single()
+        : await supabase
+            .from('invoices')
+            .insert(invoicePayload)
+            .select('*')
+            .single();
+      if (invoiceError) throw invoiceError;
+
+      const invoiceId = (invoiceData as Invoice).id;
+      if (editingInvoiceId) {
+        const { error: deleteLinesError } = await supabase
+          .from('invoice_line_items')
+          .delete()
+          .eq('invoice_id', invoiceId);
+        if (deleteLinesError) throw deleteLinesError;
+      }
+      const { error: linesError } = await supabase
+        .from('invoice_line_items')
+        .insert(usableLines.map((line, index) => ({
+          invoice_id: invoiceId,
+          line_type: line.line_type,
+          description: line.description.trim(),
+          quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
+          unit: line.unit.trim() || 'each',
+          unit_price_cents: dollarsToCents(line.unit_price),
+          sort_order: index,
+        })));
+      if (linesError) throw linesError;
+
+      setNotice(editingInvoiceId ? 'Invoice draft updated.' : 'Invoice draft saved.');
+      setInvoiceComposerOpen(false);
+      setEditingInvoiceId(null);
+      setInvoiceDraft(createBlankInvoiceDraft());
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save invoice draft. Make sure the ServSync invoices SQL has been applied.'));
+    } finally {
+      setSavingInvoice(false);
     }
   };
 
@@ -9530,6 +9710,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     : selectedJobsLocalContact
       ? estimates.filter(estimate => estimate.local_contact_id === selectedJobsLocalContact.id)
       : estimates;
+  const selectedJobsCustomerInvoices = selectedJobsConnection
+    ? invoices.filter(invoice => invoice.homeowner_user_id === selectedJobsConnection.homeowner_user_id)
+    : selectedJobsLocalContact
+      ? invoices.filter(invoice => invoice.local_contact_id === selectedJobsLocalContact.id)
+      : invoices;
   const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => inspections.find(insp =>
     insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)
   ) ?? null;
@@ -9563,6 +9748,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closedJobs = inspections.filter(inspectionIsClosedJob);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
+  const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
+  const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
   const selectedJobsSubject = {
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
@@ -12779,7 +12966,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => beginCompletedWorkInvoice(headerName)}
+                                    onClick={() => beginInvoiceDraftForCustomer(headerName)}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
@@ -13075,7 +13262,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {isInvoiceWorkspaceTab ? (
                                       <button
                                         type="button"
-                                        onClick={() => beginCompletedWorkInvoice(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        onClick={() => beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                         className={buttonClass('primary')}
                                       >
                                         <Receipt size={14} />
@@ -13972,8 +14159,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="grid gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
-                        { id: 'open_financial', label: 'Open Estimates', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length), helper: 'Draft, sent, accepted', icon: <FileText size={15} /> },
-                        { id: 'closed_financial', label: 'Closed/Billed', value: String(selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length), helper: 'Closed financial records', icon: <Receipt size={15} /> },
+                        { id: 'open_financial', label: 'Open Financials', value: String((selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Estimates and invoice drafts', icon: <FileText size={15} /> },
+                        { id: 'closed_financial', label: 'Closed/Billed', value: String((selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Closed financial records', icon: <Receipt size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -14062,7 +14249,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <button
                         type="button"
                         disabled={!selectedJobsCustomerName}
-                        onClick={() => beginCompletedWorkInvoice(selectedJobsCustomerName || 'Customer')}
+                        onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
                         className={buttonClass('secondary')}
                       >
                         <Receipt size={15} />
@@ -14246,6 +14433,155 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                       </div>
                     )}
+
+                    {invoiceComposerOpen && selectedJobsCustomerName && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+                              {editingInvoiceId ? 'Edit invoice draft' : 'Invoice draft'}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-700">{selectedJobsCustomerName}{selectedJobsCustomerAddress ? ` · ${selectedJobsCustomerAddress}` : ''}</p>
+                          </div>
+                          <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <Field label="Invoice number">
+                            <input className={inputClass()} value={invoiceDraft.invoice_number} onChange={event => setInvoiceDraft(d => ({ ...d, invoice_number: event.target.value }))} placeholder="Optional" />
+                          </Field>
+                          <Field label="Invoice title">
+                            <input className={inputClass()} value={invoiceDraft.title} onChange={event => setInvoiceDraft(d => ({ ...d, title: event.target.value }))} />
+                          </Field>
+                          <Field label="Due date">
+                            <input className={inputClass()} type="date" value={invoiceDraft.due_at} onChange={event => setInvoiceDraft(d => ({ ...d, due_at: event.target.value }))} />
+                          </Field>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          {selectedJobsCustomerWork.length > 0 && (
+                            <Field label="Attach to job (optional)">
+                              <select className={inputClass()} value={invoiceDraft.job_id} onChange={event => setInvoiceDraft(d => ({ ...d, job_id: event.target.value }))}>
+                                <option value="">No job attached</option>
+                                {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
+                              </select>
+                            </Field>
+                          )}
+                          {selectedJobsCustomerEstimates.length > 0 && (
+                            <Field label="Attach to estimate (optional)">
+                              <select className={inputClass()} value={invoiceDraft.estimate_id} onChange={event => setInvoiceDraft(d => ({ ...d, estimate_id: event.target.value }))}>
+                                <option value="">No estimate attached</option>
+                                {selectedJobsCustomerEstimates.map(estimate => <option key={estimate.id} value={estimate.id}>{estimate.title}</option>)}
+                              </select>
+                            </Field>
+                          )}
+                        </div>
+
+                        <div className="mt-4">
+                          <Field label="Scope">
+                            <textarea className={inputClass()} rows={3} value={invoiceDraft.scope} onChange={event => setInvoiceDraft(d => ({ ...d, scope: event.target.value }))} placeholder="What completed work does this invoice cover?" />
+                          </Field>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-slate-950">Invoice line items</p>
+                            <button type="button" onClick={() => setInvoiceDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
+                              <Plus size={14} />
+                              Add line
+                            </button>
+                          </div>
+                          {invoiceDraft.line_items.map((line, index) => (
+                            <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                              <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
+                                <Field label="Type">
+                                  <select className={inputClass()} value={line.line_type} onChange={event => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
+                                  }))}>
+                                    {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => <option key={type} value={type}>{type}</option>)}
+                                  </select>
+                                </Field>
+                                <Field label="Description">
+                                  <input className={inputClass()} value={line.description} onChange={event => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
+                                  }))} placeholder="Labor, materials, disposal..." />
+                                </Field>
+                                <Field label="Qty">
+                                  <input className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
+                                  }))} />
+                                </Field>
+                                <Field label="Unit">
+                                  <input className={inputClass()} value={line.unit} onChange={event => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
+                                  }))} />
+                                </Field>
+                                <Field label="Unit price">
+                                  <input className={inputClass()} value={line.unit_price} onChange={event => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
+                                  }))} placeholder="$0.00" />
+                                </Field>
+                                <div>
+                                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">${(estimateLineTotalCents(line) / 100).toFixed(2)}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setInvoiceDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
+                                  }))}
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+                                  aria-label={`Remove invoice line ${index + 1}`}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <Field label="Notes">
+                            <textarea className={inputClass()} rows={3} value={invoiceDraft.notes} onChange={event => setInvoiceDraft(d => ({ ...d, notes: event.target.value }))} />
+                          </Field>
+                          <Field label="Terms">
+                            <textarea className={inputClass()} rows={3} value={invoiceDraft.terms} onChange={event => setInvoiceDraft(d => ({ ...d, terms: event.target.value }))} />
+                          </Field>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1.2fr] md:items-end">
+                          <Field label="Tax">
+                            <input className={inputClass()} value={invoiceDraft.tax} onChange={event => setInvoiceDraft(d => ({ ...d, tax: event.target.value }))} placeholder="$0.00" />
+                          </Field>
+                          <Field label="Discount">
+                            <input className={inputClass()} value={invoiceDraft.discount} onChange={event => setInvoiceDraft(d => ({ ...d, discount: event.target.value }))} placeholder="$0.00" />
+                          </Field>
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
+                            <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
+                            <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items))}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void saveInvoiceDraft(selectedJobsSubject)} disabled={savingInvoice} className={buttonClass('primary')}>
+                            <Receipt size={15} />
+                            {savingInvoice ? 'Saving...' : editingInvoiceId ? 'Update invoice draft' : 'Save invoice draft'}
+                          </button>
+                          <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} disabled={savingInvoice} className={buttonClass('secondary')}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
               )}
@@ -14256,11 +14592,74 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const records = contractorJobsView === 'open_financial'
                       ? (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)) : openFinancialRecords)
                       : (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)) : closedFinancialRecords);
-                    if (records.length === 0) {
+                    const invoiceRecordsForView = contractorJobsView === 'open_financial'
+                      ? (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
+                      : (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
+                    if (records.length === 0 && invoiceRecordsForView.length === 0) {
                       return <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />;
                     }
                     return (
                       <div className="space-y-2">
+                        {invoiceRecordsForView.length > 0 && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">First-class invoices</p>
+                                <p className="mt-1 text-xs text-slate-500">{invoiceRecordsForView.length} invoice{invoiceRecordsForView.length === 1 ? '' : 's'} in this view</p>
+                              </div>
+                              <button type="button" onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')} disabled={!selectedJobsCustomerName} className={buttonClass('secondary')}>
+                                <Plus size={14} />
+                                New Invoice
+                              </button>
+                            </div>
+                            <div className="space-y-2">
+                              {invoiceRecordsForView.map(invoice => {
+                                const connection = invoice.homeowner_user_id ? connections.find(c => c.homeowner_user_id === invoice.homeowner_user_id) : null;
+                                const local = invoice.local_contact_id ? localContacts.find(c => c.id === invoice.local_contact_id) : null;
+                                const customerName = connection?.display_name || local?.display_name || 'Customer';
+                                const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
+                                const lineCount = invoice.line_items?.length ?? 0;
+                                return (
+                                  <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">Invoice</span>
+                                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${invoice.status === 'draft' ? 'bg-amber-100 text-amber-700' : invoice.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : invoice.status === 'void' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-700'}`}>{invoice.status}</span>
+                                        </div>
+                                        <p className="mt-2 font-semibold text-slate-950">{invoice.title || 'Invoice draft'}</p>
+                                        <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
+                                        {invoice.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{invoice.scope}</p>}
+                                      </div>
+                                      <p className="text-xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
+                                    </div>
+                                    {invoice.status === 'draft' && (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                            setEditingInvoiceId(invoice.id);
+                                            setInvoiceDraft(invoiceDraftFromInvoice(invoice));
+                                            setInvoiceComposerOpen(true);
+                                            setEstimateComposerOpen(false);
+                                            setContractorJobsView('new_financial');
+                                          }}
+                                          className={buttonClass('secondary')}
+                                        >
+                                          Edit draft
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {records.length > 0 && (
+                          <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Legacy estimate records</p>
+                        )}
                         {records.map(estimate => {
                           const isInvoice = estimateDocumentLabel(estimate) === 'Invoice';
                           const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
@@ -14329,9 +14728,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       type="button"
                                       onClick={() => {
                                         setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
-                                        beginCompletedWorkInvoice(customerName, {
+                                        beginInvoiceDraftForCustomer(customerName, {
                                           serviceRequestId: estimate.service_request_id || undefined,
-                                          inspectionId: estimate.inspection_id || undefined,
+                                          jobId: estimate.inspection_id || undefined,
+                                          estimateId: estimate.id,
+                                          sourceEstimate: estimate,
                                         });
                                       }}
                                       className={buttonClass('primary')}
@@ -16440,9 +16841,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <button
                           type="button"
-                          disabled
-                          title="Invoicing flow coming soon"
-                          className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => beginInvoiceDraftForCustomer(homeownerLabel || 'Customer', {
+                            serviceRequestId: activeInspection.service_request_id || undefined,
+                            jobId: activeInspection.id,
+                            estimateId: activeInspection.estimate_id || undefined,
+                          })}
+                          className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700"
                         >
                           <FileText size={14} /> Create Invoice
                         </button>

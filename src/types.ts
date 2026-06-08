@@ -11,6 +11,7 @@ export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
+export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
 export type SupportInquiryCategory = 'feature_request' | 'tweak' | 'bug' | 'question' | 'billing' | 'other';
@@ -68,6 +69,69 @@ export interface Estimate {
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItem[];
+}
+
+export interface InvoiceLineItem {
+  id: string;
+  invoice_id: string;
+  line_type: EstimateLineType;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price_cents: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  contractor_id: string;
+  homeowner_user_id: string | null;
+  local_contact_id: string | null;
+  service_request_id: string | null;
+  job_id: string | null;
+  estimate_id: string | null;
+  invoice_number: string;
+  title: string;
+  scope: string;
+  notes: string;
+  terms: string;
+  status: InvoiceStatus;
+  subtotal_cents: number;
+  tax_cents: number;
+  discount_cents: number;
+  total_cents: number;
+  amount_paid_cents: number;
+  issued_at: string | null;
+  due_at: string | null;
+  paid_at: string | null;
+  voided_at: string | null;
+  created_at: string;
+  updated_at: string;
+  line_items?: InvoiceLineItem[];
+}
+
+export interface InvoiceDraft {
+  invoice_number: string;
+  title: string;
+  scope: string;
+  notes: string;
+  terms: string;
+  service_request_id: string;
+  job_id: string;
+  estimate_id: string;
+  issued_at: string;
+  due_at: string;
+  tax_cents: number;
+  discount_cents: number;
+  line_items: Array<{
+    line_type: EstimateLineType;
+    description: string;
+    quantity: string;
+    unit: string;
+    unit_price: string;
+  }>;
 }
 
 export interface EstimateTemplateLineItem {
