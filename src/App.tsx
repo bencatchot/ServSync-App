@@ -66,6 +66,7 @@ import type {
   InspectionRoomData,
   InspectionTemplate,
   InspectionTemplateRoom,
+  JobLifecycleStatus,
   MaintenanceLogEntry,
   PublicReview,
   ConnectionStatus,
@@ -226,9 +227,12 @@ const CONTRACTOR_TEAM_ROLE_LABELS: Record<ContractorTeamRole, string> = {
 const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
   admin: 'Can help manage team access and day-to-day workspace activity.',
   office: 'Good for scheduling, requests, estimates, and customer communication.',
-  field_tech: 'Good for field work, photos, notes, and assigned job activity.',
+  field_tech: 'Good for jobs, photos, notes, and assigned job activity.',
   viewer: 'Read-only style access for oversight. Deeper restrictions can be added later.',
 };
+
+const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
+
 type StoredFieldWorkDraft = {
   inspectionId: string;
   rooms_with_findings: InspectionRoomData[];
@@ -312,6 +316,42 @@ function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'not
 function isInspectionLikeFieldWork(work: Pick<Inspection, 'name' | 'summary'>) {
   const haystack = normalizeText(`${work.name || ''} ${work.summary || ''}`);
   return /\b(inspection|assessment|inspect|report)\b/.test(haystack);
+}
+
+const OPEN_JOB_STATUSES: JobLifecycleStatus[] = ['draft', 'scheduled', 'in_progress'];
+const CLOSED_JOB_STATUSES: JobLifecycleStatus[] = ['completed', 'closed', 'cancelled'];
+
+function inspectionJobStatus(work: Pick<Inspection, 'status' | 'job_status'>): JobLifecycleStatus {
+  if (work.job_status) return work.job_status;
+  return work.status === 'finalized' ? 'completed' : 'draft';
+}
+
+function inspectionIsOpenJob(work: Pick<Inspection, 'status' | 'job_status'>) {
+  return OPEN_JOB_STATUSES.includes(inspectionJobStatus(work));
+}
+
+function inspectionIsClosedJob(work: Pick<Inspection, 'status' | 'job_status'>) {
+  return CLOSED_JOB_STATUSES.includes(inspectionJobStatus(work));
+}
+
+function inspectionJobStatusLabel(work: Pick<Inspection, 'status' | 'job_status'>) {
+  const labels: Record<JobLifecycleStatus, string> = {
+    draft: 'Draft',
+    scheduled: 'Scheduled',
+    in_progress: 'In progress',
+    completed: 'Completed',
+    closed: 'Closed',
+    cancelled: 'Cancelled',
+  };
+  return labels[inspectionJobStatus(work)];
+}
+
+function inspectionJobBadgeClass(work: Pick<Inspection, 'status' | 'job_status'>) {
+  const status = inspectionJobStatus(work);
+  if (status === 'draft' || status === 'scheduled') return 'bg-amber-50 text-amber-700';
+  if (status === 'in_progress') return 'bg-blue-50 text-blue-700';
+  if (status === 'cancelled') return 'bg-red-50 text-red-700';
+  return 'bg-emerald-50 text-emerald-700';
 }
 
 function inferSmartEstimateLineType(text: string): EstimateLineType {
@@ -1383,7 +1423,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
   },
   Framing: {
     kind: 'work_order',
-    name: 'Framing Work Order',
+    name: 'Framing Job',
     description: 'Framing, structural carpentry, rough opening, blocking, and repair workflow.',
     rooms: [
       { room: 'Framing Scope', items: ['Area and dimensions documented', 'Existing framing condition checked', 'Load path or structural concern noted', 'Openings, blocking, or support requirements documented'] },
@@ -1399,7 +1439,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
   },
   Carpentry: {
     kind: 'work_order',
-    name: 'Carpentry Work Order',
+    name: 'Carpentry Job',
     description: 'Finish carpentry, trim, repair, shelving, doors, and woodwork workflow.',
     rooms: [
       { room: 'Carpentry Scope', items: ['Work area and dimensions documented', 'Existing trim, door, cabinet, or woodwork condition noted', 'Material species/profile/finish requirements recorded', 'Fit, alignment, or damage concern documented'] },
@@ -1479,7 +1519,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
   },
   Drywall: {
     kind: 'work_order',
-    name: 'Drywall Repair Work Order',
+    name: 'Drywall Repair Job',
     description: 'Drywall and sheetrock repair workflow for cracks, holes, stains, texture, and paint-ready finish.',
     rooms: [
       { room: 'Drywall Condition', items: ['Damage type and location documented', 'Cause of damage noted when known', 'Moisture or active leak concern checked', 'Texture and finish match requirements documented'] },
@@ -1831,7 +1871,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
   },
   'Moving Service': {
     kind: 'work_order',
-    name: 'Moving Service Work Order',
+    name: 'Moving Service Job',
     description: 'Moving workflow for inventory, access, protection, labor, travel, and completion condition.',
     rooms: [
       { room: 'Move Scope', items: ['Origin/destination, rooms, and inventory documented', 'Stairs, elevator, parking, access, and travel constraints noted', 'Fragile/heavy/specialty items documented', 'Packing or protection needs confirmed'] },
@@ -1847,7 +1887,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
   },
   Handyman: {
     kind: 'work_order',
-    name: 'Handyman Work Order',
+    name: 'Handyman Job',
     description: 'Flexible small-repair workflow for multiple household tasks, materials, photos, and follow-up items.',
     rooms: [
       { room: 'Task List', items: ['Homeowner task list confirmed', 'Each affected area documented', 'Materials or parts needed noted', 'Safety or access concerns documented'] },
@@ -2273,7 +2313,7 @@ function drawPdfImageCover(pdf: jsPDF, image: PdfImageAsset, x: number, y: numbe
   pdf.addImage(image.dataUrl, image.format, x + (boxW - w) / 2, y + (boxH - h) / 2, w, h);
 }
 
-// PDF generation for inspection reports
+// PDF generation for job reports. Internal inspection names remain until the schema is renamed.
 async function generateInspectionPdf(
   inspection: Inspection,
   contractorName: string,
@@ -2379,7 +2419,7 @@ async function generateInspectionPdf(
   // Header
   drawRect(0, 0, pageW, 44, BLUE, 0);
   txt(contractorName, margin, 13, WHITE, 16, true);
-  txt('Field Work Report', margin, 20, [147, 197, 253], 8);
+  txt('Job Report', margin, 20, [147, 197, 253], 8);
   const statusLabel = urgentCount > 0 ? `${urgentCount} URGENT` : issueCount > 0 ? `${issueCount} ISSUES` : 'ALL CLEAR';
   const statusBg = urgentCount > 0 ? STATUS_PDF['Urgent'].bg : issueCount > 0 ? STATUS_PDF['Needs Repair'].bg : STATUS_PDF['Pass'].bg;
   const statusTxt = urgentCount > 0 ? STATUS_PDF['Urgent'].text : issueCount > 0 ? STATUS_PDF['Needs Repair'].text : STATUS_PDF['Pass'].text;
@@ -2401,7 +2441,7 @@ async function generateInspectionPdf(
   // Property info
   txt(homeownerName, margin, y, DARK, 15, true); y += 6;
   if (homeAddress) { txt(homeAddress, margin, y, GRAY, 9); y += 5; }
-  txt(`Field work: ${inspection.name}`, margin, y, GRAY, 8); y += 5;
+  txt(`Job: ${inspection.name}`, margin, y, GRAY, 8); y += 5;
   txt(`Prepared: ${today}`, margin, y, GRAY, 8); y += 9;
 
   // Stats row
@@ -2598,7 +2638,7 @@ async function generateInspectionPdf(
   // Footer
   checkPageBreak(28);
   drawRect(margin, pageH - 28, contentW, 10, LIGHT, 2);
-  txt('This report is based on limited field work and accessible conditions at the time of service. It is not a code inspection, engineering report, or guarantee of hidden conditions unless explicitly stated by the contractor. Items marked Urgent or Needs Repair should be addressed by a qualified professional.', margin + 2, pageH - 24, GRAY, 6.2, false, 'left', contentW - 4);
+  txt('This report is based on limited job observations and accessible conditions at the time of service. It is not a code inspection, engineering report, or guarantee of hidden conditions unless explicitly stated by the contractor. Items marked Urgent or Needs Repair should be addressed by a qualified professional.', margin + 2, pageH - 24, GRAY, 6.2, false, 'left', contentW - 4);
   drawRect(0, pageH - 14, pageW, 14, DARK, 0);
   txt(`${contractorName}  ·  ServSync`, pageW / 2, pageH - 6, [148, 163, 184], 7, false, 'center');
 
@@ -3090,8 +3130,8 @@ function buildProfessionalReportSummary(rooms: InspectionRoomData[]): ReportSumm
   });
 
   const intro = issueCount === 0
-    ? `A thorough inspection of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} was completed. The property is in good overall condition with ${pass.length} item${pass.length !== 1 ? 's' : ''} passing inspection.${monitor.length > 0 ? ` ${monitor.length} item${monitor.length !== 1 ? 's' : ''} should be monitored at the next visit.` : ''}`
-    : `A comprehensive inspection of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} identified ${issueCount} item${issueCount !== 1 ? 's' : ''} requiring attention — ${urgent.length} urgent and ${repair.length} in need of repair.${pass.length > 0 ? ` ${pass.length} item${pass.length !== 1 ? 's' : ''} passed with no issues noted.` : ''}`;
+    ? `A thorough job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} was completed. The property is in good overall condition with ${pass.length} item${pass.length !== 1 ? 's' : ''} passing the checklist.${monitor.length > 0 ? ` ${monitor.length} item${monitor.length !== 1 ? 's' : ''} should be monitored at the next visit.` : ''}`
+    : `A comprehensive job review of ${roomCount} area${roomCount !== 1 ? 's' : ''} covering ${totalItems} checklist item${totalItems !== 1 ? 's' : ''} identified ${issueCount} item${issueCount !== 1 ? 's' : ''} requiring attention — ${urgent.length} urgent and ${repair.length} in need of repair.${pass.length > 0 ? ` ${pass.length} item${pass.length !== 1 ? 's' : ''} passed with no issues noted.` : ''}`;
 
   const urgentText = urgent.length > 0
     ? `${urgent.length} item${urgent.length !== 1 ? 's' : ''} require${urgent.length === 1 ? 's' : ''} immediate professional attention.`
@@ -3122,7 +3162,7 @@ function buildInspectionSummaryText(rooms: InspectionRoomData[]): string {
 function buildValueAddText(rooms: InspectionRoomData[]): string {
   const fixedCount = rooms.flatMap(room => room.findings).filter(finding => finding.status === 'Fixed On Site').length;
   if (fixedCount === 0) return '';
-  return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes represent immediate value from the field work and may help prevent repeat service calls or additional damage.`;
+  return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes represent immediate value from the job and may help prevent repeat service calls or additional damage.`;
 }
 
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
@@ -3585,7 +3625,7 @@ function notificationCategoryLabel(type: string) {
   if (type.includes('estimate')) return 'Estimate';
   if (type.includes('quote')) return 'Quote';
   if (type.includes('connection')) return 'Connection';
-  if (type.includes('inspection') || type.includes('report')) return 'Field Work';
+  if (type.includes('inspection') || type.includes('report')) return 'Job';
   if (type.includes('log')) return 'Home History';
   return 'Service Request';
 }
@@ -4526,7 +4566,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         supabase.rpc('servsync_get_homeowner_connections'),
         supabase.from('contractor_profiles').select('*').eq('public_profile_enabled', true).eq('account_status', 'active').order('business_name', { ascending: true }),
         supabase.rpc('servsync_homeowner_service_requests'),
-        supabase.from('estimates').select('*, line_items:estimate_line_items(*)').eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
+        supabase.from('estimates').select(ESTIMATE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
         supabase.from('notifications').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('home_maintenance_log').select('*').eq('homeowner_user_id', profile.id).order('performed_at', { ascending: false }),
         supabase.from('home_documents').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: false }),
@@ -5716,7 +5756,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           }
           if (!notification.request_id) {
             const category = notificationCategoryLabel(notification.type);
-            setHomeownerTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'estimates' : category === 'Field Work' || category === 'Home History' ? 'documents' : category === 'Connection' ? 'contractors' : 'requests');
+            setHomeownerTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'estimates' : category === 'Job' || category === 'Home History' ? 'documents' : category === 'Connection' ? 'contractors' : 'requests');
             return;
           }
           const request = serviceRequests.find(item => item.id === notification.request_id);
@@ -7785,7 +7825,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">From request</span>
                           )}
                           {entry.inspection_id && (
-                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">Field work</span>
+                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">Job</span>
                           )}
                           {reportDocument && (
                             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Report filed</span>
@@ -7848,7 +7888,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="space-y-5">
           <Card title="Home documents" icon={<FolderOpen size={18} />}>
             <p className="text-sm text-slate-500 mb-4">
-              Store warranty documents, inspection reports, appliance manuals, permits, and other home records securely. Files are private and only accessible by you.
+              Store warranty documents, job reports, appliance manuals, permits, and other home records securely. Files are private and only accessible by you.
             </p>
 
             {/* Upload area */}
@@ -7862,7 +7902,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   >
                     <option value="warranty">Warranty</option>
                     <option value="manual">Appliance manual</option>
-                    <option value="inspection">Inspection report</option>
+                    <option value="inspection">Job report</option>
                     <option value="insurance">Insurance document</option>
                     <option value="permit">Permit</option>
                     <option value="receipt">Receipt / Invoice</option>
@@ -7902,7 +7942,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="mt-4 space-y-2">
                 {homeDocuments.map(doc => {
                   const typeLabels: Record<string, string> = {
-                    warranty: 'Warranty', manual: 'Manual', inspection: 'Inspection',
+                    warranty: 'Warranty', manual: 'Manual', inspection: 'Job report',
                     insurance: 'Insurance', permit: 'Permit', receipt: 'Receipt', other: 'Other',
                   };
                   const sizeLabel = doc.file_size_bytes
@@ -8021,6 +8061,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
+  const [convertingEstimateId, setConvertingEstimateId] = useState<string | null>(null);
+  const convertingEstimateIdsRef = useRef<Set<string>>(new Set());
   const [estimateTemplateSearch, setEstimateTemplateSearch] = useState('');
   const [estimateAssistantText, setEstimateAssistantText] = useState('');
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
@@ -8124,7 +8166,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [templateDraft, setTemplateDraft] = useState<{ name: string; rooms: InspectionTemplateRoom[] }>({ name: '', rooms: [] });
   const [templateEditRoom, setTemplateEditRoom] = useState('');
   const [templateEditItems, setTemplateEditItems] = useState('');
-  // Inspection Assistant state
+  // Job assistant state
   const [selectedChecklistRoom, setSelectedChecklistRoom] = useState<string | null>(null);
   const [assistantMode, setAssistantMode] = useState<'single' | 'walkthrough' | 'ai'>('single');
   const [singleNoteText, setSingleNoteText] = useState('');
@@ -8308,7 +8350,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .order('created_at', { ascending: false }),
           supabase
             .from('estimates')
-            .select('*, line_items:estimate_line_items(*)')
+            .select(ESTIMATE_WITH_LINES_SELECT)
             .eq('contractor_id', loadedContractor.id)
             .order('updated_at', { ascending: false }),
           supabase
@@ -9126,6 +9168,68 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const createJobFromAcceptedEstimate = async (estimate: Estimate) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    if (estimate.status !== 'accepted') {
+      setError('Only accepted estimates can be converted to jobs.');
+      return;
+    }
+    if (convertingEstimateIdsRef.current.has(estimate.id)) return;
+    const existingJob = jobForEstimate(estimate);
+    if (existingJob) {
+      openInspection(existingJob);
+      setNotice('Opened the job linked to this accepted estimate.');
+      return;
+    }
+    if (estimate.inspection_id) {
+      await openLinkedJobForEstimate(estimate);
+      return;
+    }
+
+    convertingEstimateIdsRef.current.add(estimate.id);
+    setConvertingEstimateId(estimate.id);
+    try {
+      const { data, error: convertError } = await supabase.rpc('servsync_create_job_from_estimate', {
+        p_estimate_id: estimate.id,
+      });
+      if (convertError) throw convertError;
+      const result = (data || {}) as { job_id?: string; created?: boolean };
+      if (!result.job_id) throw new Error('The job was created, but no job id was returned.');
+
+      const { data: jobData, error: jobError } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', result.job_id)
+        .single();
+      if (jobError) throw jobError;
+
+      const job = jobData as Inspection;
+      setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
+      setEstimates(prev => prev.map(item => item.id === estimate.id ? { ...item, inspection_id: job.id } : item));
+
+      if (job.homeowner_user_id) {
+        const connection = connections.find(item => item.homeowner_user_id === job.homeowner_user_id);
+        if (connection) setSelectedHomeownerSubjectId(connection.connection_id);
+      } else if (job.local_contact_id) {
+        setSelectedHomeownerSubjectId(`local:${job.local_contact_id}`);
+      }
+
+      openInspection(job);
+      setNotice(result.created
+        ? 'Job created from accepted estimate.'
+        : 'This estimate already had a linked job. Opening it now.'
+      );
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create job from accepted estimate. Make sure the estimate-to-job SQL has been applied.'));
+    } finally {
+      convertingEstimateIdsRef.current.delete(estimate.id);
+      setConvertingEstimateId(null);
+    }
+  };
+
   const saveEstimateAsTemplate = async (estimate: Estimate) => {
     if (!supabase || !contractor?.id) return;
     const templateName = window.prompt('Name this estimate template:', estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template');
@@ -9426,16 +9530,45 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     : selectedJobsLocalContact
       ? estimates.filter(estimate => estimate.local_contact_id === selectedJobsLocalContact.id)
       : estimates;
-  const openJobs = inspections.filter(insp => insp.status === 'draft');
-  const closedJobs = inspections.filter(insp => insp.status === 'finalized');
+  const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => inspections.find(insp =>
+    insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)
+  ) ?? null;
+  const estimateHasLinkedJob = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => Boolean(jobForEstimate(estimate) || estimate.inspection_id);
+  const openLinkedJobForEstimate = async (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => {
+    const linkedJob = jobForEstimate(estimate);
+    if (linkedJob) {
+      openInspection(linkedJob);
+      setNotice('Opened the job linked to this accepted estimate.');
+      return;
+    }
+    if (!supabase || !estimate.inspection_id) {
+      setError('No linked job was found for this estimate.');
+      return;
+    }
+    const { data, error: jobError } = await supabase
+      .from('inspections')
+      .select('*')
+      .eq('id', estimate.inspection_id)
+      .single();
+    if (jobError) {
+      setError(readableError(jobError, 'Unable to open the linked job.'));
+      return;
+    }
+    const job = data as Inspection;
+    setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
+    openInspection(job);
+    setNotice('Opened the job linked to this accepted estimate.');
+  };
+  const openJobs = inspections.filter(inspectionIsOpenJob);
+  const closedJobs = inspections.filter(inspectionIsClosedJob);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const selectedJobsSubject = {
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
   };
-  const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(insp => insp.status === 'draft');
-  const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(insp => insp.status === 'finalized');
+  const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsOpenJob);
+  const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsClosedJob);
   const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
@@ -9627,6 +9760,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         name: inspectionNewDraft.name.trim(),
         summary: '',
         status: 'draft',
+        job_type: 'service_visit',
+        job_status: 'draft',
+        estimate_id: null,
+        completed_at: null,
+        closed_at: null,
         rooms_with_findings: seedFindings,
         report_storage_path: null,
         report_file_name: null,
@@ -9652,7 +9790,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorTab('inspections');
       persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: 'checklist', selectedRoom: rooms[0]?.room ?? null });
     } catch (err) {
-      setError(readableError(err, 'Failed to create inspection.'));
+      setError(readableError(err, 'Failed to create job.'));
     } finally {
       setSavingInspection(false);
     }
@@ -9675,8 +9813,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setNotice('');
     setError('');
     const confirmed = window.confirm(insp.homeowner_user_id
-      ? 'Finalize and file this field work report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
-      : 'Finalize this new customer field work report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
+      ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
+      : 'Finalize this new customer job report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
     );
     if (!confirmed) return;
     setFinalizingInspection(true);
@@ -9717,7 +9855,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       });
       if (finalizeError) throw finalizeError;
 
-      const finalized = { ...finalInsp, status: 'finalized' as const, report_storage_path: storagePath, report_file_name: fileName };
+      const finalized = {
+        ...finalInsp,
+        status: 'finalized' as const,
+        job_status: 'completed' as const,
+        completed_at: finalInsp.completed_at ?? new Date().toISOString(),
+        report_storage_path: storagePath,
+        report_file_name: fileName,
+      };
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
       if (insp.homeowner_user_id) {
         setActiveInspection(finalized);
@@ -9742,11 +9887,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       }
       setNotice(insp.homeowner_user_id
-        ? 'Field work report finalized, saved to homeowner Documents, and added to their maintenance log.'
-        : 'New customer field work report finalized.'
+        ? 'Job report finalized, saved to homeowner Documents, and added to their maintenance log.'
+        : 'New customer job report finalized.'
       );
     } catch (err) {
-      setError(readableError(err, 'Failed to finalize field work report.'));
+      setError(readableError(err, 'Failed to finalize job report.'));
     } finally {
       setFinalizingInspection(false);
     }
@@ -9770,6 +9915,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_inspection_id: insp.id,
       });
       if (notifyError) throw notifyError;
+      const closedAt = new Date().toISOString();
+      setInspections(prev => prev.map(item => item.id === insp.id ? {
+        ...item,
+        job_status: 'closed',
+        completed_at: item.completed_at ?? closedAt,
+        closed_at: item.closed_at ?? closedAt,
+      } : item));
       await loadContractor();
       setActiveInspection(null);
       setLocalFindings({});
@@ -9797,12 +9949,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const deleteInspection = async (insp: Inspection) => {
     if (!supabase) return;
-    const confirmed = window.confirm(`Delete "${insp.name}"? This field work record will be permanently removed and the homeowner will not be notified.`);
+    const confirmed = window.confirm(`Delete "${insp.name}"? This job record will be permanently removed and the homeowner will not be notified.`);
     if (!confirmed) return;
     const { error: delErr } = await supabase.rpc('servsync_delete_inspection', {
       p_inspection_id: insp.id,
     });
-    if (delErr) { setError(readableError(delErr, 'Failed to delete inspection.')); return; }
+    if (delErr) { setError(readableError(delErr, 'Failed to delete job.')); return; }
     setInspections(prev => prev.filter(i => i.id !== insp.id));
     if (activeInspection?.id === insp.id) {
       setActiveInspection(null);
@@ -9817,7 +9969,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspectionView('list');
       persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
     }
-    setNotice('Field work draft deleted.');
+    setNotice('Job draft deleted.');
   };
 
   const openInspection = (insp: Inspection, options?: { subTab?: InspectionSubTab; selectedRoom?: string | null; stayInHomeownerWorkspace?: boolean }) => {
@@ -9869,7 +10021,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorJobsView('open_jobs');
       setContractorTab('inspections');
     } else {
-      setContractorJobsView(insp.status === 'draft' ? 'open_jobs' : 'closed_jobs');
+      setContractorJobsView(inspectionIsOpenJob(insp) ? 'open_jobs' : 'closed_jobs');
       setContractorTab('inspections');
     }
     persistFieldWorkState({ inspectionId: insp.id, view: 'detail', subTab: nextSubTab, selectedRoom: nextSelectedRoom });
@@ -9967,7 +10119,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     autoSaveTimerRef.current = setTimeout(() => {
       void saveInspectionProgress(activeInspection, { silent: true })
         .then(() => { lastAutoSaveSignatureRef.current = signature; })
-        .catch(err => setError(readableError(err, 'Unable to auto-save field work progress.')));
+        .catch(err => setError(readableError(err, 'Unable to auto-save job progress.')));
     }, 1200);
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -10091,13 +10243,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       .filter(room => room.room.trim() && room.items.length > 0);
 
     if (rooms.length === 0) {
-      setError('Add at least one section and checklist item before saving this work order as a template.');
+      setError('Add at least one section and checklist item before saving this job as a template.');
       return;
     }
 
     const fallbackName = activeInspection.name
       .split('—')[0]
-      ?.trim() || 'New work order template';
+      ?.trim() || 'New job template';
     const templateName = window.prompt('Name this reusable template:', fallbackName);
     if (!templateName?.trim()) return;
 
@@ -10112,7 +10264,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
       setNotice('Work order saved as a reusable template.');
     } catch (err) {
-      setError(readableError(err, 'Failed to save work order as a template.'));
+      setError(readableError(err, 'Failed to save job as a template.'));
     } finally {
       setSavingInspection(false);
     }
@@ -10206,7 +10358,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         home_notes: '',
       });
       setShowLocalContactForm(false);
-      setNotice(autoStart ? 'New customer saved. You can start field work now.' : 'New customer saved.');
+      setNotice(autoStart ? 'New customer saved. You can start a job now.' : 'New customer saved.');
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to save new customer.'));
@@ -10267,7 +10419,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }
           if (!notification.request_id) {
             const category = notificationCategoryLabel(notification.type);
-            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'inspections' : category === 'Field Work' ? 'inspections' : category === 'Connection' ? 'connections' : 'requests');
+            setContractorTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'inspections' : category === 'Job' ? 'inspections' : category === 'Connection' ? 'connections' : 'requests');
             return;
           }
           const request = serviceRequests.find(item => item.id === notification.request_id);
@@ -10487,7 +10639,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <div>
                 <p className="text-sm font-bold text-[#02132D]">Contractor logo</p>
                 <p className="mt-1 max-w-xl text-sm leading-5 text-[#223D67]">
-                  Upload the logo homeowners should see on your public profile, field work reports, estimates, and future customer-facing documents.
+                  Upload the logo homeowners should see on your public profile, job reports, estimates, and future customer-facing documents.
                 </p>
               </div>
             </div>
@@ -11667,10 +11819,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             const subjectRequests = serviceRequests.filter(request => request.connection_id === subject.connection.connection_id);
             const followUpCount = subjectRequests.filter(contractorRequestNeedsFollowUp).length;
             const openRequestCount = subjectRequests.filter(request => !['closed', 'declined'].includes(request.status)).length;
-            const draftWorkOrderCount = fieldWorkForHomeowner(subject.connection.homeowner_user_id).filter(work => work.status === 'draft').length;
+            const draftWorkOrderCount = fieldWorkForHomeowner(subject.connection.homeowner_user_id).filter(inspectionIsOpenJob).length;
             return followUpCount * 100 + openRequestCount * 30 + draftWorkOrderCount * 20 + (subject.isActive ? 5 : 0);
           }
-          return fieldWorkForLocalContact(subject.contact.id).filter(work => work.status === 'draft').length * 20;
+          return fieldWorkForLocalContact(subject.contact.id).filter(inspectionIsOpenJob).length * 20;
         };
         const subjectSearchText = (subject: Subject) => {
           if (subject.kind === 'request') {
@@ -11784,8 +11936,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       const openRequestCount = subjectRequests.filter(request => !['closed', 'declined'].includes(request.status)).length;
                       const followUpCount = subjectRequests.filter(contractorRequestNeedsFollowUp).length;
                       const subjectWorkOrders = fieldWorkForHomeowner(subject.connection.homeowner_user_id);
-                      const draftWorkOrderCount = subjectWorkOrders.filter(work => work.status === 'draft').length;
-                      const filedReportCount = subjectWorkOrders.filter(work => work.status === 'finalized').length;
+                      const draftWorkOrderCount = subjectWorkOrders.filter(inspectionIsOpenJob).length;
+                      const filedReportCount = subjectWorkOrders.filter(inspectionIsClosedJob).length;
                       rowName = perm.share_contact ? (subject.connection.display_name || 'Homeowner') : 'Homeowner';
                       subtitle = subject.connection.home?.nickname || subject.connection.home?.address_line1 || subject.connection.city || (perm.share_contact ? '' : 'Contact private');
                       pills.push(subject.isActive ? { label: 'Connected', tone: 'emerald' } : { label: subject.connection.status === 'declined' ? 'Declined' : 'Revoked', tone: 'red' });
@@ -11795,8 +11947,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
                     } else if (subject.kind === 'local') {
                       const subjectWorkOrders = fieldWorkForLocalContact(subject.contact.id);
-                      const draftWorkOrderCount = subjectWorkOrders.filter(work => work.status === 'draft').length;
-                      const filedReportCount = subjectWorkOrders.filter(work => work.status === 'finalized').length;
+                      const draftWorkOrderCount = subjectWorkOrders.filter(inspectionIsOpenJob).length;
+                      const filedReportCount = subjectWorkOrders.filter(inspectionIsClosedJob).length;
                       rowName = subject.contact.display_name || 'New customer';
                       const home = subject.contact.homes?.[0];
                       subtitle = home?.address_line1 || home?.nickname || subject.contact.phone || subject.contact.email || '';
@@ -11883,7 +12035,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <Users size={22} />
                       </div>
                       <p className="text-sm font-semibold text-slate-700">Pick a homeowner from the list</p>
-                      <p className="mt-2 text-xs text-slate-500">Select someone on the left to see their profile, home details, field work history, service requests, and schedule.</p>
+                      <p className="mt-2 text-xs text-slate-500">Select someone on the left to see their profile, home details, job history, service requests, and schedule.</p>
                     </div>
                   </div>
                 ) : selectedSubject.kind === 'request' ? (
@@ -11939,10 +12091,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
                     const draftEstimateCount = estimateRecords.filter(estimate => estimate.status === 'draft').length;
                     const draftInvoiceCount = invoiceRecords.filter(estimate => estimate.status === 'draft').length;
-                    const workOrderDraftCount = workOrderRecords.filter(insp => insp.status === 'draft').length;
-                    const workOrderFinalCount = workOrderRecords.filter(insp => insp.status === 'finalized').length;
-                    const inspectionDraftCount = inspectionRecords.filter(insp => insp.status === 'draft').length;
-                    const inspectionFinalCount = inspectionRecords.filter(insp => insp.status === 'finalized').length;
+                    const workOrderDraftCount = workOrderRecords.filter(inspectionIsOpenJob).length;
+                    const workOrderFinalCount = workOrderRecords.filter(inspectionIsClosedJob).length;
+                    const inspectionDraftCount = inspectionRecords.filter(inspectionIsOpenJob).length;
+                    const inspectionFinalCount = inspectionRecords.filter(inspectionIsClosedJob).length;
                     const estimateSections: Array<{ id: HomeownerWorkspaceEstimateView; title: string; helper: string; estimates: Estimate[] }> = [
                       {
                         id: 'draft',
@@ -11959,7 +12111,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {
                         id: 'accepted',
                         title: 'Accepted',
-                        helper: 'Approved estimates that are ready to schedule or turn into work orders.',
+                        helper: 'Approved estimates that are ready to schedule or turn into jobs.',
                         estimates: estimateRecords.filter(estimate => estimate.status === 'accepted'),
                       },
                       {
@@ -12059,7 +12211,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       .filter(r => r.appointment && (r.appointment.status === 'confirmed' || r.appointment.status === 'proposed'))
                       .sort((a, b) => new Date(a.appointment!.proposed_at).getTime() - new Date(b.appointment!.proposed_at).getTime()) : [];
 
-                    const openJobCount = workOrderRecords.filter(item => item.status === 'draft').length + inspectionRecords.filter(item => item.status === 'draft').length;
+                    const openJobCount = workOrderRecords.filter(inspectionIsOpenJob).length + inspectionRecords.filter(inspectionIsOpenJob).length;
                     const openFinancialCount = estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length + invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length;
                     const jobsAttentionCount = openJobCount + openFinancialCount + followUpReqs.length;
                     const tabs: Array<{ id: HomeownerWorkspaceTab; label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'slate' }> = [
@@ -12108,7 +12260,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const recentRequests = connReqs.slice(0, 3);
                     const nextFollowUpRequest = followUpReqs[0] ?? null;
                     const nextOpenRequest = activeReqs[0] ?? null;
-                    const nextDraftWorkOrder = workOrderRecords.find(insp => insp.status === 'draft') ?? null;
+                    const nextDraftWorkOrder = workOrderRecords.find(inspectionIsOpenJob) ?? null;
                     const nextAppointmentRequest = upcomingAppts[0] ?? null;
                     const workspaceCards: Array<{ label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'emerald' | 'slate'; onClick: () => void }> = [
                       ...(isConn ? [
@@ -12272,10 +12424,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         : nextOpenRequest
                                           ? 'Review the active service request'
                                           : nextDraftWorkOrder
-                                            ? 'Continue the draft work order'
+                                            ? 'Continue the draft job'
                                             : nextAppointmentRequest
                                               ? 'Review the next appointment'
-                                              : 'Create a work order when you are ready'}
+                                              : 'Create a job when you are ready'}
                                     </h3>
                                     <p className="mt-1 text-sm text-slate-500">
                                       {nextFollowUpRequest
@@ -12286,7 +12438,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             ? `${nextDraftWorkOrder.name} is saved as a draft.`
                                             : nextAppointmentRequest?.appointment
                                               ? `${nextAppointmentRequest.title} is set for ${formatDateTime(nextAppointmentRequest.appointment.proposed_at)}.`
-                                              : 'This workspace is ready for profile review, service requests, work orders, and appointments.'}
+                                              : 'This workspace is ready for profile review, service requests, jobs, and appointments.'}
                                     </p>
                                   </div>
                                   <button
@@ -12362,13 +12514,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                   <div className="mb-3 flex items-center justify-between gap-3">
                                     <div>
-                                      <h3 className="font-bold text-slate-950">Recent work orders</h3>
+                                      <h3 className="font-bold text-slate-950">Recent jobs</h3>
                                       <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed</p>
                                     </div>
                                     <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentWorkOrders.length === 0 ? (
-                                    <EmptyState text="No work orders yet for this workspace." />
+                                    <EmptyState text="No jobs yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
                                       {recentWorkOrders.map(insp => (
@@ -12381,7 +12533,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                               <p className="font-semibold text-slate-900">{insp.name}</p>
-                                              <p className="mt-1 text-xs text-slate-500">{insp.status === 'draft' ? 'Draft' : 'Filed'} · Updated {formatDateTime(insp.updated_at)}</p>
+                                              <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
                                             </div>
                                             <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                           </div>
@@ -12400,7 +12552,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentInspections.length === 0 ? (
-                                    <EmptyState text="No inspections yet for this workspace." />
+                                    <EmptyState text="No inspection jobs yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
                                       {recentInspections.map(insp => (
@@ -12413,7 +12565,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                               <p className="font-semibold text-slate-900">{insp.name}</p>
-                                              <p className="mt-1 text-xs text-slate-500">{insp.status === 'draft' ? 'Draft' : 'Filed'} · Updated {formatDateTime(insp.updated_at)}</p>
+                                              <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
                                             </div>
                                             <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                           </div>
@@ -12614,7 +12766,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   >
                                     <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
                                     <p className="mt-2 text-sm font-bold">Create job</p>
-                                    <p className="mt-1 text-xs text-blue-700">Inspection, work order, or service workflow</p>
+                                    <p className="mt-1 text-xs text-blue-700">Inspection, job, or service workflow</p>
                                   </button>
                                   <button
                                     type="button"
@@ -12654,7 +12806,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="min-w-0">
                                                 <p className="truncate text-sm font-semibold text-slate-900">{work.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{work.status === 'draft' ? 'Draft' : 'Filed'} · Updated {formatDateTime(work.updated_at)}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(work)} · Updated {formatDateTime(work.updated_at)}</p>
                                               </div>
                                               <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                             </div>
@@ -12744,14 +12896,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                   <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn); } else if (localCustomer) { beginFieldWorkForLocalContact(localCustomer); } }} className={buttonClass('primary')}>
                                     <Plus size={14} />
-                                    Create work order
+                                    Create job
                                   </button>
                                 </div>
                                 {isStartingWorkOrderForThisSubject && (
                                   <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
                                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                       <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New work order</p>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New job</p>
                                         <p className="mt-1 text-sm text-blue-900">Start blank for on-site work, or use a template when a repeatable checklist helps.</p>
                                       </div>
                                       <button type="button" onClick={() => setInspectionView('list')} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
@@ -12795,7 +12947,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
                                           }));
                                         }}>
-                                          <option value="blank">Blank work order — build on site</option>
+                                          <option value="blank">Blank job — build on site</option>
                                           <optgroup label="ServSync starter templates">
                                             {sortedServSyncFieldWorkTemplates.map(t => (
                                               <option key={t.id} value={`starter:${t.id}`}>
@@ -12818,14 +12970,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         disabled={savingInspection || !inspectionNewDraft.name.trim() || (inspectionNewDraft.subject_type === 'connected' ? !inspectionNewDraft.homeowner_user_id : !inspectionNewDraft.local_contact_id)}
                                         className={buttonClass('primary')}
                                       >
-                                        {savingInspection ? 'Creating...' : 'Create work order'}
+                                        {savingInspection ? 'Creating...' : 'Create job'}
                                       </button>
                                       <button type="button" onClick={() => setInspectionView('list')} className={buttonClass('secondary')}>Cancel</button>
                                     </div>
                                   </div>
                                 )}
                                 {workOrderRecords.length === 0 ? (
-                                  <EmptyState text="No work orders yet for this homeowner." />
+                                  <EmptyState text="No jobs yet for this homeowner." />
                                 ) : (
                                   <div className="space-y-2">
                                     {workOrderRecords.map(insp => {
@@ -12836,8 +12988,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                  {insp.status === 'draft' ? 'Draft' : 'Filed'}
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
+                                                  {inspectionJobStatusLabel(insp)}
                                                 </span>
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
@@ -12878,7 +13030,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                 </div>
                                 {inspectionRecords.length === 0 ? (
-                                  <EmptyState text="No inspections yet for this homeowner." />
+                                  <EmptyState text="No inspection jobs yet for this homeowner." />
                                 ) : (
                                   <div className="space-y-2">
                                     {inspectionRecords.map(insp => {
@@ -12889,8 +13041,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                  {insp.status === 'draft' ? 'Draft' : 'Filed'}
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
+                                                  {inspectionJobStatusLabel(insp)}
                                                 </span>
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
@@ -12915,7 +13067,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <h3 className="font-bold text-slate-950">{isInvoiceWorkspaceTab ? 'Invoices' : 'Estimates'}</h3>
                                     <p className="mt-1 text-xs text-slate-500">
                                       {isInvoiceWorkspaceTab
-                                        ? 'Create invoice-style records for completed or billable work without starting an inspection.'
+                                        ? 'Create invoice-style records for completed or billable work without starting a job.'
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
@@ -12977,9 +13129,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </Field>
                                       )}
                                       {fieldWork.length > 0 && (
-                                        <Field label="Attach to work order (optional)">
+                                        <Field label="Attach to job (optional)">
                                           <select className={inputClass()} value={estimateDraft.inspection_id} onChange={e => setEstimateDraft(d => ({ ...d, inspection_id: e.target.value }))}>
-                                            <option value="">No work order</option>
+                                            <option value="">No job</option>
                                             {fieldWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
                                           </select>
                                         </Field>
@@ -13404,6 +13556,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <EmptyState text={`No ${selectedDocumentSection.title.toLowerCase()} for this workspace.`} />
                                       ) : selectedDocumentSection.estimates.map(estimate => {
                                       const lineCount = estimate.line_items?.length ?? 0;
+                                      const hasLinkedJob = estimateHasLinkedJob(estimate);
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -13473,26 +13626,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             {estimate.status === 'accepted' && (
                                               <button
                                                 type="button"
-                                                onClick={() => {
-                                                  const customerName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                  const workOrderName = `Work order from accepted estimate — ${customerName} — ${estimate.title}`;
-                                                  if (conn) {
-                                                    beginFieldWorkForHomeowner(conn, {
-                                                      name: workOrderName,
-                                                      serviceRequestId: estimate.service_request_id || undefined,
-                                                      workflowKind: 'work_order',
-                                                    });
-                                                  } else if (localCustomer) {
-                                                    beginFieldWorkForLocalContact(localCustomer, {
-                                                      name: workOrderName,
-                                                      workflowKind: 'work_order',
-                                                    });
-                                                  }
-                                                }}
+                                                onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
+                                                disabled={convertingEstimateId === estimate.id}
                                                 className={buttonClass('primary')}
                                               >
                                                 <ClipboardCheck size={15} />
-                                                Create work order
+                                                {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
                                               </button>
                                             )}
                                             {estimate.status === 'sent' && (
@@ -14128,6 +14267,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const local = estimate.local_contact_id ? localContacts.find(c => c.id === estimate.local_contact_id) : null;
                           const customerName = connection?.display_name || local?.display_name || 'Customer';
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
+                          const hasLinkedJob = estimateHasLinkedJob(estimate);
                           return (
                             <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -14201,25 +14341,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        const workOrderName = `Work order from accepted estimate — ${customerName} — ${estimate.title}`;
-                                        if (connection) {
-                                          beginFieldWorkForHomeowner(connection, {
-                                            name: workOrderName,
-                                            serviceRequestId: estimate.service_request_id || undefined,
-                                            workflowKind: 'work_order',
-                                          });
-                                        } else if (local) {
-                                          beginFieldWorkForLocalContact(local, {
-                                            name: workOrderName,
-                                            workflowKind: 'work_order',
-                                          });
-                                        }
-                                      }}
+                                      onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
+                                      disabled={convertingEstimateId === estimate.id}
                                       className={buttonClass('secondary')}
                                     >
                                       <ClipboardCheck size={15} />
-                                      Create job
+                                      {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
                                     </button>
                                   </>
                                 )}
@@ -14253,13 +14380,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
                           return (
-                            <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${insp.status === 'draft' ? 'border-amber-200' : 'border-slate-200'}`}>
+                            <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}>
                               <div className="flex flex-wrap items-center gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="truncate text-sm font-medium text-slate-950">{insp.name}</p>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                      {insp.status === 'draft' ? 'Open' : 'Closed'}
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
+                                      {inspectionJobStatusLabel(insp)}
                                     </span>
                                     {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
                                     {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
@@ -14268,7 +14395,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatDateTime(insp.updated_at)}
                                   </p>
                                 </div>
-                                {insp.status === 'draft' && (
+                                {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                                   <button type="button" onClick={() => void deleteInspection(insp)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700">
                                     Delete
                                   </button>
@@ -14400,7 +14527,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-slate-950">Your workflow templates</p>
-                        <p className="mt-1 text-xs text-slate-500">Work orders, inspections, and checklist-style templates.</p>
+                        <p className="mt-1 text-xs text-slate-500">Jobs, inspections, and checklist-style templates.</p>
                       </div>
                       <span className="text-xl font-bold text-slate-950">{inspectionTemplates.length}</span>
                     </div>
@@ -14647,7 +14774,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {contractorJobsView === 'overview' && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {inspections.length === 0 ? (
-                  <EmptyState text="No work orders yet. Create an inspection, repair visit, maintenance visit, or assessment to get started." />
+                  <EmptyState text="No jobs yet. Create an inspection, repair visit, maintenance visit, or assessment to get started." />
                 ) : (
                   <div className="space-y-2">
                     {inspections.slice(0, 5).map(insp => {
@@ -14656,12 +14783,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       const subjectLabel = fieldWorkSubjectLabel(insp);
                       const subjectAddress = fieldWorkSubjectAddress(insp);
                       return (
-                        <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 flex items-center gap-3 shadow-sm ${insp.status === 'draft' ? 'border-amber-200' : 'border-slate-200'}`}>
+                        <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 flex items-center gap-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-slate-950 truncate">{insp.name}</p>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${insp.status === 'draft' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                                {insp.status === 'draft' ? 'Draft' : 'Finalized'}
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
+                                {inspectionJobStatusLabel(insp)}
                               </span>
                               {urgentCount > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-xs font-semibold">{urgentCount} Urgent</span>}
                               {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-semibold">{issueCount} Issues</span>}
@@ -14670,8 +14797,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {new Date(insp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
                           </div>
-                          {insp.status === 'draft' && (
-                            <button type="button" onClick={() => void deleteInspection(insp)} className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors" title="Delete inspection">
+                          {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
+                            <button type="button" onClick={() => void deleteInspection(insp)} className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors" title="Delete job">
                               Delete
                             </button>
                           )}
@@ -14690,7 +14817,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
           {/* ── NEW VIEW ── */}
           {inspectionView === 'new' && (
-            <Card title="New work order" icon={<ClipboardList size={18} />}>
+            <Card title="New job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
                 <Field label="Customer">
                   <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -14741,7 +14868,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">New customer</p>
-                        <p className="mt-1 text-sm text-blue-900">Save the customer once, then this work order can be tied to them.</p>
+                        <p className="mt-1 text-sm text-blue-900">Save the customer once, then this job can be tied to them.</p>
                       </div>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
                         Cancel
@@ -14804,7 +14931,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </Field>
-                  <Field label="Field work name">
+                  <Field label="Job name">
                     <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC seasonal inspection" />
                   </Field>
                 </div>
@@ -14824,7 +14951,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
                     }));
                   }}>
-                    <option value="blank">Blank work order — build on site</option>
+                    <option value="blank">Blank job — build on site</option>
                     <optgroup label="ServSync starter templates">
                       {sortedServSyncFieldWorkTemplates.map(t => (
                         <option key={t.id} value={`starter:${t.id}`}>
@@ -14846,7 +14973,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     disabled={savingInspection || !inspectionNewDraft.name.trim() || (inspectionNewDraft.subject_type === 'connected' ? !inspectionNewDraft.homeowner_user_id : !inspectionNewDraft.local_contact_id)}
                     className={buttonClass('primary')}
                   >
-                    {savingInspection ? 'Creating…' : 'Create work order'}
+                    {savingInspection ? 'Creating…' : 'Create job'}
                   </button>
                   <button type="button" onClick={() => setInspectionView('list')} className={buttonClass('secondary')}>Cancel</button>
                 </div>
@@ -14891,7 +15018,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   type="button"
                   onClick={() => {
                     setInspectionView('list');
-                    setContractorJobsView(activeInspection.status === 'draft' ? 'open_jobs' : 'closed_jobs');
+                    setContractorJobsView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
                     setContractorTab('inspections');
                   }}
                   className="text-xs font-medium text-slate-500 hover:text-slate-700"
@@ -14906,8 +15033,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <h2 className="font-bold text-slate-950 text-xl truncate">{activeInspection.name}</h2>
                         <p className="mt-1 text-sm text-slate-500">{homeownerLabel}{homeAddress ? ` · ${homeAddress}` : ''}</p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${activeInspection.status === 'draft' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {activeInspection.status === 'draft' ? 'Draft' : 'Finalized'}
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
+                            {inspectionJobStatusLabel(activeInspection)}
                           </span>
                           {urgentCountFin > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 flex items-center gap-1"><AlertTriangle size={10}/>{urgentCountFin} urgent</span>}
                           {issueCountFin > 0 && urgentCountFin === 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCountFin} open</span>}
@@ -14924,7 +15051,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <button type="button" onClick={goToReportReview} className={buttonClass('primary')}>
                           Review report
                         </button>
-                        {activeInspection.status === 'draft' && (
+                        {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
                           <button type="button" onClick={() => void deleteInspection(activeInspection)} className="text-xs font-medium border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5">
                             <Trash2 size={13} /> Delete
                           </button>
@@ -15166,7 +15293,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="flex gap-2">
                                   <input
                                     className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
-                                    placeholder="Custom inspection item..."
+                                    placeholder="Custom checklist item..."
                                     value={customItemInput}
                                     onChange={e => setCustomItemInput(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter' && customItemInput.trim()) { addItem(customItemInput.trim()); setCustomItemInput(''); } }}
@@ -15536,12 +15663,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             )}
                           </div>
 
-                          {/* Right sidebar: Inspection Assistant */}
+                          {/* Right sidebar: Job Assistant */}
                           <div className="w-72 shrink-0 border-l border-slate-200 bg-white overflow-y-auto p-4 space-y-4">
                             <div className="border border-blue-200 rounded-2xl overflow-hidden bg-blue-50/40">
                               <div className="px-4 py-3 border-b border-blue-100 bg-blue-50 flex items-center gap-2">
                                 <Sparkles size={14} className="text-blue-600" />
-                                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Inspection Assistant</p>
+                                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Job Assistant</p>
                               </div>
                               <div className="p-3 space-y-3">
                                 <div className="grid grid-cols-3 gap-1 bg-white border border-blue-100 rounded-xl p-1">
@@ -15694,7 +15821,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <p className="text-xs text-slate-500 leading-relaxed">Describe your observations. AI will suggest statuses, actions, and match findings to your checklist items.</p>
                                     <textarea rows={5}
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
-                                      placeholder="Describe what you observed during the inspection…"
+                                      placeholder="Describe what you observed during the job…"
                                       value={aiNoteText} onChange={e => setAiNoteText(e.target.value)} />
                                     <button type="button" disabled={!aiNoteText.trim() || aiProcessing}
                                       onClick={async () => {
@@ -15734,7 +15861,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           setWalkthroughSuggestions(aiResults);
                                           setAssistantMode('walkthrough');
                                         } catch {
-                                          setError('AI suggestions unavailable. Ensure the inspection-ai edge function is deployed.');
+                                          setError('AI suggestions unavailable. Ensure the job assistant service is deployed.');
                                         } finally {
                                           setAiProcessing(false);
                                         }
@@ -15742,7 +15869,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       className="w-full bg-blue-600 text-white rounded-lg px-3 py-2 text-xs font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
                                       {aiProcessing ? 'Getting AI suggestions…' : 'Get AI suggestions'}
                                     </button>
-                                    <p className="text-[11px] text-slate-400 leading-relaxed">Requires the <code className="bg-slate-100 px-1 rounded text-slate-500">inspection-ai</code> edge function.</p>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed">Requires the job assistant service.</p>
                                   </>
                                 )}
                               </div>
@@ -15813,8 +15940,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                         <div className="bg-blue-600 px-6 py-4 flex items-center justify-between">
                           <div>
-                            <p className="text-white font-bold text-lg">{contractor?.business_name || 'ServSync Field Work Report'}</p>
-                            <p className="text-blue-200 text-sm">Field Work Report</p>
+                            <p className="text-white font-bold text-lg">{contractor?.business_name || 'ServSync Job Report'}</p>
+                            <p className="text-blue-200 text-sm">Job Report</p>
                           </div>
                           <div className="text-right">
                             {statusCounts.Urgent > 0 ? (
@@ -15853,12 +15980,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className={`text-sm font-bold ${inspectionClosedForReview ? 'text-emerald-800' : 'text-amber-800'}`}>
-                                {inspectionClosedForReview ? 'Field work closed for review' : 'Field work still open'}
+                                {inspectionClosedForReview ? 'Job closed for review' : 'Job still open'}
                               </p>
                               <p className={`text-xs mt-1 leading-relaxed ${inspectionClosedForReview ? 'text-emerald-700' : 'text-amber-700'}`}>
                                 {inspectionClosedForReview
-                                  ? 'You can preview the PDF, edit the homeowner summary below, or finalize and file this field work. The homeowner sees nothing until you finalize.'
-                                  : 'Close field work for review when you are done entering findings. Closing does not send anything yet; it locks the work and enables PDF preview and the summary editor.'}
+                                  ? 'You can preview the PDF, edit the homeowner summary below, or finalize this job report. The homeowner sees nothing until you finalize.'
+                                  : 'Close the job for review when you are done entering findings. Closing does not send anything yet; it locks the work and enables PDF preview and the summary editor.'}
                               </p>
                             </div>
                             {inspectionClosedForReview ? (
@@ -16132,7 +16259,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {/* Per-room findings */}
                       {reportRooms.every(r => r.findings.length === 0) && (
                         <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                          <p className="text-slate-400 text-sm">No findings or photos yet. Run an inspection first.</p>
+                          <p className="text-slate-400 text-sm">No findings or photos yet. Add job notes first.</p>
                         </div>
                       )}
                       {reportRooms.map(roomData => {
@@ -16279,7 +16406,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             className="w-full bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
                             <CheckCircle2 size={14} />
-                            {finalizingInspection ? 'Finalizing…' : 'Finalize & File'}
+                            {finalizingInspection ? 'Finalizing…' : 'Finalize Report'}
                           </button>
                         ) : (
                           <div className="w-full rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex items-center justify-center gap-2">

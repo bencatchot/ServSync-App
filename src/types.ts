@@ -11,6 +11,7 @@ export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
+export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
 export type SupportInquiryCategory = 'feature_request' | 'tweak' | 'bug' | 'question' | 'billing' | 'other';
 
@@ -488,12 +489,19 @@ export interface Inspection {
   name: string;
   summary: string;
   status: 'draft' | 'finalized';
+  job_type?: string;
+  job_status?: JobLifecycleStatus;
+  estimate_id?: string | null;
+  completed_at?: string | null;
+  closed_at?: string | null;
   rooms_with_findings: InspectionRoomData[];
   report_storage_path: string | null;
   report_file_name: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type Job = Inspection;
 
 export interface HomeDocument {
   id: string;
