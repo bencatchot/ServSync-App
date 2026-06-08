@@ -212,6 +212,7 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
 type StoredFieldWorkDraft = {
   inspectionId: string;
   rooms_with_findings: InspectionRoomData[];
+  available_rooms?: InspectionTemplateRoom[];
   summary: string;
   savedAt: string;
 };
@@ -7513,6 +7514,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftNotice, setEstimateDraftNotice] = useState('');
   const [uploadingInspectionPhotoKey, setUploadingInspectionPhotoKey] = useState<string | null>(null);
   const [activeRooms, setActiveRooms] = useState<InspectionTemplateRoom[]>([]);
+  const [availableChecklistRooms, setAvailableChecklistRooms] = useState<InspectionTemplateRoom[]>([]);
   const [inspectionSummary, setInspectionSummary] = useState('');
   const [savingInspection, setSavingInspection] = useState(false);
   const [finalizingInspection, setFinalizingInspection] = useState(false);
@@ -8916,6 +8918,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? {
             inspectionId: activeInspection.id,
             rooms_with_findings: buildInspectionRoomsSnapshot(),
+            available_rooms: availableChecklistRooms.length > 0 ? availableChecklistRooms : activeRooms,
             summary: inspectionSummary,
             savedAt: new Date().toISOString(),
           }
@@ -8982,6 +8985,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
       setActiveInspection(newInspection);
       setActiveRooms(rooms);
+      setAvailableChecklistRooms(rooms);
       const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
       seedFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
       setLocalFindings(init);
@@ -9069,6 +9073,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setActiveInspection(null);
         setLocalFindings({});
         setActiveRooms([]);
+        setAvailableChecklistRooms([]);
         setInspectionSummary('');
         setInspectionClosedForReview(false);
         setInspectionView('list');
@@ -9109,6 +9114,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setActiveInspection(null);
       setLocalFindings({});
       setActiveRooms([]);
+      setAvailableChecklistRooms([]);
       setInspectionSummary('');
       setInspectionClosedForReview(false);
       setInspectionView('list');
@@ -9139,6 +9145,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setActiveInspection(null);
       setLocalFindings({});
       setActiveRooms([]);
+      setAvailableChecklistRooms([]);
       setInspectionSummary('');
       setInspectionClosedForReview(false);
       setInspectionView('list');
@@ -9164,6 +9171,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInspectionSummary(summary);
     const rooms: InspectionTemplateRoom[] = roomsWithFindings.map(r => ({ room: r.room, items: r.findings.map(f => f.title) }));
     setActiveRooms(rooms);
+    setAvailableChecklistRooms(storedDraft?.available_rooms ?? rooms);
     const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
     roomsWithFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: f.photos ?? [] }; }));
     setLocalFindings(init);
@@ -9254,7 +9262,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   useEffect(() => {
     if (!activeInspection) return;
     persistFieldWorkState();
-  }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, localFindings, inspectionSummary]);
+  }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, availableChecklistRooms, localFindings, inspectionSummary]);
 
   useEffect(() => {
     if (contractorTab !== 'inspections' || loading || restoredFieldWorkRef.current || activeInspection || inspections.length === 0) return;
@@ -9453,6 +9461,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const existingRoom = activeRooms.find(room => room.room.toLowerCase() === name.toLowerCase());
     const nextSelectedRoom = existingRoom?.room ?? name;
     setActiveRooms(prev => (
+      prev.some(room => room.room.toLowerCase() === name.toLowerCase())
+        ? prev
+        : [...prev, { room: name, items: [] }]
+    ));
+    setAvailableChecklistRooms(prev => (
       prev.some(room => room.room.toLowerCase() === name.toLowerCase())
         ? prev
         : [...prev, { room: name, items: [] }]
@@ -14250,6 +14263,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     rm.items.forEach(item => { delete updated[`${rm.room}||${item}`]; });
                                     setLocalFindings(updated);
                                     setActiveRooms(prev => prev.filter(r => r.room !== rm.room));
+                                    setAvailableChecklistRooms(prev => prev.filter(r => r.room !== rm.room));
                                     if (selectedChecklistRoom === rm.room) {
                                       setSelectedChecklistRoom(activeRooms.find(r => r.room !== rm.room)?.room ?? null);
                                     }
@@ -14299,12 +14313,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         ) => Object.keys(findings).find(key => isFindingKeyMatch(key, room, item));
 
                         const roomData = activeRooms.find(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom));
-                        if (!roomData) return null;
+                        const availableRoomData = availableChecklistRooms.find(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(selectedChecklistRoom)) ?? roomData;
+                        if (!roomData || !availableRoomData) return null;
 
                         const recommended = recommendedItemsForRoom(selectedChecklistRoom);
                         const currentSet = new Set(roomData.items.map(item => normalizeChecklistItem(item)));
                         const isRecommendedItem = (item: string) => recommended.some(rec => isChecklistItemMatch(rec, item));
-                        const customItems = roomData.items.filter(item => !isRecommendedItem(item));
+                        const customItems = availableRoomData.items.filter(item => !isRecommendedItem(item));
 
                         const addItem = (item: string, room?: string) => {
                           const roomName = room ?? selectedChecklistRoom ?? roomData.room;
@@ -14317,6 +14332,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               ? { ...r, items: [...r.items, trimmedItem] }
                               : r
                           ));
+                          setAvailableChecklistRooms(prev => {
+                            const hasRoom = prev.some(r => normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName));
+                            if (!hasRoom) return [...prev, { room: roomName, items: [trimmedItem] }];
+                            return prev.map(r =>
+                              normalizeChecklistRoom(r.room) === normalizeChecklistRoom(roomName)
+                                && !r.items.some(existing => isChecklistItemMatch(existing, trimmedItem))
+                                ? { ...r, items: [...r.items, trimmedItem] }
+                                : r
+                            );
+                          });
                           setLocalFindings(prev => {
                             const existingKey = matchingFindingKey(prev, roomName, trimmedItem);
                             if (existingKey) return prev;
@@ -14340,6 +14365,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               .forEach(key => delete updated[key]);
                             return updated;
                           });
+                        };
+                        const deleteAvailableItem = (room: string, item: string) => {
+                          removeItem(room, item);
+                          setAvailableChecklistRooms(prev => prev.map(r =>
+                            normalizeChecklistRoom(r.room) === normalizeChecklistRoom(room)
+                              ? { ...r, items: r.items.filter(existing => !isChecklistItemMatch(existing, item)) }
+                              : r
+                          ));
                         };
                         const hasItemInRoom = (room: string, item: string) => {
                           const roomFound = activeRooms.find(candidate => normalizeChecklistRoom(candidate.room) === normalizeChecklistRoom(room));
@@ -14448,7 +14481,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             e.preventDefault();
                                             e.stopPropagation();
                                             if (!selectedChecklistRoom) return;
-                                            removeItem(selectedChecklistRoom, item);
+                                            deleteAvailableItem(selectedChecklistRoom, item);
                                           }}
                                           className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                         >
