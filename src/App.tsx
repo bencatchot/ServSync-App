@@ -6487,15 +6487,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     + visibleClosedInvoiceRecords.length
     + visibleClosedEstimateRecords.length;
   const homeownerHasAnyEstimateInvoiceRecords = estimates.length > 0 || invoices.length > 0;
+  const homeownerRecordCardChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', expanded: boolean) => {
+    const tones = {
+      attention: expanded
+        ? 'border-amber-300 bg-amber-50/35 shadow-md ring-1 ring-amber-100 before:bg-amber-400'
+        : 'border-amber-200 bg-white shadow-sm hover:border-amber-300 hover:shadow-md before:bg-amber-400',
+      invoice: expanded
+        ? 'border-blue-300 bg-blue-50/30 shadow-md ring-1 ring-blue-100 before:bg-blue-500'
+        : 'border-blue-200 bg-white shadow-sm hover:border-blue-300 hover:shadow-md before:bg-blue-500',
+      accepted: expanded
+        ? 'border-emerald-300 bg-emerald-50/30 shadow-md ring-1 ring-emerald-100 before:bg-emerald-500'
+        : 'border-emerald-200 bg-white shadow-sm hover:border-emerald-300 hover:shadow-md before:bg-emerald-500',
+      closed: expanded
+        ? 'border-slate-300 bg-slate-50 shadow-md ring-1 ring-slate-200 before:bg-slate-400'
+        : 'border-slate-300 bg-white shadow-sm hover:border-slate-400 hover:shadow-md before:bg-slate-400',
+    };
+    return `relative overflow-hidden rounded-xl border p-4 transition before:absolute before:inset-y-0 before:left-0 before:w-1.5 ${tones[tone]}`;
+  };
 
   const renderHomeownerInvoiceCard = (invoice: Invoice, options: { showPaymentGuidance?: boolean } = {}) => {
     const invoiceConnection = connections.find(connection => connection.contractor_id === invoice.contractor_id) ?? null;
     const invoiceDirectoryContractor = directoryContractors.find(contractor => contractor.id === invoice.contractor_id) ?? null;
     const contractorName = homeownerRecordContractorName(invoice.contractor_id);
     const isOpen = viewingInvoiceId === invoice.id;
+    const cardTone = options.showPaymentGuidance ? 'invoice' : 'closed';
 
     return (
-      <div key={invoice.id} className={`rounded-xl border bg-white p-4 shadow-sm transition ${isOpen ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200 hover:border-blue-200'}`}>
+      <div key={invoice.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -6544,9 +6562,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </button>
         </div>
         {isOpen && (
-          <div className="mt-3 space-y-3">
+          <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
             {options.showPaymentGuidance && (
-              <Notice tone="info" text="Payment is handled directly with your contractor. Contact them for payment instructions." />
+              <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
+                Payment is handled directly with your contractor. Contact them for payment instructions.
+              </div>
             )}
             {invoice.scope && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
             {invoice.line_items && invoice.line_items.length > 0 && (
@@ -6595,9 +6615,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const estimateFiled = maintenanceLog.some(entry => entry.estimate_id === estimate.id);
     const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
     const isOpen = viewingEstimateId === estimate.id;
+    const cardTone = options.needsReview ? 'attention' : options.accepted ? 'accepted' : 'closed';
 
     return (
-      <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm transition ${isOpen ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200 hover:border-blue-200'}`}>
+      <div key={estimate.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -6642,7 +6663,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </button>
         </div>
         {isOpen && (
-          <div className="mt-3 space-y-3">
+          <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
             {options.needsReview && (
               <Notice tone="info" text="Review the estimate details, then accept or decline when you are ready." />
             )}
@@ -6725,15 +6746,30 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     );
   };
-  const renderHomeownerRecordsSection = (title: string, helper: string, emptyText: string, children: ReactNode[]) => (
-    <section className="space-y-2">
-      <div className="px-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{title}</p>
-        <p className="mt-1 text-sm text-slate-500">{helper}</p>
+  const renderHomeownerRecordsSection = (
+    title: string,
+    helper: string,
+    emptyText: string,
+    children: ReactNode[],
+    tone: 'attention' | 'invoice' | 'accepted' | 'closed'
+  ) => {
+    const sectionTone = {
+      attention: 'border-amber-200 bg-amber-50/70 text-amber-950 before:bg-amber-400',
+      invoice: 'border-blue-200 bg-blue-50/70 text-blue-950 before:bg-blue-500',
+      accepted: 'border-emerald-200 bg-emerald-50/70 text-emerald-950 before:bg-emerald-500',
+      closed: 'border-slate-200 bg-slate-100/80 text-slate-950 before:bg-slate-400',
+    }[tone];
+
+    return (
+    <section className="space-y-4 border-t border-slate-200 pt-6 first:border-t-0 first:pt-0">
+      <div className={`relative overflow-hidden rounded-xl border px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
+        <p className="text-base font-bold leading-6 sm:text-lg">{title}</p>
+        <p className="mt-1 text-sm leading-5 text-slate-600">{helper}</p>
       </div>
-      {children.length > 0 ? children : <EmptyState text={emptyText} />}
+      {children.length > 0 ? <div className="space-y-3">{children}</div> : <EmptyState text={emptyText} />}
     </section>
-  );
+    );
+  };
   const renderHomeownerEstimatesInvoicesPage = () => (
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
       <div className="space-y-5">
@@ -6802,21 +6838,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               'Needs Review',
               'Estimates waiting for your approval or decline.',
               'No estimates need your review right now.',
-              visibleNeedsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true }))
+              visibleNeedsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true })),
+              'attention'
             )}
 
             {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'open_invoices') && renderHomeownerRecordsSection(
               'Open Invoices',
               'Invoices that have been sent and are not marked paid or void.',
               'No open invoices right now.',
-              visibleOpenInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true }))
+              visibleOpenInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true })),
+              'invoice'
             )}
 
             {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'accepted') && renderHomeownerRecordsSection(
               'Accepted Estimates',
               'Approved estimates and any linked job or invoice status ServSync can show.',
               'No accepted estimates yet.',
-              visibleAcceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true }))
+              visibleAcceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true })),
+              'accepted'
             )}
 
             {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'closed') && renderHomeownerRecordsSection(
@@ -6826,7 +6865,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               [
                 ...visibleClosedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
                 ...visibleClosedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
-              ]
+              ],
+              'closed'
             )}
           </>
         )}
