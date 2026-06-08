@@ -8504,6 +8504,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [creatingInvoiceSourceId, setCreatingInvoiceSourceId] = useState<string | null>(null);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
@@ -9768,6 +9769,100 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to void invoice.'));
     } finally {
       setUpdatingInvoiceId(null);
+    }
+  };
+
+  const openInvoiceRecord = (invoice: Invoice) => {
+    const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
+    const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
+    setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+    setContractorTab('inspections');
+    setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
+    if (invoice.status === 'draft') {
+      setEditingInvoiceId(invoice.id);
+      setInvoiceDraft(invoiceDraftFromInvoice(invoice));
+      setInvoiceComposerOpen(true);
+      setEstimateComposerOpen(false);
+      setContractorJobsView('new_financial');
+      return;
+    }
+    setEditingInvoiceId(null);
+    setInvoiceComposerOpen(false);
+    setEstimateComposerOpen(false);
+    setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
+  };
+
+  const loadInvoiceById = async (invoiceId: string) => {
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const { data, error: invoiceError } = await supabase
+      .from('invoices')
+      .select(INVOICE_WITH_LINES_SELECT)
+      .eq('id', invoiceId)
+      .single();
+    if (invoiceError) throw invoiceError;
+    const invoice = data as Invoice;
+    setInvoices(prev => [invoice, ...prev.filter(item => item.id !== invoice.id)]);
+    return invoice;
+  };
+
+  const createInvoiceFromEstimate = async (estimate: Estimate) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void');
+    if (existingInvoice) {
+      openInvoiceRecord(existingInvoice);
+      setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
+      return;
+    }
+    setCreatingInvoiceSourceId(`estimate:${estimate.id}`);
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate', {
+        p_estimate_id: estimate.id,
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
+      if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
+      const invoice = await loadInvoiceById(result.invoice_id);
+      openInvoiceRecord(invoice);
+      setNotice(result.created ? 'Invoice draft created from accepted estimate.' : 'Opened the existing invoice for this estimate.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create invoice from estimate. Make sure the invoice-from-source SQL has been applied.'));
+    } finally {
+      setCreatingInvoiceSourceId(null);
+    }
+  };
+
+  const createInvoiceFromJob = async (job: Inspection) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    const existingInvoice = invoices.find(invoice =>
+      invoice.status !== 'void'
+      && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
+    );
+    if (existingInvoice) {
+      openInvoiceRecord(existingInvoice);
+      setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this job.' : 'Opened the invoice linked to this job.');
+      return;
+    }
+    setCreatingInvoiceSourceId(`job:${job.id}`);
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_job', {
+        p_inspection_id: job.id,
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
+      if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
+      const invoice = await loadInvoiceById(result.invoice_id);
+      openInvoiceRecord(invoice);
+      setNotice(result.created ? 'Invoice draft created from job.' : 'Opened the existing invoice for this job.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create invoice from job. Make sure the invoice-from-source SQL has been applied.'));
+    } finally {
+      setCreatingInvoiceSourceId(null);
     }
   };
 
@@ -14191,6 +14286,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       ) : selectedDocumentSection.estimates.map(estimate => {
                                       const lineCount = estimate.line_items?.length ?? 0;
                                       const hasLinkedJob = estimateHasLinkedJob(estimate);
+                                      const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -14257,16 +14353,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 </button>
                                               </>
                                             )}
-                                            {estimate.status === 'accepted' && (
-                                              <button
-                                                type="button"
-                                                onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
-                                                disabled={convertingEstimateId === estimate.id}
-                                                className={buttonClass('primary')}
-                                              >
-                                                <ClipboardCheck size={15} />
-                                                {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
-                                              </button>
+                                            {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromEstimate(estimate)}
+                                                  disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
+                                                  className={buttonClass('primary')}
+                                                >
+                                                  <Receipt size={15} />
+                                                  {creatingInvoiceSourceId === `estimate:${estimate.id}`
+                                                    ? 'Creating...'
+                                                    : linkedInvoice
+                                                      ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                                      : 'Create Invoice'}
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
+                                                  disabled={convertingEstimateId === estimate.id}
+                                                  className={buttonClass('secondary')}
+                                                >
+                                                  <ClipboardCheck size={15} />
+                                                  {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
+                                                </button>
+                                              </>
                                             )}
                                             {estimate.status === 'sent' && (
                                               <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
@@ -15176,6 +15287,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const customerName = connection?.display_name || local?.display_name || 'Customer';
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                           const hasLinkedJob = estimateHasLinkedJob(estimate);
+                          const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
                           return (
                             <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -15237,17 +15349,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       type="button"
                                       onClick={() => {
                                         setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
-                                        beginInvoiceDraftForCustomer(customerName, {
-                                          serviceRequestId: estimate.service_request_id || undefined,
-                                          jobId: estimate.inspection_id || undefined,
-                                          estimateId: estimate.id,
-                                          sourceEstimate: estimate,
-                                        });
+                                        if (linkedInvoice) openInvoiceRecord(linkedInvoice);
+                                        else void createInvoiceFromEstimate(estimate);
                                       }}
+                                      disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
                                       className={buttonClass('primary')}
                                     >
                                       <Receipt size={15} />
-                                      Create invoice
+                                      {creatingInvoiceSourceId === `estimate:${estimate.id}`
+                                        ? 'Creating...'
+                                        : linkedInvoice
+                                          ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                          : 'Create Invoice'}
                                     </button>
                                     <button
                                       type="button"
@@ -15289,6 +15402,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const issueCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
+                          const linkedInvoice = invoices.find(invoice =>
+                            invoice.status !== 'void'
+                            && (invoice.job_id === insp.id || (insp.estimate_id ? invoice.estimate_id === insp.estimate_id : false))
+                          ) ?? null;
+                          const showJobInvoiceAction = inspectionIsClosedJob(insp);
                           return (
                             <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}>
                               <div className="flex flex-wrap items-center gap-3">
@@ -15313,6 +15431,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
                                   {insp.status === 'draft' ? 'Continue' : 'View report'}
                                 </button>
+                                {showJobInvoiceAction && (
+                                  <button
+                                    type="button"
+                                    onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromJob(insp)}
+                                    disabled={creatingInvoiceSourceId === `job:${insp.id}`}
+                                    className={buttonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
+                                  >
+                                    <Receipt size={15} />
+                                    {creatingInvoiceSourceId === `job:${insp.id}`
+                                      ? 'Creating...'
+                                      : linkedInvoice
+                                        ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                        : 'Create Invoice'}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -17350,14 +17483,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <button
                           type="button"
-                          onClick={() => beginInvoiceDraftForCustomer(homeownerLabel || 'Customer', {
-                            serviceRequestId: activeInspection.service_request_id || undefined,
-                            jobId: activeInspection.id,
-                            estimateId: activeInspection.estimate_id || undefined,
-                          })}
+                          disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                          onClick={() => void createInvoiceFromJob(activeInspection)}
                           className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700"
                         >
-                          <FileText size={14} /> Create Invoice
+                          <FileText size={14} /> {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
                         </button>
 
                         <button
