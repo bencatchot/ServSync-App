@@ -1178,12 +1178,40 @@ const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
     'Smoke/CO detector presence observed',
     'Water heater visible condition, leaks, and venting/discharge concerns observed',
   ]},
-  { room: 'Interior / Wet Areas', items: [
-    'Wall, ceiling, or floor staining/cracking observed',
+  { room: 'Kitchen', items: [
+    'Sink, faucet, and under-sink leaks/moisture observed',
+    'Cabinet, counter, and visible surface condition observed',
+    'Appliance basic condition/operation observed where applicable',
+    'GFCI protection checked where accessible',
+    'Ventilation or exhaust concern observed where applicable',
+  ]},
+  { room: 'Bathrooms', items: [
+    'Sink, toilet, tub, or shower leaks/moisture observed',
+    'Toilet function/base movement concerns observed',
+    'Caulk, grout, or moisture damage observed',
+    'Exhaust fan or ventilation concern observed',
+    'Flooring or wall damage observed',
+  ]},
+  { room: 'Living / Common Areas', items: [
+    'Walls, ceilings, and floors condition observed',
     'Windows and doors basic operation/condition observed',
-    'Under-sink leaks or moisture observed',
-    'Bathroom caulk, grout, exhaust, and moisture concerns observed',
-    'Soft flooring or water damage observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Trip hazards or safety concerns observed',
+  ]},
+  { room: 'Bedrooms', items: [
+    'Walls, ceilings, and floors condition observed',
+    'Windows and doors basic operation/condition observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Smoke/CO detector presence observed where applicable',
+  ]},
+  { room: 'Laundry', items: [
+    'Washer supply/drain connections observed where accessible',
+    'Dryer vent material/condition observed where accessible',
+    'Leaks, moisture, or floor damage observed',
+    'GFCI protection checked where accessible',
+    'Ventilation or clearance concerns observed',
   ]},
   { room: 'Garage / Basement / Crawlspace', items: [
     'Water intrusion or moisture concerns observed',
@@ -1192,6 +1220,23 @@ const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
     'Visible structural concerns observed where accessible',
     'Storage, clearance, or access limitations noted where relevant',
   ]},
+];
+
+const INSPECTION_SECTION_QUICK_ADD_ROOMS = [
+  'Kitchen',
+  'Bathroom',
+  'Master Bathroom',
+  'Bedroom',
+  'Master Bedroom',
+  'Living Room',
+  'Dining Room',
+  'Laundry Room',
+  'Garage',
+  'Attic',
+  'Crawlspace',
+  'Basement',
+  'Exterior',
+  'Roof',
 ];
 
 type TradeStarterTemplateBlueprint = {
@@ -17043,10 +17088,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="p-6 space-y-4">
                             {(() => {
                               const existing = new Set(activeRooms.map(r => r.room.toLowerCase()));
-                              const available = DEFAULT_INSPECTION_ROOMS.map(r => r.room).filter(r => !existing.has(r.toLowerCase()));
+                              const available = INSPECTION_SECTION_QUICK_ADD_ROOMS.filter(r => !existing.has(r.toLowerCase()));
                               return available.length > 0 ? (
                                 <div>
-                                  <p className="text-xs font-semibold text-slate-500 mb-2">Common Sections</p>
+                                  <p className="text-xs font-semibold text-slate-500 mb-2">Common Rooms / Spaces</p>
                                   <div className="flex flex-wrap gap-2">
                                     {available.map(r => (
                                       <button
