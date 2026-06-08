@@ -6687,6 +6687,119 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     </Card>
   );
+  const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
+    const requestEstimates = estimates
+      .filter(estimate => estimate.service_request_id === request.id)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    const requestEstimateIds = new Set(requestEstimates.map(estimate => estimate.id));
+    const requestInvoices = invoices
+      .filter(invoice =>
+        invoice.service_request_id === request.id
+        || (invoice.estimate_id ? requestEstimateIds.has(invoice.estimate_id) : false)
+      )
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    const reportLinks = maintenanceLog
+      .filter(entry => entry.service_request_id === request.id && entry.report_document_id)
+      .map(entry => ({
+        entry,
+        document: entry.report_document_id ? homeDocumentById.get(entry.report_document_id) ?? null : null,
+      }))
+      .filter(item => item.document);
+
+    if (requestEstimates.length === 0 && requestInvoices.length === 0 && reportLinks.length === 0) return null;
+
+    return (
+      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Related updates</p>
+        <div className="mt-3 space-y-2">
+          {requestEstimates.map(estimate => {
+            const statusText = estimate.status === 'sent'
+              ? 'Estimate available'
+              : estimate.status === 'accepted'
+                ? 'Estimate accepted'
+                : estimate.status === 'declined'
+                  ? 'Estimate declined'
+                  : `Estimate ${estimate.status}`;
+            return (
+              <div key={estimate.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{statusText}</p>
+                  <p className="text-xs text-slate-500">{estimate.title} · ${(estimate.total_cents / 100).toFixed(2)}</p>
+                </div>
+                {estimate.status === 'sent' && (
+                  <button
+                    type="button"
+                    onClick={() => setHomeownerTab('estimates')}
+                    className={buttonClass('primary')}
+                  >
+                    <Receipt size={15} />
+                    Review Estimate
+                  </button>
+                )}
+                {estimate.status !== 'sent' && (
+                  <button
+                    type="button"
+                    onClick={() => setHomeownerTab('estimates')}
+                    className={buttonClass('secondary')}
+                  >
+                    View Estimate
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {reportLinks.map(({ entry, document }) => document && (
+            <div key={`${entry.id}:${document.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">Job report available</p>
+                <p className="text-xs text-slate-500">{entry.title || document.file_name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void downloadDocument(document)}
+                className={buttonClass('secondary')}
+              >
+                <FileText size={15} />
+                View Report
+              </button>
+            </div>
+          ))}
+
+          {requestInvoices.map(invoice => {
+            const isPaid = invoice.status === 'paid';
+            const isOpenInvoice = ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status);
+            return (
+              <div key={invoice.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">{isPaid ? 'Invoice paid' : 'Invoice available'}</p>
+                    <p className="text-xs text-slate-500">{invoice.title || 'Invoice'} · {formatMoney(invoice.total_cents)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHomeownerTab('estimates');
+                      void viewHomeownerInvoice(invoice);
+                    }}
+                    className={buttonClass('secondary')}
+                  >
+                    <Receipt size={15} />
+                    View Invoice
+                  </button>
+                </div>
+                {isOpenInvoice && (
+                  <p className="mt-2 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-500">
+                    Payment is handled directly with your contractor.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <SidebarLayout
@@ -8050,6 +8163,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           </p>
                         </div>
                       )}
+                      {renderRequestLinkedWorkflow(request)}
                       <details open={!isClosedCard}>
                         <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700">
                           Thread · {request.messages.length} {request.messages.length === 1 ? 'message' : 'messages'}
