@@ -308,7 +308,13 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
 
 function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
   const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return {
+  const defaultLineItems = [
+    createEstimateLineDraft({ line_type: 'labor', description: 'Labor for completed work', quantity: '1', unit: 'job' }),
+    createEstimateLineDraft({ line_type: 'material', description: 'Materials and supplies', quantity: '1', unit: 'lot' }),
+    createEstimateLineDraft({ line_type: 'labor', description: 'Demolition / removal of existing material', quantity: '1', unit: 'job' }),
+    createEstimateLineDraft({ line_type: 'fee', description: 'Debris disposal / haul-off', quantity: '1', unit: 'job' }),
+  ];
+  const draft = {
     invoice_number: '',
     title: `Invoice — ${subjectName || 'Customer'} — ${dateLabel}`,
     scope: 'Completed work performed for the customer.',
@@ -320,13 +326,12 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
     due_at: '',
     tax: '',
     discount: '',
-    line_items: [
-      createEstimateLineDraft({ line_type: 'labor', description: 'Labor for completed work', quantity: '1', unit: 'job' }),
-      createEstimateLineDraft({ line_type: 'material', description: 'Materials and supplies', quantity: '1', unit: 'lot' }),
-      createEstimateLineDraft({ line_type: 'labor', description: 'Demolition / removal of existing material', quantity: '1', unit: 'job' }),
-      createEstimateLineDraft({ line_type: 'fee', description: 'Debris disposal / haul-off', quantity: '1', unit: 'job' }),
-    ],
+    line_items: defaultLineItems,
     ...overrides,
+  };
+  return {
+    ...draft,
+    line_items: Array.isArray(draft.line_items) && draft.line_items.length ? draft.line_items : [createEstimateLineDraft()],
   };
 }
 
@@ -3274,12 +3279,12 @@ function estimateLineTotalCents(line: EstimateLineDraft) {
   return Math.round(safeQuantity * dollarsToCents(line.unit_price));
 }
 
-function estimateTotalCents(lines: EstimateLineDraft[]) {
+function estimateTotalCents(lines: EstimateLineDraft[] = []) {
   return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
 }
 
 function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount'>) {
-  return Math.max(0, estimateTotalCents(draft.line_items) + dollarsToCents(draft.tax) - dollarsToCents(draft.discount));
+  return Math.max(0, estimateTotalCents(draft.line_items ?? []) + dollarsToCents(draft.tax) - dollarsToCents(draft.discount));
 }
 
 function formatMoney(cents: number) {
@@ -9240,7 +9245,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError('Add an invoice title before saving.');
       return;
     }
-    const usableLines = invoiceDraft.line_items.filter(line => line.description.trim());
+    const usableLines = (invoiceDraft.line_items ?? []).filter(line => line.description.trim());
     if (usableLines.length === 0) {
       setError('Add at least one line item before saving the invoice.');
       return;
@@ -14488,18 +14493,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Invoice line items</p>
-                            <button type="button" onClick={() => setInvoiceDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
+                            <button type="button" onClick={() => setInvoiceDraft(d => ({ ...d, line_items: [...(d.line_items ?? []), createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
                               <Plus size={14} />
                               Add line
                             </button>
                           </div>
-                          {invoiceDraft.line_items.map((line, index) => (
+                          {(invoiceDraft.line_items ?? []).map((line, index) => (
                             <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
                               <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
                                 <Field label="Type">
                                   <select className={inputClass()} value={line.line_type} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
+                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
                                   }))}>
                                     {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => <option key={type} value={type}>{type}</option>)}
                                   </select>
@@ -14507,25 +14512,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <Field label="Description">
                                   <input className={inputClass()} value={line.description} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
+                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
                                   }))} placeholder="Labor, materials, disposal..." />
                                 </Field>
                                 <Field label="Qty">
                                   <input className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
+                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
                                   }))} />
                                 </Field>
                                 <Field label="Unit">
                                   <input className={inputClass()} value={line.unit} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
+                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
                                   }))} />
                                 </Field>
                                 <Field label="Unit price">
                                   <input className={inputClass()} value={line.unit_price} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
+                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
                                   }))} placeholder="$0.00" />
                                 </Field>
                                 <div>
@@ -14536,7 +14541,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   type="button"
                                   onClick={() => setInvoiceDraft(d => ({
                                     ...d,
-                                    line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
+                                    line_items: (d.line_items ?? []).length <= 1 ? [createEstimateLineDraft()] : (d.line_items ?? []).filter(item => item.id !== line.id),
                                   }))}
                                   className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
                                   aria-label={`Remove invoice line ${index + 1}`}
@@ -14567,7 +14572,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="rounded-xl border border-slate-200 bg-white p-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
                             <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
-                            <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items))}</p>
+                            <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items ?? []))}</p>
                           </div>
                         </div>
 
