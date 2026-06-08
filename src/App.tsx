@@ -6761,7 +6761,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }[tone];
 
     return (
-    <section className="space-y-4 border-t border-slate-200 pt-6 first:border-t-0 first:pt-0">
+    <section className="space-y-5 border-t border-slate-200 pt-8 first:border-t-0 first:pt-0">
       <div className={`relative overflow-hidden rounded-xl border px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
         <p className="text-base font-bold leading-6 sm:text-lg">{title}</p>
         <p className="mt-1 text-sm leading-5 text-slate-600">{helper}</p>
