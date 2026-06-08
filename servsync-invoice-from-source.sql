@@ -202,6 +202,23 @@ begin
   end if;
 
   if v_existing.id is not null then
+    if v_job.service_request_id is not null
+       and (
+         coalesce(v_job.job_status, '') in ('completed', 'closed')
+         or v_job.status = 'finalized'
+       ) then
+      update public.service_requests
+         set status = 'closed',
+             closing_summary = coalesce(
+               nullif(trim(closing_summary), ''),
+               'Job completed and invoice created.'
+             ),
+             updated_at = now()
+       where id = v_job.service_request_id
+         and contractor_id = v_job.contractor_id
+         and status not in ('closed', 'declined');
+    end if;
+
     return jsonb_build_object(
       'invoice_id', v_existing.id,
       'created', false,
@@ -377,6 +394,23 @@ begin
       0,
       0
     );
+  end if;
+
+  if v_job.service_request_id is not null
+     and (
+       coalesce(v_job.job_status, '') in ('completed', 'closed')
+       or v_job.status = 'finalized'
+     ) then
+    update public.service_requests
+       set status = 'closed',
+           closing_summary = coalesce(
+             nullif(trim(closing_summary), ''),
+             'Job completed and invoice created.'
+           ),
+           updated_at = now()
+     where id = v_job.service_request_id
+       and contractor_id = v_job.contractor_id
+       and status not in ('closed', 'declined');
   end if;
 
   return jsonb_build_object(

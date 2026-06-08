@@ -10331,6 +10331,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInvoices(prev => [invoice, ...prev.filter(item => item.id !== invoice.id)]);
     return invoice;
   };
+  const autoCloseServiceRequestForJobInvoice = async (job: Inspection, invoice: Invoice) => {
+    if (!supabase || !job.service_request_id || invoice.status === 'void' || !inspectionIsClosedJob(job)) return false;
+    const linkedRequest = serviceRequests.find(request => request.id === job.service_request_id);
+    if (!linkedRequest || ['closed', 'declined'].includes(linkedRequest.status)) return false;
+
+    const { error: closeError } = await supabase.rpc('servsync_contractor_update_service_request', {
+      p_request_id: linkedRequest.id,
+      p_body: 'Job completed and invoice created.',
+      p_new_status: 'closed',
+      p_quote_amount_cents: null,
+      p_quote_scope: null,
+      p_closing_summary: 'Job completed and invoice created.',
+    });
+    if (closeError) throw closeError;
+    return true;
+  };
 
   const createInvoiceFromEstimate = async (estimate: Estimate) => {
     if (!supabase) return;
@@ -10370,12 +10386,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
     );
     if (existingInvoice) {
-      openInvoiceRecord(existingInvoice);
-      setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this job.' : 'Opened the invoice linked to this job.');
+      try {
+        const closedRequest = await autoCloseServiceRequestForJobInvoice(job, existingInvoice);
+        openInvoiceRecord(existingInvoice);
+        setNotice(closedRequest
+          ? 'Opened the invoice linked to this job and moved the service request to closed.'
+          : existingInvoice.status === 'draft' ? 'Opened the draft invoice for this job.' : 'Opened the invoice linked to this job.'
+        );
+        if (closedRequest) await loadContractor();
+      } catch (err) {
+        setError(readableError(err, 'Unable to close the linked service request.'));
+      }
       return;
     }
     setCreatingInvoiceSourceId(`job:${job.id}`);
     try {
+      const requestWillClose = Boolean(job.service_request_id && inspectionIsClosedJob(job));
       const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_job', {
         p_inspection_id: job.id,
       });
@@ -10384,7 +10410,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
       const invoice = await loadInvoiceById(result.invoice_id);
       openInvoiceRecord(invoice);
-      setNotice(result.created ? 'Invoice draft created from job.' : 'Opened the existing invoice for this job.');
+      setNotice(requestWillClose
+        ? result.created
+          ? 'Invoice draft created from job and linked service request moved to closed.'
+          : 'Opened the existing invoice for this job and linked service request moved to closed.'
+        : result.created ? 'Invoice draft created from job.' : 'Opened the existing invoice for this job.'
+      );
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to create invoice from job. Make sure the invoice-from-source SQL has been applied.'));
