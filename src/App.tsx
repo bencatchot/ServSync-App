@@ -377,9 +377,7 @@ function jobTypeFromWorkflowKind(kind: FieldWorkflowKind, mode: JobWorkflowMode 
 function isChecklistJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
   const type = (job.job_type || '').trim();
   if (CHECKLIST_JOB_TYPES.has(type)) return true;
-  if (SIMPLE_SERVICE_JOB_TYPES.has(type)) {
-    return jobHasChecklistStructure(job) && (Boolean(job.template_id) || isInspectionLikeFieldWork(job));
-  }
+  if (SIMPLE_SERVICE_JOB_TYPES.has(type)) return false;
   return Boolean(job.template_id && jobHasChecklistStructure(job)) || (isInspectionLikeFieldWork(job) && jobHasChecklistStructure(job));
 }
 
@@ -10520,7 +10518,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
     setSavingInspection(true);
     try {
-      const isSimpleJobDraft = inspectionNewDraft.job_mode === 'simple';
+      const isSimpleJobDraft = inspectionNewDraft.job_mode === 'simple'
+        || inspectionNewDraft.workflow_kind === 'work_order'
+        || SIMPLE_SERVICE_JOB_TYPES.has((inspectionNewDraft.job_type || '').trim());
       const requestedJobType = isSimpleJobDraft
         ? inspectionNewDraft.job_type
         : jobTypeFromWorkflowKind(inspectionNewDraft.workflow_kind, 'checklist');
@@ -16192,7 +16192,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   <>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Workflow type">
-                        <select className={inputClass()} value={inspectionNewDraft.workflow_kind} onChange={e => {
+                        <select className={inputClass()} value={inspectionNewDraft.workflow_kind === 'work_order' ? 'inspection' : inspectionNewDraft.workflow_kind} onChange={e => {
                           const nextKind = e.target.value as FieldWorkflowKind;
                           const nextStarter = sortedServSyncFieldWorkTemplates.find(t => t.kind === nextKind) ?? sortedServSyncFieldWorkTemplates[0];
                           setInspectionNewDraft(d => ({
@@ -16209,7 +16209,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               : d.name,
                           }));
                         }}>
-                          {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          {Object.entries(FIELD_WORK_KIND_LABEL)
+                            .filter(([value]) => value !== 'work_order')
+                            .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
                       </Field>
                       <Field label="Job name">
