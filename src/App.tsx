@@ -350,9 +350,14 @@ function isInspectionLikeFieldWork(work: Pick<Inspection, 'name' | 'summary'>) {
 
 const SIMPLE_SERVICE_JOB_TYPES = new Set(['service_visit', 'repair', 'install', 'estimate_visit']);
 const CHECKLIST_JOB_TYPES = new Set(['inspection', 'maintenance_visit']);
+const SIMPLE_WORK_ITEMS_ROOM = 'Work Items';
 
 function roomIsApprovedScope(roomName: string) {
   return normalizeText(roomName) === 'approved scope' || normalizeText(roomName) === 'approved work';
+}
+
+function roomIsSimpleWorkItems(roomName: string) {
+  return normalizeText(roomName) === normalizeText(SIMPLE_WORK_ITEMS_ROOM);
 }
 
 function jobHasChecklistStructure(job: Pick<Inspection, 'rooms_with_findings'>) {
@@ -8630,6 +8635,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   });
   const [localFindings, setLocalFindings] = useState<Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>>({});
   const [inspectionClosedForReview, setInspectionClosedForReview] = useState(false);
+  const [simpleTaskTitleDraft, setSimpleTaskTitleDraft] = useState('');
   const [repairEstimateDrafts, setRepairEstimateDrafts] = useState<Record<string, RepairEstimateLineDraft[]>>({});
   const [showRepairEstimateDraft, setShowRepairEstimateDraft] = useState(false);
   const [estimateDraftNotice, setEstimateDraftNotice] = useState('');
@@ -10779,6 +10785,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const summaryText = inspectionSummary.trim() || insp.summary || '';
     try {
       const updatedRooms = buildInspectionRoomsSnapshot();
+      if (isSimpleServiceJob(insp)) {
+        const taskFindings = updatedRooms.flatMap(room => room.findings);
+        const incompleteCount = taskFindings.filter(finding => finding.status !== 'Fixed On Site').length;
+        if (incompleteCount > 0 && !window.confirm(`${incompleteCount} task${incompleteCount === 1 ? ' is' : 's are'} still marked not complete. Complete this job anyway?`)) {
+          return;
+        }
+      }
       const { data: updated, error: updateError } = await supabase
         .from('inspections')
         .update({
@@ -16298,6 +16311,107 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 : null;
               const completed = inspectionIsClosedJob(activeInspection);
               const photoCount = workingFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
+              const simpleJobReadonly = activeInspection.status !== 'draft' || completed;
+              const simpleWorkRooms = workingRooms.filter(room => !roomIsApprovedScope(room.room));
+              const simpleTaskRows = simpleWorkRooms.flatMap(room =>
+                room.findings.map(finding => ({
+                  room: room.room,
+                  key: `${room.room}||${finding.title}`,
+                  finding,
+                }))
+              );
+              const allSimpleTaskRows = [
+                ...approvedScopeRooms.flatMap(room => room.findings.map(finding => ({ room: room.room, key: `${room.room}||${finding.title}`, finding }))),
+                ...simpleTaskRows,
+              ];
+              const completeTaskCount = allSimpleTaskRows.filter(row => row.finding.status === 'Fixed On Site').length;
+              const incompleteTaskCount = allSimpleTaskRows.length - completeTaskCount;
+              const setSimpleTaskValue = (
+                room: string,
+                title: string,
+                updates: Partial<{ status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>,
+              ) => {
+                const key = `${room}||${title}`;
+                setLocalFindings(prev => {
+                  const current = prev[key] ?? { status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+                  return { ...prev, [key]: { ...current, ...updates } };
+                });
+              };
+              const addSimpleTask = () => {
+                const title = simpleTaskTitleDraft.trim();
+                if (!title) return;
+                const existingTask = simpleTaskRows.some(row => normalizeText(row.finding.title) === normalizeText(title));
+                if (existingTask) {
+                  setError('That task is already on this job.');
+                  return;
+                }
+                const key = `${SIMPLE_WORK_ITEMS_ROOM}||${title}`;
+                setActiveRooms(prev => {
+                  const hasRoom = prev.some(room => roomIsSimpleWorkItems(room.room));
+                  if (!hasRoom) return [...prev, { room: SIMPLE_WORK_ITEMS_ROOM, items: [title] }];
+                  return prev.map(room => roomIsSimpleWorkItems(room.room) ? { ...room, items: [...room.items, title] } : room);
+                });
+                setAvailableChecklistRooms(prev => {
+                  const hasRoom = prev.some(room => roomIsSimpleWorkItems(room.room));
+                  if (!hasRoom) return [...prev, { room: SIMPLE_WORK_ITEMS_ROOM, items: [title] }];
+                  return prev.map(room => roomIsSimpleWorkItems(room.room) ? { ...room, items: [...room.items, title] } : room);
+                });
+                setLocalFindings(prev => ({
+                  ...prev,
+                  [key]: { status: 'Monitor', notes: '', action: '', due: '', photos: [] },
+                }));
+                setSimpleTaskTitleDraft('');
+              };
+              const updateSimpleTaskTitle = (room: string, title: string, nextTitle: string) => {
+                const trimmed = nextTitle.trim();
+                if (!trimmed || trimmed === title) return;
+                const duplicate = simpleTaskRows.some(row =>
+                  row.room === room
+                  && row.finding.title !== title
+                  && normalizeText(row.finding.title) === normalizeText(trimmed)
+                );
+                if (duplicate) {
+                  setError('Another task already uses that title.');
+                  return;
+                }
+                const oldKey = `${room}||${title}`;
+                const nextKey = `${room}||${trimmed}`;
+                setActiveRooms(prev => prev.map(itemRoom =>
+                  itemRoom.room === room
+                    ? { ...itemRoom, items: itemRoom.items.map(item => item === title ? trimmed : item) }
+                    : itemRoom
+                ));
+                setAvailableChecklistRooms(prev => prev.map(itemRoom =>
+                  itemRoom.room === room
+                    ? { ...itemRoom, items: itemRoom.items.map(item => item === title ? trimmed : item) }
+                    : itemRoom
+                ));
+                setLocalFindings(prev => {
+                  const current = prev[oldKey] ?? { status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+                  const updated = { ...prev };
+                  delete updated[oldKey];
+                  updated[nextKey] = current;
+                  return updated;
+                });
+              };
+              const removeSimpleTask = (room: string, title: string) => {
+                const key = `${room}||${title}`;
+                setActiveRooms(prev => prev.map(itemRoom =>
+                  itemRoom.room === room
+                    ? { ...itemRoom, items: itemRoom.items.filter(item => item !== title) }
+                    : itemRoom
+                ).filter(itemRoom => !roomIsSimpleWorkItems(itemRoom.room) || itemRoom.items.length > 0));
+                setAvailableChecklistRooms(prev => prev.map(itemRoom =>
+                  itemRoom.room === room
+                    ? { ...itemRoom, items: itemRoom.items.filter(item => item !== title) }
+                    : itemRoom
+                ).filter(itemRoom => !roomIsSimpleWorkItems(itemRoom.room) || itemRoom.items.length > 0));
+                setLocalFindings(prev => {
+                  const updated = { ...prev };
+                  delete updated[key];
+                  return updated;
+                });
+              };
               return (
                 <div className="space-y-4">
                   <button
@@ -16382,27 +16496,140 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
 
                       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-bold text-slate-950">Approved Scope / Work To Complete</h3>
-                        {approvedWorkItems.length === 0 ? (
-                          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                            No approved scope has been added yet. Use Work Notes to describe the completed work or create the job from an accepted estimate.
-                          </p>
-                        ) : (
-                          <div className="mt-3 space-y-2">
-                            {approvedWorkItems.map((item, index) => (
-                              <div key={`${item.title}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                                {item.notes && <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-600">{item.notes}</p>}
-                                {item.action && <p className="mt-2 text-sm font-medium text-blue-700">{item.action}</p>}
-                                {(item.photos ?? []).length > 0 && (
-                                  <div className="mt-3 grid grid-cols-4 gap-2">
-                                    {(item.photos ?? []).map((url, pi) => (
-                                      <InspectionPhotoImage key={pi} photo={url} alt={item.title} className="h-20 w-full rounded-lg object-cover" />
-                                    ))}
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-950">Tasks / Work Items</h3>
+                            <p className="mt-1 text-xs text-slate-500">Track normal service work without inspection sections or finding statuses.</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                            {completeTaskCount}/{allSimpleTaskRows.length} complete
+                          </span>
+                        </div>
+
+                        {approvedWorkItems.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Approved work</p>
+                            {approvedScopeRooms.flatMap(room => room.findings.map((item, index) => {
+                              const taskComplete = item.status === 'Fixed On Site';
+                              return (
+                                <div key={`${room.room}-${item.title}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                                  <div className="flex flex-wrap items-start gap-3">
+                                    <label className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-slate-950">
+                                      <input
+                                        type="checkbox"
+                                        checked={taskComplete}
+                                        disabled={simpleJobReadonly}
+                                        onChange={event => setSimpleTaskValue(room.room, item.title, {
+                                          status: event.target.checked ? 'Fixed On Site' : 'Monitor',
+                                          action: event.target.checked ? 'Completed approved work.' : item.action,
+                                        })}
+                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                      />
+                                      <span>{item.title}</span>
+                                    </label>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${taskComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                      {taskComplete ? 'Complete' : 'Not complete'}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                  {item.notes && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{item.notes}</p>}
+                                  {item.action && <p className="mt-2 text-sm font-medium text-blue-700">{item.action}</p>}
+                                  {(item.photos ?? []).length > 0 && (
+                                    <div className="mt-3 grid grid-cols-4 gap-2">
+                                      {(item.photos ?? []).map((url, pi) => (
+                                        <InspectionPhotoImage key={pi} photo={url} alt={item.title} className="h-20 w-full rounded-lg object-cover" />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }))}
+                          </div>
+                        )}
+
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Work items</p>
+                            <p className="text-xs text-slate-500">{incompleteTaskCount} not complete</p>
+                          </div>
+                          {simpleTaskRows.length === 0 ? (
+                            <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                              No work items yet. Add the tasks the contractor needs to complete for this job.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {simpleTaskRows.map(row => {
+                                const taskComplete = row.finding.status === 'Fixed On Site';
+                                return (
+                                  <div key={row.key} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div className="flex flex-wrap items-start gap-3">
+                                      <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                        <input
+                                          type="checkbox"
+                                          checked={taskComplete}
+                                          disabled={simpleJobReadonly}
+                                          onChange={event => setSimpleTaskValue(row.room, row.finding.title, {
+                                            status: event.target.checked ? 'Fixed On Site' : 'Monitor',
+                                            action: event.target.checked ? 'Completed.' : row.finding.action,
+                                          })}
+                                          className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                        />
+                                        {taskComplete ? 'Complete' : 'Not complete'}
+                                      </label>
+                                      <div className="min-w-[220px] flex-1">
+                                        <label className="block text-xs font-semibold text-slate-500">Task</label>
+                                        <input
+                                          key={`${row.key}-title`}
+                                          className={`${inputClass()} mt-1`}
+                                          defaultValue={row.finding.title}
+                                          disabled={simpleJobReadonly}
+                                          onBlur={event => updateSimpleTaskTitle(row.room, row.finding.title, event.target.value)}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={simpleJobReadonly}
+                                        onClick={() => removeSimpleTask(row.room, row.finding.title)}
+                                        className="mt-6 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                    <label className="mt-3 block text-xs font-semibold text-slate-500">Notes</label>
+                                    <textarea
+                                      className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
+                                      value={row.finding.notes}
+                                      disabled={simpleJobReadonly}
+                                      onChange={event => setSimpleTaskValue(row.room, row.finding.title, { notes: event.target.value })}
+                                      placeholder="Add parts used, location, completion detail, or follow-up notes..."
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {!simpleJobReadonly && (
+                          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                            <label className="block text-xs font-semibold text-slate-500">Add task</label>
+                            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                              <input
+                                className={inputClass()}
+                                value={simpleTaskTitleDraft}
+                                onChange={event => setSimpleTaskTitleDraft(event.target.value)}
+                                onKeyDown={event => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    addSimpleTask();
+                                  }
+                                }}
+                                placeholder="e.g. Install new outlet"
+                              />
+                              <button type="button" onClick={addSimpleTask} disabled={!simpleTaskTitleDraft.trim()} className={buttonClass('primary')}>
+                                <Plus size={15} />
+                                Add Task
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
