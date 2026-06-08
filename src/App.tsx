@@ -2036,6 +2036,83 @@ const SERVSYNC_FIELD_WORK_TEMPLATES: ServSyncFieldWorkTemplate[] = TRADE_OPTIONS
   };
 });
 
+const CURATED_INSPECTION_TEMPLATE_CONFIG: Partial<Record<string, {
+  name: string;
+  description: string;
+  kind: FieldWorkflowKind;
+  rooms?: InspectionTemplateRoom[];
+}>> = {
+  'General Maintenance': {
+    name: 'General Home Inspection / Home Maintenance Walkthrough',
+    description: 'Whole-home checklist for room-by-room conditions, safety items, visible maintenance needs, and homeowner-ready reporting.',
+    kind: 'inspection',
+    rooms: DEFAULT_INSPECTION_ROOMS,
+  },
+  HVAC: {
+    name: 'HVAC Maintenance Inspection',
+    description: 'HVAC maintenance checklist for equipment condition, airflow, controls, drainage, safety observations, and recommendations.',
+    kind: 'inspection',
+  },
+  Electrical: {
+    name: 'Electrical Safety Check',
+    description: 'Electrical safety checklist for panels, devices, GFCI/AFCI protection, visible wiring concerns, detectors, and recommendations.',
+    kind: 'inspection',
+  },
+  Plumbing: {
+    name: 'Plumbing Inspection',
+    description: 'Plumbing checklist for water heaters, fixtures, supply lines, drains, leaks, shutoffs, visible moisture, and recommendations.',
+    kind: 'inspection',
+    rooms: [
+      { room: 'Water Heater', items: ['Tank or equipment condition checked', 'Visible leaks, corrosion, or staining noted', 'Pressure relief valve and discharge pipe checked', 'Venting, clearance, or electrical/gas safety concerns documented'] },
+      { room: 'Fixtures and Supply', items: ['Faucets, toilets, and visible fixtures checked', 'Supply valves and connectors checked', 'Water pressure or flow concerns documented', 'Visible leaks or moisture at fixtures documented'] },
+      { room: 'Drains and Waste', items: ['Sink, tub, shower, and floor drains checked where accessible', 'Slow drain, odor, backup, or trap concern documented', 'Visible drain piping condition checked', 'Cleanout or access limitations noted'] },
+      { room: 'Recommendations', items: ['Repair recommendation added if needed', 'Urgent leak or safety concern documented', 'Preventive maintenance recommendation added', 'Photos added for homeowner record'] },
+    ],
+  },
+  'Pest Control': {
+    name: 'Pest Inspection',
+    description: 'Pest inspection checklist for activity evidence, entry points, moisture conditions, damage, treatment recommendations, and follow-up.',
+    kind: 'inspection',
+    rooms: [
+      { room: 'Exterior Conditions', items: ['Entry points, gaps, or penetrations checked', 'Vegetation, moisture, wood contact, or conducive conditions noted', 'Nests, trails, droppings, or visible activity documented', 'Foundation, doors, windows, and utility penetrations checked'] },
+      { room: 'Interior Evidence', items: ['Droppings, damage, staining, or odor evidence documented', 'Kitchen, pantry, attic, crawlspace, or garage areas checked where accessible', 'Moisture or food-source conditions noted', 'Photos added for homeowner record'] },
+      { room: 'Recommendations', items: ['Treatment or exclusion recommendation added', 'Sanitation or moisture-control recommendation added', 'Follow-up timing documented', 'Urgent structural or health concern documented'] },
+    ],
+  },
+  Roofing: {
+    name: 'Roof / Exterior Inspection',
+    description: 'Roof and exterior checklist for roof covering, flashing, penetrations, gutters, siding, drainage, and visible exterior concerns.',
+    kind: 'inspection',
+    rooms: [
+      { room: 'Roof Covering', items: ['Roof material and approximate condition documented', 'Missing, lifted, cracked, damaged, or deteriorated areas noted', 'Debris, moss, ponding, or surface wear documented', 'Photos added for notable roof conditions'] },
+      { room: 'Flashing and Penetrations', items: ['Flashing at walls, chimney, valleys, and skylights checked', 'Pipe boots, vents, and roof penetrations checked', 'Interior leak concern connected to roof area if known', 'Urgent water-entry concern documented'] },
+      { room: 'Exterior and Drainage', items: ['Gutters and downspouts checked for flow, attachment, and extensions', 'Siding, trim, fascia, soffit, and caulking concerns documented', 'Grading or drainage concern near structure noted', 'Repair or maintenance recommendation added'] },
+    ],
+  },
+};
+
+function curatedInspectionStarterTemplate(template: ServSyncFieldWorkTemplate): ServSyncFieldWorkTemplate | null {
+  const config = CURATED_INSPECTION_TEMPLATE_CONFIG[template.trade];
+  if (!config) return null;
+  return {
+    ...template,
+    name: config.name,
+    description: config.description,
+    kind: config.kind,
+    rooms: config.rooms ?? template.rooms,
+  };
+}
+
+function customTemplateLooksInspectionLike(template: Pick<InspectionTemplate, 'name' | 'rooms'>) {
+  const haystack = normalizeText([
+    template.name,
+    ...template.rooms.flatMap(room => [room.room, ...room.items]),
+  ].join(' '));
+  const positive = ['inspection', 'inspect', 'check', 'safety', 'maintenance', 'walkthrough', 'evaluation', 'evaluate', 'assessment', 'report'];
+  const negative = ['service visit', 'repair job', 'install', 'installation', 'cleaning', 'moving', 'appliance repair', 'handyman', 'drywall repair'];
+  return positive.some(term => hasPhrase(haystack, term)) && !negative.some(term => hasPhrase(haystack, term));
+}
+
 const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(trade => {
   const blueprint = TRADE_STARTER_TEMPLATE_BLUEPRINTS[trade] ?? TRADE_STARTER_TEMPLATE_BLUEPRINTS['General Maintenance'];
   return {
@@ -10244,10 +10321,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (aRecommended !== bRecommended) return aRecommended - bRecommended;
     return a.name.localeCompare(b.name);
   });
-  const inspectionStarterTemplateFallback = SERVSYNC_FIELD_WORK_TEMPLATES
-    .filter(template => template.kind !== 'work_order' && template.trade === 'General Maintenance');
-  const checklistStarterTemplates = sortedServSyncFieldWorkTemplates
-    .filter(template => template.kind !== 'work_order');
+  const curatedInspectionStarterTemplates = SERVSYNC_FIELD_WORK_TEMPLATES
+    .map(curatedInspectionStarterTemplate)
+    .filter((template): template is ServSyncFieldWorkTemplate => Boolean(template))
+    .sort((a, b) => {
+      const aRecommended = starterTemplateRecommendedForContractor(a.trade) ? 0 : 1;
+      const bRecommended = starterTemplateRecommendedForContractor(b.trade) ? 0 : 1;
+      if (aRecommended !== bRecommended) return aRecommended - bRecommended;
+      return a.name.localeCompare(b.name);
+    });
+  const inspectionStarterTemplateFallback = curatedInspectionStarterTemplates
+    .filter(template => template.trade === 'General Maintenance');
+  const checklistStarterTemplates = contractorTradeSet.size
+    ? curatedInspectionStarterTemplates.filter(template => starterTemplateAllowedForContractor(template.trade))
+    : inspectionStarterTemplateFallback;
   const inspectionStarterTemplatesForNewJob = checklistStarterTemplates.length
     ? checklistStarterTemplates
     : inspectionStarterTemplateFallback;
@@ -10267,6 +10354,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
   const filteredCustomTemplates = inspectionTemplates.filter(templateMatchesSearch);
+  const inspectionCustomTemplatesForNewJob = inspectionTemplates
+    .filter(customTemplateLooksInspectionLike)
+    .filter(templateMatchesSearch);
   const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<{ description: string; line_type: string; unit: string }> }) => {
     if (!normalizedTemplateSearch) return true;
     const haystack = normalizeText([
@@ -10542,7 +10632,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id)
         : null;
       const selectedStarterTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'starter'
-        ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id && t.kind !== 'work_order')
+        ? inspectionStarterTemplatesForNewJob.find(t => t.id === inspectionNewDraft.starter_template_id)
         : null;
       const rooms: InspectionTemplateRoom[] = selectedTemplate
         ? selectedTemplate.rooms
@@ -16097,7 +16187,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
                         const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
                         const selectedTemplate = inspectionNewDraft.template_source === 'starter'
-                          ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
+                          ? inspectionStarterTemplatesForNewJob.find(t => t.id === inspectionNewDraft.starter_template_id)
                           : null;
                         const workflowLabel = workflowDisplayLabelForDraft(inspectionNewDraft.workflow_kind, inspectionNewDraft.job_mode, inspectionNewDraft.template_source);
                         const subjectName = conn?.display_name || local?.display_name || '';
@@ -16224,7 +16314,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           return;
                         }
                         const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
-                        const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === id);
+                        const starter = inspectionStarterTemplatesForNewJob.find(t => t.id === id);
                         setInspectionNewDraft(d => ({
                           ...d,
                           template_source: source,
@@ -16242,9 +16332,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </option>
                           ))}
                         </optgroup>
-                        {inspectionTemplates.length > 0 && (
+                        {inspectionCustomTemplatesForNewJob.length > 0 && (
                           <optgroup label="Your templates">
-                            {inspectionTemplates.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
+                            {inspectionCustomTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
                           </optgroup>
                         )}
                       </select>
