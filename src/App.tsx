@@ -1262,26 +1262,54 @@ const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
     'GFCI protection checked where accessible',
     'Ventilation or exhaust concern observed where applicable',
   ]},
-  { room: 'Bathrooms', items: [
-    'Sink, toilet, tub, or shower leaks/moisture observed',
-    'Toilet function/base movement concerns observed',
-    'Caulk, grout, or moisture damage observed',
-    'Exhaust fan or ventilation concern observed',
-    'Flooring or wall damage observed',
-  ]},
-  { room: 'Living / Common Areas', items: [
+  { room: 'Living Room', items: [
     'Walls, ceilings, and floors condition observed',
     'Windows and doors basic operation/condition observed',
     'Visible staining, cracking, or damage observed',
     'Outlets, switches, and fixtures basic condition observed',
     'Trip hazards or safety concerns observed',
   ]},
-  { room: 'Bedrooms', items: [
+  { room: 'Dining Room', items: [
+    'Walls, ceilings, and floors condition observed',
+    'Windows and doors basic operation/condition observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Trip hazards or safety concerns observed',
+  ]},
+  { room: 'Primary Bedroom', items: [
     'Walls, ceilings, and floors condition observed',
     'Windows and doors basic operation/condition observed',
     'Visible staining, cracking, or damage observed',
     'Outlets, switches, and fixtures basic condition observed',
     'Smoke/CO detector presence observed where applicable',
+  ]},
+  { room: 'Bedroom 2', items: [
+    'Walls, ceilings, and floors condition observed',
+    'Windows and doors basic operation/condition observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Smoke/CO detector presence observed where applicable',
+  ]},
+  { room: 'Bedroom 3', items: [
+    'Walls, ceilings, and floors condition observed',
+    'Windows and doors basic operation/condition observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Smoke/CO detector presence observed where applicable',
+  ]},
+  { room: 'Primary Bathroom', items: [
+    'Sink, toilet, tub, or shower leaks/moisture observed',
+    'Toilet function/base movement concerns observed',
+    'Caulk, grout, or moisture damage observed',
+    'Exhaust fan or ventilation concern observed',
+    'Flooring or wall damage observed',
+  ]},
+  { room: 'Bathroom 2', items: [
+    'Sink, toilet, tub, or shower leaks/moisture observed',
+    'Toilet function/base movement concerns observed',
+    'Caulk, grout, or moisture damage observed',
+    'Exhaust fan or ventilation concern observed',
+    'Flooring or wall damage observed',
   ]},
   { room: 'Laundry', items: [
     'Washer supply/drain connections observed where accessible',
@@ -1290,11 +1318,18 @@ const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
     'GFCI protection checked where accessible',
     'Ventilation or clearance concerns observed',
   ]},
-  { room: 'Garage / Basement / Crawlspace', items: [
+  { room: 'Garage', items: [
+    'Garage door operation and safety concerns observed where applicable',
+    'Walls, ceilings, and floors condition observed',
+    'Visible staining, cracking, or damage observed',
+    'Outlets, switches, and fixtures basic condition observed',
+    'Storage, clearance, or access limitations noted where relevant',
+  ]},
+  { room: 'Basement / Crawlspace', items: [
     'Water intrusion or moisture concerns observed',
     'Sump or drainage concerns observed where applicable',
-    'Garage door safety concerns observed where applicable',
     'Visible structural concerns observed where accessible',
+    'Pest evidence observed where accessible',
     'Storage, clearance, or access limitations noted where relevant',
   ]},
 ];
