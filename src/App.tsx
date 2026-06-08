@@ -167,6 +167,15 @@ type InspectionTemplateSubjectContext = {
   local_contact_id?: string;
   local_home_id?: string;
 };
+type HomeTemplatePromptAction = 'finalize' | 'send';
+type HomeTemplatePromptState = {
+  inspection: Inspection;
+  action: HomeTemplatePromptAction;
+  targetLabel: string;
+  defaultName: string;
+  existingTemplates: InspectionTemplate[];
+  selectedTemplateId: string;
+};
 type ServSyncFieldWorkTemplate = {
   id: string;
   name: string;
@@ -8867,6 +8876,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [templateDraft, setTemplateDraft] = useState<{ name: string; rooms: InspectionTemplateRoom[] }>({ name: '', rooms: [] });
   const [templateEditRoom, setTemplateEditRoom] = useState('');
   const [templateEditItems, setTemplateEditItems] = useState('');
+  const [homeTemplatePrompt, setHomeTemplatePrompt] = useState<HomeTemplatePromptState | null>(null);
+  const [homeTemplateNameDraft, setHomeTemplateNameDraft] = useState('');
+  const [savingHomeTemplateAction, setSavingHomeTemplateAction] = useState<'insert' | 'update' | 'skip' | null>(null);
   // Job assistant state
   const [selectedChecklistRoom, setSelectedChecklistRoom] = useState<string | null>(null);
   const [assistantMode, setAssistantMode] = useState<'single' | 'walkthrough' | 'ai'>('single');
@@ -10718,6 +10730,160 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return !inspectionLayoutSnapshotsEqual(originalInspectionLayoutRef.current, currentInspectionLayoutSnapshot());
   };
 
+  const buildInspectionTemplateRoomsFromLayout = (): InspectionTemplateRoom[] => activeRooms
+    .map((room, index) => ({
+      ...roomIdentityFields(room, index),
+      items: (Array.isArray(room.items) ? room.items : [])
+        .map(item => item.trim())
+        .filter(Boolean),
+    }))
+    .filter(room => room.room.trim() && room.items.length > 0);
+
+  const homeTemplateContextForInspection = (insp: Inspection): InspectionTemplateSubjectContext | null => {
+    if (insp.homeowner_user_id) {
+      const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
+      return {
+        subject_type: 'connected',
+        homeowner_user_id: insp.homeowner_user_id,
+        home_id: connection?.home?.id ?? '',
+      };
+    }
+    if (insp.local_contact_id) {
+      return {
+        subject_type: 'local',
+        local_contact_id: insp.local_contact_id,
+        local_home_id: insp.local_home_id ?? '',
+      };
+    }
+    return null;
+  };
+
+  const homeTemplateTargetLabel = (insp: Inspection) => {
+    if (insp.homeowner_user_id) {
+      const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
+      return connection?.display_name ? `${connection.display_name}'s home` : connection?.home?.nickname || connection?.home?.address_line1 || 'this home';
+    }
+    const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
+    const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
+    return contact?.display_name ? `${contact.display_name}'s home` : localHome?.nickname || localHome?.address_line1 || 'this home';
+  };
+
+  const defaultHomeTemplateName = (insp: Inspection) => {
+    if (insp.homeowner_user_id) {
+      const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
+      if (connection?.home?.nickname?.trim()) return `${connection.home.nickname.trim()} Home Template`;
+      if (connection?.home?.address_line1?.trim()) return `${connection.home.address_line1.trim()} Home Template`;
+      if (connection?.display_name?.trim()) return `${connection.display_name.trim()}'s Home Template`;
+      return 'Home Inspection Template';
+    }
+    const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
+    const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
+    if (localHome?.nickname?.trim()) return `${localHome.nickname.trim()} Home Template`;
+    if (localHome?.address_line1?.trim()) return `${localHome.address_line1.trim()} Home Template`;
+    if (contact?.display_name?.trim()) return `${contact.display_name.trim()}'s Home Template`;
+    return 'Home Inspection Template';
+  };
+
+  const homeTemplatesForInspection = (insp: Inspection) => {
+    const context = homeTemplateContextForInspection(insp);
+    if (!context) return [];
+    return activeInspectionTemplates.filter(template => templateMatchesInspectionSubject(template, context));
+  };
+
+  const resetInspectionLayoutBaseline = () => {
+    originalInspectionLayoutRef.current = currentInspectionLayoutSnapshot();
+    inspectionLayoutDirtyRef.current = false;
+  };
+
+  const maybeOpenHomeTemplatePrompt = (insp: Inspection, action: HomeTemplatePromptAction) => {
+    if (!contractor || isSimpleServiceJob(insp) || !homeTemplateContextForInspection(insp)) return false;
+    const layoutChanged = hasInspectionLayoutChanged();
+    inspectionLayoutDirtyRef.current = layoutChanged;
+    if (!layoutChanged || buildInspectionTemplateRoomsFromLayout().length === 0) return false;
+
+    const existingTemplates = homeTemplatesForInspection(insp);
+    const selectedTemplate = existingTemplates.find(template => template.is_default_for_home) ?? existingTemplates[0] ?? null;
+    const defaultName = selectedTemplate?.name || defaultHomeTemplateName(insp);
+    setHomeTemplatePrompt({
+      inspection: insp,
+      action,
+      targetLabel: homeTemplateTargetLabel(insp),
+      defaultName,
+      existingTemplates,
+      selectedTemplateId: selectedTemplate?.id ?? '',
+    });
+    setHomeTemplateNameDraft(defaultName);
+    return true;
+  };
+
+  const continueHomeTemplatePromptAction = async (prompt: HomeTemplatePromptState) => {
+    const { inspection, action } = prompt;
+    setHomeTemplatePrompt(null);
+    setHomeTemplateNameDraft('');
+    resetInspectionLayoutBaseline();
+    if (action === 'send') {
+      await sendInspectionReportToHomeowner(inspection, { skipHomeTemplatePrompt: true });
+      return;
+    }
+    await finalizeInspection(inspection, { skipHomeTemplatePrompt: true, skipConfirmation: true });
+  };
+
+  const saveHomeTemplateFromPrompt = async (mode: 'insert' | 'update') => {
+    if (!supabase || !contractor || !homeTemplatePrompt) return;
+    const prompt = homeTemplatePrompt;
+    const context = homeTemplateContextForInspection(prompt.inspection);
+    const rooms = buildInspectionTemplateRoomsFromLayout();
+    if (!context || rooms.length === 0) {
+      setError('Add at least one section and checklist item before saving this home template.');
+      return;
+    }
+    const templateName = homeTemplateNameDraft.trim() || prompt.defaultName;
+    setSavingHomeTemplateAction(mode);
+    try {
+      if (mode === 'update') {
+        const templateId = prompt.selectedTemplateId || prompt.existingTemplates[0]?.id;
+        if (!templateId) throw new Error('Select a home template to update.');
+        const { data, error: updateError } = await supabase
+          .from('inspection_templates')
+          .update({
+            name: templateName,
+            rooms,
+            source_inspection_id: prompt.inspection.id,
+          })
+          .eq('id', templateId)
+          .select()
+          .single();
+        if (updateError) throw updateError;
+        setInspectionTemplates(prev => prev.map(template => template.id === templateId ? data as InspectionTemplate : template));
+      } else {
+        const hasExistingDefault = prompt.existingTemplates.some(template => template.is_default_for_home);
+        const { data, error: insertError } = await supabase
+          .from('inspection_templates')
+          .insert({
+            contractor_id: contractor.id,
+            name: templateName,
+            rooms,
+            scope: 'home',
+            homeowner_user_id: context.subject_type === 'connected' ? context.homeowner_user_id || null : null,
+            home_id: context.subject_type === 'connected' ? context.home_id || null : null,
+            local_contact_id: context.subject_type === 'local' ? context.local_contact_id || null : null,
+            local_home_id: context.subject_type === 'local' ? context.local_home_id || null : null,
+            source_inspection_id: prompt.inspection.id,
+            is_default_for_home: !hasExistingDefault,
+          })
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
+      }
+      await continueHomeTemplatePromptAction(prompt);
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this home template.'));
+    } finally {
+      setSavingHomeTemplateAction(null);
+    }
+  };
+
   const persistInspectionRooms = async (
     insp: Inspection,
     rooms: InspectionRoomData[],
@@ -10904,15 +11070,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const finalizeInspection = async (insp: Inspection) => {
+  const finalizeInspection = async (insp: Inspection, options?: { skipHomeTemplatePrompt?: boolean; skipConfirmation?: boolean }) => {
     if (!supabase || !contractor) return;
     setNotice('');
     setError('');
-    const confirmed = window.confirm(insp.homeowner_user_id
-      ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
-      : 'Finalize this new customer job report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
-    );
-    if (!confirmed) return;
+    if (!options?.skipConfirmation) {
+      const confirmed = window.confirm(insp.homeowner_user_id
+        ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
+        : 'Finalize this new customer job report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
+      );
+      if (!confirmed) return;
+    }
+    if (!options?.skipHomeTemplatePrompt && maybeOpenHomeTemplatePrompt(insp, 'finalize')) return;
     setFinalizingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
@@ -10959,6 +11128,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         report_storage_path: storagePath,
         report_file_name: fileName,
       };
+      resetInspectionLayoutBaseline();
       setInspections(prev => prev.map(i => i.id === insp.id ? finalized : i));
       if (insp.homeowner_user_id) {
         setActiveInspection(finalized);
@@ -10993,7 +11163,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const sendInspectionReportToHomeowner = async (insp: Inspection) => {
+  const sendInspectionReportToHomeowner = async (insp: Inspection, options?: { skipHomeTemplatePrompt?: boolean }) => {
     if (!supabase) return;
     setNotice('');
     setError('');
@@ -11005,6 +11175,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError('Finalize and file the report before sending it to the homeowner.');
       return;
     }
+    if (!options?.skipHomeTemplatePrompt && maybeOpenHomeTemplatePrompt(insp, 'send')) return;
     setSendingInspectionReportId(insp.id);
     try {
       const { error: notifyError } = await supabase.rpc('servsync_notify_field_work_report', {
@@ -11590,6 +11761,109 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+      {homeTemplatePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Home template</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-950">Save this inspection layout?</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHomeTemplatePrompt(null)}
+                disabled={Boolean(savingHomeTemplateAction)}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                aria-label="Cancel"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              You changed the inspection layout for {homeTemplatePrompt.targetLabel}. Save this layout for future inspections at this home?
+            </p>
+            <div className="mt-4 space-y-3">
+              <Field label="Template name">
+                <input
+                  className={inputClass()}
+                  value={homeTemplateNameDraft}
+                  onChange={event => setHomeTemplateNameDraft(event.target.value)}
+                  placeholder="Home Inspection Template"
+                />
+              </Field>
+              {homeTemplatePrompt.existingTemplates.length > 0 && (
+                <Field label="Existing home template">
+                  <select
+                    className={inputClass()}
+                    value={homeTemplatePrompt.selectedTemplateId}
+                    onChange={event => {
+                      const selectedId = event.target.value;
+                      const selectedTemplate = homeTemplatePrompt.existingTemplates.find(template => template.id === selectedId);
+                      setHomeTemplatePrompt(current => current ? { ...current, selectedTemplateId: selectedId } : current);
+                      if (selectedTemplate) setHomeTemplateNameDraft(selectedTemplate.name);
+                    }}
+                  >
+                    {homeTemplatePrompt.existingTemplates.map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}{template.is_default_for_home ? ' — default' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {homeTemplatePrompt.existingTemplates.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void saveHomeTemplateFromPrompt('update')}
+                  disabled={Boolean(savingHomeTemplateAction)}
+                  className={buttonClass('primary')}
+                >
+                  {savingHomeTemplateAction === 'update' ? 'Updating...' : 'Update Existing Home Template'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void saveHomeTemplateFromPrompt('insert')}
+                disabled={Boolean(savingHomeTemplateAction)}
+                className={buttonClass(homeTemplatePrompt.existingTemplates.length > 0 ? 'secondary' : 'primary')}
+              >
+                {savingHomeTemplateAction === 'insert'
+                  ? 'Saving...'
+                  : homeTemplatePrompt.existingTemplates.length > 0
+                    ? 'Save as New Home Template'
+                    : 'Save Home Template'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const prompt = homeTemplatePrompt;
+                  if (!prompt) return;
+                  setSavingHomeTemplateAction('skip');
+                  try {
+                    await continueHomeTemplatePromptAction(prompt);
+                  } finally {
+                    setSavingHomeTemplateAction(null);
+                  }
+                }}
+                disabled={Boolean(savingHomeTemplateAction)}
+                className={buttonClass('secondary')}
+              >
+                Continue Without Saving
+              </button>
+              <button
+                type="button"
+                onClick={() => setHomeTemplatePrompt(null)}
+                disabled={Boolean(savingHomeTemplateAction)}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {contractorTab === 'overview' && (
         <div className="space-y-4">
