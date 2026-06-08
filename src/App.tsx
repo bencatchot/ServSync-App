@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   AlertTriangle,
@@ -6407,6 +6407,286 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       description: '',
     });
   };
+  const needsReviewEstimates = estimates.filter(estimate => estimate.status === 'sent');
+  const acceptedEstimates = estimates.filter(estimate => estimate.status === 'accepted');
+  const closedEstimateRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
+  const openInvoiceRecords = invoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
+  const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
+
+  const renderHomeownerInvoiceCard = (invoice: Invoice, options: { showPaymentGuidance?: boolean } = {}) => {
+    const invoiceConnection = connections.find(connection => connection.contractor_id === invoice.contractor_id) ?? null;
+    const invoiceDirectoryContractor = directoryContractors.find(contractor => contractor.id === invoice.contractor_id) ?? null;
+    const contractorName = invoiceConnection?.business_name
+      || invoiceDirectoryContractor?.business_name
+      || 'Contractor';
+    const isOpen = viewingInvoiceId === invoice.id;
+
+    return (
+      <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>
+                {invoiceStatusLabel(invoice.status)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {contractorName}
+              {invoice.issued_at ? ` · Issued ${formatDateTime(invoice.issued_at)}` : ''}
+              {invoice.due_at ? ` · Due ${formatDateTime(invoice.due_at)}` : ''}
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
+        </div>
+        {options.showPaymentGuidance && (
+          <Notice tone="info" text="Payment is handled directly with your contractor. Contact them for payment instructions." />
+        )}
+        {invoice.scope && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void viewHomeownerInvoice(invoice)}
+            disabled={updatingInvoiceId === invoice.id}
+            className={buttonClass('secondary')}
+          >
+            <Receipt size={16} />
+            {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide details' : 'View Invoice'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadInvoicePdf(invoice, {
+              contractorName,
+              contractorLogoUrl: invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url || null,
+              contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
+              contractorPhone: invoiceConnection?.phone || invoiceDirectoryContractor?.phone || '',
+              contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
+              customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
+              customerAddress: home?.address_line1 || '',
+              serviceLabel: home?.nickname || home?.address_line1 || '',
+            }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
+            className={buttonClass('secondary')}
+          >
+            <Download size={16} />
+            Download PDF
+          </button>
+        </div>
+        {isOpen && (
+          <div className="mt-3 space-y-3">
+            {invoice.line_items && invoice.line_items.length > 0 && (
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                {[...invoice.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
+                  <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
+                    <span className="text-slate-700">{line.description}</span>
+                    <span className="text-slate-500">{line.quantity} {line.unit}</span>
+                    <span className="font-semibold text-slate-950 sm:text-right">{formatMoney(Math.round(line.quantity * line.unit_price_cents))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-4">
+              <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(invoice.subtotal_cents)}</strong></span>
+              <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(invoice.tax_cents)}</strong></span>
+              <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
+              <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
+            </div>
+            {(invoice.notes || invoice.terms) && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {invoice.notes && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.notes}</p>
+                  </div>
+                )}
+                {invoice.terms && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.terms}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderHomeownerEstimateCard = (estimate: Estimate, options: { needsReview?: boolean; accepted?: boolean } = {}) => {
+    const estimateConnection = connections.find(connection => connection.contractor_id === estimate.contractor_id) ?? null;
+    const estimateDirectoryContractor = directoryContractors.find(contractor => contractor.id === estimate.contractor_id) ?? null;
+    const contractorName = estimateConnection?.business_name
+      || estimateDirectoryContractor?.business_name
+      || 'Contractor';
+    const estimateFiled = maintenanceLog.some(entry => entry.estimate_id === estimate.id);
+    const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+
+    return (
+      <div key={estimate.id} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-bold text-slate-950">{estimate.title}</p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${estimate.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : estimate.status === 'declined' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+                {estimate.status}
+              </span>
+              {estimateFiled && (
+                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                  Filed
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{contractorName} · Updated {formatDateTime(estimate.updated_at)}</p>
+          </div>
+          <p className="text-2xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
+        </div>
+        {options.needsReview && (
+          <Notice tone="info" text="Review the estimate details, then accept or decline when you are ready." />
+        )}
+        {options.accepted && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            <p className="font-semibold">You accepted this estimate.</p>
+            <div className="mt-1 space-y-1">
+              {estimate.inspection_id && <p>The contractor has created a job from this approved estimate.</p>}
+              {linkedInvoice && <p>An invoice is linked to this estimate with status: {invoiceStatusLabel(linkedInvoice.status)}.</p>}
+              {estimateFiled && <p>A copy has been saved to your Documents and Home History.</p>}
+              {!estimate.inspection_id && !linkedInvoice && !estimateFiled && <p>Your contractor can use this approved estimate to start the job.</p>}
+            </div>
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void downloadEstimatePdf(estimate, {
+              contractorName,
+              customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
+              customerAddress: home?.address_line1 || '',
+              contractorLogoUrl: estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url || null,
+            }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
+            className={buttonClass('secondary')}
+          >
+            <Download size={16} />
+            Download PDF
+          </button>
+          {estimate.status === 'accepted' && (
+            <button
+              type="button"
+              onClick={() => void fileEstimateToHomeRecords(estimate, contractorName)}
+              disabled={filingEstimateId === estimate.id || estimateFiled}
+              className={estimateFiled ? buttonClass('secondary') : buttonClass('primary')}
+            >
+              <FolderOpen size={16} />
+              {estimateFiled ? 'Filed to records' : filingEstimateId === estimate.id ? 'Filing...' : 'File to Documents & Log'}
+            </button>
+          )}
+        </div>
+        {estimate.scope && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{estimate.scope}</p>}
+        {estimate.line_items && estimate.line_items.length > 0 && (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+            {[...estimate.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
+              <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
+                <span className="text-slate-700">{line.description}</span>
+                <span className="text-slate-500">{line.quantity} {line.unit}</span>
+                <span className="font-semibold text-slate-950 sm:text-right">${((line.quantity * line.unit_price_cents) / 100).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {(estimate.notes || estimate.terms) && (
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {estimate.notes && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes / exclusions</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{estimate.notes}</p>
+              </div>
+            )}
+            {estimate.terms && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{estimate.terms}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {estimate.status === 'sent' && (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => void respondToEstimate(estimate, 'accept')}
+              disabled={updatingEstimateId === estimate.id}
+              className={buttonClass('primary')}
+            >
+              <CheckCircle2 size={16} />
+              {updatingEstimateId === estimate.id ? 'Updating...' : 'Accept estimate'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void respondToEstimate(estimate, 'decline')}
+              disabled={updatingEstimateId === estimate.id}
+              className={buttonClass('secondary')}
+            >
+              Decline
+            </button>
+          </div>
+        )}
+        {estimate.status === 'declined' && (
+          <Notice tone="info" text="You declined this estimate. The contractor can revise it if needed." />
+        )}
+      </div>
+    );
+  };
+  const renderHomeownerRecordsSection = (title: string, helper: string, emptyText: string, children: ReactNode[]) => (
+    <section className="space-y-2">
+      <div className="px-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{title}</p>
+        <p className="mt-1 text-sm text-slate-500">{helper}</p>
+      </div>
+      {children.length > 0 ? children : <EmptyState text={emptyText} />}
+    </section>
+  );
+  const renderHomeownerEstimatesInvoicesPage = () => (
+    <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
+          <p className="mt-1 text-sm text-blue-800">
+            Drafts stay private to the contractor. Anything shown here has been sent to you.
+          </p>
+        </div>
+
+        {renderHomeownerRecordsSection(
+          'Needs Review',
+          'Estimates waiting for your approval or decline.',
+          'No estimates need your review right now.',
+          needsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true }))
+        )}
+
+        {renderHomeownerRecordsSection(
+          'Open Invoices',
+          'Invoices that have been sent and are not marked paid or void.',
+          'No open invoices right now.',
+          openInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true }))
+        )}
+
+        {renderHomeownerRecordsSection(
+          'Accepted Estimates',
+          'Approved estimates and any linked job or invoice status ServSync can show.',
+          'No accepted estimates yet.',
+          acceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true }))
+        )}
+
+        {renderHomeownerRecordsSection(
+          'Paid / Closed',
+          'Paid invoices, void invoices, and estimates that are no longer active.',
+          'No paid or closed records yet.',
+          [
+            ...closedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
+            ...closedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
+          ]
+        )}
+      </div>
+    </Card>
+  );
 
   return (
     <SidebarLayout
@@ -6417,7 +6697,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
         { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
         { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
-        { id: 'estimates',    label: 'Estimates / invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount, group: 'Contractors' },
+        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount, group: 'Contractors' },
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
@@ -7759,7 +8039,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       {isClosedCard && request.quote && (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-                            <Receipt size={11} /> Invoice
+                            <Receipt size={11} /> Service quote
                           </p>
                           <div className="flex items-baseline justify-between gap-2">
                             <p className="flex-1 text-sm text-slate-600">{request.quote.scope || 'Services rendered'}</p>
@@ -8216,242 +8496,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </Card>
       )}
 
-      {homeownerTab === 'estimates' && (
-        <Card title="Estimates and invoices" icon={<Receipt size={18} />}>
-          <div className="space-y-3">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
-              <p className="mt-1 text-sm text-blue-800">
-                Drafts stay private to the contractor. Anything shown here has been sent to you for review.
-              </p>
-            </div>
-            {estimates.length === 0 && invoices.length === 0 ? (
-              <EmptyState text="No estimates or invoices have been sent to you yet." />
-            ) : (
-              <>
-                {invoices.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Invoices</p>
-                    {invoices.map(invoice => {
-                      const invoiceConnection = connections.find(connection => connection.contractor_id === invoice.contractor_id) ?? null;
-                      const invoiceDirectoryContractor = directoryContractors.find(contractor => contractor.id === invoice.contractor_id) ?? null;
-                      const contractorName = invoiceConnection?.business_name
-                        || invoiceDirectoryContractor?.business_name
-                        || 'Contractor';
-                      const isOpen = viewingInvoiceId === invoice.id;
-                      return (
-                        <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>
-                                  {invoiceStatusLabel(invoice.status)}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {contractorName}
-                                {invoice.issued_at ? ` · Issued ${formatDateTime(invoice.issued_at)}` : ''}
-                                {invoice.due_at ? ` · Due ${formatDateTime(invoice.due_at)}` : ''}
-                              </p>
-                            </div>
-                            <p className="text-2xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
-                          </div>
-                          {invoice.scope && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void viewHomeownerInvoice(invoice)}
-                              disabled={updatingInvoiceId === invoice.id}
-                              className={buttonClass('secondary')}
-                            >
-                              <Receipt size={16} />
-                              {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide details' : 'View invoice'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void downloadInvoicePdf(invoice, {
-                                contractorName,
-                                contractorLogoUrl: invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url || null,
-                                contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
-                                contractorPhone: invoiceConnection?.phone || invoiceDirectoryContractor?.phone || '',
-                                contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
-                                customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
-                                customerAddress: home?.address_line1 || '',
-                                serviceLabel: home?.nickname || home?.address_line1 || '',
-                              }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
-                              className={buttonClass('secondary')}
-                            >
-                              <Download size={16} />
-                              Download PDF
-                            </button>
-                          </div>
-                          {isOpen && (
-                            <div className="mt-3 space-y-3">
-                              {invoice.line_items && invoice.line_items.length > 0 && (
-                                <div className="overflow-hidden rounded-xl border border-slate-200">
-                                  {[...invoice.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
-                                    <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
-                                      <span className="text-slate-700">{line.description}</span>
-                                      <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                                      <span className="font-semibold text-slate-950 sm:text-right">{formatMoney(Math.round(line.quantity * line.unit_price_cents))}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-4">
-                                <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(invoice.subtotal_cents)}</strong></span>
-                                <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(invoice.tax_cents)}</strong></span>
-                                <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
-                                <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
-                              </div>
-                              {(invoice.notes || invoice.terms) && (
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  {invoice.notes && (
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
-                                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.notes}</p>
-                                    </div>
-                                  )}
-                                  {invoice.terms && (
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
-                                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{invoice.terms}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {estimates.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estimates</p>
-                    {estimates.map(estimate => {
-                const contractorName = connections.find(connection => connection.contractor_id === estimate.contractor_id)?.business_name
-                  || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.business_name
-                  || 'Contractor';
-                const estimateFiled = maintenanceLog.some(entry => entry.estimate_id === estimate.id);
-                return (
-                  <div key={estimate.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-slate-950">{estimate.title}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimate.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : estimate.status === 'declined' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-                            {estimate.status}
-                          </span>
-                          {estimateFiled && (
-                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
-                              Filed
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">{contractorName} · Updated {formatDateTime(estimate.updated_at)}</p>
-                      </div>
-                      <p className="text-2xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void downloadEstimatePdf(estimate, {
-                          contractorName,
-                          customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
-                          customerAddress: home?.address_line1 || '',
-                          contractorLogoUrl: connections.find(connection => connection.contractor_id === estimate.contractor_id)?.logo_url
-                            || directoryContractors.find(contractor => contractor.id === estimate.contractor_id)?.logo_url
-                            || null,
-                        }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
-                        className={buttonClass('secondary')}
-                      >
-                        <Download size={16} />
-                        Download PDF
-                      </button>
-                      {estimate.status === 'accepted' && (
-                        <button
-                          type="button"
-                          onClick={() => void fileEstimateToHomeRecords(estimate, contractorName)}
-                          disabled={filingEstimateId === estimate.id || estimateFiled}
-                          className={estimateFiled ? buttonClass('secondary') : buttonClass('primary')}
-                        >
-                          <FolderOpen size={16} />
-                          {estimateFiled ? 'Filed to records' : filingEstimateId === estimate.id ? 'Filing...' : 'File to Documents & Log'}
-                        </button>
-                      )}
-                    </div>
-                    {estimate.scope && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{estimate.scope}</p>}
-                    {estimate.line_items && estimate.line_items.length > 0 && (
-                      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                        {estimate.line_items.sort((a, b) => a.sort_order - b.sort_order).map(line => (
-                          <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
-                            <span className="text-slate-700">{line.description}</span>
-                            <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                            <span className="font-semibold text-slate-950 sm:text-right">${((line.quantity * line.unit_price_cents) / 100).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {(estimate.notes || estimate.terms) && (
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        {estimate.notes && (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes / exclusions</p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{estimate.notes}</p>
-                          </div>
-                        )}
-                        {estimate.terms && (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms</p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{estimate.terms}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {estimate.status === 'sent' && (
-                      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                        <button
-                          type="button"
-                          onClick={() => void respondToEstimate(estimate, 'accept')}
-                          disabled={updatingEstimateId === estimate.id}
-                          className={buttonClass('primary')}
-                        >
-                          <CheckCircle2 size={16} />
-                          {updatingEstimateId === estimate.id ? 'Updating...' : 'Accept estimate'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void respondToEstimate(estimate, 'decline')}
-                          disabled={updatingEstimateId === estimate.id}
-                          className={buttonClass('secondary')}
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    )}
-                    {estimate.status === 'accepted' && (
-                      <Notice tone="success" text={estimateFiled
-                        ? 'This estimate has been saved to your Documents and Maintenance Log.'
-                        : 'You accepted this estimate. You can file a copy to Documents and add it to your Maintenance Log when you are ready.'}
-                      />
-                    )}
-                    {estimate.status === 'declined' && (
-                      <Notice tone="info" text="You declined this estimate. The contractor can revise it if needed." />
-                    )}
-                  </div>
-                );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </Card>
-      )}
+      {homeownerTab === 'estimates' && renderHomeownerEstimatesInvoicesPage()}
 
       {homeownerTab === 'log' && (
         <div className="space-y-4">
