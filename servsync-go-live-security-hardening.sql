@@ -105,10 +105,9 @@ update storage.buckets
        file_size_limit = 20971520,
        allowed_mime_types = array[
          'image/jpeg',
+         'image/jpg',
          'image/png',
-         'image/webp',
-         'image/heic',
-         'image/heif'
+         'image/webp'
        ]::text[]
  where id = 'discover-media';
 
@@ -217,7 +216,7 @@ create policy "discover_media_upload_contractor"
     and (storage.foldername(name))[1] = auth.uid()::text
     and public.servsync_storage_extension_is_allowed(
       name,
-      array['jpg','jpeg','png','webp','heic','heif']::text[]
+      array['jpg','jpeg','png','webp']::text[]
     )
     and exists (
       select 1

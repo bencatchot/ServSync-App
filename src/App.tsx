@@ -17303,11 +17303,15 @@ function DiscoverFeed({
     if (!supabase || files.length === 0) return [];
     const urls: string[] = [];
     for (const file of files) {
-      const ext = file.name.split('.').pop() ?? 'jpg';
+      const contentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
+      const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+        throw new Error('Discover photos must be JPG, PNG, or WebP. HEIC/HEIF photos may upload but will not display reliably in web browsers.');
+      }
       const storagePath = `${userId}/posts/${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('discover-media')
-        .upload(storagePath, file, { contentType: file.type });
+        .upload(storagePath, file, { contentType });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('discover-media').getPublicUrl(storagePath);
       urls.push(urlData.publicUrl);
@@ -17500,7 +17504,7 @@ function DiscoverFeed({
             <input
               ref={el => setPostFileInput(el)}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               multiple
               className="hidden"
               onChange={e => {
@@ -17513,7 +17517,7 @@ function DiscoverFeed({
               <Paperclip size={15} /> Add photos
             </button>
             <span className="max-w-xl text-xs leading-5 text-slate-500">
-              Discover photos are public marketing images. Only upload photos you are comfortable showing on ServSync.
+              Discover photos are public marketing images. Use JPG, PNG, or WebP so they display correctly.
             </span>
             {postFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
