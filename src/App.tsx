@@ -297,8 +297,25 @@ const STORAGE_KEYS = {
   contractorSelectedHomeowner: 'servsync.contractor.selectedHomeowner',
   contractorHomeownerDetailTab: 'servsync.contractor.homeownerDetailTab',
   contractorHomeownerRequestView: 'servsync.contractor.homeownerRequestView',
+  contractorJobsView: 'servsync.contractor.jobsView',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
+
+function storedFieldWorkState(): StoredFieldWorkState | null {
+  try {
+    return JSON.parse(window.localStorage.getItem(STORAGE_KEYS.fieldWorkState) || 'null') as StoredFieldWorkState | null;
+  } catch {
+    return null;
+  }
+}
+
+function storedInspectionViewForJobsView(jobsView: ContractorJobsView): InspectionView {
+  const fieldWorkState = storedFieldWorkState();
+  if ((jobsView === 'open_jobs' || jobsView === 'closed_jobs') && fieldWorkState?.view === 'detail' && fieldWorkState.inspectionId) {
+    return 'detail';
+  }
+  return jobsView === 'new_jobs' ? 'new' : 'list';
+}
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
   return {
@@ -8751,7 +8768,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'schedule'] as const, 'profile'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
-  const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>('overview');
+  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates'] as const, 'overview');
+  const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
   const [estimateComposerOpen, setEstimateComposerOpen] = useState(false);
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
@@ -8823,7 +8841,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspectionTemplates, setInspectionTemplates] = useState<InspectionTemplate[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
-  const [inspectionView, setInspectionView] = useState<InspectionView>('list');
+  const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
   const [inspectionNewDraft, setInspectionNewDraft] = useState({
@@ -8922,6 +8940,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorTab, contractorTab);
   }, [contractorTab]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.contractorJobsView, contractorJobsView);
+  }, [contractorJobsView]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorHomeownerFilter, homeownerFilter);
@@ -10947,6 +10969,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }));
   };
 
+  const persistFieldWorkListState = (view: InspectionView) => {
+    const current = storedFieldWorkState() ?? {};
+    window.localStorage.setItem(STORAGE_KEYS.fieldWorkState, JSON.stringify({
+      ...current,
+      inspectionId: null,
+      view,
+      selectedRoom: null,
+    }));
+  };
+
+  useEffect(() => {
+    if (contractorTab !== 'inspections' || inspectionView === 'detail') return;
+    if (activeInspection) {
+      resetInspectionLayoutBaseline();
+      setActiveInspection(null);
+      setLocalFindings({});
+      setActiveRooms([]);
+      setAvailableChecklistRooms([]);
+      setInspectionSummary('');
+      setIncludeReportSummary(true);
+      setIncludeReportValueAdd(true);
+      setReportValueAddText('');
+      setInspectionClosedForReview(false);
+    }
+    persistFieldWorkListState(inspectionView);
+  }, [contractorTab, contractorJobsView, inspectionView, activeInspection]);
+
   // ── Inspection helpers ────────────────────────────────────────────────────
   const startNewInspection = async () => {
     const hasSubject = inspectionNewDraft.subject_type === 'connected'
@@ -11424,13 +11473,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, availableChecklistRooms, localFindings, inspectionSummary, includeReportSummary, includeReportValueAdd, reportValueAddText]);
 
   useEffect(() => {
-    if (contractorTab !== 'inspections' || loading || restoredFieldWorkRef.current || activeInspection || inspections.length === 0) return;
-    let saved: StoredFieldWorkState | null = null;
-    try {
-      saved = JSON.parse(window.localStorage.getItem(STORAGE_KEYS.fieldWorkState) || 'null') as StoredFieldWorkState | null;
-    } catch {
-      saved = null;
-    }
+    if (
+      contractorTab !== 'inspections'
+      || loading
+      || restoredFieldWorkRef.current
+      || activeInspection
+      || inspections.length === 0
+      || inspectionView !== 'detail'
+      || !['open_jobs', 'closed_jobs'].includes(contractorJobsView)
+    ) return;
+    const saved = storedFieldWorkState();
+    if (saved?.view !== 'detail') return;
     const savedInspection = saved?.inspectionId
       ? inspections.find(insp => insp.id === saved?.inspectionId)
       : null;
@@ -11442,7 +11495,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       subTab: savedSubTab,
       selectedRoom: savedSelectedRoom,
     });
-  }, [contractorTab, loading, inspections, activeInspection]);
+  }, [contractorTab, contractorJobsView, inspectionView, loading, inspections, activeInspection]);
 
   useEffect(() => {
     if (!activeInspection || activeInspection.status !== 'draft' || finalizingInspection) return;
