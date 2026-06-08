@@ -429,6 +429,65 @@ function findRoomByIdentity<T extends RoomIdentitySource>(rooms: T[], selection?
   ) ?? null;
 }
 
+const SMART_NUMBERED_ROOM_BASES = new Set(['bedroom', 'bathroom', 'garage', 'living room', 'dining room', 'office', 'hallway', 'closet']);
+
+function smartRoomBaseLabel(label: string) {
+  const normalized = normalizeText(label);
+  if (normalized.includes('bedroom') || normalized === 'bed') return 'Bedroom';
+  if (normalized.includes('bathroom') || normalized === 'bath') return 'Bathroom';
+  if (normalized.includes('garage')) return 'Garage';
+  if (normalized.includes('living room')) return 'Living Room';
+  if (normalized.includes('dining room')) return 'Dining Room';
+  if (normalized.includes('office')) return 'Office';
+  if (normalized.includes('hallway') || normalized === 'hall') return 'Hallway';
+  if (normalized.includes('closet')) return 'Closet';
+  return label.trim();
+}
+
+function isSmartNumberedRoomBase(label: string) {
+  return SMART_NUMBERED_ROOM_BASES.has(normalizeText(smartRoomBaseLabel(label)));
+}
+
+function numberedRoomRank(label: string, baseLabel: string) {
+  const normalized = normalizeText(label);
+  const base = normalizeText(baseLabel);
+  if (base === 'bedroom' && (normalized === 'primary bedroom' || normalized === 'master bedroom')) return 1;
+  if (base === 'bathroom' && (normalized === 'primary bathroom' || normalized === 'master bathroom')) return 1;
+  if (normalized === base) return 1;
+  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  const match = normalized.match(new RegExp(`^${escapedBase}\\s+(\\d+)$`));
+  return match ? Number(match[1]) : null;
+}
+
+function nextRoomSectionName(baseRoomName: string, existingRooms: Array<Partial<RoomIdentitySource>>) {
+  const baseLabel = smartRoomBaseLabel(baseRoomName);
+  const existingLabels = existingRooms.map(room => roomDisplayLabel(room)).filter(Boolean);
+  const normalizedExisting = new Set(existingLabels.map(label => normalizeText(label)));
+
+  if (!isSmartNumberedRoomBase(baseLabel)) {
+    if (!normalizedExisting.has(normalizeText(baseLabel))) return baseLabel;
+    let suffix = 2;
+    let candidate = `${baseLabel} ${suffix}`;
+    while (normalizedExisting.has(normalizeText(candidate))) {
+      suffix += 1;
+      candidate = `${baseLabel} ${suffix}`;
+    }
+    return candidate;
+  }
+
+  const highestRank = existingLabels.reduce((highest, label) => {
+    const rank = numberedRoomRank(label, baseLabel);
+    return rank && rank > highest ? rank : highest;
+  }, 0);
+
+  let candidate = highestRank > 0 ? `${baseLabel} ${highestRank + 1}` : baseLabel;
+  while (normalizedExisting.has(normalizeText(candidate))) {
+    const rank = numberedRoomRank(candidate, baseLabel) ?? 1;
+    candidate = `${baseLabel} ${rank + 1}`;
+  }
+  return candidate;
+}
+
 function roomIsApprovedScope(roomName: string) {
   return normalizeText(roomName) === 'approved scope' || normalizeText(roomName) === 'approved work';
 }
@@ -11250,18 +11309,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const addChecklistSection = (roomName: string) => {
-    const name = roomName.trim();
-    if (!name) return;
-    const existingRoom = activeRooms.find(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase());
+    const requestedName = roomName.trim();
+    if (!requestedName) return;
+    const name = nextRoomSectionName(requestedName, activeRooms);
+    const existingRoom = activeRooms.find(room => normalizeText(roomDisplayLabel(room)) === normalizeText(name) || normalizeText(room.room) === normalizeText(name));
     const newRoom = roomIdentityFields({ room: name, display_name: name }, activeRooms.length);
     const nextSelectedRoom = existingRoom ? roomIdentityKey(existingRoom) : roomIdentityKey(newRoom);
     setActiveRooms(prev => (
-      prev.some(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase())
+      prev.some(room => normalizeText(roomDisplayLabel(room)) === normalizeText(name) || normalizeText(room.room) === normalizeText(name))
         ? prev
         : [...prev, { ...newRoom, items: [] }]
     ));
     setAvailableChecklistRooms(prev => (
-      prev.some(room => roomDisplayLabel(room).toLowerCase() === name.toLowerCase() || room.room.toLowerCase() === name.toLowerCase())
+      prev.some(room => normalizeText(roomDisplayLabel(room)) === normalizeText(name) || normalizeText(room.room) === normalizeText(name))
         ? prev
         : [...prev, { ...newRoom, items: [] }]
     ));
@@ -17228,7 +17288,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="p-6 space-y-4">
                             {(() => {
                               const existing = new Set(activeRooms.flatMap(r => [r.room.toLowerCase(), roomDisplayLabel(r).toLowerCase()]));
-                              const available = INSPECTION_SECTION_QUICK_ADD_ROOMS.filter(r => !existing.has(r.toLowerCase()));
+                              const available = INSPECTION_SECTION_QUICK_ADD_ROOMS.filter(r => !existing.has(r.toLowerCase()) || isSmartNumberedRoomBase(r));
                               return available.length > 0 ? (
                                 <div>
                                   <p className="text-xs font-semibold text-slate-500 mb-2">Common Rooms / Spaces</p>
