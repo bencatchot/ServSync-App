@@ -8770,6 +8770,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
   const [renamingInspectionTemplateId, setRenamingInspectionTemplateId] = useState<string | null>(null);
   const [archivingInspectionTemplateId, setArchivingInspectionTemplateId] = useState<string | null>(null);
+  const [restoringInspectionTemplateId, setRestoringInspectionTemplateId] = useState<string | null>(null);
+  const [showArchivedInspectionTemplates, setShowArchivedInspectionTemplates] = useState(false);
   const [convertingEstimateId, setConvertingEstimateId] = useState<string | null>(null);
   const convertingEstimateIdsRef = useRef<Set<string>>(new Set());
   const [estimateTemplateSearch, setEstimateTemplateSearch] = useState('');
@@ -10507,12 +10509,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return null;
   })();
   const activeInspectionTemplates = inspectionTemplates.filter(template => !template.archived_at);
+  const archivedInspectionTemplates = inspectionTemplates.filter(template => template.archived_at);
   const contractorScopedInspectionTemplates = activeInspectionTemplates.filter(template => templateScope(template) === 'contractor');
   const homeScopedInspectionTemplates = activeInspectionTemplates.filter(template => templateScope(template) === 'home');
   const homeScopedInspectionTemplatesForSelectedSubject = activeInspectionTemplates.filter(template => templateMatchesInspectionSubject(template, inspectionTemplateSubjectContext));
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
   const filteredCustomTemplates = contractorScopedInspectionTemplates.filter(templateMatchesSearch);
   const filteredHomeTemplates = homeScopedInspectionTemplates.filter(templateMatchesSearch);
+  const filteredArchivedTemplates = archivedInspectionTemplates.filter(templateMatchesSearch);
   const inspectionHomeTemplatesForNewJob = homeScopedInspectionTemplatesForSelectedSubject
     .filter(templateMatchesSearch);
   const inspectionContractorTemplatesForNewJob = contractorScopedInspectionTemplates
@@ -10537,7 +10541,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const filteredStarterEstimateTemplates = sortedStarterEstimateTemplates.filter(estimateTemplateMatchesSearch);
   const filteredCustomEstimateTemplates = estimateTemplates.filter(estimateTemplateMatchesSearch);
   const templateLibraryMatchCount = templateLibraryView === 'workflow'
-    ? filteredStarterTemplates.length + filteredCustomTemplates.length + filteredHomeTemplates.length
+    ? filteredStarterTemplates.length + filteredCustomTemplates.length + filteredHomeTemplates.length + (showArchivedInspectionTemplates ? filteredArchivedTemplates.length : 0)
     : templateLibraryView === 'estimate'
       ? filteredCustomEstimateTemplates.length
       : filteredStarterTemplates.length + filteredStarterEstimateTemplates.length;
@@ -11672,6 +11676,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to archive this template.'));
     } finally {
       setArchivingInspectionTemplateId(null);
+    }
+  };
+
+  const restoreInspectionTemplate = async (template: InspectionTemplate) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setRestoringInspectionTemplateId(template.id);
+    try {
+      const { data, error: restoreError } = await supabase
+        .from('inspection_templates')
+        .update({ archived_at: null })
+        .eq('id', template.id)
+        .select()
+        .single();
+      if (restoreError) throw restoreError;
+      setInspectionTemplates(prev => prev.map(item => item.id === template.id ? data as InspectionTemplate : item));
+      setNotice('Template restored.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to restore this template.'));
+    } finally {
+      setRestoringInspectionTemplateId(null);
     }
   };
 
@@ -16628,6 +16654,69 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     );
                                   })}
                                 </div>
+                              )}
+                            </section>
+
+                            <section className="space-y-2">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Archived Templates</p>
+                                  <p className="mt-1 text-xs text-slate-500">{archivedInspectionTemplates.length} archived template{archivedInspectionTemplates.length === 1 ? '' : 's'}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowArchivedInspectionTemplates(current => !current)}
+                                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                  {showArchivedInspectionTemplates ? 'Hide Archived Templates' : 'Show Archived Templates'}
+                                </button>
+                              </div>
+                              {showArchivedInspectionTemplates && (
+                                filteredArchivedTemplates.length === 0 ? (
+                                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-sm font-semibold text-slate-950">No archived templates found.</p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      {archivedInspectionTemplates.length > 0 ? 'Try clearing the template search.' : 'Archived contractor and home templates will appear here.'}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {filteredArchivedTemplates.map(tpl => {
+                                      const stats = inspectionTemplateStats(tpl);
+                                      const isHomeTemplate = templateScope(tpl) === 'home';
+                                      const busy = restoringInspectionTemplateId === tpl.id;
+                                      return (
+                                        <div key={tpl.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm opacity-90">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <p className="truncate text-sm font-medium text-slate-950">{tpl.name}</p>
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                                  {isHomeTemplate ? 'Home Template' : 'Your Template'}
+                                                </span>
+                                                {isHomeTemplate && tpl.is_default_for_home && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">Default for home</span>}
+                                              </div>
+                                              {isHomeTemplate && <p className="mt-0.5 text-xs text-slate-500">{homeTemplateContextLabel(tpl)}</p>}
+                                              <p className="mt-0.5 text-xs text-slate-500">
+                                                {stats.sectionCount} section{stats.sectionCount === 1 ? '' : 's'} · {stats.itemCount} item{stats.itemCount === 1 ? '' : 's'}
+                                                {tpl.archived_at ? ` · Archived ${formatDateTime(tpl.archived_at)}` : ''}
+                                              </p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => void restoreInspectionTemplate(tpl)}
+                                              disabled={!canManageInspectionTemplates || busy}
+                                              title={canManageInspectionTemplates ? 'Restore template' : 'Viewer access cannot restore templates'}
+                                              className="shrink-0 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                                            >
+                                              {busy ? 'Restoring...' : 'Restore'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )
                               )}
                             </section>
                           </div>
