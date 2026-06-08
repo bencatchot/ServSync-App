@@ -8768,6 +8768,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
+  const [renamingInspectionTemplateId, setRenamingInspectionTemplateId] = useState<string | null>(null);
+  const [archivingInspectionTemplateId, setArchivingInspectionTemplateId] = useState<string | null>(null);
   const [convertingEstimateId, setConvertingEstimateId] = useState<string | null>(null);
   const convertingEstimateIdsRef = useRef<Set<string>>(new Set());
   const [estimateTemplateSearch, setEstimateTemplateSearch] = useState('');
@@ -10506,9 +10508,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   })();
   const activeInspectionTemplates = inspectionTemplates.filter(template => !template.archived_at);
   const contractorScopedInspectionTemplates = activeInspectionTemplates.filter(template => templateScope(template) === 'contractor');
+  const homeScopedInspectionTemplates = activeInspectionTemplates.filter(template => templateScope(template) === 'home');
   const homeScopedInspectionTemplatesForSelectedSubject = activeInspectionTemplates.filter(template => templateMatchesInspectionSubject(template, inspectionTemplateSubjectContext));
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
   const filteredCustomTemplates = contractorScopedInspectionTemplates.filter(templateMatchesSearch);
+  const filteredHomeTemplates = homeScopedInspectionTemplates.filter(templateMatchesSearch);
   const inspectionHomeTemplatesForNewJob = homeScopedInspectionTemplatesForSelectedSubject
     .filter(templateMatchesSearch);
   const inspectionContractorTemplatesForNewJob = contractorScopedInspectionTemplates
@@ -10533,7 +10537,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const filteredStarterEstimateTemplates = sortedStarterEstimateTemplates.filter(estimateTemplateMatchesSearch);
   const filteredCustomEstimateTemplates = estimateTemplates.filter(estimateTemplateMatchesSearch);
   const templateLibraryMatchCount = templateLibraryView === 'workflow'
-    ? filteredCustomTemplates.length
+    ? filteredStarterTemplates.length + filteredCustomTemplates.length + filteredHomeTemplates.length
     : templateLibraryView === 'estimate'
       ? filteredCustomEstimateTemplates.length
       : filteredStarterTemplates.length + filteredStarterEstimateTemplates.length;
@@ -11600,10 +11604,75 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const deleteTemplate = async (tplId: string) => {
+  const canManageInspectionTemplates = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
+
+  const inspectionTemplateStats = (template: InspectionTemplate) => ({
+    sectionCount: template.rooms.length,
+    itemCount: template.rooms.reduce((count, room) => count + room.items.length, 0),
+  });
+
+  const homeTemplateContextLabel = (template: InspectionTemplate) => {
+    if (template.homeowner_user_id) {
+      const connection = connections.find(candidate => candidate.homeowner_user_id === template.homeowner_user_id);
+      const homeLabel = connection?.home?.nickname || connection?.home?.address_line1 || '';
+      return [connection?.display_name || 'ServSync homeowner', homeLabel].filter(Boolean).join(' · ');
+    }
+    if (template.local_contact_id) {
+      const contact = localContacts.find(candidate => candidate.id === template.local_contact_id);
+      const home = contact?.homes?.find(candidate => candidate.id === template.local_home_id) ?? contact?.homes?.[0] ?? null;
+      const homeLabel = home?.nickname || home?.address_line1 || '';
+      return [contact?.display_name || 'New customer', homeLabel].filter(Boolean).join(' · ');
+    }
+    return 'Home context not available';
+  };
+
+  const renameInspectionTemplate = async (template: InspectionTemplate) => {
     if (!supabase) return;
-    await supabase.from('inspection_templates').delete().eq('id', tplId);
-    setInspectionTemplates(prev => prev.filter(t => t.id !== tplId));
+    const nextName = window.prompt('Rename template:', template.name);
+    if (!nextName?.trim() || nextName.trim() === template.name) return;
+    setNotice('');
+    setError('');
+    setRenamingInspectionTemplateId(template.id);
+    try {
+      const { data, error: renameError } = await supabase
+        .from('inspection_templates')
+        .update({ name: nextName.trim() })
+        .eq('id', template.id)
+        .select()
+        .single();
+      if (renameError) throw renameError;
+      setInspectionTemplates(prev => prev.map(item => item.id === template.id ? data as InspectionTemplate : item));
+      setNotice('Template renamed.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to rename this template.'));
+    } finally {
+      setRenamingInspectionTemplateId(null);
+    }
+  };
+
+  const archiveInspectionTemplate = async (template: InspectionTemplate) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Archive the template "${template.name}"? Existing jobs and reports created from it will not be deleted.`);
+    if (!confirmed) return;
+    setNotice('');
+    setError('');
+    setArchivingInspectionTemplateId(template.id);
+    try {
+      const archivedAt = new Date().toISOString();
+      const { data, error: archiveError } = await supabase
+        .from('inspection_templates')
+        .update({ archived_at: archivedAt })
+        .eq('id', template.id)
+        .select()
+        .single();
+      if (archiveError) throw archiveError;
+      setInspectionTemplates(prev => prev.map(item => item.id === template.id ? data as InspectionTemplate : item));
+      setNotice('Template archived.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to archive this template.'));
+    } finally {
+      setArchivingInspectionTemplateId(null);
+    }
   };
 
   const addChecklistSection = (roomName: string) => {
@@ -16276,7 +16345,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </button>
                 </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-2">
+                <div className="mb-4 grid gap-3 md:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -16293,6 +16362,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="mt-1 text-xs text-slate-500">Jobs, inspections, and checklist-style templates.</p>
                       </div>
                       <span className="text-xl font-bold text-slate-950">{contractorScopedInspectionTemplates.length}</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateSearch('');
+                      setTemplateLibraryView('workflow');
+                      setShowTemplateLibrary(true);
+                      setShowTemplateForm(false);
+                    }}
+                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">Home templates</p>
+                        <p className="mt-1 text-xs text-slate-500">Layouts saved for a specific customer home.</p>
+                      </div>
+                      <span className="text-xl font-bold text-slate-950">{homeScopedInspectionTemplates.length}</span>
                     </div>
                   </button>
                   <button
@@ -16376,7 +16463,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         {templateLibraryView === 'workflow'
-                          ? 'Your workflow templates'
+                          ? 'Inspection templates'
                           : templateLibraryView === 'estimate'
                             ? 'Your estimate templates'
                             : templateSearch.trim()
@@ -16394,27 +16481,155 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="mt-1 text-xs text-slate-500">
                           {templateLibraryView === 'generic'
                             ? 'Try a trade like plumbing, electrical, cleaning, HVAC, roofing, concrete, gutters, or deck.'
-                            : 'Create a template or copy one from the generic template search.'}
+                            : templateLibraryView === 'workflow'
+                              ? 'Create a template, save a home template from an inspection, or copy a starter template.'
+                              : 'Create a template or copy one from the generic template search.'}
                         </p>
                       </div>
                     ) : (
                       <>
-                        {templateLibraryView === 'workflow' && filteredCustomTemplates.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your workflow templates</p>
-                            {filteredCustomTemplates.map(tpl => (
-                              <div key={tpl.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-slate-950">{tpl.name}</p>
-                                  <p className="mt-0.5 text-xs text-slate-500">{tpl.rooms.length} sections · {tpl.rooms.reduce((n, r) => n + r.items.length, 0)} items</p>
+                        {templateLibraryView === 'workflow' && (
+                          <div className="space-y-5">
+                            <section className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Starter Templates</p>
+                              {filteredStarterTemplates.length === 0 ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <p className="text-sm font-semibold text-slate-950">No starter templates match this search.</p>
                                 </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                  <button type="button" onClick={() => void deleteTemplate(tpl.id)} className="text-slate-500 hover:text-red-400 transition-colors" title="Delete template">
-                                    <Trash2 size={15} />
-                                  </button>
+                              ) : (
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  {filteredStarterTemplates.map(tpl => {
+                                    const recommended = starterTemplateRecommendedForContractor(tpl.trade);
+                                    return (
+                                      <div key={tpl.id} className={`rounded-xl border px-4 py-3 shadow-sm ${recommended ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-medium text-slate-950">{tpl.name}</p>
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">{tpl.description}</p>
+                                            <p className="mt-2 text-xs text-slate-500">{tpl.rooms.length} sections · {tpl.rooms.reduce((n, r) => n + r.items.length, 0)} items</p>
+                                          </div>
+                                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${recommended ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                            {recommended ? 'Recommended' : tpl.trade}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => void copyStarterTemplateToLibrary(tpl)}
+                                          disabled={savingInspection}
+                                          className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                                        >
+                                          Copy to my templates
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                            ))}
+                              )}
+                            </section>
+
+                            <section className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your Templates</p>
+                              {filteredCustomTemplates.length === 0 ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <p className="text-sm font-semibold text-slate-950">No contractor templates yet.</p>
+                                  <p className="mt-1 text-xs text-slate-500">Create a template above or copy one from Starter Templates.</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {filteredCustomTemplates.map(tpl => {
+                                    const stats = inspectionTemplateStats(tpl);
+                                    const busy = renamingInspectionTemplateId === tpl.id || archivingInspectionTemplateId === tpl.id;
+                                    return (
+                                      <div key={tpl.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium text-slate-950">{tpl.name}</p>
+                                            <p className="mt-0.5 text-xs text-slate-500">
+                                              {stats.sectionCount} section{stats.sectionCount === 1 ? '' : 's'} · {stats.itemCount} item{stats.itemCount === 1 ? '' : 's'}
+                                              {tpl.updated_at ? ` · Updated ${formatDateTime(tpl.updated_at)}` : tpl.created_at ? ` · Created ${formatDateTime(tpl.created_at)}` : ''}
+                                            </p>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => void renameInspectionTemplate(tpl)}
+                                              disabled={!canManageInspectionTemplates || busy}
+                                              title={canManageInspectionTemplates ? 'Rename template' : 'Viewer access cannot rename templates'}
+                                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                            >
+                                              {renamingInspectionTemplateId === tpl.id ? 'Renaming...' : 'Rename'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void archiveInspectionTemplate(tpl)}
+                                              disabled={!canManageInspectionTemplates || busy}
+                                              title={canManageInspectionTemplates ? 'Archive template' : 'Viewer access cannot archive templates'}
+                                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                            >
+                                              {archivingInspectionTemplateId === tpl.id ? 'Archiving...' : 'Archive'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </section>
+
+                            <section className="space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Home Templates</p>
+                              {filteredHomeTemplates.length === 0 ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <p className="text-sm font-semibold text-slate-950">No home-specific templates yet.</p>
+                                  <p className="mt-1 text-xs text-slate-500">Customize an inspection layout for a home and save it before finalizing the report.</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {filteredHomeTemplates.map(tpl => {
+                                    const stats = inspectionTemplateStats(tpl);
+                                    const busy = renamingInspectionTemplateId === tpl.id || archivingInspectionTemplateId === tpl.id;
+                                    return (
+                                      <div key={tpl.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <p className="truncate text-sm font-medium text-slate-950">{tpl.name}</p>
+                                              {tpl.is_default_for_home && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">Default for home</span>}
+                                            </div>
+                                            <p className="mt-0.5 text-xs text-slate-500">{homeTemplateContextLabel(tpl)}</p>
+                                            <p className="mt-0.5 text-xs text-slate-500">
+                                              {stats.sectionCount} section{stats.sectionCount === 1 ? '' : 's'} · {stats.itemCount} item{stats.itemCount === 1 ? '' : 's'}
+                                              {tpl.updated_at ? ` · Updated ${formatDateTime(tpl.updated_at)}` : tpl.created_at ? ` · Created ${formatDateTime(tpl.created_at)}` : ''}
+                                            </p>
+                                          </div>
+                                          <div className="flex shrink-0 items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => void renameInspectionTemplate(tpl)}
+                                              disabled={!canManageInspectionTemplates || busy}
+                                              title={canManageInspectionTemplates ? 'Rename home template' : 'Viewer access cannot rename templates'}
+                                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                            >
+                                              {renamingInspectionTemplateId === tpl.id ? 'Renaming...' : 'Rename'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void archiveInspectionTemplate(tpl)}
+                                              disabled={!canManageInspectionTemplates || busy}
+                                              title={canManageInspectionTemplates ? 'Archive home template' : 'Viewer access cannot archive templates'}
+                                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                            >
+                                              {archivingInspectionTemplateId === tpl.id ? 'Archiving...' : 'Archive'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </section>
                           </div>
                         )}
 
