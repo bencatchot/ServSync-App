@@ -10244,6 +10244,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (aRecommended !== bRecommended) return aRecommended - bRecommended;
     return a.name.localeCompare(b.name);
   });
+  const inspectionStarterTemplateFallback = SERVSYNC_FIELD_WORK_TEMPLATES
+    .filter(template => template.kind !== 'work_order' && template.trade === 'General Maintenance');
+  const checklistStarterTemplates = sortedServSyncFieldWorkTemplates
+    .filter(template => template.kind !== 'work_order');
+  const inspectionStarterTemplatesForNewJob = checklistStarterTemplates.length
+    ? checklistStarterTemplates
+    : inspectionStarterTemplateFallback;
   const sortedStarterEstimateTemplates = [...starterEstimateTemplatePool]
     .sort((a, b) => a.name.localeCompare(b.name));
   const normalizedTemplateSearch = normalizeText(templateSearch);
@@ -10354,15 +10361,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsOpenJob);
   const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsClosedJob);
+  const workflowDisplayLabelForDraft = (kind: FieldWorkflowKind, mode: JobWorkflowMode, templateSource: FieldWorkTemplateSource = 'blank') => {
+    if (mode === 'simple' && templateSource === 'blank') return 'Service Job';
+    if (mode === 'checklist' && templateSource === 'blank') return 'Inspection Job';
+    return FIELD_WORK_KIND_LABEL[kind];
+  };
   const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
-    const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
+    const jobMode: JobWorkflowMode = templateSource === 'blank' && kind === 'work_order' ? 'simple' : 'checklist';
+    const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     const homeownerName = connection.display_name || connection.home?.nickname || 'Homeowner';
     return `${starter?.name || workflowLabel} — ${homeownerName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
   const buildLocalFieldWorkName = (contact: ContractorLocalContact, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
-    const workflowLabel = FIELD_WORK_KIND_LABEL[kind];
+    const jobMode: JobWorkflowMode = templateSource === 'blank' && kind === 'work_order' ? 'simple' : 'checklist';
+    const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
   type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string };
@@ -10528,7 +10542,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id)
         : null;
       const selectedStarterTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'starter'
-        ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
+        ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id && t.kind !== 'work_order')
         : null;
       const rooms: InspectionTemplateRoom[] = selectedTemplate
         ? selectedTemplate.rooms
@@ -16027,7 +16041,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <Card title="New job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Job type</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Choose job workflow</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     <button
                       type="button"
@@ -16044,26 +16058,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-blue-100 p-2 text-blue-700"><ClipboardCheck size={17} /></span>
                         <span>
-                          <span className="block text-sm font-bold text-slate-950">Simple Service Job</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">For repairs, installs, one-off service calls, and approved work.</span>
+                          <span className="block text-sm font-bold text-slate-950">Service Job</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">For repairs, installs, service calls, and approved work.</span>
                         </span>
                       </div>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setInspectionNewDraft(d => ({
-                        ...d,
-                        job_mode: 'checklist',
-                        job_type: d.workflow_kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
-                        workflow_kind: d.workflow_kind === 'work_order' ? 'inspection' : d.workflow_kind,
-                      }))}
+                      onClick={() => setInspectionNewDraft(d => {
+                        const nextStarter = inspectionStarterTemplatesForNewJob[0] ?? null;
+                        return {
+                          ...d,
+                          job_mode: 'checklist',
+                          job_type: d.workflow_kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
+                          workflow_kind: d.workflow_kind === 'maintenance' ? 'maintenance' : 'inspection',
+                          starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
+                        };
+                      })}
                       className={`rounded-xl border p-4 text-left transition ${inspectionNewDraft.job_mode === 'checklist' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
                     >
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-slate-100 p-2 text-slate-700"><ClipboardList size={17} /></span>
                         <span>
-                          <span className="block text-sm font-bold text-slate-950">Inspection / Checklist Job</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">For inspections, maintenance visits, evaluations, checklists, and reports.</span>
+                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and reports.</span>
                         </span>
                       </div>
                     </button>
@@ -16081,7 +16099,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const selectedTemplate = inspectionNewDraft.template_source === 'starter'
                           ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
                           : null;
-                        const workflowLabel = FIELD_WORK_KIND_LABEL[inspectionNewDraft.workflow_kind];
+                        const workflowLabel = workflowDisplayLabelForDraft(inspectionNewDraft.workflow_kind, inspectionNewDraft.job_mode, inspectionNewDraft.template_source);
                         const subjectName = conn?.display_name || local?.display_name || '';
                         const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
                         setInspectionNewDraft(d => ({
@@ -16163,13 +16181,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 {inspectionNewDraft.job_mode === 'simple' ? (
                   <>
                     <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Simple job type">
+                      <Field label="Service option">
                         <select
                           className={inputClass()}
                           value={inspectionNewDraft.job_type}
                           onChange={event => setInspectionNewDraft(d => ({ ...d, job_type: event.target.value as SimpleServiceJobType }))}
                         >
-                          <option value="service_visit">Service visit</option>
+                          <option value="service_visit">Blank Service Job</option>
                           <option value="repair">Repair</option>
                           <option value="install">Install</option>
                           <option value="estimate_visit">Estimate visit</option>
@@ -16190,38 +16208,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </>
                 ) : (
                   <>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Field label="Workflow type">
-                        <select className={inputClass()} value={inspectionNewDraft.workflow_kind === 'work_order' ? 'inspection' : inspectionNewDraft.workflow_kind} onChange={e => {
-                          const nextKind = e.target.value as FieldWorkflowKind;
-                          const nextStarter = sortedServSyncFieldWorkTemplates.find(t => t.kind === nextKind) ?? sortedServSyncFieldWorkTemplates[0];
+                    <Field label="Job name">
+                      <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC maintenance inspection" />
+                    </Field>
+                    <Field label="Start from">
+                      <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : inspectionStarterTemplatesForNewJob.some(template => template.id === inspectionNewDraft.starter_template_id) ? `starter:${inspectionNewDraft.starter_template_id}` : 'blank'} onChange={e => {
+                        if (e.target.value === 'blank') {
                           setInspectionNewDraft(d => ({
                             ...d,
-                            workflow_kind: nextKind,
-                            job_type: nextKind === 'maintenance' ? 'maintenance_visit' : 'inspection',
-                            starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
-                            name: d.homeowner_user_id || d.local_contact_id
-                              ? `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${
-                                  d.subject_type === 'local'
-                                    ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'New customer'
-                                    : connections.find(c => c.homeowner_user_id === d.homeowner_user_id)?.display_name ?? 'Homeowner'
-                                } — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
-                              : d.name,
+                            template_source: 'blank',
+                            template_id: '',
+                            workflow_kind: 'inspection',
+                            job_type: 'inspection',
                           }));
-                        }}>
-                          {Object.entries(FIELD_WORK_KIND_LABEL)
-                            .filter(([value]) => value !== 'work_order')
-                            .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Job name">
-                        <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC seasonal inspection" />
-                      </Field>
-                    </div>
-                    <Field label="Start from">
-                      <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
-                        if (e.target.value === 'blank') {
-                          setInspectionNewDraft(d => ({ ...d, template_source: 'blank', template_id: '' }));
                           return;
                         }
                         const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
@@ -16235,9 +16234,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           job_type: source === 'starter' && starter?.kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
                         }));
                       }}>
-                        <option value="blank">Blank checklist — build on site</option>
-                        <optgroup label="ServSync starter templates">
-                          {sortedServSyncFieldWorkTemplates.map(t => (
+                        <option value="blank">Blank Inspection</option>
+                        <optgroup label="Inspection templates">
+                          {inspectionStarterTemplatesForNewJob.map(t => (
                             <option key={t.id} value={`starter:${t.id}`}>
                               {starterTemplateRecommendedForContractor(t.trade) ? 'Recommended — ' : ''}{t.name} ({FIELD_WORK_KIND_LABEL[t.kind]})
                             </option>
