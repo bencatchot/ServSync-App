@@ -355,6 +355,19 @@ const FINDING_KEY_SEPARATOR = '||';
 
 type RoomIdentitySource = Pick<InspectionRoomData, 'room' | 'room_id' | 'display_name' | 'room_type' | 'location_note' | 'reference_photo_storage_path' | 'sort_order' | 'last_edited_by' | 'last_edited_at'>;
 type LocalFindingState = { status: FindingStatus; notes: string; action: string; due: string; photos: string[] };
+type InspectionLayoutSnapshotRoom = {
+  room_key: string;
+  room_id: string;
+  display_name: string;
+  room: string;
+  room_type: string;
+  location_note: string;
+  reference_photo_storage_path: string;
+  sort_order: number;
+  items: string[];
+};
+
+type InspectionLayoutSnapshot = InspectionLayoutSnapshotRoom[];
 
 function createClientRoomId(label?: string) {
   const seed = (label || 'room')
@@ -404,6 +417,47 @@ function normalizeTemplateRoom(room: InspectionTemplateRoom, index: number): Ins
     ...roomIdentityFields(room, index),
     items: Array.isArray(room.items) ? room.items : [],
   };
+}
+
+function normalizeLayoutText(value?: string | null) {
+  return (value || '').trim().replace(/\s+/g, ' ');
+}
+
+function layoutRoomIdentityKey(room: Partial<RoomIdentitySource>) {
+  return normalizeLayoutText(room.room_id || roomDisplayLabel(room) || room.room || 'Unnamed Room');
+}
+
+function inspectionLayoutSnapshotFromTemplateRooms(rooms: InspectionTemplateRoom[]): InspectionLayoutSnapshot {
+  return rooms.map((room, index) => {
+    const displayName = normalizeLayoutText(room.display_name || room.room || roomDisplayLabel(room) || 'Unnamed Room');
+    return {
+      room_key: layoutRoomIdentityKey(room),
+      room_id: normalizeLayoutText(room.room_id),
+      display_name: displayName,
+      room: normalizeLayoutText(room.room || displayName || 'Unnamed Room'),
+      room_type: normalizeLayoutText(room.room_type),
+      location_note: normalizeLayoutText(room.location_note),
+      reference_photo_storage_path: normalizeLayoutText(room.reference_photo_storage_path),
+      sort_order: typeof room.sort_order === 'number' ? room.sort_order : index,
+      items: (Array.isArray(room.items) ? room.items : [])
+        .map(item => normalizeLayoutText(item))
+        .filter(Boolean),
+    };
+  });
+}
+
+function inspectionLayoutSnapshotFromInspectionRooms(rooms: InspectionRoomData[]): InspectionLayoutSnapshot {
+  return inspectionLayoutSnapshotFromTemplateRooms(rooms.map((room, index) => ({
+    ...roomIdentityFields(room, index),
+    items: (Array.isArray(room.findings) ? room.findings : [])
+      .map(finding => finding.title)
+      .filter(Boolean),
+  })));
+}
+
+function inspectionLayoutSnapshotsEqual(left: InspectionLayoutSnapshot | null, right: InspectionLayoutSnapshot | null) {
+  if (!left || !right) return left === right;
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function findingStateKey(room: Partial<RoomIdentitySource>, item: string) {
@@ -8820,6 +8874,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const restoredFieldWorkRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutoSaveSignatureRef = useRef('');
+  const originalInspectionLayoutRef = useRef<InspectionLayoutSnapshot | null>(null);
+  const inspectionLayoutDirtyRef = useRef(false);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorTab, contractorTab);
@@ -10602,6 +10658,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }),
   }));
 
+  const currentInspectionLayoutSnapshot = () => inspectionLayoutSnapshotFromTemplateRooms(activeRooms);
+
+  const hasInspectionLayoutChanged = () => {
+    if (!activeInspection || isSimpleServiceJob(activeInspection)) return false;
+    return !inspectionLayoutSnapshotsEqual(originalInspectionLayoutRef.current, currentInspectionLayoutSnapshot());
+  };
+
   const persistInspectionRooms = async (
     insp: Inspection,
     rooms: InspectionRoomData[],
@@ -10749,6 +10812,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             items: room.findings.map(finding => finding.title),
           }))
         : rooms;
+      originalInspectionLayoutRef.current = isSimpleJobDraft ? null : inspectionLayoutSnapshotFromTemplateRooms(activeRoomSeed);
+      inspectionLayoutDirtyRef.current = false;
       setActiveInspection(newInspection);
       setActiveRooms(activeRoomSeed);
       setAvailableChecklistRooms(activeRoomSeed);
@@ -11010,6 +11075,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const normalizedRoomsWithFindings = roomsWithFindings.map((room, index) => normalizeInspectionRoomData(room, index));
     const summary = storedDraft?.summary ?? insp.summary;
 
+    originalInspectionLayoutRef.current = isSimpleServiceJob(insp) ? null : inspectionLayoutSnapshotFromInspectionRooms(normalizedRoomsWithFindings);
+    inspectionLayoutDirtyRef.current = false;
     setActiveInspection({ ...insp, rooms_with_findings: normalizedRoomsWithFindings });
     setInspectionSummary(summary);
     const rooms: InspectionTemplateRoom[] = normalizedRoomsWithFindings.map((r, index) => ({
@@ -11114,6 +11181,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   useEffect(() => {
     if (!activeInspection) return;
+    inspectionLayoutDirtyRef.current = hasInspectionLayoutChanged();
     persistFieldWorkState();
   }, [activeInspection?.id, activeInspection?.status, inspectionView, inspectionSubTab, selectedChecklistRoom, activeRooms, availableChecklistRooms, localFindings, inspectionSummary, includeReportSummary, includeReportValueAdd, reportValueAddText]);
 
