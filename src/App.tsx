@@ -271,6 +271,7 @@ type StoredFieldWorkDraft = {
   inspectionId: string;
   rooms_with_findings: InspectionRoomData[];
   available_rooms?: InspectionTemplateRoom[];
+  layout_baseline?: InspectionLayoutSnapshot | null;
   summary: string;
   include_summary?: boolean;
   include_value_add?: boolean;
@@ -10737,7 +10738,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .map(item => item.trim())
         .filter(Boolean),
     }))
-    .filter(room => room.room.trim() && room.items.length > 0);
+    .filter(room => room.room.trim());
 
   const homeTemplateContextForInspection = (insp: Inspection): InspectionTemplateSubjectContext | null => {
     if (insp.homeowner_user_id) {
@@ -10834,7 +10835,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const context = homeTemplateContextForInspection(prompt.inspection);
     const rooms = buildInspectionTemplateRoomsFromLayout();
     if (!context || rooms.length === 0) {
-      setError('Add at least one section and checklist item before saving this home template.');
+      setError('Add at least one section before saving this home template.');
       return;
     }
     const templateName = homeTemplateNameDraft.trim() || prompt.defaultName;
@@ -10918,6 +10919,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             inspectionId: activeInspection.id,
             rooms_with_findings: buildInspectionRoomsSnapshot(),
             available_rooms: availableChecklistRooms.length > 0 ? availableChecklistRooms : activeRooms,
+            layout_baseline: originalInspectionLayoutRef.current,
             summary: inspectionSummary,
             include_summary: includeReportSummary,
             include_value_add: includeReportValueAdd,
@@ -11297,9 +11299,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       : null;
     const roomsWithFindings = storedDraft?.rooms_with_findings ?? insp.rooms_with_findings;
     const normalizedRoomsWithFindings = roomsWithFindings.map((room, index) => normalizeInspectionRoomData(room, index));
+    const persistedRoomsWithFindings = (insp.rooms_with_findings ?? []).map((room, index) => normalizeInspectionRoomData(room, index));
     const summary = storedDraft?.summary ?? insp.summary;
 
-    originalInspectionLayoutRef.current = isSimpleServiceJob(insp) ? null : inspectionLayoutSnapshotFromInspectionRooms(normalizedRoomsWithFindings);
+    originalInspectionLayoutRef.current = isSimpleServiceJob(insp)
+      ? null
+      : storedDraft?.layout_baseline ?? inspectionLayoutSnapshotFromInspectionRooms(persistedRoomsWithFindings);
     inspectionLayoutDirtyRef.current = false;
     setActiveInspection({ ...insp, rooms_with_findings: normalizedRoomsWithFindings });
     setInspectionSummary(summary);
