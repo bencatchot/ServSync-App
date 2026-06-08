@@ -3984,6 +3984,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [savingConnectionId, setSavingConnectionId] = useState<string | null>(null);
   const [revokingConnectionId, setRevokingConnectionId] = useState<string | null>(null);
+  const [dismissingConnectionId, setDismissingConnectionId] = useState<string | null>(null);
   const [reconnectingConnectionId, setReconnectingConnectionId] = useState<string | null>(null);
   const [reconnectDraftConnectionId, setReconnectDraftConnectionId] = useState<string | null>(null);
   const [serviceRequestDraft, setServiceRequestDraft] = useState<HomeownerServiceRequestDraft>({
@@ -4672,6 +4673,42 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
+  const dismissConnection = async (connection: HomeownerConnection) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Hide ${connection.business_name} from My Contractors? You can find them again in Discover/Search and request a connection later.`);
+    if (!confirmed) return;
+
+    setNotice('');
+    setError('');
+    setDismissingConnectionId(connection.connection_id);
+    try {
+      const { error: connectionError } = await supabase
+        .from('homeowner_contractor_connections')
+        .update({ status: 'dismissed' })
+        .eq('id', connection.connection_id)
+        .eq('homeowner_user_id', profile.id);
+      if (connectionError) throw connectionError;
+
+      const { error: auditError } = await supabase
+        .from('connection_audit_events')
+        .insert({
+          connection_id: connection.connection_id,
+          actor_user_id: profile.id,
+          event_type: 'connection_dismissed',
+          event_details: { contractor_id: connection.contractor_id },
+        });
+      if (auditError) throw auditError;
+
+      setNotice(`${connection.business_name} was removed from My Contractors.`);
+      setExpandedConnectionId(null);
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to hide contractor.'));
+    } finally {
+      setDismissingConnectionId(null);
+    }
+  };
+
   const requestReconnect = async (connection: HomeownerConnection, proposedPermissions: SharingPermissions) => {
     if (!supabase) return;
     setNotice('');
@@ -4727,7 +4764,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     try {
       const existing = connections.find(connection => connection.contractor_id === contractor.id);
       if (existing) {
-        setNotice(`You already have a ${existing.status} connection with ${contractor.business_name}.`);
+        if (existing.status === 'pending') {
+          setNotice(`You already have a pending connection request with ${contractor.business_name}.`);
+          return;
+        }
+        if (existing.status === 'active') {
+          setNotice(`You are already connected with ${contractor.business_name}.`);
+          return;
+        }
+        const { error: reconnectError } = await supabase
+          .from('homeowner_contractor_connections')
+          .update({ status: 'pending' })
+          .eq('id', existing.connection_id)
+          .eq('homeowner_user_id', profile.id);
+        if (reconnectError) throw reconnectError;
+
+        const { error: auditError } = await supabase
+          .from('connection_audit_events')
+          .insert({
+            connection_id: existing.connection_id,
+            actor_user_id: profile.id,
+            event_type: existing.status === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
+            event_details: { contractor_id: contractor.id, previous_status: existing.status },
+          });
+        if (auditError) throw auditError;
+
+        setNotice(`Connection request sent to ${contractor.business_name}.`);
+        await loadHomeowner();
         return;
       }
 
@@ -5825,19 +5888,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
 
         <Card title="My contractors" icon={<Users size={18} />}>
+          {(() => {
+            const visibleConnections = connections.filter(connection => connection.status !== 'dismissed');
+            return (
           <div className="space-y-3">
-            {connections.length === 0 ? (
+            {visibleConnections.length === 0 ? (
               <EmptyState text="No contractor connections yet." />
             ) : (
-              connections.map(connection => {
+              visibleConnections.map(connection => {
                 const isExpanded = expandedConnectionId === connection.connection_id;
                 const draft = permissionDrafts[connection.connection_id] || normalizeSharingPermissions(connection.permissions);
                 const isSaving = savingConnectionId === connection.connection_id;
                 const isRevoking = revokingConnectionId === connection.connection_id;
+                const isDismissing = dismissingConnectionId === connection.connection_id;
                 const isReconnecting = reconnectingConnectionId === connection.connection_id;
                 const isChoosingReconnect = reconnectDraftConnectionId === connection.connection_id;
                 const isRequestingService = requestingConnectionId === connection.connection_id;
                 const isRevoked = connection.status === 'revoked';
+                const isDeclined = connection.status === 'declined';
                 const isPending = connection.status === 'pending';
                 const connectionServiceCategories = serviceCategoriesForConnection(connection);
 
@@ -5855,7 +5923,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          isRevoked ? 'bg-slate-100 text-slate-600' : isPending ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
+                          isRevoked ? 'bg-slate-100 text-slate-600' : isDeclined ? 'bg-red-50 text-red-700' : isPending ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
                         }`}>
                           {connection.status}
                         </span>
@@ -5875,9 +5943,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <p className="mt-1 text-sm text-slate-500">
                           This controls what {connection.business_name} can see. Nothing extra is shared unless you turn it on.
                         </p>
-                        {isRevoked ? (
+                        {(isRevoked || isDeclined) ? (
                           <div className="mt-4 space-y-3">
-                            <Notice tone="info" text="This connection has been revoked. The contractor can no longer see shared home or contact details." />
+                            <Notice tone="info" text={isDeclined ? 'This contractor declined the connection request. You can request again or hide this contractor from My Contractors.' : 'This connection has been revoked. The contractor can no longer see shared home or contact details.'} />
                             {isChoosingReconnect ? (
                               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                                 <p className="text-sm font-bold text-blue-950">Choose proposed sharing</p>
@@ -5909,14 +5977,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => setReconnectDraftConnectionId(connection.connection_id)}
-                                className={buttonClass('primary')}
-                              >
-                                <Link2 size={16} />
-                                Request reconnect
-                              </button>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setReconnectDraftConnectionId(connection.connection_id)}
+                                  className={buttonClass('primary')}
+                                >
+                                  <Link2 size={16} />
+                                  {isDeclined ? 'Request again' : 'Request reconnect'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void dismissConnection(connection)}
+                                  disabled={isDismissing}
+                                  className={buttonClass('secondary')}
+                                >
+                                  <X size={16} />
+                                  {isDismissing ? 'Hiding...' : 'Hide from My Contractors'}
+                                </button>
+                              </div>
                             )}
                           </div>
                         ) : isPending ? (
@@ -6094,6 +6173,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               })
             )}
           </div>
+            );
+          })()}
         </Card>
 
         <Card title="Find or request service" icon={<MessageSquare size={18} />}>
@@ -9667,7 +9748,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
-        { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, group: 'Homeowner Work' },
+        { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: connectionRequests.length, group: 'Homeowner Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorFollowUpCount || openServiceRequestCount, group: 'Homeowner Work' },
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: homeownerAppointmentRequests.length, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
@@ -9732,6 +9813,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       {contractorTab === 'overview' && (
         <div className="space-y-4">
+          {connectionRequests.length > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-amber-950">
+                    {connectionRequests.length} homeowner connection request{connectionRequests.length === 1 ? '' : 's'} waiting
+                  </p>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Homeowners cannot share details or start connected work with you until you accept.
+                  </p>
+                </div>
+                <button type="button" onClick={() => setContractorTab('connections')} className={buttonClass('primary')}>
+                  <CheckCircle2 size={16} />
+                  Review requests
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
               <div className="p-4 sm:p-5">
@@ -9741,9 +9840,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   Manage homeowner connections, service requests, appointments, referrals, and your public business profile from one place.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" className={buttonClass('primary')} onClick={() => setContractorTab(openServiceRequestCount > 0 ? 'requests' : 'connections')}>
-                    <MessageSquare size={16} />
-                    {openServiceRequestCount > 0 ? 'Review open requests' : 'View homeowners'}
+                  <button type="button" className={buttonClass('primary')} onClick={() => setContractorTab(connectionRequests.length > 0 ? 'connections' : openServiceRequestCount > 0 ? 'requests' : 'connections')}>
+                    {connectionRequests.length > 0 ? <CheckCircle2 size={16} /> : <MessageSquare size={16} />}
+                    {connectionRequests.length > 0 ? 'Review connection requests' : openServiceRequestCount > 0 ? 'Review open requests' : 'View homeowners'}
                   </button>
                   <button type="button" className={buttonClass('secondary')} onClick={() => setContractorTab('invites')}>
                     <Link2 size={16} />
@@ -11157,6 +11256,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <Plus size={14} /> Add
                     </button>
                   </div>
+                  {connectionRequests.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHomeownerFilter('active');
+                        setSelectedHomeownerSubjectId(`request:${connectionRequests[0].id}`);
+                        setShowLocalContactForm(false);
+                      }}
+                      className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-800 hover:border-amber-300 hover:bg-amber-100"
+                    >
+                      {connectionRequests.length} connection request{connectionRequests.length === 1 ? '' : 's'} need review
+                    </button>
+                  )}
                   <div className="grid grid-cols-2 gap-1 mt-3 bg-slate-100 rounded-xl p-1">
                     {(['active', 'inactive'] as const).map(filter => (
                       <button key={filter} type="button" onClick={() => setHomeownerFilter(filter)}
@@ -17389,7 +17501,7 @@ function NotificationBell({
 
   const handleNotificationClick = (notification: AppNotification) => {
     if (!notification.read_at) onMarkRead([notification.id]);
-    if ((notification.request_id || notification.estimate_id || notification.support_inquiry_id || notification.type.includes('support')) && onOpenNotification) {
+    if ((notification.request_id || notification.estimate_id || notification.support_inquiry_id || notification.type.includes('support') || notification.type.includes('connection')) && onOpenNotification) {
       onOpenNotification(notification);
       setOpen(false);
     }
@@ -17461,7 +17573,7 @@ function NotificationBell({
                         <p className="mt-0.5 text-xs text-[#223D67]">{n.body}</p>
                         <p className="mt-1 text-xs text-[#223D67]/70">{formatDateTime(n.created_at)}</p>
                       </div>
-                      {(n.request_id || n.estimate_id || n.support_inquiry_id || n.type.includes('support')) && <ArrowRight size={14} className="mt-1 shrink-0 text-[#223D67]/55" />}
+                      {(n.request_id || n.estimate_id || n.support_inquiry_id || n.type.includes('support') || n.type.includes('connection')) && <ArrowRight size={14} className="mt-1 shrink-0 text-[#223D67]/55" />}
                     </div>
                   </button>
                 </li>
@@ -17485,6 +17597,7 @@ function ContractorPublicProfilePage({
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [requestDone, setRequestDone] = useState(false);
 
@@ -17499,11 +17612,14 @@ function ContractorPublicProfilePage({
       if (currentProfile?.role === 'homeowner') {
         const { data: conn } = await supabase
           .from('homeowner_contractor_connections')
-          .select('status')
+          .select('id,status')
           .eq('homeowner_user_id', currentProfile.id)
           .eq('contractor_id', profile.contractor_id)
           .maybeSingle();
-        if (conn) setConnectionStatus(conn.status as string);
+        if (conn) {
+          setConnectionId(conn.id as string);
+          setConnectionStatus(conn.status as string);
+        }
       }
       setLoading(false);
     };
@@ -17514,6 +17630,23 @@ function ContractorPublicProfilePage({
     if (!supabase || !data || !currentProfile) return;
     setRequesting(true);
     try {
+      if (connectionId && connectionStatus && ['declined', 'revoked', 'dismissed'].includes(connectionStatus)) {
+        const { error: updateError } = await supabase
+          .from('homeowner_contractor_connections')
+          .update({ status: 'pending' })
+          .eq('id', connectionId)
+          .eq('homeowner_user_id', currentProfile.id);
+        if (updateError) throw updateError;
+        await supabase.from('connection_audit_events').insert({
+          connection_id: connectionId,
+          actor_user_id: currentProfile.id,
+          event_type: connectionStatus === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
+          event_details: { contractor_id: data.contractor_id, source: 'public_profile', previous_status: connectionStatus },
+        });
+        setConnectionStatus('pending');
+        setRequestDone(true);
+        return;
+      }
       const { data: conn, error } = await supabase
         .from('homeowner_contractor_connections')
         .insert({ homeowner_user_id: currentProfile.id, contractor_id: data.contractor_id, status: 'pending', source: 'homeowner_request' })
@@ -17521,6 +17654,7 @@ function ContractorPublicProfilePage({
         .single();
       if (error) throw error;
       if (conn?.id) {
+        setConnectionId(conn.id);
         await supabase.from('connection_audit_events').insert({
           connection_id: conn.id,
           actor_user_id: currentProfile.id,
@@ -17599,7 +17733,7 @@ function ContractorPublicProfilePage({
 
         {/* CTA */}
         <div className="mt-5 border-t border-slate-200 pt-5">
-          {currentProfile?.role === 'homeowner' && !connectionStatus && !requestDone && (
+          {currentProfile?.role === 'homeowner' && (!connectionStatus || ['declined', 'revoked', 'dismissed'].includes(connectionStatus)) && !requestDone && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm font-semibold text-blue-950">Connect before requesting service</p>
               <p className="mt-1 text-sm text-blue-800">
@@ -17607,11 +17741,11 @@ function ContractorPublicProfilePage({
               </p>
               <button type="button" onClick={() => void requestConnection()} disabled={requesting} className={`${buttonClass('primary')} mt-3`}>
                 <Link2 size={16} />
-                {requesting ? 'Sending request…' : `Request connection with ${data.business_name}`}
+                {requesting ? 'Sending request…' : connectionStatus ? `Request again with ${data.business_name}` : `Request connection with ${data.business_name}`}
               </button>
             </div>
           )}
-          {currentProfile?.role === 'homeowner' && (connectionStatus || requestDone) && (
+          {currentProfile?.role === 'homeowner' && ((connectionStatus && !['declined', 'revoked', 'dismissed'].includes(connectionStatus)) || requestDone) && (
             <div className="flex flex-wrap items-center gap-3">
               <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
                 connectionStatus === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
@@ -17819,6 +17953,33 @@ function DiscoverFeed({
     setActionNotice('');
     setActionError('');
     try {
+      const existing = connections.find(connection => connection.contractor_id === item.contractor_id);
+      if (existing) {
+        if (existing.status === 'active') {
+          setActionNotice(`You are already connected with ${item.business_name}.`);
+          return;
+        }
+        if (existing.status === 'pending') {
+          setActionNotice(`You already have a pending connection request with ${item.business_name}.`);
+          return;
+        }
+        const { error: updateError } = await supabase
+          .from('homeowner_contractor_connections')
+          .update({ status: 'pending' })
+          .eq('id', existing.connection_id)
+          .eq('homeowner_user_id', userId);
+        if (updateError) throw updateError;
+        await supabase.from('connection_audit_events').insert({
+          connection_id: existing.connection_id,
+          actor_user_id: userId,
+          event_type: existing.status === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
+          event_details: { contractor_id: item.contractor_id, source: 'discover', previous_status: existing.status },
+        });
+        setLocalConnectionStatuses(prev => ({ ...prev, [item.contractor_id]: 'pending' }));
+        setActionNotice(`Connection request sent to ${item.business_name}.`);
+        await onConnectionRequested?.();
+        return;
+      }
       const { error } = await supabase.from('homeowner_contractor_connections').insert({
         homeowner_user_id: userId,
         contractor_id: item.contractor_id,
@@ -18065,14 +18226,14 @@ function DiscoverFeed({
                     <p className="text-xs text-slate-500">{item.review_count} {item.review_count === 1 ? 'review' : 'reviews'}</p>
                   )}
 
-                  {perspective === 'homeowner' && !existingStatus && (
+                  {perspective === 'homeowner' && (!existingStatus || ['declined', 'revoked', 'dismissed'].includes(existingStatus)) && (
                     <button
                       type="button"
                       disabled={requestingContractorId === item.contractor_id}
                       onClick={() => void requestConnection(item)}
                       className={buttonClass('primary')}
                     >
-                      {requestingContractorId === item.contractor_id ? 'Sending...' : 'Request connection'}
+                      {requestingContractorId === item.contractor_id ? 'Sending...' : existingStatus ? 'Request again' : 'Request connection'}
                     </button>
                   )}
                   {perspective === 'homeowner' && existingStatus === 'active' && (
@@ -18089,7 +18250,7 @@ function DiscoverFeed({
                       </button>
                     </div>
                   )}
-                  {perspective === 'homeowner' && existingStatus && existingStatus !== 'active' && (
+                  {perspective === 'homeowner' && existingStatus === 'pending' && (
                     <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                       Pending
                     </span>

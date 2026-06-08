@@ -1,6 +1,6 @@
 export type UserRole = 'homeowner' | 'contractor' | 'platform_admin';
 
-export type ConnectionStatus = 'pending' | 'active' | 'declined' | 'revoked';
+export type ConnectionStatus = 'pending' | 'active' | 'declined' | 'revoked' | 'dismissed';
 export type ContractorAccountStatus = 'active' | 'inactive' | 'paused';
 export type ContractorSubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'unpaid';
 export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
