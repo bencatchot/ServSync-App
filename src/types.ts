@@ -295,6 +295,7 @@ export interface ContractorConnectedHomeowner {
   status: ConnectionStatus;
   permissions: SharingPermissions;
   home: {
+    id?: string;
     nickname: string;
     address_line1: string;
     address_line2: string;
@@ -520,7 +521,16 @@ export interface InspectionTemplate {
   contractor_id: string;
   name: string;
   rooms: InspectionTemplateRoom[];
+  scope?: 'contractor' | 'home';
+  homeowner_user_id?: string | null;
+  home_id?: string | null;
+  local_contact_id?: string | null;
+  local_home_id?: string | null;
+  source_inspection_id?: string | null;
+  is_default_for_home?: boolean;
+  archived_at?: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ContractorLocalHome {

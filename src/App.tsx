@@ -160,6 +160,13 @@ type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessme
 type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
 type JobWorkflowMode = 'simple' | 'checklist';
 type SimpleServiceJobType = 'service_visit' | 'repair' | 'install' | 'estimate_visit';
+type InspectionTemplateSubjectContext = {
+  subject_type: 'connected' | 'local';
+  homeowner_user_id?: string;
+  home_id?: string;
+  local_contact_id?: string;
+  local_home_id?: string;
+};
 type ServSyncFieldWorkTemplate = {
   id: string;
   name: string;
@@ -2205,6 +2212,24 @@ function customTemplateLooksInspectionLike(template: Pick<InspectionTemplate, 'n
   const positive = ['inspection', 'inspect', 'check', 'safety', 'maintenance', 'walkthrough', 'evaluation', 'evaluate', 'assessment', 'report'];
   const negative = ['service visit', 'repair job', 'install', 'installation', 'cleaning', 'moving', 'appliance repair', 'handyman', 'drywall repair'];
   return positive.some(term => hasPhrase(haystack, term)) && !negative.some(term => hasPhrase(haystack, term));
+}
+
+function templateScope(template: InspectionTemplate) {
+  return template.scope || 'contractor';
+}
+
+function templateMatchesInspectionSubject(template: InspectionTemplate, context: InspectionTemplateSubjectContext | null) {
+  if (templateScope(template) !== 'home' || !context) return false;
+
+  if (context.subject_type === 'connected') {
+    const homeownerMatches = Boolean(template.homeowner_user_id && context.homeowner_user_id && template.homeowner_user_id === context.homeowner_user_id);
+    const homeMatches = Boolean(template.home_id && context.home_id && template.home_id === context.home_id);
+    return homeownerMatches || homeMatches;
+  }
+
+  const localContactMatches = Boolean(template.local_contact_id && context.local_contact_id && template.local_contact_id === context.local_contact_id);
+  const localHomeMatches = Boolean(template.local_home_id && context.local_home_id && template.local_home_id === context.local_home_id);
+  return localContactMatches || localHomeMatches;
 }
 
 const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(trade => {
@@ -10448,11 +10473,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     ].filter(Boolean).join(' '));
     return normalizedTemplateSearch.split(' ').every(term => haystack.includes(term));
   };
+  const inspectionTemplateSubjectContext: InspectionTemplateSubjectContext | null = (() => {
+    if (inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id) {
+      const selectedConnection = connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id);
+      return {
+        subject_type: 'connected',
+        homeowner_user_id: inspectionNewDraft.homeowner_user_id,
+        home_id: selectedConnection?.home?.id ?? '',
+      };
+    }
+    if (inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id) {
+      return {
+        subject_type: 'local',
+        local_contact_id: inspectionNewDraft.local_contact_id,
+        local_home_id: inspectionNewDraft.local_home_id || '',
+      };
+    }
+    return null;
+  })();
+  const activeInspectionTemplates = inspectionTemplates.filter(template => !template.archived_at);
+  const contractorScopedInspectionTemplates = activeInspectionTemplates.filter(template => templateScope(template) === 'contractor');
+  const homeScopedInspectionTemplatesForSelectedSubject = activeInspectionTemplates.filter(template => templateMatchesInspectionSubject(template, inspectionTemplateSubjectContext));
   const filteredStarterTemplates = sortedServSyncFieldWorkTemplates.filter(templateMatchesSearch);
-  const filteredCustomTemplates = inspectionTemplates.filter(templateMatchesSearch);
-  const inspectionCustomTemplatesForNewJob = inspectionTemplates
+  const filteredCustomTemplates = contractorScopedInspectionTemplates.filter(templateMatchesSearch);
+  const inspectionHomeTemplatesForNewJob = homeScopedInspectionTemplatesForSelectedSubject
     .filter(customTemplateLooksInspectionLike)
     .filter(templateMatchesSearch);
+  const inspectionContractorTemplatesForNewJob = contractorScopedInspectionTemplates
+    .filter(customTemplateLooksInspectionLike)
+    .filter(templateMatchesSearch);
+  const inspectionCustomTemplatesForNewJob = [
+    ...inspectionHomeTemplatesForNewJob,
+    ...inspectionContractorTemplatesForNewJob,
+  ];
   const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<{ description: string; line_type: string; unit: string }> }) => {
     if (!normalizedTemplateSearch) return true;
     const haystack = normalizeText([
@@ -10732,7 +10785,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? inspectionNewDraft.job_type
         : jobTypeFromWorkflowKind(inspectionNewDraft.workflow_kind, 'checklist');
       const selectedTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'custom'
-        ? inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id)
+        ? inspectionCustomTemplatesForNewJob.find(t => t.id === inspectionNewDraft.template_id)
         : null;
       const selectedStarterTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'starter'
         ? inspectionStarterTemplatesForNewJob.find(t => t.id === inspectionNewDraft.starter_template_id)
@@ -15140,7 +15193,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className={`rounded-lg p-1.5 ${contractorJobsView === 'templates' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}><ClipboardList size={15} /></span>
-                        <span className="text-lg font-bold">{inspectionTemplates.length + estimateTemplates.length}</span>
+                        <span className="text-lg font-bold">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
                       </div>
                       <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-600'}`}>Templates</p>
                       <p className={`mt-1 text-xs ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-500'}`}>Workflow and estimate starters</p>
@@ -15959,7 +16012,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="text-sm font-bold text-slate-950">Your workflow templates</p>
                         <p className="mt-1 text-xs text-slate-500">Jobs, inspections, and checklist-style templates.</p>
                       </div>
-                      <span className="text-xl font-bold text-slate-950">{inspectionTemplates.length}</span>
+                      <span className="text-xl font-bold text-slate-950">{contractorScopedInspectionTemplates.length}</span>
                     </div>
                   </button>
                   <button
@@ -16308,6 +16361,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const [subjectType, id] = e.target.value.split(':') as ['connected' | 'local', string];
                         const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
                         const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
+                        const nextContext: InspectionTemplateSubjectContext | null = subjectType === 'connected' && id
+                          ? { subject_type: 'connected', homeowner_user_id: id, home_id: conn?.home?.id ?? '' }
+                          : subjectType === 'local' && id
+                            ? { subject_type: 'local', local_contact_id: id, local_home_id: local?.homes?.[0]?.id ?? '' }
+                            : null;
+                        const currentCustomTemplate = inspectionNewDraft.template_source === 'custom'
+                          ? inspectionTemplates.find(template => template.id === inspectionNewDraft.template_id)
+                          : null;
+                        const keepCurrentCustomTemplate = !currentCustomTemplate
+                          || templateScope(currentCustomTemplate) === 'contractor'
+                          || templateMatchesInspectionSubject(currentCustomTemplate, nextContext);
                         const selectedTemplate = inspectionNewDraft.template_source === 'starter'
                           ? inspectionStarterTemplatesForNewJob.find(t => t.id === inspectionNewDraft.starter_template_id)
                           : null;
@@ -16321,6 +16385,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           local_contact_id: subjectType === 'local' ? id : '',
                           local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
                           service_request_id: subjectType === 'connected' ? d.service_request_id : '',
+                          template_source: keepCurrentCustomTemplate ? d.template_source : 'blank',
+                          template_id: keepCurrentCustomTemplate ? d.template_id : '',
                           name: autoName || d.name,
                         }));
                       }}
@@ -16424,7 +16490,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC maintenance inspection" />
                     </Field>
                     <Field label="Start from">
-                      <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : inspectionStarterTemplatesForNewJob.some(template => template.id === inspectionNewDraft.starter_template_id) ? `starter:${inspectionNewDraft.starter_template_id}` : 'blank'} onChange={e => {
+                      <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' && inspectionCustomTemplatesForNewJob.some(template => template.id === inspectionNewDraft.template_id) ? `custom:${inspectionNewDraft.template_id}` : inspectionStarterTemplatesForNewJob.some(template => template.id === inspectionNewDraft.starter_template_id) ? `starter:${inspectionNewDraft.starter_template_id}` : 'blank'} onChange={e => {
                         if (e.target.value === 'blank') {
                           setInspectionNewDraft(d => ({
                             ...d,
@@ -16447,18 +16513,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         }));
                       }}>
                         <option value="blank">Blank Inspection</option>
-                        <optgroup label="Inspection templates">
+                        {inspectionHomeTemplatesForNewJob.length > 0 && (
+                          <optgroup label="This Home's Templates">
+                            {inspectionHomeTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
+                          </optgroup>
+                        )}
+                        {inspectionContractorTemplatesForNewJob.length > 0 && (
+                          <optgroup label="Your Templates">
+                            {inspectionContractorTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
+                          </optgroup>
+                        )}
+                        <optgroup label="Starter Templates">
                           {inspectionStarterTemplatesForNewJob.map(t => (
                             <option key={t.id} value={`starter:${t.id}`}>
                               {starterTemplateRecommendedForContractor(t.trade) ? 'Recommended — ' : ''}{t.name} ({FIELD_WORK_KIND_LABEL[t.kind]})
                             </option>
                           ))}
                         </optgroup>
-                        {inspectionCustomTemplatesForNewJob.length > 0 && (
-                          <optgroup label="Your templates">
-                            {inspectionCustomTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
-                          </optgroup>
-                        )}
                       </select>
                     </Field>
                   </>
