@@ -158,6 +158,8 @@ type HomeownerServiceRequestDraft = {
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
 type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
+type JobWorkflowMode = 'simple' | 'checklist';
+type SimpleServiceJobType = 'service_visit' | 'repair' | 'install' | 'estimate_visit';
 type ServSyncFieldWorkTemplate = {
   id: string;
   name: string;
@@ -344,6 +346,53 @@ function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'not
 function isInspectionLikeFieldWork(work: Pick<Inspection, 'name' | 'summary'>) {
   const haystack = normalizeText(`${work.name || ''} ${work.summary || ''}`);
   return /\b(inspection|assessment|inspect|report)\b/.test(haystack);
+}
+
+const SIMPLE_SERVICE_JOB_TYPES = new Set(['service_visit', 'repair', 'install', 'estimate_visit']);
+const CHECKLIST_JOB_TYPES = new Set(['inspection', 'maintenance_visit']);
+
+function roomIsApprovedScope(roomName: string) {
+  return normalizeText(roomName) === 'approved scope' || normalizeText(roomName) === 'approved work';
+}
+
+function jobHasChecklistStructure(job: Pick<Inspection, 'rooms_with_findings'>) {
+  const rooms = job.rooms_with_findings ?? [];
+  const findingCount = rooms.reduce((count, room) => count + (room.findings?.length ?? 0), 0);
+  if (findingCount === 0) return false;
+  return !rooms.every(room => roomIsApprovedScope(room.room));
+}
+
+function jobTypeFromWorkflowKind(kind: FieldWorkflowKind, mode: JobWorkflowMode = 'checklist'): string {
+  if (mode === 'simple') return 'service_visit';
+  if (kind === 'maintenance') return 'maintenance_visit';
+  if (kind === 'inspection' || kind === 'assessment') return 'inspection';
+  return 'service_visit';
+}
+
+function isChecklistJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
+  const type = (job.job_type || '').trim();
+  if (CHECKLIST_JOB_TYPES.has(type)) return true;
+  if (SIMPLE_SERVICE_JOB_TYPES.has(type)) {
+    return jobHasChecklistStructure(job) && (Boolean(job.template_id) || isInspectionLikeFieldWork(job));
+  }
+  return Boolean(job.template_id && jobHasChecklistStructure(job)) || (isInspectionLikeFieldWork(job) && jobHasChecklistStructure(job));
+}
+
+function isSimpleServiceJob(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
+  return !isChecklistJob(job);
+}
+
+function jobTypeLabel(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
+  if (isChecklistJob(job)) {
+    return job.job_type === 'maintenance_visit' ? 'Maintenance / checklist job' : 'Inspection / checklist job';
+  }
+  const labels: Record<string, string> = {
+    service_visit: 'Simple service job',
+    repair: 'Repair job',
+    install: 'Install job',
+    estimate_visit: 'Estimate visit',
+  };
+  return labels[(job.job_type || 'service_visit').trim()] ?? 'Simple service job';
 }
 
 const OPEN_JOB_STATUSES: JobLifecycleStatus[] = ['draft', 'scheduled', 'in_progress'];
@@ -8571,6 +8620,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     local_home_id: '',
     service_request_id: '',
     name: '',
+    scope: '',
+    job_mode: 'simple' as JobWorkflowMode,
+    job_type: 'service_visit' as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
     template_id: '',
     template_source: 'blank' as FieldWorkTemplateSource,
     starter_template_id: 'starter-general-maintenance-field-work',
@@ -10319,6 +10371,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
+    const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
@@ -10326,6 +10379,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
       name: options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource),
+      scope: '',
+      job_mode: jobMode,
+      job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
       template_id: options?.templateId ?? '',
       template_source: templateSource,
       starter_template_id: starterTemplateId,
@@ -10337,6 +10393,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
+    const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
@@ -10344,6 +10401,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: contact.homes?.[0]?.id ?? '',
       service_request_id: '',
       name: options?.name ?? buildLocalFieldWorkName(contact, starterTemplateId, workflowKind, templateSource),
+      scope: '',
+      job_mode: jobMode,
+      job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
       template_id: options?.templateId ?? '',
       template_source: templateSource,
       starter_template_id: starterTemplateId,
@@ -10454,19 +10514,38 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
     setSavingInspection(true);
     try {
-      const selectedTemplate = inspectionNewDraft.template_source === 'custom'
+      const isSimpleJobDraft = inspectionNewDraft.job_mode === 'simple';
+      const requestedJobType = isSimpleJobDraft
+        ? inspectionNewDraft.job_type
+        : jobTypeFromWorkflowKind(inspectionNewDraft.workflow_kind, 'checklist');
+      const selectedTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'custom'
         ? inspectionTemplates.find(t => t.id === inspectionNewDraft.template_id)
         : null;
-      const selectedStarterTemplate = inspectionNewDraft.template_source === 'starter'
+      const selectedStarterTemplate = !isSimpleJobDraft && inspectionNewDraft.template_source === 'starter'
         ? SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === inspectionNewDraft.starter_template_id)
         : null;
       const rooms: InspectionTemplateRoom[] = selectedTemplate
         ? selectedTemplate.rooms
         : selectedStarterTemplate?.rooms ?? [];
-      const seedFindings: InspectionRoomData[] = rooms.map(r => ({
-        room: r.room,
-        findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
-      }));
+      const trimmedScope = inspectionNewDraft.scope.trim();
+      const seedFindings: InspectionRoomData[] = isSimpleJobDraft
+        ? trimmedScope
+          ? [{
+              room: 'Approved Scope',
+              findings: [{
+                title: inspectionNewDraft.name.trim(),
+                status: 'Monitor' as FindingStatus,
+                notes: trimmedScope,
+                action: 'Complete the approved work.',
+                due: '',
+                photos: [],
+              }],
+            }]
+          : []
+        : rooms.map(r => ({
+            room: r.room,
+            findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
+          }));
 
       const { data, error: rpcErr } = await supabase.rpc('servsync_create_field_work', {
         p_homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
@@ -10478,8 +10557,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_template_id: selectedTemplate?.id ?? null,
       });
       if (rpcErr) throw rpcErr;
+      const newInspectionId = data as string;
+      const { data: updatedJobData, error: jobTypeError } = await supabase
+        .from('inspections')
+        .update({
+          job_type: requestedJobType,
+          summary: trimmedScope,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', newInspectionId)
+        .select('*')
+        .single();
+      if (jobTypeError) throw jobTypeError;
       const newInspection: Inspection = {
-        id: data as string,
+        id: newInspectionId,
         contractor_id: contractor?.id || '',
         homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
         local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
@@ -10487,9 +10578,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         service_request_id: inspectionNewDraft.service_request_id || null,
         template_id: selectedTemplate?.id ?? null,
         name: inspectionNewDraft.name.trim(),
-        summary: '',
+        summary: trimmedScope,
         status: 'draft',
-        job_type: 'service_visit',
+        job_type: requestedJobType,
         job_status: 'draft',
         estimate_id: null,
         completed_at: null,
@@ -10499,10 +10590,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         report_file_name: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        ...(updatedJobData as Partial<Inspection>),
       };
+      const activeRoomSeed: InspectionTemplateRoom[] = isSimpleJobDraft
+        ? seedFindings.map(room => ({ room: room.room, items: room.findings.map(finding => finding.title) }))
+        : rooms;
       setActiveInspection(newInspection);
-      setActiveRooms(rooms);
-      setAvailableChecklistRooms(rooms);
+      setActiveRooms(activeRoomSeed);
+      setAvailableChecklistRooms(activeRoomSeed);
       const init: Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }> = {};
       seedFindings.forEach(rd => rd.findings.forEach(f => { init[`${rd.room}||${f.title}`] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
       setLocalFindings(init);
@@ -10511,13 +10606,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setIncludeReportValueAdd(true);
       setReportValueAddText(buildValueAddText(seedFindings));
       setInspectionClosedForReview(false);
-      setSelectedChecklistRoom(rooms[0]?.room ?? null);
+      setSelectedChecklistRoom(activeRoomSeed[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
-      setInspectionSubTab('checklist');
+      setInspectionSubTab(isSimpleJobDraft ? 'inspect' : 'checklist');
       setInspectionView('detail');
       setContractorJobsView('open_jobs');
       setContractorTab('inspections');
-      persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: 'checklist', selectedRoom: rooms[0]?.room ?? null });
+      persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: isSimpleJobDraft ? 'inspect' : 'checklist', selectedRoom: activeRoomSeed[0]?.room ?? null });
     } catch (err) {
       setError(readableError(err, 'Failed to create job.'));
     } finally {
@@ -10673,6 +10768,45 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to send report notification to homeowner.'));
     } finally {
       setSendingInspectionReportId(null);
+    }
+  };
+
+  const completeSimpleServiceJob = async (insp: Inspection) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    const completedAt = new Date().toISOString();
+    const summaryText = inspectionSummary.trim() || insp.summary || '';
+    try {
+      const updatedRooms = buildInspectionRoomsSnapshot();
+      const { data: updated, error: updateError } = await supabase
+        .from('inspections')
+        .update({
+          job_status: 'completed',
+          completed_at: completedAt,
+          summary: summaryText,
+          rooms_with_findings: updatedRooms,
+          updated_at: completedAt,
+        })
+        .eq('id', insp.id)
+        .select('*')
+        .single();
+      if (updateError) throw updateError;
+
+      const completedJob = (updated as Inspection) ?? {
+        ...insp,
+        job_status: 'completed' as const,
+        completed_at: completedAt,
+        summary: summaryText,
+        rooms_with_findings: updatedRooms,
+        updated_at: completedAt,
+      };
+      setActiveInspection(completedJob);
+      setInspections(prev => prev.map(item => item.id === insp.id ? completedJob : item));
+      setContractorJobsView('closed_jobs');
+      setNotice('Job marked completed. You can create an invoice when ready.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to complete this job.'));
     }
   };
 
@@ -15398,10 +15532,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     return (
                       <div className="space-y-2">
                         {records.map(insp => {
-                          const urgentCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length;
-                          const issueCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+                          const checklistStyle = isChecklistJob(insp);
+                          const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
+                          const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
+                          const linkedEstimate = insp.estimate_id ? estimates.find(estimate => estimate.id === insp.estimate_id) ?? null : null;
                           const linkedInvoice = invoices.find(invoice =>
                             invoice.status !== 'void'
                             && (invoice.job_id === insp.id || (insp.estimate_id ? invoice.estimate_id === insp.estimate_id : false))
@@ -15416,12 +15552,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
                                       {inspectionJobStatusLabel(insp)}
                                     </span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{jobTypeLabel(insp)}</span>
                                     {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
                                     {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
+                                    {!checklistStyle && linkedEstimate && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Estimate linked</span>}
+                                    {!checklistStyle && linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
                                   </div>
                                   <p className="mt-0.5 text-xs text-slate-500">
                                     {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatDateTime(insp.updated_at)}
                                   </p>
+                                  {!checklistStyle && insp.summary && (
+                                    <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>
+                                  )}
                                 </div>
                                 {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                                   <button type="button" onClick={() => void deleteInspection(insp)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700">
@@ -15429,8 +15571,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                 )}
                                 <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
-                                  {insp.status === 'draft' ? 'Continue' : 'View report'}
+                                  {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                                 </button>
+                                {!checklistStyle && inspectionIsOpenJob(insp) && (
+                                  <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={buttonClass('primary')}>
+                                    <CheckCircle2 size={15} />
+                                    Complete Job
+                                  </button>
+                                )}
                                 {showJobInvoiceAction && (
                                   <button
                                     type="button"
@@ -15821,8 +15969,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 ) : (
                   <div className="space-y-2">
                     {inspections.slice(0, 5).map(insp => {
-                      const urgentCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length;
-                      const issueCount = insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length;
+                      const checklistStyle = isChecklistJob(insp);
+                      const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
+                      const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
                       const subjectLabel = fieldWorkSubjectLabel(insp);
                       const subjectAddress = fieldWorkSubjectAddress(insp);
                       return (
@@ -15833,12 +15982,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
                                 {inspectionJobStatusLabel(insp)}
                               </span>
+                              <span className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs font-semibold">{jobTypeLabel(insp)}</span>
                               {urgentCount > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-xs font-semibold">{urgentCount} Urgent</span>}
                               {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-semibold">{issueCount} Issues</span>}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {new Date(insp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
+                            {!checklistStyle && insp.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>}
                           </div>
                           {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                             <button type="button" onClick={() => void deleteInspection(insp)} className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors" title="Delete job">
@@ -15846,7 +15997,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </button>
                           )}
                           <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
-                            {insp.status === 'draft' ? 'Continue' : 'View report'}
+                            {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                           </button>
                         </div>
                       );
@@ -15862,6 +16013,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {inspectionView === 'new' && (
             <Card title="New job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Job type</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setInspectionNewDraft(d => ({
+                        ...d,
+                        job_mode: 'simple',
+                        job_type: (SIMPLE_SERVICE_JOB_TYPES.has(d.job_type) ? d.job_type : 'service_visit') as SimpleServiceJobType,
+                        template_source: 'blank',
+                        template_id: '',
+                        workflow_kind: 'work_order',
+                      }))}
+                      className={`rounded-xl border p-4 text-left transition ${inspectionNewDraft.job_mode === 'simple' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="rounded-lg bg-blue-100 p-2 text-blue-700"><ClipboardCheck size={17} /></span>
+                        <span>
+                          <span className="block text-sm font-bold text-slate-950">Simple Service Job</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">For repairs, installs, one-off service calls, and approved work.</span>
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInspectionNewDraft(d => ({
+                        ...d,
+                        job_mode: 'checklist',
+                        job_type: d.workflow_kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
+                        workflow_kind: d.workflow_kind === 'work_order' ? 'inspection' : d.workflow_kind,
+                      }))}
+                      className={`rounded-xl border p-4 text-left transition ${inspectionNewDraft.job_mode === 'checklist' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="rounded-lg bg-slate-100 p-2 text-slate-700"><ClipboardList size={17} /></span>
+                        <span>
+                          <span className="block text-sm font-bold text-slate-950">Inspection / Checklist Job</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">For inspections, maintenance visits, evaluations, checklists, and reports.</span>
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 <Field label="Customer">
                   <div className="grid gap-2 md:grid-cols-[1fr_auto]">
                     <select
@@ -15953,62 +16147,96 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                   </div>
                 )}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Workflow type">
-                    <select className={inputClass()} value={inspectionNewDraft.workflow_kind} onChange={e => {
-                      const nextKind = e.target.value as FieldWorkflowKind;
-                      const nextStarter = sortedServSyncFieldWorkTemplates.find(t => t.kind === nextKind) ?? sortedServSyncFieldWorkTemplates[0];
-                      setInspectionNewDraft(d => ({
-                        ...d,
-                        workflow_kind: nextKind,
-                        starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
-                        name: d.homeowner_user_id || d.local_contact_id
-                          ? `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${
-                              d.subject_type === 'local'
-                                ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'New customer'
-                                : connections.find(c => c.homeowner_user_id === d.homeowner_user_id)?.display_name ?? 'Homeowner'
-                            } — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
-                          : d.name,
-                      }));
-                    }}>
-                      {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Job name">
-                    <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC seasonal inspection" />
-                  </Field>
-                </div>
-                <Field label="Start from">
-                  <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
-                    if (e.target.value === 'blank') {
-                      setInspectionNewDraft(d => ({ ...d, template_source: 'blank', template_id: '' }));
-                      return;
-                    }
-                    const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
-                    const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === id);
-                    setInspectionNewDraft(d => ({
-                      ...d,
-                      template_source: source,
-                      template_id: source === 'custom' ? id : '',
-                      starter_template_id: source === 'starter' ? id : d.starter_template_id,
-                      workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
-                    }));
-                  }}>
-                    <option value="blank">Blank job — build on site</option>
-                    <optgroup label="ServSync starter templates">
-                      {sortedServSyncFieldWorkTemplates.map(t => (
-                        <option key={t.id} value={`starter:${t.id}`}>
-                          {starterTemplateRecommendedForContractor(t.trade) ? 'Recommended — ' : ''}{t.name} ({FIELD_WORK_KIND_LABEL[t.kind]})
-                        </option>
-                      ))}
-                    </optgroup>
-                    {inspectionTemplates.length > 0 && (
-                      <optgroup label="Your templates">
-                        {inspectionTemplates.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
-                      </optgroup>
-                    )}
-                  </select>
-                </Field>
+                {inspectionNewDraft.job_mode === 'simple' ? (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Simple job type">
+                        <select
+                          className={inputClass()}
+                          value={inspectionNewDraft.job_type}
+                          onChange={event => setInspectionNewDraft(d => ({ ...d, job_type: event.target.value as SimpleServiceJobType }))}
+                        >
+                          <option value="service_visit">Service visit</option>
+                          <option value="repair">Repair</option>
+                          <option value="install">Install</option>
+                          <option value="estimate_visit">Estimate visit</option>
+                        </select>
+                      </Field>
+                      <Field label="Job name">
+                        <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Replace kitchen faucet" />
+                      </Field>
+                    </div>
+                    <Field label="Scope / description">
+                      <textarea
+                        className={`${inputClass()} min-h-[120px] resize-y`}
+                        value={inspectionNewDraft.scope}
+                        onChange={event => setInspectionNewDraft(d => ({ ...d, scope: event.target.value }))}
+                        placeholder="Describe the work to perform, materials to use, or the approved work to complete."
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Workflow type">
+                        <select className={inputClass()} value={inspectionNewDraft.workflow_kind} onChange={e => {
+                          const nextKind = e.target.value as FieldWorkflowKind;
+                          const nextStarter = sortedServSyncFieldWorkTemplates.find(t => t.kind === nextKind) ?? sortedServSyncFieldWorkTemplates[0];
+                          setInspectionNewDraft(d => ({
+                            ...d,
+                            workflow_kind: nextKind,
+                            job_type: nextKind === 'maintenance' ? 'maintenance_visit' : 'inspection',
+                            starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
+                            name: d.homeowner_user_id || d.local_contact_id
+                              ? `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${
+                                  d.subject_type === 'local'
+                                    ? localContacts.find(c => c.id === d.local_contact_id)?.display_name ?? 'New customer'
+                                    : connections.find(c => c.homeowner_user_id === d.homeowner_user_id)?.display_name ?? 'Homeowner'
+                                } — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+                              : d.name,
+                          }));
+                        }}>
+                          {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Job name">
+                        <input className={inputClass()} value={inspectionNewDraft.name} onChange={e => setInspectionNewDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. HVAC seasonal inspection" />
+                      </Field>
+                    </div>
+                    <Field label="Start from">
+                      <select className={inputClass()} value={inspectionNewDraft.template_source === 'blank' ? 'blank' : inspectionNewDraft.template_source === 'custom' ? `custom:${inspectionNewDraft.template_id}` : `starter:${inspectionNewDraft.starter_template_id}`} onChange={e => {
+                        if (e.target.value === 'blank') {
+                          setInspectionNewDraft(d => ({ ...d, template_source: 'blank', template_id: '' }));
+                          return;
+                        }
+                        const [source, id] = e.target.value.split(':') as [FieldWorkTemplateSource, string];
+                        const starter = SERVSYNC_FIELD_WORK_TEMPLATES.find(t => t.id === id);
+                        setInspectionNewDraft(d => ({
+                          ...d,
+                          template_source: source,
+                          template_id: source === 'custom' ? id : '',
+                          starter_template_id: source === 'starter' ? id : d.starter_template_id,
+                          workflow_kind: source === 'starter' && starter ? starter.kind : d.workflow_kind,
+                          job_type: source === 'starter' && starter?.kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
+                        }));
+                      }}>
+                        <option value="blank">Blank checklist — build on site</option>
+                        <optgroup label="ServSync starter templates">
+                          {sortedServSyncFieldWorkTemplates.map(t => (
+                            <option key={t.id} value={`starter:${t.id}`}>
+                              {starterTemplateRecommendedForContractor(t.trade) ? 'Recommended — ' : ''}{t.name} ({FIELD_WORK_KIND_LABEL[t.kind]})
+                            </option>
+                          ))}
+                        </optgroup>
+                        {inspectionTemplates.length > 0 && (
+                          <optgroup label="Your templates">
+                            {inspectionTemplates.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
+                          </optgroup>
+                        )}
+                      </select>
+                    </Field>
+                  </>
+                )}
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -16055,6 +16283,185 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               setInspectionSubTab('report');
               setNotice('Report review is ready. Check the homeowner summary before filing.');
             };
+            if (isSimpleServiceJob(activeInspection)) {
+              const approvedScopeRooms = workingRooms.filter(room => roomIsApprovedScope(room.room));
+              const approvedWorkItems = approvedScopeRooms.flatMap(room => room.findings);
+              const linkedEstimate = activeInspection.estimate_id
+                ? estimates.find(estimate => estimate.id === activeInspection.estimate_id) ?? null
+                : null;
+              const linkedInvoice = invoices.find(invoice =>
+                invoice.status !== 'void'
+                && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
+              ) ?? null;
+              const linkedServiceRequest = activeInspection.service_request_id
+                ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
+                : null;
+              const completed = inspectionIsClosedJob(activeInspection);
+              const photoCount = workingFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
+              return (
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInspectionView('list');
+                      setContractorJobsView(inspectionIsOpenJob(activeInspection) ? 'open_jobs' : 'closed_jobs');
+                      setContractorTab('inspections');
+                    }}
+                    className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                  >
+                    ← Back to Jobs
+                  </button>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
+                            {inspectionJobStatusLabel(activeInspection)}
+                          </span>
+                          {linkedEstimate && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Estimate linked</span>}
+                          {linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
+                        </div>
+                        <h2 className="mt-2 truncate text-xl font-bold text-slate-950">{activeInspection.name}</h2>
+                        <p className="mt-1 text-sm text-slate-500">{homeownerLabel}{homeAddress ? ` · ${homeAddress}` : ''}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} className={buttonClass('secondary')}>
+                          {savingInspection ? 'Saving...' : 'Save'}
+                        </button>
+                        {inspectionIsOpenJob(activeInspection) && (
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
+                            <CheckCircle2 size={15} />
+                            Complete Job
+                          </button>
+                        )}
+                        {completed && (
+                          <button
+                            type="button"
+                            disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                            onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromJob(activeInspection)}
+                            className={buttonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
+                          >
+                            <Receipt size={15} />
+                            {creatingInvoiceSourceId === `job:${activeInspection.id}`
+                              ? 'Creating...'
+                              : linkedInvoice
+                                ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                : 'Create Invoice'}
+                          </button>
+                        )}
+                        {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
+                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
+                            <p className="mt-1 text-xs text-slate-500">Simple service jobs track the work without forcing an inspection checklist.</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <InfoBox label="Customer" value={homeownerLabel} />
+                          <InfoBox label="Service address" value={homeAddress || 'Not provided'} />
+                          <InfoBox label="Job status" value={inspectionJobStatusLabel(activeInspection)} />
+                          <InfoBox label="Photos attached" value={String(photoCount)} />
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          {linkedEstimate && <InfoBox label="Linked estimate" value={linkedEstimate.title || 'Accepted estimate'} />}
+                          {linkedServiceRequest && <InfoBox label="Linked request" value={linkedServiceRequest.title || linkedServiceRequest.category || 'Service request'} />}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-950">Approved Scope / Work To Complete</h3>
+                        {approvedWorkItems.length === 0 ? (
+                          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                            No approved scope has been added yet. Use Work Notes to describe the completed work or create the job from an accepted estimate.
+                          </p>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {approvedWorkItems.map((item, index) => (
+                              <div key={`${item.title}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p className="text-sm font-semibold text-slate-950">{item.title}</p>
+                                {item.notes && <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-600">{item.notes}</p>}
+                                {item.action && <p className="mt-2 text-sm font-medium text-blue-700">{item.action}</p>}
+                                {(item.photos ?? []).length > 0 && (
+                                  <div className="mt-3 grid grid-cols-4 gap-2">
+                                    {(item.photos ?? []).map((url, pi) => (
+                                      <InspectionPhotoImage key={pi} photo={url} alt={item.title} className="h-20 w-full rounded-lg object-cover" />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-950">Work Notes</h3>
+                        <p className="mt-1 text-xs text-slate-500">Use this for the contractor-facing scope, progress notes, or completion summary. Full simple-job photo notes can be expanded in a later PR without changing this workflow.</p>
+                        <textarea
+                          className={`${inputClass()} mt-3 min-h-[150px] resize-y`}
+                          value={inspectionSummary}
+                          onChange={event => setInspectionSummary(event.target.value)}
+                          disabled={activeInspection.status !== 'draft' || completed}
+                          placeholder="Describe work performed, materials used, open follow-up, or completion notes..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 self-start xl:sticky xl:top-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-950">Completion</h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Simple jobs can be completed without generating an inspection-style report.</p>
+                        {completed ? (
+                          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
+                            <CheckCircle2 size={18} className="mx-auto text-emerald-600" />
+                            <p className="mt-1 text-sm font-semibold text-emerald-700">Job completed</p>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={`${buttonClass('primary')} mt-3 w-full justify-center`}>
+                            <CheckCircle2 size={15} />
+                            Complete Job
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-950">Invoice</h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Create the invoice after the job is complete, or open the invoice already linked to this job.</p>
+                        {linkedInvoice ? (
+                          <button type="button" onClick={() => openInvoiceRecord(linkedInvoice)} className={`${buttonClass(linkedInvoice.status === 'draft' ? 'secondary' : 'primary')} mt-3 w-full justify-center`}>
+                            <Receipt size={15} />
+                            {linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!completed || creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                            onClick={() => void createInvoiceFromJob(activeInspection)}
+                            className={`${buttonClass('primary')} mt-3 w-full justify-center disabled:opacity-50`}
+                          >
+                            <Receipt size={15} />
+                            {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div className="space-y-4">
                 <button
