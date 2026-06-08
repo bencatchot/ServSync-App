@@ -584,6 +584,79 @@ function roomIsSimpleWorkItems(roomName: string) {
   return normalizeText(roomName) === normalizeText(SIMPLE_WORK_ITEMS_ROOM);
 }
 
+const SERVICE_TASK_ACTION_STARTERS = [
+  'add',
+  'adjust',
+  'assemble',
+  'build',
+  'caulk',
+  'check',
+  'clean',
+  'connect',
+  'demo',
+  'diagnose',
+  'dispose',
+  'fix',
+  'haul',
+  'install',
+  'inspect',
+  'mount',
+  'paint',
+  'patch',
+  'repair',
+  'replace',
+  'remove',
+  'seal',
+  'secure',
+  'service',
+  'test',
+  'troubleshoot',
+  'verify',
+];
+
+function cleanServiceTaskTitle(value: string) {
+  return value
+    .replace(/^\s*[-*\d.)]+/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,;:\s]+|[,;:\s.]+$/g, '')
+    .trim();
+}
+
+function splitScopeIntoServiceTaskCandidates(scope: string) {
+  const protectedScope = scope
+    .replace(/\r\n/g, '\n')
+    .replace(/\s*[;]\s*/g, '\n')
+    .replace(/\n+/g, '\n');
+  const commaPattern = new RegExp(`,\\s+(?=(?:${SERVICE_TASK_ACTION_STARTERS.join('|')})\\b)`, 'gi');
+  const andPattern = new RegExp(`\\s+and\\s+(?=(?:${SERVICE_TASK_ACTION_STARTERS.join('|')})\\b)`, 'gi');
+  return protectedScope
+    .split('\n')
+    .flatMap(part => part.split(commaPattern))
+    .flatMap(part => part.split(andPattern));
+}
+
+function serviceTasksFromScope(scope: string, jobTitle: string) {
+  const normalizedJobTitle = normalizeText(jobTitle);
+  const seen = new Set<string>();
+  const tasks = splitScopeIntoServiceTaskCandidates(scope)
+    .map(cleanServiceTaskTitle)
+    .filter(candidate => {
+      const normalized = normalizeText(candidate);
+      if (!normalized || normalized.length < 4) return false;
+      if (normalized === normalizedJobTitle) return false;
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+  if (tasks.length > 1) return tasks;
+  const fallback = cleanServiceTaskTitle(scope);
+  const normalizedFallback = normalizeText(fallback);
+  if (normalizedFallback && normalizedFallback !== normalizedJobTitle && normalizedFallback.length >= 4) {
+    return [fallback];
+  }
+  return [];
+}
+
 function jobHasChecklistStructure(job: Pick<Inspection, 'rooms_with_findings'>) {
   const rooms = job.rooms_with_findings ?? [];
   const findingCount = rooms.reduce((count, room) => count + (room.findings?.length ?? 0), 0);
@@ -11022,8 +11095,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         : selectedStarterTemplate?.rooms ?? []
       ).map((room, index) => normalizeTemplateRoom(room, index));
       const trimmedScope = inspectionNewDraft.scope.trim();
+      const serviceTaskTitles = isSimpleJobDraft
+        ? serviceTasksFromScope(trimmedScope, inspectionNewDraft.name)
+        : [];
       const seedFindings: InspectionRoomData[] = isSimpleJobDraft
-        ? []
+        ? serviceTaskTitles.length
+          ? [{
+              ...roomIdentityFields({ room: SIMPLE_WORK_ITEMS_ROOM, display_name: SIMPLE_WORK_ITEMS_ROOM }, 0),
+              findings: serviceTaskTitles.map(title => ({
+                title,
+                status: 'Monitor' as FindingStatus,
+                notes: '',
+                action: '',
+                due: '',
+                photos: [],
+              })),
+            }]
+          : []
         : rooms.map((r, index) => ({
             ...roomIdentityFields(r, index),
             findings: r.items.map(item => ({ title: item, status: 'Pass' as FindingStatus, notes: '', action: '', due: '', photos: [] })),
