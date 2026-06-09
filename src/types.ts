@@ -645,6 +645,7 @@ export type Job = Inspection;
 export interface HomeDocument {
   id: string;
   homeowner_user_id: string;
+  home_id?: string | null;
   storage_path: string;
   file_name: string;
   content_type: string;

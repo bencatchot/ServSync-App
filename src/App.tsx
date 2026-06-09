@@ -202,6 +202,7 @@ type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
+type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
@@ -6337,6 +6338,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [docUploading, setDocUploading] = useState(false);
   const [docDeletingId, setDocDeletingId] = useState<string | null>(null);
   const [docPendingDelete, setDocPendingDelete] = useState<HomeDocument | null>(null);
+  const [homeownerDocumentPropertyScope, setHomeownerDocumentPropertyScope] = useState<HomeownerDocumentPropertyScope>('selected');
   const [maintenanceLog, setMaintenanceLog] = useState<MaintenanceLogEntry[]>([]);
   const [logFormOpen, setLogFormOpen] = useState(false);
   const [logDraft, setLogDraft] = useState<{ service_request_id: string | null; category: string; title: string; description: string; performed_at: string; contractor_name: string; cost: string; notes: string }>({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
@@ -6684,6 +6686,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     fileName: string,
     documentType: HomeDocumentType,
     notes: string,
+    options: { homeId?: string | null } = {},
   ) => {
     if (!supabase) throw new Error('Supabase is not connected.');
     const ext = fileName.split('.').pop() ?? 'bin';
@@ -6699,6 +6702,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       file_size_bytes: blob.size,
       document_type: documentType,
       notes,
+      home_id: options.homeId ?? null,
     }).select('*').single();
     if (insertError) {
       await supabase.storage.from('home-documents').remove([path]);
@@ -6707,8 +6711,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return data as HomeDocument;
   };
 
-  const createHomeDocumentFromFile = async (file: File, documentType: HomeDocumentType, notes: string) => {
-    return createHomeDocumentFromBlob(file, file.name, documentType, notes);
+  const createHomeDocumentFromFile = async (
+    file: File,
+    documentType: HomeDocumentType,
+    notes: string,
+    options: { homeId?: string | null } = {},
+  ) => {
+    return createHomeDocumentFromBlob(file, file.name, documentType, notes, options);
   };
 
   const saveLogEntry = async () => {
@@ -6786,7 +6795,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setDocUploading(true);
     setError('');
     try {
-      await createHomeDocumentFromFile(file, docUploadType, docUploadNotes.trim());
+      await createHomeDocumentFromFile(file, docUploadType, docUploadNotes.trim(), { homeId: selectedHome?.id || selectedHomeId || null });
       setDocUploadNotes('');
       setDocUploadType('other');
       await loadHomeowner();
@@ -7639,6 +7648,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const recentLogEntries = maintenanceLog.slice(0, 3);
   const recentDocuments = homeDocuments.slice(0, 3);
   const homeDocumentById = new Map(homeDocuments.map(doc => [doc.id, doc]));
+  const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
+  const unassignedHomeDocumentCount = homeDocuments.filter(doc => !doc.home_id).length;
+  const homeownerDocumentPropertyMatches = (doc: Pick<HomeDocument, 'home_id'>) => {
+    if (homeownerDocumentPropertyScope === 'all') return true;
+    if (homeownerDocumentPropertyScope === 'unassigned') return !doc.home_id;
+    return selectedHomeId ? doc.home_id === selectedHomeId : !doc.home_id;
+  };
+  const propertyScopedHomeDocuments = homeDocuments.filter(homeownerDocumentPropertyMatches);
+  const homeownerDocumentScopeLabel = homeownerDocumentPropertyScope === 'all'
+    ? 'all properties'
+    : homeownerDocumentPropertyScope === 'unassigned'
+      ? 'unassigned documents'
+      : selectedHomeId
+        ? selectedDocumentPropertyLabel
+        : 'unassigned documents';
   const homeProfileFields = [
     homeDraft.nickname,
     homeDraft.address_line1,
@@ -10747,6 +10771,43 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               Private home document storage. Files saved here are for your account only. Connected contractors cannot browse this document library, and there is no share button from this tab. You can upload and download your own home records here.
             </p>
 
+            <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Private document scope</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-950">
+                    Showing private documents for: {homeownerDocumentScopeLabel}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-blue-900">
+                    Use All properties to see every private document, or Unassigned to find older uploads that are not tied to a property yet.
+                  </p>
+                </div>
+                <Field label="View">
+                  <select
+                    className={`${inputClass()} min-w-[180px] bg-white`}
+                    value={homeownerDocumentPropertyScope}
+                    onChange={event => setHomeownerDocumentPropertyScope(event.target.value as HomeownerDocumentPropertyScope)}
+                  >
+                    <option value="selected">Selected property</option>
+                    <option value="all">All properties</option>
+                    <option value="unassigned">Unassigned</option>
+                  </select>
+                </Field>
+              </div>
+              {homeownerDocumentPropertyScope === 'selected' && unassignedHomeDocumentCount > 0 && (
+                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                  <span>Some older documents are not assigned to a property yet.</span>
+                  <button
+                    type="button"
+                    onClick={() => setHomeownerDocumentPropertyScope('unassigned')}
+                    className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100"
+                  >
+                    View Unassigned
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Upload area */}
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -10795,11 +10856,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
 
             {/* Document list */}
-            {homeDocuments.length === 0 ? (
-              <EmptyState text="No documents uploaded yet." />
+            {propertyScopedHomeDocuments.length === 0 ? (
+              <EmptyState text={
+                homeownerDocumentPropertyScope === 'selected' && selectedHomeId
+                  ? 'No documents stored for this property yet.'
+                  : homeownerDocumentPropertyScope === 'unassigned'
+                    ? 'No unassigned documents.'
+                    : 'No documents uploaded yet.'
+              } />
             ) : (
               <div className="mt-4 space-y-2">
-                {homeDocuments.map(doc => {
+                {propertyScopedHomeDocuments.map(doc => {
                   const typeLabels: Record<string, string> = {
                     warranty: 'Warranty', manual: 'Manual', inspection: 'Job report',
                     insurance: 'Insurance', permit: 'Permit', receipt: 'Receipt', other: 'Other',
@@ -10809,6 +10876,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       ? `${(doc.file_size_bytes / 1_000_000).toFixed(1)} MB`
                       : `${Math.round(doc.file_size_bytes / 1024)} KB`
                     : '';
+                  const documentPropertyLabel = propertyRecordLabel(doc, { homes });
                   return (
                     <div key={doc.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
                       <FileText size={18} className="shrink-0 text-slate-400" />
@@ -10824,6 +10892,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {sizeLabel ? ` · ${sizeLabel}` : ''}
                           {doc.notes ? ` · ${doc.notes}` : ''}
                         </p>
+                        {homeownerDocumentPropertyScope === 'all' && documentPropertyLabel && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            Property: {documentPropertyLabel}
+                          </p>
+                        )}
+                        {homeownerDocumentPropertyScope === 'unassigned' && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            Not assigned to a property
+                          </p>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <button
