@@ -7649,6 +7649,79 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const completedHomeFields = homeProfileFields.filter(Boolean).length;
   const homeProfileScore = Math.round((completedHomeFields / homeProfileFields.length) * 100);
+  const homeownerOnboardingItems: Array<{
+    label: string;
+    helper: string;
+    complete: boolean;
+    actionLabel: string;
+    onAction: () => void;
+  }> = [
+    {
+      label: 'Add or confirm your first property',
+      helper: 'Save the home profile that anchors your records.',
+      complete: homes.length > 0,
+      actionLabel: homes.length > 0 ? 'View property' : 'Add property',
+      onAction: () => {
+        if (homes.length === 0) startAddProperty();
+        else setHomeownerTab('home');
+      },
+    },
+    {
+      label: 'Upload your first home document',
+      helper: 'Store a receipt, warranty, manual, or home file for your records.',
+      complete: homeDocuments.length > 0,
+      actionLabel: 'Upload document',
+      onAction: () => {
+        setHomeownerDocumentPropertyScope('selected');
+        setHomeownerTab('documents');
+      },
+    },
+    {
+      label: 'Connect with a contractor',
+      helper: 'Find local pros and choose when you are ready to connect.',
+      complete: activeConnections.length > 0,
+      actionLabel: 'Find contractors',
+      onAction: () => setHomeownerTab('discover'),
+    },
+    {
+      label: 'Request service',
+      helper: 'Start a request for work you want handled around the home.',
+      complete: serviceRequests.length > 0,
+      actionLabel: 'Request service',
+      onAction: () => {
+        setHomeownerRequestPropertyScope('selected');
+        setRequestComposerOpen(true);
+        setRequestingConnectionId(null);
+        setServiceRequestDraft(current => ({
+          ...current,
+          home_id: selectedHome?.id || selectedHomeId || current.home_id,
+        }));
+        setHomeownerTab('requests');
+      },
+    },
+    {
+      label: 'Review an estimate or invoice',
+      helper: 'Keep contractor pricing and billing connected to your home record.',
+      complete: estimates.length > 0 || invoices.length > 0,
+      actionLabel: 'View records',
+      onAction: () => {
+        setHomeownerRecordPropertyScope('selected');
+        setHomeownerTab('estimates');
+      },
+    },
+    {
+      label: 'View your home history',
+      helper: 'See maintenance entries, completed work, and filed reports.',
+      complete: maintenanceLog.length > 0,
+      actionLabel: 'View history',
+      onAction: () => {
+        setHomeownerMaintenancePropertyScope('selected');
+        setHomeownerTab('log');
+      },
+    },
+  ];
+  const completedHomeownerOnboardingCount = homeownerOnboardingItems.filter(item => item.complete).length;
+  const showHomeownerOnboardingChecklist = completedHomeownerOnboardingCount < homeownerOnboardingItems.length;
   const filteredDirectoryContractors = directoryContractors.filter(contractor => {
     const categoryMatch = !directoryCategory || contractor.service_categories.some(c => c.toLowerCase() === directoryCategory.toLowerCase());
     const locationQuery = directoryLocation.trim().toLowerCase();
@@ -8700,6 +8773,46 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </div>
           </section>
+
+          {showHomeownerOnboardingChecklist && (
+            <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-blue-950">Set up your home record</p>
+                  <p className="mt-1 text-sm leading-5 text-blue-800">
+                    Add the basics once, then ServSync becomes your place for home records, requests, and contractor work.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit items-center rounded-full bg-white px-2.5 py-1 text-xs font-bold text-blue-800 shadow-sm">
+                  {completedHomeownerOnboardingCount} of {homeownerOnboardingItems.length} complete
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {homeownerOnboardingItems.map(item => (
+                  <div key={item.label} className="flex flex-col gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 gap-2">
+                      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                        item.complete ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-400'
+                      }`}>
+                        {item.complete ? <CheckCircle2 size={14} /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className={`break-words text-sm font-semibold ${item.complete ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-950'}`}>
+                          {item.label}
+                        </p>
+                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{item.helper}</p>
+                      </div>
+                    </div>
+                    {!item.complete && (
+                      <button type="button" onClick={item.onAction} className={`${buttonClass('secondary')} shrink-0 justify-center bg-white`}>
+                        {item.actionLabel}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
