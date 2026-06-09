@@ -16154,9 +16154,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
         return (
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
+            <div className="grid gap-0 md:grid-cols-[20rem_minmax(0,1fr)] md:items-start">
               {/* === Left sidebar === */}
-              <div className="border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
+              <div className="border-b border-slate-200 bg-white md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:border-b-0 md:border-r">
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-slate-800 text-sm">Homeowners</h2>
@@ -16203,7 +16203,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     )}
                   </div>
                 </div>
-                <div className="divide-y divide-slate-100 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto">
+                <div className="divide-y divide-slate-100 md:max-h-[calc(100vh-17rem)] md:overflow-y-auto">
                   {visibleSubjects.length === 0 ? (
                     <p className="text-xs text-slate-400 text-center py-8 px-4">
                       {homeownerWorkspaceSearch ? 'No homeowners match that search.' : `No ${homeownerFilter} homeowners yet.`}
