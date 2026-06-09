@@ -193,9 +193,9 @@ type StarterEstimateTemplate = {
   terms: string;
   line_items: EstimateTemplateLineItem[];
 };
-type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'privacy' | 'support';
+type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
-type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'privacy' | 'support';
+type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
@@ -3808,6 +3808,89 @@ function PrivacyDataRequestsPanel({
   );
 }
 
+function TrustSafetyPanel({
+  role,
+  onOpenPrivacy,
+  onOpenSupport,
+}: {
+  role: 'homeowner' | 'contractor';
+  onOpenPrivacy: () => void;
+  onOpenSupport: () => void;
+}) {
+  const sections = [
+    {
+      title: 'Homeowner control',
+      body: 'Homeowners choose when to connect with a contractor, request service, and share home information. Review what you share before sending requests, documents, photos, or reports.',
+    },
+    {
+      title: 'Contractor access boundaries',
+      body: 'Contractors should only use homeowner information for the requested work, active relationship, estimate, invoice, report, or support context where that information was shared.',
+    },
+    {
+      title: 'Discover boundaries',
+      body: 'Contractors can post helpful local updates, maintenance tips, and recent work. They cannot directly contact or solicit homeowners through Discover. Homeowners choose when to view a profile, connect, or request service.',
+    },
+    {
+      title: 'Contractor credentials',
+      body: 'If license, insurance, or bonded information appears, treat it as listed information unless ServSync clearly says it has been verified. ServSync does not guarantee contractor licensing, insurance, quality, or performance.',
+    },
+    {
+      title: 'Platform role',
+      body: 'ServSync is software for organizing home work, records, estimates, reports, and invoices. Contractors are responsible for their own work, pricing, documents, licenses, insurance, and services. Homeowners should evaluate contractors before hiring.',
+    },
+    {
+      title: 'Documents and photos',
+      body: 'Home documents and photos may contain sensitive information. Upload only files you have the right to share, and review visibility before sharing them with a contractor or support.',
+    },
+  ];
+
+  return (
+    <Card title="Trust & Safety" icon={<ShieldCheck size={18} />}>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-bold text-slate-950">How ServSync is designed to support responsible platform use.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            This page is plain-language platform guidance. It is not a compliance certification, legal guarantee, background check program,
+            or verification program.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {sections.map(section => (
+            <div key={section.title} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="font-bold text-slate-950">{section.title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{section.body}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-bold text-blue-950">Privacy, data, account, or content concerns</p>
+          <p className="mt-1 text-sm leading-6 text-blue-900">
+            Use Privacy & Data Requests for account data questions, export requests, deletion help, or document/photo deletion help.
+            Use Support for account, safety, data, or content concerns that need review.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={onOpenPrivacy} className={`${buttonClass('primary')}`}>
+              Open Privacy & Data Requests
+            </button>
+            <button type="button" onClick={onOpenSupport} className={`${buttonClass('secondary')} bg-white`}>
+              Contact Support
+            </button>
+          </div>
+        </div>
+
+        {role === 'contractor' && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            Contractor reminder: Discover is for helpful public updates and profile visibility. It is not for direct homeowner solicitation,
+            lead chasing, bidding, or messaging homeowners who have not initiated a connection or request.
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -5342,7 +5425,7 @@ function MissingProfile({
 }
 
 function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
-  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'privacy', 'support'] as const, 'overview'));
+  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
   const [home, setHome] = useState<HomeProfile | null>(null);
   const [homeownerProfilePhotoUrl, setHomeownerProfilePhotoUrl] = useState('');
@@ -7578,6 +7661,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
+        { id: 'trust',        label: 'Trust & Safety',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
@@ -9791,6 +9875,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
       )}
 
+      {homeownerTab === 'trust' && (
+        <TrustSafetyPanel
+          role="homeowner"
+          onOpenPrivacy={() => setHomeownerTab('privacy')}
+          onOpenSupport={() => setHomeownerTab('support')}
+        />
+      )}
+
       {homeownerTab === 'privacy' && (
         <PrivacyDataRequestsPanel role="homeowner" onStartRequest={startHomeownerPrivacyRequest} />
       )}
@@ -9829,7 +9921,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
-  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'privacy', 'support'] as const, 'overview'));
+  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
@@ -12971,6 +13063,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
+        { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
@@ -16581,6 +16674,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           userId={profile.id}
           contractorId={contractor?.id ?? null}
           connections={[]}
+        />
+      )}
+
+      {contractorTab === 'trust' && (
+        <TrustSafetyPanel
+          role="contractor"
+          onOpenPrivacy={() => setContractorTab('privacy')}
+          onOpenSupport={() => setContractorTab('support')}
         />
       )}
 
