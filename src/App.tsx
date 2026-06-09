@@ -203,6 +203,7 @@ type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'c
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
+type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
@@ -6344,6 +6345,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [logDraft, setLogDraft] = useState<{ service_request_id: string | null; category: string; title: string; description: string; performed_at: string; contractor_name: string; cost: string; notes: string }>({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
   const [logInvoiceFile, setLogInvoiceFile] = useState<File | null>(null);
   const [logInvoiceNotice, setLogInvoiceNotice] = useState('');
+  const [homeownerMaintenancePropertyScope, setHomeownerMaintenancePropertyScope] = useState<HomeownerMaintenancePropertyScope>('selected');
   const [savingLogEntry, setSavingLogEntry] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const [quickLogDrafts, setQuickLogDrafts] = useState<Record<string, boolean>>({});
@@ -6735,9 +6737,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             `Invoice/receipt for maintenance log${logDraft.title.trim() ? `: ${logDraft.title.trim()}` : ''}`,
           )
         : null;
+      const linkedLogRequest = logDraft.service_request_id
+        ? serviceRequests.find(request => request.id === logDraft.service_request_id) ?? null
+        : null;
+      const logEntryHomeId = linkedLogRequest?.home_id || selectedHome?.id || selectedHomeId || null;
       const payload = {
         homeowner_user_id: profile.id,
         service_request_id: logDraft.service_request_id,
+        home_id: logEntryHomeId,
         ...(invoiceDocument ? { invoice_document_id: invoiceDocument.id } : {}),
         category: logDraft.category,
         title: logDraft.title.trim(),
@@ -6753,9 +6760,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: insertError } = await supabase.from('home_maintenance_log').insert(payload);
       if (insertError) {
         const message = insertError.message || '';
-        if (invoiceDocument && /invoice_document_id|schema cache|column/i.test(message)) {
+        if (/(invoice_document_id|home_id|schema cache|column)/i.test(message)) {
           const fallbackPayload = { ...payload };
           delete (fallbackPayload as Record<string, unknown>).invoice_document_id;
+          delete (fallbackPayload as Record<string, unknown>).home_id;
           const { error: fallbackError } = await supabase.from('home_maintenance_log').insert(fallbackPayload);
           if (fallbackError) throw fallbackError;
         } else {
@@ -7646,6 +7654,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentLogEntries = maintenanceLog.slice(0, 3);
+  const selectedMaintenancePropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
+  const unassignedMaintenanceLogCount = maintenanceLog.filter(entry => !entry.home_id).length;
+  const homeownerMaintenancePropertyMatches = (entry: Pick<MaintenanceLogEntry, 'home_id'>) => {
+    if (homeownerMaintenancePropertyScope === 'all') return true;
+    if (homeownerMaintenancePropertyScope === 'unassigned') return !entry.home_id;
+    return selectedHomeId ? entry.home_id === selectedHomeId : !entry.home_id;
+  };
+  const propertyScopedMaintenanceLog = maintenanceLog.filter(homeownerMaintenancePropertyMatches);
+  const homeownerMaintenanceScopeLabel = homeownerMaintenancePropertyScope === 'all'
+    ? 'all properties'
+    : homeownerMaintenancePropertyScope === 'unassigned'
+      ? 'unassigned history'
+      : selectedHomeId
+        ? selectedMaintenancePropertyLabel
+        : 'unassigned history';
   const recentDocuments = homeDocuments.slice(0, 3);
   const homeDocumentById = new Map(homeDocuments.map(doc => [doc.id, doc]));
   const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
@@ -10533,14 +10556,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'log' && (
         <div className="space-y-4">
           {/* Stats row */}
-          {maintenanceLog.length > 0 && (
+          {propertyScopedMaintenanceLog.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total jobs logged</p>
-                <p className="mt-1 text-2xl font-bold text-slate-950">{maintenanceLog.length}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-950">{propertyScopedMaintenanceLog.length}</p>
               </div>
               {(() => {
-                const total = maintenanceLog.reduce((s, e) => s + (e.cost_cents ?? 0), 0);
+                const total = propertyScopedMaintenanceLog.reduce((s, e) => s + (e.cost_cents ?? 0), 0);
                 return total > 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total cost tracked</p>
@@ -10553,6 +10576,43 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
           {/* Add entry form */}
           <Card title="Maintenance log" icon={<ClipboardList size={18} />}>
+            <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Home history scope</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-950">
+                    Showing home history for: {homeownerMaintenanceScopeLabel}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900">
+                    Use All properties to see every maintenance entry, or Unassigned to find older entries that are not tied to a property yet.
+                  </p>
+                </div>
+                <Field label="View">
+                  <select
+                    className={`${inputClass()} min-w-[180px] bg-white`}
+                    value={homeownerMaintenancePropertyScope}
+                    onChange={event => setHomeownerMaintenancePropertyScope(event.target.value as HomeownerMaintenancePropertyScope)}
+                  >
+                    <option value="selected">Selected property</option>
+                    <option value="all">All properties</option>
+                    <option value="unassigned">Unassigned</option>
+                  </select>
+                </Field>
+              </div>
+              {homeownerMaintenancePropertyScope === 'selected' && unassignedMaintenanceLogCount > 0 && (
+                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                  <span>Some older maintenance entries are not assigned to a property yet.</span>
+                  <button
+                    type="button"
+                    onClick={() => setHomeownerMaintenancePropertyScope('unassigned')}
+                    className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100"
+                  >
+                    View Unassigned
+                  </button>
+                </div>
+              )}
+            </div>
+
             {!logFormOpen ? (
               <button type="button" className={buttonClass('primary')}
                 onClick={() => {
@@ -10684,14 +10744,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
 
             {/* Log list */}
-            {maintenanceLog.length === 0 && !logFormOpen && (
-              <p className="mt-4 text-sm text-slate-500">No log entries yet. Add your first entry or log a job from a closed service request.</p>
+            {propertyScopedMaintenanceLog.length === 0 && !logFormOpen && (
+              <p className="mt-4 text-sm text-slate-500">
+                {homeownerMaintenancePropertyScope === 'selected' && selectedHomeId
+                  ? 'No maintenance history for this property yet.'
+                  : homeownerMaintenancePropertyScope === 'unassigned'
+                    ? 'No unassigned maintenance entries.'
+                    : 'No log entries yet. Add your first entry or log a job from a closed service request.'}
+              </p>
             )}
-            {maintenanceLog.length > 0 && (
+            {propertyScopedMaintenanceLog.length > 0 && (
               <div className="mt-4 space-y-3">
-                {maintenanceLog.map(entry => {
+                {propertyScopedMaintenanceLog.map(entry => {
                   const invoiceDocument = entry.invoice_document_id ? homeDocumentById.get(entry.invoice_document_id) : null;
                   const reportDocument = entry.report_document_id ? homeDocumentById.get(entry.report_document_id) : null;
+                  const entryPropertyLabel = propertyRecordLabel(entry, { homes });
                   return (
                   <div key={entry.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -10719,6 +10786,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {entry.contractor_name ? ` · ${entry.contractor_name}` : ''}
                           {entry.cost_cents ? ` · $${(entry.cost_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : ''}
                         </p>
+                        {homeownerMaintenancePropertyScope === 'all' && entryPropertyLabel && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            Property: {entryPropertyLabel}
+                          </p>
+                        )}
+                        {homeownerMaintenancePropertyScope === 'unassigned' && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">
+                            Not assigned to a property
+                          </p>
+                        )}
                         {entry.description && <p className="mt-1.5 text-sm text-slate-700">{entry.description}</p>}
                         {entry.notes && <p className="mt-1 text-xs text-slate-500 italic">{entry.notes}</p>}
                         {(reportDocument || invoiceDocument) && (

@@ -414,6 +414,7 @@ export interface ServiceRequestMessage {
 export interface MaintenanceLogEntry {
   id: string;
   homeowner_user_id: string;
+  home_id?: string | null;
   service_request_id: string | null;
   estimate_id: string | null;
   inspection_id: string | null;
