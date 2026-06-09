@@ -193,9 +193,10 @@ type StarterEstimateTemplate = {
   terms: string;
   line_items: EstimateTemplateLineItem[];
 };
-type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'support';
+type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'privacy' | 'support';
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
-type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'support';
+type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'privacy' | 'support';
+type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
 type InspectionView = 'list' | 'new' | 'detail';
@@ -3708,6 +3709,105 @@ function LegalPage({ pageId }: { pageId: keyof typeof LEGAL_PAGES }) {
   );
 }
 
+function privacyRequestDraft(kind: PrivacyRequestKind, role: 'homeowner' | 'contractor') {
+  const roleLabel = role === 'homeowner' ? 'homeowner' : 'contractor';
+  const titles: Record<PrivacyRequestKind, string> = {
+    export: 'Privacy request: data export',
+    account_deletion: 'Privacy request: account deletion',
+    file_deletion: 'Privacy request: document or photo deletion help',
+    question: 'Privacy question',
+  };
+  const bodies: Record<PrivacyRequestKind, string> = {
+    export: `I would like help requesting an export of my ServSync ${roleLabel} account data. I understand this is reviewed by support and may require account verification.`,
+    account_deletion: `I would like help requesting deletion or closure of my ServSync ${roleLabel} account. I understand this is reviewed by support, may require account verification, and some records may need to be retained for legal, security, billing, or dispute reasons.`,
+    file_deletion: role === 'homeowner'
+      ? 'I would like help deleting or reviewing uploaded home documents/photos. I understand home files may contain sensitive information and this request may require account verification.'
+      : 'I would like help deleting or reviewing uploaded contractor files, public profile media, or Discover posts. I understand some customer/business records may need review before removal.',
+    question: `I have a privacy or data question about my ServSync ${roleLabel} account.`,
+  };
+  return {
+    category: 'question' as SupportInquiryCategory,
+    title: titles[kind],
+    body: bodies[kind],
+  };
+}
+
+function PrivacyDataRequestsPanel({
+  role,
+  onStartRequest,
+}: {
+  role: 'homeowner' | 'contractor';
+  onStartRequest: (kind: PrivacyRequestKind) => void;
+}) {
+  const options: Array<{ kind: PrivacyRequestKind; title: string; body: string }> = [
+    {
+      kind: 'export',
+      title: 'Request data export',
+      body: 'Ask support for help reviewing what account data can be exported.',
+    },
+    {
+      kind: 'account_deletion',
+      title: 'Request account deletion',
+      body: 'Ask support to review account deletion or closure. Some records may need to be retained.',
+    },
+    {
+      kind: 'file_deletion',
+      title: role === 'homeowner' ? 'Request document/photo deletion help' : 'Request file/profile content deletion help',
+      body: role === 'homeowner'
+        ? 'Get help with uploaded home documents, photos, or sensitive file records.'
+        : 'Get help with public profile media, Discover posts, files, or customer-related records.',
+    },
+    {
+      kind: 'question',
+      title: 'Ask a privacy question',
+      body: 'Send support a question about data sharing, retention, deletion, or account privacy.',
+    },
+  ];
+
+  return (
+    <Card title="Privacy & Data Requests" icon={<ShieldCheck size={18} />}>
+      <div className="space-y-5">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-bold text-blue-950">Use this page to request help with your ServSync account data.</p>
+          <p className="mt-1 text-sm leading-6 text-blue-900">
+            Requests are reviewed by support and may require identity or account verification. This is not automatic deletion or export,
+            and some records may need to be retained where required for legal, security, billing, or dispute reasons.
+          </p>
+          <button type="button" onClick={() => updateRoute('privacy')} className={`${buttonClass('secondary')} mt-3 bg-white`}>
+            View Privacy Policy
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {options.map(option => (
+            <div key={option.kind} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="font-bold text-slate-950">{option.title}</p>
+              <p className="mt-1 text-sm leading-5 text-slate-500">{option.body}</p>
+              <button type="button" onClick={() => onStartRequest(option.kind)} className={`${buttonClass('primary')} mt-3`}>
+                Open Support Request
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          {role === 'homeowner' ? (
+            <p>
+              Home documents, photos, reports, requests, estimates, invoices, and maintenance logs may contain sensitive home information.
+              Review sharing permissions before sharing data with contractors.
+            </p>
+          ) : (
+            <p>
+              Contractor public profiles and Discover posts may require separate removal or unpublishing support. Contractor customer records
+              may involve homeowner data and business records that need review before removal.
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -5242,7 +5342,7 @@ function MissingProfile({
 }
 
 function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
-  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'support'] as const, 'overview'));
+  const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'privacy', 'support'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
   const [home, setHome] = useState<HomeProfile | null>(null);
   const [homeownerProfilePhotoUrl, setHomeownerProfilePhotoUrl] = useState('');
@@ -5579,6 +5679,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     } finally {
       setSavingSupport(false);
     }
+  };
+
+  const startHomeownerPrivacyRequest = (kind: PrivacyRequestKind) => {
+    setSupportDraft(privacyRequestDraft(kind, 'homeowner'));
+    setSupportDraftFiles([]);
+    setHomeownerTab('support');
   };
 
   const emptyLogDraft = () => ({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
@@ -7472,6 +7578,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
+        { id: 'privacy',      label: 'Privacy & Data',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
       activeTab={homeownerTab}
@@ -9684,6 +9791,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
       )}
 
+      {homeownerTab === 'privacy' && (
+        <PrivacyDataRequestsPanel role="homeowner" onStartRequest={startHomeownerPrivacyRequest} />
+      )}
+
       {homeownerTab === 'support' && (
         <SupportInboxPanel
           title="ServSync support"
@@ -9718,7 +9829,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
-  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'support'] as const, 'overview'));
+  const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'privacy', 'support'] as const, 'overview'));
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
@@ -10209,6 +10320,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     } finally {
       setSavingSupport(false);
     }
+  };
+
+  const startContractorPrivacyRequest = (kind: PrivacyRequestKind) => {
+    setSupportDraft(privacyRequestDraft(kind, 'contractor'));
+    setSupportDraftFiles([]);
+    setContractorTab('support');
   };
 
   const saveContractor = async () => {
@@ -12854,6 +12971,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
+        { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
       activeTab={contractorTab}
@@ -16464,6 +16582,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           contractorId={contractor?.id ?? null}
           connections={[]}
         />
+      )}
+
+      {contractorTab === 'privacy' && (
+        <PrivacyDataRequestsPanel role="contractor" onStartRequest={startContractorPrivacyRequest} />
       )}
 
       {contractorTab === 'support' && (
