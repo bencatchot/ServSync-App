@@ -73,6 +73,7 @@ import type {
   PublicReview,
   ConnectionStatus,
   ContractorConnectedHomeowner,
+  ContractorConnectedHomeownerHome,
   ContractorAccountStatus,
   ContractorConnectionRequest,
   ContractorLocalContact,
@@ -15728,7 +15729,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const isSelected = selectedHomeownerSubjectId === subject.id;
                     let rowName = '';
                     let subtitle = '';
-                    const pills: { label: string; tone: 'emerald' | 'amber' | 'slate' | 'red' }[] = [];
+                    const pills: { label: string; tone: 'emerald' | 'amber' | 'blue' | 'slate' | 'red' }[] = [];
                     if (subject.kind === 'connection') {
                       const perm = normalizeSharingPermissions(subject.connection.permissions);
                       const subjectRequests = serviceRequests.filter(request => request.connection_id === subject.connection.connection_id);
@@ -15737,9 +15738,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       const subjectWorkOrders = fieldWorkForHomeowner(subject.connection.homeowner_user_id);
                       const draftWorkOrderCount = subjectWorkOrders.filter(inspectionIsOpenJob).length;
                       const filedReportCount = subjectWorkOrders.filter(inspectionIsClosedJob).length;
+                      const primaryHome = connectedHomeList(subject.connection)[0] ?? subject.connection.home;
                       rowName = perm.share_contact ? (subject.connection.display_name || 'Homeowner') : 'Homeowner';
-                      subtitle = subject.connection.home?.nickname || subject.connection.home?.address_line1 || subject.connection.city || (perm.share_contact ? '' : 'Contact private');
+                      subtitle = primaryHome?.nickname || primaryHome?.address_line1 || subject.connection.city || (perm.share_contact ? '' : 'Contact private');
                       pills.push(subject.isActive ? { label: 'Connected', tone: 'emerald' } : { label: subject.connection.status === 'declined' ? 'Declined' : 'Revoked', tone: 'red' });
+                      if (perm.share_home_overview && connectedHomeList(subject.connection).length > 1) pills.push({ label: `${connectedHomeList(subject.connection).length} properties`, tone: 'blue' });
                       if (followUpCount > 0) pills.push({ label: `${followUpCount} follow-up`, tone: 'amber' });
                       if (openRequestCount > 0) pills.push({ label: `${openRequestCount} open`, tone: 'slate' });
                       if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
@@ -15784,7 +15787,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="text-slate-400 text-xs mt-0.5 truncate">{subtitle || '—'}</p>
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           {pills.map((p, idx) => {
-                            const style = p.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : p.tone === 'amber' ? 'bg-amber-50 text-amber-700' : p.tone === 'red' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600';
+                            const style = p.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : p.tone === 'amber' ? 'bg-amber-50 text-amber-700' : p.tone === 'blue' ? 'bg-blue-50 text-blue-700' : p.tone === 'red' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600';
                             return <span key={idx} className={`text-xs px-2 py-0.5 rounded-full ${style}`}>{p.label}</span>;
                           })}
                         </div>
@@ -15888,9 +15891,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const conn = isConn ? selectedSubject.connection : null;
                     const localCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
+                    const connectedHomes = conn ? connectedHomeList(conn) : [];
+                    const primaryConnectedHome = connectedHomes[0] ?? conn?.home ?? null;
                     const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'New customer');
                     const localHome = localCustomer?.homes?.[0] ?? null;
-                    const headerAddress = conn ? (perm!.share_address ? (conn.home?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
+                    const headerAddress = conn ? (perm!.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
                     const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
                     const localClaimInvitesForCustomer = localCustomer
                       ? localClaimInvites
@@ -16553,20 +16558,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="mb-4 flex items-center gap-2">
                                   <Home size={18} className="text-blue-700" />
-                                  <h3 className="font-bold text-slate-950">Home</h3>
+                                  <h3 className="font-bold text-slate-950">Properties</h3>
                                 </div>
                                 {conn && perm && (
-                                  <div className="grid gap-4 sm:grid-cols-2">
-                                    <SharedField label="Home nickname" value={conn.home?.nickname} allowed={perm.share_home_overview} />
-                                    <SharedField label="Home type" value={conn.home?.home_type} allowed={perm.share_home_overview} />
-                                    <SharedField label="Year built" value={conn.home?.year_built} allowed={perm.share_home_overview} />
-                                    <SharedField label="Square feet" value={conn.home?.square_feet} allowed={perm.share_home_overview} />
-                                    <SharedField label="Address" value={conn.home?.address_line1} allowed={perm.share_address} />
-                                    <SharedField label="ZIP" value={conn.home?.zip_code} allowed={perm.share_home_overview} />
-                                    <div className="sm:col-span-2">
-                                      <SharedField label="Home notes" value={conn.home?.notes} allowed={perm.share_home_overview} />
-                                    </div>
-                                  </div>
+                                  <ConnectedHomeProperties homes={connectedHomes} permissions={perm} />
                                 )}
                                 {localCustomer && localHome && (
                                   <div className="grid gap-4 sm:grid-cols-2">
@@ -16602,20 +16597,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                   <Home size={18} className="text-blue-700" />
-                                  <h3 className="font-bold text-slate-950">Home details</h3>
+                                  <h3 className="font-bold text-slate-950">{conn ? 'Properties' : 'Home details'}</h3>
                                 </div>
                                 {conn && perm && (
-                                  <div className="grid gap-4 sm:grid-cols-2">
-                                    <SharedField label="Home nickname" value={conn.home?.nickname} allowed={perm.share_home_overview} />
-                                    <SharedField label="Home type" value={conn.home?.home_type} allowed={perm.share_home_overview} />
-                                    <SharedField label="Year built" value={conn.home?.year_built} allowed={perm.share_home_overview} />
-                                    <SharedField label="Square feet" value={conn.home?.square_feet} allowed={perm.share_home_overview} />
-                                    <SharedField label="Address" value={conn.home?.address_line1} allowed={perm.share_address} />
-                                    <SharedField label="ZIP" value={conn.home?.zip_code} allowed={perm.share_home_overview} />
-                                    <div className="sm:col-span-2">
-                                      <SharedField label="Home notes" value={conn.home?.notes} allowed={perm.share_home_overview} />
-                                    </div>
-                                  </div>
+                                  <ConnectedHomeProperties homes={connectedHomes} permissions={perm} />
                                 )}
                                 {localCustomer && localHome && (
                                   <div className="grid gap-4 sm:grid-cols-2">
@@ -23117,6 +23102,52 @@ function SharedField({ label, value, allowed }: { label: string; value?: string 
       <p className={`mt-0.5 text-sm font-semibold ${allowed ? 'text-[#02132D]' : 'text-[#223D67]/65'}`}>
         {allowed ? value || 'Not provided' : 'Not shared'}
       </p>
+    </div>
+  );
+}
+
+function connectedHomeList(connection: ContractorConnectedHomeowner): ContractorConnectedHomeownerHome[] {
+  if (Array.isArray(connection.homes) && connection.homes.length > 0) return connection.homes;
+  return connection.home ? [connection.home] : [];
+}
+
+function ConnectedHomeProperties({ homes, permissions }: { homes: ContractorConnectedHomeownerHome[]; permissions: SharingPermissions }) {
+  if (!permissions.share_home_overview) {
+    return <EmptyState text="Home details are not shared for this connection." />;
+  }
+  if (homes.length === 0) {
+    return <EmptyState text="No homeowner properties are shared yet." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      {homes.map((home, index) => {
+        const propertyLabel = home.nickname || home.address_line1 || `Property ${index + 1}`;
+        const location = [home.city, home.state].filter(Boolean).join(', ');
+        return (
+          <div key={home.id || `${propertyLabel}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-slate-950">{propertyLabel}</p>
+                {location && <p className="mt-0.5 text-xs font-medium text-slate-500">{location}</p>}
+              </div>
+              {index === 0 && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">Primary</span>}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SharedField label="Home nickname" value={home.nickname} allowed={permissions.share_home_overview} />
+              <SharedField label="Home type" value={home.home_type} allowed={permissions.share_home_overview} />
+              <SharedField label="Year built" value={home.year_built} allowed={permissions.share_home_overview} />
+              <SharedField label="Square feet" value={home.square_feet} allowed={permissions.share_home_overview} />
+              <SharedField label="Address" value={[home.address_line1, home.address_line2].filter(Boolean).join(', ')} allowed={permissions.share_address} />
+              <SharedField label="City / State" value={location} allowed={permissions.share_home_overview} />
+              <SharedField label="ZIP" value={home.zip_code} allowed={permissions.share_home_overview} />
+              <div className="sm:col-span-2">
+                <SharedField label="Home notes" value={home.notes} allowed={permissions.share_home_overview} />
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

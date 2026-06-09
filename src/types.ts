@@ -293,6 +293,20 @@ export interface HomeownerConnection {
   updated_at: string;
 }
 
+export interface ContractorConnectedHomeownerHome {
+  id?: string;
+  nickname: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  home_type: string;
+  year_built: string;
+  square_feet: string;
+  notes: string;
+}
+
 export interface ContractorConnectedHomeowner {
   connection_id: string;
   homeowner_user_id: string;
@@ -303,19 +317,8 @@ export interface ContractorConnectedHomeowner {
   zip_code: string;
   status: ConnectionStatus;
   permissions: SharingPermissions;
-  home: {
-    id?: string;
-    nickname: string;
-    address_line1: string;
-    address_line2: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    home_type: string;
-    year_built: string;
-    square_feet: string;
-    notes: string;
-  } | null;
+  home: ContractorConnectedHomeownerHome | null;
+  homes?: ContractorConnectedHomeownerHome[];
   created_at: string;
   updated_at: string;
   source: string;
