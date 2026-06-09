@@ -24391,7 +24391,7 @@ function SidebarLayout({
   );
 
   return (
-    <div className="flex h-screen bg-[#F7F9FC] overflow-hidden">
+    <div className="flex min-h-screen bg-[#F7F9FC] md:h-screen md:overflow-hidden">
       <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col">
         {sidebarContent}
       </aside>
@@ -24405,7 +24405,7 @@ function SidebarLayout({
         </div>
       )}
 
-      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+      <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:overflow-hidden">
         <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 py-3 md:hidden shrink-0">
           <button type="button" onClick={() => setMobileOpen(true)} className="text-[#223D67] hover:text-[#0078FF] transition-colors">
             <Menu size={22} />
@@ -24416,7 +24416,7 @@ function SidebarLayout({
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-h-0 flex-1 overflow-y-visible md:overflow-y-auto">
           <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
             <div className="hidden items-center justify-between gap-3 md:flex">
               <div>
