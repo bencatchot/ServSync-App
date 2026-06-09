@@ -6912,7 +6912,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!nextHome) return;
     setSelectedHomeId(nextHome.id);
     setHome(nextHome);
-    setHomeownerTab('home');
+  };
+
+  const selectServiceRequestHome = (homeId: string) => {
+    selectHome(homeId);
+    setServiceRequestDraft(current => ({ ...current, home_id: homeId }));
   };
 
   const startAddProperty = () => {
@@ -7600,7 +7604,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <select
             className={inputClass()}
             value={currentServiceRequestHome?.id || ''}
-            onChange={event => setServiceRequestDraft(current => ({ ...current, home_id: event.target.value }))}
+            onChange={event => selectServiceRequestHome(event.target.value)}
           >
             {homes.map(candidate => (
               <option key={candidate.id} value={candidate.id}>{homeProfileDisplayLabel(candidate)}</option>
