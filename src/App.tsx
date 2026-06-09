@@ -4799,9 +4799,9 @@ function notificationCategoryClass(type: string) {
 }
 
 const SUPPORT_CATEGORY_OPTIONS: { value: SupportInquiryCategory; label: string }[] = [
-  { value: 'feature_request', label: 'New feature request' },
-  { value: 'tweak', label: 'Tweak existing feature' },
-  { value: 'bug', label: 'Something is not working' },
+  { value: 'feature_request', label: 'Feature suggestion' },
+  { value: 'tweak', label: 'Confusing experience' },
+  { value: 'bug', label: 'Bug' },
   { value: 'question', label: 'Question' },
   { value: 'billing', label: 'Billing or account' },
   { value: 'other', label: 'Other' },
@@ -6552,7 +6552,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (messageError) throw messageError;
       setSupportDraft({ category: 'feature_request', title: '', body: '' });
       setSupportDraftFiles([]);
-      setNotice('ServSync received your inquiry. You can track replies in Support.');
+      setNotice('Thanks — your feedback was sent. You can track replies in Support.');
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to send support inquiry.'));
@@ -7722,6 +7722,29 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const completedHomeownerOnboardingCount = homeownerOnboardingItems.filter(item => item.complete).length;
   const showHomeownerOnboardingChecklist = completedHomeownerOnboardingCount < homeownerOnboardingItems.length;
+  const homeownerFeedbackPageLabel = {
+    overview: 'Dashboard',
+    home: 'Home / Properties',
+    contractors: 'Contractors',
+    requests: 'Service Requests',
+    calendar: 'Calendar',
+    estimates: 'Estimates / Invoices',
+    log: 'Home History',
+    documents: 'Documents',
+    discover: 'Discover',
+    trust: 'Trust & Safety',
+    privacy: 'Privacy & Data',
+    support: 'Support',
+  }[homeownerTab];
+  const openHomeownerBetaFeedback = (category: SupportInquiryCategory, title: string) => {
+    setSupportDraft({
+      category,
+      title,
+      body: `Page/context: Homeowner portal - ${homeownerFeedbackPageLabel}\n\nTell us what broke, what confused you, or what would make this easier. Please avoid including sensitive home details unless support needs them.`,
+    });
+    setSupportDraftFiles([]);
+    setHomeownerTab('support');
+  };
   const filteredDirectoryContractors = directoryContractors.filter(contractor => {
     const categoryMatch = !directoryCategory || contractor.service_categories.some(c => c.toLowerCase() === directoryCategory.toLowerCase());
     const locationQuery = directoryLocation.trim().toLowerCase();
@@ -8813,6 +8836,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </section>
           )}
+
+          <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-950">Help improve ServSync</p>
+                <p className="mt-1 text-sm leading-5 text-slate-500">
+                  Tell us what broke, what confused you, or what would make this easier. Please do not include sensitive home details unless support needs them.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => openHomeownerBetaFeedback('bug', 'Bug report')} className={`${buttonClass('secondary')} bg-white`}>
+                  Report bug
+                </button>
+                <button type="button" onClick={() => openHomeownerBetaFeedback('tweak', 'Confusing experience')} className={`${buttonClass('secondary')} bg-white`}>
+                  Confusing?
+                </button>
+                <button type="button" onClick={() => openHomeownerBetaFeedback('feature_request', 'Feature suggestion')} className={`${buttonClass('secondary')} bg-white`}>
+                  Suggest improvement
+                </button>
+              </div>
+            </div>
+          </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -11210,7 +11255,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'support' && (
         <SupportInboxPanel
           title="ServSync support"
-          description="Request a new feature, ask for a tweak, report an issue, or send a question. ServSync can reply here, and the full conversation stays on file."
+          description="Help us improve ServSync. Tell us what broke, what confused you, or what would make this easier. Please avoid sharing sensitive home details unless support needs them."
           inquiries={supportInquiries}
           draft={supportDraft}
           onDraftChange={setSupportDraft}
@@ -11724,7 +11769,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (messageError) throw messageError;
       setSupportDraft({ category: 'feature_request', title: '', body: '' });
       setSupportDraftFiles([]);
-      setNotice('ServSync received your inquiry. You can track replies in Support.');
+      setNotice('Thanks — your feedback was sent. You can track replies in Support.');
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to send support inquiry.'));
@@ -13350,6 +13395,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   ];
   const completedContractorOnboardingCount = contractorOnboardingItems.filter(item => item.complete).length;
   const showContractorOnboardingChecklist = completedContractorOnboardingCount < contractorOnboardingItems.length;
+  const contractorFeedbackPageLabel = {
+    overview: 'Dashboard',
+    profile: 'Business Profile',
+    connections: 'Homeowners',
+    requests: 'Service Requests',
+    calendar: 'Calendar',
+    invites: 'Invites & Referrals',
+    discover: 'Discover',
+    inspections: 'Jobs',
+    trust: 'Trust & Safety',
+    privacy: 'Privacy & Data',
+    support: 'Support',
+  }[contractorTab];
+  const openContractorBetaFeedback = (category: SupportInquiryCategory, title: string) => {
+    setSupportDraft({
+      category,
+      title,
+      body: `Page/context: Contractor portal - ${contractorFeedbackPageLabel}\n\nTell us what broke, what confused you, or what would make this easier. Please avoid including private customer details unless support needs them.`,
+    });
+    setSupportDraftFiles([]);
+    setContractorTab('support');
+  };
   const selectedJobsSubject = {
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
@@ -14985,6 +15052,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </section>
           )}
+
+          <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-950">Help improve ServSync</p>
+                <p className="mt-1 text-sm leading-5 text-slate-500">
+                  Tell us what broke, what confused you, or what would make this easier. Please avoid including private customer details unless support needs them.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => openContractorBetaFeedback('bug', 'Bug report')} className={`${buttonClass('secondary')} bg-white`}>
+                  Report bug
+                </button>
+                <button type="button" onClick={() => openContractorBetaFeedback('tweak', 'Confusing experience')} className={`${buttonClass('secondary')} bg-white`}>
+                  Confusing?
+                </button>
+                <button type="button" onClick={() => openContractorBetaFeedback('feature_request', 'Feature suggestion')} className={`${buttonClass('secondary')} bg-white`}>
+                  Suggest improvement
+                </button>
+              </div>
+            </div>
+          </section>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <OverviewCard icon={<MessageSquare size={18} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
@@ -18860,7 +18949,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {contractorTab === 'support' && (
         <SupportInboxPanel
           title="ServSync support"
-          description="Request a new feature, ask for a workflow tweak, report an issue, or send a question about your contractor workspace. ServSync can reply here, and the conversation stays on file."
+          description="Help us improve ServSync. Tell us what broke, what confused you, or what would make your contractor workflow easier. Please avoid sharing private customer details unless support needs them."
           inquiries={supportInquiries}
           draft={supportDraft}
           onDraftChange={setSupportDraft}
