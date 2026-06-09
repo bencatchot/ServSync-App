@@ -16153,10 +16153,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
 
         return (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex min-h-[640px]" style={{ height: 'calc(100vh - 220px)' }}>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
               {/* === Left sidebar === */}
-              <div className="w-72 shrink-0 border-r border-slate-200 flex flex-col bg-white">
+              <div className="border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-slate-800 text-sm">Homeowners</h2>
@@ -16203,7 +16203,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     )}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto">
                   {visibleSubjects.length === 0 ? (
                     <p className="text-xs text-slate-400 text-center py-8 px-4">
                       {homeownerWorkspaceSearch ? 'No homeowners match that search.' : `No ${homeownerFilter} homeowners yet.`}
@@ -16293,9 +16293,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
 
               {/* === Right detail panel === */}
-              <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+              <div className="min-w-0 bg-slate-50">
                 {showLocalContactForm ? (
-                  <div className="overflow-y-auto p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5 max-w-3xl mx-auto">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -16340,7 +16340,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                   </div>
                 ) : !selectedSubject ? (
-                  <div className="flex h-full items-center justify-center">
+                  <div className="flex min-h-[420px] items-center justify-center">
                     <div className="max-w-sm text-center px-6">
                       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-3">
                         <Users size={22} />
@@ -16354,7 +16354,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const reqSubject = selectedSubject.request;
                     const isUpdating = updatingRequestId === reqSubject.id;
                     return (
-                      <div className="overflow-y-auto p-6">
+                      <div className="p-4 sm:p-6">
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 max-w-2xl mx-auto">
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -16802,7 +16802,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6">
+                        <div className="p-4 sm:p-6">
                           {activeTabId === 'overview' && (
                             <div className="mb-5 grid gap-3 max-w-5xl sm:grid-cols-2 xl:grid-cols-4">
                               {workspaceCards.map(card => {
