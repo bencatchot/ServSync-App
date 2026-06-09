@@ -7559,6 +7559,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const dashboardInvoices = invoices.filter(dashboardPropertyMatches);
   const dashboardHomeDocuments = homeDocuments.filter(dashboardPropertyMatches);
   const dashboardMaintenanceLog = maintenanceLog.filter(dashboardPropertyMatches);
+  const homeownerHasMultipleProperties = homes.length > 1;
+  const shouldShowHomeownerUnassignedPropertyNotice = (propertyScope: 'selected' | 'all' | 'unassigned', unassignedCount: number) =>
+    homeownerHasMultipleProperties && Boolean(selectedHomeId) && propertyScope === 'selected' && unassignedCount > 0;
   const dashboardUnassignedRecordCount = [
     ...serviceRequests,
     ...estimates,
@@ -7567,9 +7570,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ...maintenanceLog,
   ].filter(record => !record.home_id).length;
   const showDashboardUnassignedRecordNotice = homeownerTab === 'overview'
-    && homes.length > 1
-    && Boolean(selectedHomeId)
-    && dashboardUnassignedRecordCount > 0;
+    && shouldShowHomeownerUnassignedPropertyNotice('selected', dashboardUnassignedRecordCount);
   const homeownerAttentionRequests = dashboardServiceRequests.filter(homeownerRequestNeedsResponse);
   const openServiceRequests = dashboardServiceRequests.filter(request => !['closed', 'declined'].includes(request.status));
   const openServiceRequestCount = openServiceRequests.length;
@@ -8207,7 +8208,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
               <p className="mt-1 text-sm font-semibold text-slate-950">Showing records for: {homeownerRecordScopeLabel}</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Use All properties to see every record, or Unassigned to find older estimates and invoices that are not tied to a property yet.
+                {homeownerHasMultipleProperties && unassignedRecordCount > 0
+                  ? 'Use All properties to see every record, or Unassigned to find older estimates and invoices that are not tied to a property yet.'
+                  : homeownerHasMultipleProperties
+                    ? 'Use All properties to see records across every property.'
+                    : 'Use the menu to switch between selected, all, or unassigned records.'}
               </p>
             </div>
             <Field label="Show">
@@ -8226,9 +8231,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </select>
             </Field>
           </div>
-          {homeownerRecordPropertyScope === 'selected' && unassignedRecordCount > 0 && (
+          {shouldShowHomeownerUnassignedPropertyNotice(homeownerRecordPropertyScope, unassignedRecordCount) && (
             <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-              <span>Some older records are not assigned to a property yet.</span>
+              <span>Some older records are not assigned to a property. You can find them in the related tab under Unassigned.</span>
               <button
                 type="button"
                 onClick={() => {
@@ -8632,7 +8637,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
         {homes.length > 1 && (
           <p className="mt-2 text-xs leading-5 text-blue-800">
-            Dashboard highlights activity for the selected property. Use each tab's All properties or Unassigned view to find older records that are not tied to a property yet.
+            {dashboardUnassignedRecordCount > 0
+              ? "Dashboard highlights activity for the selected property. Use each tab's All properties or Unassigned view to find older records that are not tied to a property yet."
+              : "Dashboard highlights activity for the selected property. Use each tab's All properties view to see records across every property."}
           </p>
         )}
         {showDashboardUnassignedRecordNotice && (
@@ -10401,7 +10408,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
                       <p className="mt-1 text-sm font-semibold text-slate-950">Showing requests for: {homeownerRequestScopeLabel}</p>
                       <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Use All properties to see every request, or Unassigned to find older requests that are not tied to a property yet.
+                        {homeownerHasMultipleProperties && unassignedServiceRequestCount > 0
+                          ? 'Use All properties to see every request, or Unassigned to find older requests that are not tied to a property yet.'
+                          : homeownerHasMultipleProperties
+                            ? 'Use All properties to see requests across every property.'
+                            : 'Use the menu to switch between selected, all, or unassigned requests.'}
                       </p>
                     </div>
                     <Field label="Show">
@@ -10419,9 +10430,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       </select>
                     </Field>
                   </div>
-                  {homeownerRequestPropertyScope === 'selected' && unassignedServiceRequestCount > 0 && (
+                  {shouldShowHomeownerUnassignedPropertyNotice(homeownerRequestPropertyScope, unassignedServiceRequestCount) && (
                     <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Some older requests are not assigned to a property yet.</span>
+                      <span>Some older requests are not assigned to a property. You can find them under Unassigned.</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -10542,7 +10553,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     Showing home history for: {homeownerMaintenanceScopeLabel}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
-                    Use All properties to see every maintenance entry, or Unassigned to find older entries that are not tied to a property yet.
+                    {homeownerHasMultipleProperties && unassignedMaintenanceLogCount > 0
+                      ? 'Use All properties to see every maintenance entry, or Unassigned to find older entries that are not tied to a property yet.'
+                      : homeownerHasMultipleProperties
+                        ? 'Use All properties to see home history across every property.'
+                        : 'Use the menu to switch between selected, all, or unassigned history.'}
                   </p>
                 </div>
                 <Field label="View">
@@ -10557,9 +10572,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </select>
                 </Field>
               </div>
-              {homeownerMaintenancePropertyScope === 'selected' && unassignedMaintenanceLogCount > 0 && (
+              {shouldShowHomeownerUnassignedPropertyNotice(homeownerMaintenancePropertyScope, unassignedMaintenanceLogCount) && (
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Some older maintenance entries are not assigned to a property yet.</span>
+                  <span>Some older maintenance entries are not assigned to a property. You can find them under Unassigned.</span>
                   <button
                     type="button"
                     onClick={() => setHomeownerMaintenancePropertyScope('unassigned')}
@@ -10814,7 +10829,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     Showing private documents for: {homeownerDocumentScopeLabel}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-blue-900">
-                    Use All properties to see every private document, or Unassigned to find older uploads that are not tied to a property yet.
+                    {homeownerHasMultipleProperties && unassignedHomeDocumentCount > 0
+                      ? 'Use All properties to see every private document, or Unassigned to find older uploads that are not tied to a property yet.'
+                      : homeownerHasMultipleProperties
+                        ? 'Use All properties to see private documents across every property.'
+                        : 'Use the menu to switch between selected, all, or unassigned documents.'}
                   </p>
                 </div>
                 <Field label="View">
@@ -10829,9 +10848,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </select>
                 </Field>
               </div>
-              {homeownerDocumentPropertyScope === 'selected' && unassignedHomeDocumentCount > 0 && (
+              {shouldShowHomeownerUnassignedPropertyNotice(homeownerDocumentPropertyScope, unassignedHomeDocumentCount) && (
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Some older documents are not assigned to a property yet.</span>
+                  <span>Some older documents are not assigned to a property. You can find them under Unassigned.</span>
                   <button
                     type="button"
                     onClick={() => setHomeownerDocumentPropertyScope('unassigned')}
@@ -16450,6 +16469,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         + rawSubjectEstimates.filter(estimate => !estimate.home_id).length
                         + rawConnReqs.filter(request => !request.home_id).length
                       : 0;
+                    const showWorkspaceUnassignedRecordNotice = propertyScopeEnabled
+                      && connectedHomes.length > 1
+                      && homeownerWorkspacePropertyScope === 'selected'
+                      && Boolean(selectedWorkspaceHomeId)
+                      && workspaceUnassignedRecordCount > 0;
                     const showWorkspacePropertyControls = propertyScopeEnabled && (connectedHomes.length > 1 || workspaceUnassignedRecordCount > 0);
                     const workspacePropertyContext = !propertyScopeEnabled
                       ? ''
@@ -16831,7 +16855,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
                                     <p className="mt-1 text-xs text-slate-500">These records are not assigned to a property.</p>
                                   )}
-                                  {homeownerWorkspacePropertyScope !== 'unassigned' && workspaceUnassignedRecordCount > 0 && (
+                                  {showWorkspaceUnassignedRecordNotice && (
                                     <p className="mt-1 text-xs text-slate-500">Older unassigned records are available from the Unassigned view.</p>
                                   )}
                                 </div>
