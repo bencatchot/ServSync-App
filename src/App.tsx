@@ -6337,8 +6337,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const homeownerAttentionRequests = serviceRequests.filter(homeownerRequestNeedsResponse);
   const openServiceRequests = serviceRequests.filter(request => !['closed', 'declined'].includes(request.status));
-  const newServiceRequests = serviceRequests.filter(request => request.status === 'open' && !request.appointment);
-  const closedServiceRequests = serviceRequests.filter(request => request.status === 'closed');
   const openServiceRequestCount = openServiceRequests.length;
   const activeServiceRequests = openServiceRequests.slice(0, 4);
   const upcomingAppointments = serviceRequests
@@ -6350,6 +6348,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'
   ).length;
   const pendingEstimateCount = estimates.filter(estimate => estimate.status === 'sent').length;
+  const openHomeownerInvoiceCount = invoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)).length;
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentLogEntries = maintenanceLog.slice(0, 3);
@@ -7062,6 +7061,97 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     );
   };
+  const openRequestFromDashboard = (request: ServiceRequestSummary) => {
+    setHomeownerRequestView(homeownerRequestQueueFor(request));
+    setExpandedRequestIds(new Set([request.id]));
+    setHomeownerTab('requests');
+  };
+  const homeownerNeedsAttentionAllItems: Array<{
+    id: string;
+    tone: 'amber' | 'blue' | 'emerald' | 'slate';
+    icon: ReactNode;
+    title: string;
+    detail: string;
+    meta?: string;
+    actionLabel: string;
+    onAction: () => void;
+  }> = [
+    ...needsReviewEstimates.map(estimate => ({
+      id: `estimate-${estimate.id}`,
+      tone: 'amber' as const,
+      icon: <Receipt size={17} />,
+      title: 'Estimate ready for review',
+      detail: `${homeownerRecordContractorName(estimate.contractor_id)} · ${formatMoney(estimate.total_cents)}`,
+      meta: estimate.title,
+      actionLabel: 'Review Estimate',
+      onAction: () => {
+        setHomeownerRecordSection('needs_review');
+        setViewingInvoiceId(null);
+        setViewingEstimateId(estimate.id);
+        setHomeownerTab('estimates');
+      },
+    })),
+    ...openInvoiceRecords.map(invoice => ({
+      id: `invoice-${invoice.id}`,
+      tone: 'blue' as const,
+      icon: <Receipt size={17} />,
+      title: 'Invoice available',
+      detail: `${homeownerRecordContractorName(invoice.contractor_id)} · ${formatMoney(invoice.total_cents)}`,
+      meta: invoice.title || invoice.invoice_number || 'Invoice',
+      actionLabel: 'View Invoice',
+      onAction: () => {
+        setHomeownerRecordSection('open_invoices');
+        setViewingEstimateId(null);
+        setHomeownerTab('estimates');
+        void viewHomeownerInvoice(invoice);
+      },
+    })),
+    ...homeownerAttentionRequests.map(request => ({
+      id: `request-${request.id}`,
+      tone: 'emerald' as const,
+      icon: <MessageSquare size={17} />,
+      title: request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'
+        ? 'Appointment needs review'
+        : 'Contractor replied',
+      detail: `${request.contractor_name} · ${request.title}`,
+      meta: request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'
+        ? formatDateTime(request.appointment.proposed_at)
+        : request.messages[request.messages.length - 1]?.body,
+      actionLabel: request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor' ? 'Review Appointment' : 'Reply',
+      onAction: () => openRequestFromDashboard(request),
+    })),
+    ...upcomingAppointments
+      .filter(request => !(request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'))
+      .map(request => ({
+        id: `appointment-${request.id}`,
+        tone: 'slate' as const,
+        icon: <Calendar size={17} />,
+        title: 'Upcoming appointment',
+        detail: `${request.contractor_name} · ${request.title}`,
+        meta: request.appointment?.proposed_at ? formatDateTime(request.appointment.proposed_at) : undefined,
+        actionLabel: 'View Request',
+        onAction: () => openRequestFromDashboard(request),
+      })),
+    ...supportInquiries
+      .filter(inquiry => inquiry.status === 'waiting_on_user')
+      .map(inquiry => ({
+        id: `support-${inquiry.id}`,
+        tone: 'blue' as const,
+        icon: <MessageSquare size={17} />,
+        title: 'Support reply',
+        detail: inquiry.title,
+        meta: `Updated ${formatDateTime(inquiry.updated_at)}`,
+        actionLabel: 'Open Support',
+        onAction: () => setHomeownerTab('support'),
+      })),
+  ];
+  const homeownerNeedsAttentionItems = homeownerNeedsAttentionAllItems.slice(0, 5);
+  const attentionToneClass = (tone: 'amber' | 'blue' | 'emerald' | 'slate') => ({
+    amber: 'border-amber-200 bg-amber-50/70 text-amber-700',
+    blue: 'border-blue-200 bg-blue-50/70 text-blue-700',
+    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-700',
+    slate: 'border-slate-200 bg-slate-50 text-slate-600',
+  }[tone]);
 
   return (
     <SidebarLayout
@@ -7072,7 +7162,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
         { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
         { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
-        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount, group: 'Contractors' },
+        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount + openHomeownerInvoiceCount, group: 'Contractors' },
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
@@ -7167,68 +7257,46 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Next best action</p>
-                <h2 className="mt-1.5 text-base font-bold text-slate-950">
-                  {homeownerAttentionRequests[0]
-                    ? 'Respond to your contractor'
-                    : upcomingAppointments[0]
-                      ? 'Review your next appointment'
-                      : openServiceRequests[0]
-                        ? 'Check your active service request'
-                        : homeProfileScore < 100
-                          ? 'Finish your home profile'
-                          : activeConnections.length === 0
-                            ? 'Connect with a contractor'
-                            : 'Your home workspace is up to date'}
-                </h2>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Needs Attention</p>
+                <h2 className="mt-1.5 text-base font-bold text-slate-950">What needs your attention?</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {homeownerAttentionRequests[0]
-                    ? `${homeownerAttentionRequests[0].contractor_name} is waiting on you for "${homeownerAttentionRequests[0].title}".`
-                    : upcomingAppointments[0]?.appointment
-                      ? `${upcomingAppointments[0].title} is set for ${formatDateTime(upcomingAppointments[0].appointment.proposed_at)}.`
-                      : openServiceRequests[0]
-                        ? `${openServiceRequests[0].title} is still active with ${openServiceRequests[0].contractor_name}.`
-                        : homeProfileScore < 100
-                          ? 'A complete home profile helps contractors respond with better context.'
-                          : activeConnections.length === 0
-                            ? 'Find a contractor or accept an invite so you can start sending requests.'
-                            : 'No urgent items are waiting on you right now.'}
+                  Estimates, invoices, replies, appointments, and support updates that may need your next step.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (homeownerAttentionRequests[0]) {
-                    setHomeownerRequestView(homeownerRequestQueueFor(homeownerAttentionRequests[0]));
-                    setExpandedRequestIds(new Set([homeownerAttentionRequests[0].id]));
-                    setHomeownerTab('requests');
-                    return;
-                  }
-                  if (upcomingAppointments[0]) {
-                    setHomeownerTab('calendar');
-                    return;
-                  }
-                  if (openServiceRequests[0]) {
-                    setHomeownerRequestView(homeownerRequestQueueFor(openServiceRequests[0]));
-                    setExpandedRequestIds(new Set([openServiceRequests[0].id]));
-                    setHomeownerTab('requests');
-                    return;
-                  }
-                  setHomeownerTab(homeProfileScore < 100 ? 'home' : activeConnections.length === 0 ? 'contractors' : 'overview');
-                }}
-                className={buttonClass('primary')}
-              >
-                <ArrowRight size={16} />
-                Open next step
-              </button>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {homeownerNeedsAttentionItems.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="font-semibold text-emerald-900">You're all caught up.</p>
+                <p className="mt-1 text-sm text-emerald-800">No estimates, invoices, replies, appointments, or support updates need action right now.</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                {homeownerNeedsAttentionItems.map(item => (
+                  <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${attentionToneClass(item.tone)}`}>
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-950">{item.title}</p>
+                        <p className="mt-0.5 text-sm text-slate-600">{item.detail}</p>
+                        {item.meta && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.meta}</p>}
+                      </div>
+                    </div>
+                    <button type="button" onClick={item.onAction} className={`${buttonClass('primary')} mt-3 w-full justify-center sm:w-auto`}>
+                      {item.actionLabel}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
+              <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
               <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestView('attention'); setHomeownerTab('requests'); }} />
-              <MetricButton label="New requests" value={String(newServiceRequests.length)} onClick={() => { setHomeownerRequestView('new'); setHomeownerTab('requests'); }} />
               <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
-              <MetricButton label="Closed records" value={String(closedServiceRequests.length)} onClick={() => { setHomeownerRequestView('closed'); setHomeownerTab('requests'); }} />
             </div>
           </section>
 
