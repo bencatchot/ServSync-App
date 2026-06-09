@@ -108,7 +108,7 @@ import type {
   ServiceRequestUrgency,
 } from './types';
 
-type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile';
+type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement';
 type HomeownerRequestView = 'attention' | 'new' | 'scheduled' | 'closed' | 'declined';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
 type HomeownerWorkspaceRequestView = 'attention' | 'active' | 'closed';
@@ -301,6 +301,71 @@ const STORAGE_KEYS = {
   contractorJobsView: 'servsync.contractor.jobsView',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
+
+const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement'>, { title: string; sections: Array<{ title: string; body: string }> }> = {
+  terms: {
+    title: 'Terms of Service',
+    sections: [
+      { title: 'Platform use', body: 'ServSync is intended to help homeowners and contractors organize connections, requests, estimates, jobs, invoices, reports, documents, and home records. Final terms should define permitted use, account access, and platform rules.' },
+      { title: 'Accounts', body: 'Users are responsible for accurate account information, credential security, and activity under their account. Attorney review should define account suspension, closure, and access limits.' },
+      { title: 'Homeowner responsibilities', body: 'Homeowners should provide accurate information, choose what to share with contractors, review contractor documents, and use judgment before approving work or payments.' },
+      { title: 'Contractor responsibilities', body: 'Contractors are responsible for their profiles, licensing and insurance representations, estimates, invoices, reports, services, work quality, and communications with homeowners.' },
+      { title: 'Estimates, invoices, and reports', body: 'ServSync provides software tools for contractor-created records. Final terms should clarify that estimates, invoices, reports, and payment instructions are contractor-provided unless otherwise stated.' },
+      { title: 'Discover/public content', body: 'Public profile and Discover content should be accurate, helpful, and non-misleading. Contractors may not use Discover to directly solicit homeowners outside homeowner-initiated connection or request flows.' },
+      { title: 'Content uploads', body: 'Users should upload only content they own or have the right to share, and should avoid uploading unlawful, unsafe, misleading, or highly sensitive information unless needed.' },
+      { title: 'Disclaimers', body: 'ServSync is a software platform. Contractors, not ServSync, are responsible for their own work, services, licenses, insurance, estimates, invoices, and reports.' },
+      { title: 'Limitation of liability placeholder', body: 'Attorney review should provide appropriate limitation of liability, warranty disclaimer, and damages language for the ServSync business model and launch states.' },
+      { title: 'Termination', body: 'Final terms should explain when accounts, content, public profiles, or access may be suspended, restricted, archived, or removed.' },
+      { title: 'Contact/support', body: 'Users can contact ServSync support through the app. Final terms should include the official legal/contact address and dispute process.' },
+    ],
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    sections: [
+      { title: 'Information collected', body: 'ServSync may collect account, profile, contact, contractor business, connection, request, estimate, invoice, report, notification, support, and usage-related information.' },
+      { title: 'Home/property information', body: 'Homeowners may store home profile details, addresses, photos, documents, maintenance logs, and service history. Final policy should explain the sensitivity of this information.' },
+      { title: 'Documents/photos/uploads', body: 'Uploaded content may include property-sensitive or personal information. Final policy should explain storage, access, sharing, deletion, and support access practices.' },
+      { title: 'Connections and permissions', body: 'Homeowners control sharing permissions for each contractor connection. Final policy should describe what contractors can see when sharing is enabled.' },
+      { title: 'How information is used', body: 'ServSync uses information to provide accounts, contractor discovery, service requests, reports, estimates, invoices, documents, notifications, support, and platform administration.' },
+      { title: 'How information is shared', body: 'Information may be shared with connected contractors, homeowners, service providers, support/admin users, or public viewers depending on user actions and settings.' },
+      { title: 'Public profile/Discover visibility', body: 'Contractor public profiles and Discover posts may be visible to authenticated users or public visitors depending on app settings. Final policy should define visibility clearly.' },
+      { title: 'Data retention/deletion requests', body: 'Final policy should explain how users request access, correction, export, deletion, or account closure, and what records may need to be retained.' },
+      { title: 'Security practices placeholder', body: 'ServSync should describe practical security practices without overclaiming compliance, certification, or guaranteed protection.' },
+      { title: 'Contact/support', body: 'Final policy should provide privacy contact information and any state-specific rights process that applies.' },
+    ],
+  },
+  'acceptable-use': {
+    title: 'Acceptable Use & Content Policy',
+    sections: [
+      { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover updates.' },
+      { title: 'Prohibited content', body: 'Final policy should prohibit unlawful, deceptive, harmful, harassing, discriminatory, infringing, unsafe, or privacy-invasive content.' },
+      { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to share, and should review visibility before uploading sensitive home, identity, financial, or insurance records.' },
+      { title: 'Discover posting rules', body: 'Discover posts should be helpful local updates, maintenance tips, company updates, or recent work. They should not be misleading or include private homeowner information without permission.' },
+      { title: 'No direct solicitation through Discover', body: 'Contractors may not directly message, pitch, solicit, or contact homeowners through Discover unless the homeowner initiates a connection, service request, or approved communication path.' },
+      { title: 'No misleading licensing/insurance claims', body: 'Contractors should accurately represent licensing, insurance, bonding, certifications, qualifications, service areas, and business status. Listed credentials are not verified unless ServSync explicitly says so.' },
+      { title: 'No unsafe/illegal content', body: 'Content should not encourage unsafe work, illegal activity, code evasion, fraud, or improper handling of hazardous materials or regulated services.' },
+      { title: 'Takedown/moderation placeholder', body: 'ServSync may review, restrict, archive, or remove content or accounts under standards to be finalized by attorney review.' },
+    ],
+  },
+  'contractor-agreement': {
+    title: 'Contractor Platform Agreement',
+    sections: [
+      { title: 'Contractor account use', body: 'Contractors are responsible for the accuracy and security of their contractor account, team access, public profile, customer records, and uploaded content.' },
+      { title: 'Subscription/payment placeholder', body: 'Final agreement should define subscription terms, billing, cancellations, refunds, taxes, plan changes, and payment collection once billing is active.' },
+      { title: 'Responsibility for contractor work', body: 'Contractors remain solely responsible for their services, work quality, scheduling, estimates, invoices, reports, licenses, insurance, permits, warranties, and customer communications.' },
+      { title: 'Estimates/invoices/reports', body: 'ServSync provides tools to create records, but contractors are responsible for the content, accuracy, pricing, terms, and legal effect of records they send.' },
+      { title: 'Homeowner data access and confidentiality', body: 'Contractors may access homeowner/home information only as allowed by connection permissions, service requests, or homeowner-approved workflows, and should keep that information confidential.' },
+      { title: 'Discover posting rules', body: 'Contractor posts should be helpful local updates, maintenance tips, company updates, or recent work. Posts must not expose private homeowner information without permission.' },
+      { title: 'Public profile rules', body: 'Public profile information should be accurate, current, and not misleading. Listed credentials should not imply ServSync verification unless a verification process exists.' },
+      { title: 'No direct solicitation', body: 'Contractors may not directly solicit, pitch, message, or contact homeowners through Discover unless the homeowner has initiated a connection, service request, or approved communication path.' },
+      { title: 'Licensing/insurance representation placeholder', body: 'Final agreement should define what contractors may say about licensing, insurance, bonding, certifications, permits, and trade qualifications.' },
+    ],
+  },
+};
+
+function legalRouteLabel(route: keyof typeof LEGAL_PAGES) {
+  return route === 'acceptable-use' ? 'Acceptable Use' : route === 'contractor-agreement' ? 'Contractor Agreement' : LEGAL_PAGES[route].title.replace(' of Service', '');
+}
 
 function storedFieldWorkState(): StoredFieldWorkState | null {
   try {
@@ -3588,13 +3653,59 @@ function currentRoute() {
   const [path, query = ''] = rawHash.split('?');
   const route = (path || 'home') as RouteName;
   return {
-    route: ['home', 'homeowner', 'contractor', 'admin', 'profile'].includes(route) ? route : 'home',
+    route: ['home', 'homeowner', 'contractor', 'admin', 'profile', 'terms', 'privacy', 'acceptable-use', 'contractor-agreement'].includes(route) ? route : 'home',
     query: new URLSearchParams(query),
   };
 }
 
 function updateRoute(route: RouteName, query = '') {
   window.location.hash = query ? `/${route}?${query}` : `/${route}`;
+}
+
+function LegalLinks({ contractor = false, className = '' }: { contractor?: boolean; className?: string }) {
+  const routes: Array<keyof typeof LEGAL_PAGES> = contractor
+    ? ['terms', 'privacy', 'acceptable-use', 'contractor-agreement']
+    : ['terms', 'privacy', 'acceptable-use'];
+  return (
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${className}`}>
+      {routes.map(route => (
+        <button key={route} type="button" onClick={() => updateRoute(route)} className="font-semibold underline-offset-2 hover:underline">
+          {legalRouteLabel(route)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LegalPage({ pageId }: { pageId: keyof typeof LEGAL_PAGES }) {
+  const page = LEGAL_PAGES[pageId];
+  return (
+    <div className="mx-auto max-w-4xl space-y-5">
+      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Draft placeholder for attorney review</p>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950">{page.title}</h1>
+        <p className="mt-2 text-sm leading-6 text-amber-900">
+          This page is a product placeholder to organize legal topics for attorney review. It is not final legal advice,
+          not an attorney-approved agreement, and should be reviewed before public launch.
+        </p>
+      </section>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="space-y-5">
+          {page.sections.map(section => (
+            <div key={section.title} className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0">
+              <h2 className="text-base font-bold text-slate-950">{section.title}</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{section.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => updateRoute('home')} className={buttonClass('secondary')}>
+          Back to ServSync
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function slugify(value: string) {
@@ -4599,7 +4710,7 @@ export default function App() {
   if (!supabaseConfigured) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        <SetupNotice />
+        {route in LEGAL_PAGES ? <LegalPage pageId={route as keyof typeof LEGAL_PAGES} /> : <SetupNotice />}
       </PublicShell>
     );
   }
@@ -4617,7 +4728,9 @@ export default function App() {
   if (!session) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        {route === 'home' ? (
+        {route in LEGAL_PAGES ? (
+          <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
+        ) : route === 'home' ? (
           <LandingPage />
         ) : (
           <AuthPage
@@ -4651,6 +4764,14 @@ export default function App() {
     );
   }
 
+  if (route in LEGAL_PAGES) {
+    return (
+      <PublicShell route={route} profile={profile} onSignOut={signOut}>
+        <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
+      </PublicShell>
+    );
+  }
+
   return (
     <>
       {profile.role === 'homeowner' && <HomeownerDashboard profile={profile} onSignOut={signOut} />}
@@ -4675,6 +4796,9 @@ function PublicShell({
     <div className="min-h-screen bg-[#02132D]">
       <TopBar route={route} profile={profile} onSignOut={onSignOut} />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+      <footer className="mx-auto max-w-6xl px-4 pb-8 sm:px-6 lg:px-8">
+        <LegalLinks contractor className="justify-center text-blue-100/70" />
+      </footer>
     </div>
   );
 }
@@ -4925,6 +5049,7 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -4938,6 +5063,9 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
         if (error) throw error;
         onAuthed();
         return;
+      }
+      if (!acceptedLegal) {
+        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
       }
 
       const { data, error } = await supabase.auth.signUp({
@@ -5010,16 +5138,41 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
           {mode === 'signup' && (
             <p className="text-xs text-slate-400">Use a strong password. Supabase may reject short or weak passwords.</p>
           )}
-          <button type="submit" disabled={busy || !email || !password} className={buttonClass('primary')}>
+          {mode === 'signup' && (
+            <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={acceptedLegal}
+                onChange={event => setAcceptedLegal(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+              />
+              <span>
+                I agree to the{' '}
+                <button type="button" onClick={() => updateRoute('terms')} className="font-semibold text-blue-700 hover:text-blue-800">
+                  Terms of Service
+                </button>
+                {' '}and{' '}
+                <button type="button" onClick={() => updateRoute('privacy')} className="font-semibold text-blue-700 hover:text-blue-800">
+                  Privacy Policy
+                </button>
+                .
+              </span>
+            </label>
+          )}
+          <button type="submit" disabled={busy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
             <KeyRound size={16} />
             {busy ? 'Working...' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
           {message && <Notice tone="info" text={message} />}
         </form>
+        <LegalLinks contractor={role === 'contractor'} className="mt-4 text-slate-400" />
         <div className="mt-6 border-t border-[#E1E3E7] pt-4">
           <button
             type="button"
-            onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+            onClick={() => {
+              setMode(mode === 'signin' ? 'signup' : 'signin');
+              setAcceptedLegal(false);
+            }}
             className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
           >
             {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
@@ -6681,6 +6834,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {options.showPaymentGuidance && (
               <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
                 Payment is handled directly with your contractor. Contact them for payment instructions.
+                <span className="mt-1 block text-xs text-blue-800">
+                  ServSync is a software platform. Contractors are responsible for their own work, invoices, licenses, insurance, and services.
+                </span>
               </div>
             )}
             {invoice.scope && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
@@ -9137,6 +9293,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         Add a photo or PDF now. ServSync will save it in Documents as a receipt and link it to this log entry.
                       </p>
                       <p className="mt-1 text-xs text-blue-700">
+                        Only upload documents you have the right to share. Receipts and invoices may contain sensitive information.
+                      </p>
+                      <p className="mt-1 text-xs text-blue-700">
                         Today, smart fill uses details it can read from the file name. OCR/AI reading from the photo itself can plug into this same flow later.
                       </p>
                     </div>
@@ -9363,6 +9522,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 />
               </label>
               <p className="mt-2 text-xs text-slate-500">PDF, images, Word docs, and more — up to 50 MB per file.</p>
+              <p className="mt-1 text-xs leading-5 text-amber-700">
+                Only upload documents and photos you have the right to share. Home documents may contain sensitive information, so review visibility and sharing before uploading.
+              </p>
             </div>
 
             {/* Document list */}
@@ -20712,21 +20874,26 @@ function PermissionPicker({
   ];
 
   return (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-      {options.map(option => (
-        <label key={option.key} className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50">
-          <input
-            type="checkbox"
-            checked={permissions[option.key]}
-            onChange={event => onChange({ ...permissions, [option.key]: event.target.checked })}
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
-          />
-          <span>
-            <span className="block text-sm font-bold text-slate-900">{option.label}</span>
-            <span className="block text-xs text-slate-500">{option.help}</span>
-          </span>
-        </label>
-      ))}
+    <div className="mt-3 space-y-3">
+      <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+        You control what home information is shared with each contractor. Only share information needed for the work or relationship.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(option => (
+          <label key={option.key} className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50">
+            <input
+              type="checkbox"
+              checked={permissions[option.key]}
+              onChange={event => onChange({ ...permissions, [option.key]: event.target.checked })}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+            />
+            <span>
+              <span className="block text-sm font-bold text-slate-900">{option.label}</span>
+              <span className="block text-xs text-slate-500">{option.help}</span>
+            </span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -22242,6 +22409,10 @@ function DiscoverFeed({
           <p className="mt-1 mb-3 text-sm leading-5 text-slate-500">
             Post maintenance tips, company updates, and recent work. Homeowners choose whether to view your profile or request a connection.
           </p>
+          <p className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+            Posts are public and should be helpful local updates, maintenance tips, or recent work. Discover does not allow contractors to directly contact homeowners.
+            Homeowners choose when to view your profile, connect, or request service.
+          </p>
           {postNotice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{postNotice}</div>}
           {postError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{postError}</div>}
           <div className="grid gap-3 sm:grid-cols-2">
@@ -22601,6 +22772,7 @@ function SidebarLayout({
             <LogOut size={16} />
           </button>
         </div>
+        <LegalLinks contractor={profile.role === 'contractor'} className="px-2 pt-1 text-blue-100/55" />
       </div>
     </div>
   );
@@ -22700,6 +22872,9 @@ function PhotoUploadPanel({
         </label>
       </div>
       {footer && <p className="mt-2 text-xs font-medium text-amber-700">{footer}</p>}
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        Only upload photos you have the right to share. Home photos may contain sensitive information, so review visibility and sharing before uploading.
+      </p>
     </div>
   );
 }
