@@ -22675,6 +22675,7 @@ function DiscoverFeed({
   const [filterCategory, setFilterCategory] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterKeyword, setFilterKeyword] = useState('');
+  const [feedView, setFeedView] = useState<'all' | 'saved'>('all');
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
 
   const [postDraft, setPostDraft] = useState({ category: '', title: '', description: '', city: '', state: '' });
@@ -22686,6 +22687,7 @@ function DiscoverFeed({
   const [postError, setPostError] = useState('');
 
   const [requestingContractorId, setRequestingContractorId] = useState<string | null>(null);
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
   const [localConnectionStatuses, setLocalConnectionStatuses] = useState<Record<string, ConnectionStatus>>({});
   const [actionNotice, setActionNotice] = useState('');
   const [actionError, setActionError] = useState('');
@@ -22859,15 +22861,47 @@ function DiscoverFeed({
     }
   };
 
+  const togglePostSave = async (item: DiscoverFeedItem) => {
+    if (!supabase || perspective !== 'homeowner') return;
+    const wasSaved = Boolean(item.is_saved);
+    setSavingPostId(item.post_id);
+    setActionNotice('');
+    setActionError('');
+    try {
+      const { data, error } = await supabase.rpc('servsync_toggle_discover_post_save', {
+        p_post_id: item.post_id,
+      });
+      if (error) throw error;
+      const isSaved = Boolean(data);
+      setFeed(prev => prev.map(post => {
+        if (post.post_id !== item.post_id) return post;
+        const currentSaveCount = Number(post.save_count ?? 0);
+        const nextSaveCount = isSaved === wasSaved
+          ? currentSaveCount
+          : Math.max(0, currentSaveCount + (isSaved ? 1 : -1));
+        return { ...post, is_saved: isSaved, save_count: nextSaveCount };
+      }));
+      setActionNotice(isSaved ? 'Update saved.' : 'Update removed from saved updates.');
+    } catch (err) {
+      setActionError(readableError(err, 'Unable to update saved updates.'));
+    } finally {
+      setSavingPostId(null);
+    }
+  };
+
   const existingConnectionMap = connections.reduce<Record<string, ConnectionStatus>>((map, c) => {
     map[c.contractor_id] = c.status;
     return map;
   }, { ...localConnectionStatuses });
 
+  const savedFeedCount = feed.filter(item => item.is_saved).length;
+  const feedForView = perspective === 'homeowner' && feedView === 'saved'
+    ? feed.filter(item => item.is_saved)
+    : feed;
   const keywordTerms = normalizeText(filterKeyword).split(' ').filter(Boolean);
   const visibleFeed = keywordTerms.length === 0
-    ? feed
-    : feed.filter(item => {
+    ? feedForView
+    : feedForView.filter(item => {
       const searchableText = normalizeText([
         item.title,
         item.description,
@@ -22960,6 +22994,25 @@ function DiscoverFeed({
               {feedLoading ? 'Loading...' : 'Search'}
             </button>
           </div>
+        </div>
+      )}
+      {perspective === 'homeowner' && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFeedView('all')}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${feedView === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
+          >
+            All Updates
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeedView('saved')}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${feedView === 'saved' ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
+          >
+            Saved Updates
+            {savedFeedCount > 0 && <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{savedFeedCount}</span>}
+          </button>
         </div>
       )}
       {actionNotice && <Notice tone="success" text={actionNotice} />}
@@ -23066,11 +23119,13 @@ function DiscoverFeed({
 
       {/* Feed */}
       {!feedLoading && visibleFeed.length === 0 && (
-        <EmptyState text={feed.length === 0
-          ? perspective === 'homeowner'
-            ? 'No local updates yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
-            : 'No shared updates yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
-          : 'No local updates match those filters yet.'} />
+        <EmptyState text={perspective === 'homeowner' && feedView === 'saved' && savedFeedCount === 0
+          ? 'No saved updates yet. Save helpful contractor posts to revisit later.'
+          : feed.length === 0
+            ? perspective === 'homeowner'
+              ? 'No local updates yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
+              : 'No shared updates yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
+            : 'No local updates match those filters yet.'} />
       )}
 
       {visibleFeed.map(item => {
@@ -23139,8 +23194,19 @@ function DiscoverFeed({
                   )}
                   {isOwnPost && (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {Number(item.view_count ?? 0).toLocaleString()} {Number(item.view_count ?? 0) === 1 ? 'view' : 'views'}
+                      {Number(item.view_count ?? 0).toLocaleString()} {Number(item.view_count ?? 0) === 1 ? 'view' : 'views'} · {Number(item.save_count ?? 0).toLocaleString()} {Number(item.save_count ?? 0) === 1 ? 'save' : 'saves'}
                     </span>
+                  )}
+
+                  {perspective === 'homeowner' && (
+                    <button
+                      type="button"
+                      disabled={savingPostId === item.post_id}
+                      onClick={() => void togglePostSave(item)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${item.is_saved ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
+                    >
+                      {savingPostId === item.post_id ? 'Saving...' : item.is_saved ? 'Saved' : 'Save'}
+                    </button>
                   )}
 
                   {perspective === 'homeowner' && contractorSlug && (

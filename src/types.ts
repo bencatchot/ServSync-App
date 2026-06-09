@@ -481,6 +481,8 @@ export interface DiscoverFeedItem {
   reviews: PublicReview[];
   created_at: string;
   view_count?: number;
+  save_count?: number;
+  is_saved?: boolean;
 }
 
 export type HomeDocumentType = 'warranty' | 'manual' | 'inspection' | 'insurance' | 'permit' | 'receipt' | 'other';
