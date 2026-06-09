@@ -5260,103 +5260,24 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 
 function LandingPage() {
   const steps = [
-    { title: 'Homeowner request', text: 'Jordan requests help with the kitchen sink at Oak Street Home.' },
-    { title: 'Contractor estimate', text: 'Harbor Home Services sends an estimate before work begins.' },
-    { title: 'Approval', text: 'Jordan reviews the scope and approves the work.' },
-    { title: 'Job / report', text: 'The repair is completed and documented in a service report.' },
-    { title: 'Invoice', text: 'A connected invoice is sent from the completed job.' },
-    { title: 'Home record', text: 'The estimate, report, invoice, and notes stay tied to the home.' },
-  ];
-
-  const homeownerCards = [
-    {
-      title: 'Needs Attention',
-      eyebrow: 'Homeowner dashboard',
-      lines: ['Estimate ready for review', 'Invoice available', 'Contractor replied'],
-      footer: 'Jordan Miller · Oak Street Home',
-    },
-    {
-      title: 'Discover local contractors',
-      eyebrow: 'Directory',
-      lines: ['Harbor Home Services', 'Plumbing · Home maintenance', 'License listed · Insurance listed'],
-      footer: 'Connect when you are ready',
-    },
-    {
-      title: 'Kitchen sink leak repair',
-      eyebrow: 'Service request',
-      lines: ['Leak under kitchen sink', 'Photos and notes attached', 'Sent to Harbor Home Services'],
-      footer: 'Homeowner controls what is shared',
-    },
-    {
-      title: 'Replace supply line and test sink',
-      eyebrow: 'Estimate review',
-      lines: ['$285.00 total', 'Supply line replacement', 'Test faucet and drain'],
-      footer: 'Review before work begins',
-    },
-    {
-      title: 'Kitchen sink service visit',
-      eyebrow: 'Invoice view',
-      lines: ['$285.00 amount due', 'Payment handled with contractor', 'Download PDF'],
-      footer: 'Invoice stays with the home record',
-    },
-    {
-      title: 'Home documents & history',
-      eyebrow: 'Home record',
-      lines: ['Plumbing service report', 'Receipt PDF', 'Maintenance note saved'],
-      footer: 'Records for Oak Street Home',
-    },
-  ];
-
-  const contractorCards = [
-    {
-      title: 'Contractor dashboard',
-      eyebrow: 'Harbor Home Services',
-      lines: ['Open requests: 2', 'Jobs in progress: 1', 'Invoices open: 1'],
-      footer: 'Work stays organized',
-    },
-    {
-      title: 'Kitchen sink leak repair',
-      eyebrow: 'Service job',
-      lines: ['Replace supply line', 'Test faucet', 'Check cabinet moisture'],
-      footer: 'Editable work items',
-    },
-    {
-      title: 'Estimate builder',
-      eyebrow: 'Pre-work offer',
-      lines: ['Replace supply line', 'Labor and material line items', '$285.00 estimate total'],
-      footer: 'Send for homeowner approval',
-    },
-    {
-      title: 'Plumbing service report',
-      eyebrow: 'Completion',
-      lines: ['Leak repaired', 'Sink tested', 'Photos and notes saved'],
-      footer: 'Customer-facing report',
-    },
-    {
-      title: 'Invoice draft',
-      eyebrow: 'Post-work bill',
-      lines: ['Kitchen sink service visit', 'Line items copied from work', '$285.00 invoice total'],
-      footer: 'Review before sending',
-    },
-    {
-      title: 'Recent Local Work',
-      eyebrow: 'Discover post',
-      lines: ['Helpful sink leak prevention tip', 'Recent repair example', 'Homeowners choose to connect'],
-      footer: 'Visibility without buying leads',
-    },
+    'Homeowner requests service.',
+    'Contractor sends an estimate.',
+    'Homeowner reviews and approves.',
+    'Contractor completes the job or report.',
+    'Invoice and records are saved to the home history.',
   ];
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <section className="grid gap-8 rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Connect · Manage · Protect</p>
-          <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            Home service records, contractor workflows, and trusted connections in one place.
+          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
+            Organize home work from request to record.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100/80">
-            ServSync helps homeowners organize their home and work with trusted contractors, while giving contractors tools to manage
-            service jobs, estimates, invoices, reports, and homeowner relationships.
+            ServSync helps homeowners organize their home, connect with local contractors, request service, review estimates,
+            view invoices, and keep reports, documents, and maintenance history in one place.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('primary')}>
@@ -5366,222 +5287,52 @@ function LandingPage() {
               Create contractor account <ArrowRight size={16} />
             </button>
           </div>
-          <button type="button" onClick={() => document.getElementById('servsync-story')?.scrollIntoView({ behavior: 'smooth' })} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
-            Scroll to see how it works
+          <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
+            View Trust & Safety
           </button>
         </div>
-        <div className="grid gap-4">
-          <DemoWorkflowCard
-            eyebrow="Demo example"
-            title="Kitchen sink leak repair"
-            lines={['Jordan Miller requested service', 'Harbor Home Services sent an estimate', 'Report and invoice saved to Oak Street Home']}
-            footer="Fake demo data only"
-            accent="blue"
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Request service, review estimates and invoices, and keep records together." />
-            <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage jobs, reports, estimates, invoices, and homeowner-initiated requests." />
-          </div>
+        <div className="grid gap-3">
+          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Build a home record, request service, review estimates and invoices, and control what information gets shared." />
+          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests." />
+          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful updates and recent work. Homeowners choose when to connect." />
+          <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
         </div>
       </section>
 
-      <section id="servsync-story" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">How ServSync works</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">One connected workflow</h2>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner loop for home work</h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-slate-600">
-            Each step stays connected, so homeowners can find records later and contractors do not have to rebuild the same information.
+            Requests, estimates, jobs, invoices, reports, documents, and maintenance records stay connected instead of scattered.
           </p>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="mt-5 grid gap-3 md:grid-cols-5">
           {steps.map((step, index) => (
-            <div key={step.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div key={step} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{index + 1}</span>
-              <p className="mt-3 text-sm font-bold leading-5 text-slate-900">{step.title}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-600">{step.text}</p>
+              <p className="mt-3 text-sm font-semibold leading-5 text-slate-800">{step}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <LandingStorySection
-        eyebrow="For Homeowners"
-        title="A home hub that keeps work easy to find later."
-        description="Request service from connected contractors, review estimates before work begins, view invoices and reports in one place, and keep documents, photos, reports, and maintenance history tied to your home."
-        bullets={[
-          'Request service from connected contractors.',
-          'Review estimates before work begins.',
-          'View invoices and job reports in one place.',
-          'Control what home information is shared.',
-        ]}
-        cards={homeownerCards}
-        accent="emerald"
-      />
-
-      <LandingStorySection
-        eyebrow="For Contractors"
-        title="A cleaner operating system for small contractor workflows."
-        description="Turn service requests into jobs, create estimates and invoices from the same workflow, document completed work with reports, and stay visible through Discover without buying leads."
-        bullets={[
-          'Turn service requests into jobs.',
-          'Create estimates and invoices from the same workflow.',
-          'Document completed work with reports.',
-          'Homeowners choose when to connect or request service.',
-        ]}
-        cards={contractorCards}
-        accent="blue"
-      />
-
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="bg-slate-950 p-6 text-white lg:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-300">Discover</p>
-            <h2 className="mt-2 text-2xl font-bold">Discovery without direct solicitation</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Contractors can share helpful local updates, maintenance tips, and recent work. Homeowners choose when to view a profile,
-              connect, or request service. Contractors cannot directly contact homeowners through Discover.
-            </p>
-            <button type="button" onClick={() => updateRoute('trust-safety')} className={`${buttonClass('secondary')} mt-5`}>
-              View Trust & Safety
-            </button>
-          </div>
-          <div className="grid gap-3 bg-slate-50 p-6 lg:p-8">
-            <DemoWorkflowCard
-              eyebrow="Demo example"
-              title="Helpful Local Update"
-              lines={['Harbor Home Services', 'How to spot a sink supply line leak early', 'Homeowners can view profile or request connection']}
-              footer="No direct homeowner solicitation"
-              accent="blue"
-            />
-            <DemoWorkflowCard
-              eyebrow="Demo example"
-              title="Recent Local Work"
-              lines={['Kitchen sink leak repair', 'Supply line replaced and sink tested', 'Photos hidden in demo example']}
-              footer="Homeowner chooses next step"
-              accent="slate"
-            />
-          </div>
+      <section className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">Homeowners control sharing</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Connect when you are ready and choose what home information to share with a contractor.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">Discover has boundaries</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors can post helpful updates, but cannot directly solicit homeowners through Discover.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">ServSync is software</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors are responsible for their own work, credentials, estimates, invoices, reports, and services.</p>
         </div>
       </section>
-
-      <section className="rounded-3xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Trust note</p>
-        <h2 className="mt-2 text-2xl font-bold text-blue-950">Built for clear boundaries.</h2>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-blue-900">
-          ServSync is a software platform. Contractors are responsible for their own work, credentials, estimates, invoices, reports, and services.
-          Credential fields are listed by contractors unless ServSync clearly states otherwise.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => updateRoute('trust-safety')} className={buttonClass('primary')}>
-            Trust & Safety
-          </button>
-          <button type="button" onClick={() => updateRoute('privacy')} className={`${buttonClass('secondary')} bg-white`}>
-            Privacy
-          </button>
-          <button type="button" onClick={() => updateRoute('terms')} className={`${buttonClass('secondary')} bg-white`}>
-            Terms
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 text-center shadow-2xl shadow-black/20 lg:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Get started</p>
-        <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-bold text-white">Start building a cleaner home service record.</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-blue-100/80">
-          Create an account, set up your profile, and start connecting requests, estimates, jobs, reports, invoices, and records.
-        </p>
-        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('primary')}>
-            Create homeowner account <ArrowRight size={16} />
-          </button>
-          <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('secondary')}>
-            Create contractor account <ArrowRight size={16} />
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function LandingStorySection({
-  eyebrow,
-  title,
-  description,
-  bullets,
-  cards,
-  accent,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  bullets: string[];
-  cards: Array<{ eyebrow: string; title: string; lines: string[]; footer: string }>;
-  accent: 'blue' | 'emerald';
-}) {
-  const accentClass = accent === 'emerald' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-blue-700 bg-blue-50 border-blue-200';
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
-      <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
-        <div>
-          <p className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] ${accentClass}`}>{eyebrow}</p>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950">{title}</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-          <div className="mt-5 space-y-2">
-            {bullets.map(bullet => (
-              <div key={bullet} className="flex gap-2 text-sm leading-5 text-slate-700">
-                <CheckCircle2 size={16} className={accent === 'emerald' ? 'mt-0.5 shrink-0 text-emerald-600' : 'mt-0.5 shrink-0 text-blue-600'} />
-                <span>{bullet}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {cards.map(card => (
-            <DemoWorkflowCard key={`${card.eyebrow}-${card.title}`} {...card} accent={accent} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function DemoWorkflowCard({
-  eyebrow,
-  title,
-  lines,
-  footer,
-  accent,
-}: {
-  eyebrow: string;
-  title: string;
-  lines: string[];
-  footer: string;
-  accent: 'blue' | 'emerald' | 'slate';
-}) {
-  const accentClass = accent === 'emerald'
-    ? 'border-l-emerald-500'
-    : accent === 'blue'
-      ? 'border-l-blue-500'
-      : 'border-l-slate-400';
-  const dotClass = accent === 'emerald' ? 'bg-emerald-500' : accent === 'blue' ? 'bg-blue-500' : 'bg-slate-400';
-  return (
-    <div className={`rounded-2xl border border-l-4 ${accentClass} border-slate-200 bg-white p-4 shadow-sm`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{eyebrow}</p>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Demo example</span>
-      </div>
-      <p className="mt-2 text-base font-bold text-slate-950">{title}</p>
-      <div className="mt-3 space-y-2">
-        {lines.map(line => (
-          <div key={line} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
-            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
-            <span className="text-xs font-medium leading-5 text-slate-700">{line}</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-3 text-xs font-semibold text-slate-500">{footer}</p>
     </div>
   );
 }
