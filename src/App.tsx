@@ -194,6 +194,7 @@ type StarterEstimateTemplate = {
   line_items: EstimateTemplateLineItem[];
 };
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'support';
+type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'support';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
@@ -5156,7 +5157,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [filingEstimateId, setFilingEstimateId] = useState<string | null>(null);
   const [homeownerRecordSearch, setHomeownerRecordSearch] = useState('');
-  const [homeownerRecordStatusFilter, setHomeownerRecordStatusFilter] = useState<'all' | 'needs_review' | 'open_invoices' | 'accepted' | 'closed'>('all');
+  const [homeownerRecordSection, setHomeownerRecordSection] = useState<HomeownerRecordSection | null>(null);
   const [homeownerRecordContractorFilter, setHomeownerRecordContractorFilter] = useState('all');
   const [homeownerRecordSort, setHomeownerRecordSort] = useState<'newest' | 'oldest'>('newest');
   const [updatingAppointmentRequestId, setUpdatingAppointmentRequestId] = useState<string | null>(null);
@@ -6466,27 +6467,93 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const bTime = new Date(b.issued_at || b.updated_at || b.created_at).getTime();
     return homeownerRecordSort === 'newest' ? bTime - aTime : aTime - bTime;
   });
-  const visibleNeedsReviewEstimates = homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'needs_review'
-    ? sortHomeownerEstimates(needsReviewEstimates.filter(homeownerEstimateMatchesFilters))
-    : [];
-  const visibleOpenInvoiceRecords = homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'open_invoices'
-    ? sortHomeownerInvoices(openInvoiceRecords.filter(homeownerInvoiceMatchesFilters))
-    : [];
-  const visibleAcceptedEstimates = homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'accepted'
-    ? sortHomeownerEstimates(acceptedEstimates.filter(homeownerEstimateMatchesFilters))
-    : [];
-  const visibleClosedInvoiceRecords = homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'closed'
-    ? sortHomeownerInvoices(closedInvoiceRecords.filter(homeownerInvoiceMatchesFilters))
-    : [];
-  const visibleClosedEstimateRecords = homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'closed'
-    ? sortHomeownerEstimates(closedEstimateRecords.filter(homeownerEstimateMatchesFilters))
-    : [];
-  const homeownerVisibleRecordCount = visibleNeedsReviewEstimates.length
-    + visibleOpenInvoiceRecords.length
-    + visibleAcceptedEstimates.length
-    + visibleClosedInvoiceRecords.length
-    + visibleClosedEstimateRecords.length;
+  const visibleNeedsReviewEstimates = sortHomeownerEstimates(needsReviewEstimates.filter(homeownerEstimateMatchesFilters));
+  const visibleOpenInvoiceRecords = sortHomeownerInvoices(openInvoiceRecords.filter(homeownerInvoiceMatchesFilters));
+  const visibleAcceptedEstimates = sortHomeownerEstimates(acceptedEstimates.filter(homeownerEstimateMatchesFilters));
+  const visibleClosedInvoiceRecords = sortHomeownerInvoices(closedInvoiceRecords.filter(homeownerInvoiceMatchesFilters));
+  const visibleClosedEstimateRecords = sortHomeownerEstimates(closedEstimateRecords.filter(homeownerEstimateMatchesFilters));
+  const defaultHomeownerRecordSection: HomeownerRecordSection = needsReviewEstimates.length > 0
+    ? 'needs_review'
+    : openInvoiceRecords.length > 0
+      ? 'open_invoices'
+      : acceptedEstimates.length > 0
+        ? 'accepted'
+        : 'closed';
+  const selectedHomeownerRecordSection = homeownerRecordSection ?? defaultHomeownerRecordSection;
+  const selectedHomeownerRecordCount = selectedHomeownerRecordSection === 'needs_review'
+    ? visibleNeedsReviewEstimates.length
+    : selectedHomeownerRecordSection === 'open_invoices'
+      ? visibleOpenInvoiceRecords.length
+      : selectedHomeownerRecordSection === 'accepted'
+        ? visibleAcceptedEstimates.length
+        : visibleClosedInvoiceRecords.length + visibleClosedEstimateRecords.length;
   const homeownerHasAnyEstimateInvoiceRecords = estimates.length > 0 || invoices.length > 0;
+  const sumEstimateCents = (items: Estimate[]) => items.reduce((total, estimate) => total + (estimate.total_cents || 0), 0);
+  const sumInvoiceCents = (items: Invoice[]) => items.reduce((total, invoice) => total + (invoice.total_cents || 0), 0);
+  const homeownerRecordSectionTiles: Array<{
+    id: HomeownerRecordSection;
+    title: string;
+    helper: string;
+    emptyText: string;
+    count: number;
+    totalCents: number;
+    tone: 'attention' | 'invoice' | 'accepted' | 'closed';
+  }> = [
+    {
+      id: 'needs_review',
+      title: 'Needs Review',
+      helper: 'Awaiting your decision',
+      emptyText: 'No estimates need your review right now.',
+      count: needsReviewEstimates.length,
+      totalCents: sumEstimateCents(needsReviewEstimates),
+      tone: 'attention',
+    },
+    {
+      id: 'open_invoices',
+      title: 'Open Invoices',
+      helper: 'Sent and unpaid',
+      emptyText: 'No open invoices right now.',
+      count: openInvoiceRecords.length,
+      totalCents: sumInvoiceCents(openInvoiceRecords),
+      tone: 'invoice',
+    },
+    {
+      id: 'accepted',
+      title: 'Accepted',
+      helper: 'Approved estimates',
+      emptyText: 'No accepted estimates yet.',
+      count: acceptedEstimates.length,
+      totalCents: sumEstimateCents(acceptedEstimates),
+      tone: 'accepted',
+    },
+    {
+      id: 'closed',
+      title: 'Paid / Closed',
+      helper: 'Completed records',
+      emptyText: 'No paid or closed records yet.',
+      count: closedInvoiceRecords.length + closedEstimateRecords.length,
+      totalCents: sumInvoiceCents(closedInvoiceRecords) + sumEstimateCents(closedEstimateRecords),
+      tone: 'closed',
+    },
+  ];
+  const selectedHomeownerRecordTile = homeownerRecordSectionTiles.find(tile => tile.id === selectedHomeownerRecordSection) ?? homeownerRecordSectionTiles[0];
+  const homeownerRecordTileChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', active: boolean) => {
+    const tones = {
+      attention: active
+        ? 'border-amber-300 bg-amber-50 text-amber-950 ring-2 ring-amber-100'
+        : 'border-amber-200 bg-white text-slate-800 hover:border-amber-300 hover:bg-amber-50/60',
+      invoice: active
+        ? 'border-blue-300 bg-blue-50 text-blue-950 ring-2 ring-blue-100'
+        : 'border-blue-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60',
+      accepted: active
+        ? 'border-emerald-300 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-100'
+        : 'border-emerald-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/60',
+      closed: active
+        ? 'border-slate-400 bg-slate-100 text-slate-950 ring-2 ring-slate-200'
+        : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50',
+    };
+    return `rounded-xl border p-3 text-left shadow-sm transition ${tones[tone]}`;
+  };
   const homeownerRecordCardChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', expanded: boolean) => {
     const tones = {
       attention: expanded
@@ -6770,6 +6837,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     </section>
     );
   };
+  const selectedHomeownerRecordChildren = selectedHomeownerRecordSection === 'needs_review'
+    ? visibleNeedsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true }))
+    : selectedHomeownerRecordSection === 'open_invoices'
+      ? visibleOpenInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true }))
+      : selectedHomeownerRecordSection === 'accepted'
+        ? visibleAcceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true }))
+        : [
+            ...visibleClosedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
+            ...visibleClosedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
+          ];
+  const homeownerRecordFiltersActive = Boolean(homeownerRecordSearch || homeownerRecordContractorFilter !== 'all');
+  const homeownerRecordControlsDirty = homeownerRecordFiltersActive || homeownerRecordSort !== 'newest';
+
   const renderHomeownerEstimatesInvoicesPage = () => (
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
       <div className="space-y-5">
@@ -6780,8 +6860,37 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </p>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {homeownerRecordSectionTiles.map(tile => {
+            const active = tile.id === selectedHomeownerRecordSection;
+            return (
+              <button
+                key={tile.id}
+                type="button"
+                onClick={() => {
+                  setHomeownerRecordSection(tile.id);
+                  setViewingEstimateId(null);
+                  setViewingInvoiceId(null);
+                }}
+                className={homeownerRecordTileChrome(tile.tone, active)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold">{tile.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{tile.helper}</p>
+                  </div>
+                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm">
+                    {tile.count}
+                  </span>
+                </div>
+                <p className="mt-3 text-lg font-bold">{formatMoney(tile.totalCents)}</p>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_150px]">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px_150px]">
             <Field label="Search">
               <input
                 className={inputClass()}
@@ -6789,15 +6898,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 onChange={event => setHomeownerRecordSearch(event.target.value)}
                 placeholder="Search title, contractor, or scope"
               />
-            </Field>
-            <Field label="Status">
-              <select className={inputClass()} value={homeownerRecordStatusFilter} onChange={event => setHomeownerRecordStatusFilter(event.target.value as typeof homeownerRecordStatusFilter)}>
-                <option value="all">All</option>
-                <option value="needs_review">Needs Review</option>
-                <option value="open_invoices">Open Invoices</option>
-                <option value="accepted">Accepted</option>
-                <option value="closed">Paid / Closed</option>
-              </select>
             </Field>
             <Field label="Contractor">
               <select className={inputClass()} value={homeownerRecordContractorFilter} onChange={event => setHomeownerRecordContractorFilter(event.target.value)}>
@@ -6814,12 +6914,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </select>
             </Field>
           </div>
-          {(homeownerRecordSearch || homeownerRecordStatusFilter !== 'all' || homeownerRecordContractorFilter !== 'all' || homeownerRecordSort !== 'newest') && (
+          {homeownerRecordControlsDirty && (
             <button
               type="button"
               onClick={() => {
                 setHomeownerRecordSearch('');
-                setHomeownerRecordStatusFilter('all');
                 setHomeownerRecordContractorFilter('all');
                 setHomeownerRecordSort('newest');
               }}
@@ -6830,45 +6929,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
         </div>
 
-        {homeownerHasAnyEstimateInvoiceRecords && homeownerVisibleRecordCount === 0 ? (
+        {homeownerHasAnyEstimateInvoiceRecords && homeownerRecordFiltersActive && selectedHomeownerRecordCount === 0 ? (
           <EmptyState text="No records match your filters." />
         ) : (
-          <>
-            {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'needs_review') && renderHomeownerRecordsSection(
-              'Needs Review',
-              'Estimates waiting for your approval or decline.',
-              'No estimates need your review right now.',
-              visibleNeedsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true })),
-              'attention'
-            )}
-
-            {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'open_invoices') && renderHomeownerRecordsSection(
-              'Open Invoices',
-              'Invoices that have been sent and are not marked paid or void.',
-              'No open invoices right now.',
-              visibleOpenInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true })),
-              'invoice'
-            )}
-
-            {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'accepted') && renderHomeownerRecordsSection(
-              'Accepted Estimates',
-              'Approved estimates and any linked job or invoice status ServSync can show.',
-              'No accepted estimates yet.',
-              visibleAcceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true })),
-              'accepted'
-            )}
-
-            {(homeownerRecordStatusFilter === 'all' || homeownerRecordStatusFilter === 'closed') && renderHomeownerRecordsSection(
-              'Paid / Closed',
-              'Paid invoices, void invoices, and estimates that are no longer active.',
-              'No paid or closed records yet.',
-              [
-                ...visibleClosedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
-                ...visibleClosedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
-              ],
-              'closed'
-            )}
-          </>
+          renderHomeownerRecordsSection(
+            selectedHomeownerRecordTile.title,
+            selectedHomeownerRecordSection === 'needs_review'
+              ? 'Estimates waiting for your approval or decline.'
+              : selectedHomeownerRecordSection === 'open_invoices'
+                ? 'Invoices that have been sent and are not marked paid or void.'
+                : selectedHomeownerRecordSection === 'accepted'
+                  ? 'Approved estimates and any linked job or invoice status ServSync can show.'
+                  : 'Paid invoices, void invoices, and estimates that are no longer active.',
+            selectedHomeownerRecordTile.emptyText,
+            selectedHomeownerRecordChildren,
+            selectedHomeownerRecordTile.tone
+          )
         )}
       </div>
     </Card>
