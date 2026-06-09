@@ -13143,6 +13143,100 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
   const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
+  const onboardingCustomerCount = connections.length + localContacts.length;
+  const onboardingSentEstimateCount = estimates.filter(estimate => estimate.status !== 'draft').length;
+  const onboardingSentInvoiceCount = invoices.filter(invoice => invoice.status !== 'draft').length;
+  const onboardingFiledReportCount = inspections.filter(inspectionIsClosedJob).length;
+  const openJobsOnboardingWorkspace = () => {
+    setContractorTab('inspections');
+    setContractorJobsView('new_jobs');
+    setInspectionView('new');
+  };
+  const openFinancialOnboardingWorkspace = () => {
+    setContractorTab('inspections');
+    setContractorJobsView('new_financial');
+    setInspectionView('list');
+  };
+  const openCustomersOnboardingWorkspace = () => {
+    setContractorTab('connections');
+    setHomeownerFilter('active');
+    if (onboardingCustomerCount === 0) setShowLocalContactForm(true);
+  };
+  const openInviteOnboardingWorkspace = () => {
+    setContractorTab('connections');
+    setHomeownerFilter('active');
+    setHomeownerDetailTab('profile');
+    const inviteTarget = localContacts.find(contact => !contact.homeowner_user_id && !contact.claimed_at) ?? localContacts[0] ?? null;
+    if (inviteTarget) {
+      setSelectedHomeownerSubjectId(`local:${inviteTarget.id}`);
+    } else {
+      setShowLocalContactForm(true);
+    }
+  };
+  const openReportOnboardingWorkspace = () => {
+    setContractorTab('inspections');
+    setContractorJobsView(openJobs.length > 0 ? 'open_jobs' : 'new_jobs');
+    setInspectionView(openJobs.length > 0 ? 'list' : 'new');
+  };
+  const contractorOnboardingItems: Array<{
+    label: string;
+    helper: string;
+    complete: boolean;
+    actionLabel: string;
+    onAction: () => void;
+  }> = [
+    {
+      label: 'Complete company profile',
+      helper: 'Add the basics homeowners see on your profile and documents.',
+      complete: Boolean(contractorDraft.business_name.trim()) && contractorProfileScore >= 70,
+      actionLabel: 'Complete profile',
+      onAction: () => setContractorTab('profile'),
+    },
+    {
+      label: 'Add your first customer',
+      helper: 'Create a local customer or connect with a homeowner.',
+      complete: onboardingCustomerCount > 0,
+      actionLabel: 'Add customer',
+      onAction: openCustomersOnboardingWorkspace,
+    },
+    {
+      label: 'Create your first job',
+      helper: 'Start a service job or inspection workflow.',
+      complete: inspections.length > 0,
+      actionLabel: 'Create job',
+      onAction: openJobsOnboardingWorkspace,
+    },
+    {
+      label: 'Send your first estimate',
+      helper: 'Create and send an estimate from the Jobs workspace.',
+      complete: onboardingSentEstimateCount > 0,
+      actionLabel: 'Create estimate',
+      onAction: openFinancialOnboardingWorkspace,
+    },
+    {
+      label: 'Send your first invoice',
+      helper: 'Create and send an invoice when work is ready to bill.',
+      complete: onboardingSentInvoiceCount > 0,
+      actionLabel: 'Create invoice',
+      onAction: openFinancialOnboardingWorkspace,
+    },
+    {
+      label: 'Invite a homeowner to ServSync',
+      helper: 'Send a local customer a claim link for their homeowner account.',
+      complete: localClaimInvites.length > 0,
+      actionLabel: 'Invite homeowner',
+      onAction: openInviteOnboardingWorkspace,
+    },
+    {
+      label: 'File your first report',
+      helper: 'Finalize a job report so it is saved to the customer record.',
+      complete: onboardingFiledReportCount > 0,
+      actionLabel: openJobs.length > 0 ? 'View jobs' : 'Create job',
+      onAction: openReportOnboardingWorkspace,
+    },
+  ];
+  const completedContractorOnboardingCount = contractorOnboardingItems.filter(item => item.complete).length;
+  const showContractorOnboardingChecklist = completedContractorOnboardingCount < contractorOnboardingItems.length;
   const selectedJobsSubject = {
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
@@ -14738,6 +14832,46 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </div>
           </div>
+
+          {showContractorOnboardingChecklist && (
+            <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-blue-950">Get started with ServSync</p>
+                  <p className="mt-1 text-sm leading-5 text-blue-800">
+                    Follow the core workflow once, then this checklist gets out of the way.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit items-center rounded-full bg-white px-2.5 py-1 text-xs font-bold text-blue-800 shadow-sm">
+                  {completedContractorOnboardingCount} of {contractorOnboardingItems.length} complete
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {contractorOnboardingItems.map(item => (
+                  <div key={item.label} className="flex flex-col gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 gap-2">
+                      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                        item.complete ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-slate-50 text-slate-400'
+                      }`}>
+                        {item.complete ? <CheckCircle2 size={14} /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className={`break-words text-sm font-semibold ${item.complete ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-950'}`}>
+                          {item.label}
+                        </p>
+                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{item.helper}</p>
+                      </div>
+                    </div>
+                    {!item.complete && (
+                      <button type="button" onClick={item.onAction} className={`${buttonClass('secondary')} shrink-0 justify-center bg-white`}>
+                        {item.actionLabel}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <OverviewCard icon={<MessageSquare size={18} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
