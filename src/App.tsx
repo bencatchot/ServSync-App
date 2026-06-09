@@ -200,6 +200,7 @@ type StarterEstimateTemplate = {
 };
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
+type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
@@ -6356,6 +6357,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [filingEstimateId, setFilingEstimateId] = useState<string | null>(null);
   const [homeownerRecordSearch, setHomeownerRecordSearch] = useState('');
   const [homeownerRecordSection, setHomeownerRecordSection] = useState<HomeownerRecordSection | null>(null);
+  const [homeownerRecordPropertyScope, setHomeownerRecordPropertyScope] = useState<HomeownerRecordPropertyScope>('selected');
   const [homeownerRecordContractorFilter, setHomeownerRecordContractorFilter] = useState('all');
   const [homeownerRecordSort, setHomeownerRecordSort] = useState<'newest' | 'oldest'>('newest');
   const [updatingAppointmentRequestId, setUpdatingAppointmentRequestId] = useState<string | null>(null);
@@ -7706,11 +7708,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       description: '',
     });
   };
-  const needsReviewEstimates = estimates.filter(estimate => estimate.status === 'sent');
-  const acceptedEstimates = estimates.filter(estimate => estimate.status === 'accepted');
-  const closedEstimateRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
-  const openInvoiceRecords = invoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
-  const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
+  const selectedPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
+  const unassignedEstimateCount = estimates.filter(estimate => !estimate.home_id).length;
+  const unassignedInvoiceCount = invoices.filter(invoice => !invoice.home_id).length;
+  const unassignedRecordCount = unassignedEstimateCount + unassignedInvoiceCount;
+  const homeownerRecordPropertyMatches = (record: Pick<Estimate | Invoice, 'home_id'>) => {
+    if (homeownerRecordPropertyScope === 'all') return true;
+    if (homeownerRecordPropertyScope === 'unassigned') return !record.home_id;
+    return selectedHomeId ? record.home_id === selectedHomeId : !record.home_id;
+  };
+  const propertyScopedEstimates = estimates.filter(homeownerRecordPropertyMatches);
+  const propertyScopedInvoices = invoices.filter(homeownerRecordPropertyMatches);
+  const needsReviewEstimates = propertyScopedEstimates.filter(estimate => estimate.status === 'sent');
+  const acceptedEstimates = propertyScopedEstimates.filter(estimate => estimate.status === 'accepted');
+  const closedEstimateRecords = propertyScopedEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
+  const openInvoiceRecords = propertyScopedInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
+  const closedInvoiceRecords = propertyScopedInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
   const homeownerRecordContractorName = (contractorId: string) => {
     const connection = connections.find(item => item.contractor_id === contractorId) ?? null;
     const directoryContractor = directoryContractors.find(contractor => contractor.id === contractorId) ?? null;
@@ -7718,7 +7731,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const homeownerRecordContractors = Array.from(
     new Map(
-      [...estimates.map(estimate => estimate.contractor_id), ...invoices.map(invoice => invoice.contractor_id)]
+      [...propertyScopedEstimates.map(estimate => estimate.contractor_id), ...propertyScopedInvoices.map(invoice => invoice.contractor_id)]
         .map(contractorId => [contractorId, homeownerRecordContractorName(contractorId)] as const)
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
@@ -7782,7 +7795,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       : selectedHomeownerRecordSection === 'accepted'
         ? visibleAcceptedEstimates.length
         : visibleClosedInvoiceRecords.length + visibleClosedEstimateRecords.length;
-  const homeownerHasAnyEstimateInvoiceRecords = estimates.length > 0 || invoices.length > 0;
+  const homeownerHasAnyPropertyScopedRecords = propertyScopedEstimates.length > 0 || propertyScopedInvoices.length > 0;
+  const homeownerRecordScopeLabel = homeownerRecordPropertyScope === 'all'
+    ? 'all properties'
+    : homeownerRecordPropertyScope === 'unassigned'
+      ? 'unassigned records'
+      : selectedHomeId
+        ? selectedPropertyLabel
+        : 'unassigned records';
   const sumEstimateCents = (items: Estimate[]) => items.reduce((total, estimate) => total + (estimate.total_cents || 0), 0);
   const sumInvoiceCents = (items: Invoice[]) => items.reduce((total, invoice) => total + (invoice.total_cents || 0), 0);
   const homeownerRecordSectionTiles: Array<{
@@ -7832,6 +7852,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
   ];
   const selectedHomeownerRecordTile = homeownerRecordSectionTiles.find(tile => tile.id === selectedHomeownerRecordSection) ?? homeownerRecordSectionTiles[0];
+  const selectedHomeownerRecordEmptyText = homeownerRecordPropertyScope === 'selected' && selectedHomeId && !homeownerHasAnyPropertyScopedRecords
+    ? 'No estimates or invoices for this property yet.'
+    : homeownerRecordPropertyScope === 'unassigned' && !homeownerHasAnyPropertyScopedRecords
+      ? 'No unassigned estimates or invoices.'
+      : selectedHomeownerRecordTile.emptyText;
   const homeownerRecordTileChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', active: boolean) => {
     const tones = {
       attention: active
@@ -8162,6 +8187,49 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </p>
         </div>
 
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px] lg:items-end">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">Showing records for: {homeownerRecordScopeLabel}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Use All properties to see every record, or Unassigned to find older estimates and invoices that are not tied to a property yet.
+              </p>
+            </div>
+            <Field label="Show">
+              <select
+                className={inputClass()}
+                value={homeownerRecordPropertyScope}
+                onChange={event => {
+                  setHomeownerRecordPropertyScope(event.target.value as HomeownerRecordPropertyScope);
+                  setViewingEstimateId(null);
+                  setViewingInvoiceId(null);
+                }}
+              >
+                <option value="selected">Selected property</option>
+                <option value="all">All properties</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+            </Field>
+          </div>
+          {homeownerRecordPropertyScope === 'selected' && unassignedRecordCount > 0 && (
+            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+              <span>Some older records are not assigned to a property yet.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setHomeownerRecordPropertyScope('unassigned');
+                  setViewingEstimateId(null);
+                  setViewingInvoiceId(null);
+                }}
+                className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
+              >
+                View Unassigned
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {homeownerRecordSectionTiles.map(tile => {
             const active = tile.id === selectedHomeownerRecordSection;
@@ -8231,7 +8299,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
         </div>
 
-        {homeownerHasAnyEstimateInvoiceRecords && homeownerRecordFiltersActive && selectedHomeownerRecordCount === 0 ? (
+        {homeownerHasAnyPropertyScopedRecords && homeownerRecordFiltersActive && selectedHomeownerRecordCount === 0 ? (
           <EmptyState text="No records match your filters." />
         ) : (
           renderHomeownerRecordsSection(
@@ -8243,7 +8311,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 : selectedHomeownerRecordSection === 'accepted'
                   ? 'Approved estimates and any linked job or invoice status ServSync can show.'
                   : 'Paid invoices, void invoices, and estimates that are no longer active.',
-            selectedHomeownerRecordTile.emptyText,
+            selectedHomeownerRecordEmptyText,
             selectedHomeownerRecordChildren,
             selectedHomeownerRecordTile.tone
           )
