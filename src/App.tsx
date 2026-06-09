@@ -16614,12 +16614,52 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         tone: upcomingAppts.length > 0 ? 'blue' : 'slate',
                       },
                     ];
-                    const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
-                    const workspaceSubjectFilterId = conn?.connection_id ?? (localCustomer ? `local:${localCustomer.id}` : '');
-                    const isStartingWorkOrderForThisSubject = inspectionView === 'new' && (
-                      (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
-                      || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
-                    );
+	                    const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
+	                    const workspaceSubjectFilterId = conn?.connection_id ?? (localCustomer ? `local:${localCustomer.id}` : '');
+	                    const headerStatusLabel = isConn
+	                      ? 'Connected homeowner'
+	                      : localCustomerIsClaimed
+	                        ? 'Claimed local customer'
+	                        : 'Local customer';
+	                    const headerStatusClass = isConn
+	                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+	                      : localCustomerIsClaimed
+	                        ? 'bg-blue-50 text-blue-700 ring-blue-200'
+	                        : localClaimStatus === 'pending'
+	                          ? 'bg-amber-50 text-amber-700 ring-amber-200'
+	                          : 'bg-slate-100 text-slate-600 ring-slate-200';
+	                    const headerContactItems = [
+	                      headerAddress || (conn ? 'Address not shared' : 'No address on file'),
+	                      headerCity,
+	                      conn && perm?.share_contact ? formatPhoneNumber(conn.phone) : '',
+	                      !isConn && localCustomer?.phone ? formatPhoneNumber(localCustomer.phone) : '',
+	                      !isConn && localCustomer?.email ? localCustomer.email : '',
+	                    ].filter(Boolean);
+	                    const compactHeaderActionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60';
+	                    const beginWorkspaceJob = () => {
+	                      if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
+	                      else if (localCustomer) beginFieldWorkForLocalContact(localCustomer);
+	                    };
+	                    const beginWorkspaceEstimate = () => {
+	                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+	                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+	                    };
+	                    const beginWorkspaceInvoice = () => {
+	                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+	                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+	                    };
+	                    const handleLocalInviteAction = () => {
+	                      if (!localCustomer) return;
+	                      if (pendingLocalClaimInvite || localCustomerIsClaimed) {
+	                        setHomeownerDetailTab('profile');
+	                      } else {
+	                        void createLocalCustomerClaimInvite(localCustomer);
+	                      }
+	                    };
+	                    const isStartingWorkOrderForThisSubject = inspectionView === 'new' && (
+	                      (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
+	                      || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
+	                    );
                     const recentWorkOrders = workOrderRecords.slice(0, 3);
                     const recentInspections = inspectionRecords.slice(0, 3);
                     const recentRequests = connReqs.slice(0, 3);
@@ -16718,23 +16758,73 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                     return (
                       <>
-                        <div className="bg-white border-b border-slate-200 px-6 py-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h2 className="font-bold text-slate-950 text-xl">{headerName}</h2>
-                              <p className="mt-1 text-sm text-slate-500">{headerAddress || (conn ? 'Address not shared' : 'No address on file')}</p>
-                              {headerCity && <p className="text-xs text-slate-400">{headerCity}</p>}
-                            </div>
-                          </div>
-                          {propertyScopeEnabled && (
-                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="flex flex-wrap items-end justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property context</p>
-                                  <p className="mt-1 text-sm font-bold text-slate-950">
-                                    Working on: {workspacePropertyContext}
-                                  </p>
-                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
+	                        <div className="bg-white border-b border-slate-200 px-4 py-3 sm:px-5">
+	                          <div className="flex flex-wrap items-start justify-between gap-3">
+	                            <div className="min-w-0">
+	                              <div className="flex flex-wrap items-center gap-2">
+	                                <h2 className="truncate text-lg font-bold text-slate-950">{headerName}</h2>
+	                                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${headerStatusClass}`}>
+	                                  {headerStatusLabel}
+	                                </span>
+	                              </div>
+	                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+	                                {headerContactItems.map((item, index) => (
+	                                  <span key={`${item}-${index}`} className="min-w-0 truncate">{item}</span>
+	                                ))}
+	                              </div>
+	                            </div>
+	                            <div className="flex flex-wrap items-center gap-2">
+	                              <button
+	                                type="button"
+	                                onClick={beginWorkspaceJob}
+	                                className={`${compactHeaderActionClass} border-blue-600 bg-blue-600 text-white hover:bg-blue-700`}
+	                              >
+	                                <Plus size={14} />
+	                                Create job
+	                              </button>
+	                              <button
+	                                type="button"
+	                                onClick={beginWorkspaceEstimate}
+	                                className={`${compactHeaderActionClass} border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50`}
+	                              >
+	                                <Receipt size={14} />
+	                                Estimate
+	                              </button>
+	                              <button
+	                                type="button"
+	                                onClick={beginWorkspaceInvoice}
+	                                className={`${compactHeaderActionClass} border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50`}
+	                              >
+	                                <Receipt size={14} />
+	                                Invoice
+	                              </button>
+	                              {!isConn && localCustomer && (
+	                                <button
+	                                  type="button"
+	                                  disabled={creatingLocalClaimInviteId === localCustomer.id || localCustomerIsClaimed}
+	                                  onClick={handleLocalInviteAction}
+	                                  className={`${compactHeaderActionClass} border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50`}
+	                                  title={localCustomerIsClaimed ? 'This local customer has already claimed their homeowner account.' : undefined}
+	                                >
+	                                  {localCustomerIsClaimed
+	                                    ? 'Claimed'
+	                                    : pendingLocalClaimInvite
+	                                      ? 'View invite'
+	                                      : creatingLocalClaimInviteId === localCustomer.id
+	                                        ? 'Creating...'
+	                                        : 'Invite to ServSync'}
+	                                </button>
+	                              )}
+	                            </div>
+	                          </div>
+	                          {propertyScopeEnabled && (
+	                            <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+	                              <div className="flex flex-wrap items-center justify-between gap-2">
+	                                <div className="min-w-0">
+	                                  <p className="text-sm font-bold text-slate-950">
+	                                    Working on: {workspacePropertyContext}
+	                                  </p>
+	                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
                                     <p className="mt-1 text-xs text-slate-500">These records are not assigned to a property.</p>
                                   )}
                                   {homeownerWorkspacePropertyScope !== 'unassigned' && workspaceUnassignedRecordCount > 0 && (
@@ -16742,24 +16832,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                 </div>
                                 {showWorkspacePropertyControls ? (
-                                  <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-none">
-                                    <Field label="View">
-                                      <select
-                                        className={inputClass()}
-                                        value={homeownerWorkspacePropertyScope}
-                                        onChange={event => setHomeownerWorkspacePropertyScope(event.target.value as ContractorHomeownerPropertyScope)}
-                                      >
+	                                  <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-none">
+	                                    <label className="grid gap-1">
+	                                      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">View</span>
+	                                      <select
+	                                        className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+	                                        value={homeownerWorkspacePropertyScope}
+	                                        onChange={event => setHomeownerWorkspacePropertyScope(event.target.value as ContractorHomeownerPropertyScope)}
+	                                      >
                                         <option value="selected">Selected property</option>
                                         <option value="all">All properties</option>
                                         <option value="unassigned">Unassigned</option>
-                                      </select>
-                                    </Field>
-                                    <Field label="Property">
-                                      <select
-                                        className={inputClass()}
-                                        value={selectedWorkspaceHomeId}
-                                        onChange={event => {
-                                          setSelectedHomeownerWorkspaceHomeId(event.target.value);
+	                                      </select>
+	                                    </label>
+	                                    <label className="grid gap-1">
+	                                      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Property</span>
+	                                      <select
+	                                        className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+	                                        value={selectedWorkspaceHomeId}
+	                                        onChange={event => {
+	                                          setSelectedHomeownerWorkspaceHomeId(event.target.value);
                                           setHomeownerWorkspacePropertyScope('selected');
                                         }}
                                       >
@@ -16768,38 +16860,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             {connectedHomeOptionLabel(home, index)}
                                           </option>
                                         ))}
-                                      </select>
-                                    </Field>
-                                  </div>
-                                ) : (
-                                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+	                                      </select>
+	                                    </label>
+	                                  </div>
+	                                ) : (
+	                                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
                                     {connectedHomes.length === 1 ? 'Single property' : 'Selected property'}
                                   </span>
                                 )}
-                              </div>
-                            </div>
-                          )}
-                          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                            {tabs.map(t => (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => setHomeownerDetailTab(t.id)}
-                                className={`rounded-xl border p-3 text-left transition ${
-                                  activeTabId === t.id
-                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                                    : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300 hover:bg-blue-50'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className={`rounded-lg p-1.5 ${activeTabId === t.id ? 'bg-blue-500 text-white' : t.tone === 'amber' ? 'bg-amber-100 text-amber-700' : t.tone === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{t.icon}</span>
-                                  <span className="text-lg font-bold">{t.value}</span>
-                                </div>
-                                <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${activeTabId === t.id ? 'text-blue-50' : 'text-slate-700'}`}>{t.label}</p>
-                                <p className={`mt-1 text-xs ${activeTabId === t.id ? 'text-blue-50' : 'text-slate-500'}`}>{t.helper}</p>
-                              </button>
-                            ))}
-                          </div>
+	                              </div>
+	                            </div>
+	                          )}
+	                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+	                            {tabs.map(t => (
+	                              <button
+	                                key={t.id}
+	                                type="button"
+	                                onClick={() => setHomeownerDetailTab(t.id)}
+	                                title={t.helper}
+	                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+	                                  activeTabId === t.id
+	                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+	                                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+	                                }`}
+	                              >
+	                                <span className={`${activeTabId === t.id ? 'text-white' : t.tone === 'amber' ? 'text-amber-700' : t.tone === 'blue' ? 'text-blue-700' : 'text-slate-500'}`}>{t.icon}</span>
+	                                <span>{t.label}</span>
+	                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${activeTabId === t.id ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{t.value}</span>
+	                              </button>
+	                            ))}
+	                          </div>
                         </div>
 
                         <div className="p-4 sm:p-6">
