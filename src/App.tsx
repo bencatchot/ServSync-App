@@ -15777,7 +15777,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div>
                                             <p className="text-sm font-bold text-slate-950">Homeowner claim invite</p>
                                             <p className="mt-1 text-xs text-slate-600">
-                                              Send this customer a claim link or QR code when they are ready to create their own ServSync homeowner account and confirm the profile/home details you saved.
+                                              Send this customer a link or QR code to create their ServSync account and review the profile/home information you entered.
                                             </p>
                                           </div>
                                           <span className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -15840,7 +15840,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             >
                                               {creatingLocalClaimInviteId === localCustomer.id
                                                 ? 'Creating...'
-                                                : latestLocalClaimInvite ? 'Create New Claim Invite' : 'Invite to Claim Profile'}
+                                                : latestLocalClaimInvite ? 'Create New ServSync Invite' : 'Invite to ServSync'}
                                             </button>
                                             {localClaimStatus && latestLocalClaimInvite && (
                                               <p className="text-xs text-slate-500">
@@ -15971,7 +15971,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           ? 'View Claim Invite'
                                           : creatingLocalClaimInviteId === localCustomer.id
                                             ? 'Creating...'
-                                            : 'Invite to Claim Profile'}
+                                            : 'Invite to ServSync'}
                                     </button>
                                   )}
                                 </div>
