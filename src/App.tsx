@@ -9928,7 +9928,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </label>
               <p className="mt-2 text-xs text-slate-500">PDF, images, Word docs, and more — up to 50 MB per file.</p>
               <p className="mt-1 text-xs leading-5 text-amber-700">
-                Documents may contain sensitive home information. Store them here for your own records.
+                Private document storage. Files saved here are visible only to you and cannot be shared from this tab. You can upload, download, or delete your own home records here.
               </p>
             </div>
 
