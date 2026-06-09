@@ -221,6 +221,8 @@ type EstimateDraft = {
   terms: string;
   service_request_id: string;
   inspection_id: string;
+  home_id?: string;
+  local_home_id?: string;
   line_items: EstimateLineDraft[];
 };
 type InvoiceDraftForm = {
@@ -232,6 +234,8 @@ type InvoiceDraftForm = {
   service_request_id: string;
   job_id: string;
   estimate_id: string;
+  home_id?: string;
+  local_home_id?: string;
   due_at: string;
   tax: string;
   discount: string;
@@ -298,8 +302,8 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
   viewer: 'Read-only style access for oversight. Deeper restrictions can be added later.',
 };
 
-const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
-const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, discount_cents, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
+const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
+const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, discount_cents, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -437,6 +441,8 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     terms: 'Estimate is valid for 30 days unless otherwise noted. Final pricing may change if site conditions or requested scope changes.',
     service_request_id: '',
     inspection_id: '',
+    home_id: '',
+    local_home_id: '',
     line_items: [createEstimateLineDraft()],
     ...overrides,
   };
@@ -459,6 +465,8 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
     service_request_id: '',
     job_id: '',
     estimate_id: '',
+    home_id: '',
+    local_home_id: '',
     due_at: '',
     tax: '',
     discount: '',
@@ -1233,6 +1241,8 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
     terms: estimate.terms,
     service_request_id: estimate.service_request_id || '',
     inspection_id: estimate.inspection_id || '',
+    home_id: estimate.home_id || '',
+    local_home_id: estimate.local_home_id || '',
     line_items: estimate.line_items?.length
       ? [...estimate.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -1258,6 +1268,8 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
     service_request_id: invoice.service_request_id || '',
     job_id: invoice.job_id || '',
     estimate_id: invoice.estimate_id || '',
+    home_id: invoice.home_id || '',
+    local_home_id: invoice.local_home_id || '',
     due_at: invoice.due_at ? invoice.due_at.slice(0, 10) : '',
     tax: centsToDollars(invoice.tax_cents),
     discount: centsToDollars(invoice.discount_cents),
@@ -3742,6 +3754,46 @@ function serviceRequestPropertyLabel(request: Pick<ServiceRequestSummary, 'home_
   const primary = request.home_label || request.home_address || '';
   if (!primary) return '';
   return request.home_address && request.home_address !== primary ? `${primary} — ${request.home_address}` : primary;
+}
+
+type PropertyContextRecord = {
+  home_id?: string | null;
+  local_home_id?: string | null;
+  home_label?: string | null;
+  home_address?: string | null;
+};
+
+function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
+  if (!home) return '';
+  const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
+  const cityStateZip = [home.city, home.state, home.zip_code].filter(Boolean).join(' ');
+  return [addressLine, cityStateZip].filter(Boolean).join(', ');
+}
+
+function propertyRecordLabel(
+  record: PropertyContextRecord,
+  options: {
+    homes?: Array<HomeProfile | ContractorConnectedHomeownerHome>;
+    localHomes?: ContractorLocalHome[];
+  } = {},
+) {
+  const directPrimary = record.home_label || record.home_address || '';
+  if (directPrimary) {
+    return record.home_address && record.home_address !== directPrimary ? `${directPrimary} — ${record.home_address}` : directPrimary;
+  }
+  const home = record.home_id ? options.homes?.find(candidate => candidate.id === record.home_id) : null;
+  if (home) {
+    const address = compactAddressLabel(home);
+    const primary = home.nickname || home.address_line1 || address || 'Unnamed property';
+    return address && address !== primary ? `${primary} — ${address}` : primary;
+  }
+  const localHome = record.local_home_id ? options.localHomes?.find(candidate => candidate.id === record.local_home_id) : null;
+  if (localHome) {
+    const address = compactAddressLabel(localHome);
+    const primary = localHome.nickname || localHome.address_line1 || address || 'Unnamed property';
+    return address && address !== primary ? `${primary} — ${address}` : primary;
+  }
+  return '';
 }
 
 function currentRoute() {
@@ -7680,6 +7732,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     && homeownerRecordMatchesQuery([
       estimate.title,
       homeownerRecordContractorName(estimate.contractor_id),
+      propertyRecordLabel(estimate, { homes }),
       estimate.scope,
       estimate.notes,
       estimate.terms,
@@ -7691,6 +7744,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     && homeownerRecordMatchesQuery([
       invoice.title,
       homeownerRecordContractorName(invoice.contractor_id),
+      propertyRecordLabel(invoice, { homes }),
       invoice.scope,
       invoice.notes,
       invoice.terms,
@@ -7819,6 +7873,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contractorName = homeownerRecordContractorName(invoice.contractor_id);
     const isOpen = viewingInvoiceId === invoice.id;
     const cardTone = options.showPaymentGuidance ? 'invoice' : 'closed';
+    const propertyLabel = propertyRecordLabel(invoice, { homes });
 
     return (
       <div key={invoice.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
@@ -7835,6 +7890,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               {invoice.issued_at ? ` · Issued ${formatDateTime(invoice.issued_at)}` : ''}
               {invoice.due_at ? ` · Due ${formatDateTime(invoice.due_at)}` : ''}
             </p>
+            {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
           </div>
           <p className="text-2xl font-bold text-slate-950 md:text-right">{formatMoney(invoice.total_cents)}</p>
         </div>
@@ -7927,6 +7983,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
     const isOpen = viewingEstimateId === estimate.id;
     const cardTone = options.needsReview ? 'attention' : options.accepted ? 'accepted' : 'closed';
+    const propertyLabel = propertyRecordLabel(estimate, { homes });
 
     return (
       <div key={estimate.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
@@ -7944,6 +8001,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               )}
             </div>
             <p className="mt-1 text-xs text-slate-500">{contractorName} · Updated {formatDateTime(estimate.updated_at)}</p>
+            {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
           </div>
           <p className="text-2xl font-bold text-slate-950 md:text-right">${(estimate.total_cents / 100).toFixed(2)}</p>
         </div>
@@ -11876,13 +11934,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const beginInvoiceDraftForCustomer = (
     subjectName: string,
-    options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate } = {},
+    options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate; homeId?: string | null; localHomeId?: string | null } = {},
   ) => {
     setEditingInvoiceId(null);
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
       service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id ?? '',
       job_id: options.jobId ?? options.sourceEstimate?.inspection_id ?? '',
       estimate_id: options.estimateId ?? options.sourceEstimate?.id ?? '',
+      home_id: options.homeId ?? options.sourceEstimate?.home_id ?? defaultConnectedHomeId,
+      local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id ?? defaultLocalHomeId,
       scope: options.sourceEstimate?.scope || 'Completed work performed for the customer.',
       line_items: options.sourceEstimate?.line_items?.length
         ? [...options.sourceEstimate.line_items]
@@ -11903,12 +11963,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('inspections');
   };
 
-  const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string } = {}) => {
+  const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string; homeId?: string | null; localHomeId?: string | null } = {}) => {
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
       title: `Estimate — ${subjectName || 'Customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
       service_request_id: options.serviceRequestId ?? '',
       inspection_id: options.inspectionId ?? '',
+      home_id: options.homeId ?? defaultConnectedHomeId,
+      local_home_id: options.localHomeId ?? defaultLocalHomeId,
     }));
     setEstimateAssistantText('');
     setEstimateAssistantNotice('');
@@ -11939,12 +12001,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setSavingEstimate(true);
     try {
       const subtotalCents = estimateTotalCents(usableLines);
+      const property = estimateSourceProperty(estimateDraft);
       const estimatePayload = {
         contractor_id: contractor.id,
         homeowner_user_id: subject.homeownerUserId || null,
         local_contact_id: subject.localContactId || null,
         service_request_id: estimateDraft.service_request_id || null,
         inspection_id: estimateDraft.inspection_id || null,
+        home_id: subject.homeownerUserId ? property.home_id || null : null,
+        local_home_id: subject.localContactId ? property.local_home_id || null : null,
         title: estimateDraft.title.trim(),
         scope: estimateDraft.scope.trim(),
         notes: estimateDraft.notes.trim(),
@@ -12029,6 +12094,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const taxCents = dollarsToCents(invoiceDraft.tax);
       const discountCents = dollarsToCents(invoiceDraft.discount);
       const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+      const property = invoiceSourceProperty(invoiceDraft);
       const invoicePayload = {
         contractor_id: contractor.id,
         homeowner_user_id: subject.homeownerUserId || currentInvoice?.homeowner_user_id || null,
@@ -12036,6 +12102,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         service_request_id: invoiceDraft.service_request_id || null,
         job_id: invoiceDraft.job_id || null,
         estimate_id: invoiceDraft.estimate_id || null,
+        home_id: (subject.homeownerUserId || currentInvoice?.homeowner_user_id) ? property.home_id || null : null,
+        local_home_id: (subject.localContactId || currentInvoice?.local_contact_id) ? property.local_home_id || null : null,
         invoice_number: invoiceDraft.invoice_number.trim(),
         title: invoiceDraft.title.trim(),
         scope: invoiceDraft.scope.trim(),
@@ -12484,6 +12552,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ...builtDraft,
       service_request_id: current.service_request_id,
       inspection_id: current.inspection_id,
+      home_id: current.home_id,
+      local_home_id: current.local_home_id,
     }));
     setEstimateAssistantText('');
     setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
@@ -12784,6 +12854,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const selectedJobsSubject = {
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
+  };
+  const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
+  const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
+  const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
+  const defaultLocalHomeId = selectedJobsLocalContact?.homes?.[0]?.id ?? '';
+  const recordPropertyLabelForContractor = (record: PropertyContextRecord) => propertyRecordLabel(record, {
+    homes: connectedHomesForPropertyLabels,
+    localHomes: localHomesForPropertyLabels,
+  });
+  const estimateSourceProperty = (draft: Pick<EstimateDraft, 'service_request_id' | 'inspection_id' | 'home_id' | 'local_home_id'>) => {
+    const linkedRequest = draft.service_request_id ? serviceRequests.find(request => request.id === draft.service_request_id) : null;
+    const linkedJob = draft.inspection_id ? inspections.find(job => job.id === draft.inspection_id) : null;
+    return {
+      home_id: draft.home_id || linkedRequest?.home_id || linkedJob?.home_id || defaultConnectedHomeId || '',
+      local_home_id: draft.local_home_id || linkedJob?.local_home_id || defaultLocalHomeId || '',
+    };
+  };
+  const invoiceSourceProperty = (draft: Pick<InvoiceDraftForm, 'service_request_id' | 'job_id' | 'estimate_id' | 'home_id' | 'local_home_id'>) => {
+    const linkedRequest = draft.service_request_id ? serviceRequests.find(request => request.id === draft.service_request_id) : null;
+    const linkedJob = draft.job_id ? inspections.find(job => job.id === draft.job_id) : null;
+    const linkedEstimate = draft.estimate_id ? estimates.find(estimate => estimate.id === draft.estimate_id) : null;
+    return {
+      home_id: draft.home_id || linkedRequest?.home_id || linkedJob?.home_id || linkedEstimate?.home_id || defaultConnectedHomeId || '',
+      local_home_id: draft.local_home_id || linkedJob?.local_home_id || linkedEstimate?.local_home_id || defaultLocalHomeId || '',
+    };
   };
   const openJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsOpenJob);
   const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsClosedJob);
@@ -17152,7 +17247,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </Field>
                                       {connReqs.length > 0 && (
                                         <Field label="Attach to request (optional)">
-                                          <select className={inputClass()} value={estimateDraft.service_request_id} onChange={e => setEstimateDraft(d => ({ ...d, service_request_id: e.target.value }))}>
+                                          <select className={inputClass()} value={estimateDraft.service_request_id} onChange={e => {
+                                            const request = connReqs.find(item => item.id === e.target.value);
+                                            setEstimateDraft(d => ({
+                                              ...d,
+                                              service_request_id: e.target.value,
+                                              home_id: request?.home_id || d.home_id,
+                                            }));
+                                          }}>
                                             <option value="">No service request</option>
                                             {connReqs.map(request => <option key={request.id} value={request.id}>{request.title}</option>)}
                                           </select>
@@ -17160,7 +17262,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       )}
                                       {fieldWork.length > 0 && (
                                         <Field label="Attach to job (optional)">
-                                          <select className={inputClass()} value={estimateDraft.inspection_id} onChange={e => setEstimateDraft(d => ({ ...d, inspection_id: e.target.value }))}>
+                                          <select className={inputClass()} value={estimateDraft.inspection_id} onChange={e => {
+                                            const work = fieldWork.find(item => item.id === e.target.value);
+                                            setEstimateDraft(d => ({
+                                              ...d,
+                                              inspection_id: e.target.value,
+                                              home_id: work?.home_id || d.home_id,
+                                              local_home_id: work?.local_home_id || d.local_home_id,
+                                            }));
+                                          }}>
                                             <option value="">No job</option>
                                             {fieldWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
                                           </select>
@@ -17590,6 +17700,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       const lineCount = estimate.line_items?.length ?? 0;
                                       const hasLinkedJob = estimateHasLinkedJob(estimate);
                                       const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                                      const propertyLabel = recordPropertyLabelForContractor(estimate);
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -17603,6 +17714,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <p className="mt-1 text-xs text-slate-500">
                                                 {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(estimate.updated_at)}
                                               </p>
+                                              {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                               {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
                                             </div>
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
@@ -18169,7 +18281,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                           {selectedJobsCustomerWork.length > 0 && (
                             <Field label="Attach to job (optional)">
-                              <select className={inputClass()} value={estimateDraft.inspection_id} onChange={event => setEstimateDraft(d => ({ ...d, inspection_id: event.target.value }))}>
+                              <select className={inputClass()} value={estimateDraft.inspection_id} onChange={event => {
+                                const work = selectedJobsCustomerWork.find(item => item.id === event.target.value);
+                                setEstimateDraft(d => ({
+                                  ...d,
+                                  inspection_id: event.target.value,
+                                  home_id: work?.home_id || d.home_id,
+                                  local_home_id: work?.local_home_id || d.local_home_id,
+                                }));
+                              }}>
                                 <option value="">No job attached</option>
                                 {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
                               </select>
@@ -18352,7 +18472,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
                           {selectedJobsCustomerWork.length > 0 && (
                             <Field label="Attach to job (optional)">
-                              <select className={inputClass()} value={invoiceDraft.job_id} onChange={event => setInvoiceDraft(d => ({ ...d, job_id: event.target.value }))}>
+                              <select className={inputClass()} value={invoiceDraft.job_id} onChange={event => {
+                                const work = selectedJobsCustomerWork.find(item => item.id === event.target.value);
+                                setInvoiceDraft(d => ({
+                                  ...d,
+                                  job_id: event.target.value,
+                                  home_id: work?.home_id || d.home_id,
+                                  local_home_id: work?.local_home_id || d.local_home_id,
+                                }));
+                              }}>
                                 <option value="">No job attached</option>
                                 {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
                               </select>
@@ -18360,7 +18488,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           )}
                           {selectedJobsCustomerEstimates.length > 0 && (
                             <Field label="Attach to estimate (optional)">
-                              <select className={inputClass()} value={invoiceDraft.estimate_id} onChange={event => setInvoiceDraft(d => ({ ...d, estimate_id: event.target.value }))}>
+                              <select className={inputClass()} value={invoiceDraft.estimate_id} onChange={event => {
+                                const estimate = selectedJobsCustomerEstimates.find(item => item.id === event.target.value);
+                                setInvoiceDraft(d => ({
+                                  ...d,
+                                  estimate_id: event.target.value,
+                                  home_id: estimate?.home_id || d.home_id,
+                                  local_home_id: estimate?.local_home_id || d.local_home_id,
+                                }));
+                              }}>
                                 <option value="">No estimate attached</option>
                                 {selectedJobsCustomerEstimates.map(estimate => <option key={estimate.id} value={estimate.id}>{estimate.title}</option>)}
                               </select>
@@ -18509,6 +18645,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                                 const customerServiceLabel = connection?.home?.nickname || local?.homes?.[0]?.nickname || customerAddress;
                                 const lineCount = invoice.line_items?.length ?? 0;
+                                const propertyLabel = recordPropertyLabelForContractor(invoice);
                                 return (
                                   <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -18519,6 +18656,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </div>
                                         <p className="mt-2 font-semibold text-slate-950">{invoice.title || 'Invoice draft'}</p>
                                         <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
+                                        {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                         {invoice.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{invoice.scope}</p>}
                                       </div>
                                       <p className="text-xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
@@ -18619,6 +18757,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                           const hasLinkedJob = estimateHasLinkedJob(estimate);
                           const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                          const propertyLabel = recordPropertyLabelForContractor(estimate);
                           return (
                             <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -18629,6 +18768,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                   <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
+                                  {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                   {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
                                 </div>
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>

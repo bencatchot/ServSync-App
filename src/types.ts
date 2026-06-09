@@ -67,6 +67,10 @@ export interface Estimate {
   local_contact_id: string | null;
   service_request_id: string | null;
   inspection_id: string | null;
+  home_id?: string | null;
+  local_home_id?: string | null;
+  home_label?: string | null;
+  home_address?: string | null;
   title: string;
   scope: string;
   notes: string;
@@ -100,6 +104,10 @@ export interface Invoice {
   service_request_id: string | null;
   job_id: string | null;
   estimate_id: string | null;
+  home_id?: string | null;
+  local_home_id?: string | null;
+  home_label?: string | null;
+  home_address?: string | null;
   invoice_number: string;
   title: string;
   scope: string;
