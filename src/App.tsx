@@ -7622,8 +7622,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contractor = contractorProfileById.get(connection.contractor_id);
     return contractor?.service_categories?.length ? contractor.service_categories : SERVICE_REQUEST_CATEGORIES;
   };
-  const homeownerAttentionRequests = serviceRequests.filter(homeownerRequestNeedsResponse);
-  const openServiceRequests = serviceRequests.filter(request => !['closed', 'declined'].includes(request.status));
+  const dashboardPropertyMatches = (record: { home_id?: string | null }) => selectedHomeId ? record.home_id === selectedHomeId : true;
+  const dashboardServiceRequests = serviceRequests.filter(dashboardPropertyMatches);
+  const dashboardEstimates = estimates.filter(dashboardPropertyMatches);
+  const dashboardInvoices = invoices.filter(dashboardPropertyMatches);
+  const dashboardHomeDocuments = homeDocuments.filter(dashboardPropertyMatches);
+  const dashboardMaintenanceLog = maintenanceLog.filter(dashboardPropertyMatches);
+  const dashboardUnassignedRecordCount = [
+    ...serviceRequests,
+    ...estimates,
+    ...invoices,
+    ...homeDocuments,
+    ...maintenanceLog,
+  ].filter(record => !record.home_id).length;
+  const homeownerAttentionRequests = dashboardServiceRequests.filter(homeownerRequestNeedsResponse);
+  const openServiceRequests = dashboardServiceRequests.filter(request => !['closed', 'declined'].includes(request.status));
   const openServiceRequestCount = openServiceRequests.length;
   const activeServiceRequests = openServiceRequests.slice(0, 4);
   const selectedRequestPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
@@ -7641,19 +7654,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       : selectedHomeId
         ? selectedRequestPropertyLabel
         : 'unassigned requests';
-  const upcomingAppointments = serviceRequests
+  const upcomingAppointments = dashboardServiceRequests
     .filter(request => request.appointment && ['proposed', 'confirmed'].includes(request.appointment.status))
     .slice(0, 3);
   const unreadNotificationCount = notifications.filter(notification => !notification.read_at).length;
   const homeownerActionRequestCount = homeownerAttentionRequests.length;
-  const homeownerCalendarActionCount = serviceRequests.filter(request =>
+  const homeownerCalendarActionCount = dashboardServiceRequests.filter(request =>
     request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'
   ).length;
-  const pendingEstimateCount = estimates.filter(estimate => estimate.status === 'sent').length;
-  const openHomeownerInvoiceCount = invoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)).length;
+  const dashboardNeedsReviewEstimates = dashboardEstimates.filter(estimate => estimate.status === 'sent');
+  const dashboardOpenInvoiceRecords = dashboardInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
+  const pendingEstimateCount = dashboardNeedsReviewEstimates.length;
+  const openHomeownerInvoiceCount = dashboardOpenInvoiceRecords.length;
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
-  const recentLogEntries = maintenanceLog.slice(0, 3);
+  const recentLogEntries = dashboardMaintenanceLog.slice(0, 3);
   const selectedMaintenancePropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedMaintenanceLogCount = maintenanceLog.filter(entry => !entry.home_id).length;
   const homeownerMaintenancePropertyMatches = (entry: Pick<MaintenanceLogEntry, 'home_id'>) => {
@@ -7669,7 +7684,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       : selectedHomeId
         ? selectedMaintenancePropertyLabel
         : 'unassigned history';
-  const recentDocuments = homeDocuments.slice(0, 3);
+  const recentDocuments = dashboardHomeDocuments.slice(0, 3);
   const homeDocumentById = new Map(homeDocuments.map(doc => [doc.id, doc]));
   const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedHomeDocumentCount = homeDocuments.filter(doc => !doc.home_id).length;
@@ -8497,6 +8512,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     );
   };
   const openRequestFromDashboard = (request: ServiceRequestSummary) => {
+    setHomeownerRequestPropertyScope('selected');
     setHomeownerRequestView(homeownerRequestQueueFor(request));
     setExpandedRequestIds(new Set([request.id]));
     setHomeownerTab('requests');
@@ -8511,7 +8527,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     actionLabel: string;
     onAction: () => void;
   }> = [
-    ...needsReviewEstimates.map(estimate => ({
+    ...dashboardNeedsReviewEstimates.map(estimate => ({
       id: `estimate-${estimate.id}`,
       tone: 'amber' as const,
       icon: <Receipt size={17} />,
@@ -8520,13 +8536,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       meta: estimate.title,
       actionLabel: 'Review Estimate',
       onAction: () => {
+        setHomeownerRecordPropertyScope('selected');
         setHomeownerRecordSection('needs_review');
         setViewingInvoiceId(null);
         setViewingEstimateId(estimate.id);
         setHomeownerTab('estimates');
       },
     })),
-    ...openInvoiceRecords.map(invoice => ({
+    ...dashboardOpenInvoiceRecords.map(invoice => ({
       id: `invoice-${invoice.id}`,
       tone: 'blue' as const,
       icon: <Receipt size={17} />,
@@ -8535,6 +8552,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       meta: invoice.title || invoice.invoice_number || 'Invoice',
       actionLabel: 'View Invoice',
       onAction: () => {
+        setHomeownerRecordPropertyScope('selected');
         setHomeownerRecordSection('open_invoices');
         setViewingEstimateId(null);
         setHomeownerTab('estimates');
@@ -8679,7 +8697,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
         {homes.length > 1 && (
           <p className="mt-2 text-xs leading-5 text-blue-800">
-            Dashboard, requests, estimates, invoices, documents, and home history still show account-level records for now. Property-specific filtering will be added as records are linked to individual homes.
+            Dashboard highlights activity for the selected property. Use each tab's All properties or Unassigned view to find older records that are not tied to a property yet.
+          </p>
+        )}
+        {selectedHomeId && dashboardUnassignedRecordCount > 0 && (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+            Some older records are not assigned to a property yet. You can view them from the related tab under Unassigned.
           </p>
         )}
       </section>
@@ -8691,7 +8714,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="p-4 sm:p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Home command center</p>
                 <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
-                  {homeDraft.nickname || 'My Home'}
+                  Dashboard for: {selectedHome?.nickname || homeDraft.nickname || 'My Home'}
                 </h1>
                 <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-600">
                   Request help, track active work, store documents, and keep your home history in one place.
@@ -8701,11 +8724,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <MessageSquare size={16} />
                     Request service
                   </button>
-                  <button type="button" onClick={() => setHomeownerTab('documents')} className={buttonClass('secondary')}>
+                  <button type="button" onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} className={buttonClass('secondary')}>
                     <FolderOpen size={16} />
                     Add document
                   </button>
-                  <button type="button" onClick={() => setHomeownerTab('log')} className={buttonClass('secondary')}>
+                  <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className={buttonClass('secondary')}>
                     <ClipboardList size={16} />
                     Log maintenance
                   </button>
@@ -8713,10 +8736,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
               <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-5 lg:border-l lg:border-t-0">
                 <div className="grid grid-cols-2 gap-2">
-                  <MetricButton label="Open requests" value={String(openServiceRequestCount)} onClick={() => setHomeownerTab('requests')} />
+                  <MetricButton label="Open requests" value={String(openServiceRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerTab('requests'); }} />
                   <MetricButton label="Connected pros" value={String(activeConnections.length)} onClick={() => setHomeownerTab('contractors')} />
                   <MetricButton label="Home profile" value={`${homeProfileScore}%`} onClick={() => setHomeownerTab('home')} />
-                  <MetricButton label="Documents" value={String(homeDocuments.length)} onClick={() => setHomeownerTab('documents')} />
+                  <MetricButton label="Documents" value={String(dashboardHomeDocuments.length)} onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} />
                   <MetricButton label="Support" value={waitingOnHomeownerSupportCount > 0 ? `${waitingOnHomeownerSupportCount} reply` : String(openSupportInquiryCount)} onClick={() => setHomeownerTab('support')} />
                 </div>
                 <button type="button" onClick={() => setHomeownerTab('calendar')} className="mt-3 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50">
@@ -8773,9 +8796,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
-              <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
-              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestView('attention'); setHomeownerTab('requests'); }} />
+              <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
+              <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
+              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerRequestView('attention'); setHomeownerTab('requests'); }} />
               <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
             </div>
           </section>
@@ -8956,7 +8979,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </div>
                   ))
                 )}
-                <button type="button" onClick={() => setHomeownerTab('log')} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                   Open maintenance log
                 </button>
               </div>
@@ -8974,7 +8997,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </div>
                   ))
                 )}
-                <button type="button" onClick={() => setHomeownerTab('documents')} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                <button type="button" onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                   Open documents
                 </button>
               </div>
