@@ -254,6 +254,33 @@ type TradeToolDefinition = {
   inputs: TradeToolInput[];
   buildDraft: (inputValues: Record<string, string>, subjectName: string) => EstimateDraft;
 };
+type LocalCustomerClaimPreview = {
+  invite_id: string;
+  status: LocalCustomerClaimInviteStatus;
+  expires_at: string;
+  contractor: {
+    id: string;
+    business_name: string;
+    city?: string | null;
+    state?: string | null;
+  };
+  contact: {
+    display_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  home: {
+    nickname?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip_code?: string | null;
+    home_type?: string | null;
+    year_built?: string | null;
+    square_feet?: string | null;
+  } | null;
+};
 
 const CONTRACTOR_TEAM_ROLE_LABELS: Record<ContractorTeamRole, string> = {
   admin: 'Admin',
@@ -4995,6 +5022,7 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authMessage, setAuthMessage] = useState('');
+  const claimToken = route === 'homeowner' ? query.get('claim') || '' : '';
 
   useEffect(() => {
     const onHashChange = () => setRouteState(currentRoute());
@@ -5083,6 +5111,14 @@ export default function App() {
           <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
         ) : route === 'home' ? (
           <LandingPage />
+        ) : claimToken ? (
+          <LocalCustomerClaimPage
+            token={claimToken}
+            session={null}
+            profile={null}
+            onAuthed={() => void loadProfile(session)}
+            onClaimed={() => updateRoute('homeowner')}
+          />
         ) : (
           <AuthPage
             role={route === 'admin' ? 'platform_admin' : route === 'contractor' ? 'contractor' : 'homeowner'}
@@ -5104,6 +5140,20 @@ export default function App() {
           onCreated={() => void loadProfile(session)}
         />
         {authMessage && <Notice tone="error" text={authMessage} />}
+      </PublicShell>
+    );
+  }
+
+  if (claimToken) {
+    return (
+      <PublicShell route={route} profile={profile} onSignOut={signOut}>
+        <LocalCustomerClaimPage
+          token={claimToken}
+          session={session}
+          profile={profile}
+          onAuthed={() => void loadProfile(session)}
+          onClaimed={() => updateRoute('homeowner')}
+        />
       </PublicShell>
     );
   }
@@ -5622,6 +5672,479 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LocalCustomerClaimPage({
+  token,
+  session,
+  profile,
+  onAuthed,
+  onClaimed,
+}: {
+  token: string;
+  session: Session | null;
+  profile: Profile | null;
+  onAuthed: () => void;
+  onClaimed: () => void;
+}) {
+  const [preview, setPreview] = useState<LocalCustomerClaimPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(true);
+  const [previewError, setPreviewError] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
+  const [existingHome, setExistingHome] = useState<HomeProfile | null>(null);
+  const [loadingHome, setLoadingHome] = useState(false);
+  const [profileUpdates, setProfileUpdates] = useState({
+    display_name: '',
+    phone: '',
+    city: '',
+    state: '',
+    zip_code: '',
+  });
+  const [homeUpdates, setHomeUpdates] = useState({
+    nickname: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    home_type: '',
+    year_built: '',
+    square_feet: '',
+  });
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimMessage, setClaimMessage] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const prefilledRef = useRef(false);
+
+  useEffect(() => {
+    if (!supabase || !token) return;
+    const client = supabase;
+    let mounted = true;
+    setLoadingPreview(true);
+    setPreviewError('');
+    const loadClaimPreview = async () => {
+      try {
+        const { data, error } = await client.rpc('servsync_lookup_local_customer_claim', { p_token: token });
+        if (!mounted) return;
+        if (error) throw error;
+        const nextPreview = data as LocalCustomerClaimPreview;
+        setPreview(nextPreview);
+        if (!prefilledRef.current) {
+          prefilledRef.current = true;
+          const contactName = nextPreview.contact?.display_name || '';
+          const contactEmail = nextPreview.contact?.email || session?.user.email || '';
+          const contactPhone = nextPreview.contact?.phone || '';
+          const home = nextPreview.home;
+          setFullName(contactName);
+          setEmail(contactEmail);
+          setProfileUpdates({
+            display_name: contactName,
+            phone: contactPhone,
+            city: home?.city || '',
+            state: home?.state || '',
+            zip_code: home?.zip_code || '',
+          });
+          setHomeUpdates({
+            nickname: home?.nickname || 'My Home',
+            address_line1: home?.address_line1 || '',
+            address_line2: home?.address_line2 || '',
+            city: home?.city || '',
+            state: home?.state || '',
+            zip_code: home?.zip_code || '',
+            home_type: home?.home_type || '',
+            year_built: home?.year_built || '',
+            square_feet: home?.square_feet || '',
+          });
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setPreview(null);
+        setPreviewError(readableError(err, 'This invite link is no longer available.'));
+      } finally {
+        if (mounted) setLoadingPreview(false);
+      }
+    };
+    void loadClaimPreview();
+    return () => { mounted = false; };
+  }, [session?.user.email, token]);
+
+  useEffect(() => {
+    if (!supabase || !profile || profile.role !== 'homeowner') return;
+    const client = supabase;
+    let mounted = true;
+    setLoadingHome(true);
+    const loadExistingHome = async () => {
+      try {
+        const { data, error } = await client
+          .from('homes')
+          .select('*')
+          .eq('homeowner_user_id', profile.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (!mounted) return;
+        if (error) throw error;
+        setExistingHome((data as HomeProfile | null) || null);
+      } catch (err) {
+        if (mounted) setClaimError(readableError(err, 'Unable to check your existing home profile.'));
+      } finally {
+        if (mounted) setLoadingHome(false);
+      }
+    };
+    void loadExistingHome();
+    return () => { mounted = false; };
+  }, [profile]);
+
+  const unavailable = previewError || (!loadingPreview && !preview);
+  const contractorName = preview?.contractor?.business_name || 'Your contractor';
+  const contractorLocation = [preview?.contractor?.city, preview?.contractor?.state].filter(Boolean).join(', ');
+
+  const submitAuth = async () => {
+    if (!supabase) return;
+    setAuthBusy(true);
+    setAuthMessage('');
+    try {
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onAuthed();
+        return;
+      }
+      if (!acceptedLegal) {
+        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
+      }
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || profileUpdates.display_name,
+            role: 'homeowner',
+            local_customer_claim: token,
+          },
+        },
+      });
+      if (error) throw error;
+      if (data.session && data.user) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email,
+          full_name: fullName || profileUpdates.display_name || '',
+          role: 'homeowner',
+        });
+        if (profileError) throw profileError;
+        onAuthed();
+      } else {
+        setAuthMessage('Account created. Check your email if Supabase asks you to confirm before signing in, then reopen this invite link.');
+      }
+    } catch (err) {
+      setAuthMessage(readableError(err, 'Unable to complete authentication.'));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const acceptClaim = async () => {
+    if (!supabase || !profile || profile.role !== 'homeowner' || !preview) return;
+    setClaimBusy(true);
+    setClaimMessage('');
+    setClaimError('');
+    try {
+      const useExistingHome = Boolean(existingHome && preview.home);
+      const { error } = await supabase.rpc('servsync_accept_local_customer_claim', {
+        p_token: token,
+        p_home_id: useExistingHome ? existingHome!.id : null,
+        p_profile_updates: {
+          display_name: profileUpdates.display_name.trim(),
+          phone: profileUpdates.phone.trim(),
+          city: profileUpdates.city.trim(),
+          state: profileUpdates.state.trim(),
+          zip_code: profileUpdates.zip_code.trim(),
+        },
+        p_home_updates: !useExistingHome && preview.home ? {
+          nickname: homeUpdates.nickname.trim(),
+          address_line1: homeUpdates.address_line1.trim(),
+          address_line2: homeUpdates.address_line2.trim(),
+          city: homeUpdates.city.trim(),
+          state: homeUpdates.state.trim(),
+          zip_code: homeUpdates.zip_code.trim(),
+          home_type: homeUpdates.home_type.trim(),
+          year_built: homeUpdates.year_built.trim(),
+          square_feet: homeUpdates.square_feet.trim(),
+        } : {},
+      });
+      if (error) throw error;
+      setClaimMessage('Invite accepted. Your ServSync home profile and contractor connection are ready.');
+      window.setTimeout(onClaimed, 700);
+    } catch (err) {
+      setClaimError(readableError(err, 'Unable to accept this invite.'));
+    } finally {
+      setClaimBusy(false);
+    }
+  };
+
+  const declineClaim = async () => {
+    if (!supabase || !profile || profile.role !== 'homeowner') return;
+    const confirmed = window.confirm('Decline this invitation? Your contractor-created local customer record will stay contractor-only.');
+    if (!confirmed) return;
+    setClaimBusy(true);
+    setClaimMessage('');
+    setClaimError('');
+    try {
+      const { error } = await supabase.rpc('servsync_decline_local_customer_claim', { p_token: token });
+      if (error) throw error;
+      setClaimMessage('Invite declined. No homeowner profile data was claimed.');
+      window.setTimeout(onClaimed, 900);
+    } catch (err) {
+      setClaimError(readableError(err, 'Unable to decline this invite.'));
+    } finally {
+      setClaimBusy(false);
+    }
+  };
+
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!authBusy && email && password) void submitAuth();
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-5">
+      <section className="rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">ServSync invitation</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-white">
+          {loadingPreview ? 'Loading your invitation...' : `${contractorName} invited you to join ServSync.`}
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100/80">
+          Review the contact and home information your contractor entered, then decide whether to create or link your homeowner account.
+          You stay in control of your ServSync account and private document storage.
+        </p>
+        {contractorLocation && <p className="mt-3 text-xs font-semibold text-blue-100/70">{contractorLocation}</p>}
+      </section>
+
+      {loadingPreview ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600 shadow-sm">
+          Checking invite link...
+        </div>
+      ) : unavailable ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
+          <p className="text-lg font-bold text-red-900">This invite link is no longer available.</p>
+          <p className="mt-2 text-sm leading-6 text-red-800">Ask your contractor for a new invite.</p>
+          {previewError && <p className="mt-3 text-xs text-red-700">{previewError}</p>}
+        </div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-bold text-slate-950">Invite preview</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">This is the safe information your contractor entered for you to review.</p>
+              <div className="mt-4 space-y-3 text-sm">
+                <InfoBox label="Contractor" value={contractorName} />
+                <InfoBox label="Customer name" value={preview?.contact?.display_name || 'Not provided'} />
+                <InfoBox label="Email" value={preview?.contact?.email || 'Not provided'} />
+                <InfoBox label="Phone" value={formatPhoneNumber(preview?.contact?.phone) || 'Not provided'} />
+                {preview?.home && (
+                  <>
+                    <InfoBox label="Home" value={preview.home.nickname || 'Home'} />
+                    <InfoBox label="Address" value={[preview.home.address_line1, preview.home.address_line2].filter(Boolean).join(', ') || 'Not provided'} />
+                    <InfoBox label="City / State / ZIP" value={[preview.home.city, preview.home.state, preview.home.zip_code].filter(Boolean).join(', ') || 'Not provided'} />
+                    <InfoBox label="Home type" value={preview.home.home_type || 'Not provided'} />
+                  </>
+                )}
+              </div>
+              <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                Contractor private notes, unrelated records, and your private document library are not shown here.
+              </p>
+            </div>
+          </div>
+
+          {!profile ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex rounded-xl bg-slate-100 p-1">
+                {(['signup', 'signin'] as const).map(nextMode => (
+                  <button
+                    key={nextMode}
+                    type="button"
+                    onClick={() => {
+                      setMode(nextMode);
+                      setAuthMessage('');
+                    }}
+                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${mode === nextMode ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {nextMode === 'signup' ? 'Create account' : 'Sign in'}
+                  </button>
+                ))}
+              </div>
+              <form
+                className="space-y-4"
+                onSubmit={event => {
+                  event.preventDefault();
+                  if (!authBusy && email && password) void submitAuth();
+                }}
+              >
+                {mode === 'signup' && (
+                  <Field label="Full name">
+                    <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} onKeyDown={submitOnEnter} />
+                  </Field>
+                )}
+                <Field label="Email">
+                  <input className={inputClass()} type="email" value={email} onChange={event => setEmail(event.target.value)} onKeyDown={submitOnEnter} />
+                </Field>
+                <Field label="Password">
+                  <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
+                </Field>
+                {mode === 'signup' && (
+                  <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={acceptedLegal}
+                      onChange={event => setAcceptedLegal(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+                    />
+                    <span>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/terms`, '_blank', 'noopener,noreferrer')}
+                        className="font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Terms of Service
+                      </button>
+                      {' '}and{' '}
+                      <button
+                        type="button"
+                        onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/privacy`, '_blank', 'noopener,noreferrer')}
+                        className="font-semibold text-blue-700 hover:text-blue-800"
+                      >
+                        Privacy Policy
+                      </button>.
+                    </span>
+                  </label>
+                )}
+                <button type="submit" disabled={authBusy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
+                  <KeyRound size={16} />
+                  {authBusy ? 'Working...' : mode === 'signup' ? 'Create homeowner account' : 'Sign in'}
+                </button>
+                {authMessage && <Notice tone="info" text={authMessage} />}
+              </form>
+              <LegalLinks className="mt-4 text-slate-400" />
+            </div>
+          ) : profile.role !== 'homeowner' ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+              <p className="text-lg font-bold text-amber-950">Use a homeowner account to accept this invite.</p>
+              <p className="mt-2 text-sm leading-6 text-amber-800">You are currently signed in as {ROLE_LABEL[profile.role]}. Sign out and reopen this invite with a homeowner account.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div>
+                <p className="text-sm font-bold text-slate-950">Review and confirm</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Edit details before accepting. ServSync will not overwrite an existing home profile without your choice.</p>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Field label="Your name">
+                  <input className={inputClass()} value={profileUpdates.display_name} onChange={event => setProfileUpdates(current => ({ ...current, display_name: event.target.value }))} />
+                </Field>
+                <Field label="Phone">
+                  <input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={profileUpdates.phone} onChange={event => setProfileUpdates(current => ({ ...current, phone: formatPhoneInputValue(event.target.value) }))} />
+                </Field>
+                <Field label="City">
+                  <input className={inputClass()} value={profileUpdates.city} onChange={event => setProfileUpdates(current => ({ ...current, city: event.target.value }))} />
+                </Field>
+                <Field label="State">
+                  <AutocompleteInput
+                    id="claim-profile-state"
+                    value={profileUpdates.state}
+                    onChange={state => setProfileUpdates(current => ({ ...current, state }))}
+                    options={US_STATE_OPTIONS}
+                    placeholder="Start typing a state..."
+                  />
+                </Field>
+                <Field label="ZIP">
+                  <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={profileUpdates.zip_code} onChange={event => setProfileUpdates(current => ({ ...current, zip_code: event.target.value }))} />
+                </Field>
+              </div>
+
+              {preview?.home && (
+                existingHome ? (
+                  <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm font-bold text-blue-950">You already have a home profile.</p>
+                    <p className="mt-1 text-sm leading-6 text-blue-900">
+                      For now, this invitation will link to your existing home: {existingHome.nickname || existingHome.address_line1 || 'My Home'}.
+                      Multi-property support is coming separately.
+                    </p>
+                    <p className="mt-2 text-xs text-blue-800">No existing home fields will be overwritten by this invite.</p>
+                  </div>
+                ) : (
+                  <div className="mt-5">
+                    <p className="mb-3 text-sm font-bold text-slate-950">Home details</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Home nickname">
+                        <input className={inputClass()} value={homeUpdates.nickname} onChange={event => setHomeUpdates(current => ({ ...current, nickname: event.target.value }))} />
+                      </Field>
+                      <Field label="Address">
+                        <input className={inputClass()} value={homeUpdates.address_line1} onChange={event => setHomeUpdates(current => ({ ...current, address_line1: event.target.value }))} />
+                      </Field>
+                      <Field label="Address line 2">
+                        <input className={inputClass()} value={homeUpdates.address_line2} onChange={event => setHomeUpdates(current => ({ ...current, address_line2: event.target.value }))} />
+                      </Field>
+                      <Field label="City">
+                        <input className={inputClass()} value={homeUpdates.city} onChange={event => setHomeUpdates(current => ({ ...current, city: event.target.value }))} />
+                      </Field>
+                      <Field label="State">
+                        <AutocompleteInput
+                          id="claim-home-state"
+                          value={homeUpdates.state}
+                          onChange={state => setHomeUpdates(current => ({ ...current, state }))}
+                          options={US_STATE_OPTIONS}
+                          placeholder="Start typing a state..."
+                        />
+                      </Field>
+                      <Field label="ZIP">
+                        <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={homeUpdates.zip_code} onChange={event => setHomeUpdates(current => ({ ...current, zip_code: event.target.value }))} />
+                      </Field>
+                      <Field label="Home type">
+                        <AutocompleteInput
+                          id="claim-home-type"
+                          value={homeUpdates.home_type}
+                          onChange={home_type => setHomeUpdates(current => ({ ...current, home_type }))}
+                          options={HOME_TYPE_OPTIONS}
+                          placeholder="Single family"
+                        />
+                      </Field>
+                      <Field label="Year built">
+                        <input className={inputClass()} value={homeUpdates.year_built} onChange={event => setHomeUpdates(current => ({ ...current, year_built: event.target.value }))} />
+                      </Field>
+                      <Field label="Square feet">
+                        <input className={inputClass()} value={homeUpdates.square_feet} onChange={event => setHomeUpdates(current => ({ ...current, square_feet: event.target.value }))} />
+                      </Field>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {loadingHome && <p className="mt-3 text-xs text-slate-500">Checking your existing home profile...</p>}
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" disabled={claimBusy || loadingHome} onClick={() => void acceptClaim()} className={buttonClass('primary')}>
+                  {claimBusy ? 'Working...' : existingHome && preview?.home ? 'Accept and link to my existing home' : 'Accept and create/link my profile'}
+                </button>
+                <button type="button" disabled={claimBusy} onClick={() => void declineClaim()} className={buttonClass('secondary')}>
+                  Decline invite
+                </button>
+              </div>
+              {claimMessage && <div className="mt-4"><Notice tone="success" text={claimMessage} /></div>}
+              {claimError && <div className="mt-4"><Notice tone="error" text={claimError} /></div>}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -11937,9 +12460,29 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     : templateLibraryView === 'estimate'
       ? filteredCustomEstimateTemplates.length
       : filteredStarterTemplates.length + filteredStarterEstimateTemplates.length;
-  const fieldWorkForHomeowner = (homeownerUserId: string) => inspections
-    .filter(insp => insp.homeowner_user_id === homeownerUserId)
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const localContactIdsForHomeowner = (homeownerUserId: string) => new Set(
+    localContacts
+      .filter(contact => contact.homeowner_user_id === homeownerUserId)
+      .map(contact => contact.id)
+  );
+  const fieldWorkForHomeowner = (homeownerUserId: string) => {
+    const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
+    return inspections
+      .filter(insp => insp.homeowner_user_id === homeownerUserId || (insp.local_contact_id ? linkedLocalContactIds.has(insp.local_contact_id) : false))
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  };
+  const estimatesForHomeowner = (homeownerUserId: string) => {
+    const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
+    return estimates
+      .filter(estimate => estimate.homeowner_user_id === homeownerUserId || (estimate.local_contact_id ? linkedLocalContactIds.has(estimate.local_contact_id) : false))
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  };
+  const invoicesForHomeowner = (homeownerUserId: string) => {
+    const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
+    return invoices
+      .filter(invoice => invoice.homeowner_user_id === homeownerUserId || (invoice.local_contact_id ? linkedLocalContactIds.has(invoice.local_contact_id) : false))
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  };
   const fieldWorkForLocalContact = (localContactId: string) => inspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -11962,12 +12505,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ? fieldWorkForLocalContact(selectedJobsLocalContact.id)
       : inspections;
   const selectedJobsCustomerEstimates = selectedJobsConnection
-    ? estimates.filter(estimate => estimate.homeowner_user_id === selectedJobsConnection.homeowner_user_id)
+    ? estimatesForHomeowner(selectedJobsConnection.homeowner_user_id)
     : selectedJobsLocalContact
       ? estimates.filter(estimate => estimate.local_contact_id === selectedJobsLocalContact.id)
       : estimates;
   const selectedJobsCustomerInvoices = selectedJobsConnection
-    ? invoices.filter(invoice => invoice.homeowner_user_id === selectedJobsConnection.homeowner_user_id)
+    ? invoicesForHomeowner(selectedJobsConnection.homeowner_user_id)
     : selectedJobsLocalContact
       ? invoices.filter(invoice => invoice.local_contact_id === selectedJobsLocalContact.id)
       : invoices;
@@ -14914,11 +15457,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
         const activeConnList = connections.filter(c => c.status === 'active');
         const inactiveConnList = connections.filter(c => c.status === 'declined' || c.status === 'revoked');
+        const unclaimedLocalContacts = localContacts.filter(contact => !contact.homeowner_user_id && !contact.claimed_at);
 
         const activeSubjects: Subject[] = [
           ...connectionRequests.map(r => ({ kind: 'request' as const, id: `request:${r.id}`, request: r })),
           ...activeConnList.map(c => ({ kind: 'connection' as const, id: c.connection_id, isActive: true, connection: c })),
-          ...localContacts.map(c => ({ kind: 'local' as const, id: `local:${c.id}`, contact: c })),
+          ...unclaimedLocalContacts.map(c => ({ kind: 'local' as const, id: `local:${c.id}`, contact: c })),
         ];
         const inactiveSubjects: Subject[] = inactiveConnList.map(c => ({ kind: 'connection' as const, id: c.connection_id, isActive: false, connection: c }));
 
@@ -15220,7 +15764,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const inspectionRecords = fieldWork.filter(isInspectionLikeFieldWork);
                     const workOrderRecords = fieldWork.filter(work => !isInspectionLikeFieldWork(work));
                     const subjectEstimates = conn
-                      ? estimates.filter(estimate => estimate.homeowner_user_id === conn.homeowner_user_id)
+                      ? estimatesForHomeowner(conn.homeowner_user_id)
                       : localCustomer
                         ? estimates.filter(estimate => estimate.local_contact_id === localCustomer.id)
                         : [];
