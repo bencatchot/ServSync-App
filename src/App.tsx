@@ -341,6 +341,7 @@ const STORAGE_KEYS = {
   contractorSelectedHomeowner: 'servsync.contractor.selectedHomeowner',
   contractorHomeownerDetailTab: 'servsync.contractor.homeownerDetailTab',
   contractorHomeownerRequestView: 'servsync.contractor.homeownerRequestView',
+  contractorJobsCustomerFilter: 'servsync.contractor.jobsCustomerFilter',
   contractorJobsView: 'servsync.contractor.jobsView',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
@@ -11113,6 +11114,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
   const [selectedHomeownerWorkspaceHomeId, setSelectedHomeownerWorkspaceHomeId] = useState('');
+  const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
   const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
@@ -11310,6 +11312,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       window.localStorage.removeItem(STORAGE_KEYS.contractorSelectedHomeowner);
     }
   }, [selectedHomeownerSubjectId]);
+
+  useEffect(() => {
+    if (jobsCustomerFilterSubjectId) {
+      window.localStorage.setItem(STORAGE_KEYS.contractorJobsCustomerFilter, jobsCustomerFilterSubjectId);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.contractorJobsCustomerFilter);
+    }
+  }, [jobsCustomerFilterSubjectId]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorHomeownerDetailTab, homeownerDetailTab);
@@ -12477,7 +12487,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const openInvoiceRecord = (invoice: Invoice) => {
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
-    setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
     setContractorTab('inspections');
     setInspectionView('list');
     setHomeownerWorkspaceEstimateView(invoice.status === 'draft' ? 'draft' : 'sent');
@@ -12667,9 +12677,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       if (job.homeowner_user_id) {
         const connection = connections.find(item => item.homeowner_user_id === job.homeowner_user_id);
-        if (connection) setSelectedHomeownerSubjectId(connection.connection_id);
+        if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
       } else if (job.local_contact_id) {
-        setSelectedHomeownerSubjectId(`local:${job.local_contact_id}`);
+        setJobsCustomerFilterSubjectId(`local:${job.local_contact_id}`);
       }
 
       openInspection(job);
@@ -13035,14 +13045,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const fieldWorkForLocalContact = (localContactId: string) => inspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-  const selectedJobsConnection = selectedHomeownerSubjectId
+  const selectedJobsConnection = jobsCustomerFilterSubjectId
     ? connections.find(connection =>
-      connection.connection_id === selectedHomeownerSubjectId
-      || connection.homeowner_user_id === selectedHomeownerSubjectId
+      connection.connection_id === jobsCustomerFilterSubjectId
+      || connection.homeowner_user_id === jobsCustomerFilterSubjectId
     ) ?? null
     : null;
-  const selectedJobsLocalContact = selectedHomeownerSubjectId?.startsWith('local:')
-    ? localContacts.find(contact => `local:${contact.id}` === selectedHomeownerSubjectId) ?? null
+  const selectedJobsLocalContact = jobsCustomerFilterSubjectId?.startsWith('local:')
+    ? localContacts.find(contact => `local:${contact.id}` === jobsCustomerFilterSubjectId) ?? null
     : null;
   const selectedJobsCustomerName = selectedJobsConnection?.display_name || selectedJobsLocalContact?.display_name || '';
   const selectedJobsCustomerAddress = selectedJobsConnection
@@ -13070,6 +13080,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const openLinkedJobForEstimate = async (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => {
     const linkedJob = jobForEstimate(estimate);
     if (linkedJob) {
+      if (linkedJob.homeowner_user_id) {
+        const connection = connections.find(item => item.homeowner_user_id === linkedJob.homeowner_user_id);
+        if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
+      } else if (linkedJob.local_contact_id) {
+        setJobsCustomerFilterSubjectId(`local:${linkedJob.local_contact_id}`);
+      }
       openInspection(linkedJob);
       setNotice('Opened the job linked to this accepted estimate.');
       return;
@@ -13089,6 +13105,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     const job = data as Inspection;
     setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
+    if (job.homeowner_user_id) {
+      const connection = connections.find(item => item.homeowner_user_id === job.homeowner_user_id);
+      if (connection) setJobsCustomerFilterSubjectId(connection.connection_id);
+    } else if (job.local_contact_id) {
+      setJobsCustomerFilterSubjectId(`local:${job.local_contact_id}`);
+    }
     openInspection(job);
     setNotice('Opened the job linked to this accepted estimate.');
   };
@@ -13161,6 +13183,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const defaultHome = options?.homeId
       ? connectedHomeList(connection).find(home => home.id === options.homeId) ?? connectedHomeList(connection)[0] ?? connection.home ?? null
       : connectedHomeList(connection)[0] ?? connection.home ?? null;
+    setJobsCustomerFilterSubjectId(connection.connection_id);
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
@@ -13184,6 +13207,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
+    setJobsCustomerFilterSubjectId(`local:${contact.id}`);
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
@@ -13573,6 +13597,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (jobTypeError) throw jobTypeError;
       const savedRooms = ((updatedJobData as Partial<Inspection> | null)?.rooms_with_findings ?? seedFindings)
         .map((room, index) => normalizeInspectionRoomData(room, index));
+      const nextJobsFilterSubjectId = inspectionNewDraft.subject_type === 'connected'
+        ? connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id)?.connection_id ?? ''
+        : inspectionNewDraft.subject_type === 'local'
+          ? `local:${inspectionNewDraft.local_contact_id}`
+          : '';
       const newInspection: Inspection = {
         id: newInspectionId,
         contractor_id: contractor?.id || '',
@@ -13618,6 +13647,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspectionClosedForReview(false);
       setSelectedChecklistRoom(activeRoomSeed[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
+      if (nextJobsFilterSubjectId) setJobsCustomerFilterSubjectId(nextJobsFilterSubjectId);
       setInspectionSubTab(isSimpleJobDraft ? 'inspect' : 'checklist');
       setInspectionView('detail');
       setContractorJobsView('open_jobs');
@@ -13903,10 +13933,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         const conn = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
         if (conn) {
           setSelectedHomeownerSubjectId(conn.connection_id);
+          setJobsCustomerFilterSubjectId(conn.connection_id);
           setHomeownerFilter(conn.status === 'active' ? 'active' : 'inactive');
         }
       } else if (insp.local_contact_id) {
         setSelectedHomeownerSubjectId(`local:${insp.local_contact_id}`);
+        setJobsCustomerFilterSubjectId(`local:${insp.local_contact_id}`);
         setHomeownerFilter('active');
       }
       setContractorJobsView('open_jobs');
@@ -14486,8 +14518,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             if (estimate?.homeowner_user_id) {
               const connection = connections.find(candidate => candidate.homeowner_user_id === estimate.homeowner_user_id);
               if (connection) {
-                setSelectedHomeownerSubjectId(connection.connection_id);
-                setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
+                setJobsCustomerFilterSubjectId(connection.connection_id);
                 setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
                 setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
                 setContractorTab('inspections');
@@ -14495,8 +14526,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               }
             }
             if (estimate?.local_contact_id) {
-              setSelectedHomeownerSubjectId(`local:${estimate.local_contact_id}`);
-              setHomeownerFilter('active');
+              setJobsCustomerFilterSubjectId(`local:${estimate.local_contact_id}`);
               setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
               setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
               setContractorTab('inspections');
@@ -16585,6 +16615,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       },
                     ];
                     const activeTabId = tabs.some(t => t.id === homeownerDetailTab) ? homeownerDetailTab : 'profile';
+                    const workspaceSubjectFilterId = conn?.connection_id ?? (localCustomer ? `local:${localCustomer.id}` : '');
                     const isStartingWorkOrderForThisSubject = inspectionView === 'new' && (
                       (isConn && conn && inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id === conn.homeowner_user_id)
                       || (!isConn && localCustomer && inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id === localCustomer.id)
@@ -16618,6 +16649,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         icon: <ClipboardCheck size={16} />,
                         tone: workOrderDraftCount > 0 ? 'amber' : 'emerald',
                         onClick: () => {
+                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setContractorJobsView(workOrderDraftCount > 0 ? 'open_jobs' : 'new_jobs');
                           setContractorTab('inspections');
                         },
@@ -16629,6 +16661,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         icon: <ClipboardList size={16} />,
                         tone: inspectionDraftCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
+                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setContractorJobsView(inspectionDraftCount > 0 ? 'open_jobs' : 'new_jobs');
                           setContractorTab('inspections');
                         },
@@ -16640,6 +16673,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         icon: <Receipt size={16} />,
                         tone: estimateRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftEstimateCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
+                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setHomeownerWorkspaceEstimateView(estimateRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftEstimateCount > 0 ? 'draft' : 'sent');
                           setContractorJobsView(estimateRecords.length > 0 ? 'open_financial' : 'new_financial');
                           setContractorTab('inspections');
@@ -16652,6 +16686,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         icon: <Receipt size={16} />,
                         tone: invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftInvoiceCount > 0 ? 'amber' : 'slate',
                         onClick: () => {
+                          if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                           setHomeownerWorkspaceEstimateView(invoiceRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftInvoiceCount > 0 ? 'draft' : 'sent');
                           setContractorJobsView(invoiceRecords.length > 0 ? 'open_financial' : 'new_financial');
                           setContractorTab('inspections');
@@ -16908,7 +16943,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <h3 className="font-bold text-slate-950">Recent jobs</h3>
                                       <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
+                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentWorkOrders.length === 0 ? (
                                     <EmptyState text="No jobs yet for this workspace." />
@@ -16949,7 +16984,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <h3 className="font-bold text-slate-950">Recent inspections</h3>
                                       <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed</p>
                                     </div>
-                                    <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
+                                    <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentInspections.length === 0 ? (
                                     <EmptyState text="No inspection jobs yet for this workspace." />
@@ -17258,7 +17293,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined })}
+                                    onClick={() => {
+                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+                                    }}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
@@ -17267,7 +17305,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined })}
+                                    onClick={() => {
+                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+                                    }}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
@@ -17283,7 +17324,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <h4 className="text-sm font-bold text-slate-950">Jobs in progress</h4>
                                         <p className="mt-1 text-xs text-slate-500">{workOrderRecords.length + inspectionRecords.length} total job record{workOrderRecords.length + inspectionRecords.length === 1 ? '' : 's'}</p>
                                       </div>
-                                      <button type="button" onClick={() => { setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Jobs</button>
+                                      <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Jobs</button>
                                     </div>
                                     {[...workOrderRecords, ...inspectionRecords].slice(0, 5).length === 0 ? (
                                       <EmptyState text="No job records yet for this customer." />
@@ -17319,7 +17360,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <h4 className="text-sm font-bold text-slate-950">Estimates and invoices</h4>
                                         <p className="mt-1 text-xs text-slate-500">{estimateRecords.length + invoiceRecords.length} financial record{estimateRecords.length + invoiceRecords.length === 1 ? '' : 's'}</p>
                                       </div>
-                                      <button type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open financials</button>
+                                      <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open financials</button>
                                     </div>
                                     {[...estimateRecords, ...invoiceRecords].slice(0, 5).length === 0 ? (
                                       <EmptyState text="No estimates or invoices yet for this customer." />
@@ -17328,7 +17369,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         {[...estimateRecords, ...invoiceRecords].slice(0, 5).map(record => {
                                           const propertyLabel = recordPropertyLabelForContractor(record);
                                           return (
-                                            <button key={record.id} type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                            <button key={record.id} type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                   <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
@@ -18487,9 +18528,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Customer filter</label>
                     <select
                       className={inputClass()}
-                      value={selectedHomeownerSubjectId ?? ''}
+                      value={jobsCustomerFilterSubjectId ?? ''}
                       onChange={event => {
-                        setSelectedHomeownerSubjectId(event.target.value || null);
+                        setJobsCustomerFilterSubjectId(event.target.value || null);
                       }}
                     >
                       <option value="">All customers</option>
@@ -18512,8 +18553,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="grid gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Inspection or service work', icon: <Plus size={15} /> },
-                        { id: 'open_jobs', label: 'Open Jobs', value: String(selectedHomeownerSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
-                        { id: 'closed_jobs', label: 'Closed Jobs', value: String(selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
+                        { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
+                        { id: 'closed_jobs', label: 'Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -18551,8 +18592,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="grid gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
-                        { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} /> },
-                        { id: 'closed_financial', label: 'Closed Estimates / Invoices', value: String((selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Closed estimates and billed invoices', icon: <Receipt size={15} /> },
+                        { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} /> },
+                        { id: 'closed_financial', label: 'Closed Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Closed estimates and billed invoices', icon: <Receipt size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -18617,8 +18658,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <Field label="Customer">
                         <select
                           className={inputClass()}
-                          value={selectedHomeownerSubjectId ?? ''}
-                          onChange={event => setSelectedHomeownerSubjectId(event.target.value || null)}
+                          value={jobsCustomerFilterSubjectId ?? ''}
+                          onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
                         >
                           <option value="">Choose customer...</option>
                           {connections.filter(c => c.status === 'active').map(c => (
@@ -19007,11 +19048,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <Card title={contractorJobsView === 'open_financial' ? 'Open estimates and invoices' : 'Closed / billed records'} icon={<Receipt size={18} />}>
                   {(() => {
                     const records = contractorJobsView === 'open_financial'
-                      ? (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)) : openFinancialRecords)
-                      : (selectedHomeownerSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)) : closedFinancialRecords);
+                      ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)) : openFinancialRecords)
+                      : (jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)) : closedFinancialRecords);
                     const invoiceRecordsForView = contractorJobsView === 'open_financial'
-                      ? (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
-                      : (selectedHomeownerSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
+                      ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
+                      : (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
                     if (records.length === 0 && invoiceRecordsForView.length === 0) {
                       return <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />;
                     }
@@ -19086,7 +19127,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                            setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                             setEditingInvoiceId(invoice.id);
                                             setInvoiceDraft(invoiceDraftFromInvoice(invoice));
                                             setInvoiceComposerOpen(true);
@@ -19188,7 +19229,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                        setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                         setEditingEstimateId(estimate.id);
                                         setEstimateDraft(estimateDraftFromEstimate(estimate));
                                         setEstimateAssistantText('');
@@ -19211,7 +19252,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setSelectedHomeownerSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : selectedHomeownerSubjectId));
+                                        setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                         if (linkedInvoice) openInvoiceRecord(linkedInvoice);
                                         else void createInvoiceFromEstimate(estimate);
                                       }}
@@ -19253,8 +19294,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'} icon={<ClipboardCheck size={18} />}>
                   {(() => {
                     const records = contractorJobsView === 'open_jobs'
-                      ? (selectedHomeownerSubjectId ? openJobsForSelectedCustomer : openJobs)
-                      : (selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.slice(0, 10) : closedJobs.slice(0, 10));
+                      ? (jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer : openJobs)
+                      : (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.slice(0, 10) : closedJobs.slice(0, 10));
                     if (records.length === 0) {
                       return <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} />;
                     }
@@ -19327,7 +19368,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           );
                         })}
-                        {contractorJobsView === 'closed_jobs' && (selectedHomeownerSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
+                        {contractorJobsView === 'closed_jobs' && (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
                           <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
                             Showing the 10 most recent closed jobs. Search and deeper filters can be added as this list grows.
                           </p>
