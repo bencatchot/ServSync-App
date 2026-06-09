@@ -7899,7 +7899,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         ? 'border-slate-300 bg-slate-50 shadow-md ring-1 ring-slate-200 before:bg-slate-400'
         : 'border-slate-300 bg-white shadow-sm hover:border-slate-400 hover:shadow-md before:bg-slate-400',
     };
-    return `relative overflow-hidden rounded-xl border p-4 transition before:absolute before:inset-y-0 before:left-0 before:w-1.5 ${tones[tone]}`;
+    return `relative overflow-hidden rounded-xl border p-3 transition before:absolute before:inset-y-0 before:left-0 before:w-1.5 sm:p-4 ${tones[tone]}`;
   };
 
   const renderHomeownerInvoiceCard = (invoice: Invoice, options: { showPaymentGuidance?: boolean } = {}) => {
@@ -7915,7 +7915,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
+              <p className="min-w-0 break-words font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>
                 {invoiceStatusLabel(invoice.status)}
               </span>
@@ -7927,7 +7927,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </p>
             {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
           </div>
-          <p className="text-2xl font-bold text-slate-950 md:text-right">{formatMoney(invoice.total_cents)}</p>
+          <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">{formatMoney(invoice.total_cents)}</p>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
@@ -8025,7 +8025,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-bold text-slate-950">{estimate.title}</p>
+              <p className="min-w-0 break-words font-bold text-slate-950">{estimate.title}</p>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${estimate.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : estimate.status === 'declined' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
                 {estimate.status}
               </span>
@@ -8038,7 +8038,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <p className="mt-1 text-xs text-slate-500">{contractorName} · Updated {formatDateTime(estimate.updated_at)}</p>
             {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
           </div>
-          <p className="text-2xl font-bold text-slate-950 md:text-right">${(estimate.total_cents / 100).toFixed(2)}</p>
+          <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">${(estimate.total_cents / 100).toFixed(2)}</p>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
@@ -8255,15 +8255,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 className={homeownerRecordTileChrome(tile.tone, active)}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold">{tile.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{tile.helper}</p>
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-bold">{tile.title}</p>
+                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">{tile.helper}</p>
                   </div>
-                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm">
+                  <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm">
                     {tile.count}
                   </span>
                 </div>
-                <p className="mt-3 text-lg font-bold">{formatMoney(tile.totalCents)}</p>
+                <p className="mt-2 break-words text-base font-bold sm:text-lg">{formatMoney(tile.totalCents)}</p>
               </button>
             );
           })}
@@ -10445,8 +10445,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
                         }`}
                       >
-                        <p className={`text-xs font-semibold uppercase tracking-[0.12em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
-                        <p className="mt-1 text-xl font-bold">{section.requests.length}</p>
+	                        <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
+	                        <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
                       </button>
                     );
                   })}
@@ -10513,15 +10513,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           {propertyScopedMaintenanceLog.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total jobs logged</p>
-                <p className="mt-1 text-2xl font-bold text-slate-950">{propertyScopedMaintenanceLog.length}</p>
+	                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Total jobs logged</p>
+	                <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedMaintenanceLog.length}</p>
               </div>
               {(() => {
                 const total = propertyScopedMaintenanceLog.reduce((s, e) => s + (e.cost_cents ?? 0), 0);
                 return total > 0 ? (
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Total cost tracked</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-950">${(total / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+	                    <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Total cost tracked</p>
+	                    <p className="mt-1 break-words text-xl font-bold text-slate-950 sm:text-2xl">${(total / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                   </div>
                 ) : null;
               })()}
@@ -15830,8 +15830,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
                     }`}
                   >
-                    <p className={`text-xs font-semibold uppercase tracking-[0.12em] ${activeContractorRequestView === 'overview' ? 'text-blue-50' : 'text-slate-500'}`}>Dashboard</p>
-                    <p className="mt-1 text-xl font-bold">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status)).length}</p>
+	                    <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${activeContractorRequestView === 'overview' ? 'text-blue-50' : 'text-slate-500'}`}>Dashboard</p>
+	                    <p className="mt-1 text-lg font-bold sm:text-xl">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status)).length}</p>
                   </button>
                   {requestSections.map(section => {
                     const active = section.id === activeContractorRequestView;
@@ -15846,8 +15846,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
                         }`}
                       >
-                        <p className={`text-xs font-semibold uppercase tracking-[0.12em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
-                        <p className="mt-1 text-xl font-bold">{section.requests.length}</p>
+	                        <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
+	                        <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
                       </button>
                     );
                   })}
@@ -15857,18 +15857,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="grid gap-3 lg:grid-cols-3">
                       <button type="button" onClick={() => setContractorRequestView('new')} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">First priority</p>
-                        <p className="mt-0.5 text-xl font-bold text-slate-950">{requestSections.find(s => s.id === 'new')?.requests.length ?? 0}</p>
+	                        <p className="mt-0.5 text-lg font-bold text-slate-950 sm:text-xl">{requestSections.find(s => s.id === 'new')?.requests.length ?? 0}</p>
                         <p className="mt-0.5 text-xs leading-4 text-slate-500">New requests need an initial response.</p>
                       </button>
                       <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left shadow-sm transition hover:border-amber-300">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-700">Follow-up signals</p>
-                        <p className="mt-0.5 text-xl font-bold text-amber-950">{followUpRequests.length}</p>
-                        <p className="mt-0.5 text-xs leading-4 text-amber-800">Open requests with homeowner replies, accepted quotes, or requested times.</p>
+	                        <p className="mt-0.5 text-lg font-bold text-amber-950 sm:text-xl">{followUpRequests.length}</p>
+	                        <p className="mt-0.5 break-words text-xs leading-4 text-amber-800">Open requests with homeowner replies, accepted quotes, or requested times.</p>
                       </button>
                       <button type="button" onClick={() => setContractorRequestView('open')} className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Appointment activity</p>
-                        <p className="mt-0.5 text-xl font-bold text-slate-950">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
-                        <p className="mt-0.5 text-xs leading-4 text-slate-500">Scheduled and proposed appointments inside open requests.</p>
+	                        <p className="mt-0.5 text-lg font-bold text-slate-950 sm:text-xl">{requestPhaseServiceRequests.filter(r => !['closed', 'declined'].includes(r.status) && r.appointment).length}</p>
+	                        <p className="mt-0.5 break-words text-xs leading-4 text-slate-500">Scheduled and proposed appointments inside open requests.</p>
                       </button>
                     </div>
 
@@ -16635,7 +16635,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                      !isConn && localCustomer?.phone ? formatPhoneNumber(localCustomer.phone) : '',
 	                      !isConn && localCustomer?.email ? localCustomer.email : '',
 	                    ].filter(Boolean);
-	                    const compactHeaderActionClass = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60';
+		                    const compactHeaderActionClass = 'inline-flex min-h-9 max-w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-center text-xs font-semibold leading-4 transition disabled:cursor-not-allowed disabled:opacity-60';
 	                    const beginWorkspaceJob = () => {
 	                      if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
 	                      else if (localCustomer) beginFieldWorkForLocalContact(localCustomer);
@@ -16762,14 +16762,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                          <div className="flex flex-wrap items-start justify-between gap-3">
 	                            <div className="min-w-0">
 	                              <div className="flex flex-wrap items-center gap-2">
-	                                <h2 className="truncate text-lg font-bold text-slate-950">{headerName}</h2>
+		                                <h2 className="min-w-0 break-words text-lg font-bold leading-6 text-slate-950">{headerName}</h2>
 	                                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${headerStatusClass}`}>
 	                                  {headerStatusLabel}
 	                                </span>
 	                              </div>
 	                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
 	                                {headerContactItems.map((item, index) => (
-	                                  <span key={`${item}-${index}`} className="min-w-0 truncate">{item}</span>
+		                                  <span key={`${item}-${index}`} className="min-w-0 break-words">{item}</span>
 	                                ))}
 	                              </div>
 	                            </div>
@@ -16878,15 +16878,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                                type="button"
 	                                onClick={() => setHomeownerDetailTab(t.id)}
 	                                title={t.helper}
-	                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+	                                className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold leading-4 transition ${
 	                                  activeTabId === t.id
 	                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
 	                                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
 	                                }`}
 	                              >
 	                                <span className={`${activeTabId === t.id ? 'text-white' : t.tone === 'amber' ? 'text-amber-700' : t.tone === 'blue' ? 'text-blue-700' : 'text-slate-500'}`}>{t.icon}</span>
-	                                <span>{t.label}</span>
-	                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${activeTabId === t.id ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{t.value}</span>
+	                                <span className="min-w-0 break-words">{t.label}</span>
+	                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${activeTabId === t.id ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{t.value}</span>
 	                              </button>
 	                            ))}
 	                          </div>
@@ -16908,17 +16908,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     key={card.label}
                                     type="button"
                                     onClick={card.onClick}
-                                    className={`rounded-2xl border p-4 text-left shadow-sm transition hover:shadow-md ${toneClass}`}
+	                                    className={`rounded-xl border p-3 text-left shadow-sm transition hover:shadow-md sm:p-4 ${toneClass}`}
                                   >
                                     <div className="flex items-start justify-between gap-3">
-                                      <div>
-                                        <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">{card.label}</p>
-                                        <p className="mt-1 text-2xl font-bold">{card.value}</p>
-                                      </div>
-                                      <span className="rounded-xl bg-white/75 p-2 shadow-sm">{card.icon}</span>
-                                    </div>
-                                    <p className="mt-2 text-xs font-medium opacity-80">{card.helper}</p>
-                                  </button>
+	                                      <div className="min-w-0">
+	                                        <p className="break-words text-xs font-semibold uppercase tracking-[0.08em] opacity-75">{card.label}</p>
+	                                        <p className="mt-1 break-words text-xl font-bold sm:text-2xl">{card.value}</p>
+	                                      </div>
+	                                      <span className="rounded-xl bg-white/75 p-2 shadow-sm">{card.icon}</span>
+	                                    </div>
+	                                    <p className="mt-2 break-words text-xs font-medium leading-5 opacity-80">{card.helper}</p>
+	                                  </button>
                                 );
                               })}
                             </div>
@@ -18656,19 +18656,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               if (item.id === 'new_jobs') setInspectionView('new');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
-                            className={`rounded-xl border p-3 text-left transition ${
-                              active
-                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
-                              <span className="text-lg font-bold">{item.value}</span>
-                            </div>
-                            <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
-                            <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
-                          </button>
+	                            className={`rounded-xl border p-3 text-left transition ${
+	                              active
+	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+	                            }`}
+	                          >
+	                            <div className="flex items-center justify-between gap-2">
+	                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
+	                              <span className="shrink-0 text-base font-bold sm:text-lg">{item.value}</span>
+	                            </div>
+	                            <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+	                            <p className={`mt-1 break-words text-xs leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+	                          </button>
                         );
                       })}
                     </div>
@@ -18694,19 +18694,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               setContractorJobsView(item.id);
                               setInspectionView('list');
                             }}
-                            className={`rounded-xl border p-3 text-left transition ${
-                              active
-                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
-                              <span className="text-lg font-bold">{item.value}</span>
-                            </div>
-                            <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
-                            <p className={`mt-1 text-xs ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
-                          </button>
+	                            className={`rounded-xl border p-3 text-left transition ${
+	                              active
+	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+	                            }`}
+	                          >
+	                            <div className="flex items-center justify-between gap-2">
+	                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
+	                              <span className="shrink-0 text-base font-bold sm:text-lg">{item.value}</span>
+	                            </div>
+	                            <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+	                            <p className={`mt-1 break-words text-xs leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+	                          </button>
                         );
                       })}
                     </div>
@@ -18732,10 +18732,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className={`rounded-lg p-1.5 ${contractorJobsView === 'templates' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}><ClipboardList size={15} /></span>
-                        <span className="text-lg font-bold">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
-                      </div>
-                      <p className={`mt-2 text-xs font-bold uppercase tracking-[0.1em] ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-600'}`}>Templates</p>
-                      <p className={`mt-1 text-xs ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-500'}`}>Workflow and estimate starters</p>
+	                        <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
+	                      </div>
+	                      <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-600'}`}>Templates</p>
+	                      <p className={`mt-1 break-words text-xs leading-5 ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-500'}`}>Workflow and estimate starters</p>
                     </button>
                   </div>
                 </div>
@@ -19573,16 +19573,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       setShowTemplateLibrary(true);
                       setShowTemplateForm(false);
                     }}
-                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">Your workflow templates</p>
-                        <p className="mt-1 text-xs text-slate-500">Jobs, inspections, and checklist-style templates.</p>
-                      </div>
-                      <span className="text-xl font-bold text-slate-950">{contractorScopedInspectionTemplates.length}</span>
-                    </div>
-                  </button>
+	                    className={`rounded-xl border p-3 text-left transition sm:p-4 ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+	                  >
+	                    <div className="flex items-center justify-between gap-3">
+	                      <div className="min-w-0">
+	                        <p className="break-words text-sm font-bold text-slate-950">Your workflow templates</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Jobs, inspections, and checklist-style templates.</p>
+	                      </div>
+	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{contractorScopedInspectionTemplates.length}</span>
+	                    </div>
+	                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -19591,16 +19591,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       setShowTemplateLibrary(true);
                       setShowTemplateForm(false);
                     }}
-                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">Home templates</p>
-                        <p className="mt-1 text-xs text-slate-500">Layouts saved for a specific customer home.</p>
-                      </div>
-                      <span className="text-xl font-bold text-slate-950">{homeScopedInspectionTemplates.length}</span>
-                    </div>
-                  </button>
+	                    className={`rounded-xl border p-3 text-left transition sm:p-4 ${showTemplateLibrary && templateLibraryView === 'workflow' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+	                  >
+	                    <div className="flex items-center justify-between gap-3">
+	                      <div className="min-w-0">
+	                        <p className="break-words text-sm font-bold text-slate-950">Home templates</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Layouts saved for a specific customer home.</p>
+	                      </div>
+	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{homeScopedInspectionTemplates.length}</span>
+	                    </div>
+	                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -19609,16 +19609,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       setShowTemplateLibrary(true);
                       setShowTemplateForm(false);
                     }}
-                    className={`rounded-xl border p-4 text-left transition ${showTemplateLibrary && templateLibraryView === 'estimate' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">Your estimate templates</p>
-                        <p className="mt-1 text-xs text-slate-500">Reusable pricing, scope, and line item templates.</p>
-                      </div>
-                      <span className="text-xl font-bold text-slate-950">{estimateTemplates.length}</span>
-                    </div>
-                  </button>
+	                    className={`rounded-xl border p-3 text-left transition sm:p-4 ${showTemplateLibrary && templateLibraryView === 'estimate' ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+	                  >
+	                    <div className="flex items-center justify-between gap-3">
+	                      <div className="min-w-0">
+	                        <p className="break-words text-sm font-bold text-slate-950">Your estimate templates</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Reusable pricing, scope, and line item templates.</p>
+	                      </div>
+	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{estimateTemplates.length}</span>
+	                    </div>
+	                  </button>
                 </div>
 
                 {showTemplateForm && (
@@ -20095,14 +20095,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         template_id: '',
                         workflow_kind: 'work_order',
                       }))}
-                      className={`rounded-xl border p-4 text-left transition ${inspectionNewDraft.job_mode === 'simple' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+	                      className={`rounded-xl border p-3 text-left transition sm:p-4 ${inspectionNewDraft.job_mode === 'simple' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
                     >
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-blue-100 p-2 text-blue-700"><ClipboardCheck size={17} /></span>
-                        <span>
-                          <span className="block text-sm font-bold text-slate-950">Service Job</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">For repairs, installs, service calls, and approved work.</span>
-                        </span>
+	                        <span className="min-w-0">
+	                          <span className="block text-sm font-bold text-slate-950">Service Job</span>
+	                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For repairs, installs, service calls, and approved work.</span>
+	                        </span>
                       </div>
                     </button>
                     <button
@@ -20117,14 +20117,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
                         };
                       })}
-                      className={`rounded-xl border p-4 text-left transition ${inspectionNewDraft.job_mode === 'checklist' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+	                      className={`rounded-xl border p-3 text-left transition sm:p-4 ${inspectionNewDraft.job_mode === 'checklist' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
                     >
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-slate-100 p-2 text-slate-700"><ClipboardList size={17} /></span>
-                        <span>
-                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and reports.</span>
-                        </span>
+	                        <span className="min-w-0">
+	                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
+	                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and reports.</span>
+	                        </span>
                       </div>
                     </button>
                   </div>
