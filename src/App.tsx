@@ -108,7 +108,7 @@ import type {
   ServiceRequestUrgency,
 } from './types';
 
-type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement';
+type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement' | 'trust-safety';
 type HomeownerRequestView = 'attention' | 'new' | 'scheduled' | 'closed' | 'declined';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
 type HomeownerWorkspaceRequestView = 'attention' | 'active' | 'closed';
@@ -3654,7 +3654,7 @@ function currentRoute() {
   const [path, query = ''] = rawHash.split('?');
   const route = (path || 'home') as RouteName;
   return {
-    route: ['home', 'homeowner', 'contractor', 'admin', 'profile', 'terms', 'privacy', 'acceptable-use', 'contractor-agreement'].includes(route) ? route : 'home',
+    route: ['home', 'homeowner', 'contractor', 'admin', 'profile', 'terms', 'privacy', 'acceptable-use', 'contractor-agreement', 'trust-safety'].includes(route) ? route : 'home',
     query: new URLSearchParams(query),
   };
 }
@@ -3674,6 +3674,9 @@ function LegalLinks({ contractor = false, className = '' }: { contractor?: boole
           {legalRouteLabel(route)}
         </button>
       ))}
+      <button type="button" onClick={() => updateRoute('trust-safety')} className="font-semibold underline-offset-2 hover:underline">
+        Trust & Safety
+      </button>
     </div>
   );
 }
@@ -3888,6 +3891,68 @@ function TrustSafetyPanel({
         )}
       </div>
     </Card>
+  );
+}
+
+function TrustSafetyPublicPage() {
+  const sections = [
+    {
+      title: 'Homeowners stay in control',
+      body: 'Homeowners choose when to connect with a contractor, request service, and share home information. ServSync is designed around homeowner-initiated sharing.',
+    },
+    {
+      title: 'Discover is homeowner-controlled',
+      body: 'Contractors can post helpful local updates, maintenance tips, and recent work. They cannot directly contact or solicit homeowners through Discover.',
+    },
+    {
+      title: 'Contractor credentials are listed',
+      body: 'License, insurance, or bonded details should be treated as listed information unless ServSync clearly says a future verification program applies.',
+    },
+    {
+      title: 'ServSync is software',
+      body: 'Contractors are responsible for their own work, estimates, invoices, reports, credentials, insurance, and services. Homeowners should evaluate contractors before hiring.',
+    },
+  ];
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-5">
+      <section className="rounded-3xl border border-[#1B85FB]/25 bg-white p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Trust & Safety</p>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950">Plain-language platform guidance</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+          ServSync helps homeowners and contractors organize work together, while keeping homeowner sharing and contractor access boundaries clear.
+          This page is not a compliance certification, background check program, or credential verification program.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => updateRoute('homeowner')} className={buttonClass('primary')}>
+            I'm a homeowner <ArrowRight size={16} />
+          </button>
+          <button type="button" onClick={() => updateRoute('contractor')} className={buttonClass('secondary')}>
+            I'm a contractor <ArrowRight size={16} />
+          </button>
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2">
+        {sections.map(section => (
+          <div key={section.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="font-bold text-slate-950">{section.title}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{section.body}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+        <p className="font-bold text-blue-950">Privacy, data, account, or content questions</p>
+        <p className="mt-2 text-sm leading-6 text-blue-900">
+          Signed-in users can use Privacy & Data Requests or Support for account data questions, export requests, deletion help, document/photo deletion help,
+          or safety/content concerns.
+        </p>
+        <button type="button" onClick={() => updateRoute('privacy')} className={`${buttonClass('secondary')} mt-3 bg-white`}>
+          View Privacy Policy
+        </button>
+      </section>
+    </div>
   );
 }
 
@@ -4893,7 +4958,7 @@ export default function App() {
   if (!supabaseConfigured) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        {route in LEGAL_PAGES ? <LegalPage pageId={route as keyof typeof LEGAL_PAGES} /> : <SetupNotice />}
+        {route === 'trust-safety' ? <TrustSafetyPublicPage /> : route in LEGAL_PAGES ? <LegalPage pageId={route as keyof typeof LEGAL_PAGES} /> : <SetupNotice />}
       </PublicShell>
     );
   }
@@ -4911,7 +4976,9 @@ export default function App() {
   if (!session) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
-        {route in LEGAL_PAGES ? (
+        {route === 'trust-safety' ? (
+          <TrustSafetyPublicPage />
+        ) : route in LEGAL_PAGES ? (
           <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
         ) : route === 'home' ? (
           <LandingPage />
@@ -4919,6 +4986,7 @@ export default function App() {
           <AuthPage
             role={route === 'admin' ? 'platform_admin' : route === 'contractor' ? 'contractor' : 'homeowner'}
             inviteCode={query.get('invite') || ''}
+            initialMode={query.get('mode') === 'signup' ? 'signup' : 'signin'}
             onAuthed={() => void loadProfile(session)}
           />
         )}
@@ -4951,6 +5019,14 @@ export default function App() {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
         <LegalPage pageId={route as keyof typeof LEGAL_PAGES} />
+      </PublicShell>
+    );
+  }
+
+  if (route === 'trust-safety') {
+    return (
+      <PublicShell route={route} profile={profile} onSignOut={signOut}>
+        <TrustSafetyPublicPage />
       </PublicShell>
     );
   }
@@ -5183,32 +5259,78 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 }
 
 function LandingPage() {
+  const steps = [
+    'Homeowner requests service.',
+    'Contractor sends an estimate.',
+    'Homeowner reviews and approves.',
+    'Contractor completes the job or report.',
+    'Invoice and records are saved to the home history.',
+  ];
+
   return (
     <div className="space-y-8">
       <section className="grid gap-8 rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Connect · Manage · Protect</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            One place for homeowners and contractors to connect with permission.
+            Organize home work from request to record.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100/80">
-            Homeowners own their home profile. Contractors own their business profile. ServSync manages the connection,
-            referral, and sharing rules between them.
+            ServSync helps homeowners organize their home, connect with local contractors, request service, review estimates,
+            view invoices, and keep reports, documents, and maintenance history in one place.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button type="button" onClick={() => updateRoute('homeowner')} className={buttonClass('primary')}>
-              Homeowner portal <ArrowRight size={16} />
+            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('primary')}>
+              Create homeowner account <ArrowRight size={16} />
             </button>
-            <button type="button" onClick={() => updateRoute('contractor')} className={buttonClass('secondary')}>
-              Contractor portal <ArrowRight size={16} />
+            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('secondary')}>
+              Create contractor account <ArrowRight size={16} />
             </button>
           </div>
+          <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
+            View Trust & Safety
+          </button>
         </div>
         <div className="grid gap-3">
-          <FeatureRow icon={<UserRound size={18} />} title="Homeowner profile" text="Homeowner controls personal and home details." />
-          <FeatureRow icon={<Building2 size={18} />} title="Contractor profile" text="Business information, services, and credentials." />
-          <FeatureRow icon={<Link2 size={18} />} title="Invite links" text="Contractors can invite homeowners without mass-searching." />
-          <FeatureRow icon={<Lock size={18} />} title="Permission sharing" text="Each connection has its own sharing permissions." />
+          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Build a home record, request service, review estimates and invoices, and control what information gets shared." />
+          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests." />
+          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful updates and recent work. Homeowners choose when to connect." />
+          <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">How ServSync works</p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner loop for home work</h2>
+          </div>
+          <p className="max-w-xl text-sm leading-6 text-slate-600">
+            Requests, estimates, jobs, invoices, reports, documents, and maintenance records stay connected instead of scattered.
+          </p>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-5">
+          {steps.map((step, index) => (
+            <div key={step} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{index + 1}</span>
+              <p className="mt-3 text-sm font-semibold leading-5 text-slate-800">{step}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">Homeowners control sharing</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Connect when you are ready and choose what home information to share with a contractor.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">Discover has boundaries</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors can post helpful updates, but cannot directly solicit homeowners through Discover.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="font-bold text-slate-950">ServSync is software</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors are responsible for their own work, credentials, estimates, invoices, reports, and services.</p>
         </div>
       </section>
     </div>
@@ -5227,8 +5349,8 @@ function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: strin
   );
 }
 
-function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: string; onAuthed: () => void }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>(inviteCode ? 'signup' : 'signin');
+function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole; inviteCode: string; initialMode: 'signin' | 'signup'; onAuthed: () => void }) {
+  const [mode, setMode] = useState<'signin' | 'signup'>(inviteCode || initialMode === 'signup' ? 'signup' : 'signin');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -5288,16 +5410,47 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
     if (!busy && email && password) void submit();
   };
 
+  const signupGuidance = role === 'contractor'
+    ? [
+      'Complete your business profile and service area.',
+      'Choose service categories and decide whether your public profile is visible.',
+      'Start managing jobs, estimates, invoices, reports, and homeowner-initiated requests.',
+    ]
+    : [
+      'Add your home profile and key property details.',
+      'Upload documents or photos you want stored with your home record.',
+      'Find contractors, request service, review estimates, and view invoices.',
+    ];
+
   return (
     <div className="mx-auto max-w-xl">
       <div className="rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm">
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">{ROLE_LABEL[role]}</p>
-          <h1 className="mt-2 text-3xl font-bold text-[#02132D]">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1>
+          <h1 className="mt-2 text-3xl font-bold text-[#02132D]">
+            {mode === 'signin'
+              ? 'Sign in'
+              : role === 'contractor'
+                ? 'Create contractor account'
+                : 'Create homeowner account'}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#223D67]">
+            {role === 'contractor'
+              ? 'Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests.'
+              : 'Organize your home, connect with local contractors, request service, and keep records together.'}
+          </p>
           {inviteCode && (
             <p className="mt-2 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] px-3 py-2 text-sm font-medium text-[#223D67]">
               Contractor referral link detected. You can create your homeowner account without automatically sharing any private information.
             </p>
+          )}
+          {mode === 'signup' && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">After signup</p>
+              <ul className="mt-2 space-y-1 text-sm leading-5 text-blue-950">
+                {signupGuidance.map(item => <li key={item}>- {item}</li>)}
+              </ul>
+            </div>
           )}
         </div>
         <form
@@ -5344,7 +5497,13 @@ function AuthPage({ role, inviteCode, onAuthed }: { role: UserRole; inviteCode: 
           )}
           <button type="submit" disabled={busy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
             <KeyRound size={16} />
-            {busy ? 'Working...' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            {busy
+              ? 'Working...'
+              : mode === 'signin'
+                ? 'Sign in'
+                : role === 'contractor'
+                  ? 'Create contractor account'
+                  : 'Create homeowner account'}
           </button>
           {message && <Notice tone="info" text={message} />}
         </form>
@@ -5412,7 +5571,7 @@ function MissingProfile({
           <select className={inputClass()} value={role} onChange={event => setRole(event.target.value as UserRole)}>
             <option value="homeowner">Homeowner</option>
             <option value="contractor">Contractor</option>
-            <option value="platform_admin">ServSync Admin</option>
+            {requestedRole === 'platform_admin' && <option value="platform_admin">ServSync Admin</option>}
           </select>
         </Field>
         <button type="button" onClick={() => void createProfile()} disabled={busy} className={buttonClass('primary')}>
@@ -22321,22 +22480,25 @@ function ContractorPublicProfilePage({
               {data.license_number && (
                 <div className="flex items-center gap-2 text-slate-700">
                   <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>Licensed · {data.license_number}</span>
+                  <span>License listed · {data.license_number}</span>
                 </div>
               )}
               {data.insurance_status && (
                 <div className="flex items-center gap-2 text-slate-700">
                   <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>Insured · {data.insurance_status}</span>
+                  <span>Insurance listed · {data.insurance_status}</span>
                 </div>
               )}
               {data.bonded_status && (
                 <div className="flex items-center gap-2 text-slate-700">
                   <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-                  <span>Bonded · {data.bonded_status}</span>
+                  <span>Bonded listed · {data.bonded_status}</span>
                 </div>
               )}
             </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              Listed credentials are contractor-provided unless ServSync clearly states otherwise.
+            </p>
           </section>
         )}
       </div>
