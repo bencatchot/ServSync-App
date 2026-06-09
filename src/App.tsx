@@ -25605,6 +25605,12 @@ function CalendarView({
   );
   const confirmed = appointments.filter(({ appointment }) => appointment.status === 'confirmed');
   const completed = appointments.filter(({ appointment }) => appointment.status === 'completed');
+  const calendarSummaryTiles = [
+    { label: 'Upcoming', value: upcoming.length },
+    { label: 'Needs response', value: proposedForMe.length },
+    { label: 'Confirmed', value: confirmed.length },
+    { label: 'Completed', value: completed.length },
+  ];
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -25680,10 +25686,9 @@ function CalendarView({
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <InfoBox label="Upcoming" value={String(upcoming.length)} />
-        <InfoBox label="Needs response" value={String(proposedForMe.length)} />
-        <InfoBox label="Confirmed" value={String(confirmed.length)} />
-        <InfoBox label="Completed" value={String(completed.length)} />
+        {calendarSummaryTiles.map(tile => (
+          <InfoBox key={tile.label} label={tile.label} value={String(tile.value)} />
+        ))}
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
