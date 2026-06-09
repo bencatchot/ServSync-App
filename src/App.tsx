@@ -19413,9 +19413,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   if (!selectedConnection || connectedHomes.length === 0) return null;
                   const selectedHome = connectedHomes.find(home => home.id === inspectionNewDraft.home_id) ?? connectedHomes[0];
                   const propertyLabel = (home: ContractorConnectedHomeownerHome) => {
-                    const label = home.nickname || home.address_line1 || 'Property';
-                    const location = [home.city, home.state].filter(Boolean).join(', ');
-                    return location ? `${label} — ${location}` : label;
+                    const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
+                    const cityStateZip = [home.city, home.state, home.zip_code].filter(Boolean).join(' ');
+                    const address = [addressLine, cityStateZip].filter(Boolean).join(', ');
+                    const primary = home.nickname || addressLine || address || 'Unnamed property';
+                    return address && address !== primary ? `${primary} — ${address}` : primary;
                   };
                   const updateConnectedHome = (homeId: string) => {
                     const nextContext: InspectionTemplateSubjectContext = {
@@ -19457,7 +19459,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                       )}
                       {connectedHomes.length > 1 && (
-                        <p className="mt-1 text-xs text-slate-500">Select the homeowner property this job belongs to.</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Selected property: {selectedHome ? propertyLabel(selectedHome) : 'Property not assigned'}
+                        </p>
                       )}
                     </Field>
                   );
