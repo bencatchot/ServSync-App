@@ -320,6 +320,7 @@ type StoredFieldWorkState = {
 
 const STORAGE_KEYS = {
   homeownerTab: 'servsync.homeowner.activeTab',
+  homeownerSelectedHome: 'servsync.homeowner.selectedHome',
   homeownerRequestView: 'servsync.homeowner.requestView',
   homeownerRequestSearch: 'servsync.homeowner.requestSearch',
   homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
@@ -6210,7 +6211,9 @@ function MissingProfile({
 function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
   const [homeownerTab, setHomeownerTab] = useState<HomeownerTab>(() => storedTab(STORAGE_KEYS.homeownerTab, ['overview', 'home', 'contractors', 'requests', 'calendar', 'estimates', 'log', 'documents', 'discover', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeowner, setHomeowner] = useState<HomeownerProfile | null>(null);
+  const [homes, setHomes] = useState<HomeProfile[]>([]);
   const [home, setHome] = useState<HomeProfile | null>(null);
+  const [selectedHomeId, setSelectedHomeId] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerSelectedHome) ?? '');
   const [homeownerProfilePhotoUrl, setHomeownerProfilePhotoUrl] = useState('');
   const [homePhotoUrl, setHomePhotoUrl] = useState('');
   const [uploadingHomeownerProfilePhoto, setUploadingHomeownerProfilePhoto] = useState(false);
@@ -6296,6 +6299,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   }, [homeownerTab]);
 
   useEffect(() => {
+    if (selectedHomeId) {
+      window.localStorage.setItem(STORAGE_KEYS.homeownerSelectedHome, selectedHomeId);
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.homeownerSelectedHome);
+    }
+  }, [selectedHomeId]);
+
+  useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerRequestView, homeownerRequestView);
   }, [homeownerRequestView]);
 
@@ -6319,7 +6330,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     updated_at: '',
   };
 
-  const homeDraft = home || {
+  const createEmptyHomeDraft = (): HomeProfile => ({
     id: '',
     homeowner_user_id: profile.id,
     nickname: 'My Home',
@@ -6335,7 +6346,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     home_photo_path: '',
     created_at: '',
     updated_at: '',
-  };
+  });
+
+  const selectedHome = homes.find(candidate => candidate.id === selectedHomeId) ?? (home?.id ? home : null);
+  const homeDraft = home || createEmptyHomeDraft();
 
   const signedHomeAssetUrl = useCallback(async (path?: string | null) => {
     if (!supabase || !path) return '';
@@ -6351,7 +6365,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     try {
       const [profileRes, homeRes, connectionsRes, directoryRes, serviceRequestsRes, estimatesRes, invoicesRes, notifRes, logRes, docsRes, supportRes] = await Promise.all([
         supabase.from('homeowner_profiles').select('*').eq('user_id', profile.id).maybeSingle(),
-        supabase.from('homes').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: true }).limit(1).maybeSingle(),
+        supabase.from('homes').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: true }),
         supabase.rpc('servsync_get_homeowner_connections'),
         supabase.from('contractor_profiles').select('*').eq('public_profile_enabled', true).eq('account_status', 'active').order('business_name', { ascending: true }),
         supabase.rpc('servsync_homeowner_service_requests'),
@@ -6369,16 +6383,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (serviceRequestsRes.error) throw serviceRequestsRes.error;
 
       const loadedHomeowner = (profileRes.data as HomeownerProfile | null) || null;
-      const loadedHome = (homeRes.data as HomeProfile | null) || null;
-      const [profilePhotoUrl, homePhotoSignedUrl] = await Promise.all([
-        signedHomeAssetUrl(loadedHomeowner?.profile_photo_path),
-        signedHomeAssetUrl(loadedHome?.home_photo_path),
-      ]);
+      const loadedHomes = (homeRes.data || []) as HomeProfile[];
+      const savedSelectedHomeId = window.localStorage.getItem(STORAGE_KEYS.homeownerSelectedHome) ?? '';
+      const loadedHome = loadedHomes.find(candidate => candidate.id === savedSelectedHomeId) ?? loadedHomes[0] ?? null;
+      const profilePhotoUrl = await signedHomeAssetUrl(loadedHomeowner?.profile_photo_path);
 
       setHomeowner(loadedHomeowner);
+      setHomes(loadedHomes);
+      setSelectedHomeId(loadedHome?.id ?? '');
       setHome(loadedHome);
       setHomeownerProfilePhotoUrl(profilePhotoUrl);
-      setHomePhotoUrl(homePhotoSignedUrl);
       setDirectoryContractors((directoryRes.data || []) as ContractorProfile[]);
       const loadedConnections = (connectionsRes.data || []) as HomeownerConnection[];
       const connectionIds = loadedConnections.map(connection => connection.connection_id);
@@ -6414,6 +6428,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     void loadHomeowner();
   }, [loadHomeowner]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSelectedHomePhoto = async () => {
+      const signedUrl = await signedHomeAssetUrl(home?.home_photo_path);
+      if (!cancelled) setHomePhotoUrl(signedUrl);
+    };
+    void loadSelectedHomePhoto();
+    return () => { cancelled = true; };
+  }, [home?.home_photo_path, signedHomeAssetUrl]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -6790,6 +6814,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       const signedUrl = await signedHomeAssetUrl(storagePath);
       setHome(prev => prev ? { ...prev, home_photo_path: storagePath } : { ...homeDraft, home_photo_path: storagePath });
+      setHomes(prev => prev.map(candidate => candidate.id === homeDraft.id ? { ...candidate, home_photo_path: storagePath } : candidate));
       setHomePhotoUrl(signedUrl);
       setNotice('Home photo uploaded.');
     } catch (err) {
@@ -6831,14 +6856,39 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         notes: homeDraft.notes,
         home_photo_path: homeDraft.home_photo_path || '',
       };
-      const { error: homeError } = await supabase.from('homes').upsert(homePayload).select('*').single();
+      const { data: savedHome, error: homeError } = await supabase.from('homes').upsert(homePayload).select('*').single();
       if (homeError) throw homeError;
+      const normalizedSavedHome = savedHome as HomeProfile;
+      window.localStorage.setItem(STORAGE_KEYS.homeownerSelectedHome, normalizedSavedHome.id);
+      setSelectedHomeId(normalizedSavedHome.id);
+      setHome(normalizedSavedHome);
+      setHomes(prev => {
+        const exists = prev.some(candidate => candidate.id === normalizedSavedHome.id);
+        return exists
+          ? prev.map(candidate => candidate.id === normalizedSavedHome.id ? normalizedSavedHome : candidate)
+          : [...prev, normalizedSavedHome].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+      });
 
-      setNotice('Homeowner profile saved.');
+      setNotice(homeDraft.id ? 'Profile and property saved.' : 'Profile and new property saved.');
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to save homeowner profile.'));
     }
+  };
+
+  const selectHome = (homeId: string) => {
+    const nextHome = homes.find(candidate => candidate.id === homeId) ?? null;
+    if (!nextHome) return;
+    setSelectedHomeId(nextHome.id);
+    setHome(nextHome);
+    setHomeownerTab('home');
+  };
+
+  const startAddProperty = () => {
+    setSelectedHomeId('');
+    setHome(createEmptyHomeDraft());
+    setHomePhotoUrl('');
+    setHomeownerTab('home');
   };
 
   const updatePermissionDraft = (connectionId: string, nextPermissions: SharingPermissions) => {
@@ -8288,7 +8338,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       brand={{ name: 'ServSync', subtitle: 'Homeowner Portal' }}
       tabs={[
         { id: 'overview',     label: 'Dashboard',         icon: <LayoutDashboard size={17} />, group: 'Home' },
-        { id: 'home',         label: 'Home Profile',      icon: <Home size={17} />, group: 'Home' },
+        { id: 'home',         label: 'Properties',        icon: <Home size={17} />, group: 'Home' },
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
         { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
         { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
@@ -8335,6 +8385,49 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {loading && <Notice tone="info" text="Loading homeowner profile..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+
+      <section className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Viewing property</p>
+            <p className="mt-1 truncate text-sm font-bold text-slate-950">
+              {selectedHome?.nickname || homeDraft.nickname || 'No property selected'}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">
+              {[selectedHome?.address_line1 || homeDraft.address_line1, selectedHome?.city || homeDraft.city, selectedHome?.state || homeDraft.state].filter(Boolean).join(', ') || 'Add property details to personalize your home record.'}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              className="min-w-[220px] rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              value={selectedHome?.id || ''}
+              onChange={event => selectHome(event.target.value)}
+            >
+              {homes.length === 0 ? (
+                <option value="">No saved properties yet</option>
+              ) : (
+                <>
+                  {!homeDraft.id && <option value="">New property draft</option>}
+                  {homes.map(candidate => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.nickname || candidate.address_line1 || 'Unnamed property'}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+            <button type="button" onClick={startAddProperty} className={buttonClass('secondary')}>
+              <Plus size={15} />
+              Add property
+            </button>
+          </div>
+        </div>
+        {homes.length > 1 && (
+          <p className="mt-2 text-xs leading-5 text-blue-800">
+            Dashboard, requests, estimates, invoices, documents, and home history still show account-level records for now. Property-specific filtering will be added as records are linked to individual homes.
+          </p>
+        )}
+      </section>
 
       {homeownerTab === 'overview' && (
         <div className="space-y-4">
@@ -8632,6 +8725,59 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'home' && (
         <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="lg:col-span-2">
+          <Card title="Home / Properties" icon={<Home size={18} />}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">Manage the homes connected to your account.</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                  Pick the property you want to view or edit. Existing requests, estimates, invoices, documents, and home history remain account-level in this PR.
+                </p>
+              </div>
+              <button type="button" onClick={startAddProperty} className={buttonClass('primary')}>
+                <Plus size={16} />
+                Add property
+              </button>
+            </div>
+            {homes.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">No saved properties yet.</p>
+                <p className="mt-1 text-sm text-slate-500">Use the property editor below to add your first home record.</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {homes.map(candidate => {
+                  const isSelected = selectedHome?.id === candidate.id;
+                  const address = [candidate.address_line1, candidate.city, candidate.state].filter(Boolean).join(', ');
+                  return (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => selectHome(candidate.id)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        isSelected
+                          ? 'border-blue-300 bg-blue-50 shadow-sm ring-2 ring-blue-100'
+                          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-950">{candidate.nickname || 'Unnamed property'}</p>
+                          <p className="mt-1 truncate text-xs text-slate-500">{address || 'No address added yet'}</p>
+                        </div>
+                        {isSelected && <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">Viewing</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+              Property-specific filtering will be added as requests, documents, estimates, invoices, jobs, reports, and maintenance logs are linked to individual homes.
+            </p>
+          </Card>
+        </div>
+
         <Card title="My profile" icon={<UserRound size={18} />}>
           <PhotoUploadPanel
             title="Profile photo"
@@ -8670,10 +8816,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
         </Card>
 
-        <Card title="My home" icon={<Home size={18} />}>
+        <Card title={homeDraft.id ? 'Selected property' : 'Add property'} icon={<Home size={18} />}>
           <PhotoUploadPanel
             title="Home photo"
-            helper="This can be used as your home image when no profile photo is uploaded."
+            helper="This can be used as the image for the selected property."
             imageUrl={homePhotoUrl}
             fallback={<Home size={24} className="text-[#223D67]/45" />}
             uploading={uploadingHomePhoto}
@@ -8725,7 +8871,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="mt-4">
             <button type="button" onClick={() => void saveHomeownerProfile()} className={buttonClass('primary')}>
               <ClipboardCheck size={16} />
-              Save profile
+              {homeDraft.id ? 'Save profile and property' : 'Save profile and add property'}
             </button>
           </div>
           <div className="mt-4 border-t border-slate-200 pt-4">
