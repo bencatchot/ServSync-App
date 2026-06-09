@@ -5667,6 +5667,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [docUploadNotes, setDocUploadNotes] = useState('');
   const [docUploading, setDocUploading] = useState(false);
   const [docDeletingId, setDocDeletingId] = useState<string | null>(null);
+  const [docPendingDelete, setDocPendingDelete] = useState<HomeDocument | null>(null);
   const [maintenanceLog, setMaintenanceLog] = useState<MaintenanceLogEntry[]>([]);
   const [logFormOpen, setLogFormOpen] = useState(false);
   const [logDraft, setLogDraft] = useState<{ service_request_id: string | null; category: string; title: string; description: string; performed_at: string; contractor_name: string; cost: string; notes: string }>({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
@@ -6115,6 +6116,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error } = await supabase.from('home_documents').delete().eq('id', doc.id);
       if (error) throw error;
       setHomeDocuments(prev => prev.filter(d => d.id !== doc.id));
+      setDocPendingDelete(null);
     } catch (err) {
       setError(readableError(err, 'Unable to delete document.'));
     } finally {
@@ -9880,7 +9882,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="space-y-5">
           <Card title="Home documents" icon={<FolderOpen size={18} />}>
             <p className="text-sm text-slate-500 mb-4">
-              Store warranty documents, job reports, appliance manuals, permits, and other home records in your private homeowner document library. Contractors cannot browse this library through a connection.
+              Private home document storage. Files saved here are for your account only. Connected contractors cannot browse this document library, and there is no share button from this tab. You can upload and download your own home records here.
             </p>
 
             {/* Upload area */}
@@ -9926,7 +9928,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </label>
               <p className="mt-2 text-xs text-slate-500">PDF, images, Word docs, and more — up to 50 MB per file.</p>
               <p className="mt-1 text-xs leading-5 text-amber-700">
-                Private homeowner storage. Contractors cannot see these files from your document library unless you intentionally send a copy through a specific request or message. Home documents may contain sensitive information, so only upload files you have the right to store.
+                Documents may contain sensitive home information. Store them here for your own records.
               </p>
             </div>
 
@@ -9973,7 +9975,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <button
                           type="button"
                           disabled={docDeletingId === doc.id}
-                          onClick={() => void deleteDocument(doc)}
+                          onClick={() => setDocPendingDelete(doc)}
                           className="text-slate-500 hover:text-red-400 transition-colors"
                           title="Delete"
                         >
@@ -9986,6 +9988,46 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
           </Card>
+        </div>
+      )}
+
+      {docPendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <Trash2 size={18} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-slate-950">Delete this document?</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  This will remove the file from your private document library. This action cannot be undone.
+                </p>
+                <p className="mt-3 truncate rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                  {docPendingDelete.file_name}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={docDeletingId === docPendingDelete.id}
+                onClick={() => setDocPendingDelete(null)}
+                className={buttonClass('secondary')}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={docDeletingId === docPendingDelete.id}
+                onClick={() => void deleteDocument(docPendingDelete)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 size={15} />
+                {docDeletingId === docPendingDelete.id ? 'Deleting...' : 'Delete document'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
