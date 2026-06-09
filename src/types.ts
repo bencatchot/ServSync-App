@@ -752,6 +752,9 @@ export interface ServiceRequestSummary {
   homeowner_user_id: string;
   homeowner_name: string;
   homeowner_city: string;
+  home_id: string | null;
+  home_label: string;
+  home_address: string;
   category: string;
   title: string;
   description: string;

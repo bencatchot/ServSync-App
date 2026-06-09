@@ -155,6 +155,7 @@ type RepairEstimateLineDraft = {
 };
 type HomeownerServiceRequestDraft = {
   connection_id: string;
+  home_id: string;
   category: string;
   urgency: ServiceRequestUrgency;
   title: string;
@@ -3712,6 +3713,9 @@ function buildValueAddText(rooms: InspectionRoomData[]): string {
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
   const withDefaults = {
     ...request,
+    home_id: request.home_id ?? null,
+    home_label: request.home_label ?? '',
+    home_address: request.home_address ?? '',
     review_eligible: Boolean(request.review_eligible),
   };
   if (!withDefaults.appointment) return withDefaults;
@@ -3723,6 +3727,21 @@ function normalizeServiceRequestSummary(request: ServiceRequestSummary): Service
       proposed_by: rawAppointment.proposed_by ?? 'contractor',
     },
   };
+}
+
+function homeProfileDisplayLabel(home?: Pick<HomeProfile, 'nickname' | 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
+  if (!home) return 'Property not assigned';
+  const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
+  const cityStateZip = [home.city, home.state, home.zip_code].filter(Boolean).join(' ');
+  const address = [addressLine, cityStateZip].filter(Boolean).join(', ');
+  const primary = home.nickname || addressLine || address || 'Unnamed property';
+  return address && address !== primary ? `${primary} — ${address}` : primary;
+}
+
+function serviceRequestPropertyLabel(request: Pick<ServiceRequestSummary, 'home_label' | 'home_address'>) {
+  const primary = request.home_label || request.home_address || '';
+  if (!primary) return '';
+  return request.home_address && request.home_address !== primary ? `${primary} — ${request.home_address}` : primary;
 }
 
 function currentRoute() {
@@ -4696,6 +4715,8 @@ function serviceRequestSearchText(request: ServiceRequestSummary) {
     request.contractor_name,
     request.homeowner_name,
     request.homeowner_city,
+    request.home_label,
+    request.home_address,
     request.closing_summary,
     request.quote?.scope,
     request.quote?.status,
@@ -6237,6 +6258,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [reconnectDraftConnectionId, setReconnectDraftConnectionId] = useState<string | null>(null);
   const [serviceRequestDraft, setServiceRequestDraft] = useState<HomeownerServiceRequestDraft>({
     connection_id: '',
+    home_id: selectedHomeId,
     category: '',
     urgency: 'normal',
     title: '',
@@ -6351,6 +6373,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const selectedHome = homes.find(candidate => candidate.id === selectedHomeId) ?? (home?.id ? home : null);
   const homeDraft = home || createEmptyHomeDraft();
+
+  useEffect(() => {
+    if (!selectedHomeId) return;
+    setServiceRequestDraft(current => {
+      if ((requestComposerOpen || requestingConnectionId) && current.home_id) return current;
+      return { ...current, home_id: selectedHomeId };
+    });
+  }, [selectedHomeId, requestComposerOpen, requestingConnectionId]);
 
   const signedHomeAssetUrl = useCallback(async (path?: string | null) => {
     if (!supabase || !path) return '';
@@ -7182,6 +7212,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         p_urgency: serviceRequestDraft.urgency,
         p_title: serviceRequestDraft.title,
         p_description: serviceRequestDraft.description,
+        p_home_id: serviceRequestDraft.home_id || selectedHome?.id || null,
       });
       if (requestError) throw requestError;
 
@@ -7191,6 +7222,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       setServiceRequestDraft({
         connection_id: '',
+        home_id: selectedHome?.id || selectedHomeId || '',
         category: '',
         urgency: 'normal',
         title: '',
@@ -7558,6 +7590,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
   const selectedRequestCategories = selectedRequestConnection ? serviceCategoriesForConnection(selectedRequestConnection) : SERVICE_REQUEST_CATEGORIES;
+  const currentServiceRequestHomeId = serviceRequestDraft.home_id || selectedHome?.id || homes[0]?.id || '';
+  const currentServiceRequestHome = homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
+  const renderServiceRequestPropertyField = () => {
+    if (homes.length === 0) return null;
+    return (
+      <Field label="Request for">
+        {homes.length > 1 ? (
+          <select
+            className={inputClass()}
+            value={currentServiceRequestHome?.id || ''}
+            onChange={event => setServiceRequestDraft(current => ({ ...current, home_id: event.target.value }))}
+          >
+            {homes.map(candidate => (
+              <option key={candidate.id} value={candidate.id}>{homeProfileDisplayLabel(candidate)}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+            {homeProfileDisplayLabel(currentServiceRequestHome)}
+          </div>
+        )}
+        <p className="mt-1 text-xs text-slate-500">
+          Selected property: {homeProfileDisplayLabel(currentServiceRequestHome)}
+        </p>
+      </Field>
+    );
+  };
   const applySuggestedServiceCategory = (category: string, options?: { connectionId?: string; allowedCategories?: string[] }) => {
     const allowed = options?.allowedCategories ?? SERVICE_REQUEST_CATEGORIES;
     if (!allowed.some(item => item.toLowerCase() === category.toLowerCase())) return;
@@ -7584,6 +7643,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setServiceProblemText('');
     setServiceRequestDraft({
       connection_id: connection.connection_id,
+      home_id: selectedHome?.id || selectedHomeId || '',
       category: category || categories[0] || 'General Maintenance',
       urgency: 'normal',
       title: '',
@@ -8565,6 +8625,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </select>
                   </Field>
                 </div>
+                {renderServiceRequestPropertyField()}
                 {serviceRequestDraft.category && connectedContractorsForRequest.length === 0 && (
                   <Notice tone="info" text="No connected contractor matches that service yet. You can search the contractor directory next." />
                 )}
@@ -8635,28 +8696,32 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 {activeServiceRequests.length === 0 ? (
                   <EmptyState text="No active service requests." />
                 ) : (
-                  activeServiceRequests.map(request => (
-                    <button
-                      key={request.id}
-                      type="button"
-                      onClick={() => {
-                        setHomeownerRequestView(homeownerRequestQueueFor(request));
-                        setExpandedRequestIds(new Set([request.id]));
-                        setHomeownerTab('requests');
-                      }}
-                      className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-800">{request.title}</p>
-                          <p className="mt-1 text-xs text-slate-500">{request.contractor_name} · {request.category}</p>
+                  activeServiceRequests.map(request => {
+                    const propertyLabel = serviceRequestPropertyLabel(request);
+                    return (
+                      <button
+                        key={request.id}
+                        type="button"
+                        onClick={() => {
+                          setHomeownerRequestView(homeownerRequestQueueFor(request));
+                          setExpandedRequestIds(new Set([request.id]));
+                          setHomeownerTab('requests');
+                        }}
+                        className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800">{request.title}</p>
+                            <p className="mt-1 text-xs text-slate-500">{request.contractor_name} · {request.category}</p>
+                            {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
+                            {serviceRequestStatusLabel(request.status)}
+                          </span>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
-                          {serviceRequestStatusLabel(request.status)}
-                        </span>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </Card>
@@ -8905,6 +8970,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         setServiceProblemText('');
                         setServiceRequestDraft({
                           connection_id: '',
+                          home_id: selectedHome?.id || selectedHomeId || '',
                           category: '',
                           urgency: 'normal',
                           title: '',
@@ -8927,6 +8993,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     allowedCategories: selectedRequestCategories,
                   })}
                 />
+                {renderServiceRequestPropertyField()}
 
                 <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
                   <Field label="Service type">
@@ -9196,6 +9263,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                     setServiceProblemText('');
                                     setServiceRequestDraft({
                                       connection_id: '',
+                                      home_id: selectedHome?.id || selectedHomeId || '',
                                       category: '',
                                       urgency: 'normal',
                                       title: '',
@@ -9228,6 +9296,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                     allowedCategories: connectionServiceCategories,
                                   })}
                                 />
+                                {renderServiceRequestPropertyField()}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   <Field label="Service type">
                                     <select
@@ -9305,6 +9374,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                       setServiceProblemText('');
                                       setServiceRequestDraft({
                                         connection_id: '',
+                                        home_id: selectedHome?.id || selectedHomeId || '',
                                         category: '',
                                         urgency: 'normal',
                                         title: '',
@@ -9381,6 +9451,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
                   {serviceRequestDraft.connection_id ? (
                     <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                      {renderServiceRequestPropertyField()}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <Field label="Urgency">
                           <select
@@ -9546,6 +9617,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onClick={() => {
                     setRequestComposerOpen(true);
                     setRequestingConnectionId(null);
+                    setServiceRequestDraft(current => ({
+                      ...current,
+                      home_id: selectedHome?.id || selectedHomeId || current.home_id,
+                    }));
                   }}
                   className={buttonClass('primary')}
                 >
@@ -9570,6 +9645,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       setNewRequestFiles([]);
                       setServiceRequestDraft({
                         connection_id: '',
+                        home_id: selectedHome?.id || selectedHomeId || '',
                         category: '',
                         urgency: 'normal',
                         title: '',
@@ -9636,6 +9712,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </select>
                   </Field>
                 </div>
+                {renderServiceRequestPropertyField()}
 
                 {serviceRequestDraft.category && connectedContractorsForRequest.length === 0 && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
@@ -9725,6 +9802,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const isExpanded = expandedRequestIds.has(request.id);
               const isUpdating = updatingServiceRequestId === request.id;
               const lastMessage = request.messages[request.messages.length - 1];
+              const propertyLabel = serviceRequestPropertyLabel(request);
               return (
                 <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
                   <button
@@ -9748,6 +9826,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <p className="mt-0.5 text-xs text-slate-500">
                           {request.contractor_name} · {request.category} · {urgencyLabel(request.urgency)} · {formatDateTime(request.updated_at)}
                         </p>
+                        {propertyLabel && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                        )}
                         {!isExpanded && lastMessage && (
                           <p className="mt-1 text-sm text-slate-500 line-clamp-1 italic">"{lastMessage.body}"</p>
                         )}
@@ -12720,7 +12801,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
-  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string };
+  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string; homeId?: string | null };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
     const templateSource: FieldWorkTemplateSource = options?.templateSource ?? (options?.templateId ? 'custom' : options?.starterTemplateId ? 'starter' : 'blank');
     const starterTemplateId = options?.starterTemplateId ?? sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work';
@@ -12731,11 +12812,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
-    const defaultHome = connectedHomeList(connection)[0] ?? connection.home ?? null;
+    const defaultHome = options?.homeId
+      ? connectedHomeList(connection).find(home => home.id === options.homeId) ?? connectedHomeList(connection)[0] ?? connection.home ?? null
+      : connectedHomeList(connection)[0] ?? connection.home ?? null;
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
-      home_id: defaultHome?.id ?? '',
+      home_id: options?.homeId ?? defaultHome?.id ?? '',
       local_contact_id: '',
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
@@ -14302,27 +14385,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </button>
                 ))}
 
-                {recentOpenServiceRequests.map(request => (
-                  <button
-                    key={request.id}
-                    type="button"
-                    onClick={() => openHomeownerWorkspaceForRequest(request)}
-                    className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-800">{request.title}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
-                            {serviceRequestStatusLabel(request.status)}
-                          </span>
+                {recentOpenServiceRequests.map(request => {
+                  const propertyLabel = serviceRequestPropertyLabel(request);
+                  return (
+                    <button
+                      key={request.id}
+                      type="button"
+                      onClick={() => openHomeownerWorkspaceForRequest(request)}
+                      className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-slate-800">{request.title}</p>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
+                              {serviceRequestStatusLabel(request.status)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{request.homeowner_name || 'Homeowner'} · {request.category} · {urgencyLabel(request.urgency)}</p>
+                          {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">{request.homeowner_name || 'Homeowner'} · {request.category} · {urgencyLabel(request.urgency)}</p>
+                        <ArrowRight size={16} className="mt-1 shrink-0 text-slate-400" />
                       </div>
-                      <ArrowRight size={16} className="mt-1 shrink-0 text-slate-400" />
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
 
                 {connectionRequests.length === 0 && homeownerAppointmentRequests.length === 0 && recentOpenServiceRequests.length === 0 && (
                   <EmptyState text="Nothing waiting right now. New requests, connection approvals, and homeowner appointment changes will show here first." />
@@ -14790,6 +14877,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const needsFollowUp = contractorRequestNeedsFollowUp(request);
               const hasAppointment = Boolean(request.appointment);
               const hasQuote = Boolean(request.quote);
+              const propertyLabel = serviceRequestPropertyLabel(request);
               const requestConnection = connections.find(connection =>
                 connection.connection_id === request.connection_id
                 || connection.homeowner_user_id === request.homeowner_user_id
@@ -14835,6 +14923,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="mt-1 text-xs text-slate-500">
                           {request.homeowner_name || 'Homeowner'}{request.homeowner_city ? ` · ${request.homeowner_city}` : ''} · {request.category} · {urgencyLabel(request.urgency)} · {formatDateTime(request.updated_at)}
                         </p>
+                        {propertyLabel && (
+                          <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                        )}
                         {!isExpanded && lastMessage && (
                           <p className="mt-2 text-sm text-slate-600 line-clamp-2">{lastMessage.body}</p>
                         )}
@@ -14860,6 +14951,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         onClick={() => beginFieldWorkForHomeowner(requestConnection, {
                           name: `${request.category} service visit — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
                           serviceRequestId: request.id,
+                          homeId: request.home_id,
                           workflowKind: 'work_order',
                           templateSource: 'blank',
                         })}
@@ -16335,24 +16427,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <EmptyState text="No service requests from this homeowner yet." />
                                     ) : (
                                       <div className="space-y-2">
-                                        {recentRequests.map(request => (
-                                          <button
-                                            key={request.id}
-                                            type="button"
-                                            onClick={() => {
-                                              openContractorRequestInRequestsTab(request);
-                                            }}
-                                            className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
-                                          >
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="min-w-0">
-                                                <p className="font-semibold text-slate-900">{request.title}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{serviceRequestStatusLabel(request.status)} · {request.category} · {formatDateTime(request.updated_at)}</p>
+                                        {recentRequests.map(request => {
+                                          const propertyLabel = serviceRequestPropertyLabel(request);
+                                          return (
+                                            <button
+                                              key={request.id}
+                                              type="button"
+                                              onClick={() => {
+                                                openContractorRequestInRequestsTab(request);
+                                              }}
+                                              className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                                            >
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <p className="font-semibold text-slate-900">{request.title}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{serviceRequestStatusLabel(request.status)} · {request.category} · {formatDateTime(request.updated_at)}</p>
+                                                  {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+                                                </div>
+                                                {contractorRequestNeedsFollowUp(request) && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Follow-up</span>}
                                               </div>
-                                              {contractorRequestNeedsFollowUp(request) && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Follow-up</span>}
-                                            </div>
-                                          </button>
-                                        ))}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>
@@ -16792,17 +16888,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <EmptyState text="No service requests from this homeowner yet." />
                                       ) : (
                                         <div className="grid gap-2 md:grid-cols-2">
-                                          {connReqs.slice(0, 4).map(request => (
-                                            <button
-                                              key={request.id}
-                                              type="button"
-                                              onClick={() => openContractorRequestInRequestsTab(request)}
-                                              className={`rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
-                                            >
-                                              <p className="truncate text-sm font-semibold text-slate-900">{request.title}</p>
-                                              <p className="mt-1 text-xs text-slate-500">{serviceRequestStatusLabel(request.status)} · {request.category}</p>
-                                            </button>
-                                          ))}
+                                          {connReqs.slice(0, 4).map(request => {
+                                            const propertyLabel = serviceRequestPropertyLabel(request);
+                                            return (
+                                              <button
+                                                key={request.id}
+                                                type="button"
+                                                onClick={() => openContractorRequestInRequestsTab(request)}
+                                                className={`rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                                              >
+                                                <p className="truncate text-sm font-semibold text-slate-900">{request.title}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{serviceRequestStatusLabel(request.status)} · {request.category}</p>
+                                                {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       )}
                                     </div>
@@ -17640,6 +17740,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <div className="space-y-2">
                                     {selectedWorkspaceRequestSection.requests.map(request => {
                                       const needsFollowUp = contractorRequestNeedsFollowUp(request);
+                                      const propertyLabel = serviceRequestPropertyLabel(request);
                                       return (
                                         <button key={request.id} type="button" onClick={() => openContractorRequestInRequestsTab(request)} className={`w-full rounded-xl border bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm border-l-4 border-slate-200 ${serviceRequestStatusAccent(request.status)}`}>
                                           <div className="flex items-start justify-between gap-3">
@@ -17652,6 +17753,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 {needsFollowUp && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Follow-up</span>}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">{request.category} · {urgencyLabel(request.urgency)} · Updated {formatDateTime(request.updated_at)}</p>
+                                              {propertyLabel && (
+                                                <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                                              )}
                                             </div>
                                             <ArrowRight size={16} className="mt-1 shrink-0 text-slate-400" />
                                           </div>
@@ -17663,6 +17767,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </div>
                               {selectedWorkspaceRequest && (
                                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                  {(() => {
+                                    const propertyLabel = serviceRequestPropertyLabel(selectedWorkspaceRequest);
+                                    return propertyLabel ? (
+                                      <p className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                                        Property: {propertyLabel}
+                                      </p>
+                                    ) : null;
+                                  })()}
                                   <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
@@ -17684,6 +17796,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         beginFieldWorkForHomeowner(conn, {
                                           name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
                                           serviceRequestId: selectedWorkspaceRequest.id,
+                                          homeId: selectedWorkspaceRequest.home_id,
                                           workflowKind: 'work_order',
                                           templateSource: 'blank',
                                         });
@@ -17739,6 +17852,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             beginFieldWorkForHomeowner(conn, {
                                               name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
                                               serviceRequestId: selectedWorkspaceRequest.id,
+                                              homeId: selectedWorkspaceRequest.home_id,
                                               workflowKind: 'work_order',
                                               templateSource: 'blank',
                                             });
