@@ -480,6 +480,7 @@ export interface DiscoverFeedItem {
   photos: string[];
   reviews: PublicReview[];
   created_at: string;
+  view_count?: number;
 }
 
 export type HomeDocumentType = 'warranty' | 'manual' | 'inspection' | 'insurance' | 'permit' | 'receipt' | 'other';

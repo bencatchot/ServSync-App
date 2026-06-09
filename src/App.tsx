@@ -16933,6 +16933,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           perspective="contractor"
           userId={profile.id}
           contractorId={contractor?.id ?? null}
+          contractorProfile={contractor}
           connections={[]}
         />
       )}
@@ -22654,6 +22655,7 @@ function DiscoverFeed({
   perspective,
   userId,
   contractorId,
+  contractorProfile,
   connections,
   contractorSlugs = {},
   onConnectionRequested,
@@ -22662,6 +22664,7 @@ function DiscoverFeed({
   perspective: 'homeowner' | 'contractor';
   userId: string;
   contractorId: string | null;
+  contractorProfile?: ContractorProfile | null;
   connections: HomeownerConnection[];
   contractorSlugs?: Record<string, string>;
   onConnectionRequested?: () => void | Promise<void>;
@@ -22691,10 +22694,12 @@ function DiscoverFeed({
     if (!supabase) return;
     setFeedLoading(true);
     try {
-      const { data, error } = await supabase.rpc('servsync_discover_feed', {
-        p_category: filterCategory || null,
-        p_location: filterLocation || null,
-      });
+      const { data, error } = perspective === 'contractor'
+        ? await supabase.rpc('servsync_my_discover_posts')
+        : await supabase.rpc('servsync_discover_feed', {
+          p_category: filterCategory || null,
+          p_location: filterLocation || null,
+        });
       if (error) throw error;
       setFeed((data || []) as DiscoverFeedItem[]);
     } catch {
@@ -22705,6 +22710,23 @@ function DiscoverFeed({
   };
 
   useEffect(() => { void loadFeed(); }, []);
+
+  const recordPostView = async (item: DiscoverFeedItem, source: 'homeowner_discover_expand' | 'homeowner_discover_profile') => {
+    if (!supabase || perspective !== 'homeowner') return;
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const storageKey = `servsync.discover.postView.${userId}.${item.post_id}.${today}`;
+      if (window.localStorage.getItem(storageKey)) return;
+      const { error } = await supabase.rpc('servsync_record_discover_post_view', {
+        p_post_id: item.post_id,
+        p_source: source,
+      });
+      if (error) throw error;
+      window.localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      // View tracking should never interrupt homeowner browsing.
+    }
+  };
 
   const kudosCounts = (reviews: PublicReview[]) => {
     const counts: Record<string, number> = {};
@@ -22862,52 +22884,84 @@ function DiscoverFeed({
 
   return (
     <div className="space-y-5">
+      {perspective === 'contractor' && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <p className="text-sm font-bold text-blue-950">Your Discover presence</p>
+              <p className="mt-1 text-sm leading-6 text-blue-900">
+                Homeowners can discover your public profile and helpful updates. Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through this feed.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className={`rounded-full px-3 py-1 ${contractorProfile?.public_profile_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {contractorProfile?.public_profile_enabled ? 'Public profile enabled' : 'Public profile hidden'}
+                </span>
+                {contractorProfile?.business_name && (
+                  <span className="rounded-full bg-white/80 px-3 py-1 text-blue-900">{contractorProfile.business_name}</span>
+                )}
+              </div>
+            </div>
+            {contractorProfile?.slug && (
+              <button
+                type="button"
+                onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractorProfile.slug)}`)}
+                className={buttonClass('secondary')}
+              >
+                View public profile
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filter bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-3">
-          <p className="text-sm font-bold text-slate-950">Filter helpful local updates</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
-          </p>
-        </div>
-        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder="Search work, contractor, keyword"
-              value={filterKeyword}
-              onChange={e => setFilterKeyword(e.target.value)}
-            />
+      {perspective === 'homeowner' && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <p className="text-sm font-bold text-slate-950">Filter helpful local updates</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
+            </p>
           </div>
-          <select
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-          >
-            <option value="">All categories</option>
-            {SERVICE_REQUEST_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <div className="relative">
-            <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder="City or state"
-              value={filterLocation}
-              onChange={e => setFilterLocation(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && void loadFeed()}
-            />
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                placeholder="Search work, contractor, keyword"
+                value={filterKeyword}
+                onChange={e => setFilterKeyword(e.target.value)}
+              />
+            </div>
+            <select
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+            >
+              <option value="">All categories</option>
+              {SERVICE_REQUEST_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <div className="relative">
+              <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                placeholder="City or state"
+                value={filterLocation}
+                onChange={e => setFilterLocation(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void loadFeed()}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadFeed()}
+              disabled={feedLoading}
+              className={buttonClass('primary')}
+            >
+              {feedLoading ? 'Loading...' : 'Search'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void loadFeed()}
-            disabled={feedLoading}
-            className={buttonClass('primary')}
-          >
-            {feedLoading ? 'Loading...' : 'Search'}
-          </button>
         </div>
-      </div>
+      )}
       {actionNotice && <Notice tone="success" text={actionNotice} />}
       {actionError && <Notice tone="error" text={actionError} />}
 
@@ -22994,12 +23048,28 @@ function DiscoverFeed({
         </div>
       )}
 
+      {perspective === 'contractor' && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-slate-950">My Shared Updates</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Only posts from your contractor account appear here. View counts are real homeowner views, shown as aggregate totals only.
+              </p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {feed.length} {feed.length === 1 ? 'post' : 'posts'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Feed */}
       {!feedLoading && visibleFeed.length === 0 && (
         <EmptyState text={feed.length === 0
           ? perspective === 'homeowner'
             ? 'No local updates yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
-            : 'No local updates yet. Share a maintenance tip, company update, or recent work when you are ready.'
+            : 'No shared updates yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
           : 'No local updates match those filters yet.'} />
       )}
 
@@ -23067,11 +23137,19 @@ function DiscoverFeed({
                   {item.review_count > 0 && (
                     <p className="text-xs text-slate-500">{item.review_count} {item.review_count === 1 ? 'review' : 'reviews'}</p>
                   )}
+                  {isOwnPost && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {Number(item.view_count ?? 0).toLocaleString()} {Number(item.view_count ?? 0) === 1 ? 'view' : 'views'}
+                    </span>
+                  )}
 
                   {perspective === 'homeowner' && contractorSlug && (
                     <button
                       type="button"
-                      onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractorSlug)}`)}
+                      onClick={() => {
+                        void recordPostView(item, 'homeowner_discover_profile');
+                        updateRoute('profile', `slug=${encodeURIComponent(contractorSlug)}`);
+                      }}
                       className={buttonClass('secondary')}
                     >
                       View Profile
@@ -23118,7 +23196,10 @@ function DiscoverFeed({
                   )}
                   <button
                     type="button"
-                    onClick={() => setExpandedPostId(isExpanded ? null : item.post_id)}
+                    onClick={() => {
+                      setExpandedPostId(isExpanded ? null : item.post_id);
+                      if (!isExpanded) void recordPostView(item, 'homeowner_discover_expand');
+                    }}
                     className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
                   >
                     {isExpanded ? 'Less' : 'More'}
