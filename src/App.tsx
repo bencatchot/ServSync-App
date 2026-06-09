@@ -340,7 +340,7 @@ const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-u
     sections: [
       { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover updates.' },
       { title: 'Prohibited content', body: 'Final policy should prohibit unlawful, deceptive, harmful, harassing, discriminatory, infringing, unsafe, or privacy-invasive content.' },
-      { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to share, and should review visibility before uploading sensitive home, identity, financial, or insurance records.' },
+      { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to use or share, and should be careful before sending sensitive home, identity, financial, or insurance records to a contractor, support, or another person.' },
       { title: 'Discover posting rules', body: 'Discover posts should be helpful local updates, maintenance tips, company updates, or recent work. They should not be misleading or include private homeowner information without permission.' },
       { title: 'No direct solicitation through Discover', body: 'Contractors may not directly message, pitch, solicit, or contact homeowners through Discover unless the homeowner initiates a connection, service request, or approved communication path.' },
       { title: 'No misleading licensing/insurance claims', body: 'Contractors should accurately represent licensing, insurance, bonding, certifications, qualifications, service areas, and business status. Listed credentials are not verified unless ServSync explicitly says so.' },
@@ -9880,7 +9880,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="space-y-5">
           <Card title="Home documents" icon={<FolderOpen size={18} />}>
             <p className="text-sm text-slate-500 mb-4">
-              Store warranty documents, job reports, appliance manuals, permits, and other home records securely. Files are private and only accessible by you.
+              Store warranty documents, job reports, appliance manuals, permits, and other home records in your private homeowner document library. Contractors cannot browse this library through a connection.
             </p>
 
             {/* Upload area */}
@@ -9926,7 +9926,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </label>
               <p className="mt-2 text-xs text-slate-500">PDF, images, Word docs, and more — up to 50 MB per file.</p>
               <p className="mt-1 text-xs leading-5 text-amber-700">
-                Only upload documents and photos you have the right to share. Home documents may contain sensitive information, so review visibility and sharing before uploading.
+                Private homeowner storage. Contractors cannot see these files from your document library unless you intentionally send a copy through a specific request or message. Home documents may contain sensitive information, so only upload files you have the right to store.
               </p>
             </div>
 
@@ -23340,7 +23340,7 @@ function PhotoUploadPanel({
       </div>
       {footer && <p className="mt-2 text-xs font-medium text-amber-700">{footer}</p>}
       <p className="mt-2 text-xs leading-5 text-slate-500">
-        Only upload photos you have the right to share. Home photos may contain sensitive information, so review visibility and sharing before uploading.
+        Only upload photos you have the right to use. Home photos may contain sensitive information, so be careful before sending or sharing copies outside your account.
       </p>
     </div>
   );
