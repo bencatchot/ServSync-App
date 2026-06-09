@@ -3679,12 +3679,16 @@ function buildValueAddText(rooms: InspectionRoomData[]): string {
 }
 
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
-  if (!request.appointment) return request;
+  const withDefaults = {
+    ...request,
+    review_eligible: Boolean(request.review_eligible),
+  };
+  if (!withDefaults.appointment) return withDefaults;
   const rawAppointment = request.appointment as ServiceRequestAppointment & { proposed_by?: 'contractor' | 'homeowner' | null };
   return {
-    ...request,
+    ...withDefaults,
     appointment: {
-      ...request.appointment,
+      ...withDefaults.appointment,
       proposed_by: rawAppointment.proposed_by ?? 'contractor',
     },
   };
@@ -9024,6 +9028,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           {(() => {
             const renderRequestCard = (request: ServiceRequestSummary) => {
               const isClosedCard = ['closed', 'declined'].includes(request.status);
+              const canLeaveReview = request.status === 'closed' && Boolean(request.review_eligible);
               const isExpanded = expandedRequestIds.has(request.id);
               const isUpdating = updatingServiceRequestId === request.id;
               const lastMessage = request.messages[request.messages.length - 1];
@@ -9239,7 +9244,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           </div>
                         </>
                       )}
-                      {isClosedCard && (
+                      {isClosedCard && (request.review || canLeaveReview) && (
                         <div className="space-y-3">
                           {/* Review section */}
                           {request.review ? (
@@ -9260,7 +9265,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </p>
                               )}
                             </div>
-                          ) : reviewDrafts[request.id]?.open ? (
+                          ) : canLeaveReview && reviewDrafts[request.id]?.open ? (
                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                               <p className="text-sm font-semibold text-slate-950">Leave a review for {request.contractor_name}</p>
                               <div>
@@ -9324,11 +9329,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 >Cancel</button>
                               </div>
                             </div>
-                          ) : (
+                          ) : canLeaveReview ? (
                             <button type="button" className={buttonClass('secondary')}
                               onClick={() => setReviewDrafts(prev => ({ ...prev, [request.id]: { open: true, rating: 0, kudos: [], body: '', displayName: '', location: '' } }))}
                             ><Star size={15} />Leave a review</button>
-                          )}
+                          ) : null}
                           {/* Log this job */}
                           {!maintenanceLog.some(e => e.service_request_id === request.id) && (
                             quickLogDrafts[request.id] ? (

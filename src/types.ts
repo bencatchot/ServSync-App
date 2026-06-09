@@ -732,6 +732,7 @@ export interface ServiceRequestSummary {
   quote: ServiceRequestQuote | null;
   appointment: ServiceRequestAppointment | null;
   review: ServiceRequestReview | null;
+  review_eligible?: boolean;
   created_at: string;
   updated_at: string;
 }
