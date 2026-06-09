@@ -10813,6 +10813,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspectionNewDraft, setInspectionNewDraft] = useState({
     subject_type: 'connected' as 'connected' | 'local',
     homeowner_user_id: '',
+    home_id: '',
     local_contact_id: '',
     local_home_id: '',
     service_request_id: '',
@@ -12554,11 +12555,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const inspectionTemplateSubjectContext: InspectionTemplateSubjectContext | null = (() => {
     if (inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id) {
-      const selectedConnection = connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id);
       return {
         subject_type: 'connected',
         homeowner_user_id: inspectionNewDraft.homeowner_user_id,
-        home_id: selectedConnection?.home?.id ?? '',
+        home_id: inspectionNewDraft.home_id || '',
       };
     }
     if (inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id) {
@@ -12644,7 +12644,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     : null;
   const selectedJobsCustomerName = selectedJobsConnection?.display_name || selectedJobsLocalContact?.display_name || '';
   const selectedJobsCustomerAddress = selectedJobsConnection
-    ? selectedJobsConnection.home?.address_line1 || selectedJobsConnection.city || ''
+    ? connectedHomeList(selectedJobsConnection)[0]?.address_line1 || selectedJobsConnection.home?.address_line1 || selectedJobsConnection.city || ''
     : selectedJobsLocalContact?.homes?.[0]?.address_line1 || selectedJobsLocalContact?.homes?.[0]?.city || '';
   const selectedJobsCustomerWork = selectedJobsConnection
     ? fieldWorkForHomeowner(selectedJobsConnection.homeowner_user_id)
@@ -12731,9 +12731,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const beginFieldWorkForHomeowner = (connection: ContractorConnectedHomeowner, options?: BeginFieldWorkOptions) => {
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
+    const defaultHome = connectedHomeList(connection)[0] ?? connection.home ?? null;
     setInspectionNewDraft({
       subject_type: 'connected',
       homeowner_user_id: connection.homeowner_user_id,
+      home_id: defaultHome?.id ?? '',
       local_contact_id: '',
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
@@ -12756,6 +12758,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
+      home_id: '',
       local_contact_id: contact.id,
       local_home_id: contact.homes?.[0]?.id ?? '',
       service_request_id: '',
@@ -12786,13 +12789,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const fieldWorkSubjectAddress = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
       const conn = connections.find(c => c.homeowner_user_id === insp.homeowner_user_id);
-      return conn?.home
-        ? [conn.home.address_line1, conn.home.city, conn.home.state].filter(Boolean).join(', ')
+      const home = conn ? connectedHomeList(conn).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(conn)[0] ?? conn.home : null;
+      const location = home ? [home.address_line1, home.city, home.state].filter(Boolean).join(', ') : '';
+      return home
+        ? [home.nickname, location].filter(Boolean).join(' — ')
         : [conn?.city, conn?.state].filter(Boolean).join(', ');
     }
     const contact = insp.local_contact_id ? localContacts.find(c => c.id === insp.local_contact_id) : null;
     const home = contact?.homes?.find(h => h.id === insp.local_home_id) ?? contact?.homes?.[0];
-    return home ? [home.address_line1, home.city, home.state].filter(Boolean).join(', ') : '';
+    const location = home ? [home.address_line1, home.city, home.state].filter(Boolean).join(', ') : '';
+    return home ? [home.nickname, location].filter(Boolean).join(' — ') : '';
   };
 
   const buildInspectionRoomsSnapshot = (
@@ -12832,10 +12838,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const homeTemplateContextForInspection = (insp: Inspection): InspectionTemplateSubjectContext | null => {
     if (insp.homeowner_user_id) {
       const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
+      const home = connection ? connectedHomeList(connection).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(connection)[0] ?? connection.home : null;
       return {
         subject_type: 'connected',
         homeowner_user_id: insp.homeowner_user_id,
-        home_id: connection?.home?.id ?? '',
+        home_id: insp.home_id ?? home?.id ?? '',
       };
     }
     if (insp.local_contact_id) {
@@ -12851,7 +12858,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const homeTemplateTargetLabel = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
       const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
-      return connection?.display_name ? `${connection.display_name}'s home` : connection?.home?.nickname || connection?.home?.address_line1 || 'this home';
+      const home = connection ? connectedHomeList(connection).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(connection)[0] ?? connection.home : null;
+      return connection?.display_name ? `${connection.display_name}'s home` : home?.nickname || home?.address_line1 || 'this home';
     }
     const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
     const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
@@ -12861,8 +12869,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const defaultHomeTemplateName = (insp: Inspection) => {
     if (insp.homeowner_user_id) {
       const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
-      if (connection?.home?.nickname?.trim()) return `${connection.home.nickname.trim()} Home Template`;
-      if (connection?.home?.address_line1?.trim()) return `${connection.home.address_line1.trim()} Home Template`;
+      const home = connection ? connectedHomeList(connection).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(connection)[0] ?? connection.home : null;
+      if (home?.nickname?.trim()) return `${home.nickname.trim()} Home Template`;
+      if (home?.address_line1?.trim()) return `${home.address_line1.trim()} Home Template`;
       if (connection?.display_name?.trim()) return `${connection.display_name.trim()}'s Home Template`;
       return 'Home Inspection Template';
     }
@@ -13064,6 +13073,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
     setSavingInspection(true);
     try {
+      const selectedConnectedConnection = inspectionNewDraft.subject_type === 'connected'
+        ? connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id) ?? null
+        : null;
+      const resolvedConnectedHomeId = selectedConnectedConnection
+        ? inspectionNewDraft.home_id || connectedHomeList(selectedConnectedConnection)[0]?.id || selectedConnectedConnection.home?.id || ''
+        : '';
       const isSimpleJobDraft = inspectionNewDraft.job_mode === 'simple'
         || inspectionNewDraft.workflow_kind === 'work_order'
         || SIMPLE_SERVICE_JOB_TYPES.has((inspectionNewDraft.job_type || '').trim());
@@ -13105,6 +13120,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       const { data, error: rpcErr } = await supabase.rpc('servsync_create_field_work', {
         p_homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
+        p_home_id: inspectionNewDraft.subject_type === 'connected' ? resolvedConnectedHomeId || null : null,
         p_local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
         p_local_home_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_home_id || null : null,
         p_service_request_id: inspectionNewDraft.service_request_id || null,
@@ -13132,6 +13148,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         id: newInspectionId,
         contractor_id: contractor?.id || '',
         homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
+        home_id: inspectionNewDraft.subject_type === 'connected' ? resolvedConnectedHomeId || null : null,
         local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
         local_home_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_home_id || null : null,
         service_request_id: inspectionNewDraft.service_request_id || null,
@@ -13218,11 +13235,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const localContact = insp.local_contact_id ? localContacts.find(contact => contact.id === insp.local_contact_id) : null;
       const localHome = localContact?.homes?.find(home => home.id === insp.local_home_id) ?? localContact?.homes?.[0] ?? null;
       const homeownerName = homeownerConn?.display_name || localContact?.display_name || 'Customer';
-      const homeAddress = homeownerConn?.home
-        ? [homeownerConn.home.address_line1, homeownerConn.home.city, homeownerConn.home.state].filter(Boolean).join(', ')
-        : localHome
-          ? [localHome.address_line1, localHome.city, localHome.state].filter(Boolean).join(', ')
-          : [homeownerConn?.city, homeownerConn?.state].filter(Boolean).join(', ');
+      const homeAddress = fieldWorkSubjectAddress(insp) || (localHome
+        ? [localHome.address_line1, localHome.city, localHome.state].filter(Boolean).join(', ')
+        : [homeownerConn?.city, homeownerConn?.state].filter(Boolean).join(', '));
 
       const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url, {
         includeSummary: includeReportSummary,
@@ -19342,8 +19357,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const [subjectType, id] = e.target.value.split(':') as ['connected' | 'local', string];
                         const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
                         const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
+                        const defaultHomeId = conn ? connectedHomeList(conn)[0]?.id ?? conn.home?.id ?? '' : '';
                         const nextContext: InspectionTemplateSubjectContext | null = subjectType === 'connected' && id
-                          ? { subject_type: 'connected', homeowner_user_id: id, home_id: conn?.home?.id ?? '' }
+                          ? { subject_type: 'connected', homeowner_user_id: id, home_id: defaultHomeId }
                           : subjectType === 'local' && id
                             ? { subject_type: 'local', local_contact_id: id, local_home_id: local?.homes?.[0]?.id ?? '' }
                             : null;
@@ -19363,6 +19379,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           ...d,
                           subject_type: subjectType,
                           homeowner_user_id: subjectType === 'connected' ? id : '',
+                          home_id: subjectType === 'connected' ? defaultHomeId : '',
                           local_contact_id: subjectType === 'local' ? id : '',
                           local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
                           service_request_id: subjectType === 'connected' ? d.service_request_id : '',
@@ -19390,6 +19407,61 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </button>
                   </div>
                 </Field>
+                {inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id && (() => {
+                  const selectedConnection = connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id) ?? null;
+                  const connectedHomes = selectedConnection ? connectedHomeList(selectedConnection) : [];
+                  if (!selectedConnection || connectedHomes.length === 0) return null;
+                  const selectedHome = connectedHomes.find(home => home.id === inspectionNewDraft.home_id) ?? connectedHomes[0];
+                  const propertyLabel = (home: ContractorConnectedHomeownerHome) => {
+                    const label = home.nickname || home.address_line1 || 'Property';
+                    const location = [home.city, home.state].filter(Boolean).join(', ');
+                    return location ? `${label} — ${location}` : label;
+                  };
+                  const updateConnectedHome = (homeId: string) => {
+                    const nextContext: InspectionTemplateSubjectContext = {
+                      subject_type: 'connected',
+                      homeowner_user_id: inspectionNewDraft.homeowner_user_id,
+                      home_id: homeId,
+                    };
+                    const currentCustomTemplate = inspectionNewDraft.template_source === 'custom'
+                      ? inspectionTemplates.find(template => template.id === inspectionNewDraft.template_id)
+                      : null;
+                    const keepCurrentCustomTemplate = !currentCustomTemplate
+                      || templateScope(currentCustomTemplate) === 'contractor'
+                      || templateMatchesInspectionSubject(currentCustomTemplate, nextContext);
+                    setInspectionNewDraft(d => ({
+                      ...d,
+                      home_id: homeId,
+                      template_source: keepCurrentCustomTemplate ? d.template_source : 'blank',
+                      template_id: keepCurrentCustomTemplate ? d.template_id : '',
+                    }));
+                  };
+
+                  return (
+                    <Field label="Property">
+                      {connectedHomes.length > 1 ? (
+                        <select
+                          className={inputClass()}
+                          value={inspectionNewDraft.home_id || selectedHome?.id || ''}
+                          onChange={event => updateConnectedHome(event.target.value)}
+                        >
+                          {connectedHomes.map(home => (
+                            <option key={home.id || propertyLabel(home)} value={home.id || ''}>
+                              {propertyLabel(home)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                          {selectedHome ? propertyLabel(selectedHome) : 'Property not assigned'}
+                        </div>
+                      )}
+                      {connectedHomes.length > 1 && (
+                        <p className="mt-1 text-xs text-slate-500">Select the homeowner property this job belongs to.</p>
+                      )}
+                    </Field>
+                  );
+                })()}
                 {showLocalContactForm && (
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

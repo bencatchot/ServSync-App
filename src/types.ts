@@ -612,6 +612,7 @@ export interface Inspection {
   id: string;
   contractor_id: string;
   homeowner_user_id: string | null;
+  home_id?: string | null;
   local_contact_id: string | null;
   local_home_id: string | null;
   service_request_id: string | null;
