@@ -339,10 +339,10 @@ const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-u
   'acceptable-use': {
     title: 'Acceptable Use & Content Policy',
     sections: [
-      { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover updates.' },
+      { title: 'Allowed use', body: 'ServSync may be used to manage homeowner-contractor connections, service requests, estimates, jobs, inspections, reports, invoices, documents, maintenance records, public profiles, and helpful Discover posts.' },
       { title: 'Prohibited content', body: 'Final policy should prohibit unlawful, deceptive, harmful, harassing, discriminatory, infringing, unsafe, or privacy-invasive content.' },
       { title: 'Document/photo upload rules', body: 'Users should upload only documents and photos they have the right to use or share, and should be careful before sending sensitive home, identity, financial, or insurance records to a contractor, support, or another person.' },
-      { title: 'Discover posting rules', body: 'Discover posts should be helpful local updates, maintenance tips, company updates, or recent work. They should not be misleading or include private homeowner information without permission.' },
+      { title: 'Discover posting rules', body: 'Discover posts should share recent work, maintenance tips, company news, or helpful local advice. They should not be misleading or include private homeowner information without permission.' },
       { title: 'No direct solicitation through Discover', body: 'Contractors may not directly message, pitch, solicit, or contact homeowners through Discover unless the homeowner initiates a connection, service request, or approved communication path.' },
       { title: 'No misleading licensing/insurance claims', body: 'Contractors should accurately represent licensing, insurance, bonding, certifications, qualifications, service areas, and business status. Listed credentials are not verified unless ServSync explicitly says so.' },
       { title: 'No unsafe/illegal content', body: 'Content should not encourage unsafe work, illegal activity, code evasion, fraud, or improper handling of hazardous materials or regulated services.' },
@@ -357,7 +357,7 @@ const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-u
       { title: 'Responsibility for contractor work', body: 'Contractors remain solely responsible for their services, work quality, scheduling, estimates, invoices, reports, licenses, insurance, permits, warranties, and customer communications.' },
       { title: 'Estimates/invoices/reports', body: 'ServSync provides tools to create records, but contractors are responsible for the content, accuracy, pricing, terms, and legal effect of records they send.' },
       { title: 'Homeowner data access and confidentiality', body: 'Contractors may access homeowner/home information only as allowed by connection permissions, service requests, or homeowner-approved workflows, and should keep that information confidential.' },
-      { title: 'Discover posting rules', body: 'Contractor posts should be helpful local updates, maintenance tips, company updates, or recent work. Posts must not expose private homeowner information without permission.' },
+      { title: 'Discover posting rules', body: 'Contractor posts should share recent work, maintenance tips, company news, or helpful local advice. Posts must not expose private homeowner information without permission.' },
       { title: 'Public profile rules', body: 'Public profile information should be accurate, current, and not misleading. Listed credentials should not imply ServSync verification unless a verification process exists.' },
       { title: 'No direct solicitation', body: 'Contractors may not directly solicit, pitch, message, or contact homeowners through Discover unless the homeowner has initiated a connection, service request, or approved communication path.' },
       { title: 'Licensing/insurance representation placeholder', body: 'Final agreement should define what contractors may say about licensing, insurance, bonding, certifications, permits, and trade qualifications.' },
@@ -3872,7 +3872,7 @@ function TrustSafetyPanel({
     },
     {
       title: 'Discover boundaries',
-      body: 'Contractors can post helpful local updates, maintenance tips, and recent work. They cannot directly contact or solicit homeowners through Discover. Homeowners choose when to view a profile, connect, or request service.',
+      body: 'Contractors can create helpful local posts with maintenance tips and recent work. They cannot directly contact or solicit homeowners through Discover. Homeowners choose when to view a profile, connect, or request service.',
     },
     {
       title: 'Contractor credentials',
@@ -3926,7 +3926,7 @@ function TrustSafetyPanel({
 
         {role === 'contractor' && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-            Contractor reminder: Discover is for helpful public updates and profile visibility. It is not for direct homeowner solicitation,
+            Contractor reminder: Discover is for helpful public posts and profile visibility. It is not for direct homeowner solicitation,
             lead chasing, bidding, or messaging homeowners who have not initiated a connection or request.
           </div>
         )}
@@ -3943,7 +3943,7 @@ function TrustSafetyPublicPage() {
     },
     {
       title: 'Discover is homeowner-controlled',
-      body: 'Contractors can post helpful local updates, maintenance tips, and recent work. They cannot directly contact or solicit homeowners through Discover.',
+      body: 'Contractors can create helpful local posts with maintenance tips and recent work. They cannot directly contact or solicit homeowners through Discover.',
     },
     {
       title: 'Contractor credentials are listed',
@@ -5368,7 +5368,7 @@ function LandingPage() {
         <div className="grid gap-3">
           <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Build a home record, request service, review estimates and invoices, and control what information gets shared." />
           <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests." />
-          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful updates and recent work. Homeowners choose when to connect." />
+          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful posts and recent work. Homeowners choose when to connect." />
           <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
         </div>
       </section>
@@ -5400,7 +5400,7 @@ function LandingPage() {
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="font-bold text-slate-950">Discover has boundaries</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors can post helpful updates, but cannot directly solicit homeowners through Discover.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Contractors can create helpful posts, but cannot directly solicit homeowners through Discover.</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="font-bold text-slate-950">ServSync is software</p>
@@ -9925,10 +9925,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'discover' && (
         <div className="space-y-5">
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Discover local updates</p>
-            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Helpful local updates and recent work</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Discover local posts</p>
+            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Helpful local posts and recent work</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-900">
-              Browse maintenance tips, contractor updates, and recent local work. Save useful updates for later, view profiles,
+              Browse maintenance tips, contractor posts, and recent local work. Save useful posts for later, view profiles,
               and choose when to connect or request service.
             </p>
           </section>
@@ -9955,9 +9955,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <section className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Recent Local Work</p>
-              <h2 className="mt-1 text-lg font-bold text-slate-950">Helpful local updates and recent work</h2>
+              <h2 className="mt-1 text-lg font-bold text-slate-950">Helpful local posts and recent work</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Contractors can share helpful updates, maintenance tips, and recent work. Homeowners choose whether to view a profile,
+                Contractors can share recent work, maintenance tips, or helpful local advice. Homeowners choose whether to view a profile,
                 connect, or request service.
               </p>
             </div>
@@ -22743,10 +22743,10 @@ function DiscoverFeed({
       if (error) throw error;
       setPostDraft({ category: '', title: '', description: '', city: '', state: '' });
       setPostFiles([]);
-      setPostNotice('Post shared to the feed.');
+      setPostNotice('Post published.');
       await loadFeed();
     } catch (err) {
-      setPostError(err instanceof Error ? err.message : 'Unable to share post.');
+      setPostError(err instanceof Error ? err.message : 'Unable to create post.');
     } finally {
       setPosting(false);
     }
@@ -22849,9 +22849,9 @@ function DiscoverFeed({
           : Math.max(0, currentSaveCount + (isSaved ? 1 : -1));
         return { ...post, is_saved: isSaved, save_count: nextSaveCount };
       }));
-      setActionNotice(isSaved ? 'Update saved.' : 'Update removed from saved updates.');
+      setActionNotice(isSaved ? 'Post saved.' : 'Post removed from saved posts.');
     } catch (err) {
-      setActionError(readableError(err, 'Unable to update saved updates.'));
+      setActionError(readableError(err, 'Unable to update saved posts.'));
     } finally {
       setSavingPostId(null);
     }
@@ -22892,7 +22892,7 @@ function DiscoverFeed({
             <div className="max-w-3xl">
               <p className="text-sm font-bold text-blue-950">Your Discover presence</p>
               <p className="mt-1 text-sm leading-6 text-blue-900">
-                Homeowners can discover your public profile and helpful updates. Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through this feed.
+                Homeowners can discover your public profile and helpful posts. Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through Discover.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
                 <span className={`rounded-full px-3 py-1 ${contractorProfile?.public_profile_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -22920,7 +22920,7 @@ function DiscoverFeed({
       {perspective === 'homeowner' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3">
-            <p className="text-sm font-bold text-slate-950">Filter helpful local updates</p>
+            <p className="text-sm font-bold text-slate-950">Filter Discover posts</p>
             <p className="mt-1 text-sm text-slate-500">
               Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
             </p>
@@ -22971,14 +22971,14 @@ function DiscoverFeed({
             onClick={() => setFeedView('all')}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition ${feedView === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
           >
-            All Updates
+            All Posts
           </button>
           <button
             type="button"
             onClick={() => setFeedView('saved')}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition ${feedView === 'saved' ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
           >
-            Saved Updates
+            Saved Posts
             {savedFeedCount > 0 && <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">{savedFeedCount}</span>}
           </button>
         </div>
@@ -22989,12 +22989,12 @@ function DiscoverFeed({
       {/* Contractor: share a job */}
       {perspective === 'contractor' && contractorId && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-slate-950">Share a helpful local update</p>
+          <p className="text-sm font-bold text-slate-950">Create Post</p>
           <p className="mt-1 mb-3 text-sm leading-5 text-slate-500">
-            Post maintenance tips, company updates, and recent work. Homeowners choose whether to view your profile or request a connection.
+            Share recent work, maintenance tips, or helpful local advice. Homeowners choose whether to view your profile or request a connection.
           </p>
           <p className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
-            Posts are public and should be helpful local updates, maintenance tips, or recent work. Discover does not allow contractors to directly contact homeowners.
+            Posts are public and should share recent work, maintenance tips, or helpful local advice. Discover does not allow contractors to directly contact homeowners.
             Homeowners choose when to view your profile, connect, or request service.
           </p>
           {postNotice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{postNotice}</div>}
@@ -23023,7 +23023,7 @@ function DiscoverFeed({
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description">
-                <textarea className={inputClass()} rows={3} {...writingAssistProps} placeholder="Share useful context, maintenance advice, or what homeowners can learn from this work." value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
+                <textarea className={inputClass()} rows={3} {...writingAssistProps} placeholder="Share recent work, maintenance advice, or helpful local context." value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
               </Field>
             </div>
           </div>
@@ -23063,7 +23063,7 @@ function DiscoverFeed({
 
           <div className="mt-4">
             <button type="button" onClick={() => void submitPost()} disabled={posting} className={buttonClass('primary')}>
-              {posting ? 'Sharing...' : 'Share update'}
+              {posting ? 'Publishing...' : 'Create Post'}
             </button>
           </div>
         </div>
@@ -23073,7 +23073,7 @@ function DiscoverFeed({
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-slate-950">My Shared Updates</p>
+              <p className="text-sm font-bold text-slate-950">My Posts</p>
               <p className="mt-1 text-sm text-slate-500">
                 Only posts from your contractor account appear here. View counts are real homeowner views, shown as aggregate totals only.
               </p>
@@ -23088,12 +23088,12 @@ function DiscoverFeed({
       {/* Feed */}
       {!feedLoading && visibleFeed.length === 0 && (
         <EmptyState text={perspective === 'homeowner' && feedView === 'saved' && savedFeedCount === 0
-          ? 'No saved updates yet. Save helpful contractor posts to revisit later.'
+          ? 'No saved posts yet. Save helpful contractor posts to revisit later.'
           : feed.length === 0
             ? perspective === 'homeowner'
-              ? 'No local updates yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
-              : 'No shared updates yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
-            : 'No local updates match those filters yet.'} />
+              ? 'No posts yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
+              : 'No posts yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
+            : 'No posts match those filters yet.'} />
       )}
 
       {visibleFeed.map(item => {
@@ -23182,7 +23182,7 @@ function DiscoverFeed({
                       onClick={() => void togglePostSave(item)}
                       className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${item.is_saved ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'}`}
                     >
-                      {savingPostId === item.post_id ? 'Saving...' : item.is_saved ? 'Saved' : 'Save'}
+                      {savingPostId === item.post_id ? 'Saving...' : item.is_saved ? 'Saved' : 'Save Post'}
                     </button>
                   )}
 
@@ -23245,7 +23245,7 @@ function DiscoverFeed({
                     }}
                     className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
                   >
-                    {isExpanded ? 'Less' : 'More'}
+                    {isExpanded ? 'Hide Post' : 'View Post'}
                     <ChevronDown size={13} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
                 </div>
