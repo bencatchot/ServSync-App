@@ -7566,6 +7566,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ...homeDocuments,
     ...maintenanceLog,
   ].filter(record => !record.home_id).length;
+  const showDashboardUnassignedRecordNotice = homeownerTab === 'overview'
+    && homes.length > 1
+    && Boolean(selectedHomeId)
+    && dashboardUnassignedRecordCount > 0;
   const homeownerAttentionRequests = dashboardServiceRequests.filter(homeownerRequestNeedsResponse);
   const openServiceRequests = dashboardServiceRequests.filter(request => !['closed', 'declined'].includes(request.status));
   const openServiceRequestCount = openServiceRequests.length;
@@ -8631,9 +8635,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             Dashboard highlights activity for the selected property. Use each tab's All properties or Unassigned view to find older records that are not tied to a property yet.
           </p>
         )}
-        {selectedHomeId && dashboardUnassignedRecordCount > 0 && (
+        {showDashboardUnassignedRecordNotice && (
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-            Some older records are not assigned to a property yet. You can view them from the related tab under Unassigned.
+            Some older records are not assigned to a property. You can find them in each related tab under Unassigned.
           </p>
         )}
       </section>
