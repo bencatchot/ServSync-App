@@ -201,6 +201,7 @@ type StarterEstimateTemplate = {
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
+type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
@@ -6319,6 +6320,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   });
   const [serviceProblemText, setServiceProblemText] = useState('');
   const [homeownerRequestView, setHomeownerRequestView] = useState<HomeownerRequestView>(() => storedTab(STORAGE_KEYS.homeownerRequestView, ['attention', 'new', 'scheduled', 'closed', 'declined'] as const, 'attention'));
+  const [homeownerRequestPropertyScope, setHomeownerRequestPropertyScope] = useState<HomeownerRequestPropertyScope>('selected');
   const [homeownerRequestSearch, setHomeownerRequestSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerRequestSearch) ?? '');
   const [requestComposerOpen, setRequestComposerOpen] = useState(false);
   const [homeownerReplyDrafts, setHomeownerReplyDrafts] = useState<Record<string, string>>({});
@@ -7607,6 +7609,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const openServiceRequests = serviceRequests.filter(request => !['closed', 'declined'].includes(request.status));
   const openServiceRequestCount = openServiceRequests.length;
   const activeServiceRequests = openServiceRequests.slice(0, 4);
+  const selectedRequestPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
+  const unassignedServiceRequestCount = serviceRequests.filter(request => !request.home_id).length;
+  const homeownerRequestPropertyMatches = (request: Pick<ServiceRequestSummary, 'home_id'>) => {
+    if (homeownerRequestPropertyScope === 'all') return true;
+    if (homeownerRequestPropertyScope === 'unassigned') return !request.home_id;
+    return selectedHomeId ? request.home_id === selectedHomeId : !request.home_id;
+  };
+  const propertyScopedServiceRequests = serviceRequests.filter(homeownerRequestPropertyMatches);
+  const homeownerRequestScopeLabel = homeownerRequestPropertyScope === 'all'
+    ? 'all properties'
+    : homeownerRequestPropertyScope === 'unassigned'
+      ? 'unassigned requests'
+      : selectedHomeId
+        ? selectedRequestPropertyLabel
+        : 'unassigned requests';
   const upcomingAppointments = serviceRequests
     .filter(request => request.appointment && ['proposed', 'confirmed'].includes(request.appointment.status))
     .slice(0, 3);
@@ -10330,19 +10347,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 id: 'attention',
                 title: 'Needs your response',
                 helper: 'Contractor replies, quotes, or proposed appointment times waiting on you.',
-                requests: serviceRequests.filter(isHomeownerAttention),
+                requests: propertyScopedServiceRequests.filter(isHomeownerAttention),
               },
               {
                 id: 'new',
                 title: 'New requests',
                 helper: 'Requests sent to contractors that have not been answered yet.',
-                requests: serviceRequests.filter(r => r.status === 'open' && !r.appointment),
+                requests: propertyScopedServiceRequests.filter(r => r.status === 'open' && !r.appointment),
               },
               {
                 id: 'scheduled',
                 title: 'Scheduled and appointment requests',
                 helper: 'Confirmed appointments and time changes that are already in motion.',
-                requests: serviceRequests.filter(r =>
+                requests: propertyScopedServiceRequests.filter(r =>
                   !['closed', 'declined'].includes(r.status)
                   && Boolean(r.appointment)
                   && !isHomeownerAttention(r)
@@ -10352,22 +10369,67 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 id: 'closed',
                 title: 'Closed and invoiced',
                 helper: 'Completed requests. Quotes or invoices stay attached for your records.',
-                requests: serviceRequests.filter(r => r.status === 'closed'),
+                requests: propertyScopedServiceRequests.filter(r => r.status === 'closed'),
               },
               {
                 id: 'declined',
                 title: 'Declined',
                 helper: 'Requests that were declined or cancelled.',
-                requests: serviceRequests.filter(r => r.status === 'declined'),
+                requests: propertyScopedServiceRequests.filter(r => r.status === 'declined'),
               },
             ];
             const activeHomeownerRequestView = requestSections.find(section => section.id === homeownerRequestView)?.id
               ?? homeownerRequestView;
             const selectedSection = requestSections.find(section => section.id === activeHomeownerRequestView) ?? requestSections[0];
             const filteredRequests = selectedSection.requests.filter(request => serviceRequestMatchesSearch(request, homeownerRequestSearch));
+            const selectedRequestEmptyText = homeownerRequestPropertyScope === 'selected' && selectedHomeId && propertyScopedServiceRequests.length === 0
+              ? 'No service requests for this property yet.'
+              : homeownerRequestPropertyScope === 'unassigned' && propertyScopedServiceRequests.length === 0
+                ? 'No unassigned service requests.'
+                : 'No requests in this queue.';
 
             return (
               <div className="space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_220px] lg:items-end">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">Showing requests for: {homeownerRequestScopeLabel}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Use All properties to see every request, or Unassigned to find older requests that are not tied to a property yet.
+                      </p>
+                    </div>
+                    <Field label="Show">
+                      <select
+                        className={inputClass()}
+                        value={homeownerRequestPropertyScope}
+                        onChange={event => {
+                          setHomeownerRequestPropertyScope(event.target.value as HomeownerRequestPropertyScope);
+                          setExpandedRequestIds(new Set());
+                        }}
+                      >
+                        <option value="selected">Selected property</option>
+                        <option value="all">All properties</option>
+                        <option value="unassigned">Unassigned</option>
+                      </select>
+                    </Field>
+                  </div>
+                  {homeownerRequestPropertyScope === 'selected' && unassignedServiceRequestCount > 0 && (
+                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                      <span>Some older requests are not assigned to a property yet.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHomeownerRequestPropertyScope('unassigned');
+                          setExpandedRequestIds(new Set());
+                        }}
+                        className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
+                      >
+                        View Unassigned
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   {requestSections.map(section => {
                     const active = section.id === activeHomeownerRequestView;
@@ -10414,7 +10476,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     )}
                   </div>
                   {filteredRequests.length === 0 ? (
-                    <EmptyState text={selectedSection.requests.length === 0 ? 'No requests in this queue.' : 'No requests match that search.'} />
+                    <EmptyState text={selectedSection.requests.length === 0 ? selectedRequestEmptyText : 'No requests match that search.'} />
                   ) : (
                     <div className="space-y-2">
                       {filteredRequests.map(renderRequestCard)}
