@@ -207,6 +207,7 @@ type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
+type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
@@ -11110,6 +11111,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'schedule'] as const, 'profile'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
+  const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
+  const [selectedHomeownerWorkspaceHomeId, setSelectedHomeownerWorkspaceHomeId] = useState('');
   const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
@@ -12132,7 +12135,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const openHomeownerWorkspaceForConnection = (connection: ContractorConnectedHomeowner, tab: HomeownerWorkspaceTab = 'profile') => {
+    const homes = connectedHomeList(connection);
     setSelectedHomeownerSubjectId(connection.connection_id);
+    setSelectedHomeownerWorkspaceHomeId(homes[0]?.id ?? connection.home?.id ?? '');
+    setHomeownerWorkspacePropertyScope('selected');
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
     setHomeownerDetailTab(tab);
     setContractorTab('connections');
@@ -12149,7 +12155,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorTab('requests');
       return;
     }
+    const homes = connectedHomeList(connection);
+    const requestHomeId = request.home_id && homes.some(home => home.id === request.home_id) ? request.home_id : '';
     setSelectedHomeownerSubjectId(connection.connection_id);
+    setSelectedHomeownerWorkspaceHomeId(requestHomeId || homes[0]?.id || connection.home?.id || '');
+    setHomeownerWorkspacePropertyScope(request.home_id ? 'selected' : 'unassigned');
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
     setHomeownerDetailTab(options.tab ?? 'requests');
     setHomeownerWorkspaceRequestView(
@@ -16223,7 +16233,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <button
                         key={subject.id}
                         type="button"
-                        onClick={() => { setSelectedHomeownerSubjectId(subject.id); setShowLocalContactForm(false); setHomeownerDetailTab('profile'); }}
+                        onClick={() => {
+                          setSelectedHomeownerSubjectId(subject.id);
+                          if (subject.kind === 'connection') {
+                            const homes = connectedHomeList(subject.connection);
+                            setSelectedHomeownerWorkspaceHomeId(homes[0]?.id ?? subject.connection.home?.id ?? '');
+                            setHomeownerWorkspacePropertyScope('selected');
+                          } else {
+                            setSelectedHomeownerWorkspaceHomeId('');
+                            setHomeownerWorkspacePropertyScope('selected');
+                          }
+                          setShowLocalContactForm(false);
+                          setHomeownerDetailTab('profile');
+                        }}
                         className={`w-full px-4 py-4 text-left transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                       >
                         <p className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-slate-800'}`}>{rowName}</p>
@@ -16335,7 +16357,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const localCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
                     const connectedHomes = conn ? connectedHomeList(conn) : [];
-                    const primaryConnectedHome = connectedHomes[0] ?? conn?.home ?? null;
+                    const propertyScopeEnabled = Boolean(conn && perm?.share_home_overview && connectedHomes.length > 0);
+                    const selectedWorkspaceHome = propertyScopeEnabled
+                      ? connectedHomes.find(home => home.id === selectedHomeownerWorkspaceHomeId) ?? connectedHomes[0] ?? null
+                      : null;
+                    const selectedWorkspaceHomeId = selectedWorkspaceHome?.id ?? '';
+                    const workspaceHomeLabel = selectedWorkspaceHome
+                      ? propertyRecordLabel({ home_id: selectedWorkspaceHome.id }, { homes: connectedHomes })
+                      : '';
+                    const workspaceNewRecordHomeId = propertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceHomeId : '';
+                    const connectedHomeOptionLabel = (home: ContractorConnectedHomeownerHome, index: number) => {
+                      const address = perm?.share_address ? compactAddressLabel(home) : '';
+                      const location = perm?.share_home_overview ? [home.city, home.state, home.zip_code].filter(Boolean).join(' ') : '';
+                      const primary = home.nickname || (perm?.share_address ? home.address_line1 : '') || location || `Property ${index + 1}`;
+                      return address && address !== primary ? `${primary} — ${address}` : primary;
+                    };
+                    const primaryConnectedHome = selectedWorkspaceHome ?? connectedHomes[0] ?? conn?.home ?? null;
                     const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'New customer');
                     const localHome = localCustomer?.homes?.[0] ?? null;
                     const headerAddress = conn ? (perm!.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
@@ -16354,16 +16391,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const localClaimInviteLink = latestLocalClaimInvite?.invite_token
                       ? localCustomerClaimInviteUrl(latestLocalClaimInvite.invite_token)
                       : '';
-                    const fieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id) : (localCustomer ? fieldWorkForLocalContact(localCustomer.id) : []);
-                    const inspectionRecords = fieldWork.filter(isInspectionLikeFieldWork);
-                    const workOrderRecords = fieldWork.filter(work => !isInspectionLikeFieldWork(work));
-                    const subjectEstimates = conn
+                    const rawFieldWork = conn ? fieldWorkForHomeowner(conn.homeowner_user_id) : (localCustomer ? fieldWorkForLocalContact(localCustomer.id) : []);
+                    const rawSubjectEstimates = conn
                       ? estimatesForHomeowner(conn.homeowner_user_id)
                       : localCustomer
                         ? estimates.filter(estimate => estimate.local_contact_id === localCustomer.id)
                         : [];
+                    const rawConnReqs = conn ? serviceRequests.filter(r => r.connection_id === conn.connection_id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) : [];
+                    const matchesWorkspacePropertyScope = (record: PropertyContextRecord) => {
+                      if (!propertyScopeEnabled) return true;
+                      if (homeownerWorkspacePropertyScope === 'all') return true;
+                      if (homeownerWorkspacePropertyScope === 'unassigned') return !record.home_id;
+                      return selectedWorkspaceHomeId ? record.home_id === selectedWorkspaceHomeId : !record.home_id;
+                    };
+                    const fieldWork = rawFieldWork.filter(matchesWorkspacePropertyScope);
+                    const inspectionRecords = fieldWork.filter(isInspectionLikeFieldWork);
+                    const workOrderRecords = fieldWork.filter(work => !isInspectionLikeFieldWork(work));
+                    const subjectEstimates = rawSubjectEstimates.filter(matchesWorkspacePropertyScope);
                     const invoiceRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) === 'Invoice');
                     const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
+                    const connReqs = rawConnReqs.filter(matchesWorkspacePropertyScope);
+                    const workspaceUnassignedRecordCount = propertyScopeEnabled
+                      ? rawFieldWork.filter(work => !work.home_id).length
+                        + rawSubjectEstimates.filter(estimate => !estimate.home_id).length
+                        + rawConnReqs.filter(request => !request.home_id).length
+                      : 0;
+                    const showWorkspacePropertyControls = propertyScopeEnabled && (connectedHomes.length > 1 || workspaceUnassignedRecordCount > 0);
+                    const workspacePropertyContext = !propertyScopeEnabled
+                      ? ''
+                      : homeownerWorkspacePropertyScope === 'all'
+                        ? 'All properties'
+                        : homeownerWorkspacePropertyScope === 'unassigned'
+                          ? 'Unassigned records'
+                          : workspaceHomeLabel || 'Selected property';
                     const draftEstimateCount = estimateRecords.filter(estimate => estimate.status === 'draft').length;
                     const draftInvoiceCount = invoiceRecords.filter(estimate => estimate.status === 'draft').length;
                     const workOrderDraftCount = workOrderRecords.filter(inspectionIsOpenJob).length;
@@ -16451,7 +16511,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     });
                     const fwDraftCount = workOrderDraftCount;
                     const fwFinalCount = workOrderFinalCount;
-                    const connReqs = conn ? serviceRequests.filter(r => r.connection_id === conn.connection_id).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()) : [];
                     const activeReqs = connReqs.filter(r => !['closed', 'declined'].includes(r.status));
                     const followUpReqs = activeReqs.filter(contractorRequestNeedsFollowUp);
                     const urgentReqs = activeReqs.filter(r => r.urgency === 'urgent');
@@ -16632,6 +16691,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {headerCity && <p className="text-xs text-slate-400">{headerCity}</p>}
                             </div>
                           </div>
+                          {propertyScopeEnabled && (
+                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex flex-wrap items-end justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property context</p>
+                                  <p className="mt-1 text-sm font-bold text-slate-950">
+                                    Working on: {workspacePropertyContext}
+                                  </p>
+                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
+                                    <p className="mt-1 text-xs text-slate-500">These records are not assigned to a property.</p>
+                                  )}
+                                  {homeownerWorkspacePropertyScope !== 'unassigned' && workspaceUnassignedRecordCount > 0 && (
+                                    <p className="mt-1 text-xs text-slate-500">Older unassigned records are available from the Unassigned view.</p>
+                                  )}
+                                </div>
+                                {showWorkspacePropertyControls ? (
+                                  <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-none">
+                                    <Field label="View">
+                                      <select
+                                        className={inputClass()}
+                                        value={homeownerWorkspacePropertyScope}
+                                        onChange={event => setHomeownerWorkspacePropertyScope(event.target.value as ContractorHomeownerPropertyScope)}
+                                      >
+                                        <option value="selected">Selected property</option>
+                                        <option value="all">All properties</option>
+                                        <option value="unassigned">Unassigned</option>
+                                      </select>
+                                    </Field>
+                                    <Field label="Property">
+                                      <select
+                                        className={inputClass()}
+                                        value={selectedWorkspaceHomeId}
+                                        onChange={event => {
+                                          setSelectedHomeownerWorkspaceHomeId(event.target.value);
+                                          setHomeownerWorkspacePropertyScope('selected');
+                                        }}
+                                      >
+                                        {connectedHomes.map((home, index) => (
+                                          <option key={home.id || `${home.nickname}-${index}`} value={home.id || ''}>
+                                            {connectedHomeOptionLabel(home, index)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </Field>
+                                  </div>
+                                ) : (
+                                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                    {connectedHomes.length === 1 ? 'Single property' : 'Selected property'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                           <div className="mt-4 grid gap-2 sm:grid-cols-3">
                             {tabs.map(t => (
                               <button
@@ -16726,7 +16838,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       } else if (nextAppointmentRequest) {
                                         setHomeownerDetailTab('schedule');
                                       } else if (conn) {
-                                        beginFieldWorkForHomeowner(conn);
+                                        beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
                                       } else if (localCustomer) {
                                         beginFieldWorkForLocalContact(localCustomer);
                                       }
@@ -16802,22 +16914,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <EmptyState text="No jobs yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
-                                      {recentWorkOrders.map(insp => (
-                                        <button
-                                          key={insp.id}
-                                          type="button"
-                                          onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })}
-                                          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                              <p className="font-semibold text-slate-900">{insp.name}</p>
-                                              <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                      {recentWorkOrders.map(insp => {
+                                        const propertyLabel = recordPropertyLabelForContractor(insp);
+                                        return (
+                                          <button
+                                            key={insp.id}
+                                            type="button"
+                                            onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })}
+                                            className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                                          >
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <p className="font-semibold text-slate-900">{insp.name}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                                {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
+                                                  <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                                                )}
+                                                {homeownerWorkspacePropertyScope === 'unassigned' && (
+                                                  <p className="mt-0.5 text-xs font-medium text-slate-500">Not assigned to a property</p>
+                                                )}
+                                              </div>
+                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                             </div>
-                                            <ArrowRight size={15} className="shrink-0 text-slate-400" />
-                                          </div>
-                                        </button>
-                                      ))}
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>
@@ -16834,22 +16955,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <EmptyState text="No inspection jobs yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
-                                      {recentInspections.map(insp => (
-                                        <button
-                                          key={insp.id}
-                                          type="button"
-                                          onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })}
-                                          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                              <p className="font-semibold text-slate-900">{insp.name}</p>
-                                              <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                      {recentInspections.map(insp => {
+                                        const propertyLabel = recordPropertyLabelForContractor(insp);
+                                        return (
+                                          <button
+                                            key={insp.id}
+                                            type="button"
+                                            onClick={() => openInspection(insp, { stayInHomeownerWorkspace: true })}
+                                            className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                                          >
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="min-w-0">
+                                                <p className="font-semibold text-slate-900">{insp.name}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                                {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
+                                                  <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                                                )}
+                                                {homeownerWorkspacePropertyScope === 'unassigned' && (
+                                                  <p className="mt-0.5 text-xs font-medium text-slate-500">Not assigned to a property</p>
+                                                )}
+                                              </div>
+                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                             </div>
-                                            <ArrowRight size={15} className="shrink-0 text-slate-400" />
-                                          </div>
-                                        </button>
-                                      ))}
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>
@@ -17117,7 +17247,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (isConn && conn) beginFieldWorkForHomeowner(conn);
+                                      if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
                                       else if (localCustomer) beginFieldWorkForLocalContact(localCustomer);
                                     }}
                                     className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
@@ -17128,7 +17258,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => beginEstimateDraftForCustomer(headerName)}
+                                    onClick={() => beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined })}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
@@ -17137,7 +17267,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => beginInvoiceDraftForCustomer(headerName)}
+                                    onClick={() => beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined })}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
@@ -17159,17 +17289,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <EmptyState text="No job records yet for this customer." />
                                     ) : (
                                       <div className="space-y-2">
-                                        {[...workOrderRecords, ...inspectionRecords].slice(0, 5).map(work => (
-                                          <button key={work.id} type="button" onClick={() => openInspection(work, { stayInHomeownerWorkspace: true })} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-slate-900">{work.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(work)} · Updated {formatDateTime(work.updated_at)}</p>
+                                        {[...workOrderRecords, ...inspectionRecords].slice(0, 5).map(work => {
+                                          const propertyLabel = recordPropertyLabelForContractor(work);
+                                          return (
+                                            <button key={work.id} type="button" onClick={() => openInspection(work, { stayInHomeownerWorkspace: true })} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <p className="truncate text-sm font-semibold text-slate-900">{work.name}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(work)} · Updated {formatDateTime(work.updated_at)}</p>
+                                                  {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
+                                                    <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                                                  )}
+                                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
+                                                    <p className="mt-0.5 text-xs font-medium text-slate-500">Not assigned to a property</p>
+                                                  )}
+                                                </div>
+                                                <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                               </div>
-                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
-                                            </div>
-                                          </button>
-                                        ))}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>
@@ -17186,17 +17325,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <EmptyState text="No estimates or invoices yet for this customer." />
                                     ) : (
                                       <div className="space-y-2">
-                                        {[...estimateRecords, ...invoiceRecords].slice(0, 5).map(record => (
-                                          <button key={record.id} type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {record.status}</p>
+                                        {[...estimateRecords, ...invoiceRecords].slice(0, 5).map(record => {
+                                          const propertyLabel = recordPropertyLabelForContractor(record);
+                                          return (
+                                            <button key={record.id} type="button" onClick={() => { setContractorJobsView('open_financial'); setContractorTab('inspections'); }} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {record.status}</p>
+                                                  {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
+                                                    <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
+                                                  )}
+                                                  {homeownerWorkspacePropertyScope === 'unassigned' && (
+                                                    <p className="mt-0.5 text-xs font-medium text-slate-500">Not assigned to a property</p>
+                                                  )}
+                                                </div>
+                                                <ArrowRight size={15} className="shrink-0 text-slate-400" />
                                               </div>
-                                              <ArrowRight size={15} className="shrink-0 text-slate-400" />
-                                            </div>
-                                          </button>
-                                        ))}
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </div>
@@ -17256,7 +17404,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <h3 className="font-bold text-slate-950">Work orders</h3>
                                     <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed report{fwFinalCount === 1 ? '' : 's'}</p>
                                   </div>
-                                  <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn); } else if (localCustomer) { beginFieldWorkForLocalContact(localCustomer); } }} className={buttonClass('primary')}>
+                                  <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined }); } else if (localCustomer) { beginFieldWorkForLocalContact(localCustomer); } }} className={buttonClass('primary')}>
                                     <Plus size={14} />
                                     Create job
                                   </button>
@@ -17380,7 +17528,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     type="button"
                                     onClick={() => {
                                       if (isConn && conn) {
-                                        beginFieldWorkForHomeowner(conn, { workflowKind: 'inspection' });
+                                        beginFieldWorkForHomeowner(conn, { workflowKind: 'inspection', homeId: workspaceNewRecordHomeId || undefined });
                                       } else if (localCustomer) {
                                         beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection' });
                                       }
@@ -17437,7 +17585,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {isInvoiceWorkspaceTab ? (
                                       <button
                                         type="button"
-                                        onClick={() => beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        onClick={() => beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', { homeId: workspaceNewRecordHomeId || undefined })}
                                         className={buttonClass('primary')}
                                       >
                                         <Receipt size={14} />
@@ -17451,6 +17599,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           setEditingEstimateId(null);
                                           setEstimateDraft(createBlankEstimateDraft({
                                             title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                                            home_id: workspaceNewRecordHomeId,
                                           }));
                                           setEstimateAssistantText('');
                                           setEstimateAssistantNotice('');
@@ -17776,7 +17925,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 onClick={() => {
                                                   const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
                                                   setEditingEstimateId(null);
-                                                  setEstimateDraft(estimateDraftFromStarterTemplate(template, subjectName));
+                                                  setEstimateDraft({
+                                                    ...estimateDraftFromStarterTemplate(template, subjectName),
+                                                    home_id: workspaceNewRecordHomeId,
+                                                  });
                                                   setEstimateAssistantText('');
                                                   setEstimateAssistantNotice('');
                                                   setEstimateComposerOpen(true);
@@ -17863,7 +18015,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     onClick={() => {
                                                       const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
                                                       setEditingEstimateId(null);
-                                                      setEstimateDraft(estimateDraftFromTemplate(template, subjectName));
+                                                      setEstimateDraft({
+                                                        ...estimateDraftFromTemplate(template, subjectName),
+                                                        home_id: workspaceNewRecordHomeId,
+                                                      });
                                                       setEstimateAssistantText('');
                                                       setEstimateAssistantNotice('');
                                                       setEstimateComposerOpen(true);
