@@ -5103,6 +5103,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [directoryCategory, setDirectoryCategory] = useState('');
   const [directoryLocation, setDirectoryLocation] = useState('');
+  const [discoverDirectoryKeyword, setDiscoverDirectoryKeyword] = useState('');
+  const [discoverDirectoryCategory, setDiscoverDirectoryCategory] = useState('');
+  const [discoverDirectoryLocation, setDiscoverDirectoryLocation] = useState('');
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
   const [permissionDrafts, setPermissionDrafts] = useState<Record<string, SharingPermissions>>({});
@@ -6376,6 +6379,52 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       || contractor.service_zip_codes.some(zip => zip.toLowerCase().includes(locationQuery));
     return categoryMatch && locationMatch;
   });
+  const filteredDiscoverDirectoryContractors = directoryContractors.filter(contractor => {
+    const categoryMatch = !discoverDirectoryCategory
+      || contractor.service_categories.some(category => category.toLowerCase() === discoverDirectoryCategory.toLowerCase());
+    const locationQuery = normalizeText(discoverDirectoryLocation);
+    const locationMatch = !locationQuery
+      || normalizeText(contractor.city).includes(locationQuery)
+      || normalizeText(contractor.state).includes(locationQuery)
+      || normalizeText(contractor.zip_code).includes(locationQuery)
+      || contractor.service_zip_codes.some(zip => normalizeText(zip).includes(locationQuery));
+    const keywordTerms = normalizeText(discoverDirectoryKeyword).split(' ').filter(Boolean);
+    const keywordMatch = keywordTerms.length === 0 || keywordTerms.every(term => normalizeText([
+      contractor.business_name,
+      contractor.contact_name,
+      contractor.business_summary,
+      contractor.city,
+      contractor.state,
+      contractor.zip_code,
+      contractor.service_categories.join(' '),
+      contractor.service_zip_codes.join(' '),
+      contractor.license_number,
+      contractor.insurance_status,
+      contractor.bonded_status,
+    ].join(' ')).includes(term));
+    return categoryMatch && locationMatch && keywordMatch;
+  });
+  const discoverConnectionLabel = (status: ConnectionStatus) => {
+    if (status === 'active') return 'Connected';
+    if (status === 'pending') return 'Request pending';
+    if (status === 'declined') return 'Declined';
+    if (status === 'revoked') return 'Revoked';
+    if (status === 'dismissed') return 'Hidden';
+    return status;
+  };
+  const discoverConnectionClass = (status: ConnectionStatus) => {
+    if (status === 'active') return 'bg-emerald-50 text-emerald-700';
+    if (status === 'pending') return 'bg-amber-50 text-amber-700';
+    if (status === 'declined' || status === 'revoked') return 'bg-red-50 text-red-700';
+    return 'bg-slate-100 text-slate-600';
+  };
+  const discoverTrustSignals = (contractor: ContractorProfile) => [
+    contractor.license_number ? 'License listed' : '',
+    contractor.insurance_status ? 'Insurance listed' : '',
+    contractor.bonded_status ? 'Bonded listed' : '',
+    contractor.service_zip_codes.length > 0 ? 'Service area listed' : '',
+    contractor.business_summary ? 'Profile details added' : '',
+  ].filter(Boolean);
   const selectedRequestConnection = serviceRequestDraft.connection_id
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
@@ -6948,6 +6997,107 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     </Card>
   );
+  const renderDiscoverContractorCard = (contractor: ContractorProfile) => {
+    const existingConnection = connectionByContractorId.get(contractor.id);
+    const isConnected = existingConnection?.status === 'active';
+    const canRequestAgain = existingConnection && ['declined', 'revoked', 'dismissed'].includes(existingConnection.status);
+    const trustSignals = discoverTrustSignals(contractor);
+    const location = [contractor.city, contractor.state].filter(Boolean).join(', ') || 'Location not listed';
+    const serviceArea = contractor.service_zip_codes.length > 0
+      ? `Serves ${contractor.service_zip_codes.slice(0, 5).join(', ')}${contractor.service_zip_codes.length > 5 ? ' +' : ''}`
+      : contractor.zip_code
+        ? `Based near ${contractor.zip_code}`
+        : '';
+
+    return (
+      <div key={contractor.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 gap-3">
+            {contractor.logo_url ? (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <img src={contractor.logo_url} alt={`${contractor.business_name} logo`} className="h-full w-full object-contain p-1.5" />
+              </div>
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700">
+                <Building2 size={22} />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-bold text-slate-950">{contractor.business_name || 'Unnamed contractor'}</p>
+                {existingConnection && (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${discoverConnectionClass(existingConnection.status)}`}>
+                    {discoverConnectionLabel(existingConnection.status)}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-slate-500">{location}{serviceArea ? ` · ${serviceArea}` : ''}</p>
+              {contractor.service_categories.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {contractor.service_categories.slice(0, 6).map(category => (
+                    <span key={category} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                      {category}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-3 line-clamp-3 text-sm leading-5 text-slate-600">
+          {contractor.business_summary || 'No business summary added yet.'}
+        </p>
+
+        {trustSignals.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {trustSignals.slice(0, 5).map(signal => (
+              <span key={signal} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                <ShieldCheck size={12} />
+                {signal}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-slate-500">
+            Connect when you're ready. You choose what home information gets shared.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {contractor.slug && (
+              <button type="button" onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)} className={buttonClass('secondary')}>
+                View Profile
+              </button>
+            )}
+            {isConnected ? (
+              <button
+                type="button"
+                onClick={() => {
+                  startServiceRequestForConnection(existingConnection);
+                  setHomeownerTab('contractors');
+                }}
+                className={buttonClass('primary')}
+              >
+                <MessageSquare size={16} />
+                Request Service
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void requestContractorConnection(contractor)}
+                disabled={existingConnection?.status === 'pending'}
+                className={existingConnection?.status === 'pending' ? buttonClass('secondary') : buttonClass('primary')}
+              >
+                <Link2 size={16} />
+                {existingConnection?.status === 'pending' ? 'Request Pending' : canRequestAgain ? 'Request Again' : 'Connect'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = estimates
       .filter(estimate => estimate.service_request_id === request.id)
@@ -9275,19 +9425,101 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       )}
 
       {homeownerTab === 'discover' && (
-        <DiscoverFeed
-          perspective="homeowner"
-          userId={profile.id}
-          contractorId={null}
-          connections={connections}
-          onConnectionRequested={loadHomeowner}
-          onRequestService={(contractorId, category) => {
-            const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
-            if (!connection) return;
-            startServiceRequestForConnection(connection, category);
-            setHomeownerTab('contractors');
-          }}
-        />
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Discover local help</p>
+            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Find local contractors on your terms</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-900">
+              Find local contractors, view helpful updates and recent work, and choose when to connect or request service.
+              You control what home information gets shared.
+            </p>
+          </section>
+
+          <Card title="Find Local Contractors" icon={<Users size={18} />}>
+            <div className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={discoverDirectoryKeyword}
+                    onChange={event => setDiscoverDirectoryKeyword(event.target.value)}
+                    placeholder="Search company, trade, or keyword"
+                  />
+                </div>
+                <select
+                  className={inputClass()}
+                  value={discoverDirectoryCategory}
+                  onChange={event => setDiscoverDirectoryCategory(event.target.value)}
+                >
+                  <option value="">All trades</option>
+                  {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                </select>
+                <div className="relative">
+                  <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    value={discoverDirectoryLocation}
+                    onChange={event => setDiscoverDirectoryLocation(event.target.value)}
+                    placeholder="City, state, or ZIP"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">
+                  {filteredDiscoverDirectoryContractors.length} {filteredDiscoverDirectoryContractors.length === 1 ? 'contractor' : 'contractors'} shown
+                </p>
+                {(discoverDirectoryKeyword || discoverDirectoryCategory || discoverDirectoryLocation) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDiscoverDirectoryKeyword('');
+                      setDiscoverDirectoryCategory('');
+                      setDiscoverDirectoryLocation('');
+                    }}
+                    className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {filteredDiscoverDirectoryContractors.length === 0 ? (
+                <EmptyState text="No contractors match this search yet. Try a nearby ZIP or a broader trade." />
+              ) : (
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {filteredDiscoverDirectoryContractors.map(renderDiscoverContractorCard)}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <section className="space-y-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Recent Local Work</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-950">Helpful local updates and recent work</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Contractors can share helpful updates, maintenance tips, and recent work. Homeowners choose whether to view a profile,
+                connect, or request service.
+              </p>
+            </div>
+            <DiscoverFeed
+              perspective="homeowner"
+              userId={profile.id}
+              contractorId={null}
+              connections={connections}
+              contractorSlugs={Object.fromEntries(directoryContractors.map(contractor => [contractor.id, contractor.slug]))}
+              onConnectionRequested={loadHomeowner}
+              onRequestService={(contractorId, category) => {
+                const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
+                if (!connection) return;
+                startServiceRequestForConnection(connection, category);
+                setHomeownerTab('contractors');
+              }}
+            />
+          </section>
+        </div>
       )}
 
       {homeownerTab === 'support' && (
@@ -21747,6 +21979,7 @@ function DiscoverFeed({
   userId,
   contractorId,
   connections,
+  contractorSlugs = {},
   onConnectionRequested,
   onRequestService,
 }: {
@@ -21754,6 +21987,7 @@ function DiscoverFeed({
   userId: string;
   contractorId: string | null;
   connections: HomeownerConnection[];
+  contractorSlugs?: Record<string, string>;
   onConnectionRequested?: () => void | Promise<void>;
   onRequestService?: (contractorId: string, category: string) => void;
 }) {
@@ -21954,6 +22188,12 @@ function DiscoverFeed({
     <div className="space-y-5">
       {/* Filter bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3">
+          <p className="text-sm font-bold text-slate-950">Filter helpful local updates</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
+          </p>
+        </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -21998,7 +22238,10 @@ function DiscoverFeed({
       {/* Contractor: share a job */}
       {perspective === 'contractor' && contractorId && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-sm font-bold text-slate-950">Share a job to the feed</p>
+          <p className="text-sm font-bold text-slate-950">Share a helpful local update</p>
+          <p className="mt-1 mb-3 text-sm leading-5 text-slate-500">
+            Post maintenance tips, company updates, and recent work. Homeowners choose whether to view your profile or request a connection.
+          </p>
           {postNotice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{postNotice}</div>}
           {postError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{postError}</div>}
           <div className="grid gap-3 sm:grid-cols-2">
@@ -22009,7 +22252,7 @@ function DiscoverFeed({
               </select>
             </Field>
             <Field label="Title">
-              <input className={inputClass()} placeholder="e.g. New roof installation" value={postDraft.title} onChange={e => setPostDraft(d => ({ ...d, title: e.target.value }))} />
+              <input className={inputClass()} placeholder="e.g. Spring HVAC maintenance reminder" value={postDraft.title} onChange={e => setPostDraft(d => ({ ...d, title: e.target.value }))} />
             </Field>
             <Field label="City">
               <input className={inputClass()} placeholder="City of job" value={postDraft.city} onChange={e => setPostDraft(d => ({ ...d, city: e.target.value }))} />
@@ -22025,7 +22268,7 @@ function DiscoverFeed({
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description">
-                <textarea className={inputClass()} rows={3} placeholder="Describe the work, materials, results…" value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
+                <textarea className={inputClass()} rows={3} placeholder="Share useful context, maintenance advice, or what homeowners can learn from this work." value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
               </Field>
             </div>
           </div>
@@ -22047,7 +22290,7 @@ function DiscoverFeed({
               <Paperclip size={15} /> Add photos
             </button>
             <span className="max-w-xl text-xs leading-5 text-slate-500">
-              Discover photos are public marketing images. Use JPG, PNG, or WebP so they display correctly.
+              Discover photos are public. Use JPG, PNG, or WebP so they display correctly.
             </span>
             {postFiles.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -22065,7 +22308,7 @@ function DiscoverFeed({
 
           <div className="mt-4">
             <button type="button" onClick={() => void submitPost()} disabled={posting} className={buttonClass('primary')}>
-              {posting ? 'Sharing...' : 'Share to feed'}
+              {posting ? 'Sharing...' : 'Share update'}
             </button>
           </div>
         </div>
@@ -22073,7 +22316,11 @@ function DiscoverFeed({
 
       {/* Feed */}
       {!feedLoading && visibleFeed.length === 0 && (
-        <EmptyState text={feed.length === 0 ? 'No posts in the feed yet. Be the first to share a job!' : 'No posts match those filters yet.'} />
+        <EmptyState text={feed.length === 0
+          ? perspective === 'homeowner'
+            ? 'No local updates yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
+            : 'No local updates yet. Share a maintenance tip, company update, or recent work when you are ready.'
+          : 'No local updates match those filters yet.'} />
       )}
 
       {visibleFeed.map(item => {
@@ -22081,6 +22328,7 @@ function DiscoverFeed({
         const isOwnPost = item.contractor_id === contractorId;
         const topKudos = kudosCounts(item.reviews).slice(0, 4);
         const existingStatus = existingConnectionMap[item.contractor_id];
+        const contractorSlug = contractorSlugs[item.contractor_id];
 
         return (
           <div key={item.post_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -22140,6 +22388,15 @@ function DiscoverFeed({
                     <p className="text-xs text-slate-500">{item.review_count} {item.review_count === 1 ? 'review' : 'reviews'}</p>
                   )}
 
+                  {perspective === 'homeowner' && contractorSlug && (
+                    <button
+                      type="button"
+                      onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractorSlug)}`)}
+                      className={buttonClass('secondary')}
+                    >
+                      View Profile
+                    </button>
+                  )}
                   {perspective === 'homeowner' && (!existingStatus || ['declined', 'revoked', 'dismissed'].includes(existingStatus)) && (
                     <button
                       type="button"
