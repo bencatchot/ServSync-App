@@ -5,6 +5,7 @@ export type ContractorAccountStatus = 'active' | 'inactive' | 'paused';
 export type ContractorSubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'unpaid';
 export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
 export type ReferralRewardStatus = 'not_eligible' | 'pending_review' | 'approved' | 'denied' | 'paid';
+export type ExternalReviewSource = 'google' | 'facebook' | 'yelp' | 'other';
 export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_replied' | 'declined' | 'closed';
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
 export type QuoteStatus = 'pending' | 'accepted' | 'declined';
@@ -15,6 +16,13 @@ export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_pa
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
 export type SupportInquiryCategory = 'feature_request' | 'tweak' | 'bug' | 'question' | 'billing' | 'other';
+
+export interface ExternalReviewLink {
+  source: ExternalReviewSource;
+  label: string;
+  url: string;
+  updated_at?: string;
+}
 
 export interface ServiceRequestAppointment {
   id: string;
@@ -215,6 +223,7 @@ export interface ContractorProfile {
   insurance_status: string;
   bonded_status: string;
   business_summary: string;
+  external_review_links: ExternalReviewLink[];
   public_profile_enabled: boolean;
   account_status: ContractorAccountStatus;
   subscription_status: ContractorSubscriptionStatus;
@@ -442,6 +451,7 @@ export interface PublicContractorListing {
   avg_rating: number | null;
   review_count: number;
   reviews: PublicReview[];
+  external_review_links: ExternalReviewLink[];
 }
 
 export interface ContractorPublicProfile {
@@ -462,6 +472,7 @@ export interface ContractorPublicProfile {
   avg_rating: number | null;
   review_count: number;
   reviews: PublicReview[];
+  external_review_links: ExternalReviewLink[];
 }
 
 export interface DiscoverFeedItem {
@@ -483,6 +494,7 @@ export interface DiscoverFeedItem {
   view_count?: number;
   save_count?: number;
   is_saved?: boolean;
+  external_review_links?: ExternalReviewLink[];
 }
 
 export type HomeDocumentType = 'warranty' | 'manual' | 'inspection' | 'insurance' | 'permit' | 'receipt' | 'other';

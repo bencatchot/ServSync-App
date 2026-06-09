@@ -60,6 +60,7 @@ import type {
   EstimateLineType,
   EstimateTemplate,
   EstimateTemplateLineItem,
+  ExternalReviewLink,
   FindingStatus,
   Inspection,
   InspectionRoomFinding,
@@ -3138,6 +3139,46 @@ function localDraftFromNote(note: string): FindingStatus {
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+const EXTERNAL_REVIEW_SOURCES: Array<{ source: ExternalReviewLink['source']; label: string; placeholder: string }> = [
+  { source: 'google', label: 'Google reviews link', placeholder: 'https://g.page/r/...' },
+  { source: 'facebook', label: 'Facebook reviews link', placeholder: 'https://www.facebook.com/...' },
+  { source: 'yelp', label: 'Yelp link', placeholder: 'https://www.yelp.com/biz/...' },
+  { source: 'other', label: 'Other review link', placeholder: 'https://...' },
+];
+
+const externalReviewSourceLabel = (source: ExternalReviewLink['source']) => (
+  source === 'google' ? 'Google reviews'
+    : source === 'facebook' ? 'Facebook reviews'
+      : source === 'yelp' ? 'Yelp'
+        : 'External reviews'
+);
+
+function normalizeExternalReviewLinks(links?: ExternalReviewLink[] | null): ExternalReviewLink[] {
+  if (!Array.isArray(links)) return [];
+  return links
+    .map(link => ({
+      source: EXTERNAL_REVIEW_SOURCES.some(item => item.source === link.source) ? link.source : 'other',
+      label: (link.label || externalReviewSourceLabel(link.source)).trim(),
+      url: (link.url || '').trim(),
+      updated_at: link.updated_at,
+    }))
+    .filter(link => link.url);
+}
+
+function validateExternalReviewLinks(links: ExternalReviewLink[]) {
+  for (const link of links) {
+    try {
+      const url = new URL(link.url);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        return `${externalReviewSourceLabel(link.source)} must be an http or https link.`;
+      }
+    } catch {
+      return `${externalReviewSourceLabel(link.source)} must be a valid URL.`;
+    }
+  }
+  return '';
 }
 
 function stemToken(value: string) {
@@ -10211,6 +10252,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     insurance_status: '',
     bonded_status: '',
     business_summary: '',
+    external_review_links: [],
     public_profile_enabled: true,
     account_status: 'active' as const,
     subscription_status: 'trialing' as const,
@@ -10293,7 +10335,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         : { data: [], error: null };
       if (historyRes.error) throw historyRes.error;
 
-      setContractor(loadedContractor);
+      setContractor(loadedContractor ? {
+        ...loadedContractor,
+        external_review_links: normalizeExternalReviewLinks(loadedContractor.external_review_links),
+      } : null);
       setConnections(loadedConnections);
       setServiceRequests(((serviceRequestsRes.data || []) as ServiceRequestSummary[]).map(normalizeServiceRequestSummary));
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
@@ -10483,6 +10528,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('support');
   };
 
+  const setExternalReviewLink = (source: ExternalReviewLink['source'], url: string) => {
+    const currentLinks = normalizeExternalReviewLinks(contractorDraft.external_review_links);
+    const nextLinks = currentLinks.filter(link => link.source !== source);
+    const trimmedUrl = url.trim();
+    if (trimmedUrl) {
+      nextLinks.push({
+        source,
+        label: externalReviewSourceLabel(source),
+        url: trimmedUrl,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    setContractor({ ...contractorDraft, external_review_links: nextLinks });
+  };
+
   const saveContractor = async () => {
     if (!supabase) return;
     setNotice('');
@@ -10495,6 +10555,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       }
       if (!generatedSlug) {
         setError('A public profile slug is required. Enter a business name and try again.');
+        return;
+      }
+      const externalReviewLinks = normalizeExternalReviewLinks(contractorDraft.external_review_links);
+      const externalReviewError = validateExternalReviewLinks(externalReviewLinks);
+      if (externalReviewError) {
+        setError(externalReviewError);
         return;
       }
       const payload = {
@@ -10516,6 +10582,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         insurance_status: contractorDraft.insurance_status,
         bonded_status: contractorDraft.bonded_status,
         business_summary: contractorDraft.business_summary,
+        external_review_links: externalReviewLinks.map(link => ({ ...link, updated_at: link.updated_at || new Date().toISOString() })),
         public_profile_enabled: contractorDraft.public_profile_enabled,
         account_status: contractorDraft.account_status,
       };
@@ -10525,6 +10592,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (/logo_url|schema cache|column/i.test(message)) {
           const fallbackPayload = { ...payload };
           delete (fallbackPayload as Record<string, unknown>).logo_url;
+          delete (fallbackPayload as Record<string, unknown>).external_review_links;
           const { error: fallbackError } = await supabase.from('contractor_profiles').upsert(fallbackPayload).select('*').single();
           if (fallbackError) throw fallbackError;
         } else {
@@ -13740,6 +13808,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <Field label="Business summary">
             <textarea className={inputClass()} rows={3} {...writingAssistProps} value={contractorDraft.business_summary} onChange={event => setContractor({ ...contractorDraft, business_summary: event.target.value })} />
           </Field>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-4">
+              <div className="mb-3">
+                <p className="text-sm font-bold text-white">External Review Links</p>
+                <p className="mt-1 text-sm leading-5 text-slate-400">
+                  Add links to your existing review profiles so homeowners can see your outside reputation.
+                  External reviews are separate from ServSync reviews, which come from completed work on the platform.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {EXTERNAL_REVIEW_SOURCES.map(sourceConfig => {
+                  const link = normalizeExternalReviewLinks(contractorDraft.external_review_links).find(item => item.source === sourceConfig.source);
+                  return (
+                    <Field key={sourceConfig.source} label={sourceConfig.label}>
+                      <div className="flex gap-2">
+                        <input
+                          className={inputClass()}
+                          type="url"
+                          autoComplete="url"
+                          spellCheck={false}
+                          value={link?.url ?? ''}
+                          placeholder={sourceConfig.placeholder}
+                          onChange={event => setExternalReviewLink(sourceConfig.source, event.target.value)}
+                        />
+                        {link?.url && (
+                          <button
+                            type="button"
+                            onClick={() => setExternalReviewLink(sourceConfig.source, '')}
+                            className={buttonClass('secondary')}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </Field>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                Links open third-party review sites. ServSync does not import, verify, rate, or count external reviews.
+              </p>
+            </div>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => void saveContractor()} className={buttonClass('primary')}>
@@ -22320,6 +22431,7 @@ function ContractorPublicProfilePage({
 
   const location = [data.city, data.state].filter(Boolean).join(', ');
   const hasCredentials = data.license_number || data.insurance_status || data.bonded_status;
+  const externalReviewLinks = normalizeExternalReviewLinks(data.external_review_links);
   const returnToHomeownerDiscover = () => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'discover');
     updateRoute('homeowner');
@@ -22373,7 +22485,7 @@ function ContractorPublicProfilePage({
             <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-center">
               <p className="text-3xl font-bold text-slate-950">{data.avg_rating.toFixed(1)}</p>
               <StarDisplay rating={Math.round(data.avg_rating)} />
-              <p className="mt-1 text-xs text-slate-500">{data.review_count} {data.review_count === 1 ? 'review' : 'reviews'}</p>
+              <p className="mt-1 text-xs text-slate-500">{data.review_count} ServSync {data.review_count === 1 ? 'review' : 'reviews'}</p>
             </div>
           )}
         </div>
@@ -22458,12 +22570,36 @@ function ContractorPublicProfilePage({
         )}
       </div>
 
+      {externalReviewLinks.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">External Reviews</p>
+          <p className="mb-3 text-sm leading-6 text-slate-600">
+            External review links take you to third-party review sites. ServSync reviews are separate and come from completed ServSync work.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {externalReviewLinks.map(link => (
+              <a
+                key={`${link.source}-${link.url}`}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass('secondary')}
+              >
+                <Star size={15} />
+                View {link.label || externalReviewSourceLabel(link.source)}
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Reviews */}
       {data.reviews.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-            Reviews ({data.review_count})
+            ServSync Reviews ({data.review_count})
           </p>
+          <p className="mb-3 text-sm leading-6 text-slate-600">From completed ServSync work.</p>
           <div className="space-y-3">
             {data.reviews.map((review, i) => (
               <PublicReviewCard key={i} review={review} />
@@ -22474,7 +22610,9 @@ function ContractorPublicProfilePage({
 
       {data.reviews.length === 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-          <p className="text-sm text-slate-500">No reviews yet. Completed ServSync work can add trust signals here over time.</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
+          <p className="mt-2 text-sm text-slate-500">No ServSync reviews yet.</p>
+          <p className="mt-1 text-xs text-slate-500">ServSync reviews come from completed ServSync work.</p>
         </section>
       )}
     </div>
@@ -22964,6 +23102,7 @@ function DiscoverFeed({
         const topKudos = kudosCounts(item.reviews).slice(0, 4);
         const existingStatus = existingConnectionMap[item.contractor_id];
         const contractorSlug = contractorSlugs[item.contractor_id];
+        const externalReviewLinks = normalizeExternalReviewLinks(item.external_review_links);
 
         return (
           <div key={item.post_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -23007,6 +23146,14 @@ function DiscoverFeed({
                           {k} <span className="opacity-60">×{count}</span>
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {externalReviewLinks.length > 0 && perspective === 'homeowner' && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        <Star size={12} />
+                        External reviews available
+                      </span>
                     </div>
                   )}
                 </div>
@@ -23129,9 +23276,30 @@ function DiscoverFeed({
                     <p className="text-sm text-slate-700">{item.business_summary}</p>
                   </div>
                 )}
+                {externalReviewLinks.length > 0 && perspective === 'homeowner' && (
+                  <div>
+                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">External Reviews</p>
+                    <p className="mb-2 text-xs leading-5 text-slate-500">
+                      These links open third-party review sites. They are separate from ServSync reviews.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {externalReviewLinks.map(link => (
+                        <a
+                          key={`${item.post_id}-${link.source}-${link.url}`}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={buttonClass('secondary')}
+                        >
+                          View {link.label || externalReviewSourceLabel(link.source)}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {item.reviews.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Recent reviews</p>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
                     <div className="space-y-2">
                       {item.reviews.map((review, i) => (
                         <PublicReviewCard key={i} review={review} />
