@@ -4000,6 +4000,39 @@ function formatMoney(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function formatPhoneNumber(value?: string | null) {
+  const original = (value || '').trim();
+  if (!original) return '';
+  const digits = original.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return original;
+}
+
+function formatPhoneInputValue(value: string) {
+  const original = value;
+  const digits = original.replace(/\D/g, '');
+  const allowedFormattingOnly = /^[\d\s()+.-]*$/.test(original);
+  if (!allowedFormattingOnly) return original;
+  if (digits.length === 0) return '';
+  if (digits.length > 11) return original;
+  const localDigits = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  const prefix = digits.length === 11 && digits.startsWith('1') ? '+1 ' : '';
+  if (localDigits.length <= 3) return `${prefix}${localDigits}`;
+  if (localDigits.length <= 6) return `${prefix}(${localDigits.slice(0, 3)}) ${localDigits.slice(3)}`;
+  return `${prefix}(${localDigits.slice(0, 3)}) ${localDigits.slice(3, 6)}-${localDigits.slice(6)}`;
+}
+
+const writingAssistProps = {
+  spellCheck: true,
+  autoCapitalize: 'sentences',
+  autoCorrect: 'on',
+} as const;
+
 function invoiceStatusLabel(status: Invoice['status']) {
   return status.replace(/_/g, ' ');
 }
@@ -7165,7 +7198,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               contractorName,
               contractorLogoUrl: invoiceConnection?.logo_url || invoiceDirectoryContractor?.logo_url || null,
               contractorEmail: invoiceConnection?.email || invoiceDirectoryContractor?.email || '',
-              contractorPhone: invoiceConnection?.phone || invoiceDirectoryContractor?.phone || '',
+              contractorPhone: formatPhoneNumber(invoiceConnection?.phone || invoiceDirectoryContractor?.phone || ''),
               contractorAddress: [invoiceConnection?.city || invoiceDirectoryContractor?.city, invoiceConnection?.state || invoiceDirectoryContractor?.state].filter(Boolean).join(', '),
               customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
               customerAddress: home?.address_line1 || '',
@@ -8013,6 +8046,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <Field label="Short title">
                         <input
                           className={inputClass()}
+                          {...writingAssistProps}
                           value={serviceRequestDraft.title}
                           onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, title: event.target.value })}
                           placeholder="Example: Leak under kitchen sink"
@@ -8023,6 +8057,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <textarea
                         className={inputClass()}
                         rows={3}
+                        {...writingAssistProps}
                         value={serviceRequestDraft.description}
                         onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, description: event.target.value })}
                         placeholder="Add enough detail for the contractor to understand the issue."
@@ -8172,7 +8207,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <input className={inputClass()} value={profileDraft.display_name} onChange={event => setHomeowner({ ...profileDraft, display_name: event.target.value })} />
             </Field>
             <Field label="Phone">
-              <input className={inputClass()} value={profileDraft.phone} onChange={event => setHomeowner({ ...profileDraft, phone: event.target.value })} />
+              <input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={profileDraft.phone} onChange={event => setHomeowner({ ...profileDraft, phone: formatPhoneInputValue(event.target.value) })} />
             </Field>
             <Field label="City">
               <input className={inputClass()} value={profileDraft.city} onChange={event => setHomeowner({ ...profileDraft, city: event.target.value })} />
@@ -8187,7 +8222,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               />
             </Field>
             <Field label="ZIP code">
-              <input className={inputClass()} value={profileDraft.zip_code} onChange={event => setHomeowner({ ...profileDraft, zip_code: event.target.value })} />
+              <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={profileDraft.zip_code} onChange={event => setHomeowner({ ...profileDraft, zip_code: event.target.value })} />
             </Field>
           </div>
         </Card>
@@ -8223,7 +8258,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               />
             </Field>
             <Field label="ZIP">
-              <input className={inputClass()} value={homeDraft.zip_code} onChange={event => setHome({ ...homeDraft, zip_code: event.target.value })} />
+              <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={homeDraft.zip_code} onChange={event => setHome({ ...homeDraft, zip_code: event.target.value })} />
             </Field>
             <Field label="Home type">
               <AutocompleteInput
@@ -8241,7 +8276,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <input className={inputClass()} value={homeDraft.square_feet} onChange={event => setHome({ ...homeDraft, square_feet: event.target.value })} />
             </Field>
             <Field label="Notes">
-              <textarea className={inputClass()} value={homeDraft.notes} rows={3} onChange={event => setHome({ ...homeDraft, notes: event.target.value })} />
+              <textarea className={inputClass()} {...writingAssistProps} value={homeDraft.notes} rows={3} onChange={event => setHome({ ...homeDraft, notes: event.target.value })} />
             </Field>
           </div>
           <div className="mt-4">
@@ -8337,6 +8372,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <Field label="Short title">
                   <input
                     className={inputClass()}
+                    {...writingAssistProps}
                     value={serviceRequestDraft.title}
                     onChange={event => setServiceRequestDraft(current => ({
                       ...current,
@@ -8350,6 +8386,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <textarea
                     className={inputClass()}
                     rows={4}
+                    {...writingAssistProps}
                     value={serviceRequestDraft.description}
                     onChange={event => setServiceRequestDraft(current => ({
                       ...current,
@@ -8636,6 +8673,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   <Field label="Short title">
                                     <input
                                       className={inputClass()}
+                                      {...writingAssistProps}
                                       value={serviceRequestDraft.title}
                                       onChange={event => setServiceRequestDraft(current => ({
                                         ...current,
@@ -8649,6 +8687,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                     <textarea
                                       className={inputClass()}
                                       rows={3}
+                                      {...writingAssistProps}
                                       value={serviceRequestDraft.description}
                                       onChange={event => setServiceRequestDraft(current => ({
                                         ...current,
@@ -9052,6 +9091,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <textarea
                     className={inputClass()}
                     rows={4}
+                    {...writingAssistProps}
                     value={serviceRequestDraft.description}
                     onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, description: event.target.value })}
                     placeholder="Add enough detail for the contractor to understand the issue."
@@ -9262,6 +9302,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <div className="space-y-3">
                             <Field label="Reply">
                               <textarea className={inputClass()} rows={3}
+                                {...writingAssistProps}
                                 value={homeownerReplyDrafts[request.id] || ''}
                                 onChange={e => setHomeownerReplyDrafts(c => ({ ...c, [request.id]: e.target.value }))}
                                 placeholder="Add a reply or update for the contractor."
@@ -9360,6 +9401,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               </div>
                               <Field label="Comment (optional)">
                                 <textarea className={inputClass()} rows={2}
+                                  {...writingAssistProps}
                                   value={reviewDrafts[request.id]?.body ?? ''}
                                   onChange={e => setReviewDrafts(prev => ({ ...prev, [request.id]: { ...(prev[request.id] ?? { open: true, rating: 0, kudos: [], displayName: '', location: '' }), body: e.target.value } }))}
                                   placeholder="Anything you'd like to add..."
@@ -9415,6 +9457,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </div>
                                 <Field label="Notes — optional">
                                   <input className={inputClass()} placeholder="Warranty, permit numbers, follow-up, etc."
+                                    {...writingAssistProps}
                                     value={logDraft.notes}
                                     onChange={e => setLogDraft(d => ({ ...d, notes: e.target.value }))}
                                   />
@@ -9452,6 +9495,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <div className="space-y-3">
                               <Field label="Reason for reopening (optional)">
                                 <textarea className={inputClass()} rows={2}
+                                  {...writingAssistProps}
                                   value={reopenDrafts[request.id]?.body ?? ''}
                                   onChange={e => setReopenDrafts(c => ({ ...c, [request.id]: { ...(c[request.id] || { open: true }), body: e.target.value } }))}
                                   placeholder="Describe what needs follow-up..."
@@ -9698,7 +9742,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </select>
                   </Field>
                   <Field label="Title">
-                    <input className={inputClass()} placeholder="e.g. Replaced kitchen faucet"
+                    <input
+                      className={inputClass()}
+                      {...writingAssistProps}
+                      placeholder="e.g. Replaced kitchen faucet"
                       value={logDraft.title}
                       onChange={e => setLogDraft(d => ({ ...d, title: e.target.value }))}
                     />
@@ -9717,14 +9764,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </Field>
                 </div>
                 <Field label="Description / what was done">
-                  <textarea className={inputClass()} rows={3}
+                  <textarea
+                    className={inputClass()}
+                    rows={3}
+                    {...writingAssistProps}
                     placeholder="Describe the work completed, materials used, etc."
                     value={logDraft.description}
                     onChange={e => setLogDraft(d => ({ ...d, description: e.target.value }))}
                   />
                 </Field>
                 <Field label="Notes — optional">
-                  <input className={inputClass()} placeholder="Warranty info, permit numbers, follow-up needed, etc."
+                  <input
+                    className={inputClass()}
+                    {...writingAssistProps}
+                    placeholder="Warranty info, permit numbers, follow-up needed, etc."
                     value={logDraft.notes}
                     onChange={e => setLogDraft(d => ({ ...d, notes: e.target.value }))}
                   />
@@ -13791,13 +13844,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <input className={inputClass()} value={contractorDraft.contact_name} onChange={event => setContractor({ ...contractorDraft, contact_name: event.target.value })} />
           </Field>
           <Field label="Email">
-            <input className={inputClass()} value={contractorDraft.email} onChange={event => setContractor({ ...contractorDraft, email: event.target.value })} />
+            <input className={inputClass()} type="email" autoComplete="email" spellCheck={false} value={contractorDraft.email} onChange={event => setContractor({ ...contractorDraft, email: event.target.value })} />
           </Field>
           <Field label="Phone">
-            <input className={inputClass()} value={contractorDraft.phone} onChange={event => setContractor({ ...contractorDraft, phone: event.target.value })} />
+            <input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={contractorDraft.phone} onChange={event => setContractor({ ...contractorDraft, phone: formatPhoneInputValue(event.target.value) })} />
           </Field>
           <Field label="Website">
-            <input className={inputClass()} value={contractorDraft.website_url} onChange={event => setContractor({ ...contractorDraft, website_url: event.target.value })} />
+            <input className={inputClass()} type="url" autoComplete="url" spellCheck={false} value={contractorDraft.website_url} onChange={event => setContractor({ ...contractorDraft, website_url: event.target.value })} />
           </Field>
           <Field label="City">
             <input className={inputClass()} value={contractorDraft.city} onChange={event => setContractor({ ...contractorDraft, city: event.target.value })} />
@@ -13812,7 +13865,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             />
           </Field>
           <Field label="ZIP code">
-            <input className={inputClass()} value={contractorDraft.zip_code} onChange={event => setContractor({ ...contractorDraft, zip_code: event.target.value })} />
+            <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={contractorDraft.zip_code} onChange={event => setContractor({ ...contractorDraft, zip_code: event.target.value })} />
           </Field>
           <div className="sm:col-span-2 lg:col-span-3">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Service categories</span>
@@ -13825,7 +13878,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <input className={inputClass()} value={fromList(contractorDraft.service_zip_codes)} onChange={event => setContractor({ ...contractorDraft, service_zip_codes: toList(event.target.value) })} />
           </Field>
           <Field label="License number">
-            <input className={inputClass()} value={contractorDraft.license_number} onChange={event => setContractor({ ...contractorDraft, license_number: event.target.value })} />
+            <input className={inputClass()} spellCheck={false} value={contractorDraft.license_number} onChange={event => setContractor({ ...contractorDraft, license_number: event.target.value })} />
           </Field>
           <Field label="Insurance status">
             <input className={inputClass()} value={contractorDraft.insurance_status} onChange={event => setContractor({ ...contractorDraft, insurance_status: event.target.value })} />
@@ -13834,7 +13887,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <input className={inputClass()} value={contractorDraft.bonded_status} onChange={event => setContractor({ ...contractorDraft, bonded_status: event.target.value })} />
           </Field>
           <Field label="Business summary">
-            <textarea className={inputClass()} rows={3} value={contractorDraft.business_summary} onChange={event => setContractor({ ...contractorDraft, business_summary: event.target.value })} />
+            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={contractorDraft.business_summary} onChange={event => setContractor({ ...contractorDraft, business_summary: event.target.value })} />
           </Field>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -14194,6 +14247,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <textarea
                               className={inputClass()}
                               rows={3}
+                              {...writingAssistProps}
                               value={contractorResponseDrafts[request.id] ?? ''}
                               onChange={event => setContractorResponseDrafts(current => ({ ...current, [request.id]: event.target.value }))}
                               placeholder="Send an update, ask a question, or explain next steps. Optional if you are only proposing an appointment."
@@ -14291,6 +14345,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <Field label="Notes (optional)">
                                     <input
                                       className={inputClass()}
+                                      {...writingAssistProps}
                                       placeholder="What to expect, access needed, etc."
                                       value={appointmentDrafts[request.id]?.notes ?? ''}
                                       onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, proposedAt: '' }), notes: event.target.value } }))}
@@ -14307,6 +14362,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <textarea
                                   className={inputClass()}
                                   rows={3}
+                                  {...writingAssistProps}
                                   value={closingSummaryDrafts[request.id] ?? ''}
                                   onChange={event => setClosingSummaryDrafts(current => ({ ...current, [request.id]: event.target.value }))}
                                   placeholder="Describe the work completed, parts used, next steps, etc."
@@ -14398,6 +14454,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <textarea
                                   className={inputClass()}
                                   rows={2}
+                                  {...writingAssistProps}
                                   value={contractorReopenDrafts[request.id]?.body ?? ''}
                                   onChange={event => setContractorReopenDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true }), body: event.target.value } }))}
                                   placeholder="Describe what needs follow-up..."
@@ -14899,7 +14956,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       const filedReportCount = subjectWorkOrders.filter(inspectionIsClosedJob).length;
                       rowName = subject.contact.display_name || 'New customer';
                       const home = subject.contact.homes?.[0];
-                      subtitle = home?.address_line1 || home?.nickname || subject.contact.phone || subject.contact.email || '';
+                      subtitle = home?.address_line1 || home?.nickname || formatPhoneNumber(subject.contact.phone) || subject.contact.email || '';
                       pills.push({ label: 'New customer', tone: 'slate' });
                       if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
                       if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
@@ -14943,8 +15000,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                       <div className="grid gap-4 md:grid-cols-3">
                         <Field label="Customer name"><input className={inputClass()} value={localContactDraft.display_name} onChange={e => setLocalContactDraft(d => ({ ...d, display_name: e.target.value }))} placeholder="e.g. Becky Thomas" /></Field>
-                        <Field label="Phone"><input className={inputClass()} value={localContactDraft.phone} onChange={e => setLocalContactDraft(d => ({ ...d, phone: e.target.value }))} placeholder="(555) 555-5555" /></Field>
-                        <Field label="Email"><input className={inputClass()} value={localContactDraft.email} onChange={e => setLocalContactDraft(d => ({ ...d, email: e.target.value }))} placeholder="customer@example.com" /></Field>
+                        <Field label="Phone"><input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={localContactDraft.phone} onChange={e => setLocalContactDraft(d => ({ ...d, phone: formatPhoneInputValue(e.target.value) }))} placeholder="(555) 555-5555" /></Field>
+                        <Field label="Email"><input className={inputClass()} type="email" autoComplete="email" spellCheck={false} value={localContactDraft.email} onChange={e => setLocalContactDraft(d => ({ ...d, email: e.target.value }))} placeholder="customer@example.com" /></Field>
                       </div>
                       <div className="grid gap-4 md:grid-cols-3">
                         <Field label="Home nickname"><input className={inputClass()} value={localContactDraft.home_nickname} onChange={e => setLocalContactDraft(d => ({ ...d, home_nickname: e.target.value }))} placeholder="Main home" /></Field>
@@ -14961,12 +15018,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             placeholder="Start typing a state..."
                           />
                         </Field>
-                        <Field label="ZIP"><input className={inputClass()} value={localContactDraft.zip_code} onChange={e => setLocalContactDraft(d => ({ ...d, zip_code: e.target.value }))} /></Field>
+                        <Field label="ZIP"><input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={localContactDraft.zip_code} onChange={e => setLocalContactDraft(d => ({ ...d, zip_code: e.target.value }))} /></Field>
                         <Field label="Home type"><input className={inputClass()} value={localContactDraft.home_type} onChange={e => setLocalContactDraft(d => ({ ...d, home_type: e.target.value }))} placeholder="Single family" /></Field>
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Customer notes"><textarea className={`${inputClass()} min-h-[80px] resize-y`} value={localContactDraft.notes} onChange={e => setLocalContactDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Gate code, preferred contact method, etc." /></Field>
-                        <Field label="Home notes"><textarea className={`${inputClass()} min-h-[80px] resize-y`} value={localContactDraft.home_notes} onChange={e => setLocalContactDraft(d => ({ ...d, home_notes: e.target.value }))} placeholder="Home details useful for this work." /></Field>
+                        <Field label="Customer notes"><textarea className={`${inputClass()} min-h-[80px] resize-y`} {...writingAssistProps} value={localContactDraft.notes} onChange={e => setLocalContactDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Gate code, preferred contact method, etc." /></Field>
+                        <Field label="Home notes"><textarea className={`${inputClass()} min-h-[80px] resize-y`} {...writingAssistProps} value={localContactDraft.home_notes} onChange={e => setLocalContactDraft(d => ({ ...d, home_notes: e.target.value }))} placeholder="Home details useful for this work." /></Field>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
                         <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: false })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
@@ -15561,7 +15618,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {conn && perm && (
                                     <>
                                       <SharedField label="Homeowner name" value={conn.display_name} allowed={perm.share_contact} />
-                                      <SharedField label="Phone" value={conn.phone} allowed={perm.share_contact} />
+                                      <SharedField label="Phone" value={formatPhoneNumber(conn.phone)} allowed={perm.share_contact} />
                                       <SharedField label="City" value={conn.city} allowed={perm.share_contact} />
                                       <SharedField label="State" value={conn.state} allowed={perm.share_contact} />
                                       <div>
@@ -15577,7 +15634,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {localCustomer && (
                                     <>
                                       <div><p className="text-xs text-slate-400 font-medium mb-0.5">Customer name</p><p className="text-sm text-slate-800 font-medium">{localCustomer.display_name || '—'}</p></div>
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{localCustomer.phone || '—'}</p></div>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">Phone</p><p className="text-sm text-slate-800 font-medium">{formatPhoneNumber(localCustomer.phone) || '—'}</p></div>
                                       <div><p className="text-xs text-slate-400 font-medium mb-0.5">Email</p><p className="text-sm text-slate-800 font-medium">{localCustomer.email || '—'}</p></div>
                                       <div><p className="text-xs text-slate-400 font-medium mb-0.5">Status</p><p className="text-sm text-slate-800 font-medium">New customer (not connected)</p></div>
                                       {localCustomer.notes && (
@@ -16124,6 +16181,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <Field label="Describe the estimate">
                                           <textarea
                                             className={`${inputClass()} min-h-[96px] resize-y`}
+                                            {...writingAssistProps}
                                             value={estimateAssistantText}
                                             onChange={event => setEstimateAssistantText(event.target.value)}
                                             placeholder="Example: Built deck, labor $2400, materials $3100, demo old deck $650, debris disposal $225."
@@ -16155,7 +16213,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <div className="mt-3">
                                       <Field label="Scope of work">
-                                        <textarea className={inputClass()} rows={3} value={estimateDraft.scope} onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))} placeholder="Describe what this estimate or invoice covers." />
+                                        <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.scope} onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))} placeholder="Describe what this estimate or invoice covers." />
                                       </Field>
                                     </div>
 
@@ -16191,6 +16249,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <Field label="Description">
                                               <input
                                                 className={inputClass()}
+                                                {...writingAssistProps}
                                                 value={line.description}
                                                 onChange={e => setEstimateDraft(d => ({
                                                   ...d,
@@ -16257,10 +16316,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                                       <Field label="Notes / exclusions">
-                                        <textarea className={inputClass()} rows={3} value={estimateDraft.notes} onChange={e => setEstimateDraft(d => ({ ...d, notes: e.target.value }))} placeholder="What is not included, assumptions, customer choices..." />
+                                        <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.notes} onChange={e => setEstimateDraft(d => ({ ...d, notes: e.target.value }))} placeholder="What is not included, assumptions, customer choices..." />
                                       </Field>
                                       <Field label="Terms">
-                                        <textarea className={inputClass()} rows={3} value={estimateDraft.terms} onChange={e => setEstimateDraft(d => ({ ...d, terms: e.target.value }))} />
+                                        <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.terms} onChange={e => setEstimateDraft(d => ({ ...d, terms: e.target.value }))} />
                                       </Field>
                                     </div>
                                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
@@ -17110,6 +17169,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="mt-3">
                             <textarea
                               className={`${inputClass()} min-h-[96px] resize-y`}
+                              {...writingAssistProps}
                               value={estimateAssistantText}
                               onChange={event => setEstimateAssistantText(event.target.value)}
                               placeholder="Example: Build 20x40 deck with railing, 40 billable hours at $50/hr, demo and removal $500, materials $3,000."
@@ -17132,7 +17192,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4">
                           <Field label="Scope of work">
-                            <textarea className={inputClass()} rows={3} value={estimateDraft.scope} onChange={event => setEstimateDraft(d => ({ ...d, scope: event.target.value }))} placeholder="Professional summary of the work." />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.scope} onChange={event => setEstimateDraft(d => ({ ...d, scope: event.target.value }))} placeholder="Professional summary of the work." />
                           </Field>
                         </div>
 
@@ -17156,7 +17216,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </select>
                                 </Field>
                                 <Field label="Description">
-                                  <input className={inputClass()} value={line.description} onChange={event => setEstimateDraft(d => ({
+                                  <input className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setEstimateDraft(d => ({
                                     ...d,
                                     line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
                                   }))} placeholder="Labor, materials, disposal..." />
@@ -17201,10 +17261,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <Field label="Notes / exclusions">
-                            <textarea className={inputClass()} rows={3} value={estimateDraft.notes} onChange={event => setEstimateDraft(d => ({ ...d, notes: event.target.value }))} />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.notes} onChange={event => setEstimateDraft(d => ({ ...d, notes: event.target.value }))} />
                           </Field>
                           <Field label="Terms">
-                            <textarea className={inputClass()} rows={3} value={estimateDraft.terms} onChange={event => setEstimateDraft(d => ({ ...d, terms: event.target.value }))} />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.terms} onChange={event => setEstimateDraft(d => ({ ...d, terms: event.target.value }))} />
                           </Field>
                         </div>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
@@ -17239,7 +17299,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="grid gap-3 md:grid-cols-3">
                           <Field label="Invoice number">
-                            <input className={inputClass()} value={invoiceDraft.invoice_number} onChange={event => setInvoiceDraft(d => ({ ...d, invoice_number: event.target.value }))} placeholder="Optional" />
+                            <input className={inputClass()} spellCheck={false} value={invoiceDraft.invoice_number} onChange={event => setInvoiceDraft(d => ({ ...d, invoice_number: event.target.value }))} placeholder="Optional" />
                           </Field>
                           <Field label="Invoice title">
                             <input className={inputClass()} value={invoiceDraft.title} onChange={event => setInvoiceDraft(d => ({ ...d, title: event.target.value }))} />
@@ -17270,7 +17330,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4">
                           <Field label="Scope">
-                            <textarea className={inputClass()} rows={3} value={invoiceDraft.scope} onChange={event => setInvoiceDraft(d => ({ ...d, scope: event.target.value }))} placeholder="What completed work does this invoice cover?" />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={invoiceDraft.scope} onChange={event => setInvoiceDraft(d => ({ ...d, scope: event.target.value }))} placeholder="What completed work does this invoice cover?" />
                           </Field>
                         </div>
 
@@ -17294,7 +17354,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </select>
                                 </Field>
                                 <Field label="Description">
-                                  <input className={inputClass()} value={line.description} onChange={event => setInvoiceDraft(d => ({
+                                  <input className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
                                     line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
                                   }))} placeholder="Labor, materials, disposal..." />
@@ -17339,10 +17399,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <Field label="Notes">
-                            <textarea className={inputClass()} rows={3} value={invoiceDraft.notes} onChange={event => setInvoiceDraft(d => ({ ...d, notes: event.target.value }))} />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={invoiceDraft.notes} onChange={event => setInvoiceDraft(d => ({ ...d, notes: event.target.value }))} />
                           </Field>
                           <Field label="Terms">
-                            <textarea className={inputClass()} rows={3} value={invoiceDraft.terms} onChange={event => setInvoiceDraft(d => ({ ...d, terms: event.target.value }))} />
+                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={invoiceDraft.terms} onChange={event => setInvoiceDraft(d => ({ ...d, terms: event.target.value }))} />
                           </Field>
                         </div>
 
@@ -17430,7 +17490,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
                                           contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
                                           contractorEmail: contractor?.email || contractorDraft.email || '',
-                                          contractorPhone: contractor?.phone || contractorDraft.phone || '',
+                                          contractorPhone: formatPhoneNumber(contractor?.phone || contractorDraft.phone || ''),
                                           contractorAddress: [contractor?.city || contractorDraft.city, contractor?.state || contractorDraft.state, contractor?.zip_code || contractorDraft.zip_code].filter(Boolean).join(', '),
                                           customerName,
                                           customerAddress,
@@ -17714,10 +17774,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <input className={inputClass()} value={localContactDraft.display_name} onChange={event => setLocalContactDraft(d => ({ ...d, display_name: event.target.value }))} placeholder="e.g. Becky Thomas" />
                       </Field>
                       <Field label="Phone">
-                        <input className={inputClass()} value={localContactDraft.phone} onChange={event => setLocalContactDraft(d => ({ ...d, phone: event.target.value }))} placeholder="(555) 555-5555" />
+                        <input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={localContactDraft.phone} onChange={event => setLocalContactDraft(d => ({ ...d, phone: formatPhoneInputValue(event.target.value) }))} placeholder="(555) 555-5555" />
                       </Field>
                       <Field label="Email">
-                        <input className={inputClass()} value={localContactDraft.email} onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))} placeholder="customer@example.com" />
+                        <input className={inputClass()} type="email" autoComplete="email" spellCheck={false} value={localContactDraft.email} onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))} placeholder="customer@example.com" />
                       </Field>
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -17745,7 +17805,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         />
                       </Field>
                       <Field label="ZIP">
-                        <input className={inputClass()} value={localContactDraft.zip_code} onChange={event => setLocalContactDraft(d => ({ ...d, zip_code: event.target.value }))} />
+                        <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={localContactDraft.zip_code} onChange={event => setLocalContactDraft(d => ({ ...d, zip_code: event.target.value }))} />
                       </Field>
                       <Field label="Home type">
                         <input className={inputClass()} value={localContactDraft.home_type} onChange={event => setLocalContactDraft(d => ({ ...d, home_type: event.target.value }))} placeholder="Single family" />
@@ -17753,10 +17813,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <Field label="Customer notes">
-                        <textarea className={`${inputClass()} min-h-[90px] resize-y`} value={localContactDraft.notes} onChange={event => setLocalContactDraft(d => ({ ...d, notes: event.target.value }))} placeholder="Gate code, preferred contact method, etc." />
+                        <textarea className={`${inputClass()} min-h-[90px] resize-y`} {...writingAssistProps} value={localContactDraft.notes} onChange={event => setLocalContactDraft(d => ({ ...d, notes: event.target.value }))} placeholder="Gate code, preferred contact method, etc." />
                       </Field>
                       <Field label="Home notes">
-                        <textarea className={`${inputClass()} min-h-[90px] resize-y`} value={localContactDraft.home_notes} onChange={event => setLocalContactDraft(d => ({ ...d, home_notes: event.target.value }))} placeholder="Home details useful for this work." />
+                        <textarea className={`${inputClass()} min-h-[90px] resize-y`} {...writingAssistProps} value={localContactDraft.home_notes} onChange={event => setLocalContactDraft(d => ({ ...d, home_notes: event.target.value }))} placeholder="Home details useful for this work." />
                       </Field>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -17872,7 +17932,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                         <div>
                           <label className="block text-xs text-slate-500 mb-1">Items (one per line or comma-separated)</label>
-                          <textarea className={`${inputClass()} resize-none`} rows={3} value={templateEditItems} onChange={e => setTemplateEditItems(e.target.value)} placeholder="Check appliances&#10;Test GFCI outlets" />
+                          <textarea className={`${inputClass()} resize-none`} rows={3} {...writingAssistProps} value={templateEditItems} onChange={e => setTemplateEditItems(e.target.value)} placeholder="Check appliances&#10;Test GFCI outlets" />
                         </div>
                       </div>
                       <button
@@ -18439,10 +18499,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <input className={inputClass()} value={localContactDraft.display_name} onChange={event => setLocalContactDraft(d => ({ ...d, display_name: event.target.value }))} placeholder="e.g. Becky Thomas" />
                       </Field>
                       <Field label="Phone">
-                        <input className={inputClass()} value={localContactDraft.phone} onChange={event => setLocalContactDraft(d => ({ ...d, phone: event.target.value }))} placeholder="(555) 555-5555" />
+                        <input className={inputClass()} type="tel" autoComplete="tel" spellCheck={false} value={localContactDraft.phone} onChange={event => setLocalContactDraft(d => ({ ...d, phone: formatPhoneInputValue(event.target.value) }))} placeholder="(555) 555-5555" />
                       </Field>
                       <Field label="Email">
-                        <input className={inputClass()} value={localContactDraft.email} onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))} placeholder="customer@example.com" />
+                        <input className={inputClass()} type="email" autoComplete="email" spellCheck={false} value={localContactDraft.email} onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))} placeholder="customer@example.com" />
                       </Field>
                     </div>
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -18492,6 +18552,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <Field label="Scope / description">
                       <textarea
                         className={`${inputClass()} min-h-[120px] resize-y`}
+                        {...writingAssistProps}
                         value={inspectionNewDraft.scope}
                         onChange={event => setInspectionNewDraft(d => ({ ...d, scope: event.target.value }))}
                         placeholder="Describe the work to perform, materials to use, or the approved work to complete."
@@ -18890,6 +18951,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <input
                                           key={`${row.key}-title`}
                                           className={`${inputClass()} mt-1`}
+                                          {...writingAssistProps}
                                           defaultValue={row.finding.title}
                                           disabled={simpleJobReadonly}
                                           onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, event.target.value)}
@@ -18907,6 +18969,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <label className="mt-3 block text-xs font-semibold text-slate-500">Notes</label>
                                     <textarea
                                       className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
+                                      {...writingAssistProps}
                                       value={row.finding.notes}
                                       disabled={simpleJobReadonly}
                                       onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, { notes: event.target.value })}
@@ -18925,6 +18988,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                               <input
                                 className={inputClass()}
+                                {...writingAssistProps}
                                 value={simpleTaskTitleDraft}
                                 onChange={event => setSimpleTaskTitleDraft(event.target.value)}
                                 onKeyDown={event => {
@@ -18949,6 +19013,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="mt-1 text-xs text-slate-500">Use this for the contractor-facing scope, progress notes, or completion summary. Full service job photo notes can be expanded in a later PR without changing this workflow.</p>
                         <textarea
                           className={`${inputClass()} mt-3 min-h-[150px] resize-y`}
+                          {...writingAssistProps}
                           value={inspectionSummary}
                           onChange={event => setInspectionSummary(event.target.value)}
                           disabled={activeInspection.status !== 'draft' || completed}
@@ -19587,6 +19652,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <textarea
                                           rows={2}
                                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none bg-white"
+                                          {...writingAssistProps}
                                           placeholder="Add notes, observations, or comments..."
                                           value={current.notes}
                                           onChange={e => setLocalFindings(prev => ({ ...prev, [key]: { ...current, notes: e.target.value } }))}
@@ -19600,6 +19666,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </label>
                                             <input
                                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
+                                              {...writingAssistProps}
                                               placeholder={status === 'Fixed On Site' ? 'e.g. Tightened fitting, cleared drain...' : 'e.g. Replace, repair, monitor...'}
                                               value={current.action}
                                               onChange={e => setLocalFindings(prev => ({ ...prev, [key]: { ...current, action: e.target.value } }))}
@@ -19676,6 +19743,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <p className="text-xs text-slate-500 leading-relaxed">Type an observation — get an instant status suggestion to apply to any item.</p>
                                     <textarea rows={3}
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
+                                      {...writingAssistProps}
                                       placeholder="e.g. Crack in foundation wall near corner…"
                                       value={singleNoteText} onChange={e => setSingleNoteText(e.target.value)} />
                                     {singleNoteText.trim() && (() => {
@@ -19722,6 +19790,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <p className="text-xs text-slate-500 leading-relaxed">Paste your walkthrough notes. The assistant splits them into findings and suggests a status for each.</p>
                                     <textarea rows={6}
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
+                                      {...writingAssistProps}
                                       placeholder={"Kitchen — cracked tile under sink\nRoof — missing shingles south side\nHVAC filter dirty\nGarage door auto-reverse fixed on site\n…"}
                                       value={walkthroughText} onChange={e => setWalkthroughText(e.target.value)} />
                                     <button type="button" disabled={!walkthroughText.trim()}
@@ -19817,6 +19886,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <p className="text-xs text-slate-500 leading-relaxed">Describe your observations. AI will suggest statuses, actions, and match findings to your checklist items.</p>
                                     <textarea rows={5}
                                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-500 resize-none bg-white"
+                                      {...writingAssistProps}
                                       placeholder="Describe what you observed during the job…"
                                       value={aiNoteText} onChange={e => setAiNoteText(e.target.value)} />
                                     <button type="button" disabled={!aiNoteText.trim() || aiProcessing}
@@ -20088,6 +20158,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <span className="text-xs font-medium text-slate-500">Homeowner-facing description</span>
                                           <textarea
                                             className={`${inputClass()} mt-1 min-h-[84px] resize-y`}
+                                            {...writingAssistProps}
                                             value={line.description}
                                             onChange={e => updateRepairEstimateLine(line.id, { description: e.target.value })}
                                           />
@@ -20136,6 +20207,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <span className="text-xs font-medium text-slate-500">Contractor notes</span>
                                           <textarea
                                             className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
+                                            {...writingAssistProps}
                                             value={line.notes}
                                             onChange={e => updateRepairEstimateLine(line.id, { notes: e.target.value })}
                                           />
@@ -20194,6 +20266,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <Field label="Value-add wording">
                               <textarea
                                 className={`${inputClass()} min-h-[92px] resize-y`}
+                                {...writingAssistProps}
                                 value={reportValueAddText}
                                 onChange={event => setReportValueAddText(event.target.value)}
                                 placeholder={defaultValueAddText || 'Describe the value delivered during this visit...'}
@@ -20221,6 +20294,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Edit homeowner summary before filing</p>
                             <textarea
                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500 resize-y min-h-[120px] bg-white"
+                              {...writingAssistProps}
                               value={inspectionSummary}
                               onChange={e => setInspectionSummary(e.target.value)}
                               placeholder="Write the plain-language summary the homeowner should see..."
@@ -20820,7 +20894,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                     <div>
                       <p className="font-bold text-white">{contractor.business_name || 'Unnamed contractor'}</p>
                       <p className="text-sm text-slate-400">{contractor.city}{contractor.state ? `, ${contractor.state}` : ''}</p>
-                      <p className="mt-1 text-xs text-slate-400">{contractor.email || 'No email'} · {contractor.phone || 'No phone'}</p>
+                      <p className="mt-1 text-xs text-slate-400">{contractor.email || 'No email'} · {formatPhoneNumber(contractor.phone) || 'No phone'}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">{contractor.account_status}</span>
@@ -20873,6 +20947,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                       <textarea
                         className={inputClass()}
                         rows={3}
+                        {...writingAssistProps}
                         value={draft.subscription_notes}
                         onChange={event => updateAdminDraft(contractor.id, { ...draft, subscription_notes: event.target.value })}
                         placeholder="Billing plan, trial notes, Stripe notes later..."
@@ -20882,6 +20957,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                       <textarea
                         className={inputClass()}
                         rows={3}
+                        {...writingAssistProps}
                         value={draft.admin_notes}
                         onChange={event => updateAdminDraft(contractor.id, { ...draft, admin_notes: event.target.value })}
                         placeholder="Private ServSync admin notes"
@@ -21024,6 +21100,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                     <Field label="Reward notes">
                       <input
                         className={inputClass()}
+                        {...writingAssistProps}
                         value={draft.reward_notes}
                         onChange={event => updateInviteDraft(invite.id, { ...draft, reward_notes: event.target.value })}
                         placeholder="Why this referral does or does not count"
@@ -21351,6 +21428,7 @@ function ServiceCategoryAdvisor({
         <Field label="Describe the issue">
           <textarea
             className={`${inputClass()} min-h-[88px] resize-y bg-white`}
+            {...writingAssistProps}
             value={value}
             onChange={event => onChange(event.target.value)}
             placeholder="Example: Water is dripping under my kitchen sink and the cabinet floor is wet."
@@ -21494,6 +21572,7 @@ function SupportInboxPanel({
             <Field label="Short title">
               <input
                 className={inputClass()}
+                {...writingAssistProps}
                 value={draft.title}
                 onChange={event => onDraftChange({ ...draft, title: event.target.value })}
                 placeholder="Example: Add saved filters to service requests"
@@ -21504,6 +21583,7 @@ function SupportInboxPanel({
             <Field label="Details">
               <textarea
                 className={`${inputClass()} min-h-[110px] resize-y`}
+                {...writingAssistProps}
                 value={draft.body}
                 onChange={event => onDraftChange({ ...draft, body: event.target.value })}
                 placeholder="Tell us what you want changed, what you expected, or what would make this easier."
@@ -21608,6 +21688,7 @@ function SupportInboxPanel({
                     <Field label={disabled ? 'Conversation closed' : 'Reply'}>
                       <textarea
                         className={`${inputClass()} min-h-[82px] resize-y`}
+                        {...writingAssistProps}
                         value={replyDrafts[inquiry.id] || ''}
                         onChange={event => onReplyDraftChange(inquiry.id, event.target.value)}
                         disabled={disabled}
@@ -21783,6 +21864,7 @@ function AdminSupportInbox({
                   <Field label="Admin reply">
                     <textarea
                       className={`${inputClass()} min-h-[90px] resize-y`}
+                      {...writingAssistProps}
                       value={replyDrafts[inquiry.id] || ''}
                       onChange={event => onReplyDraftChange(inquiry.id, event.target.value)}
                       placeholder="Reply to the user or ask for more details..."
@@ -22808,7 +22890,7 @@ function DiscoverFeed({
               </select>
             </Field>
             <Field label="Title">
-              <input className={inputClass()} placeholder="e.g. Spring HVAC maintenance reminder" value={postDraft.title} onChange={e => setPostDraft(d => ({ ...d, title: e.target.value }))} />
+              <input className={inputClass()} {...writingAssistProps} placeholder="e.g. Spring HVAC maintenance reminder" value={postDraft.title} onChange={e => setPostDraft(d => ({ ...d, title: e.target.value }))} />
             </Field>
             <Field label="City">
               <input className={inputClass()} placeholder="City of job" value={postDraft.city} onChange={e => setPostDraft(d => ({ ...d, city: e.target.value }))} />
@@ -22824,7 +22906,7 @@ function DiscoverFeed({
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description">
-                <textarea className={inputClass()} rows={3} placeholder="Share useful context, maintenance advice, or what homeowners can learn from this work." value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
+                <textarea className={inputClass()} rows={3} {...writingAssistProps} placeholder="Share useful context, maintenance advice, or what homeowners can learn from this work." value={postDraft.description} onChange={e => setPostDraft(d => ({ ...d, description: e.target.value }))} />
               </Field>
             </div>
           </div>
