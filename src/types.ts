@@ -552,6 +552,8 @@ export interface ContractorLocalHome {
   id: string;
   contractor_id: string;
   local_contact_id: string;
+  home_id?: string | null;
+  claimed_at?: string | null;
   nickname: string;
   address_line1: string;
   address_line2: string;
@@ -569,13 +571,38 @@ export interface ContractorLocalHome {
 export interface ContractorLocalContact {
   id: string;
   contractor_id: string;
+  homeowner_user_id?: string | null;
   display_name: string;
   phone: string;
   email: string;
   notes: string;
+  claimed_at?: string | null;
   created_at: string;
   updated_at: string;
   homes?: ContractorLocalHome[];
+}
+
+export type LocalCustomerClaimInviteStatus = 'pending' | 'claimed' | 'declined' | 'expired' | 'revoked';
+
+export interface LocalCustomerClaimInvite {
+  id: string;
+  contractor_id: string;
+  local_contact_id: string;
+  local_home_id: string | null;
+  invite_token: string;
+  invited_email: string | null;
+  invited_phone: string | null;
+  status: LocalCustomerClaimInviteStatus;
+  created_by: string;
+  claimed_by_homeowner_user_id: string | null;
+  claimed_home_id: string | null;
+  connection_id: string | null;
+  expires_at: string;
+  used_at: string | null;
+  declined_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Inspection {
