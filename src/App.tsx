@@ -11412,6 +11412,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const [templateLibraryView, setTemplateLibraryView] = useState<'workflow' | 'estimate' | 'generic'>('workflow');
   const [showLocalContactForm, setShowLocalContactForm] = useState(false);
+  const [homeownerMobileDetailOpen, setHomeownerMobileDetailOpen] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [localContactDraft, setLocalContactDraft] = useState({
     display_name: '',
@@ -12332,6 +12333,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setHomeownerWorkspacePropertyScope('selected');
     setHomeownerFilter(connection.status === 'active' ? 'active' : 'inactive');
     setHomeownerDetailTab(tab);
+    setHomeownerMobileDetailOpen(true);
     setContractorTab('connections');
   };
 
@@ -12361,6 +12363,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           : 'active',
     );
     setSelectedHomeownerRequestId(request.id);
+    setHomeownerMobileDetailOpen(true);
     setContractorTab('connections');
   };
 
@@ -13332,7 +13335,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const openCustomersOnboardingWorkspace = () => {
     setContractorTab('connections');
     setHomeownerFilter('active');
-    if (onboardingCustomerCount === 0) setShowLocalContactForm(true);
+    if (onboardingCustomerCount === 0) {
+      setShowLocalContactForm(true);
+      setHomeownerMobileDetailOpen(true);
+    }
   };
   const openInviteOnboardingWorkspace = () => {
     setContractorTab('connections');
@@ -13341,8 +13347,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const inviteTarget = localContacts.find(contact => !contact.homeowner_user_id && !contact.claimed_at) ?? localContacts[0] ?? null;
     if (inviteTarget) {
       setSelectedHomeownerSubjectId(`local:${inviteTarget.id}`);
+      setHomeownerMobileDetailOpen(true);
     } else {
       setShowLocalContactForm(true);
+      setHomeownerMobileDetailOpen(true);
     }
   };
   const openReportOnboardingWorkspace = () => {
@@ -14671,6 +14679,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         } else {
           setSelectedHomeownerSubjectId(`local:${contactWithHome.id}`);
           setHomeownerDetailTab('profile');
+          setHomeownerMobileDetailOpen(true);
         }
       }
 
@@ -16524,16 +16533,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .sort((a, b) => subjectAttentionScore(b) - subjectAttentionScore(a));
         const allSubjects = [...activeSubjects, ...inactiveSubjects];
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
+        const showHomeownerMobileDetail = homeownerMobileDetailOpen || showLocalContactForm;
 
         return (
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-0 md:grid-cols-[20rem_minmax(0,1fr)] md:items-start">
               {/* === Left sidebar === */}
-              <div className="border-b border-slate-200 bg-white md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:border-b-0 md:border-r">
+              <div className={`${showHomeownerMobileDetail ? 'hidden md:block' : 'block'} border-b border-slate-200 bg-white md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:border-b-0 md:border-r`}>
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-slate-800 text-sm">Homeowners</h2>
-                    <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                    <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
                       <Plus size={14} /> Add
                     </button>
                   </div>
@@ -16544,6 +16554,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         setHomeownerFilter('active');
                         setSelectedHomeownerSubjectId(`request:${connectionRequests[0].id}`);
                         setShowLocalContactForm(false);
+                        setHomeownerMobileDetailOpen(true);
                       }}
                       className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-800 hover:border-amber-300 hover:bg-amber-100"
                     >
@@ -16647,6 +16658,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             setHomeownerWorkspacePropertyScope('selected');
                           }
                           setShowLocalContactForm(false);
+                          setHomeownerMobileDetailOpen(true);
                           setHomeownerDetailTab('profile');
                         }}
                         className={`w-full px-4 py-4 text-left transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
@@ -16666,7 +16678,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
 
               {/* === Right detail panel === */}
-              <div className="min-w-0 bg-slate-50">
+              <div className={`${showHomeownerMobileDetail ? 'block' : 'hidden md:block'} min-w-0 bg-slate-50`}>
+                {showHomeownerMobileDetail && (
+                  <div className="border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLocalContactForm(false);
+                        setHomeownerMobileDetailOpen(false);
+                      }}
+                      className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    >
+                      Back to customers
+                    </button>
+                  </div>
+                )}
                 {showLocalContactForm ? (
                   <div className="p-4 sm:p-6">
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5 max-w-3xl mx-auto">
@@ -16675,7 +16701,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <h3 className="text-lg font-bold text-slate-950">Add new customer</h3>
                           <p className="mt-1 text-xs text-slate-500">Save someone who's not on ServSync yet. You can invite them to claim their data later.</p>
                         </div>
-                        <button type="button" onClick={() => setShowLocalContactForm(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+                        <button type="button" onClick={() => { setShowLocalContactForm(false); setHomeownerMobileDetailOpen(false); }} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
                       </div>
                       <div className="grid gap-4 md:grid-cols-3">
                         <Field label="Customer name"><input className={inputClass()} value={localContactDraft.display_name} onChange={e => setLocalContactDraft(d => ({ ...d, display_name: e.target.value }))} placeholder="e.g. Becky Thomas" /></Field>
@@ -16708,7 +16734,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <button type="button" onClick={() => void createLocalContact({ autoStartFieldWork: false })} disabled={savingInspection || !localContactDraft.display_name.trim()} className={buttonClass('primary')}>
                           {savingInspection ? 'Saving...' : 'Save new customer'}
                         </button>
-                        <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
+                        <button type="button" onClick={() => { setShowLocalContactForm(false); setHomeownerMobileDetailOpen(false); }} className={buttonClass('secondary')}>Cancel</button>
                       </div>
                     </div>
                   </div>
