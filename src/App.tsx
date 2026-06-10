@@ -4642,6 +4642,21 @@ function fromList(value?: string[]) {
 const CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS = [10, 25, 50, 100, 200] as const;
 const DEFAULT_CONTRACTOR_SERVICE_RADIUS = 25;
 
+type GeocodeLocationResult = {
+  ok: boolean;
+  normalized_location: string;
+  location_text: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  provider: string;
+  provider_place_id?: string;
+  precision: string;
+  error?: string;
+};
+
 function normalizeServiceAreaRadius(value: number | string | null | undefined) {
   const parsed = Number(value);
   return CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS.includes(parsed as typeof CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS[number])
@@ -4684,6 +4699,10 @@ function createBlankContractorServiceArea(sortOrder = 0): ContractorServiceArea 
     radius_miles: DEFAULT_CONTRACTOR_SERVICE_RADIUS,
     latitude: null,
     longitude: null,
+    geocode_status: 'pending',
+    geocoded_at: null,
+    normalized_location: '',
+    geocode_provider: '',
     sort_order: sortOrder,
     created_at: '',
     updated_at: '',
@@ -4703,6 +4722,10 @@ function normalizeContractorServiceArea(area: Partial<ContractorServiceArea>, in
     radius_miles: normalizeServiceAreaRadius(area.radius_miles),
     latitude: area.latitude ?? null,
     longitude: area.longitude ?? null,
+    geocode_status: area.geocode_status || 'pending',
+    geocoded_at: area.geocoded_at || null,
+    normalized_location: area.normalized_location || '',
+    geocode_provider: area.geocode_provider || '',
     sort_order: typeof area.sort_order === 'number' ? area.sort_order : index,
     created_at: area.created_at || '',
     updated_at: area.updated_at || '',
@@ -4716,6 +4739,11 @@ function contractorServiceAreaHasLocation(area: ContractorServiceArea) {
 function contractorServiceAreaDisplay(area: Pick<ContractorServiceArea, 'label' | 'location_text' | 'zip_code' | 'city' | 'state' | 'radius_miles'>) {
   const location = area.location_text || area.zip_code || [area.city, area.state].filter(Boolean).join(', ') || 'Service area';
   return `${area.label ? `${area.label}: ` : ''}${location} + ${normalizeServiceAreaRadius(area.radius_miles)} miles`;
+}
+
+function contractorServiceAreaNeedsGeocode(area: ContractorServiceArea) {
+  return contractorServiceAreaHasLocation(area)
+    && (area.latitude === null || area.longitude === null || area.geocode_status !== 'geocoded');
 }
 
 function contractorServiceAreaRowsForSave(areas: ContractorServiceArea[], contractorId: string) {
@@ -4732,10 +4760,56 @@ function contractorServiceAreaRowsForSave(areas: ContractorServiceArea[], contra
         radius_miles: normalizeServiceAreaRadius(area.radius_miles),
         latitude: area.latitude,
         longitude: area.longitude,
+        geocode_status: area.geocode_status,
+        geocoded_at: area.geocoded_at,
+        normalized_location: area.normalized_location,
+        geocode_provider: area.geocode_provider,
         sort_order: index,
       };
     })
     .filter(area => Boolean(area.location_text || area.zip_code || area.city || area.state));
+}
+
+async function invokeGeocodeLocation(area: Pick<ContractorServiceArea, 'location_text' | 'zip_code' | 'city' | 'state'>): Promise<GeocodeLocationResult> {
+  if (!supabase) {
+    return {
+      ok: false,
+      normalized_location: '',
+      location_text: area.location_text,
+      city: '',
+      state: '',
+      zip_code: '',
+      latitude: null,
+      longitude: null,
+      provider: '',
+      precision: '',
+      error: 'Geocoding is not available.',
+    };
+  }
+  const { data, error } = await supabase.functions.invoke('geocode-location', {
+    body: {
+      location_text: area.location_text,
+      zip_code: area.zip_code,
+      city: area.city,
+      state: area.state,
+    },
+  });
+  if (error) {
+    return {
+      ok: false,
+      normalized_location: '',
+      location_text: area.location_text,
+      city: '',
+      state: '',
+      zip_code: '',
+      latitude: null,
+      longitude: null,
+      provider: '',
+      precision: '',
+      error: error.message,
+    };
+  }
+  return data as GeocodeLocationResult;
 }
 
 function normalizeSharingPermissions(permissions?: Partial<SharingPermissions> | null): SharingPermissions {
@@ -11949,7 +12023,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const updateContractorServiceAreaLocation = (areaId: string, locationValue: string) => {
     const parsedLocation = parseContractorServiceAreaLocation(locationValue);
-    updateContractorServiceArea(areaId, parsedLocation);
+    updateContractorServiceArea(areaId, {
+      ...parsedLocation,
+      latitude: null,
+      longitude: null,
+      geocode_status: 'pending',
+      geocoded_at: null,
+      normalized_location: '',
+      geocode_provider: '',
+    });
   };
 
   const addContractorServiceArea = () => {
@@ -12018,8 +12100,48 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           throw saveError;
         }
       }
+      const geocodeWarnings: string[] = [];
+      const serviceAreasReady: ContractorServiceArea[] = [];
+      for (const area of contractorServiceAreas) {
+        if (!contractorServiceAreaHasLocation(area)) {
+          serviceAreasReady.push(area);
+          continue;
+        }
+        if (!contractorServiceAreaNeedsGeocode(area)) {
+          serviceAreasReady.push(area);
+          continue;
+        }
+        const result = await invokeGeocodeLocation(area);
+        if (result.ok && result.latitude !== null && result.longitude !== null) {
+          serviceAreasReady.push({
+            ...area,
+            location_text: area.location_text || result.location_text,
+            zip_code: area.zip_code || result.zip_code,
+            city: area.city || result.city,
+            state: area.state || result.state,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            geocode_status: 'geocoded' as const,
+            geocoded_at: new Date().toISOString(),
+            normalized_location: result.normalized_location,
+            geocode_provider: result.provider,
+          });
+        } else {
+          geocodeWarnings.push(area.location_text || area.zip_code || [area.city, area.state].filter(Boolean).join(', '));
+          serviceAreasReady.push({
+            ...area,
+            latitude: null,
+            longitude: null,
+            geocode_status: 'failed' as const,
+            geocoded_at: null,
+            normalized_location: '',
+            geocode_provider: '',
+          });
+        }
+      }
+      setContractorServiceAreas(serviceAreasReady);
       if (savedContractorId) {
-        const serviceAreaRows = contractorServiceAreaRowsForSave(contractorServiceAreas, savedContractorId);
+        const serviceAreaRows = contractorServiceAreaRowsForSave(serviceAreasReady, savedContractorId);
         const { error: deleteServiceAreasError } = await supabase
           .from('contractor_service_areas')
           .delete()
@@ -12032,8 +12154,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           if (insertServiceAreasError) throw insertServiceAreasError;
         }
       }
-      setNotice('Contractor profile saved.');
       await loadContractor();
+      setNotice('Contractor profile saved.');
+      if (geocodeWarnings.length > 0) {
+        setError(`Could not confirm ${geocodeWarnings.length === 1 ? 'this location' : 'these locations'}: ${geocodeWarnings.join(', ')}. Check the ZIP or city/state.`);
+      }
     } catch (err) {
       setError(readableError(err, 'Unable to save contractor profile.'));
     }
@@ -15696,9 +15821,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </button>
                       </div>
                       {contractorServiceAreaHasLocation(area) && (
-                        <p className="mt-2 text-xs font-medium text-[#223D67]/70">
-                          {contractorServiceAreaDisplay(area)}
-                        </p>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs font-medium text-[#223D67]/70">
+                            {contractorServiceAreaDisplay(area)}
+                          </p>
+                          {area.geocode_status === 'geocoded' && (
+                            <p className="text-xs font-semibold text-emerald-700">
+                              Location confirmed{area.normalized_location ? `: ${area.normalized_location}` : ''}
+                            </p>
+                          )}
+                          {area.geocode_status === 'failed' && (
+                            <p className="text-xs font-semibold text-amber-700">
+                              Could not confirm this location. Check the ZIP or city/state.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))
@@ -25137,6 +25274,7 @@ function DiscoverFeed({
   onRequestService?: (contractorId: string, category: string) => void;
 }) {
   const [feed, setFeed] = useState<DiscoverFeedItem[]>([]);
+  const [savedFeed, setSavedFeed] = useState<DiscoverFeedItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
@@ -25144,6 +25282,8 @@ function DiscoverFeed({
   const [filterKeyword, setFilterKeyword] = useState('');
   const [feedView, setFeedView] = useState<'all' | 'saved'>('all');
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [discoverLocationStatus, setDiscoverLocationStatus] = useState<'idle' | 'loading' | 'geocoded' | 'fallback'>('idle');
+  const [discoverLocationMessage, setDiscoverLocationMessage] = useState('');
 
   const [postDraft, setPostDraft] = useState({ category: '', title: '', description: '', city: '', state: '' });
   const [postFiles, setPostFiles] = useState<File[]>([]);
@@ -25159,16 +25299,54 @@ function DiscoverFeed({
   const [actionNotice, setActionNotice] = useState('');
   const [actionError, setActionError] = useState('');
 
+  const loadSavedFeed = async () => {
+    if (!supabase || perspective !== 'homeowner') return;
+    try {
+      const { data, error } = await supabase.rpc('servsync_discover_saved_posts');
+      if (error) throw error;
+      setSavedFeed((data || []) as DiscoverFeedItem[]);
+    } catch {
+      setSavedFeed([]);
+    }
+  };
+
   const loadFeed = async () => {
     if (!supabase) return;
     setFeedLoading(true);
     try {
+      let searchLat: number | null = null;
+      let searchLng: number | null = null;
+      const locationQuery = filterLocation.trim();
+      if (perspective === 'homeowner' && locationQuery) {
+        setDiscoverLocationStatus('loading');
+        setDiscoverLocationMessage('');
+        const geocodeResult = await invokeGeocodeLocation({
+          location_text: locationQuery,
+          zip_code: '',
+          city: '',
+          state: '',
+        });
+        if (geocodeResult.ok && geocodeResult.latitude !== null && geocodeResult.longitude !== null) {
+          searchLat = geocodeResult.latitude;
+          searchLng = geocodeResult.longitude;
+          setDiscoverLocationStatus('geocoded');
+          setDiscoverLocationMessage('Showing contractors whose listed service areas overlap this search area.');
+        } else {
+          setDiscoverLocationStatus('fallback');
+          setDiscoverLocationMessage('We could not confirm that location. Showing text matches instead.');
+        }
+      } else if (perspective === 'homeowner') {
+        setDiscoverLocationStatus('idle');
+        setDiscoverLocationMessage('');
+      }
       const { data, error } = perspective === 'contractor'
         ? await supabase.rpc('servsync_my_discover_posts')
         : await supabase.rpc('servsync_discover_feed', {
           p_category: filterCategory || null,
           p_location: filterLocation || null,
           p_radius_miles: filterLocation.trim() ? Number(filterRadiusMiles) : null,
+          p_search_lat: searchLat,
+          p_search_lng: searchLng,
         });
       if (error) throw error;
       setFeed((data || []) as DiscoverFeedItem[]);
@@ -25179,7 +25357,10 @@ function DiscoverFeed({
     }
   };
 
-  useEffect(() => { void loadFeed(); }, []);
+  useEffect(() => {
+    void loadFeed();
+    if (perspective === 'homeowner') void loadSavedFeed();
+  }, []);
 
   const recordPostView = async (item: DiscoverFeedItem, source: 'homeowner_discover_expand' | 'homeowner_discover_profile') => {
     if (!supabase || perspective !== 'homeowner') return;
@@ -25349,6 +25530,7 @@ function DiscoverFeed({
           : Math.max(0, currentSaveCount + (isSaved ? 1 : -1));
         return { ...post, is_saved: isSaved, save_count: nextSaveCount };
       }));
+      await loadSavedFeed();
       setActionNotice(isSaved ? 'Post saved.' : 'Post removed from saved posts.');
     } catch (err) {
       setActionError(readableError(err, 'Unable to update saved posts.'));
@@ -25362,9 +25544,9 @@ function DiscoverFeed({
     return map;
   }, { ...localConnectionStatuses });
 
-  const savedFeedCount = feed.filter(item => item.is_saved).length;
+  const savedFeedCount = savedFeed.length;
   const feedForView = perspective === 'homeowner' && feedView === 'saved'
-    ? feed.filter(item => item.is_saved)
+    ? savedFeed.filter(item => !filterCategory || item.post_category === filterCategory)
     : feed;
   const keywordTerms = normalizeText(filterKeyword).split(' ').filter(Boolean);
   const visibleFeed = keywordTerms.length === 0
@@ -25426,7 +25608,7 @@ function DiscoverFeed({
               Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Showing contractors and posts with listed service areas matching this location.
+              Search by ZIP or city to find contractors whose listed service areas match your area.
             </p>
           </div>
           <div className="grid gap-3 lg:grid-cols-[1fr_0.9fr_1fr_0.8fr_auto]">
@@ -25477,8 +25659,18 @@ function DiscoverFeed({
             </button>
           </div>
           {filterLocation.trim() && (
-            <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
-              Mileage is a guide for now. Results are based on contractor-listed service areas and matching locations.
+            <p className={`mt-3 rounded-xl border px-3 py-2 text-xs leading-5 ${
+              discoverLocationStatus === 'fallback'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-blue-100 bg-blue-50 text-blue-900'
+            }`}>
+              {discoverLocationStatus === 'geocoded'
+                ? discoverLocationMessage
+                : discoverLocationStatus === 'fallback'
+                  ? discoverLocationMessage
+                  : discoverLocationStatus === 'loading'
+                    ? 'Confirming that location...'
+                    : 'Mileage is a guide for now. Results are based on contractor-listed service areas and matching locations.'}
             </p>
           )}
         </div>

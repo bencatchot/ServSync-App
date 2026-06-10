@@ -254,6 +254,10 @@ export interface ContractorServiceArea {
   radius_miles: number;
   latitude: number | null;
   longitude: number | null;
+  geocode_status: 'pending' | 'geocoded' | 'failed';
+  geocoded_at: string | null;
+  normalized_location: string;
+  geocode_provider: string;
   sort_order: number;
   created_at: string;
   updated_at: string;
