@@ -243,6 +243,22 @@ export interface ContractorProfile {
   updated_at: string;
 }
 
+export interface ContractorServiceArea {
+  id: string;
+  contractor_id: string;
+  label: string;
+  location_text: string;
+  zip_code: string;
+  city: string;
+  state: string;
+  radius_miles: number;
+  latitude: number | null;
+  longitude: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ContractorTeamRole = 'admin' | 'office' | 'field_tech' | 'viewer';
 export type ContractorTeamStatus = 'active' | 'disabled';
 export type ContractorTeamInviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired';

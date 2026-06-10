@@ -79,6 +79,7 @@ import type {
   ContractorLocalContact,
   ContractorLocalHome,
   ContractorProfile,
+  ContractorServiceArea,
   ContractorTeamAccess,
   ContractorTeamInvite,
   ContractorTeamMember,
@@ -4636,6 +4637,105 @@ function toList(value: string) {
 
 function fromList(value?: string[]) {
   return (value || []).join(', ');
+}
+
+const CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS = [10, 25, 50, 100, 200] as const;
+const DEFAULT_CONTRACTOR_SERVICE_RADIUS = 25;
+
+function normalizeServiceAreaRadius(value: number | string | null | undefined) {
+  const parsed = Number(value);
+  return CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS.includes(parsed as typeof CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS[number])
+    ? parsed
+    : DEFAULT_CONTRACTOR_SERVICE_RADIUS;
+}
+
+function parseContractorServiceAreaLocation(value: string) {
+  const locationText = value.trim();
+  if (/^\d{5}$/.test(locationText)) {
+    return {
+      location_text: locationText,
+      zip_code: locationText,
+      city: '',
+      state: '',
+    };
+  }
+
+  const parts = locationText.split(',').map(part => part.trim()).filter(Boolean);
+  const city = parts.length >= 2 ? parts[0] : '';
+  const rawState = parts.length >= 2 ? parts[1] : '';
+  const state = /^[a-z]{2}$/i.test(rawState) ? rawState.toUpperCase() : rawState;
+  return {
+    location_text: locationText,
+    zip_code: '',
+    city,
+    state,
+  };
+}
+
+function createBlankContractorServiceArea(sortOrder = 0): ContractorServiceArea {
+  return {
+    id: `draft-${crypto.randomUUID()}`,
+    contractor_id: '',
+    label: '',
+    location_text: '',
+    zip_code: '',
+    city: '',
+    state: '',
+    radius_miles: DEFAULT_CONTRACTOR_SERVICE_RADIUS,
+    latitude: null,
+    longitude: null,
+    sort_order: sortOrder,
+    created_at: '',
+    updated_at: '',
+  };
+}
+
+function normalizeContractorServiceArea(area: Partial<ContractorServiceArea>, index = 0): ContractorServiceArea {
+  const location = parseContractorServiceAreaLocation(area.location_text || area.zip_code || [area.city, area.state].filter(Boolean).join(', '));
+  return {
+    id: area.id || `draft-${crypto.randomUUID()}`,
+    contractor_id: area.contractor_id || '',
+    label: area.label || '',
+    location_text: area.location_text || location.location_text,
+    zip_code: area.zip_code || location.zip_code,
+    city: area.city || location.city,
+    state: area.state || location.state,
+    radius_miles: normalizeServiceAreaRadius(area.radius_miles),
+    latitude: area.latitude ?? null,
+    longitude: area.longitude ?? null,
+    sort_order: typeof area.sort_order === 'number' ? area.sort_order : index,
+    created_at: area.created_at || '',
+    updated_at: area.updated_at || '',
+  };
+}
+
+function contractorServiceAreaHasLocation(area: ContractorServiceArea) {
+  return Boolean(area.location_text.trim() || area.zip_code.trim() || area.city.trim() || area.state.trim());
+}
+
+function contractorServiceAreaDisplay(area: Pick<ContractorServiceArea, 'label' | 'location_text' | 'zip_code' | 'city' | 'state' | 'radius_miles'>) {
+  const location = area.location_text || area.zip_code || [area.city, area.state].filter(Boolean).join(', ') || 'Service area';
+  return `${area.label ? `${area.label}: ` : ''}${location} + ${normalizeServiceAreaRadius(area.radius_miles)} miles`;
+}
+
+function contractorServiceAreaRowsForSave(areas: ContractorServiceArea[], contractorId: string) {
+  return areas
+    .map((area, index) => {
+      const parsedLocation = parseContractorServiceAreaLocation(area.location_text || area.zip_code || [area.city, area.state].filter(Boolean).join(', '));
+      return {
+        contractor_id: contractorId,
+        label: area.label.trim(),
+        location_text: parsedLocation.location_text,
+        zip_code: parsedLocation.zip_code,
+        city: parsedLocation.city,
+        state: parsedLocation.state,
+        radius_miles: normalizeServiceAreaRadius(area.radius_miles),
+        latitude: area.latitude,
+        longitude: area.longitude,
+        sort_order: index,
+      };
+    })
+    .filter(area => Boolean(area.location_text || area.zip_code || area.city || area.state));
 }
 
 function normalizeSharingPermissions(permissions?: Partial<SharingPermissions> | null): SharingPermissions {
@@ -11278,6 +11378,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
 function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
   const [contractor, setContractor] = useState<ContractorProfile | null>(null);
+  const [contractorServiceAreas, setContractorServiceAreas] = useState<ContractorServiceArea[]>([]);
   const [connections, setConnections] = useState<ContractorConnectedHomeowner[]>([]);
   const [connectionRequests, setConnectionRequests] = useState<ContractorConnectionRequest[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
@@ -11570,8 +11671,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       let loadedInvites: ContractorInvite[] = [];
       let loadedRequests: ContractorConnectionRequest[] = [];
       let loadedTeamAccess: ContractorTeamAccess | null = null;
+      let loadedServiceAreas: ContractorServiceArea[] = [];
       if (loadedContractor?.id) {
-        const [invitesRes, requestsRes, teamRes] = await Promise.all([
+        const [invitesRes, requestsRes, teamRes, serviceAreasRes] = await Promise.all([
           supabase
             .from('contractor_invites')
             .select('*')
@@ -11584,11 +11686,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .eq('status', 'pending')
             .order('created_at', { ascending: false }),
           supabase.rpc('servsync_contractor_team'),
+          supabase
+            .from('contractor_service_areas')
+            .select('*')
+            .eq('contractor_id', loadedContractor.id)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
         if (invitesRes.error) throw invitesRes.error;
         if (requestsRes.error) throw requestsRes.error;
         loadedInvites = (invitesRes.data || []) as ContractorInvite[];
         loadedRequests = (requestsRes.data || []) as ContractorConnectionRequest[];
+        if (!serviceAreasRes.error) {
+          loadedServiceAreas = ((serviceAreasRes.data || []) as ContractorServiceArea[])
+            .map((area, index) => normalizeContractorServiceArea(area, index));
+        }
         if (!teamRes.error && teamRes.data) {
           const rawTeam = teamRes.data as ContractorTeamAccess;
           loadedTeamAccess = {
@@ -11617,6 +11729,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ...loadedContractor,
         external_review_links: normalizeExternalReviewLinks(loadedContractor.external_review_links),
       } : null);
+      setContractorServiceAreas(loadedServiceAreas);
       setConnections(loadedConnections);
       setServiceRequests(((serviceRequestsRes.data || []) as ServiceRequestSummary[]).map(normalizeServiceRequestSummary));
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
@@ -11830,6 +11943,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractor({ ...contractorDraft, external_review_links: nextLinks });
   };
 
+  const updateContractorServiceArea = (areaId: string, updates: Partial<ContractorServiceArea>) => {
+    setContractorServiceAreas(current => current.map(area => area.id === areaId ? { ...area, ...updates } : area));
+  };
+
+  const updateContractorServiceAreaLocation = (areaId: string, locationValue: string) => {
+    const parsedLocation = parseContractorServiceAreaLocation(locationValue);
+    updateContractorServiceArea(areaId, parsedLocation);
+  };
+
+  const addContractorServiceArea = () => {
+    setContractorServiceAreas(current => [...current, createBlankContractorServiceArea(current.length)]);
+  };
+
+  const removeContractorServiceArea = (areaId: string) => {
+    setContractorServiceAreas(current => current.filter(area => area.id !== areaId));
+  };
+
   const saveContractor = async () => {
     if (!supabase) return;
     setNotice('');
@@ -11873,17 +12003,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         public_profile_enabled: contractorDraft.public_profile_enabled,
         account_status: contractorDraft.account_status,
       };
-      const { error: saveError } = await supabase.from('contractor_profiles').upsert(payload).select('*').single();
+      const { data: savedProfile, error: saveError } = await supabase.from('contractor_profiles').upsert(payload).select('*').single();
+      let savedContractorId = (savedProfile as ContractorProfile | null)?.id || contractorDraft.id;
       if (saveError) {
         const message = readableError(saveError, 'Unable to save contractor profile.');
         if (/logo_url|schema cache|column/i.test(message)) {
           const fallbackPayload = { ...payload };
           delete (fallbackPayload as Record<string, unknown>).logo_url;
           delete (fallbackPayload as Record<string, unknown>).external_review_links;
-          const { error: fallbackError } = await supabase.from('contractor_profiles').upsert(fallbackPayload).select('*').single();
+          const { data: fallbackProfile, error: fallbackError } = await supabase.from('contractor_profiles').upsert(fallbackPayload).select('*').single();
           if (fallbackError) throw fallbackError;
+          savedContractorId = (fallbackProfile as ContractorProfile | null)?.id || savedContractorId;
         } else {
           throw saveError;
+        }
+      }
+      if (savedContractorId) {
+        const serviceAreaRows = contractorServiceAreaRowsForSave(contractorServiceAreas, savedContractorId);
+        const { error: deleteServiceAreasError } = await supabase
+          .from('contractor_service_areas')
+          .delete()
+          .eq('contractor_id', savedContractorId);
+        if (deleteServiceAreasError) throw deleteServiceAreasError;
+        if (serviceAreaRows.length > 0) {
+          const { error: insertServiceAreasError } = await supabase
+            .from('contractor_service_areas')
+            .insert(serviceAreaRows);
+          if (insertServiceAreasError) throw insertServiceAreasError;
         }
       }
       setNotice('Contractor profile saved.');
@@ -13106,7 +13252,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     contractorDraft.state,
     contractorDraft.zip_code,
     contractorDraft.service_categories.length ? 'categories' : '',
-    contractorDraft.service_zip_codes.length ? 'zips' : '',
+    contractorServiceAreas.some(contractorServiceAreaHasLocation) || contractorDraft.service_zip_codes.length ? 'service-area' : '',
     contractorDraft.business_summary,
   ];
   const contractorProfileScore = Math.round((contractorProfileFields.filter(Boolean).length / contractorProfileFields.length) * 100);
@@ -15485,9 +15631,110 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               onChange={service_categories => setContractor({ ...contractorDraft, service_categories })}
             />
           </div>
-          <Field label="Service ZIP codes">
-            <input className={inputClass()} value={fromList(contractorDraft.service_zip_codes)} onChange={event => setContractor({ ...contractorDraft, service_zip_codes: toList(event.target.value) })} />
-          </Field>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <div className="rounded-2xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-[#02132D]">Service areas</p>
+                  <p className="mt-1 text-sm leading-5 text-[#223D67]/75">
+                    ServSync uses these locations and radius settings to show where you normally work.
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#223D67]/65">
+                    Homeowners can still request service outside this area. You can decide whether to accept.
+                  </p>
+                </div>
+                <button type="button" onClick={addContractorServiceArea} className={buttonClass('secondary')}>
+                  <Plus size={15} />
+                  Add service area
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {contractorServiceAreas.length === 0 ? (
+                  <EmptyState text="Add a ZIP or city and radius to describe where you normally work." />
+                ) : (
+                  contractorServiceAreas.map(area => (
+                    <div key={area.id} className="rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
+                      <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_auto_auto] md:items-end">
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/75">Label optional</span>
+                          <input
+                            className={inputClass()}
+                            value={area.label}
+                            onChange={event => updateContractorServiceArea(area.id, { label: event.target.value })}
+                            placeholder="Eastern Shore"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/75">ZIP or city</span>
+                          <input
+                            className={inputClass()}
+                            value={area.location_text}
+                            onChange={event => updateContractorServiceAreaLocation(area.id, event.target.value)}
+                            placeholder="Fairhope, AL or 36532"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/75">Radius</span>
+                          <select
+                            className={inputClass()}
+                            value={normalizeServiceAreaRadius(area.radius_miles)}
+                            onChange={event => updateContractorServiceArea(area.id, { radius_miles: Number(event.target.value) })}
+                          >
+                            {CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS.map(radius => (
+                              <option key={radius} value={radius}>{radius} miles</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeContractorServiceArea(area.id)}
+                          className={`${buttonClass('secondary')} md:mb-0`}
+                        >
+                          <X size={15} />
+                          Remove
+                        </button>
+                      </div>
+                      {contractorServiceAreaHasLocation(area) && (
+                        <p className="mt-2 text-xs font-medium text-[#223D67]/70">
+                          {contractorServiceAreaDisplay(area)}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {contractorServiceAreas.some(contractorServiceAreaHasLocation) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {contractorServiceAreas.filter(contractorServiceAreaHasLocation).map(area => (
+                    <span key={`summary-${area.id}`} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {contractorServiceAreaDisplay(area)}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 border-t border-[#E1E3E7] pt-4">
+                {contractorDraft.service_zip_codes.length > 0 && (
+                  <p className="mb-2 text-xs font-semibold text-[#223D67]/70">
+                    Legacy ZIP coverage: {fromList(contractorDraft.service_zip_codes)}
+                  </p>
+                )}
+                <Field label="Legacy service ZIP codes">
+                  <input
+                    className={inputClass()}
+                    value={fromList(contractorDraft.service_zip_codes)}
+                    onChange={event => setContractor({ ...contractorDraft, service_zip_codes: toList(event.target.value) })}
+                    placeholder="36532, 36526"
+                  />
+                </Field>
+                <p className="mt-1 text-xs leading-5 text-[#223D67]/60">
+                  These ZIPs are preserved for existing directory matching while service-area cards roll out.
+                </p>
+              </div>
+            </div>
+          </div>
           <Field label="License number">
             <input className={inputClass()} spellCheck={false} value={contractorDraft.license_number} onChange={event => setContractor({ ...contractorDraft, license_number: event.target.value })} />
           </Field>
