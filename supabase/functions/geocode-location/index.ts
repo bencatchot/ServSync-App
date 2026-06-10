@@ -171,6 +171,7 @@ async function geocodeWithMapbox(query: string, apiKey: string): Promise<Geocode
   url.searchParams.set('access_token', apiKey);
   url.searchParams.set('country', 'us');
   url.searchParams.set('limit', '1');
+  url.searchParams.set('permanent', 'true');
   url.searchParams.set('types', 'postcode,place,locality,address');
 
   const response = await fetch(url);
