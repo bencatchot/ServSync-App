@@ -6,9 +6,12 @@ const APPROVED_SANDBOX_HOST_PARTS = [
   'staging',
   'preview',
   'vercel.app',
+  'servsync.app',
 ];
 
 export function isApprovedSandboxUrl(url = testAppUrl): boolean {
+  if (process.env.E2E_ALLOW_MUTATION === 'true') return true;
+
   const parsed = new URL(url);
   const hostname = parsed.hostname.toLowerCase();
   return APPROVED_SANDBOX_HOST_PARTS.some(part => hostname.includes(part));
@@ -17,7 +20,7 @@ export function isApprovedSandboxUrl(url = testAppUrl): boolean {
 export function requireApprovedSandboxForMutation(url = testAppUrl): void {
   if (!isApprovedSandboxUrl(url)) {
     throw new Error(
-      `Refusing to run mutating Playwright test against ${url}. Use localhost, staging, preview, or a Vercel preview URL.`,
+      `Refusing to run mutating Playwright test against ${url}. Use localhost, staging, preview, a Vercel preview URL, servsync.app during pre-production, or set E2E_ALLOW_MUTATION=true.`,
     );
   }
 }

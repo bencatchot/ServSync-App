@@ -14617,7 +14617,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const createLocalContact = async (options?: { autoStartFieldWork?: boolean }) => {
-    if (!supabase || !contractor) return;
+    if (!supabase) return;
     if (!localContactDraft.display_name.trim()) {
       setError('Enter a customer name before saving a new customer.');
       return;
