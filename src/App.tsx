@@ -25140,6 +25140,7 @@ function DiscoverFeed({
   const [feedLoading, setFeedLoading] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  const [filterRadiusMiles, setFilterRadiusMiles] = useState(String(DEFAULT_CONTRACTOR_SERVICE_RADIUS));
   const [filterKeyword, setFilterKeyword] = useState('');
   const [feedView, setFeedView] = useState<'all' | 'saved'>('all');
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
@@ -25167,6 +25168,7 @@ function DiscoverFeed({
         : await supabase.rpc('servsync_discover_feed', {
           p_category: filterCategory || null,
           p_location: filterLocation || null,
+          p_radius_miles: filterLocation.trim() ? Number(filterRadiusMiles) : null,
         });
       if (error) throw error;
       setFeed((data || []) as DiscoverFeedItem[]);
@@ -25376,6 +25378,7 @@ function DiscoverFeed({
         item.business_summary,
         item.contractor_city,
         item.contractor_state,
+        (item.service_areas || []).map(area => contractorServiceAreaDisplay(area)).join(' '),
         item.categories.join(' '),
         item.reviews.map(review => [review.body, review.kudos.join(' ')].join(' ')).join(' '),
       ].join(' '));
@@ -25422,8 +25425,11 @@ function DiscoverFeed({
             <p className="mt-1 text-sm text-slate-500">
               Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
             </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Showing contractors and posts with listed service areas matching this location.
+            </p>
           </div>
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto]">
+          <div className="grid gap-3 lg:grid-cols-[1fr_0.9fr_1fr_0.8fr_auto]">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -25445,12 +25451,22 @@ function DiscoverFeed({
               <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                placeholder="City or state"
+                placeholder="ZIP or city"
                 value={filterLocation}
                 onChange={e => setFilterLocation(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && void loadFeed()}
               />
             </div>
+            <select
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              value={filterRadiusMiles}
+              onChange={e => setFilterRadiusMiles(e.target.value)}
+              aria-label="Service area radius"
+            >
+              {CONTRACTOR_SERVICE_AREA_RADIUS_OPTIONS.map(radius => (
+                <option key={radius} value={radius}>{radius} miles</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => void loadFeed()}
@@ -25460,6 +25476,11 @@ function DiscoverFeed({
               {feedLoading ? 'Loading...' : 'Search'}
             </button>
           </div>
+          {filterLocation.trim() && (
+            <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+              Mileage is a guide for now. Results are based on contractor-listed service areas and matching locations.
+            </p>
+          )}
         </div>
       )}
       {perspective === 'homeowner' && (
@@ -25601,6 +25622,7 @@ function DiscoverFeed({
         const existingStatus = existingConnectionMap[item.contractor_id];
         const contractorSlug = contractorSlugs[item.contractor_id];
         const externalReviewLinks = normalizeExternalReviewLinks(item.external_review_links);
+        const serviceAreas = item.service_areas || [];
 
         return (
           <div key={item.post_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -25620,6 +25642,20 @@ function DiscoverFeed({
                     {[item.contractor_city, item.contractor_state].filter(Boolean).join(', ') || 'Location not listed'}
                     {item.categories.length > 0 && <span className="ml-2 text-slate-500">· {item.categories.slice(0,3).join(', ')}</span>}
                   </p>
+                  {serviceAreas.length > 0 && perspective === 'homeowner' && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {serviceAreas.slice(0, 4).map((area, index) => (
+                        <span key={`${item.post_id}-service-area-${index}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                          {contractorServiceAreaDisplay(area)}
+                        </span>
+                      ))}
+                      {serviceAreas.length > 4 && (
+                        <span className="rounded-full bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                          +{serviceAreas.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Post title */}
                   <p className="mt-2 text-base font-semibold text-slate-950">{item.title}</p>

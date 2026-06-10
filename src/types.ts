@@ -503,6 +503,15 @@ export interface ContractorPublicProfile {
   external_review_links: ExternalReviewLink[];
 }
 
+export interface PublicContractorServiceArea {
+  label: string;
+  location_text: string;
+  zip_code: string;
+  city: string;
+  state: string;
+  radius_miles: number;
+}
+
 export interface DiscoverFeedItem {
   post_id: string;
   contractor_id: string;
@@ -523,6 +532,7 @@ export interface DiscoverFeedItem {
   save_count?: number;
   is_saved?: boolean;
   external_review_links?: ExternalReviewLink[];
+  service_areas?: PublicContractorServiceArea[];
 }
 
 export type HomeDocumentType = 'warranty' | 'manual' | 'inspection' | 'insurance' | 'permit' | 'receipt' | 'other';
