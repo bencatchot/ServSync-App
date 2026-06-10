@@ -48,6 +48,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import { supabase, supabaseConfigured } from './supabaseClient';
 import type {
+  AdminContractorAdoption,
   AdminContractorActivityRow,
   AdminGrowthRow,
   AdminPlatformHealth,
@@ -76,6 +77,8 @@ import type {
   ContractorConnectedHomeowner,
   ContractorConnectedHomeownerHome,
   ContractorAccountStatus,
+  ConnectionAlertLevel,
+  ConnectionAlertStatus,
   ContractorConnectionRequest,
   ContractorLocalContact,
   ContractorLocalHome,
@@ -139,6 +142,12 @@ type AdminReferralDraft = {
   reward_amount: string;
   admin_notes: string;
 };
+type AdminConnectionAlertDraft = {
+  status: ConnectionAlertStatus;
+  admin_notes: string;
+  next_follow_up_at: string;
+};
+type AdminConnectionFilter = 'all' | ConnectionAlertLevel | 'needs_outreach' | 'contacted_recently';
 type WalkthroughSuggestion = {
   id: string;
   rawText: string;
@@ -4848,6 +4857,51 @@ function referralDraftFromReferral(referral: AdminReferral): AdminReferralDraft 
     reward_amount: referral.reward_amount_cents ? centsToDollars(referral.reward_amount_cents) : '',
     admin_notes: referral.admin_notes || '',
   };
+}
+
+const CONNECTION_ALERT_STATUS_OPTIONS: { value: ConnectionAlertStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'acknowledged', label: 'Acknowledged' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'dismissed', label: 'Dismissed for now' },
+  { value: 'resolved', label: 'Resolved' },
+];
+
+function connectionAlertDraftFromAdoption(row: AdminContractorAdoption): AdminConnectionAlertDraft {
+  return {
+    status: row.alert_status || 'open',
+    admin_notes: row.admin_notes || '',
+    next_follow_up_at: row.next_follow_up_at ? row.next_follow_up_at.slice(0, 10) : '',
+  };
+}
+
+function connectionLevelLabel(level?: ConnectionAlertLevel | null) {
+  if (level === 'red') return 'Red';
+  if (level === 'yellow') return 'Yellow';
+  return 'Green';
+}
+
+function connectionLevelClass(level?: ConnectionAlertLevel | null) {
+  if (level === 'red') return 'bg-red-900/40 text-red-300';
+  if (level === 'yellow') return 'bg-amber-900/40 text-amber-300';
+  return 'bg-emerald-900/40 text-emerald-300';
+}
+
+function connectionAlertStatusLabel(status?: ConnectionAlertStatus | null) {
+  return CONNECTION_ALERT_STATUS_OPTIONS.find(option => option.value === status)?.label ?? 'No alert';
+}
+
+function connectionRateLabel(value?: number | null) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) return '0%';
+  return `${Math.round(numeric * 100)}%`;
+}
+
+function isConnectionAlertNeedsOutreach(row: AdminContractorAdoption) {
+  if (row.total_customer_count < 5) return false;
+  if (!['red', 'yellow'].includes(row.connection_level)) return false;
+  if (row.alert_status === 'contacted' || row.alert_status === 'dismissed' || row.alert_status === 'resolved') return false;
+  return true;
 }
 
 function formatDateTime(value?: string | null) {
@@ -23467,7 +23521,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [adminDrafts, setAdminDrafts] = useState<Record<string, AdminContractorDraft>>({});
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, InviteRewardDraft>>({});
   const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
+  const [contractorAdoption, setContractorAdoption] = useState<AdminContractorAdoption[]>([]);
+  const [connectionAlertDrafts, setConnectionAlertDrafts] = useState<Record<string, AdminConnectionAlertDraft>>({});
   const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'referrals' | 'support' | 'reports'>('overview');
+  const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
@@ -23478,6 +23535,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [savingContractorId, setSavingContractorId] = useState<string | null>(null);
   const [savingInviteId, setSavingInviteId] = useState<string | null>(null);
   const [savingReferralId, setSavingReferralId] = useState<string | null>(null);
+  const [savingConnectionAlertId, setSavingConnectionAlertId] = useState<string | null>(null);
   const [reportHealth, setReportHealth] = useState<AdminPlatformHealth | null>(null);
   const [reportRevenue, setReportRevenue] = useState<AdminRevenueRow[]>([]);
   const [reportGrowth, setReportGrowth] = useState<AdminGrowthRow[]>([]);
@@ -23493,13 +23551,14 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setLoading(true);
     setError('');
     try {
-      const [profilesRes, contractorsRes, connectionsRes, invitesRes, referralRes, connectionOverviewRes, supportRes] = await Promise.all([
+      const [profilesRes, contractorsRes, connectionsRes, invitesRes, referralRes, connectionOverviewRes, adoptionRes, supportRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('contractor_profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_connections').select('status'),
         supabase.from('contractor_invites').select('*').order('created_at', { ascending: false }),
         supabase.rpc('servsync_admin_referrals'),
         supabase.rpc('servsync_admin_connection_overview'),
+        supabase.rpc('servsync_admin_contractor_adoption'),
         supabase.from('support_inquiries').select('*, messages:support_inquiry_messages(*)').order('updated_at', { ascending: false }),
       ]);
       if (profilesRes.error) throw profilesRes.error;
@@ -23513,6 +23572,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const loadedInvites = (invitesRes.data || []) as ContractorInvite[];
       const loadedReferrals = referralRes.error ? [] : (referralRes.data || []) as AdminReferral[];
       const loadedConnectionOverviews = (connectionOverviewRes.data || []) as PlatformConnectionOverview[];
+      const loadedAdoption = adoptionRes.error ? [] : (adoptionRes.data || []) as AdminContractorAdoption[];
       const adminConnectionIds = loadedConnectionOverviews.map(connection => connection.connection_id);
       const adminHistoryRes = adminConnectionIds.length
         ? await supabase
@@ -23536,6 +23596,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setInvites(loadedInvites);
       setAdminReferrals(loadedReferrals);
       setConnectionOverviews(loadedConnectionOverviews);
+      setContractorAdoption(loadedAdoption);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
       setAdminConnectionHistory(groupConnectionHistory((adminHistoryRes.data || []) as ConnectionAuditEvent[]));
       setAdminDrafts(loadedContractors.reduce<Record<string, AdminContractorDraft>>((drafts, contractor) => {
@@ -23548,6 +23609,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       }, {}));
       setAdminReferralDrafts(loadedReferrals.reduce<Record<string, AdminReferralDraft>>((drafts, referral) => {
         drafts[referral.referral_id] = referralDraftFromReferral(referral);
+        return drafts;
+      }, {}));
+      setConnectionAlertDrafts(loadedAdoption.reduce<Record<string, AdminConnectionAlertDraft>>((drafts, row) => {
+        if (row.alert_id) drafts[row.alert_id] = connectionAlertDraftFromAdoption(row);
         return drafts;
       }, {}));
     } catch (err) {
@@ -23601,6 +23666,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setAdminReferralDrafts(current => ({
       ...current,
       [referralId]: nextDraft,
+    }));
+  };
+
+  const updateConnectionAlertDraft = (alertId: string, nextDraft: AdminConnectionAlertDraft) => {
+    setConnectionAlertDrafts(current => ({
+      ...current,
+      [alertId]: nextDraft,
     }));
   };
 
@@ -23680,6 +23752,29 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
+  const saveConnectionAlert = async (row: AdminContractorAdoption) => {
+    if (!supabase || !row.alert_id) return;
+    setNotice('');
+    setError('');
+    setSavingConnectionAlertId(row.alert_id);
+    try {
+      const draft = connectionAlertDrafts[row.alert_id] || connectionAlertDraftFromAdoption(row);
+      const { error: updateError } = await supabase.rpc('servsync_admin_update_connection_alert', {
+        p_alert_id: row.alert_id,
+        p_status: draft.status,
+        p_admin_notes: draft.admin_notes,
+        p_next_follow_up_at: draft.next_follow_up_at ? new Date(`${draft.next_follow_up_at}T12:00:00`).toISOString() : null,
+      });
+      if (updateError) throw updateError;
+      setNotice('Connection outreach tracking updated.');
+      await loadAdmin();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update connection outreach tracking.'));
+    } finally {
+      setSavingConnectionAlertId(null);
+    }
+  };
+
   const updateSupportInquiryStatus = async (inquiry: SupportInquiry, status: SupportInquiryStatus) => {
     if (!supabase) return;
     setSavingSupportInquiryId(inquiry.id);
@@ -23754,9 +23849,23 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
   const openSupportCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const pendingReferralCount = adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
+  const adoptionByContractorId = new Map(contractorAdoption.map(row => [row.contractor_id, row]));
+  const connectionAlertCount = contractorAdoption.filter(isConnectionAlertNeedsOutreach).length;
+  const filteredContractors = contractors.filter(contractor => {
+    const adoption = adoptionByContractorId.get(contractor.id);
+    if (adminConnectionFilter === 'all') return true;
+    if (!adoption) return adminConnectionFilter === 'green';
+    if (adminConnectionFilter === 'needs_outreach') return isConnectionAlertNeedsOutreach(adoption);
+    if (adminConnectionFilter === 'contacted_recently') {
+      if (adoption.alert_status !== 'contacted' || !adoption.contacted_at) return false;
+      return new Date(adoption.contacted_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000;
+    }
+    return adoption.connection_level === adminConnectionFilter;
+  });
   const stats = [
     { label: 'Homeowners', value: overview?.homeowners ?? 0, icon: Home },
     { label: 'Contractors', value: overview?.contractors ?? 0, icon: Building2 },
+    { label: 'Connection alerts', value: connectionAlertCount, icon: AlertTriangle },
     { label: 'Active Connections', value: overview?.active_connections ?? 0, icon: Link2 },
     { label: 'Active Invites', value: overview?.active_invites ?? 0, icon: Mail },
     { label: 'Referral Review', value: pendingReferralCount, icon: Receipt },
@@ -23825,8 +23934,15 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
             icon={<Icon size={18} />}
             label={label}
             value={String(value)}
-            helper={label === 'Contractors' ? 'Manage accounts' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
-            onClick={() => setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview')}
+            helper={label === 'Contractors' ? 'Manage accounts' : label === 'Connection alerts' ? 'Needs onboarding nudge' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
+            onClick={() => {
+              if (label === 'Connection alerts') {
+                setAdminConnectionFilter('needs_outreach');
+                setAdminTab('contractors');
+                return;
+              }
+              setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
+            }}
           />
         ))}
       </div>
@@ -23835,12 +23951,43 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       {adminTab === 'contractors' && (
       <Card title="Contractor accounts" icon={<Building2 size={18} />}>
         <div className="space-y-3">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-semibold text-white">Homeowner connection rate</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Alerts appear after 5 total customers when a contractor may benefit from a reminder about inviting homeowners.
+                </p>
+              </div>
+              <Field label="Connection filter">
+                <select
+                  className={inputClass()}
+                  value={adminConnectionFilter}
+                  onChange={event => setAdminConnectionFilter(event.target.value as AdminConnectionFilter)}
+                >
+                  <option value="all">All contractors</option>
+                  <option value="needs_outreach">Needs outreach</option>
+                  <option value="red">Red</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="green">Green</option>
+                  <option value="contacted_recently">Contacted recently</option>
+                </select>
+              </Field>
+            </div>
+          </div>
           {contractors.length === 0 ? (
             <EmptyState text="No contractor accounts yet." />
+          ) : filteredContractors.length === 0 ? (
+            <EmptyState text="No contractors match this connection filter." />
           ) : (
-            contractors.map(contractor => {
+            filteredContractors.map(contractor => {
               const draft = adminDrafts[contractor.id] || adminDraftFromContractor(contractor);
+              const adoption = adoptionByContractorId.get(contractor.id);
+              const alertDraft = adoption?.alert_id ? (connectionAlertDrafts[adoption.alert_id] || connectionAlertDraftFromAdoption(adoption)) : null;
               const isSaving = savingContractorId === contractor.id;
+              const isSavingAlert = adoption?.alert_id ? savingConnectionAlertId === adoption.alert_id : false;
+              const belowThreshold = !adoption || adoption.total_customer_count < 5;
+              const effectiveLevel: ConnectionAlertLevel = belowThreshold ? 'green' : adoption.connection_level;
 
               return (
                 <div key={contractor.id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
@@ -23853,7 +24000,87 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">{contractor.account_status}</span>
                       <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{contractor.subscription_status || 'trialing'}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${connectionLevelClass(effectiveLevel)}`}>
+                        {belowThreshold ? 'Building customer count' : `${connectionLevelLabel(effectiveLevel)} connection rate`}
+                      </span>
                     </div>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-slate-600 bg-slate-800/60 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {adoption && !belowThreshold
+                            ? `${connectionRateLabel(adoption.connection_rate)} homeowner connection rate`
+                            : 'Connection rate tracking starts at 5 customers'}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Local customers are fine. This flag helps identify contractors who may need an onboarding nudge about homeowner invites.
+                        </p>
+                      </div>
+                      <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${connectionLevelClass(effectiveLevel)}`}>
+                        {belowThreshold ? 'No alert yet' : connectionLevelLabel(effectiveLevel)}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                      <InfoBox label="Total customers" value={String(adoption?.total_customer_count ?? 0)} />
+                      <InfoBox label="Connected homeowners" value={String(adoption?.connected_homeowner_count ?? 0)} />
+                      <InfoBox label="Local-only customers" value={String(adoption?.local_customer_count ?? 0)} />
+                      <InfoBox label="Invites sent" value={String(adoption?.invites_sent_count ?? 0)} />
+                      <InfoBox label="Invites used" value={String(adoption?.invites_used_count ?? 0)} />
+                      <InfoBox label="Last invite used" value={formatDateTime(adoption?.last_invite_used_at)} />
+                    </div>
+
+                    {adoption?.alert_id && alertDraft ? (
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[180px_180px_1fr_auto]">
+                        <Field label="Outreach status">
+                          <select
+                            className={inputClass()}
+                            value={alertDraft.status}
+                            onChange={event => updateConnectionAlertDraft(adoption.alert_id!, { ...alertDraft, status: event.target.value as ConnectionAlertStatus })}
+                          >
+                            {CONNECTION_ALERT_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Next follow-up">
+                          <input
+                            type="date"
+                            className={inputClass()}
+                            value={alertDraft.next_follow_up_at}
+                            onChange={event => updateConnectionAlertDraft(adoption.alert_id!, { ...alertDraft, next_follow_up_at: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="Connection outreach notes">
+                          <input
+                            className={inputClass()}
+                            {...writingAssistProps}
+                            value={alertDraft.admin_notes}
+                            onChange={event => updateConnectionAlertDraft(adoption.alert_id!, { ...alertDraft, admin_notes: event.target.value })}
+                            placeholder="Private admin notes for onboarding follow-up"
+                          />
+                        </Field>
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => void saveConnectionAlert(adoption)}
+                            disabled={isSavingAlert}
+                            className={buttonClass('primary')}
+                          >
+                            <ClipboardCheck size={16} />
+                            {isSavingAlert ? 'Saving...' : 'Save outreach'}
+                          </button>
+                        </div>
+                        <p className="lg:col-span-4 text-xs text-slate-400">
+                          Alert: {connectionAlertStatusLabel(adoption.alert_status)}
+                          {adoption.contacted_at ? ` · Contacted ${formatDateTime(adoption.contacted_at)}` : ''}
+                          {adoption.next_follow_up_at ? ` · Follow up ${formatDateTime(adoption.next_follow_up_at)}` : ''}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-xs text-slate-400">
+                        No active low connection-rate alert is open for this contractor.
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-4">

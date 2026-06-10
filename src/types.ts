@@ -7,6 +7,8 @@ export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
 export type ReferralRewardStatus = 'not_eligible' | 'pending_review' | 'approved' | 'denied' | 'paid';
 export type UniversalReferralStatus = 'pending' | 'signed_up' | 'qualified' | 'reward_approved' | 'reward_paid' | 'rejected';
 export type UniversalReferralRewardStatus = 'pending' | 'approved' | 'denied' | 'paid' | 'not_eligible';
+export type ConnectionAlertLevel = 'green' | 'yellow' | 'red';
+export type ConnectionAlertStatus = 'open' | 'acknowledged' | 'contacted' | 'dismissed' | 'resolved';
 export type ExternalReviewSource = 'google' | 'facebook' | 'yelp' | 'other';
 export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_replied' | 'declined' | 'closed';
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
@@ -428,6 +430,32 @@ export interface AdminReferral {
   reward_approved_at: string | null;
   reward_paid_at: string | null;
   rejected_at: string | null;
+}
+
+export interface AdminContractorAdoption {
+  contractor_id: string;
+  contractor_name: string | null;
+  contractor_owner_user_id: string | null;
+  owner_email: string | null;
+  total_customer_count: number;
+  connected_homeowner_count: number;
+  local_customer_count: number;
+  connection_rate: number;
+  connection_level: ConnectionAlertLevel;
+  invites_sent_count: number;
+  invites_used_count: number;
+  last_customer_created_at: string | null;
+  last_invite_used_at: string | null;
+  alert_id: string | null;
+  alert_status: ConnectionAlertStatus | null;
+  alert_level: ConnectionAlertLevel | null;
+  last_triggered_at: string | null;
+  acknowledged_at: string | null;
+  contacted_at: string | null;
+  dismissed_at: string | null;
+  resolved_at: string | null;
+  next_follow_up_at: string | null;
+  admin_notes: string | null;
 }
 
 export interface PlatformOverview {
