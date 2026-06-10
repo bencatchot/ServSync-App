@@ -3655,7 +3655,7 @@ function buildInspectionSummaryText(rooms: InspectionRoomData[]): string {
 function buildValueAddText(rooms: InspectionRoomData[]): string {
   const fixedCount = rooms.flatMap(room => room.findings).filter(finding => finding.status === 'Fixed On Site').length;
   if (fixedCount === 0) return '';
-  return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes represent immediate value from the job and may help prevent repeat service calls or additional damage.`;
+  return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes document work performed on site and may help the homeowner track maintenance needs over time.`;
 }
 
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
@@ -14263,9 +14263,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const finalizeInspection = async (insp: Inspection, options?: { skipHomeTemplatePrompt?: boolean; skipConfirmation?: boolean }) => {
-    if (!supabase || !contractor) return;
     setNotice('');
     setError('');
+    if (!supabase || !contractor) {
+      setError('We could not finalize this report because your contractor session is not ready. Please refresh and try again.');
+      return;
+    }
     if (!options?.skipConfirmation) {
       const confirmed = window.confirm(insp.homeowner_user_id
         ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
@@ -20866,10 +20869,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     >
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-blue-100 p-2 text-blue-700"><ClipboardCheck size={17} /></span>
-	                        <span className="min-w-0">
-	                          <span className="block text-sm font-bold text-slate-950">Service Job</span>
-	                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For repairs, installs, service calls, and approved work.</span>
-	                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-950">Service Job</span>
+                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For repairs, installs, service calls, and approved work. Service Jobs can be completed without a formal inspection report.</span>
+                        </span>
                       </div>
                     </button>
                     <button
@@ -20888,10 +20891,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     >
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-slate-100 p-2 text-slate-700"><ClipboardList size={17} /></span>
-	                        <span className="min-w-0">
-	                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
-	                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and reports.</span>
-	                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
+                          <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and customer-facing reports with checklist findings.</span>
+                        </span>
                       </div>
                     </button>
                   </div>
@@ -22519,6 +22522,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   const openReportFindings = statusCounts.Urgent + statusCounts['Needs Repair'] + statusCounts.Monitor;
                   const clearedReportFindings = statusCounts.Pass + statusCounts['Fixed On Site'];
                   const reportPhotoCount = allReportFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
+                  const meaningfulReportFindingCount = allReportFindings.filter(finding =>
+                    finding.status !== 'Pass'
+                    || Boolean(finding.notes.trim())
+                    || Boolean(finding.action.trim())
+                    || Boolean(finding.due.trim())
+                    || (finding.photos ?? []).length > 0
+                  ).length;
                   const urgentFindings = allReportFindings.filter(f => f.status === 'Urgent');
                   const repairFindings = allReportFindings.filter(f => f.status === 'Needs Repair');
                   const monitorFindings = allReportFindings.filter(f => f.status === 'Monitor');
@@ -22553,6 +22563,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     : null;
                   const reportSentAndCompleted = activeInspection.status === 'finalized'
                     && (activeInspection.service_request_id ? linkedServiceRequest?.status === 'closed' : true);
+                  const reportSendHelperText = activeInspection.status !== 'finalized'
+                    ? 'Finalize the report before sending it.'
+                    : !activeInspection.homeowner_user_id
+                      ? 'This report can be filed locally, but it cannot be sent until the customer has a ServSync homeowner profile.'
+                      : 'Send the report to the homeowner and close the linked request when applicable.';
+                  const finalizeReportHelperText = activeInspection.status === 'draft'
+                    ? inspectionClosedForReview
+                      ? 'Finalize saves the PDF and files the report. It does not send anything until you choose to send it.'
+                      : 'Close the job for review before finalizing the report.'
+                    : 'Report PDF has been filed to Documents.';
                   return (
                   <div className="grid gap-4 xl:grid-cols-[1fr_260px] items-start">
                     {/* Main report area */}
@@ -22570,8 +22590,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-red-500 text-white">{statusCounts.Urgent} Urgent</span>
                             ) : (statusCounts['Needs Repair'] + statusCounts.Monitor) > 0 ? (
                               <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-amber-400 text-amber-900">{statusCounts['Needs Repair'] + statusCounts.Monitor} Issues</span>
-                            ) : (
+                            ) : meaningfulReportFindingCount > 0 ? (
                               <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-green-400 text-green-900">All Clear</span>
+                            ) : (
+                              <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-slate-100 text-slate-700">No findings added yet</span>
                             )}
                           </div>
                         </div>
@@ -22873,7 +22895,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {reportSummary.followUpText && <p>{reportSummary.followUpText}</p>}
                           {reportSummary.savingsDetails.length > 0 && (
                             <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-green-800">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">Potential Cost Savings / Preventative Value</p>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">Maintenance Value Notes</p>
                               <ul className="mt-2 space-y-1 list-disc list-inside text-sm">
                                 {reportSummary.savingsDetails.map(detail => <li key={detail}>{detail}</li>)}
                               </ul>
@@ -23023,6 +23045,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Completing...' : 'Complete job & send report'}
                           </button>
                         )}
+                        {!reportSentAndCompleted && (
+                          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                            {reportSendHelperText}
+                          </p>
+                        )}
 
                         {activeInspection.status === 'draft' ? (
                           <button
@@ -23040,6 +23067,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <span className="text-sm font-semibold text-emerald-700">Filed to Documents</span>
                           </div>
                         )}
+                        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                          {finalizeReportHelperText}
+                        </p>
 
                         <p className="text-[11px] leading-relaxed text-slate-400 px-1">
                           Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.
