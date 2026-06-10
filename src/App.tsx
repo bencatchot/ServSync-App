@@ -16834,6 +16834,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           : workspaceHomeLabel || 'Selected property';
                     const draftEstimateCount = estimateRecords.filter(estimate => estimate.status === 'draft').length;
                     const draftInvoiceCount = invoiceRecords.filter(estimate => estimate.status === 'draft').length;
+                    const activeJobRecords = [...workOrderRecords, ...inspectionRecords].filter(inspectionIsOpenJob);
                     const workOrderDraftCount = workOrderRecords.filter(inspectionIsOpenJob).length;
                     const workOrderFinalCount = workOrderRecords.filter(inspectionIsClosedJob).length;
                     const inspectionDraftCount = inspectionRecords.filter(inspectionIsOpenJob).length;
@@ -16953,7 +16954,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       .filter(r => r.appointment && (r.appointment.status === 'confirmed' || r.appointment.status === 'proposed'))
                       .sort((a, b) => new Date(a.appointment!.proposed_at).getTime() - new Date(b.appointment!.proposed_at).getTime()) : [];
 
-                    const openJobCount = workOrderRecords.filter(inspectionIsOpenJob).length + inspectionRecords.filter(inspectionIsOpenJob).length;
+                    const openJobCount = activeJobRecords.length;
                     const openFinancialCount = estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length + invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length;
                     const jobsAttentionCount = openJobCount + openFinancialCount + followUpReqs.length;
                     const tabs: Array<{ id: HomeownerWorkspaceTab; label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'slate' }> = [
@@ -17731,17 +17732,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                 </div>
 
-                                <div className="mt-4 grid gap-2 md:grid-cols-4">
+                                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                   {[
                                     { label: 'Open jobs', value: String(openJobCount), helper: `${workOrderDraftCount + inspectionDraftCount} draft` },
                                     { label: 'Open estimates', value: String(estimateRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length), helper: `${draftEstimateCount} draft` },
                                     { label: 'Open invoices', value: String(invoiceRecords.filter(item => !['declined', 'expired', 'revised'].includes(item.status)).length), helper: `${draftInvoiceCount} draft` },
                                     { label: 'Follow-up', value: String(followUpReqs.length), helper: isConn ? 'Service requests' : 'Connected requests only' },
                                   ].map(item => (
-                                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{item.label}</p>
+                                    <div key={item.label} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                      <p className="break-words text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-slate-500 sm:text-xs">{item.label}</p>
                                       <p className="mt-1 text-xl font-bold text-slate-950">{item.value}</p>
-                                      <p className="mt-1 text-xs text-slate-500">{item.helper}</p>
+                                      <p className="mt-1 break-words text-xs leading-4 text-slate-500">{item.helper}</p>
                                     </div>
                                   ))}
                                 </div>
@@ -17790,15 +17791,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div className="mb-3 flex items-center justify-between gap-3">
                                       <div>
                                         <h4 className="text-sm font-bold text-slate-950">Jobs in progress</h4>
-                                        <p className="mt-1 text-xs text-slate-500">{workOrderRecords.length + inspectionRecords.length} total job record{workOrderRecords.length + inspectionRecords.length === 1 ? '' : 's'}</p>
+                                        <p className="mt-1 text-xs text-slate-500">{activeJobRecords.length} active job{activeJobRecords.length === 1 ? '' : 's'}</p>
                                       </div>
                                       <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">Open Jobs</button>
                                     </div>
-                                    {[...workOrderRecords, ...inspectionRecords].slice(0, 5).length === 0 ? (
-                                      <EmptyState text="No job records yet for this customer." />
+                                    {activeJobRecords.slice(0, 5).length === 0 ? (
+                                      <EmptyState text="No active jobs for this customer." />
                                     ) : (
                                       <div className="space-y-2">
-                                        {[...workOrderRecords, ...inspectionRecords].slice(0, 5).map(work => {
+                                        {activeJobRecords.slice(0, 5).map(work => {
                                           const propertyLabel = recordPropertyLabelForContractor(work);
                                           return (
                                             <button key={work.id} type="button" onClick={() => openInspection(work, { stayInHomeownerWorkspace: true })} className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50">
