@@ -1574,95 +1574,102 @@ const CLEAR_CONDITION_PHRASES = [
 ];
 
 const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
-  { room: 'Exterior / Structure', items: [
-    'Siding, trim, or exterior damage observed',
-    'Foundation cracks or movement concerns observed',
-    'Grading or drainage concerns near the home observed',
-    'Exterior penetrations, caulking, or gaps observed',
-    'Decks, porches, steps, or trip hazards observed',
+  { room: 'Exterior', items: [
+    'Check exterior siding and trim for damage',
+    'Check foundation for visible cracks or movement',
+    'Check grading and drainage near the home',
+    'Check exterior caulking, gaps, and penetrations',
+    'Check decks, porches, steps, and trip hazards',
   ]},
   { room: 'Roof / Attic', items: [
-    'Visible roof covering condition observed',
-    'Flashing, vents, or roof penetrations observed',
-    'Gutters and downspouts condition and discharge observed',
-    'Attic moisture, staining, or ventilation concerns observed where accessible',
-    'Pest evidence observed where accessible',
+    'Check visible roof covering condition',
+    'Check flashing, vents, and roof penetrations',
+    'Check gutters and downspouts for blockage or damage',
+    'Check attic for moisture, staining, or ventilation concerns',
+    'Check visible pest evidence where accessible',
   ]},
   { room: 'Mechanical / Safety', items: [
-    'HVAC visible condition, filter, and condensate concerns observed',
-    'Electrical panel visible concerns observed',
-    'GFCI protection checked where accessible',
-    'Smoke/CO detector presence observed',
-    'Water heater visible condition, leaks, and venting/discharge concerns observed',
+    'Check HVAC filter and visible airflow',
+    'Check electrical panel for visible concerns',
+    'Check GFCI protection where accessible',
+    'Check smoke/CO detectors if accessible',
+    'Check water heater area for leaks or corrosion',
   ]},
   { room: 'Kitchen', items: [
-    'Sink, faucet, drain, and under-sink plumbing checked for leaks, moisture, and function concerns',
-    'Cabinets, counters, and visible kitchen surfaces checked for damage or moisture concerns',
-    'Major appliances checked for basic visible condition/operation where applicable',
-    'GFCI protection checked where accessible',
-    'Ventilation or exhaust concern observed where applicable',
+    'Check for active leaks under sinks',
+    'Check sink, faucet, and drain operation',
+    'Check cabinets, counters, and visible surfaces for damage',
+    'Check major appliances for visible concerns',
+    'Check kitchen GFCI protection where accessible',
   ]},
-  { room: 'Living Room', items: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Trip hazards or safety concerns observed',
+  { room: 'Living Room / Common Areas', items: [
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check trip hazards or safety concerns',
   ]},
   { room: 'Dining Room', items: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Trip hazards or safety concerns observed',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check trip hazards or safety concerns',
   ]},
   { room: 'Primary Bedroom', items: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check smoke/CO detectors if accessible',
   ]},
   { room: 'Bedroom 2', items: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check smoke/CO detectors if accessible',
   ]},
   { room: 'Bedroom 3', items: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check smoke/CO detectors if accessible',
   ]},
   { room: 'Primary Bathroom', items: [
-    'Sink, toilet, tub/shower, drains, and visible plumbing checked for leaks, moisture, or function concerns',
-    'Caulk, grout, walls, ceilings, and flooring checked for moisture damage or deterioration',
-    'Exhaust fan or ventilation concern observed',
-    'GFCI protection checked where accessible',
+    'Check sink, toilet, tub/shower, and drains',
+    'Check for active leaks or moisture concerns',
+    'Check caulk, grout, walls, ceilings, and flooring',
+    'Check exhaust fan or ventilation',
+    'Check bathroom GFCI protection where accessible',
   ]},
   { room: 'Bathroom 2', items: [
-    'Sink, toilet, tub/shower, drains, and visible plumbing checked for leaks, moisture, or function concerns',
-    'Caulk, grout, walls, ceilings, and flooring checked for moisture damage or deterioration',
-    'Exhaust fan or ventilation concern observed',
-    'GFCI protection checked where accessible',
+    'Check sink, toilet, tub/shower, and drains',
+    'Check for active leaks or moisture concerns',
+    'Check caulk, grout, walls, ceilings, and flooring',
+    'Check exhaust fan or ventilation',
+    'Check bathroom GFCI protection where accessible',
   ]},
   { room: 'Laundry', items: [
-    'Washer supply and drain connections checked where accessible',
-    'Dryer vent material, routing, and termination checked where accessible',
-    'Leaks, moisture, or floor damage observed',
-    'GFCI protection checked where accessible',
-    'Ventilation or clearance concerns observed',
+    'Check washer supply and drain connections',
+    'Check dryer vent material, routing, and termination',
+    'Check for leaks, moisture, or floor damage',
+    'Check laundry GFCI protection where accessible',
+    'Check ventilation and appliance clearance',
   ]},
   { room: 'Garage', items: [
-    'Garage door operation and safety concerns checked where applicable',
-    'Garage walls, ceilings, and floors checked for cracks, staining, moisture, or visible damage',
-    'Outlets, switches, and fixtures checked for basic condition',
-    'Storage, clearance, or access limitations noted where relevant',
+    'Check garage door operation and safety concerns',
+    'Check garage walls, ceilings, and floors for damage',
+    'Check outlets, switches, and fixtures for visible concerns',
+    'Check storage, clearance, or access limitations',
   ]},
   { room: 'Basement / Crawlspace', items: [
-    'Moisture, staining, ventilation, and insulation concerns observed where accessible',
-    'Visible structural, foundation, or framing concerns observed where accessible',
-    'Drainage, sump, vapor barrier, or crawlspace condition checked where applicable',
-    'Pest evidence observed where accessible',
-    'Storage, clearance, or access limitations noted where relevant',
+    'Check moisture, staining, ventilation, and insulation',
+    'Check visible structural, foundation, or framing concerns',
+    'Check drainage, sump, vapor barrier, or crawlspace condition',
+    'Check visible pest evidence where accessible',
+    'Check storage, clearance, or access limitations',
   ]},
 ];
 
@@ -2467,157 +2474,179 @@ const FIELD_WORK_KIND_LABEL: Record<FieldWorkflowKind, string> = {
 const RECOMMENDED_INSPECTION_ITEMS: Record<string, string[]> = {
   // ── Exterior & structure ───────────────────────────────────────────────────
   exterior: [
-    'Siding — damage, rot, or missing sections',
-    'Foundation — visible cracks (note diagonal vs horizontal)',
-    'Grading and drainage — slopes away from structure',
-    'Caulking at windows, doors, and all penetrations',
-    'Decks and porches — structure, ledger board, and railings',
-    'Stairs and handrails — secure and code compliant',
-    'Driveways and walkways — cracks and trip hazards',
-    'Exterior GFCI outlets — present and functional',
-    'Exterior hose bibs — condition and freeze protection',
-    'Exterior lighting — operation',
-    'Landscaping — overgrowth or roots near structure or utilities',
+    'Check exterior siding and trim for damage',
+    'Check foundation for visible cracks or movement',
+    'Check grading and drainage near the home',
+    'Check exterior caulking, gaps, and penetrations',
+    'Check decks, porches, steps, and trip hazards',
+    'Check exterior outlets and hose bibs',
+    'Check exterior lighting',
+    'Check visible pest or moisture concerns',
   ],
   roof: [
-    'Shingles — missing, cracked, curled, or granule loss',
-    'Gutters — debris, slope, and secure mounting',
-    'Downspouts — extension and drainage away from foundation',
-    'Flashing at chimney, vents, skylights, and valleys',
-    'Fascia and soffit — rot, damage, or pest entry points',
-    'Roof penetrations — boots and seals',
-    'Ridge cap — condition and alignment',
-    'Chimney — cap, crown, and mortar (if present)',
+    'Check shingles or roof covering for visible damage',
+    'Check gutters for blockage or damage',
+    'Check downspouts for blockage or poor drainage',
+    'Check flashing, vents, skylights, and valleys',
+    'Check fascia and soffit for rot or pest entry',
+    'Check roof penetrations and pipe boots',
+    'Check chimney cap, crown, and mortar if present',
   ],
   attic: [
-    'Moisture, staining, ventilation, and insulation concerns observed where accessible',
-    'Visible structural, roof sheathing, rafter, or truss concerns observed where accessible',
-    'Exhaust fan termination or attic air-sealing concern observed where accessible',
-    'Pest evidence observed where accessible',
-    'Storage, clearance, or access limitations noted where relevant',
+    'Check attic moisture or staining where accessible',
+    'Check attic ventilation and insulation where accessible',
+    'Check visible roof framing concerns where accessible',
+    'Check exhaust fan termination where accessible',
+    'Check visible pest evidence where accessible',
   ],
   // ── Mechanical systems ─────────────────────────────────────────────────────
   hvac: [
-    'Furnace or heat pump — condition, age, and operation',
-    'Air filter — condition (replace if dirty)',
-    'Thermostat — operation and programming',
-    'Ductwork — visible leaks, disconnections, or insulation',
-    'A/C condenser unit — fins, coil, refrigerant lines, and clearance',
-    'Flue / exhaust pipe — secure, slope, and termination',
-    'Carbon monoxide detector — present near unit',
-    'Condensate drain line — clear and properly terminated',
-    'Heat / cooling registers — all rooms open and unobstructed',
+    'Check HVAC filter condition',
+    'Check thermostat operation',
+    'Check visible airflow at registers',
+    'Check visible ductwork concerns',
+    'Check outdoor unit clearance and visible condition',
+    'Check condensate drain line where accessible',
+    'Check flue or exhaust pipe where applicable',
+    'Check carbon monoxide detector near equipment if accessible',
   ],
   'electrical panel': [
-    'Panel labeling — accurate and legible',
-    'Breaker condition — no tripped, burnt, or double-tapped breakers',
-    'AFCI breakers — installed where required (bedrooms, living areas)',
-    'GFCI protection — kitchen, bathrooms, garage, exterior, basement',
-    'Main disconnect — accessible and operational',
-    'Panel grounding and bonding — present',
-    'No signs of heat, arcing, or corrosion inside panel',
-    'Smoke detectors — present on all levels and near sleeping areas',
+    'Check panel labeling',
+    'Check breaker condition for visible damage',
+    'Check for visible heat, arcing, or corrosion',
+    'Check main disconnect access where applicable',
+    'Check visible grounding or bonding concerns',
+    'Check GFCI protection in required areas where accessible',
+    'Check smoke/CO detectors if accessible',
   ],
   'water heater': [
-    'Age and condition — note manufacturer date label',
-    'Tank or tankless unit — visible corrosion, leaks, or rust',
-    'Pressure relief valve — present, properly piped to floor or drain',
-    'Flue / exhaust — properly sloped, sealed, and terminated',
-    'Expansion tank — present on closed systems',
-    'Seismic strapping — present where required by local code',
-    'Supply and outlet connections — condition and shut-off valve present',
-    'Drain valve — present and accessible',
-    'Water temperature setting — 120 °F recommended',
+    'Check water heater age and visible condition',
+    'Check water heater area for leaks or corrosion',
+    'Check pressure relief valve and discharge pipe',
+    'Check flue or exhaust where applicable',
+    'Check supply connections and shutoff valve',
+    'Check drain valve access',
   ],
   // ── Kitchen ────────────────────────────────────────────────────────────────
   kitchen: [
-    'Sink, faucet, drain, and under-sink plumbing checked for leaks, moisture, and function concerns',
-    'Cabinets, counters, and visible kitchen surfaces checked for damage or moisture concerns',
-    'Major appliances checked for basic visible condition/operation where applicable',
-    'GFCI protection checked where accessible',
-    'Ventilation or exhaust concern observed where applicable',
+    'Check for active leaks under sinks',
+    'Check sink, faucet, and drain operation',
+    'Check cabinets and counters for damage',
+    'Check visible appliance concerns',
+    'Check kitchen GFCI protection where accessible',
+    'Check range hood or exhaust if present',
   ],
   // ── Living and dining areas ─────────────────────────────────────────────────
   'living room': [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Trip hazards or safety concerns observed',
-    'Fireplace firebox — condition and damper operation (if present)',
-    'Hearth — extension and clearance (if present)',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check fireplace condition if present',
+    'Check smoke/CO detectors if accessible',
+    'Check trip hazards or safety concerns',
   ],
   dining: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Trip hazards or safety concerns observed',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check trip hazards or safety concerns',
   ],
   // ── Bedrooms (more specific first so "master bedroom" matches before "bedroom") ──
   'master bedroom': [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check smoke/CO detectors if accessible',
   ],
   bedroom: [
-    'Walls, ceilings, and floors checked for cracks, stains, soft spots, bulging, or visible damage',
-    'Windows, doors, screens, and locks checked for basic operation and visible condition',
-    'Outlets, switches, and visible light/fan fixtures checked for basic operation and condition',
-    'Smoke/CO detector presence and basic test status observed where applicable',
+    'Check walls, ceilings, and floors for visible damage',
+    'Check doors and windows for operation',
+    'Check outlets and switches for visible damage',
+    'Check light fixtures and ceiling fans',
+    'Check smoke/CO detectors if accessible',
   ],
   // ── Bathrooms (more specific first) ────────────────────────────────────────
   'master bathroom': [
-    'Sink, toilet, tub/shower, drains, and visible plumbing checked for leaks, moisture, or function concerns',
-    'Caulk, grout, walls, ceilings, and flooring checked for moisture damage or deterioration',
-    'Exhaust fan or ventilation concern observed',
-    'GFCI protection checked where accessible',
-    'Fixture water pressure or drainage concern observed where applicable',
+    'Check sink, toilet, tub/shower, and drains',
+    'Check for active leaks or moisture concerns',
+    'Check caulk, grout, walls, ceilings, and flooring',
+    'Check exhaust fan or ventilation',
+    'Check bathroom GFCI protection where accessible',
+    'Check fixture water pressure or drainage concerns',
   ],
   bathroom: [
-    'Sink, toilet, tub/shower, drains, and visible plumbing checked for leaks, moisture, or function concerns',
-    'Caulk, grout, walls, ceilings, and flooring checked for moisture damage or deterioration',
-    'Exhaust fan or ventilation concern observed',
-    'GFCI protection checked where accessible',
-    'Fixture water pressure or drainage concern observed where applicable',
+    'Check sink, toilet, tub/shower, and drains',
+    'Check for active leaks or moisture concerns',
+    'Check caulk, grout, walls, ceilings, and flooring',
+    'Check exhaust fan or ventilation',
+    'Check bathroom GFCI protection where accessible',
+    'Check fixture water pressure or drainage concerns',
   ],
   // ── Utility and support spaces ─────────────────────────────────────────────
   laundry: [
-    'Washer supply and drain connections checked where accessible',
-    'Dryer vent material, routing, and termination checked where accessible',
-    'Leaks, moisture, and floor damage observed',
-    'GFCI protection checked where accessible',
-    'Ventilation or clearance concerns observed',
+    'Check washer supply and drain connections',
+    'Check dryer vent material, routing, and termination',
+    'Check for leaks, moisture, or floor damage',
+    'Check laundry GFCI protection where accessible',
+    'Check ventilation and appliance clearance',
   ],
   basement: [
-    'Moisture, staining, ventilation, and insulation concerns observed where accessible',
-    'Visible structural, foundation, or framing concerns observed where accessible',
-    'Drainage, sump, vapor barrier, or crawlspace condition checked where applicable',
-    'Pest evidence observed where accessible',
-    'Storage, clearance, or access limitations noted where relevant',
+    'Check moisture, staining, ventilation, and insulation',
+    'Check visible structural, foundation, or framing concerns',
+    'Check drainage, sump, vapor barrier, or crawlspace condition',
+    'Check visible pest evidence where accessible',
+    'Check storage, clearance, or access limitations',
   ],
   crawlspace: [
-    'Moisture, staining, ventilation, and insulation concerns observed where accessible',
-    'Visible structural, foundation, or framing concerns observed where accessible',
-    'Drainage, sump, vapor barrier, or crawlspace condition checked where applicable',
-    'Pest evidence observed where accessible',
-    'Storage, clearance, or access limitations noted where relevant',
+    'Check moisture, staining, ventilation, and insulation',
+    'Check visible structural, foundation, or framing concerns',
+    'Check drainage, sump, vapor barrier, or crawlspace condition',
+    'Check visible pest evidence where accessible',
+    'Check storage, clearance, or access limitations',
   ],
   garage: [
-    'Garage door operation and safety concerns checked where applicable',
-    'Garage walls, ceilings, and floors checked for cracks, staining, moisture, or visible damage',
-    'Outlets, switches, and fixtures checked for basic condition',
-    'Storage, clearance, or access limitations noted where relevant',
-    'Fire separation or door-to-living-space concern observed where applicable',
+    'Check garage door operation and safety concerns',
+    'Check garage walls, ceilings, and floors for damage',
+    'Check outlets, switches, and fixtures for visible concerns',
+    'Check storage, clearance, or access limitations',
+    'Check fire separation concerns where applicable',
   ],
 };
 
+const ROOM_RECOMMENDATION_ALIASES: Array<{ aliases: string[]; keys: string[] }> = [
+  { aliases: ['primary bath', 'master bath', 'half bath', 'powder room', 'guest bath', 'ensuite'], keys: ['bathroom'] },
+  { aliases: ['utility', 'utility room', 'mechanical room'], keys: ['laundry', 'hvac', 'water heater', 'electrical panel'] },
+  { aliases: ['family room', 'den', 'great room', 'common area', 'common areas'], keys: ['living room'] },
+  { aliases: ['entry', 'foyer', 'hall', 'hallway', 'stair', 'stairs'], keys: ['living room'] },
+  { aliases: ['carport', 'shop', 'workshop', 'shed'], keys: ['garage', 'exterior'] },
+  { aliases: ['porch', 'deck', 'patio', 'front porch', 'back porch'], keys: ['exterior'] },
+  { aliases: ['crawl space', 'crawlspace', 'crawl'], keys: ['crawlspace', 'exterior'] },
+  { aliases: ['mechanical', 'equipment', 'systems'], keys: ['hvac', 'water heater', 'electrical panel'] },
+];
+
+function uniqueInspectionItems(items: string[]) {
+  return Array.from(new Set(items));
+}
+
 function recommendedItemsForRoom(room: string): string[] {
-  const lower = room.toLowerCase();
-  for (const [key, items] of Object.entries(RECOMMENDED_INSPECTION_ITEMS)) {
-    if (lower.includes(key)) return items;
+  const lower = normalizeText(room);
+  const matchedKeys: string[] = [];
+  const addKey = (key: string) => {
+    if (RECOMMENDED_INSPECTION_ITEMS[key] && !matchedKeys.includes(key)) matchedKeys.push(key);
+  };
+
+  for (const group of ROOM_RECOMMENDATION_ALIASES) {
+    if (group.aliases.some(alias => hasPhrase(lower, alias))) group.keys.forEach(addKey);
   }
-  return [];
+
+  for (const key of Object.keys(RECOMMENDED_INSPECTION_ITEMS)) {
+    if (hasPhrase(lower, key) || lower.includes(normalizeText(key))) addKey(key);
+  }
+
+  return uniqueInspectionItems(matchedKeys.flatMap(key => RECOMMENDED_INSPECTION_ITEMS[key] ?? []));
 }
 
 function getRoomInspectionIcon(room: string): string {
@@ -3345,16 +3374,17 @@ function roomKeywords(room: string) {
   const words = lower.split(' ').filter(word => word.length > 2);
   const keywords = new Set<string>([lower, ...words]);
   if (lower.includes('kitchen')) ['kitchen', 'sink', 'dishwasher', 'refrigerator', 'range', 'stove', 'disposal'].forEach(k => keywords.add(k));
-  if (lower.includes('bath') || lower.includes('powder')) ['bathroom', 'bath', 'toilet', 'shower', 'tub', 'vanity', 'sink', 'faucet'].forEach(k => keywords.add(k));
-  if (lower.includes('master') && lower.includes('bath')) ['master bath', 'master bathroom', 'primary bath', 'primary bathroom'].forEach(k => keywords.add(k));
-  if (lower.includes('garage')) ['garage', 'garage door'].forEach(k => keywords.add(k));
-  if (lower.includes('laundry')) ['laundry', 'washer', 'dryer', 'dryer vent'].forEach(k => keywords.add(k));
+  if (lower.includes('bath') || lower.includes('powder')) ['bathroom', 'bath', 'half bath', 'powder room', 'toilet', 'shower', 'tub', 'vanity', 'sink', 'faucet'].forEach(k => keywords.add(k));
+  if ((lower.includes('master') || lower.includes('primary')) && lower.includes('bath')) ['master bath', 'master bathroom', 'primary bath', 'primary bathroom'].forEach(k => keywords.add(k));
+  if (lower.includes('garage') || lower.includes('shop') || lower.includes('shed') || lower.includes('carport')) ['garage', 'garage door', 'shop', 'shed', 'carport'].forEach(k => keywords.add(k));
+  if (lower.includes('laundry') || lower.includes('utility')) ['laundry', 'utility', 'utility room', 'washer', 'dryer', 'dryer vent'].forEach(k => keywords.add(k));
   if (lower.includes('attic')) ['attic', 'insulation', 'roof leak'].forEach(k => keywords.add(k));
   if (lower.includes('basement') || lower.includes('crawl')) ['basement', 'crawl', 'foundation', 'sump'].forEach(k => keywords.add(k));
-  if (lower.includes('exterior') || lower.includes('yard')) ['exterior', 'outside', 'yard', 'gutter', 'downspout', 'siding', 'hose bib', 'driveway'].forEach(k => keywords.add(k));
+  if (lower.includes('exterior') || lower.includes('yard') || lower.includes('porch') || lower.includes('deck') || lower.includes('patio')) ['exterior', 'outside', 'yard', 'porch', 'deck', 'patio', 'gutter', 'downspout', 'siding', 'hose bib', 'driveway'].forEach(k => keywords.add(k));
   if (lower.includes('bedroom')) ['bedroom', 'closet'].forEach(k => keywords.add(k));
-  if (lower.includes('living') || lower.includes('family')) ['living room', 'family room', 'fireplace'].forEach(k => keywords.add(k));
-  if (lower.includes('whole') || lower.includes('system')) ['hvac', 'thermostat', 'water heater', 'electrical panel', 'smoke detector', 'carbon monoxide'].forEach(k => keywords.add(k));
+  if (lower.includes('living') || lower.includes('family') || lower.includes('den') || lower.includes('great')) ['living room', 'family room', 'den', 'great room', 'fireplace'].forEach(k => keywords.add(k));
+  if (lower.includes('hall') || lower.includes('entry') || lower.includes('foyer')) ['hallway', 'entry', 'foyer', 'door', 'floor', 'light', 'switch'].forEach(k => keywords.add(k));
+  if (lower.includes('whole') || lower.includes('system') || lower.includes('mechanical')) ['hvac', 'thermostat', 'water heater', 'electrical panel', 'smoke detector', 'carbon monoxide'].forEach(k => keywords.add(k));
   return Array.from(keywords).filter(Boolean);
 }
 
@@ -3377,21 +3407,25 @@ const ITEM_MATCH_SYNONYMS: Record<string, string[]> = {
   shower: ['shower', 'tub', 'bathtub', 'pan', 'shower door', 'enclosure'],
   drain: ['drain', 'drains', 'draining', 'drainage', 'waste', 'p-trap', 'p trap', 'trap', 'slow drain', 'slow draining', 'clog'],
   leak: ['leak', 'leaks', 'leaking', 'drip', 'drips', 'dripping', 'water leak', 'moisture', 'wet', 'damp'],
+  moisture: ['moisture', 'water stain', 'stain', 'staining', 'soft spot', 'damp', 'wet', 'mold', 'mildew'],
   caulk: ['caulk', 'caulking', 'sealant', 'grout'],
   dishwasher: ['dishwasher'],
   disposal: ['disposal', 'garbage disposal', 'garburator'],
   refrigerator: ['refrigerator', 'fridge'],
   range: ['oven', 'range', 'stove', 'stovetop', 'burner'],
   vent: ['vent', 'exhaust', 'fan', 'range hood'],
-  gfci: ['gfci', 'outlet', 'receptacle'],
-  window: ['window', 'sill', 'glass'],
-  door: ['door', 'threshold', 'lock', 'hardware'],
-  gutter: ['gutter', 'downspout'],
+  gfci: ['gfci', 'outlet', 'receptacle', 'plug'],
+  switch: ['switch', 'light switch', 'dimmer'],
+  electrical: ['electrical', 'breaker', 'panel', 'wire', 'wiring', 'spark', 'sparking', 'flicker', 'flickering'],
+  window: ['window', 'windows', 'sill', 'glass', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'],
+  door: ['door', 'doors', 'threshold', 'lock', 'hardware', 'hinge', 'sticks', 'sticking', 'stuck door', 'won t latch', 'wont latch'],
+  gutter: ['gutter', 'gutters', 'downspout', 'downspouts', 'clogged gutter', 'gutter clogged', 'blocked downspout', 'overflowing'],
   roof: ['roof', 'shingle', 'flashing'],
-  hvac: ['hvac', 'filter', 'thermostat', 'furnace', 'condenser'],
+  hvac: ['hvac', 'filter', 'dirty filter', 'thermostat', 'furnace', 'condenser', 'ac', 'a c', 'air conditioner', 'not cooling', 'weak air', 'airflow', 'air flow', 'register'],
   wall: ['wall', 'walls', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'],
   cabinet: ['cabinet', 'cabinets', 'drawer', 'drawers', 'hinge', 'cabinet maker'],
   fan: ['fan', 'ceiling fan', 'fan blade', 'blade', 'squeak', 'squeaking', 'noise', 'balance', 'out of balance'],
+  pest: ['pest', 'pests', 'wasp', 'wasps', 'nest', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent', 'mice'],
 };
 
 function checklistMatchConfidence(note: string, item: string) {
@@ -3412,17 +3446,25 @@ function checklistMatchConfidence(note: string, item: string) {
 function suggestedChecklistItemFromNote(note: string, room: string) {
   const lower = normalizeText(note);
   if (['leak', 'leaking', 'drip', 'moisture', 'wet', 'water', 'supply line', 'p trap', 'p-trap'].some(word => hasPhrase(lower, word))) {
-    if (['sink', 'faucet', 'vanity', 'basin'].some(word => hasPhrase(lower, word))) return 'Under-sink plumbing — leaks, moisture, and supply lines';
-    return 'Plumbing leak or moisture concern';
+    if (['sink', 'faucet', 'vanity', 'basin', 'cabinet'].some(word => hasPhrase(lower, word))) {
+      return hasPhrase(normalizeText(room), 'bath') ? 'Bathroom sink leak' : 'Kitchen sink leak';
+    }
+    if (['ceiling', 'stain', 'water stain'].some(word => hasPhrase(lower, word))) return 'Moisture stain';
+    return 'Plumbing leak';
   }
-  if (['slow drain', 'clog', 'backup', 'not draining', 'drain'].some(word => hasPhrase(lower, word))) return 'Drainage — operation and no slow drain';
-  if (['wall', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'].some(word => hasPhrase(lower, word))) return 'Walls, ceilings, paint, and drywall condition';
-  if (['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'out of balance'].some(word => hasPhrase(lower, word))) return 'Ceiling light fixture or fan — operation and secure mount';
-  if (['floor', 'flooring', 'tile', 'carpet', 'laminate', 'hardwood'].some(word => hasPhrase(lower, word))) return 'Flooring condition and visible damage';
-  if (['cabinet', 'drawer', 'countertop'].some(word => hasPhrase(lower, word))) return 'Cabinets, drawers, and countertop condition';
-  if (['door', 'hinge', 'lock', 'handle'].some(word => hasPhrase(lower, word))) return 'Doors, hinges, locks, and hardware';
-  if (['window', 'screen', 'lock'].some(word => hasPhrase(lower, word))) return 'Windows, locks, and screens';
-  return `${room || 'General'} maintenance observation`;
+  if (['slow drain', 'clog', 'backup', 'not draining', 'drain'].some(word => hasPhrase(lower, word))) return 'Slow drain or clog';
+  if (['gutter', 'gutters', 'downspout', 'downspouts'].some(word => hasPhrase(lower, word))) return 'Gutter blockage';
+  if (['ac', 'a c', 'air conditioner', 'hvac', 'not cooling', 'weak air', 'airflow', 'air flow', 'dirty filter', 'filter'].some(word => hasPhrase(lower, word))) return 'HVAC airflow or filter concern';
+  if (['outlet', 'receptacle', 'plug', 'switch', 'light switch'].some(word => hasPhrase(lower, word))) return 'Loose outlet or switch';
+  if (['wall', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'].some(word => hasPhrase(lower, word))) return 'Wall or ceiling damage';
+  if (['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'out of balance', 'wobble', 'wobbling'].some(word => hasPhrase(lower, word))) return 'Ceiling fan noise';
+  if (['floor', 'flooring', 'tile', 'carpet', 'laminate', 'hardwood', 'soft spot'].some(word => hasPhrase(lower, word))) return 'Flooring concern';
+  if (['cabinet', 'drawer', 'countertop'].some(word => hasPhrase(lower, word))) return 'Cabinet or counter issue';
+  if (['door', 'hinge', 'lock', 'handle', 'sticks', 'sticking'].some(word => hasPhrase(lower, word))) return 'Door operation issue';
+  if (['window', 'screen', 'sash', 'won t open', 'wont open'].some(word => hasPhrase(lower, word))) return 'Window operation issue';
+  if (['wasp', 'wasps', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent', 'pest'].some(word => hasPhrase(lower, word))) return 'Pest concern';
+  const roomLabel = room && room !== 'General' ? room.replace(/\s*\/\s*/g, ' ') : 'General';
+  return `${roomLabel} observation`;
 }
 
 function findBestChecklistItem(note: string, items: string[]) {
@@ -3436,11 +3478,74 @@ function findBestChecklistItem(note: string, items: string[]) {
   const noteHasCabinet = ['cabinet', 'cabinets', 'drawer', 'drawers', 'cabinet maker'].some(word => hasPhrase(lower, word));
   const noteHasWallSurface = ['sheetrock', 'drywall', 'wall', 'walls', 'ceiling', 'paint'].some(word => hasPhrase(lower, word));
   const noteHasFan = ['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'balance', 'out of balance'].some(word => hasPhrase(lower, word));
+  const noteHasGutter = ['gutter', 'gutters', 'downspout', 'downspouts', 'gutter clogged', 'clogged gutter', 'blocked downspout', 'overflowing'].some(word => hasPhrase(lower, word));
+  const noteHasHvac = ['hvac', 'ac', 'a c', 'air conditioner', 'not cooling', 'weak air', 'airflow', 'air flow', 'filter', 'dirty filter', 'thermostat'].some(word => hasPhrase(lower, word));
+  const noteHasElectrical = ['outlet', 'receptacle', 'plug', 'switch', 'light switch', 'gfci', 'breaker', 'electrical', 'panel'].some(word => hasPhrase(lower, word));
+  const noteHasDoor = ['door', 'doors', 'hinge', 'lock', 'handle', 'sticks', 'sticking', 'won t latch', 'wont latch'].some(word => hasPhrase(lower, word));
+  const noteHasWindow = ['window', 'windows', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'].some(word => hasPhrase(lower, word));
+  const noteHasMoisture = ['moisture', 'water stain', 'stain', 'staining', 'soft spot', 'mold', 'mildew'].some(word => hasPhrase(lower, word));
+  const noteHasPest = ['pest', 'wasp', 'wasps', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent'].some(word => hasPhrase(lower, word));
+
+  if (noteHasGutter) {
+    const gutterItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      return ['gutter', 'gutters', 'downspout', 'downspouts'].some(word => hasPhrase(itemLower, word));
+    });
+    if (gutterItem) return gutterItem;
+  }
+
+  if (noteHasHvac) {
+    const hvacItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      if (hasPhrase(lower, 'filter') || hasPhrase(lower, 'dirty filter')) return hasPhrase(itemLower, 'filter');
+      if (hasPhrase(lower, 'thermostat')) return hasPhrase(itemLower, 'thermostat');
+      return ['hvac', 'airflow', 'air flow', 'register', 'outdoor unit', 'condenser', 'visible airflow'].some(word => hasPhrase(itemLower, word));
+    });
+    if (hvacItem) return hvacItem;
+  }
+
+  if (noteHasElectrical) {
+    const electricalItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      if (hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle') || hasPhrase(lower, 'plug')) {
+        return ['outlet', 'outlets', 'receptacle', 'receptacles', 'gfci'].some(word => hasPhrase(itemLower, word));
+      }
+      if (hasPhrase(lower, 'switch')) return ['switch', 'switches', 'light fixture'].some(word => hasPhrase(itemLower, word));
+      return ['electrical', 'panel', 'breaker', 'gfci'].some(word => hasPhrase(itemLower, word));
+    });
+    if (electricalItem) return electricalItem;
+  }
+
+  if (noteHasDoor || noteHasWindow) {
+    const doorWindowItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      return noteHasDoor
+        ? ['door', 'doors', 'lock', 'hardware', 'hinge'].some(word => hasPhrase(itemLower, word))
+        : ['window', 'windows', 'screen', 'screens', 'lock'].some(word => hasPhrase(itemLower, word));
+    });
+    if (doorWindowItem) return doorWindowItem;
+  }
+
+  if (noteHasPest) {
+    const pestItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      return ['pest', 'pests', 'termite', 'ants', 'wasp', 'droppings'].some(word => hasPhrase(itemLower, word));
+    });
+    if (pestItem) return pestItem;
+  }
+
+  if (noteHasMoisture && !noteHasSink && !noteHasDrain) {
+    const moistureItem = items.find(item => {
+      const itemLower = normalizeText(item);
+      return ['moisture', 'staining', 'stain', 'leak', 'water', 'soft spot', 'visible damage'].some(word => hasPhrase(itemLower, word));
+    });
+    if (moistureItem) return moistureItem;
+  }
 
   if (noteHasFan) {
     const fanItem = items.find(item => {
       const itemLower = normalizeText(item);
-      return ['ceiling fan', 'fan', 'light fixture'].some(word => hasPhrase(itemLower, word));
+      return ['ceiling fan', 'fan', 'light fixture', 'fixtures'].some(word => hasPhrase(itemLower, word));
     });
     if (fanItem) return fanItem;
   }
@@ -3523,6 +3628,13 @@ function findBestChecklistItem(note: string, items: string[]) {
     if (noteHasFan && hasPhrase(itemLower, 'outlet')) score -= 25;
     if (noteHasCabinet && (hasPhrase(itemLower, 'under sink') || hasPhrase(itemLower, 'plumbing'))) score -= 16;
     if (noteHasWallSurface && hasPhrase(itemLower, 'flooring')) score -= 18;
+    if (noteHasGutter && (hasPhrase(itemLower, 'gutter') || hasPhrase(itemLower, 'downspout'))) score += 28;
+    if (noteHasHvac && (hasPhrase(itemLower, 'hvac') || hasPhrase(itemLower, 'filter') || hasPhrase(itemLower, 'airflow') || hasPhrase(itemLower, 'thermostat'))) score += 22;
+    if (noteHasElectrical && (hasPhrase(itemLower, 'outlet') || hasPhrase(itemLower, 'switch') || hasPhrase(itemLower, 'gfci') || hasPhrase(itemLower, 'panel'))) score += 22;
+    if (noteHasDoor && hasPhrase(itemLower, 'door')) score += 20;
+    if (noteHasWindow && hasPhrase(itemLower, 'window')) score += 20;
+    if (noteHasPest && hasPhrase(itemLower, 'pest')) score += 20;
+    if (noteHasMoisture && (hasPhrase(itemLower, 'moisture') || hasPhrase(itemLower, 'staining') || hasPhrase(itemLower, 'water'))) score += 16;
 
     return { item, score };
   }).sort((a, b) => b.score - a.score);
@@ -22433,9 +22545,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex flex-wrap items-center gap-1.5">
                                                 <span className={`rounded-full px-1.5 py-0.5 font-semibold ${FINDING_STATUS_CONFIG[s.suggestedStatus].color}`}>{s.suggestedStatus}</span>
                                                 {s.detectedRoom && <span className="text-slate-500">{s.detectedRoom}{s.detectedItem ? ` › ${s.detectedItem.slice(0, 22)}…` : ''}</span>}
-                                                {s.needsNewChecklistItem && <span className="text-amber-600">will create item</span>}
+                                                {s.needsNewChecklistItem ? (
+                                                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Suggested new item</span>
+                                                ) : (
+                                                  <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 font-semibold text-emerald-700">Matched existing item</span>
+                                                )}
                                                 {!s.detectedRoom && <span className="text-slate-400">No room matched</span>}
                                               </div>
+                                              {s.suggestedAction && (
+                                                <p className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] leading-5 text-blue-700">
+                                                  Recommended action: {s.suggestedAction}
+                                                </p>
+                                              )}
                                               {s.accepted === null && (
                                                 <div className="flex gap-1.5">
                                                   <button type="button" onClick={() => {
