@@ -12516,9 +12516,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId?: string | null;
     localContactId?: string | null;
   }) => {
-    if (!supabase || !contractor?.id) return;
     setNotice('');
     setError('');
+    if (!supabase) {
+      setError('Unable to save invoice draft because ServSync is still connecting. Refresh and try again.');
+      return;
+    }
+    if (!contractor?.id) {
+      setError('Unable to save invoice draft because your contractor profile is still loading. Wait a moment and try again.');
+      return;
+    }
     if (!invoiceDraft.title.trim()) {
       setError('Add an invoice title before saving.');
       return;
@@ -19407,7 +19414,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
                               {editingInvoiceId ? 'Edit invoice draft' : 'Invoice draft'}
                             </p>
-                            <p className="mt-1 text-sm text-slate-700">{selectedJobsCustomerName}{selectedJobsCustomerAddress ? ` · ${selectedJobsCustomerAddress}` : ''}</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-800">
+                              Creating invoice for: <span>{selectedJobsCustomerName}</span>
+                            </p>
+                            {selectedJobsCustomerAddress && (
+                              <p className="mt-0.5 text-xs text-slate-600">{selectedJobsCustomerAddress}</p>
+                            )}
                           </div>
                           <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
                             Cancel
@@ -19416,13 +19428,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="grid gap-3 md:grid-cols-3">
                           <Field label="Invoice number">
-                            <input className={inputClass()} spellCheck={false} value={invoiceDraft.invoice_number} onChange={event => setInvoiceDraft(d => ({ ...d, invoice_number: event.target.value }))} placeholder="Optional" />
+                            <input aria-label="Invoice number" className={inputClass()} spellCheck={false} value={invoiceDraft.invoice_number} onChange={event => setInvoiceDraft(d => ({ ...d, invoice_number: event.target.value }))} placeholder="Optional" />
                           </Field>
                           <Field label="Invoice title">
-                            <input className={inputClass()} value={invoiceDraft.title} onChange={event => setInvoiceDraft(d => ({ ...d, title: event.target.value }))} />
+                            <input aria-label="Invoice title" className={inputClass()} value={invoiceDraft.title} onChange={event => setInvoiceDraft(d => ({ ...d, title: event.target.value }))} />
                           </Field>
                           <Field label="Due date">
-                            <input className={inputClass()} type="date" value={invoiceDraft.due_at} onChange={event => setInvoiceDraft(d => ({ ...d, due_at: event.target.value }))} />
+                            <input aria-label="Invoice due date" className={inputClass()} type="date" value={invoiceDraft.due_at} onChange={event => setInvoiceDraft(d => ({ ...d, due_at: event.target.value }))} />
                           </Field>
                         </div>
 
@@ -19463,7 +19475,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4">
                           <Field label="Scope">
-                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={invoiceDraft.scope} onChange={event => setInvoiceDraft(d => ({ ...d, scope: event.target.value }))} placeholder="What completed work does this invoice cover?" />
+                            <textarea aria-label="Invoice scope" className={inputClass()} rows={3} {...writingAssistProps} value={invoiceDraft.scope} onChange={event => setInvoiceDraft(d => ({ ...d, scope: event.target.value }))} placeholder="What completed work does this invoice cover?" />
                           </Field>
                         </div>
 
@@ -19487,13 +19499,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </select>
                                 </Field>
                                 <Field label="Description">
-                                  <input className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setInvoiceDraft(d => ({
+                                  <input aria-label={`Invoice line item ${index + 1} description`} className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
                                     line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
                                   }))} placeholder="Labor, materials, disposal..." />
                                 </Field>
                                 <Field label="Qty">
-                                  <input className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setInvoiceDraft(d => ({
+                                  <input aria-label={`Invoice line item ${index + 1} quantity`} className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
                                     line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
                                   }))} />
@@ -19505,7 +19517,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   }))} />
                                 </Field>
                                 <Field label="Unit price">
-                                  <input className={inputClass()} value={line.unit_price} onChange={event => setInvoiceDraft(d => ({
+                                  <input aria-label={`Invoice line item ${index + 1} unit price`} className={inputClass()} value={line.unit_price} onChange={event => setInvoiceDraft(d => ({
                                     ...d,
                                     line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
                                   }))} placeholder="$0.00" />
