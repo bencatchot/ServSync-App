@@ -148,6 +148,12 @@ type AdminConnectionAlertDraft = {
   next_follow_up_at: string;
 };
 type AdminConnectionFilter = 'all' | ConnectionAlertLevel | 'needs_outreach' | 'contacted_recently';
+type AdminOutreachTemplateId = 'light_onboarding' | 'short_feature' | 'feature_focused';
+type AdminOutreachMessageDraft = {
+  templateId: AdminOutreachTemplateId;
+  subject: string;
+  body: string;
+};
 type WalkthroughSuggestion = {
   id: string;
   rawText: string;
@@ -4867,6 +4873,12 @@ const CONNECTION_ALERT_STATUS_OPTIONS: { value: ConnectionAlertStatus; label: st
   { value: 'resolved', label: 'Resolved' },
 ];
 
+const CONNECTION_OUTREACH_TEMPLATE_OPTIONS: { value: AdminOutreachTemplateId; label: string }[] = [
+  { value: 'light_onboarding', label: 'Light onboarding reminder' },
+  { value: 'short_feature', label: 'Shorter version' },
+  { value: 'feature_focused', label: 'Feature-focused' },
+];
+
 function connectionAlertDraftFromAdoption(row: AdminContractorAdoption): AdminConnectionAlertDraft {
   return {
     status: row.alert_status || 'open',
@@ -4902,6 +4914,64 @@ function isConnectionAlertNeedsOutreach(row: AdminContractorAdoption) {
   if (!['red', 'yellow'].includes(row.connection_level)) return false;
   if (row.alert_status === 'contacted' || row.alert_status === 'dismissed' || row.alert_status === 'resolved') return false;
   return true;
+}
+
+function contractorOutreachName(contractor: Pick<ContractorProfile, 'business_name' | 'email'>) {
+  return contractor.business_name || contractor.email || 'there';
+}
+
+function connectionOutreachMessage(templateId: AdminOutreachTemplateId, contractorName: string): AdminOutreachMessageDraft {
+  if (templateId === 'short_feature') {
+    return {
+      templateId,
+      subject: 'ServSync homeowner connection feature',
+      body: `Hi ${contractorName},
+
+Just wanted to make sure you're aware that ServSync works best when customers connect with you through their free homeowner profile.
+
+That connection lets them view reports, estimates, invoices, service history, and home records in one place, while helping you keep the customer relationship organized after the job.
+
+If you'd like help inviting customers or using your referral link, I'm happy to help.
+
+Thanks,
+Ben
+ServSync`,
+    };
+  }
+  if (templateId === 'feature_focused') {
+    return {
+      templateId,
+      subject: 'Quick ServSync setup tip',
+      body: `Hi ${contractorName},
+
+One quick tip as you continue using ServSync: local customer records are helpful, but connected homeowner profiles give both you and the customer more value.
+
+Once a homeowner connects, they can keep your reports, estimates, invoices, and service history tied to their property record. It also gives you a more professional follow-up path for future work.
+
+I'm happy to help you set up a simple customer invite process if that would be useful.
+
+Thanks,
+Ben
+ServSync`,
+    };
+  }
+  return {
+    templateId,
+    subject: 'Getting more out of ServSync customer connections',
+    body: `Hi ${contractorName},
+
+I wanted to send a quick note to make sure you know about one of the more useful parts of ServSync.
+
+When your customers create their free homeowner profile and connect with you, they can keep reports, estimates, invoices, service history, and property records organized in one place. It also gives you a cleaner way to keep the relationship active after the visit.
+
+Local customer records are still useful, but connected homeowners unlock more of the shared record and reporting features.
+
+If you want, I can help you walk through the easiest way to invite customers or use your referral/invite link.
+
+Thanks,
+Ben
+ServSync`,
+  };
 }
 
 function formatDateTime(value?: string | null) {
@@ -23523,6 +23593,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
   const [contractorAdoption, setContractorAdoption] = useState<AdminContractorAdoption[]>([]);
   const [connectionAlertDrafts, setConnectionAlertDrafts] = useState<Record<string, AdminConnectionAlertDraft>>({});
+  const [connectionOutreachDrafts, setConnectionOutreachDrafts] = useState<Record<string, AdminOutreachMessageDraft>>({});
+  const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'referrals' | 'support' | 'reports'>('overview');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
@@ -23676,6 +23748,30 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }));
   };
 
+  const prepareConnectionOutreach = (contractor: ContractorProfile, row: AdminContractorAdoption) => {
+    if (!row.alert_id) return;
+    const template = connectionOutreachDrafts[row.alert_id] || connectionOutreachMessage('light_onboarding', contractorOutreachName(contractor));
+    setConnectionOutreachDrafts(current => ({
+      ...current,
+      [row.alert_id!]: template,
+    }));
+    setActiveConnectionOutreachId(row.alert_id);
+  };
+
+  const changeConnectionOutreachTemplate = (contractor: ContractorProfile, alertId: string, templateId: AdminOutreachTemplateId) => {
+    setConnectionOutreachDrafts(current => ({
+      ...current,
+      [alertId]: connectionOutreachMessage(templateId, contractorOutreachName(contractor)),
+    }));
+  };
+
+  const updateConnectionOutreachDraft = (alertId: string, nextDraft: AdminOutreachMessageDraft) => {
+    setConnectionOutreachDrafts(current => ({
+      ...current,
+      [alertId]: nextDraft,
+    }));
+  };
+
   const saveAdminContractor = async (contractor: ContractorProfile) => {
     if (!supabase) return;
     setNotice('');
@@ -23752,13 +23848,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
-  const saveConnectionAlert = async (row: AdminContractorAdoption) => {
+  const saveConnectionAlert = async (row: AdminContractorAdoption, overrides: Partial<AdminConnectionAlertDraft> = {}) => {
     if (!supabase || !row.alert_id) return;
     setNotice('');
     setError('');
     setSavingConnectionAlertId(row.alert_id);
     try {
-      const draft = connectionAlertDrafts[row.alert_id] || connectionAlertDraftFromAdoption(row);
+      const draft = { ...(connectionAlertDrafts[row.alert_id] || connectionAlertDraftFromAdoption(row)), ...overrides };
       const { error: updateError } = await supabase.rpc('servsync_admin_update_connection_alert', {
         p_alert_id: row.alert_id,
         p_status: draft.status,
@@ -23772,6 +23868,18 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setError(readableError(err, 'Unable to update connection outreach tracking.'));
     } finally {
       setSavingConnectionAlertId(null);
+    }
+  };
+
+  const copyConnectionOutreachMessage = async (row: AdminContractorAdoption) => {
+    if (!row.alert_id) return;
+    const draft = connectionOutreachDrafts[row.alert_id];
+    if (!draft) return;
+    try {
+      await navigator.clipboard.writeText(`Subject: ${draft.subject}\n\n${draft.body}`);
+      setNotice('Outreach message copied. Send it manually, then mark contacted when done.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to copy outreach message.'));
     }
   };
 
@@ -23984,6 +24092,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
               const draft = adminDrafts[contractor.id] || adminDraftFromContractor(contractor);
               const adoption = adoptionByContractorId.get(contractor.id);
               const alertDraft = adoption?.alert_id ? (connectionAlertDrafts[adoption.alert_id] || connectionAlertDraftFromAdoption(adoption)) : null;
+              const outreachDraft = adoption?.alert_id ? connectionOutreachDrafts[adoption.alert_id] : null;
               const isSaving = savingContractorId === contractor.id;
               const isSavingAlert = adoption?.alert_id ? savingConnectionAlertId === adoption.alert_id : false;
               const belowThreshold = !adoption || adoption.total_customer_count < 5;
@@ -24075,6 +24184,109 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                           {adoption.contacted_at ? ` · Contacted ${formatDateTime(adoption.contacted_at)}` : ''}
                           {adoption.next_follow_up_at ? ` · Follow up ${formatDateTime(adoption.next_follow_up_at)}` : ''}
                         </p>
+                        <div className="lg:col-span-4 rounded-lg border border-slate-600 bg-slate-900/50 p-3">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-white">Contractor outreach</p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                Prepare a cordial onboarding note. Nothing is sent automatically from ServSync.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => prepareConnectionOutreach(contractor, adoption)}
+                                className={buttonClass('secondary')}
+                              >
+                                <Mail size={16} />
+                                Prepare outreach
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void saveConnectionAlert(adoption, { status: 'contacted' })}
+                                disabled={isSavingAlert}
+                                className={buttonClass('secondary')}
+                              >
+                                <ClipboardCheck size={16} />
+                                Mark contacted
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void saveConnectionAlert(adoption, { status: 'dismissed' })}
+                                disabled={isSavingAlert}
+                                className={buttonClass('secondary')}
+                              >
+                                Dismiss for now
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <InfoBox label="Contractor" value={contractor.business_name || 'Unnamed contractor'} />
+                            <InfoBox label="Connection rate" value={connectionRateLabel(adoption.connection_rate)} />
+                            <InfoBox label="Local customers" value={String(adoption.local_customer_count)} />
+                            <InfoBox label="Connected homeowners" value={String(adoption.connected_homeowner_count)} />
+                          </div>
+
+                          {activeConnectionOutreachId === adoption.alert_id && outreachDraft && (
+                            <div className="mt-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
+                              <Field label="Message template">
+                                <select
+                                  className={inputClass()}
+                                  value={outreachDraft.templateId}
+                                  onChange={event => changeConnectionOutreachTemplate(contractor, adoption.alert_id!, event.target.value as AdminOutreachTemplateId)}
+                                >
+                                  {CONNECTION_OUTREACH_TEMPLATE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                </select>
+                              </Field>
+                              <Field label="Subject">
+                                <input
+                                  className={inputClass()}
+                                  {...writingAssistProps}
+                                  value={outreachDraft.subject}
+                                  onChange={event => updateConnectionOutreachDraft(adoption.alert_id!, { ...outreachDraft, subject: event.target.value })}
+                                />
+                              </Field>
+                              <Field label="Message preview">
+                                <textarea
+                                  className={inputClass()}
+                                  rows={10}
+                                  {...writingAssistProps}
+                                  value={outreachDraft.body}
+                                  onChange={event => updateConnectionOutreachDraft(adoption.alert_id!, { ...outreachDraft, body: event.target.value })}
+                                />
+                              </Field>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void copyConnectionOutreachMessage(adoption)}
+                                  className={buttonClass('primary')}
+                                >
+                                  <ClipboardCheck size={16} />
+                                  Copy message
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void saveConnectionAlert(adoption, { status: 'contacted' })}
+                                  disabled={isSavingAlert}
+                                  className={buttonClass('secondary')}
+                                >
+                                  <ClipboardCheck size={16} />
+                                  {isSavingAlert ? 'Saving...' : 'Mark contacted'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveConnectionOutreachId(null)}
+                                  className={buttonClass('secondary')}
+                                >
+                                  Close preview
+                                </button>
+                              </div>
+                              <p className="text-xs text-slate-400">
+                                Copy this into your email client or CRM. ServSync will only update outreach tracking when you mark the alert contacted, dismissed, or save a follow-up date.
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <p className="mt-4 text-xs text-slate-400">
