@@ -7776,6 +7776,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const dashboardOpenInvoiceRecords = dashboardInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
   const pendingEstimateCount = dashboardNeedsReviewEstimates.length;
   const openHomeownerInvoiceCount = dashboardOpenInvoiceRecords.length;
+  const dashboardEstimateIds = new Set(dashboardEstimates.map(estimate => estimate.id));
+  const unreadEstimateNotificationIds = notifications
+    .filter(notification => !notification.read_at && notification.estimate_id && dashboardEstimateIds.has(notification.estimate_id))
+    .map(notification => notification.id);
+  const unreadEstimateNotificationKey = unreadEstimateNotificationIds.join('|');
+  const unviewedHomeownerInvoiceCount = dashboardInvoices.filter(invoice => invoice.status === 'sent').length;
+  const homeownerFinancialBadgeCount = unreadEstimateNotificationIds.length + unviewedHomeownerInvoiceCount;
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentLogEntries = dashboardMaintenanceLog.slice(0, 3);
@@ -8816,6 +8823,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     slate: 'border-slate-200 bg-slate-50 text-slate-600',
   }[tone]);
 
+  useEffect(() => {
+    if (homeownerTab !== 'estimates' || unreadEstimateNotificationIds.length === 0) return;
+    void markNotificationsRead(unreadEstimateNotificationIds);
+  }, [homeownerTab, unreadEstimateNotificationKey]);
+
   return (
     <SidebarLayout
       brand={{ name: 'ServSync', subtitle: 'Homeowner Portal' }}
@@ -8825,7 +8837,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
         { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
         { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
-        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: pendingEstimateCount + openHomeownerInvoiceCount, group: 'Contractors' },
+        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: homeownerFinancialBadgeCount, group: 'Contractors' },
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
