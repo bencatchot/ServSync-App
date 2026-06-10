@@ -18116,7 +18116,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
                                           {editingEstimateId ? `Edit ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} draft`}
                                         </p>
-                                        <p className="mt-1 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
+                                        <p className="mt-1 text-sm font-semibold text-blue-950">
+                                          Creating estimate for: <span>{conn?.display_name || localCustomer?.display_name || 'Customer'}</span>
+                                        </p>
+                                        {(conn?.home?.address_line1 || localCustomer?.homes?.[0]?.address_line1) && (
+                                          <p className="mt-0.5 text-xs text-blue-800">
+                                            {conn?.home?.address_line1 || localCustomer?.homes?.[0]?.address_line1}
+                                          </p>
+                                        )}
+                                        <p className="mt-2 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
                                       </div>
                                       <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
                                         Cancel
@@ -19155,7 +19163,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
                               {editingEstimateId ? `Edit ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} draft`}
                             </p>
-                            <p className="mt-1 text-sm text-blue-900">{selectedJobsCustomerName}{selectedJobsCustomerAddress ? ` · ${selectedJobsCustomerAddress}` : ''}</p>
+                            <p className="mt-1 text-sm font-semibold text-blue-950">
+                              Creating estimate for: <span>{selectedJobsCustomerName}</span>
+                            </p>
+                            {selectedJobsCustomerAddress && (
+                              <p className="mt-0.5 text-xs text-blue-800">{selectedJobsCustomerAddress}</p>
+                            )}
                           </div>
                           <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
                             Cancel
