@@ -89,39 +89,42 @@ Deno.serve(async (req) => {
 
     const replyToEmail = cleanString(Deno.env.get('REPLY_TO_EMAIL'));
     const brandLogoUrl = cleanString(Deno.env.get('BRAND_LOGO_URL'));
-    const logoHtml = brandLogoUrl ? `<p style="margin:0 0 18px"><img src="${brandLogoUrl}" alt="Prevention Pros" style="max-width:170px;height:auto;display:block" /></p>` : '';
-    const subject = `Home profile setup for Prevention Pros`;
+    const fromEmail = cleanString(Deno.env.get('EMAIL_FROM'), 'ServSync <noreply@servsync.app>');
+    const logoHtml = brandLogoUrl ? `<p style="margin:0 0 18px"><img src="${brandLogoUrl}" alt="ServSync" style="max-width:170px;height:auto;display:block" /></p>` : '';
+    const subject = 'Welcome to ServSync';
     const text = `Hi ${ownerName},
 
-Here is the link to finish setting up your Prevention Pros home profile for ${customerName}:
+Thanks for creating your ServSync account. ServSync helps homeowners and contractors organize reports, estimates, invoices, service history, and property records in one place.
+
+Here is the link to finish setting up your home profile for ${customerName}:
 
 ${onboardingLink}
 
-This helps me keep your home details, preferred vendors, reports, invoices, and future service notes organized in one place.
+If you did not create this account, you can ignore this email.
 
-If you have any trouble opening the link, just reply to this email and I’ll help.
+If you have any trouble opening the link, contact ServSync support through the app.
 
 Thank you,
-Ben Catchot
-Prevention Pros LLC
-preventionprosllc.com
+ServSync
 
-Privacy Policy: https://preventionpros.app/#/privacy
-Terms of Use: https://preventionpros.app/#/terms`;
+Privacy Policy: https://servsync.app/privacy
+Terms of Use: https://servsync.app/terms
+Trust & Safety: https://servsync.app/trust`;
     const html = `
       <div style="font-family:Arial,sans-serif;line-height:1.55;color:#1f2937;max-width:620px;margin:0 auto;padding:24px">
         ${logoHtml}
         <p>Hi ${ownerName},</p>
-        <p>Here is the link to finish setting up your Prevention Pros home profile for <strong>${customerName}</strong>:</p>
+        <p>Thanks for creating your ServSync account. ServSync helps homeowners and contractors organize reports, estimates, invoices, service history, and property records in one place.</p>
+        <p>Here is the link to finish setting up your home profile for <strong>${customerName}</strong>:</p>
         <p style="margin:24px 0">
           <a href="${onboardingLink}" style="background:#2563eb;color:white;text-decoration:none;padding:11px 16px;border-radius:8px;font-weight:600;display:inline-block">Open home profile</a>
         </p>
-        <p>This helps me keep your home details, preferred vendors, reports, invoices, and future service notes organized in one place.</p>
         <p style="font-size:14px;color:#475569">If the button does not open, copy and paste this link into your browser:</p>
         <p style="word-break:break-all;color:#2563eb;font-size:14px">${onboardingLink}</p>
-        <p>If you have any trouble opening the link, just reply to this email and I’ll help.</p>
-        <p style="margin-top:28px">Thank you,<br/>Ben Catchot<br/>Prevention Pros LLC<br/><span style="color:#64748b">preventionprosllc.com</span></p>
-        <p style="font-size:12px;color:#94a3b8;margin-top:20px"><a href="https://preventionpros.app/#/privacy" style="color:#64748b">Privacy Policy</a> · <a href="https://preventionpros.app/#/terms" style="color:#64748b">Terms of Use</a></p>
+        <p>If you did not create this account, you can ignore this email.</p>
+        <p>If you have any trouble opening the link, contact ServSync support through the app.</p>
+        <p style="margin-top:28px">Thank you,<br/>ServSync<br/><span style="color:#64748b">servsync.app</span></p>
+        <p style="font-size:12px;color:#94a3b8;margin-top:20px"><a href="https://servsync.app/privacy" style="color:#64748b">Privacy Policy</a> · <a href="https://servsync.app/terms" style="color:#64748b">Terms of Use</a> · <a href="https://servsync.app/trust" style="color:#64748b">Trust &amp; Safety</a></p>
       </div>
     `;
 
@@ -132,7 +135,7 @@ Terms of Use: https://preventionpros.app/#/terms`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Ben Catchot <ben@preventionpros.app>',
+        from: fromEmail,
         to: [email],
         subject,
         html,
