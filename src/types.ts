@@ -5,6 +5,8 @@ export type ContractorAccountStatus = 'active' | 'inactive' | 'paused';
 export type ContractorSubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'unpaid';
 export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
 export type ReferralRewardStatus = 'not_eligible' | 'pending_review' | 'approved' | 'denied' | 'paid';
+export type UniversalReferralStatus = 'pending' | 'signed_up' | 'qualified' | 'reward_approved' | 'reward_paid' | 'rejected';
+export type UniversalReferralRewardStatus = 'pending' | 'approved' | 'denied' | 'paid' | 'not_eligible';
 export type ExternalReviewSource = 'google' | 'facebook' | 'yelp' | 'other';
 export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_replied' | 'declined' | 'closed';
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
@@ -401,6 +403,31 @@ export interface ContractorInvite {
   reward_status: ReferralRewardStatus;
   reward_notes: string;
   created_at: string;
+}
+
+export interface AdminReferral {
+  referral_id: string;
+  referral_code: string;
+  referrer_user_id: string | null;
+  referrer_role: 'homeowner' | 'contractor' | null;
+  referrer_email: string | null;
+  referrer_name: string | null;
+  referred_user_id: string | null;
+  referred_role: 'homeowner' | 'contractor' | null;
+  referred_email: string | null;
+  referred_name: string | null;
+  source: string;
+  status: UniversalReferralStatus;
+  reward_status: UniversalReferralRewardStatus;
+  reward_type: string | null;
+  reward_amount_cents: number | null;
+  admin_notes: string;
+  created_at: string;
+  updated_at: string;
+  qualified_at: string | null;
+  reward_approved_at: string | null;
+  reward_paid_at: string | null;
+  rejected_at: string | null;
 }
 
 export interface PlatformOverview {

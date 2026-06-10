@@ -51,6 +51,7 @@ import type {
   AdminContractorActivityRow,
   AdminGrowthRow,
   AdminPlatformHealth,
+  AdminReferral,
   AdminRevenueRow,
   AppNotification,
   ConnectionAuditEvent,
@@ -101,6 +102,8 @@ import type {
   SupportInquiryStatus,
   UserRole,
   ReferralRewardStatus,
+  UniversalReferralRewardStatus,
+  UniversalReferralStatus,
   AppointmentStatus,
   HomeDocument,
   HomeDocumentType,
@@ -128,6 +131,13 @@ type AdminContractorDraft = {
 type InviteRewardDraft = {
   reward_status: ReferralRewardStatus;
   reward_notes: string;
+};
+type AdminReferralDraft = {
+  status: UniversalReferralStatus;
+  reward_status: UniversalReferralRewardStatus;
+  reward_type: string;
+  reward_amount: string;
+  admin_notes: string;
 };
 type WalkthroughSuggestion = {
   id: string;
@@ -1479,6 +1489,8 @@ const HOME_TYPE_OPTIONS = [
 const SUBSCRIPTION_STATUS_OPTIONS: ContractorSubscriptionStatus[] = ['trialing', 'active', 'past_due', 'paused', 'canceled', 'unpaid'];
 const ACCOUNT_STATUS_OPTIONS: ContractorAccountStatus[] = ['active', 'paused', 'inactive'];
 const REFERRAL_REWARD_STATUS_OPTIONS: ReferralRewardStatus[] = ['not_eligible', 'pending_review', 'approved', 'denied', 'paid'];
+const UNIVERSAL_REFERRAL_STATUS_OPTIONS: UniversalReferralStatus[] = ['pending', 'signed_up', 'qualified', 'reward_approved', 'reward_paid', 'rejected'];
+const UNIVERSAL_REFERRAL_REWARD_STATUS_OPTIONS: UniversalReferralRewardStatus[] = ['pending', 'approved', 'denied', 'paid', 'not_eligible'];
 const SERVICE_REQUEST_URGENCY_OPTIONS: ServiceRequestUrgency[] = ['low', 'normal', 'urgent'];
 const SERVICE_REQUEST_CATEGORIES = [...TRADE_OPTIONS, 'Other'];
 const KUDOS_OPTIONS = [
@@ -4828,6 +4840,16 @@ function inviteDraftFromInvite(invite: ContractorInvite): InviteRewardDraft {
   };
 }
 
+function referralDraftFromReferral(referral: AdminReferral): AdminReferralDraft {
+  return {
+    status: referral.status || 'signed_up',
+    reward_status: referral.reward_status || 'pending',
+    reward_type: referral.reward_type || '',
+    reward_amount: referral.reward_amount_cents ? centsToDollars(referral.reward_amount_cents) : '',
+    admin_notes: referral.admin_notes || '',
+  };
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return 'Not used yet';
   const date = new Date(value);
@@ -5541,7 +5563,9 @@ export default function App() {
           <AuthPage
             role={route === 'admin' ? 'platform_admin' : route === 'contractor' ? 'contractor' : 'homeowner'}
             inviteCode={query.get('invite') || ''}
-            initialMode={query.get('mode') === 'signup' ? 'signup' : 'signin'}
+            referralCode={query.get('ref') || ''}
+            initialMode={route === 'admin' ? 'signin' : query.get('mode') === 'signup' ? 'signup' : 'signin'}
+            adminSigninOnly={route === 'admin'}
             onAuthed={() => void loadProfile(session)}
           />
         )}
@@ -5918,14 +5942,29 @@ function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: strin
   );
 }
 
-function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole; inviteCode: string; initialMode: 'signin' | 'signup'; onAuthed: () => void }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>(inviteCode || initialMode === 'signup' ? 'signup' : 'signin');
+function AuthPage({
+  role,
+  inviteCode,
+  referralCode,
+  initialMode,
+  adminSigninOnly = false,
+  onAuthed,
+}: {
+  role: UserRole;
+  inviteCode: string;
+  referralCode: string;
+  initialMode: 'signin' | 'signup';
+  adminSigninOnly?: boolean;
+  onAuthed: () => void;
+}) {
+  const [mode, setMode] = useState<'signin' | 'signup'>((!adminSigninOnly && (inviteCode || referralCode || initialMode === 'signup')) ? 'signup' : 'signin');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const signupRole: Exclude<UserRole, 'platform_admin'> = role === 'contractor' ? 'contractor' : 'homeowner';
 
   const submit = async () => {
     if (!supabase) return;
@@ -5938,6 +5977,9 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
         onAuthed();
         return;
       }
+      if (adminSigninOnly || role === 'platform_admin') {
+        throw new Error('ServSync admin accounts are created manually. Sign in with an existing admin account.');
+      }
       if (!acceptedLegal) {
         throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
       }
@@ -5948,8 +5990,9 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
         options: {
           data: {
             full_name: fullName,
-            role,
-            referral_invite_code: role === 'homeowner' ? inviteCode : '',
+            role: signupRole,
+            referral_invite_code: signupRole === 'homeowner' ? inviteCode : '',
+            referral_code: referralCode,
           },
         },
       });
@@ -5960,7 +6003,7 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
           id: data.user.id,
           email,
           full_name: fullName,
-          role,
+          role: signupRole,
         });
         onAuthed();
       } else {
@@ -6006,11 +6049,18 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
           <p className="mt-2 text-sm leading-6 text-[#223D67]">
             {role === 'contractor'
               ? 'Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests.'
+              : role === 'platform_admin'
+                ? 'Sign in with an existing ServSync admin account. Admin profiles are created manually.'
               : 'Organize your home, connect with local contractors, request service, and keep records together.'}
           </p>
           {inviteCode && (
             <p className="mt-2 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] px-3 py-2 text-sm font-medium text-[#223D67]">
               Contractor referral link detected. You can create your homeowner account without automatically sharing any private information.
+            </p>
+          )}
+          {referralCode && !inviteCode && (
+            <p className="mt-2 rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] px-3 py-2 text-sm font-medium text-[#223D67]">
+              Referral code detected. ServSync will record who referred you after signup.
             </p>
           )}
           {mode === 'signup' && (
@@ -6077,18 +6127,20 @@ function AuthPage({ role, inviteCode, initialMode, onAuthed }: { role: UserRole;
           {message && <Notice tone="info" text={message} />}
         </form>
         <LegalLinks contractor={role === 'contractor'} className="mt-4 text-slate-400" />
-        <div className="mt-6 border-t border-[#E1E3E7] pt-4">
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === 'signin' ? 'signup' : 'signin');
-              setAcceptedLegal(false);
-            }}
-            className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
-          >
-            {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
-          </button>
-        </div>
+        {!adminSigninOnly && (
+          <div className="mt-6 border-t border-[#E1E3E7] pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === 'signin' ? 'signup' : 'signin');
+                setAcceptedLegal(false);
+              }}
+              className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
+            >
+              {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -6577,12 +6629,16 @@ function MissingProfile({
   onCreated: () => void;
 }) {
   const [fullName, setFullName] = useState(session.user.user_metadata?.full_name || '');
-  const [role, setRole] = useState<UserRole>(requestedRole);
+  const [role, setRole] = useState<UserRole>(requestedRole === 'platform_admin' ? 'homeowner' : requestedRole);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
   const createProfile = async () => {
     if (!supabase) return;
+    if (role === 'platform_admin') {
+      setMessage('ServSync admin profiles are created manually. Contact the platform owner if this account should be an admin.');
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -6605,6 +6661,11 @@ function MissingProfile({
     <div className="mx-auto max-w-xl rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm">
       <h1 className="text-2xl font-bold text-[#02132D]">Finish profile setup</h1>
       <p className="mt-2 text-sm text-[#223D67]">Your login exists, but ServSync needs a role profile before continuing.</p>
+      {requestedRole === 'platform_admin' && (
+        <div className="mt-4">
+          <Notice tone="info" text="Admin profiles are created manually. This screen cannot create a ServSync admin account." />
+        </div>
+      )}
       <div className="mt-5 space-y-4">
         <Field label="Full name">
           <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} />
@@ -6613,7 +6674,6 @@ function MissingProfile({
           <select className={inputClass()} value={role} onChange={event => setRole(event.target.value as UserRole)}>
             <option value="homeowner">Homeowner</option>
             <option value="contractor">Contractor</option>
-            {requestedRole === 'platform_admin' && <option value="platform_admin">ServSync Admin</option>}
           </select>
         </Field>
         <button type="button" onClick={() => void createProfile()} disabled={busy} className={buttonClass('primary')}>
@@ -23401,10 +23461,12 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
+  const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
   const [connectionOverviews, setConnectionOverviews] = useState<PlatformConnectionOverview[]>([]);
   const [adminConnectionHistory, setAdminConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [adminDrafts, setAdminDrafts] = useState<Record<string, AdminContractorDraft>>({});
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, InviteRewardDraft>>({});
+  const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
   const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'referrals' | 'support' | 'reports'>('overview');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
@@ -23415,6 +23477,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [savingSupportInquiryId, setSavingSupportInquiryId] = useState<string | null>(null);
   const [savingContractorId, setSavingContractorId] = useState<string | null>(null);
   const [savingInviteId, setSavingInviteId] = useState<string | null>(null);
+  const [savingReferralId, setSavingReferralId] = useState<string | null>(null);
   const [reportHealth, setReportHealth] = useState<AdminPlatformHealth | null>(null);
   const [reportRevenue, setReportRevenue] = useState<AdminRevenueRow[]>([]);
   const [reportGrowth, setReportGrowth] = useState<AdminGrowthRow[]>([]);
@@ -23430,11 +23493,12 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setLoading(true);
     setError('');
     try {
-      const [profilesRes, contractorsRes, connectionsRes, invitesRes, connectionOverviewRes, supportRes] = await Promise.all([
+      const [profilesRes, contractorsRes, connectionsRes, invitesRes, referralRes, connectionOverviewRes, supportRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('contractor_profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_connections').select('status'),
         supabase.from('contractor_invites').select('*').order('created_at', { ascending: false }),
+        supabase.rpc('servsync_admin_referrals'),
         supabase.rpc('servsync_admin_connection_overview'),
         supabase.from('support_inquiries').select('*, messages:support_inquiry_messages(*)').order('updated_at', { ascending: false }),
       ]);
@@ -23447,6 +23511,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const profiles = (profilesRes.data || []) as Profile[];
       const connections = (connectionsRes.data || []) as { status: string }[];
       const loadedInvites = (invitesRes.data || []) as ContractorInvite[];
+      const loadedReferrals = referralRes.error ? [] : (referralRes.data || []) as AdminReferral[];
       const loadedConnectionOverviews = (connectionOverviewRes.data || []) as PlatformConnectionOverview[];
       const adminConnectionIds = loadedConnectionOverviews.map(connection => connection.connection_id);
       const adminHistoryRes = adminConnectionIds.length
@@ -23469,6 +23534,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const loadedContractors = (contractorsRes.data || []) as ContractorProfile[];
       setContractors(loadedContractors);
       setInvites(loadedInvites);
+      setAdminReferrals(loadedReferrals);
       setConnectionOverviews(loadedConnectionOverviews);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
       setAdminConnectionHistory(groupConnectionHistory((adminHistoryRes.data || []) as ConnectionAuditEvent[]));
@@ -23478,6 +23544,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       }, {}));
       setInviteDrafts(loadedInvites.reduce<Record<string, InviteRewardDraft>>((drafts, invite) => {
         drafts[invite.id] = inviteDraftFromInvite(invite);
+        return drafts;
+      }, {}));
+      setAdminReferralDrafts(loadedReferrals.reduce<Record<string, AdminReferralDraft>>((drafts, referral) => {
+        drafts[referral.referral_id] = referralDraftFromReferral(referral);
         return drafts;
       }, {}));
     } catch (err) {
@@ -23524,6 +23594,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setInviteDrafts(current => ({
       ...current,
       [inviteId]: nextDraft,
+    }));
+  };
+
+  const updateAdminReferralDraft = (referralId: string, nextDraft: AdminReferralDraft) => {
+    setAdminReferralDrafts(current => ({
+      ...current,
+      [referralId]: nextDraft,
     }));
   };
 
@@ -23575,6 +23652,31 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setError(readableError(err, 'Unable to update invite reward tracking.'));
     } finally {
       setSavingInviteId(null);
+    }
+  };
+
+  const saveAdminReferral = async (referral: AdminReferral) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setSavingReferralId(referral.referral_id);
+    try {
+      const draft = adminReferralDrafts[referral.referral_id] || referralDraftFromReferral(referral);
+      const { error: updateError } = await supabase.rpc('servsync_admin_update_referral_status', {
+        p_referral_id: referral.referral_id,
+        p_status: draft.status,
+        p_reward_status: draft.reward_status,
+        p_reward_type: draft.reward_type.trim() || null,
+        p_reward_amount_cents: draft.reward_amount.trim() ? dollarsToCents(draft.reward_amount) : null,
+        p_admin_notes: draft.admin_notes,
+      });
+      if (updateError) throw updateError;
+      setNotice('Referral tracking updated.');
+      await loadAdmin();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update referral tracking.'));
+    } finally {
+      setSavingReferralId(null);
     }
   };
 
@@ -23651,11 +23753,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   };
 
   const openSupportCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
+  const pendingReferralCount = adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
   const stats = [
     { label: 'Homeowners', value: overview?.homeowners ?? 0, icon: Home },
     { label: 'Contractors', value: overview?.contractors ?? 0, icon: Building2 },
     { label: 'Active Connections', value: overview?.active_connections ?? 0, icon: Link2 },
     { label: 'Active Invites', value: overview?.active_invites ?? 0, icon: Mail },
+    { label: 'Referral Review', value: pendingReferralCount, icon: Receipt },
     { label: 'Open Support', value: openSupportCount, icon: MessageSquare },
   ];
   const connectionStatusCounts = connectionOverviews.reduce<Record<string, number>>((counts, connection) => {
@@ -23722,7 +23826,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
             label={label}
             value={String(value)}
             helper={label === 'Contractors' ? 'Manage accounts' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
-            onClick={() => setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Active Invites' ? 'referrals' : label === 'Open Support' ? 'support' : 'overview')}
+            onClick={() => setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview')}
           />
         ))}
       </div>
@@ -23902,78 +24006,173 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       )}
 
       {adminTab === 'referrals' && (
-      <Card title="Referral and invite tracking" icon={<Link2 size={18} />}>
-        <div className="space-y-3">
-          {invites.length === 0 ? (
-            <EmptyState text="No contractor invite links have been created yet." />
-          ) : (
-            invites.map(invite => {
-              const contractor = contractors.find(item => item.id === invite.contractor_id);
-              const draft = inviteDrafts[invite.id] || inviteDraftFromInvite(invite);
-              const isSaving = savingInviteId === invite.id;
-              const used = invite.status === 'used' || Boolean(invite.used_by_homeowner_id);
+      <div className="space-y-5">
+        <Card title="Universal referrals" icon={<Link2 size={18} />}>
+          <div className="space-y-3">
+            {adminReferrals.length === 0 ? (
+              <EmptyState text="No universal referral signups have been recorded yet." />
+            ) : (
+              adminReferrals.map(referral => {
+                const draft = adminReferralDrafts[referral.referral_id] || referralDraftFromReferral(referral);
+                const isSaving = savingReferralId === referral.referral_id;
+                const referrerLabel = referral.referrer_name || referral.referrer_email || referral.referrer_user_id?.slice(0, 8) || 'Unknown referrer';
+                const referredLabel = referral.referred_name || referral.referred_email || referral.referred_user_id?.slice(0, 8) || 'Unknown referred user';
 
-              return (
-                <div key={invite.id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="font-bold text-white">{contractor?.business_name || 'Unknown contractor'}</p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Invite code</p>
-                      <p className="mt-1 font-mono text-sm font-bold text-slate-800">{invite.invite_code}</p>
+                return (
+                  <div key={referral.referral_id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="font-bold text-white">{referrerLabel}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          referred {referredLabel}
+                          {referral.referred_role ? ` · ${referral.referred_role}` : ''}
+                        </p>
+                        <p className="mt-2 font-mono text-xs font-bold text-slate-300">Code {referral.referral_code}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{draft.status}</span>
+                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{draft.reward_status}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${used ? 'bg-green-900/30 text-green-400' : 'bg-blue-900/30 text-blue-400'}`}>
-                        {invite.status}
-                      </span>
-                      <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">
-                        {draft.reward_status}
-                      </span>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <InfoBox label="Created" value={formatDateTime(referral.created_at)} />
+                      <InfoBox label="Source" value={referral.source || 'signup'} />
+                      <InfoBox label="Referrer role" value={referral.referrer_role || 'Unknown'} />
+                      <InfoBox label="Reward amount" value={draft.reward_amount ? `$${draft.reward_amount}` : 'Not set'} />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-[180px_180px_180px_1fr_auto]">
+                      <Field label="Referral status">
+                        <select
+                          className={inputClass()}
+                          value={draft.status}
+                          onChange={event => updateAdminReferralDraft(referral.referral_id, { ...draft, status: event.target.value as UniversalReferralStatus })}
+                        >
+                          {UNIVERSAL_REFERRAL_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Reward status">
+                        <select
+                          className={inputClass()}
+                          value={draft.reward_status}
+                          onChange={event => updateAdminReferralDraft(referral.referral_id, { ...draft, reward_status: event.target.value as UniversalReferralRewardStatus })}
+                        >
+                          {UNIVERSAL_REFERRAL_REWARD_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Reward amount">
+                        <input
+                          className={inputClass()}
+                          value={draft.reward_amount}
+                          onChange={event => updateAdminReferralDraft(referral.referral_id, { ...draft, reward_amount: event.target.value })}
+                          placeholder="0.00"
+                        />
+                      </Field>
+                      <Field label="Admin notes">
+                        <input
+                          className={inputClass()}
+                          {...writingAssistProps}
+                          value={draft.admin_notes}
+                          onChange={event => updateAdminReferralDraft(referral.referral_id, { ...draft, admin_notes: event.target.value })}
+                          placeholder="Why this referral qualifies or does not qualify"
+                        />
+                      </Field>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => void saveAdminReferral(referral)}
+                          disabled={isSaving}
+                          className={buttonClass('primary')}
+                        >
+                          <ClipboardCheck size={16} />
+                          {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
                     </div>
                   </div>
+                );
+              })
+            )}
+          </div>
+        </Card>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <InfoBox label="Created" value={formatDateTime(invite.created_at)} />
-                    <InfoBox label="Used" value={formatDateTime(invite.used_at)} />
-                    <InfoBox label="Homeowner account" value={invite.used_by_homeowner_id ? `Created (${invite.used_by_homeowner_id.slice(0, 8)})` : 'Not used yet'} />
-                  </div>
+        <Card title="Contractor invite reward tracking" icon={<Mail size={18} />}>
+          <p className="mb-4 text-sm text-slate-400">
+            Existing one-time invite and permanent QR records are preserved here. Universal referrals above are the new cross-role referral ledger.
+          </p>
+          <div className="space-y-3">
+            {invites.length === 0 ? (
+              <EmptyState text="No contractor invite links have been created yet." />
+            ) : (
+              invites.map(invite => {
+                const contractor = contractors.find(item => item.id === invite.contractor_id);
+                const draft = inviteDrafts[invite.id] || inviteDraftFromInvite(invite);
+                const isSaving = savingInviteId === invite.id;
+                const used = invite.status === 'used' || Boolean(invite.used_by_homeowner_id);
 
-                  <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr_auto]">
-                    <Field label="Reward status">
-                      <select
-                        className={inputClass()}
-                        value={draft.reward_status}
-                        onChange={event => updateInviteDraft(invite.id, { ...draft, reward_status: event.target.value as ReferralRewardStatus })}
-                      >
-                        {REFERRAL_REWARD_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Reward notes">
-                      <input
-                        className={inputClass()}
-                        {...writingAssistProps}
-                        value={draft.reward_notes}
-                        onChange={event => updateInviteDraft(invite.id, { ...draft, reward_notes: event.target.value })}
-                        placeholder="Why this referral does or does not count"
-                      />
-                    </Field>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => void saveInviteReward(invite)}
-                        disabled={isSaving}
-                        className={buttonClass('primary')}
-                      >
-                        <ClipboardCheck size={16} />
-                        {isSaving ? 'Saving...' : 'Save'}
-                      </button>
+                return (
+                  <div key={invite.id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="font-bold text-white">{contractor?.business_name || 'Unknown contractor'}</p>
+                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Invite code</p>
+                        <p className="mt-1 font-mono text-sm font-bold text-slate-300">{invite.invite_code}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${used ? 'bg-green-900/30 text-green-400' : 'bg-blue-900/30 text-blue-400'}`}>
+                          {invite.status}
+                        </span>
+                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                          {draft.reward_status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <InfoBox label="Created" value={formatDateTime(invite.created_at)} />
+                      <InfoBox label="Used" value={formatDateTime(invite.used_at)} />
+                      <InfoBox label="Homeowner account" value={invite.used_by_homeowner_id ? `Created (${invite.used_by_homeowner_id.slice(0, 8)})` : 'Not used yet'} />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr_auto]">
+                      <Field label="Reward status">
+                        <select
+                          className={inputClass()}
+                          value={draft.reward_status}
+                          onChange={event => updateInviteDraft(invite.id, { ...draft, reward_status: event.target.value as ReferralRewardStatus })}
+                        >
+                          {REFERRAL_REWARD_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Reward notes">
+                        <input
+                          className={inputClass()}
+                          {...writingAssistProps}
+                          value={draft.reward_notes}
+                          onChange={event => updateInviteDraft(invite.id, { ...draft, reward_notes: event.target.value })}
+                          placeholder="Why this referral does or does not count"
+                        />
+                      </Field>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => void saveInviteReward(invite)}
+                          disabled={isSaving}
+                          className={buttonClass('primary')}
+                        >
+                          <ClipboardCheck size={16} />
+                          {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </Card>
+                );
+              })
+            )}
+          </div>
+        </Card>
+      </div>
       )}
 
       {adminTab === 'support' && (
