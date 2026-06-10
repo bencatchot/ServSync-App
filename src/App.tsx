@@ -12423,10 +12423,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId?: string | null;
     localContactId?: string | null;
   }) => {
-    if (!supabase || !contractor?.id) return;
     setNotice('');
     setError('');
     const draftDocumentLabel = estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes });
+    if (!supabase) {
+      setError(`Unable to save ${draftDocumentLabel.toLowerCase()} because ServSync is still connecting. Refresh and try again.`);
+      return;
+    }
+    if (!contractor?.id) {
+      setError(`Unable to save ${draftDocumentLabel.toLowerCase()} because your contractor profile is still loading. Wait a moment and try again.`);
+      return;
+    }
     if (!estimateDraft.title.trim()) {
       setError(`Add a ${draftDocumentLabel.toLowerCase()} title before saving.`);
       return;

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
@@ -9,6 +9,23 @@ function timestampForRecord() {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function waitForContractorWorkspaceReady(page: Page) {
+  await expect(page.getByRole('main').getByText(/Loading contractor workspace/i)).toBeHidden({ timeout: 30_000 });
+}
+
+async function waitForEstimateDraftSave(main: Locator, saveEstimateButton: Locator) {
+  const saveError = main.getByText(
+    /Unable to save estimate|Add at least one line item|Add a .* title|contractor profile is still loading|ServSync is still connecting/i,
+  ).first();
+
+  await Promise.race([
+    saveEstimateButton.waitFor({ state: 'hidden', timeout: 30_000 }),
+    saveError.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => {
+      throw new Error(`Estimate draft save failed: ${(await saveError.textContent())?.trim() || 'unknown error'}`);
+    }),
+  ]);
 }
 
 async function createLocalE2ECustomer(page: Page, timestamp: string) {
@@ -50,6 +67,7 @@ async function createLocalE2ECustomer(page: Page, timestamp: string) {
   await expect(customerResult).toBeVisible({ timeout: 30_000 });
   await customerResult.click();
   await expect(main.getByRole('heading', { level: 2, name: new RegExp(escapeRegExp(customerName), 'i') })).toBeVisible();
+  await waitForContractorWorkspaceReady(page);
 
   return { customerName };
 }
@@ -66,6 +84,7 @@ test.describe('contractor mutating estimate creation', () => {
     await loginAs(page, 'contractor');
     await openSidebarTab(page, /Homeowners/i);
     await expectActiveTabHeading(page, /^Homeowners$/i);
+    await waitForContractorWorkspaceReady(page);
 
     const { customerName } = await createLocalE2ECustomer(page, timestamp);
 
@@ -82,7 +101,7 @@ test.describe('contractor mutating estimate creation', () => {
     const lineUnitPriceField = main.getByRole('textbox', { name: /^Line item 1 unit price$/i });
 
     await estimateTitleField.fill(estimateTitle);
-    await scopeField.fill('E2E safe estimate draft created by Playwright. No invoice, report, upload, payment, or homeowner send action should be performed.');
+    await scopeField.fill('E2E safe estimate draft created by Playwright. No follow-up document, report, upload, or homeowner send action should be performed.');
     await lineDescriptionField.fill(estimateTitle);
     await lineQuantityField.fill('1');
     await lineUnitPriceField.fill('123');
@@ -90,14 +109,10 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(estimateTitleField).toHaveValue(estimateTitle);
     await expect(lineDescriptionField).toHaveValue(estimateTitle);
 
-    const createEstimateResponsePromise = page.waitForResponse(
-      response => response.url().includes('/rest/v1/estimates') && response.request().method() === 'POST',
-      { timeout: 10_000 },
-    );
-
-    await main.getByRole('button', { name: /^Save estimate draft$/i }).click();
-    const createEstimateResponse = await createEstimateResponsePromise;
-    expect(createEstimateResponse.ok()).toBeTruthy();
+    const saveEstimateButton = main.getByRole('button', { name: /^Save estimate draft$/i });
+    await expect(saveEstimateButton).toBeEnabled();
+    await saveEstimateButton.click();
+    await waitForEstimateDraftSave(main, saveEstimateButton);
 
     await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
     await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
