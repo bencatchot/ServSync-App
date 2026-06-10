@@ -20174,7 +20174,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           ) ?? null;
                           const showJobInvoiceAction = inspectionIsClosedJob(insp);
                           return (
-                            <div key={insp.id} className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}>
+                            <div
+                              key={insp.id}
+                              data-testid="contractor-job-row"
+                              className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}
+                            >
                               <div className="flex flex-wrap items-center gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -22175,6 +22179,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 return (
                                   <div
                                     key={item}
+                                    data-testid="inspection-finding-card"
                                     className={`rounded-2xl border bg-white overflow-hidden transition-colors ${status !== 'Pass' ? `border-2` : ''}`}
                                     style={{ borderColor: status === 'Urgent' ? '#dc2626' : status === 'Needs Repair' ? '#d97706' : status === 'Monitor' ? '#2563eb' : status === 'Fixed On Site' ? '#0f766e' : '#e2e8f0' }}
                                   >
@@ -22190,6 +22195,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <button
                                               key={st}
                                               type="button"
+                                              aria-label={`Mark ${item} as ${st}`}
+                                              data-testid={st === 'Needs Repair' ? 'inspection-finding-status-needs-repair' : undefined}
                                               onClick={() => setLocalFindings(prev => ({ ...prev, [key]: { ...current, status: st } }))}
                                               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                                                 isActive ? stCfg.color : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600 hover:border-slate-300'
@@ -22206,6 +22213,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Comments / Observations</label>
                                         <textarea
                                           rows={2}
+                                          aria-label={`Notes for ${item}`}
+                                          data-testid="inspection-finding-notes"
                                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none bg-white"
                                           {...writingAssistProps}
                                           placeholder="Add notes, observations, or comments..."
@@ -22220,6 +22229,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               {status === 'Fixed On Site' ? 'Action Taken' : 'Recommended Action'}
                                             </label>
                                             <input
+                                              aria-label={`Recommended action for ${item}`}
+                                              data-testid="inspection-finding-action"
                                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
                                               {...writingAssistProps}
                                               placeholder={status === 'Fixed On Site' ? 'e.g. Tightened fitting, cleared drain...' : 'e.g. Replace, repair, monitor...'}
