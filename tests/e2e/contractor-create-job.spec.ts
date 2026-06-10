@@ -88,11 +88,9 @@ test.describe('contractor mutating job creation', () => {
     const createJobResponse = await createJobResponsePromise;
     expect(createJobResponse.ok()).toBeTruthy();
 
-    await expect(main.getByText(new RegExp(escapeRegExp(jobName), 'i'))).toBeVisible({ timeout: 30_000 });
-
-    await main.getByRole('button', { name: /Open Jobs/i }).click();
-    await expect(main.getByRole('heading', { name: /^Open jobs$/i })).toBeVisible();
-    await expect(main.getByText(new RegExp(escapeRegExp(jobName), 'i'))).toBeVisible();
+    await expect(main.getByRole('heading', { level: 2, name: new RegExp(escapeRegExp(jobName), 'i') })).toBeVisible({ timeout: 30_000 });
+    await expect(main.getByRole('button', { name: /Back to Jobs/i })).toBeVisible();
+    await expect(main.getByText(customerName, { exact: true })).toBeVisible();
 
     await consoleErrors.assertClean(testInfo);
   });
