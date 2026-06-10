@@ -75,14 +75,20 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
     await expect(main.getByText(customerName, { exact: true })).toBeVisible();
 
-    await main.getByLabel(/^Estimate title$/i).fill(estimateTitle);
-    await main.getByLabel(/^Scope of work$/i).fill('E2E safe estimate draft created by Playwright. No invoice, report, upload, payment, or homeowner send action should be performed.');
-    await main.getByLabel(/^Description$/i).first().fill(estimateTitle);
-    await main.getByLabel(/^Qty$/i).first().fill('1');
-    await main.getByLabel(/^Unit price$/i).first().fill('123');
+    const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
+    const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
+    const lineDescriptionField = main.getByRole('textbox', { name: /^Line item 1 description$/i });
+    const lineQuantityField = main.getByRole('spinbutton', { name: /^Line item 1 quantity$/i });
+    const lineUnitPriceField = main.getByRole('textbox', { name: /^Line item 1 unit price$/i });
 
-    await expect(main.getByLabel(/^Estimate title$/i)).toHaveValue(estimateTitle);
-    await expect(main.getByLabel(/^Description$/i).first()).toHaveValue(estimateTitle);
+    await estimateTitleField.fill(estimateTitle);
+    await scopeField.fill('E2E safe estimate draft created by Playwright. No invoice, report, upload, payment, or homeowner send action should be performed.');
+    await lineDescriptionField.fill(estimateTitle);
+    await lineQuantityField.fill('1');
+    await lineUnitPriceField.fill('123');
+
+    await expect(estimateTitleField).toHaveValue(estimateTitle);
+    await expect(lineDescriptionField).toHaveValue(estimateTitle);
 
     const createEstimateResponsePromise = page.waitForResponse(
       response => response.url().includes('/rest/v1/estimates') && response.request().method() === 'POST',

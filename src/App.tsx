@@ -18132,7 +18132,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2">
                                       <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
-                                        <input className={inputClass()} value={estimateDraft.title} onChange={e => setEstimateDraft(d => ({ ...d, title: e.target.value }))} />
+                                        <input
+                                          aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
+                                          className={inputClass()}
+                                          value={estimateDraft.title}
+                                          onChange={e => setEstimateDraft(d => ({ ...d, title: e.target.value }))}
+                                        />
                                       </Field>
                                       {connReqs.length > 0 && (
                                         <Field label="Attach to request (optional)">
@@ -18237,7 +18242,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
                                     <div className="mt-3">
                                       <Field label="Scope of work">
-                                        <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.scope} onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))} placeholder="Describe what this estimate or invoice covers." />
+                                        <textarea
+                                          aria-label="Scope of work"
+                                          className={inputClass()}
+                                          rows={3}
+                                          {...writingAssistProps}
+                                          value={estimateDraft.scope}
+                                          onChange={e => setEstimateDraft(d => ({ ...d, scope: e.target.value }))}
+                                          placeholder="Describe what this estimate or invoice covers."
+                                        />
                                       </Field>
                                     </div>
 
@@ -18272,6 +18285,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </Field>
                                             <Field label="Description">
                                               <input
+                                                aria-label={`Line item ${index + 1} description`}
                                                 className={inputClass()}
                                                 {...writingAssistProps}
                                                 value={line.description}
@@ -18284,6 +18298,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </Field>
                                             <Field label="Qty">
                                               <input
+                                                aria-label={`Line item ${index + 1} quantity`}
                                                 className={inputClass()}
                                                 type="number"
                                                 min="0"
@@ -18307,6 +18322,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </Field>
                                             <Field label="Unit price">
                                               <input
+                                                aria-label={`Line item ${index + 1} unit price`}
                                                 className={inputClass()}
                                                 value={line.unit_price}
                                                 onChange={e => setEstimateDraft(d => ({
@@ -19177,7 +19193,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="grid gap-3 md:grid-cols-2">
                           <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
-                            <input className={inputClass()} value={estimateDraft.title} onChange={event => setEstimateDraft(d => ({ ...d, title: event.target.value }))} />
+                            <input
+                              aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
+                              className={inputClass()}
+                              value={estimateDraft.title}
+                              onChange={event => setEstimateDraft(d => ({ ...d, title: event.target.value }))}
+                            />
                           </Field>
                           {selectedJobsCustomerWork.length > 0 && (
                             <Field label="Attach to job (optional)">
@@ -19252,7 +19273,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         <div className="mt-4">
                           <Field label="Scope of work">
-                            <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.scope} onChange={event => setEstimateDraft(d => ({ ...d, scope: event.target.value }))} placeholder="Professional summary of the work." />
+                            <textarea
+                              aria-label="Scope of work"
+                              className={inputClass()}
+                              rows={3}
+                              {...writingAssistProps}
+                              value={estimateDraft.scope}
+                              onChange={event => setEstimateDraft(d => ({ ...d, scope: event.target.value }))}
+                              placeholder="Professional summary of the work."
+                            />
                           </Field>
                         </div>
 
@@ -19276,16 +19305,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </select>
                                 </Field>
                                 <Field label="Description">
-                                  <input className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
-                                  }))} placeholder="Labor, materials, disposal..." />
+                                  <input
+                                    aria-label={`Line item ${index + 1} description`}
+                                    className={inputClass()}
+                                    {...writingAssistProps}
+                                    value={line.description}
+                                    onChange={event => setEstimateDraft(d => ({
+                                      ...d,
+                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
+                                    }))}
+                                    placeholder="Labor, materials, disposal..."
+                                  />
                                 </Field>
                                 <Field label="Qty">
-                                  <input className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
-                                  }))} />
+                                  <input
+                                    aria-label={`Line item ${index + 1} quantity`}
+                                    className={inputClass()}
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={line.quantity}
+                                    onChange={event => setEstimateDraft(d => ({
+                                      ...d,
+                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
+                                    }))}
+                                  />
                                 </Field>
                                 <Field label="Unit">
                                   <input className={inputClass()} value={line.unit} onChange={event => setEstimateDraft(d => ({
@@ -19294,10 +19338,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   }))} />
                                 </Field>
                                 <Field label="Unit price">
-                                  <input className={inputClass()} value={line.unit_price} onChange={event => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
-                                  }))} placeholder="$0.00" />
+                                  <input
+                                    aria-label={`Line item ${index + 1} unit price`}
+                                    className={inputClass()}
+                                    value={line.unit_price}
+                                    onChange={event => setEstimateDraft(d => ({
+                                      ...d,
+                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
+                                    }))}
+                                    placeholder="$0.00"
+                                  />
                                 </Field>
                                 <div>
                                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
