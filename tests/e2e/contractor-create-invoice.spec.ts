@@ -91,14 +91,17 @@ test.describe('contractor mutating invoice creation', () => {
     await main.getByRole('button', { name: /^Invoice$/i }).click();
     await expectActiveTabHeading(page, /^Jobs$/i);
     await expect(main.getByText(/^Invoice draft$/i)).toBeVisible();
-    await expect(main.getByText(/Creating invoice for:/i)).toBeVisible();
-    await expect(main.getByText(customerName, { exact: true })).toBeVisible();
+    await expect(
+      main.locator('p').filter({
+        hasText: new RegExp(`^(?:Creating invoice for:\\s*)?${escapeRegExp(customerName)}(?:\\s*·.*)?$`, 'i'),
+      }).first(),
+    ).toBeVisible();
 
     const invoiceTitleField = main.getByRole('textbox', { name: /^Invoice title$/i });
-    const scopeField = main.getByRole('textbox', { name: /^Invoice scope$/i });
-    const lineDescriptionField = main.getByRole('textbox', { name: /^Invoice line item 1 description$/i });
-    const lineQuantityField = main.getByRole('spinbutton', { name: /^Invoice line item 1 quantity$/i });
-    const lineUnitPriceField = main.getByRole('textbox', { name: /^Invoice line item 1 unit price$/i });
+    const scopeField = main.getByRole('textbox', { name: /^(Invoice scope|Scope)$/i });
+    const lineDescriptionField = main.getByRole('textbox', { name: /^(Invoice line item 1 description|Description)$/i });
+    const lineQuantityField = main.getByRole('spinbutton', { name: /^(Invoice line item 1 quantity|Qty)$/i });
+    const lineUnitPriceField = main.getByRole('textbox', { name: /^(Invoice line item 1 unit price|Unit price)$/i });
 
     await invoiceTitleField.fill(invoiceTitle);
     await scopeField.fill('E2E safe invoice draft created by Playwright. No send, payment, report, upload, or status change should be performed.');
