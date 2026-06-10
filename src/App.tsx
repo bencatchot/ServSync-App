@@ -20552,6 +20552,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </button>
                   </div>
                 </Field>
+                {(() => {
+                  const selectedNewJobConnection = inspectionNewDraft.subject_type === 'connected'
+                    ? connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id) ?? null
+                    : null;
+                  const selectedNewJobLocalContact = inspectionNewDraft.subject_type === 'local'
+                    ? localContacts.find(contact => contact.id === inspectionNewDraft.local_contact_id) ?? null
+                    : null;
+                  const selectedNewJobCustomerName = selectedNewJobConnection?.display_name || selectedNewJobLocalContact?.display_name || '';
+                  const selectedNewJobAddress = selectedNewJobConnection
+                    ? connectedHomeList(selectedNewJobConnection)[0]?.address_line1 || selectedNewJobConnection.home?.address_line1 || selectedNewJobConnection.city || ''
+                    : selectedNewJobLocalContact?.homes?.find(home => home.id === inspectionNewDraft.local_home_id)?.address_line1 || selectedNewJobLocalContact?.homes?.[0]?.address_line1 || selectedNewJobLocalContact?.homes?.[0]?.city || '';
+                  if (!selectedNewJobCustomerName) return null;
+                  return (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
+                      <p className="font-semibold">
+                        Creating job for: <span>{selectedNewJobCustomerName}</span>
+                      </p>
+                      {selectedNewJobAddress && <p className="mt-0.5 text-xs text-blue-800">{selectedNewJobAddress}</p>}
+                    </div>
+                  );
+                })()}
                 {inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id && (() => {
                   const selectedConnection = connections.find(connection => connection.homeowner_user_id === inspectionNewDraft.homeowner_user_id) ?? null;
                   const connectedHomes = selectedConnection ? connectedHomeList(selectedConnection) : [];
