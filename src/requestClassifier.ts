@@ -66,8 +66,19 @@ const GENERIC_OR_LOCATION_TERMS = new Set([
   'water',
   'leak',
   'wet',
+  'coming',
+  'up',
   'raised',
   'loose',
+  'broken',
+  'not',
+  'working',
+  'cracked',
+  'missing',
+  'stuck',
+  'clogged',
+  'noisy',
+  'board',
   'attic',
   'garage',
   'wall',
@@ -85,6 +96,233 @@ type CategoryRule = {
   score: number;
   reason: string;
 };
+
+type ObjectSymptomRule = {
+  objects: string[];
+  symptoms?: string[];
+  matches: Array<{
+    category: string;
+    objectScore?: number;
+    symptomScore: number;
+    reason: string;
+  }>;
+};
+
+const COMMON_SYMPTOMS = [
+  'coming up',
+  'raised',
+  'loose',
+  'broken',
+  'not working',
+  'wont work',
+  'will not work',
+  'wont open',
+  'will not open',
+  'wont close',
+  'will not close',
+  'leaking',
+  'leak',
+  'cracked',
+  'crack',
+  'missing',
+  'stuck',
+  'clogged',
+  'not draining',
+  'overflowing',
+  'flickering',
+  'tripping',
+  'sagging',
+  'soft',
+  'rotted',
+  'rot',
+  'leaning',
+  'peeling',
+  'bubbling',
+  'buckling',
+  'dirty',
+];
+
+const OBJECT_SYMPTOM_RULES: ObjectSymptomRule[] = [
+  {
+    objects: ['deck board', 'deck boards', 'deck', 'porch boards', 'deck railing', 'wood rot on deck', 'soft deck board'],
+    symptoms: ['coming up', 'raised', 'loose', 'soft', 'sagging', 'rot', 'rotted', 'broken'],
+    matches: [
+      { category: 'Decks', objectScore: 6, symptomScore: 13, reason: 'deck object and symptom' },
+      { category: 'Carpentry', symptomScore: 12, reason: 'wood repair possible' },
+      { category: 'Handyman', symptomScore: 11, reason: 'small deck repair possible' },
+    ],
+  },
+  {
+    objects: ['porch step', 'porch steps', 'steps', 'stairs', 'railing', 'handrail'],
+    symptoms: ['loose', 'broken', 'coming up', 'sagging', 'rotted', 'rot'],
+    matches: [
+      { category: 'Carpentry', objectScore: 5, symptomScore: 12, reason: 'step or railing carpentry issue' },
+      { category: 'Handyman', symptomScore: 11, reason: 'small step or railing repair possible' },
+      { category: 'Decks', symptomScore: 10, reason: 'porch or exterior step repair possible' },
+    ],
+  },
+  {
+    objects: ['shingle', 'shingles', 'roof', 'flashing', 'fascia', 'soffit', 'ridge cap', 'roof vent'],
+    symptoms: ['coming up', 'raised', 'loose', 'lifted', 'curling', 'buckling', 'missing', 'leaking', 'leak', 'damaged', 'rotting', 'broken'],
+    matches: [{ category: 'Roofing', objectScore: 8, symptomScore: 13, reason: 'roof object and symptom' }],
+  },
+  {
+    objects: ['sink', 'faucet', 'toilet', 'drain', 'pipe', 'shower', 'tub', 'water heater', 'garbage disposal', 'sewer'],
+    symptoms: ['leaking', 'leak', 'dripping', 'running', 'clogged', 'not draining', 'low pressure', 'backup', 'not working'],
+    matches: [{ category: 'Plumbing', objectScore: 7, symptomScore: 12, reason: 'plumbing object and symptom' }],
+  },
+  {
+    objects: ['septic'],
+    symptoms: ['backup', 'smell', 'not working', 'overflowing'],
+    matches: [
+      { category: 'Septic', objectScore: 7, symptomScore: 12, reason: 'septic object and symptom' },
+      { category: 'Plumbing', symptomScore: 7, reason: 'septic or drain issue may need plumbing review' },
+    ],
+  },
+  {
+    objects: ['outlet', 'switch', 'breaker', 'panel', 'gfci', 'lights', 'ceiling fan', 'power', 'fixture'],
+    symptoms: ['not working', 'wont reset', 'will not reset', 'tripping', 'flickering', 'sparks', 'loose', 'broken'],
+    matches: [
+      { category: 'Electrical', objectScore: 8, symptomScore: 13, reason: 'electrical object and symptom' },
+      { category: 'Handyman', symptomScore: 8, reason: 'fixture or fan repair may be handyman work' },
+    ],
+  },
+  {
+    objects: ['ac', 'air conditioner', 'air handler', 'furnace', 'heater', 'thermostat', 'condenser', 'vents', 'vent', 'duct', 'airflow', 'unit'],
+    symptoms: ['not cooling', 'not heating', 'not working', 'leaking', 'dripping', 'weak', 'frozen', 'making noise'],
+    matches: [{ category: 'HVAC', objectScore: 8, symptomScore: 13, reason: 'HVAC object and symptom' }],
+  },
+  {
+    objects: ['garage door', 'opener', 'garage remote', 'spring', 'cable', 'track'],
+    symptoms: ['not working', 'wont open', 'will not open', 'stuck', 'off track', 'broken', 'loose'],
+    matches: [{ category: 'Garage Doors', objectScore: 8, symptomScore: 13, reason: 'garage door object and symptom' }],
+  },
+  {
+    objects: ['pest', 'pests', 'bugs', 'roaches', 'ants', 'termites', 'bees', 'wasps', 'rats', 'mice', 'rodents', 'droppings', 'scratching', 'nest', 'infestation', 'animal'],
+    symptoms: ['activity', 'in attic', 'in wall', 'in garage', 'droppings', 'scratching', 'nest', 'infestation'],
+    matches: [{ category: 'Pest Control', objectScore: 9, symptomScore: 12, reason: 'pest evidence or activity' }],
+  },
+  {
+    objects: ['gutter', 'gutters', 'downspout', 'drainage'],
+    symptoms: ['overflowing', 'clogged', 'standing water', 'water pooling', 'erosion', 'water near foundation', 'issue'],
+    matches: [
+      { category: 'Gutters', objectScore: 8, symptomScore: 12, reason: 'gutter or drainage object and symptom' },
+      { category: 'Landscaping', symptomScore: 5, reason: 'grading or drainage may involve landscaping' },
+    ],
+  },
+  {
+    objects: ['fence', 'gate', 'fence post', 'fence board', 'latch'],
+    symptoms: ['leaning', 'broken', 'wont close', 'will not close', 'not closing', 'loose', 'stuck'],
+    matches: [
+      { category: 'Fencing', objectScore: 8, symptomScore: 13, reason: 'fence or gate object and symptom' },
+      { category: 'Handyman', symptomScore: 9, reason: 'small gate or latch repair possible' },
+    ],
+  },
+  {
+    objects: ['window'],
+    symptoms: ['leaking', 'leak', 'wont open', 'will not open', 'broken', 'draft', 'stuck'],
+    matches: [{ category: 'Windows', objectScore: 8, symptomScore: 13, reason: 'window object and symptom' }],
+  },
+  {
+    objects: ['door', 'frame', 'latch', 'weatherstrip'],
+    symptoms: ['sticks', 'sticking', 'wont latch', 'will not latch', 'wont open', 'will not open', 'wont close', 'will not close', 'draft', 'leaking', 'broken'],
+    matches: [
+      { category: 'Doors', objectScore: 8, symptomScore: 13, reason: 'door object and symptom' },
+      { category: 'Handyman', symptomScore: 18, reason: 'door adjustment may be handyman work' },
+    ],
+  },
+  {
+    objects: ['drywall', 'wall', 'ceiling', 'texture'],
+    symptoms: ['hole', 'crack', 'cracked', 'water stain', 'stain', 'repair'],
+    matches: [
+      { category: 'Drywall', objectScore: 7, symptomScore: 12, reason: 'drywall or surface object and symptom' },
+      { category: 'Roofing', symptomScore: 4, reason: 'ceiling stains may come from roof leaks' },
+      { category: 'Foundation Repair', symptomScore: 4, reason: 'wall or ceiling cracks may indicate movement' },
+    ],
+  },
+  {
+    objects: ['paint'],
+    symptoms: ['peeling', 'bubbling', 'cracked', 'dirty'],
+    matches: [{ category: 'Painting', objectScore: 7, symptomScore: 12, reason: 'paint object and symptom' }],
+  },
+  {
+    objects: ['tile', 'grout'],
+    symptoms: ['cracked', 'crack', 'loose', 'broken'],
+    matches: [
+      { category: 'Tile', objectScore: 8, symptomScore: 13, reason: 'tile object and symptom' },
+      { category: 'Flooring', symptomScore: 27, reason: 'floor surface repair possible' },
+    ],
+  },
+  {
+    objects: ['floor', 'flooring', 'hardwood', 'carpet'],
+    symptoms: ['soft spot', 'soft', 'buckling', 'damaged', 'cracked', 'loose'],
+    matches: [
+      { category: 'Flooring', objectScore: 8, symptomScore: 12, reason: 'flooring object and symptom' },
+      { category: 'Foundation Repair', symptomScore: 17, reason: 'soft or uneven floor may indicate support movement' },
+      { category: 'Handyman', symptomScore: 17, reason: 'small floor repair possible' },
+    ],
+  },
+  {
+    objects: ['dishwasher', 'refrigerator', 'freezer', 'washer', 'dryer', 'oven', 'microwave', 'stove', 'burner', 'ice maker'],
+    symptoms: ['not working', 'not draining', 'not cooling', 'not freezing', 'leaking', 'not spinning', 'not heating'],
+    matches: [
+      { category: 'Appliance Repair', objectScore: 8, symptomScore: 13, reason: 'appliance object and symptom' },
+      { category: 'Plumbing', symptomScore: 5, reason: 'appliance leak or drain may need plumbing review' },
+    ],
+  },
+  {
+    objects: ['lock', 'key', 'deadbolt', 'door lock'],
+    symptoms: ['stuck', 'locked out', 'not working', 'broken', 'wont open', 'will not open'],
+    matches: [
+      { category: 'Locksmith', objectScore: 8, symptomScore: 13, reason: 'lock object and symptom' },
+      { category: 'Doors', symptomScore: 17, reason: 'door hardware issue possible' },
+    ],
+  },
+  {
+    objects: ['foundation', 'slab'],
+    symptoms: ['crack', 'cracked', 'settling', 'uneven'],
+    matches: [{ category: 'Foundation Repair', objectScore: 8, symptomScore: 13, reason: 'foundation object and symptom' }],
+  },
+  {
+    objects: ['concrete', 'driveway', 'patio', 'sidewalk'],
+    symptoms: ['crack', 'cracked', 'uneven', 'trip hazard'],
+    matches: [{ category: 'Concrete', objectScore: 8, symptomScore: 12, reason: 'concrete object and symptom' }],
+  },
+  {
+    objects: ['brick', 'block', 'masonry', 'mortar'],
+    symptoms: ['crack', 'cracked', 'loose', 'broken'],
+    matches: [{ category: 'Masonry', objectScore: 8, symptomScore: 12, reason: 'masonry object and symptom' }],
+  },
+  {
+    objects: ['sprinkler', 'irrigation'],
+    symptoms: ['not working', 'broken', 'leaking', 'wont turn on', 'will not turn on'],
+    matches: [{ category: 'Irrigation', objectScore: 8, symptomScore: 13, reason: 'irrigation object and symptom' }],
+  },
+  {
+    objects: ['tree', 'limb', 'branch', 'branches'],
+    symptoms: ['hanging', 'broken', 'down', 'removal'],
+    matches: [{ category: 'Tree Service', objectScore: 8, symptomScore: 13, reason: 'tree object and symptom' }],
+  },
+  {
+    objects: ['yard', 'lawn', 'grass'],
+    symptoms: ['cleanup', 'brown spots', 'dead spots', 'overgrown'],
+    matches: [
+      { category: 'Lawn Care', objectScore: 7, symptomScore: 11, reason: 'lawn object and symptom' },
+      { category: 'Landscaping', symptomScore: 14, reason: 'yard work possible' },
+      { category: 'Irrigation', symptomScore: 14, reason: 'lawn spots may relate to irrigation' },
+    ],
+  },
+  {
+    objects: ['clean', 'cleaning', 'deep clean', 'move out clean', 'house'],
+    symptoms: ['deep clean', 'cleaning', 'clean'],
+    matches: [{ category: 'Cleaning Service', objectScore: 7, symptomScore: 12, reason: 'cleaning request' }],
+  },
+  {
+    objects: ['pressure wash', 'power wash', 'driveway', 'siding'],
+    symptoms: ['pressure wash', 'power wash', 'dirty', 'mold on exterior'],
+    matches: [{ category: 'Pressure Washing', objectScore: 7, symptomScore: 12, reason: 'pressure washing request' }],
+  },
+];
 
 const PHRASE_RULES: CategoryRule[] = [
   {
@@ -259,9 +497,15 @@ const PHRASE_RULES: CategoryRule[] = [
       'water outside near foundation',
     ],
   },
+  { category: 'Landscaping', score: 23, reason: 'possible yard drainage issue', phrases: ['water pooling outside', 'standing water near house'] },
+  { category: 'Landscaping', score: 18, reason: 'possible yard drainage issue', phrases: ['drainage issue'] },
+  { category: 'Plumbing', score: 23, reason: 'possible water source issue', phrases: ['water pooling outside'] },
   { category: 'Windows', score: 9, reason: 'window symptom', phrases: ['window leaking', 'window wont open', 'broken window', 'draft around window'] },
   { category: 'Doors', score: 9, reason: 'door symptom', phrases: ['door sticks', 'door wont latch', 'draft around door', 'exterior door leaking'] },
   { category: 'Drywall', score: 9, reason: 'drywall or wall symptom', phrases: ['drywall hole', 'hole in wall', 'wall crack', 'ceiling crack', 'water stain on drywall', 'texture repair'] },
+  { category: 'Roofing', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
+  { category: 'Plumbing', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
+  { category: 'HVAC', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
   { category: 'Painting', score: 9, reason: 'paint symptom', phrases: ['paint peeling', 'paint bubbling'] },
   { category: 'Tile', score: 9, reason: 'tile symptom', phrases: ['cracked tile', 'loose tile', 'grout cracked'] },
   { category: 'Flooring', score: 9, reason: 'flooring symptom', phrases: ['floor soft spot', 'flooring buckling', 'hardwood buckling', 'carpet damaged'] },
@@ -280,6 +524,7 @@ const PHRASE_RULES: CategoryRule[] = [
   { category: 'Well Service', score: 8, reason: 'well service symptom', phrases: ['well pump', 'pressure tank', 'no water'] },
   { category: 'Foundation Repair', score: 8, reason: 'foundation symptom', phrases: ['foundation crack', 'settling', 'stair step crack', 'crawlspace support'] },
   { category: 'Masonry', score: 8, reason: 'masonry symptom', phrases: ['brick', 'mortar', 'stone', 'chimney brick', 'block wall'] },
+  { category: 'Masonry', score: 12, reason: 'masonry wall crack', phrases: ['brick wall crack'] },
   { category: 'Concrete', score: 8, reason: 'concrete symptom', phrases: ['driveway crack', 'sidewalk crack', 'concrete', 'trip hazard'] },
   { category: 'Siding', score: 8, reason: 'siding symptom', phrases: ['siding', 'vinyl siding', 'siding damage'] },
   { category: 'Insulation', score: 8, reason: 'insulation symptom', phrases: ['attic insulation', 'drafty', 'air sealing', 'insulation'] },
@@ -309,13 +554,19 @@ const AMBIGUOUS_CONTEXT_RULES: CategoryRule[] = [
   { category: 'Plumbing', score: 5, reason: 'possible plumbing source', phrases: ['leak', 'water', 'noise', 'smell', 'wall', 'ceiling', 'leak in attic', 'stain on ceiling'] },
   { category: 'HVAC', score: 5, reason: 'possible HVAC source', phrases: ['leak', 'water', 'noise', 'smell', 'attic', 'ceiling', 'leak in attic', 'stain on ceiling'] },
   { category: 'Gutters', score: 5, reason: 'possible drainage issue', phrases: ['water', 'water outside', 'outside water'] },
-  { category: 'Landscaping', score: 4, reason: 'possible grading or yard drainage issue', phrases: ['water', 'water outside', 'outside water'] },
+  { category: 'Landscaping', score: 4, reason: 'possible grading or yard drainage issue', phrases: ['water', 'outside', 'water outside', 'outside water'] },
+  { category: 'Gutters', score: 4, reason: 'possible exterior water issue', phrases: ['outside'] },
   { category: 'Pest Control', score: 5, reason: 'possible pest activity', phrases: ['noise', 'smell', 'garage', 'attic', 'wall', 'noise in wall', 'bad smell in house', 'garage problem'] },
   { category: 'Electrical', score: 4, reason: 'possible electrical issue', phrases: ['noise', 'garage', 'wall', 'noise in wall', 'garage problem'] },
   { category: 'General Maintenance', score: 4, reason: 'general issue review', phrases: ['noise', 'smell', 'garage', 'attic', 'garage problem', 'bad smell in house'] },
   { category: 'Garage Doors', score: 5, reason: 'possible garage door issue', phrases: ['garage', 'garage problem'] },
   { category: 'Drywall', score: 4, reason: 'possible wall or ceiling surface issue', phrases: ['wall', 'ceiling', 'stain on ceiling'] },
   { category: 'Insulation', score: 4, reason: 'possible attic or insulation issue', phrases: ['attic'] },
+  { category: 'Decks', score: 4, reason: 'possible exterior board issue', phrases: ['board', 'loose', 'coming up'] },
+  { category: 'Carpentry', score: 4, reason: 'possible wood repair', phrases: ['board', 'loose', 'raised', 'broken', 'coming up'] },
+  { category: 'Handyman', score: 4, reason: 'possible small repair', phrases: ['board', 'loose', 'broken', 'not working', 'coming up'] },
+  { category: 'General Maintenance', score: 3, reason: 'general issue review', phrases: ['loose', 'broken', 'not working', 'coming up'] },
+  { category: 'Roofing', score: 4, reason: 'possible raised exterior surface', phrases: ['raised'] },
 ];
 
 function normalizeClassifierText(value: string) {
@@ -364,6 +615,31 @@ function applyRules(input: string, rules: CategoryRule[], scores: Map<string, Se
   }
 }
 
+function matchedPhrases(input: string, phrases: string[]) {
+  return phrases.filter(phrase => hasPhrase(input, phrase));
+}
+
+function applyObjectSymptomRules(input: string, rules: ObjectSymptomRule[], scores: Map<string, ServiceCategorySuggestion>) {
+  for (const rule of rules) {
+    const objectMatches = matchedPhrases(input, rule.objects);
+    if (objectMatches.length === 0) continue;
+
+    const symptomMatches = matchedPhrases(input, rule.symptoms ?? COMMON_SYMPTOMS);
+    if (symptomMatches.length === 0) continue;
+
+    const matchedContext = `${objectMatches[0]} + ${symptomMatches[0]}`;
+    for (const match of rule.matches) {
+      addScore(
+        scores,
+        match.category,
+        match.symptomScore + (match.objectScore ?? 0),
+        match.reason,
+        matchedContext,
+      );
+    }
+  }
+}
+
 function onlyGenericOrLocationWords(input: string) {
   const tokens = Array.from(tokenSet(input));
   return tokens.length > 0 && tokens.every(token => GENERIC_OR_LOCATION_TERMS.has(token));
@@ -384,6 +660,7 @@ export function classifyHomeownerRequest(
   }
 
   const scores = new Map<string, ServiceCategorySuggestion>();
+  applyObjectSymptomRules(input, OBJECT_SYMPTOM_RULES, scores);
   applyRules(input, PHRASE_RULES, scores);
   applyRules(input, AMBIGUOUS_CONTEXT_RULES, scores);
 
@@ -407,6 +684,12 @@ export function classifyHomeownerRequest(
     addScore(scores, 'Plumbing', 8, 'sewer or drain odor', 'sewer smell');
     addScore(scores, 'Septic', 15, 'possible septic issue', 'sewer smell');
   }
+  if (hasPhrase(input, 'ceiling fan not working')) {
+    addScore(scores, 'Handyman', 16, 'fan or fixture repair may be handyman work', 'ceiling fan not working');
+  }
+  if (hasPhrase(input, 'deck railing')) {
+    addScore(scores, 'Decks', 8, 'deck railing context', 'deck railing');
+  }
   if (hasPhrase(input, 'leak in attic')) {
     scores.delete('Pest Control');
   }
@@ -419,7 +702,7 @@ export function classifyHomeownerRequest(
 
   const topScore = rankedServiceTypes[0]?.score ?? 0;
   const visibleSuggestions = topScore > 0
-    ? rankedServiceTypes.filter(suggestion => suggestion.score >= Math.max(3, topScore - 7)).slice(0, 5)
+    ? rankedServiceTypes.filter(suggestion => suggestion.score >= Math.max(3, topScore - 12)).slice(0, 5)
     : [{ category: 'Other', score: 1, reasons: ['No clear trade match'] }].filter(allowedSuggestionFilter(allowedCategories));
 
   const secondScore = visibleSuggestions[1]?.score ?? 0;
@@ -432,6 +715,12 @@ export function classifyHomeownerRequest(
     'water outside',
     'outside water',
     'garage problem',
+    'board',
+    'loose',
+    'raised',
+    'broken',
+    'not working',
+    'coming up',
   ].some(phrase => hasPhrase(input, phrase));
   const ambiguous = Boolean(
     visibleSuggestions.length > 1
@@ -467,6 +756,22 @@ export function cleanHomeownerRequestText(input: string) {
   const normalized = normalizeClassifierText(trimmed);
 
   const exactCleanups: Array<{ phrases: string[]; text: string }> = [
+    { phrases: ['deck board coming up'], text: 'A deck board appears to be coming up.' },
+    { phrases: ['loose deck board', 'deck board loose'], text: 'A deck board appears to be loose.' },
+    { phrases: ['deck railing loose'], text: 'The deck railing appears to be loose.' },
+    { phrases: ['porch step loose'], text: 'A porch step appears to be loose.' },
+    { phrases: ['fence leaning'], text: 'The fence appears to be leaning.' },
+    { phrases: ['gate wont close', 'gate won t close'], text: 'The gate will not close.' },
+    { phrases: ['window leaking'], text: 'A window appears to be leaking.' },
+    { phrases: ['door sticks'], text: 'A door is sticking.' },
+    { phrases: ['drywall hole'], text: 'There is a hole in the drywall.' },
+    { phrases: ['hole in wall'], text: 'There is a hole in the wall.' },
+    { phrases: ['cracked tile'], text: 'A tile appears to be cracked.' },
+    { phrases: ['deadbolt stuck'], text: 'The deadbolt appears to be stuck.' },
+    { phrases: ['sprinkler not working'], text: 'The sprinkler is not working.' },
+    { phrases: ['tree limb hanging'], text: 'A tree limb appears to be hanging.' },
+    { phrases: ['pressure wash driveway'], text: 'The driveway needs pressure washing.' },
+    { phrases: ['deep clean house'], text: 'The house needs a deep clean.' },
     { phrases: ['shingles'], text: 'There is an issue with the roof shingles.' },
     { phrases: ['shingles raised', 'raised shingles'], text: 'The roof shingles appear to be raised.' },
     { phrases: ['lifted shingles'], text: 'The roof shingles appear to be lifted.' },
