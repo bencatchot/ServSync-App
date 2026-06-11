@@ -108,6 +108,179 @@ type ObjectSymptomRule = {
   }>;
 };
 
+type TradeObjectRule = {
+  objects: string[];
+  matches: Array<{
+    category: string;
+    score: number;
+    reason: string;
+  }>;
+};
+
+const TRADE_OBJECT_RULES: TradeObjectRule[] = [
+  {
+    objects: ['deck', 'deck board', 'deck boards', 'porch', 'porch board', 'porch boards'],
+    matches: [
+      { category: 'Decks', score: 12, reason: 'deck or porch object' },
+      { category: 'Carpentry', score: 9, reason: 'wood structure object' },
+      { category: 'Handyman', score: 8, reason: 'small exterior repair object' },
+      { category: 'General Maintenance', score: 5, reason: 'general exterior maintenance object' },
+    ],
+  },
+  {
+    objects: ['steps', 'stairs', 'railing', 'handrail'],
+    matches: [
+      { category: 'Carpentry', score: 10, reason: 'step or railing object' },
+      { category: 'Handyman', score: 9, reason: 'small step or railing repair object' },
+      { category: 'Decks', score: 7, reason: 'exterior step or railing object' },
+    ],
+  },
+  {
+    objects: ['shingle', 'shingles', 'roof', 'flashing', 'fascia', 'soffit', 'ridge cap', 'roof vent'],
+    matches: [{ category: 'Roofing', score: 13, reason: 'roofing object' }],
+  },
+  {
+    objects: ['outlet', 'breaker', 'gfci', 'switch', 'panel', 'electrical panel', 'ceiling fan', 'power', 'fixture'],
+    matches: [
+      { category: 'Electrical', score: 13, reason: 'electrical object' },
+      { category: 'Handyman', score: 5, reason: 'fixture or fan object' },
+    ],
+  },
+  {
+    objects: ['toilet', 'sink', 'drain', 'pipe', 'faucet', 'shower', 'tub', 'water heater', 'garbage disposal', 'sewer'],
+    matches: [{ category: 'Plumbing', score: 13, reason: 'plumbing object' }],
+  },
+  {
+    objects: ['thermostat', 'furnace', 'ac', 'air conditioner', 'air handler', 'condenser', 'heater', 'vent', 'vents', 'duct', 'airflow'],
+    matches: [{ category: 'HVAC', score: 13, reason: 'HVAC object' }],
+  },
+  {
+    objects: ['dishwasher', 'garbage disposal'],
+    matches: [
+      { category: 'Appliance Repair', score: 12, reason: 'appliance object' },
+      { category: 'Plumbing', score: 8, reason: 'water-connected appliance object' },
+    ],
+  },
+  {
+    objects: ['refrigerator', 'freezer', 'washer', 'dryer', 'oven', 'microwave', 'stove', 'burner', 'ice maker'],
+    matches: [{ category: 'Appliance Repair', score: 12, reason: 'appliance object' }],
+  },
+  {
+    objects: ['garage door', 'garage remote', 'garage door opener', 'garage door spring', 'garage door cable'],
+    matches: [{ category: 'Garage Doors', score: 13, reason: 'garage door object' }],
+  },
+  {
+    objects: ['opener', 'spring', 'cable', 'track'],
+    matches: [
+      { category: 'Garage Doors', score: 7, reason: 'possible garage door component' },
+      { category: 'General Maintenance', score: 4, reason: 'component needs more context' },
+    ],
+  },
+  {
+    objects: ['fence', 'gate', 'fence post', 'fence board'],
+    matches: [
+      { category: 'Fencing', score: 12, reason: 'fence or gate object' },
+      { category: 'Handyman', score: 8, reason: 'small fence or gate repair object' },
+    ],
+  },
+  {
+    objects: ['gutter', 'gutters', 'downspout'],
+    matches: [{ category: 'Gutters', score: 13, reason: 'gutter object' }],
+  },
+  {
+    objects: ['window'],
+    matches: [{ category: 'Windows', score: 13, reason: 'window object' }],
+  },
+  {
+    objects: ['door'],
+    matches: [
+      { category: 'Doors', score: 12, reason: 'door object' },
+      { category: 'Handyman', score: 8, reason: 'small door repair object' },
+    ],
+  },
+  {
+    objects: ['drywall'],
+    matches: [{ category: 'Drywall', score: 13, reason: 'drywall object' }],
+  },
+  {
+    objects: ['paint'],
+    matches: [{ category: 'Painting', score: 13, reason: 'painting object' }],
+  },
+  {
+    objects: ['tile', 'grout'],
+    matches: [
+      { category: 'Tile', score: 13, reason: 'tile object' },
+      { category: 'Flooring', score: 9, reason: 'floor surface object' },
+    ],
+  },
+  {
+    objects: ['floor', 'flooring', 'hardwood', 'carpet'],
+    matches: [
+      { category: 'Flooring', score: 12, reason: 'flooring object' },
+      { category: 'Foundation Repair', score: 7, reason: 'floor support may be relevant' },
+      { category: 'Handyman', score: 7, reason: 'small floor repair object' },
+    ],
+  },
+  {
+    objects: ['lock', 'deadbolt', 'key', 'door lock'],
+    matches: [{ category: 'Locksmith', score: 13, reason: 'locksmith object' }],
+  },
+  {
+    objects: ['sprinkler', 'irrigation'],
+    matches: [{ category: 'Irrigation', score: 13, reason: 'irrigation object' }],
+  },
+  {
+    objects: ['tree', 'limb', 'branch', 'branches'],
+    matches: [
+      { category: 'Tree Service', score: 12, reason: 'tree object' },
+      { category: 'Landscaping', score: 7, reason: 'landscape object' },
+    ],
+  },
+  {
+    objects: ['lawn', 'grass', 'yard'],
+    matches: [
+      { category: 'Lawn Care', score: 12, reason: 'lawn or yard object' },
+      { category: 'Landscaping', score: 8, reason: 'landscape object' },
+    ],
+  },
+  {
+    objects: ['pool', 'spa', 'hot tub'],
+    matches: [{ category: 'Pool Service', score: 13, reason: 'pool or spa object' }],
+  },
+  {
+    objects: ['chimney', 'fireplace', 'flue', 'chimney cap'],
+    matches: [{ category: 'Chimney', score: 13, reason: 'chimney object' }],
+  },
+  {
+    objects: ['septic'],
+    matches: [{ category: 'Septic', score: 13, reason: 'septic object' }],
+  },
+  {
+    objects: ['well', 'well pump', 'pressure tank'],
+    matches: [{ category: 'Well Service', score: 13, reason: 'well object' }],
+  },
+  {
+    objects: ['concrete', 'driveway', 'patio', 'sidewalk'],
+    matches: [{ category: 'Concrete', score: 12, reason: 'concrete object' }],
+  },
+  {
+    objects: ['foundation', 'slab', 'crawlspace'],
+    matches: [{ category: 'Foundation Repair', score: 13, reason: 'foundation object' }],
+  },
+  {
+    objects: ['brick', 'block', 'masonry', 'mortar'],
+    matches: [{ category: 'Masonry', score: 13, reason: 'masonry object' }],
+  },
+  {
+    objects: ['siding', 'vinyl siding'],
+    matches: [{ category: 'Siding', score: 13, reason: 'siding object' }],
+  },
+  {
+    objects: ['insulation'],
+    matches: [{ category: 'Insulation', score: 13, reason: 'insulation object' }],
+  },
+];
+
 const COMMON_SYMPTOMS = [
   'coming up',
   'raised',
@@ -554,8 +727,10 @@ const AMBIGUOUS_CONTEXT_RULES: CategoryRule[] = [
   { category: 'Plumbing', score: 5, reason: 'possible plumbing source', phrases: ['leak', 'water', 'noise', 'smell', 'wall', 'ceiling', 'leak in attic', 'stain on ceiling'] },
   { category: 'HVAC', score: 5, reason: 'possible HVAC source', phrases: ['leak', 'water', 'noise', 'smell', 'attic', 'ceiling', 'leak in attic', 'stain on ceiling'] },
   { category: 'Gutters', score: 5, reason: 'possible drainage issue', phrases: ['water', 'water outside', 'outside water'] },
+  { category: 'Plumbing', score: 4, reason: 'possible exterior water issue', phrases: ['outside'] },
   { category: 'Landscaping', score: 4, reason: 'possible grading or yard drainage issue', phrases: ['water', 'outside', 'water outside', 'outside water'] },
   { category: 'Gutters', score: 4, reason: 'possible exterior water issue', phrases: ['outside'] },
+  { category: 'General Maintenance', score: 4, reason: 'general exterior issue review', phrases: ['outside'] },
   { category: 'Pest Control', score: 5, reason: 'possible pest activity', phrases: ['noise', 'smell', 'garage', 'attic', 'wall', 'noise in wall', 'bad smell in house', 'garage problem'] },
   { category: 'Electrical', score: 4, reason: 'possible electrical issue', phrases: ['noise', 'garage', 'wall', 'noise in wall', 'garage problem'] },
   { category: 'General Maintenance', score: 4, reason: 'general issue review', phrases: ['noise', 'smell', 'garage', 'attic', 'garage problem', 'bad smell in house'] },
@@ -619,6 +794,17 @@ function matchedPhrases(input: string, phrases: string[]) {
   return phrases.filter(phrase => hasPhrase(input, phrase));
 }
 
+function applyTradeObjectRules(input: string, rules: TradeObjectRule[], scores: Map<string, ServiceCategorySuggestion>) {
+  for (const rule of rules) {
+    const objectMatches = matchedPhrases(input, rule.objects);
+    if (objectMatches.length === 0) continue;
+
+    for (const match of rule.matches) {
+      addScore(scores, match.category, match.score, match.reason, objectMatches[0]);
+    }
+  }
+}
+
 function applyObjectSymptomRules(input: string, rules: ObjectSymptomRule[], scores: Map<string, ServiceCategorySuggestion>) {
   for (const rule of rules) {
     const objectMatches = matchedPhrases(input, rule.objects);
@@ -660,6 +846,7 @@ export function classifyHomeownerRequest(
   }
 
   const scores = new Map<string, ServiceCategorySuggestion>();
+  applyTradeObjectRules(input, TRADE_OBJECT_RULES, scores);
   applyObjectSymptomRules(input, OBJECT_SYMPTOM_RULES, scores);
   applyRules(input, PHRASE_RULES, scores);
   applyRules(input, AMBIGUOUS_CONTEXT_RULES, scores);
@@ -682,13 +869,22 @@ export function classifyHomeownerRequest(
   }
   if (hasPhrase(input, 'sewer smell')) {
     addScore(scores, 'Plumbing', 8, 'sewer or drain odor', 'sewer smell');
-    addScore(scores, 'Septic', 15, 'possible septic issue', 'sewer smell');
+    addScore(scores, 'Septic', 20, 'possible septic issue', 'sewer smell');
   }
   if (hasPhrase(input, 'ceiling fan not working')) {
     addScore(scores, 'Handyman', 16, 'fan or fixture repair may be handyman work', 'ceiling fan not working');
   }
   if (hasPhrase(input, 'deck railing')) {
     addScore(scores, 'Decks', 8, 'deck railing context', 'deck railing');
+  }
+  if (hasPhrase(input, 'siding dirty')) {
+    addScore(scores, 'Pressure Washing', 12, 'exterior surface cleaning', 'siding dirty');
+  }
+  if (hasPhrase(input, 'deadbolt stuck')) {
+    addScore(scores, 'Doors', 12, 'door hardware issue possible', 'deadbolt stuck');
+  }
+  if (hasPhrase(input, 'lawn brown spots')) {
+    addScore(scores, 'Irrigation', 8, 'lawn spots may relate to irrigation', 'lawn brown spots');
   }
   if (hasPhrase(input, 'leak in attic')) {
     scores.delete('Pest Control');
@@ -702,7 +898,7 @@ export function classifyHomeownerRequest(
 
   const topScore = rankedServiceTypes[0]?.score ?? 0;
   const visibleSuggestions = topScore > 0
-    ? rankedServiceTypes.filter(suggestion => suggestion.score >= Math.max(3, topScore - 12)).slice(0, 5)
+    ? rankedServiceTypes.filter(suggestion => suggestion.score >= Math.max(3, topScore - 18)).slice(0, 5)
     : [{ category: 'Other', score: 1, reasons: ['No clear trade match'] }].filter(allowedSuggestionFilter(allowedCategories));
 
   const secondScore = visibleSuggestions[1]?.score ?? 0;
