@@ -121,7 +121,7 @@ import type {
 } from './types';
 
 type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement' | 'trust-safety';
-type HomeownerRequestView = 'attention' | 'new' | 'scheduled' | 'closed' | 'declined';
+type HomeownerRequestView = 'open_pending' | 'closed' | 'invoiced';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
 type HomeownerWorkspaceRequestView = 'attention' | 'active' | 'closed';
 type HomeownerWorkspaceEstimateView = 'draft' | 'sent' | 'accepted' | 'closed';
@@ -5303,18 +5303,14 @@ function contractorRequestNeedsFollowUp(request: ServiceRequestSummary) {
 function homeownerRequestNeedsResponse(request: ServiceRequestSummary) {
   return !['closed', 'declined'].includes(request.status)
     && (
-      request.status === 'contractor_responded'
-      || request.quote?.status === 'pending'
+      request.quote?.status === 'pending'
       || (request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor')
     );
 }
 
 function homeownerRequestQueueFor(request: ServiceRequestSummary): HomeownerRequestView {
-  if (request.status === 'closed') return 'closed';
-  if (request.status === 'declined') return 'declined';
-  if (homeownerRequestNeedsResponse(request)) return 'attention';
-  if (request.status === 'open' && !request.appointment) return 'new';
-  return 'scheduled';
+  if (['closed', 'declined', 'cancelled', 'archived'].includes(request.status)) return 'closed';
+  return 'open_pending';
 }
 
 function contractorRequestQueueFor(request: ServiceRequestSummary): ContractorRequestView {
@@ -5346,19 +5342,6 @@ function appointmentResponseText(appointment: ServiceRequestAppointment, perspec
   return perspective === 'homeowner'
     ? 'The contractor proposed this time. Confirm it, decline it, or request another time.'
     : 'The homeowner requested this time. Confirm it, decline it, or propose another time.';
-}
-
-function serviceRequestAppointmentBadge(request: ServiceRequestSummary, perspective: 'homeowner' | 'contractor') {
-  const appointment = request.appointment;
-  if (!appointment || appointment.status === 'cancelled') return null;
-  if (appointment.status === 'confirmed') return { label: 'Scheduled', className: 'bg-emerald-100 text-emerald-700' };
-  if (appointment.status === 'completed') return { label: 'Completed appointment', className: 'bg-slate-100 text-slate-600' };
-  if (appointment.status === 'proposed') {
-    return appointment.proposed_by === perspective
-      ? { label: 'Appointment proposed', className: 'bg-blue-50 text-blue-700' }
-      : { label: 'Needs your response', className: 'bg-amber-100 text-amber-800' };
-  }
-  return null;
 }
 
 function notificationCategoryLabel(type: string) {
@@ -6874,7 +6857,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     description: '',
   });
   const [serviceProblemText, setServiceProblemText] = useState('');
-  const [homeownerRequestView, setHomeownerRequestView] = useState<HomeownerRequestView>(() => storedTab(STORAGE_KEYS.homeownerRequestView, ['attention', 'new', 'scheduled', 'closed', 'declined'] as const, 'attention'));
+  const [homeownerRequestView, setHomeownerRequestView] = useState<HomeownerRequestView>(() => storedTab(STORAGE_KEYS.homeownerRequestView, ['open_pending', 'closed', 'invoiced'] as const, 'open_pending'));
   const [homeownerRequestPropertyScope, setHomeownerRequestPropertyScope] = useState<HomeownerRequestPropertyScope>('selected');
   const [homeownerRequestSearch, setHomeownerRequestSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerRequestSearch) ?? '');
   const [requestComposerOpen, setRequestComposerOpen] = useState(false);
@@ -9063,17 +9046,59 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     </Card>
   );
-  const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
-    const requestEstimates = estimates
+  const homeownerClosedRequestStatuses = ['closed', 'declined', 'cancelled', 'archived'];
+  const homeownerInvoiceActivityStatuses = ['sent', 'viewed', 'overdue', 'partially_paid', 'paid'];
+  const homeownerInvoicePaymentNeededStatuses = ['sent', 'viewed', 'overdue', 'partially_paid'];
+  const requestEstimatesFor = (request: ServiceRequestSummary) => estimates
       .filter(estimate => estimate.service_request_id === request.id)
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const requestInvoicesFor = (request: ServiceRequestSummary) => {
+    const requestEstimates = requestEstimatesFor(request);
     const requestEstimateIds = new Set(requestEstimates.map(estimate => estimate.id));
-    const requestInvoices = invoices
+    return invoices
       .filter(invoice =>
         invoice.service_request_id === request.id
         || (invoice.estimate_id ? requestEstimateIds.has(invoice.estimate_id) : false)
       )
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  };
+  const requestHasInvoiceActivity = (request: ServiceRequestSummary) =>
+    requestInvoicesFor(request).some(invoice => homeownerInvoiceActivityStatuses.includes(invoice.status));
+  const homeownerRequestNeedsAction = (request: ServiceRequestSummary) => {
+    if (homeownerClosedRequestStatuses.includes(request.status)) return false;
+    if (request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor') return true;
+    if (request.quote?.status === 'pending') return true;
+    if (requestEstimatesFor(request).some(estimate => estimate.status === 'sent')) return true;
+    return requestInvoicesFor(request).some(invoice => homeownerInvoicePaymentNeededStatuses.includes(invoice.status));
+  };
+  const homeownerRequestDisplayBadge = (request: ServiceRequestSummary) => {
+    const requestInvoices = requestInvoicesFor(request);
+    const openInvoice = requestInvoices.find(invoice => homeownerInvoicePaymentNeededStatuses.includes(invoice.status));
+    const paidInvoice = requestInvoices.find(invoice => invoice.status === 'paid');
+    const hasPendingEstimate = requestEstimatesFor(request).some(estimate => estimate.status === 'sent');
+
+    if (request.status === 'declined') return { label: 'Declined', className: 'bg-red-50 text-red-700' };
+    if (openInvoice) return { label: 'Invoice sent', className: 'bg-amber-100 text-amber-800' };
+    if (paidInvoice) return { label: 'Paid', className: 'bg-emerald-100 text-emerald-700' };
+    if (request.status === 'closed') return { label: 'Closed', className: 'bg-emerald-50 text-emerald-700' };
+    if (request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor') {
+      return { label: 'Needs your response', className: 'bg-amber-100 text-amber-800' };
+    }
+    if (request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'homeowner') {
+      return { label: 'New time suggested', className: 'bg-blue-50 text-blue-700' };
+    }
+    if (request.appointment?.status === 'confirmed') return { label: 'Visit scheduled', className: 'bg-emerald-100 text-emerald-700' };
+    if (request.appointment?.status === 'completed') return { label: 'Visit completed', className: 'bg-slate-100 text-slate-700' };
+    if (request.appointment?.status === 'cancelled') return { label: 'Time declined', className: 'bg-amber-50 text-amber-700' };
+    if (request.quote?.status === 'pending' || hasPendingEstimate) {
+      return { label: 'Needs your response', className: 'bg-amber-100 text-amber-800' };
+    }
+    if (request.status === 'contractor_responded') return { label: 'Contractor responded', className: 'bg-blue-50 text-blue-700' };
+    return { label: 'Waiting on contractor', className: 'bg-slate-100 text-slate-700' };
+  };
+  const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
+    const requestEstimates = requestEstimatesFor(request);
+    const requestInvoices = requestInvoicesFor(request);
     const reportLinks = maintenanceLog
       .filter(entry => entry.service_request_id === request.id && entry.report_document_id)
       .map(entry => ({
@@ -9532,7 +9557,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <MetricButton label="Estimates to review" value={String(pendingEstimateCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('needs_review'); setHomeownerTab('estimates'); }} />
               <MetricButton label="Open invoices" value={String(openHomeownerInvoiceCount)} onClick={() => { setHomeownerRecordPropertyScope('selected'); setHomeownerRecordSection('open_invoices'); setHomeownerTab('estimates'); }} />
-              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerRequestView('attention'); setHomeownerTab('requests'); }} />
+              <MetricButton label="Needs response" value={String(homeownerActionRequestCount)} onClick={() => { setHomeownerRequestPropertyScope('selected'); setHomeownerRequestView('open_pending'); setHomeownerTab('requests'); }} />
               <MetricButton label="Calendar items" value={String(upcomingAppointments.length)} onClick={() => setHomeownerTab('calendar')} />
             </div>
           </section>
@@ -10754,7 +10779,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const isUpdating = updatingServiceRequestId === request.id;
               const lastMessage = request.messages[request.messages.length - 1];
               const propertyLabel = serviceRequestPropertyLabel(request);
-              const appointmentBadge = serviceRequestAppointmentBadge(request, 'homeowner');
+              const displayBadge = homeownerRequestDisplayBadge(request);
+              const requestNeedsAction = homeownerRequestNeedsAction(request);
               return (
                 <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
                   <button
@@ -10766,15 +10792,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-slate-950">{request.title}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${serviceRequestStatusClass(request.status)}`}>
-                            {serviceRequestStatusLabel(request.status)}
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold shrink-0 ${displayBadge.className}`}>
+                            {displayBadge.label}
                           </span>
-                          {appointmentBadge && (
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${appointmentBadge.className}`}>
-                              {appointmentBadge.label}
-                            </span>
-                          )}
-                          {homeownerRequestNeedsResponse(request) && (
+                          {requestNeedsAction && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
                               Action needed
                             </span>
@@ -11151,40 +11172,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </div>
               );
             };
-            const isHomeownerAttention = homeownerRequestNeedsResponse;
             const requestSections: Array<{ id: HomeownerRequestView; title: string; helper: string; requests: ServiceRequestSummary[] }> = [
               {
-                id: 'attention',
-                title: 'Needs your response',
-                helper: 'Contractor replies, quotes, or proposed appointment times waiting on you.',
-                requests: propertyScopedServiceRequests.filter(isHomeownerAttention),
-              },
-              {
-                id: 'new',
-                title: 'New requests',
-                helper: 'Requests sent to contractors that have not been answered yet.',
-                requests: propertyScopedServiceRequests.filter(r => r.status === 'open' && !r.appointment),
-              },
-              {
-                id: 'scheduled',
-                title: 'Scheduled and proposed appointments',
-                helper: 'Confirmed appointments and proposed times, including appointments waiting for your response.',
-                requests: propertyScopedServiceRequests.filter(r =>
-                  !['closed', 'declined'].includes(r.status)
-                  && Boolean(r.appointment)
-                ),
+                id: 'open_pending',
+                title: 'Open / Pending Requests',
+                helper: 'Requests still in motion, including waiting, proposed, scheduled, and recently completed visits.',
+                requests: propertyScopedServiceRequests.filter(r => !homeownerClosedRequestStatuses.includes(r.status)),
               },
               {
                 id: 'closed',
-                title: 'Closed and invoiced',
-                helper: 'Completed requests. Quotes or invoices stay attached for your records.',
-                requests: propertyScopedServiceRequests.filter(r => r.status === 'closed'),
+                title: 'Closed Requests',
+                helper: 'Completed, declined, cancelled, or archived requests.',
+                requests: propertyScopedServiceRequests.filter(r => homeownerClosedRequestStatuses.includes(r.status)),
               },
               {
-                id: 'declined',
-                title: 'Declined',
-                helper: 'Requests that were declined or cancelled.',
-                requests: propertyScopedServiceRequests.filter(r => r.status === 'declined'),
+                id: 'invoiced',
+                title: 'Invoiced Requests',
+                helper: 'Requests with sent, viewed, overdue, partially paid, or paid invoices.',
+                requests: propertyScopedServiceRequests.filter(requestHasInvoiceActivity),
               },
             ];
             const activeHomeownerRequestView = requestSections.find(section => section.id === homeownerRequestView)?.id
@@ -11195,7 +11200,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               ? 'No service requests for this property yet.'
               : homeownerRequestPropertyScope === 'unassigned' && propertyScopedServiceRequests.length === 0
                 ? 'No unassigned service requests.'
-                : 'No requests in this queue.';
+                : 'No requests in this bucket.';
 
             return (
               <div className="space-y-4">
@@ -11243,7 +11248,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </div>
                   )}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-3">
                   {requestSections.map(section => {
                     const active = section.id === activeHomeownerRequestView;
                     return (
@@ -11269,7 +11274,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <p className="text-sm font-bold text-slate-950">{selectedSection.title}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{selectedSection.helper}</p>
                     </div>
-                    <Field label="Search this queue">
+                    <Field label="Search this bucket">
                       <input
                         className={inputClass()}
                         value={homeownerRequestSearch}
