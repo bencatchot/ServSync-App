@@ -3373,11 +3373,11 @@ type ServiceCategorySuggestion = {
 };
 
 const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
-  HVAC: ['air conditioner', 'ac', 'a c', 'heat pump', 'furnace', 'thermostat', 'duct', 'air filter', 'hvac', 'not cooling', 'not heating', 'warm air', 'cold air', 'register', 'vent airflow'],
-  Plumbing: ['leak', 'drip', 'pipe', 'faucet', 'toilet', 'sink', 'under sink', 'water under sink', 'shower', 'tub', 'drain', 'clog', 'water pressure', 'garbage disposal', 'water heater', 'sewer', 'supply line', 'hose bib'],
-  Electrical: ['outlet', 'breaker', 'light switch', 'switch', 'gfci', 'sparking', 'flickering', 'electrical', 'power', 'tripped', 'panel', 'ceiling fan wiring', 'smoke detector'],
-  Roofing: ['roof', 'shingle', 'missing shingles', 'flashing', 'roof leak', 'ceiling stain', 'stain on ceiling', 'ceiling stain after rain', 'storm damage roof', 'storm damage', 'drip from roof', 'attic leak after rain', 'ridge cap', 'roof vent', 'skylight leak'],
-  Gutters: ['gutter', 'downspout', 'water overflowing', 'fascia water', 'gutter leak', 'drain away', 'rainwater', 'water outside'],
+  HVAC: ['air conditioner', 'ac', 'a c', 'heat pump', 'furnace', 'heater', 'thermostat', 'duct', 'air filter', 'hvac', 'not cooling', 'not heating', 'warm air', 'cold air', 'register', 'vent airflow', 'weak airflow', 'air handler', 'condenser', 'unit frozen', 'vent dripping'],
+  Plumbing: ['leak', 'drip', 'pipe', 'pipe leaking', 'faucet', 'faucet dripping', 'toilet', 'toilet running', 'toilet clogged', 'sink', 'under sink', 'water under sink', 'shower', 'shower not draining', 'tub', 'drain', 'drain clogged', 'clog', 'water pressure', 'low water pressure', 'garbage disposal', 'garbage disposal leaking', 'water heater', 'water heater leaking', 'sewer', 'supply line', 'hose bib'],
+  Electrical: ['outlet', 'outlet not working', 'breaker', 'breaker tripping', 'breaker keeps tripping', 'light switch', 'switch', 'switch not working', 'gfci', 'gfci wont reset', 'sparking', 'sparks', 'flickering', 'lights flickering', 'electrical', 'power', 'no power', 'no power in room', 'tripped', 'panel', 'ceiling fan wiring', 'ceiling fan not working', 'smoke detector'],
+  Roofing: ['roof', 'shingle', 'shingles raised', 'raised shingles', 'lifted shingles', 'loose shingles', 'shingles loose', 'missing shingles', 'shingles missing', 'shingles curling', 'curling shingles', 'shingles buckling', 'buckling shingles', 'roof shingles coming up', 'flashing', 'flashing loose', 'flashing damaged', 'fascia rotting', 'soffit damaged', 'roof leak', 'ceiling stain', 'stain on ceiling', 'water stain after rain', 'ceiling stain after rain', 'storm damage roof', 'storm damage', 'drip from roof', 'attic leak after rain', 'ridge cap', 'roof vent', 'skylight leak'],
+  Gutters: ['gutter', 'gutter overflowing', 'downspout', 'downspout clogged', 'water overflowing', 'fascia water', 'gutter leak', 'drain away', 'rainwater', 'water outside', 'water pooling outside', 'standing water near house', 'drainage issue', 'erosion near foundation'],
   Concrete: ['driveway', 'sidewalk', 'concrete', 'slab', 'patio crack', 'trip hazard', 'settled concrete'],
   Masonry: ['brick', 'mortar', 'stone', 'chimney brick', 'block wall', 'masonry', 'tuckpoint'],
   'Foundation Repair': ['foundation', 'settling', 'horizontal crack', 'stair step crack', 'crawlspace support', 'pier', 'beam sag', 'structural crack'],
@@ -3385,14 +3385,14 @@ const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   Carpentry: ['trim', 'wood rot', 'shelf', 'built in', 'wood repair', 'baseboard', 'crown molding', 'carpentry'],
   Cabinets: ['cabinet', 'drawer', 'hinge', 'cabinet door', 'vanity cabinet', 'soft close', 'cabinet maker'],
   Countertops: ['countertop', 'counter top', 'granite', 'quartz', 'laminate counter', 'counter crack'],
-  Flooring: ['floor', 'flooring', 'hardwood', 'laminate', 'vinyl plank', 'carpet', 'soft spot', 'buckling floor'],
+  Flooring: ['floor', 'flooring', 'hardwood', 'laminate', 'vinyl plank', 'carpet', 'carpet damaged', 'soft spot', 'floor soft spot', 'buckling floor', 'hardwood buckling', 'loose flooring'],
   Tile: ['tile', 'grout', 'backsplash', 'shower tile', 'cracked tile', 'loose tile'],
-  Drywall: ['drywall', 'sheetrock', 'wall damage', 'hole in wall', 'ceiling patch', 'ceiling crack', 'texture repair'],
-  Painting: ['paint', 'painting', 'stain wall', 'touch up', 'peeling paint', 'exterior paint'],
+  Drywall: ['drywall', 'sheetrock', 'wall damage', 'drywall hole', 'hole in wall', 'ceiling patch', 'ceiling crack', 'wall crack', 'water stain on drywall', 'texture repair'],
+  Painting: ['paint', 'painting', 'stain wall', 'touch up', 'paint peeling', 'peeling paint', 'exterior paint'],
   Siding: ['siding', 'vinyl siding', 'hardie', 'lap siding', 'siding damage', 'exterior wall panel'],
-  Windows: ['window', 'glass', 'window lock', 'window seal', 'fogged window', 'screen', 'sash'],
-  Doors: ['door', 'doorknob', 'door frame', 'threshold', 'weatherstrip', 'door lock', 'sticking door'],
-  'Garage Doors': ['garage door', 'garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener', 'garage spring', 'garage track', 'remote opener'],
+  Windows: ['window', 'window leaking', 'window wont open', 'glass', 'broken window', 'window lock', 'window seal', 'fogged window', 'screen', 'sash'],
+  Doors: ['door', 'door sticks', 'door wont latch', 'doorknob', 'door frame', 'threshold', 'weatherstrip', 'draft around door', 'door lock', 'sticking door'],
+  'Garage Doors': ['garage door', 'garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener', 'opener not working', 'garage spring', 'broken spring', 'broken garage spring', 'door off track', 'garage door off track', 'garage door cable', 'garage track', 'remote opener', 'remote not working'],
   Decks: ['deck', 'porch boards', 'railing', 'ledger board', 'deck stair', 'baluster'],
   Fencing: ['fence', 'gate', 'fence post', 'privacy fence', 'picket'],
   Landscaping: ['landscape', 'flower bed', 'mulch', 'grading', 'yard drainage', 'plants', 'bushes'],
@@ -3404,13 +3404,13 @@ const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   'Well Service': ['well', 'well pump', 'pressure tank', 'no water', 'water pressure tank'],
   Insulation: ['insulation', 'attic insulation', 'drafty', 'hot room', 'cold room', 'air sealing', 'r value'],
   Chimney: ['chimney', 'fireplace', 'flue', 'damper', 'creosote', 'chimney cap'],
-  'Appliance Repair': ['refrigerator', 'fridge', 'dishwasher', 'dishwasher not draining', 'oven', 'range', 'stove', 'washer', 'dryer', 'ice maker', 'appliance'],
+  'Appliance Repair': ['refrigerator', 'fridge', 'refrigerator not cooling', 'freezer not freezing', 'dishwasher', 'dishwasher not draining', 'oven', 'oven not heating', 'range', 'stove', 'washer', 'washer leaking', 'dryer', 'dryer not heating', 'microwave not working', 'ice maker', 'appliance'],
   Locksmith: ['lock', 'locked out', 'key', 'rekey', 'deadbolt', 'smart lock'],
   'Cleaning Service': ['cleaning', 'deep clean', 'move out clean', 'house clean', 'maid', 'odor cleaning'],
   'Pressure Washing': ['pressure wash', 'power wash', 'soft wash', 'driveway cleaning', 'siding cleaning', 'mildew exterior'],
   'Pool Service': ['pool', 'pool pump', 'pool filter', 'algae', 'pool water', 'pool heater'],
   'Moving Service': ['moving', 'movers', 'move furniture', 'packing', 'unloading', 'loading truck'],
-  Handyman: ['small repair', 'minor repair', 'odd jobs', 'hang picture', 'assemble', 'general repair', 'punch list'],
+  Handyman: ['small repair', 'minor repair', 'minor home repair', 'odd jobs', 'hang picture', 'assemble', 'general repair', 'punch list', 'loose handrail', 'cabinet loose', 'trim damaged'],
   'General Maintenance': ['maintenance', 'not sure', 'multiple issues', 'home check', 'general home'],
 };
 
@@ -3466,6 +3466,8 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   const hasRainContext = hasAny(['after rain', 'when it rains', 'rain', 'storm']);
   const hasCeilingContext = hasAny(['ceiling', 'ceiling stain', 'stain on ceiling']);
   const hasWallContext = hasAny(['wall', 'in wall', 'inside wall']);
+  const roofSurfaceMatches = matchingTerms(['shingle', 'shingles', 'roof shingles', 'flashing', 'fascia', 'soffit']);
+  const roofConditionMatches = matchingTerms(['raised', 'lifted', 'loose', 'curling', 'buckling', 'missing', 'coming up', 'damaged', 'rotting']);
 
   if (leakMatches.length > 0 && roofMatches.length > 0) {
     addBoost('Roofing', 9, 'roof or rain leak source');
@@ -3491,6 +3493,15 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   if (leakMatches.length > 0 && hasRainContext) {
     addBoost('Roofing', 9, 'leak connected to rain or storm');
   }
+  if (roofSurfaceMatches.length > 0 && roofConditionMatches.length > 0) {
+    addBoost('Roofing', 10, `${roofSurfaceMatches[0]} condition: ${roofConditionMatches[0]}`);
+  }
+  if (hasAny(['shingles raised', 'raised shingles', 'lifted shingles', 'loose shingles', 'shingles loose', 'shingles curling', 'curling shingles', 'shingles buckling', 'buckling shingles', 'roof shingles coming up', 'missing shingles'])) {
+    addBoost('Roofing', 11, 'roof shingle condition');
+  }
+  if (hasAny(['flashing loose', 'flashing damaged', 'fascia rotting', 'soffit damaged', 'drip from roof', 'storm damage roof'])) {
+    addBoost('Roofing', 10, 'roof exterior condition');
+  }
 
   if (leakMatches.length > 0) {
     for (const affectedMaterial of WATER_DAMAGE_MATERIAL_CATEGORIES) {
@@ -3501,14 +3512,23 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   if (hasAny(['sparking', 'outlet', 'breaker', 'gfci', 'flickering', 'tripped', 'no power'])) {
     addBoost('Electrical', 7, 'electrical symptom');
   }
+  if (hasAny(['outlet not working', 'breaker tripping', 'breaker keeps tripping', 'lights flickering', 'switch not working', 'gfci wont reset', 'gfci won t reset', 'ceiling fan not working', 'no power in room'])) {
+    addBoost('Electrical', 9, 'specific electrical symptom');
+  }
   if (hasAny(['not cooling', 'not heating', 'ac', 'a c', 'air conditioner', 'furnace', 'thermostat', 'heat pump'])) {
     addBoost('HVAC', 7, 'heating or cooling symptom');
   }
   if (hasAny(['attic ac', 'attic a c', 'attic air conditioner', 'attic hvac', 'air handler', 'condensation around air handler', 'vent leaking water'])) {
     addBoost('HVAC', 9, 'HVAC equipment or condensation symptom');
   }
+  if (hasAny(['air conditioner not cooling', 'ac making noise', 'air conditioner making noise', 'heater not working', 'furnace not turning on', 'thermostat not working', 'weak airflow', 'unit frozen', 'vent dripping', 'condensation near ac'])) {
+    addBoost('HVAC', 9, 'specific HVAC symptom');
+  }
   if (hasAny(['refrigerator', 'fridge', 'dishwasher', 'oven', 'range', 'stove', 'washer', 'dryer', 'ice maker'])) {
     addBoost('Appliance Repair', 7, 'appliance symptom');
+  }
+  if (hasAny(['refrigerator not cooling', 'freezer not freezing', 'washer leaking', 'dryer not heating', 'oven not heating', 'microwave not working'])) {
+    addBoost('Appliance Repair', 9, 'specific appliance symptom');
   }
   if (hasAny(['gutter', 'downspout']) && hasAny(['overflow', 'overflowing', 'clog', 'clogged', 'rainwater', 'drain'])) {
     addBoost('Gutters', 7, 'gutter drainage symptom');
@@ -3519,12 +3539,21 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   if (hasAny(['water under sink', 'under sink water', 'wet under sink'])) {
     addBoost('Plumbing', 8, 'water issue under sink');
   }
+  if (hasAny(['pipe leaking', 'toilet running', 'toilet clogged', 'drain clogged', 'faucet dripping', 'water heater leaking', 'low water pressure', 'shower not draining', 'garbage disposal leaking'])) {
+    addBoost('Plumbing', 9, 'specific plumbing symptom');
+  }
   if (hasAny(['dishwasher not draining', 'dishwasher drain', 'dishwasher clogged'])) {
     addBoost('Appliance Repair', 8, 'dishwasher issue');
     addBoost('Plumbing', 5, 'possible drain issue');
   }
-  if (hasAny(['garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener'])) {
+  if (hasAny(['garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener', 'opener not working', 'broken spring', 'broken garage spring', 'door off track', 'garage door off track', 'garage door cable', 'remote not working'])) {
     addBoost('Garage Doors', 9, 'garage door symptom');
+  }
+  if (hasAny(['garage problem', 'problem in garage', 'garage issue'])) {
+    addBoost('Garage Doors', 5, 'possible garage door issue');
+    addBoost('Electrical', 4, 'possible electrical issue in garage');
+    addBoost('Pest Control', 3, 'possible pest issue in garage');
+    addBoost('General Maintenance', 3, 'general garage issue');
   }
   if (hasAny(['noise in wall', 'sound in wall', 'scratching in wall', 'rattle in wall', 'humming in wall'])) {
     addBoost('Pest Control', hasAny(['scratching in wall']) ? 8 : 5, 'possible activity in wall');
@@ -3602,7 +3631,15 @@ function cleanServiceRequestText(text: string) {
   if (normalized.length < 8) return ensureSentencePunctuation(sentenceCase(trimmed));
 
   const exactCleanups: Array<{ phrases: string[]; text: string }> = [
+    { phrases: ['shingles raised', 'raised shingles'], text: 'The roof shingles appear to be raised.' },
+    { phrases: ['lifted shingles'], text: 'The roof shingles appear to be lifted.' },
+    { phrases: ['loose shingles', 'shingles loose'], text: 'The roof shingles appear to be loose.' },
+    { phrases: ['missing shingles', 'shingles missing'], text: 'Some roof shingles appear to be missing.' },
+    { phrases: ['shingles curling', 'curling shingles'], text: 'The roof shingles appear to be curling.' },
+    { phrases: ['shingles buckling', 'buckling shingles'], text: 'The roof shingles appear to be buckling.' },
     { phrases: ['ac not cooling', 'a c not cooling', 'air conditioner not cooling'], text: 'The air conditioner is not cooling properly.' },
+    { phrases: ['weak airflow'], text: 'The airflow appears to be weak.' },
+    { phrases: ['thermostat not working'], text: 'The thermostat is not working.' },
     { phrases: ['pest activity in garage'], text: 'There is pest activity in the garage.' },
     { phrases: ['leak in attic'], text: 'There appears to be a leak in the attic.' },
     { phrases: ['attic leak after rain'], text: 'There appears to be a leak in the attic after rain.' },
@@ -3613,13 +3650,23 @@ function cleanServiceRequestText(text: string) {
     { phrases: ['scratching in wall'], text: 'There is scratching in the wall.' },
     { phrases: ['attic ac unit leaking', 'attic a c unit leaking', 'attic air conditioner unit leaking'], text: 'The attic air conditioner unit appears to be leaking.' },
     { phrases: ['water under sink'], text: 'There is water under the sink.' },
+    { phrases: ['toilet running'], text: 'The toilet keeps running.' },
+    { phrases: ['water heater leaking'], text: 'The water heater appears to be leaking.' },
+    { phrases: ['drain clogged'], text: 'The drain appears to be clogged.' },
     { phrases: ['outlet not working'], text: 'An outlet is not working.' },
+    { phrases: ['breaker keeps tripping', 'breaker tripping'], text: 'The breaker keeps tripping.' },
+    { phrases: ['lights flickering'], text: 'The lights are flickering.' },
+    { phrases: ['gfci wont reset', 'gfci won t reset'], text: 'The GFCI will not reset.' },
     { phrases: ['roof leak'], text: 'There appears to be a roof leak.' },
     { phrases: ['stain on ceiling'], text: 'There is a stain on the ceiling.' },
     { phrases: ['bad smell in house'], text: 'There is a bad smell in the house.' },
     { phrases: ['water outside'], text: 'There is water outside the home.' },
     { phrases: ['dishwasher not draining'], text: 'The dishwasher is not draining properly.' },
     { phrases: ['garage door wont open', 'garage door won t open'], text: 'The garage door will not open.' },
+    { phrases: ['broken garage spring'], text: 'The garage door spring appears to be broken.' },
+    { phrases: ['garage door off track'], text: 'The garage door appears to be off track.' },
+    { phrases: ['noise in wall'], text: 'There is a noise in the wall.' },
+    { phrases: ['garage problem'], text: 'There is a problem in the garage.' },
   ];
   const exactMatch = exactCleanups.find(item => item.phrases.some(phrase => normalized === normalizeText(phrase)));
   if (exactMatch) return exactMatch.text;
