@@ -368,6 +368,7 @@ const STORAGE_KEYS = {
   homeownerRequestView: 'servsync.homeowner.requestView',
   homeownerRequestSearch: 'servsync.homeowner.requestSearch',
   homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
+  homeownerHomeSetupSkipped: 'servsync.homeowner.homeSetupSkipped',
   contractorTab: 'servsync.contractor.activeTab',
   contractorHomeownerFilter: 'servsync.contractor.homeownerFilter',
   contractorHomeownerSearch: 'servsync.contractor.homeownerSearch',
@@ -6004,7 +6005,7 @@ function AuthPage({
         });
         onAuthed();
       } else {
-        setMessage('Account created. Check your email if Supabase asks you to confirm before signing in.');
+        setMessage('Account created. Check your email to confirm your ServSync account before signing in.');
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to complete authentication.');
@@ -6088,7 +6089,7 @@ function AuthPage({
             <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
           </Field>
           {mode === 'signup' && (
-            <p className="text-xs text-slate-400">Use a strong password. Supabase may reject short or weak passwords.</p>
+            <p className="text-xs text-slate-400">Use a strong password. Short or weak passwords may be rejected.</p>
           )}
           {mode === 'signup' && (
             <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -6310,7 +6311,7 @@ function LocalCustomerClaimPage({
         if (profileError) throw profileError;
         onAuthed();
       } else {
-        setAuthMessage('Account created. Check your email if Supabase asks you to confirm before signing in, then reopen this invite link.');
+        setAuthMessage('Account created. Check your email to confirm your ServSync account before signing in, then reopen this invite link.');
       }
     } catch (err) {
       setAuthMessage(readableError(err, 'Unable to complete authentication.'));
@@ -6771,9 +6772,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(() => storedStringSet(STORAGE_KEYS.homeownerExpandedRequests));
   const [reopenDrafts, setReopenDrafts] = useState<Record<string, { open: boolean; body: string }>>({});
   const [reopeningRequestId, setReopeningRequestId] = useState<string | null>(null);
+  const homeSetupStorageKey = `${STORAGE_KEYS.homeownerHomeSetupSkipped}:${profile.id}`;
+  const [homeSetupSkipped, setHomeSetupSkipped] = useState(() => window.localStorage.getItem(homeSetupStorageKey) === 'true');
+  const [savingHomeSetup, setSavingHomeSetup] = useState(false);
+  const [homeSetupDraft, setHomeSetupDraft] = useState({
+    nickname: 'Home',
+    address_line1: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    year_built: '',
+    square_feet: '',
+    phone: '',
+    notes: '',
+  });
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const skipped = window.localStorage.getItem(homeSetupStorageKey) === 'true';
+    setHomeSetupSkipped(skipped);
+  }, [homeSetupStorageKey]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, homeownerTab);
@@ -6810,6 +6830,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     created_at: '',
     updated_at: '',
   };
+
+  useEffect(() => {
+    setHomeSetupDraft(current => ({
+      ...current,
+      phone: current.phone || profileDraft.phone || '',
+      city: current.city || profileDraft.city || '',
+      state: current.state || profileDraft.state || '',
+      zip_code: current.zip_code || profileDraft.zip_code || '',
+    }));
+  }, [profileDraft.phone, profileDraft.city, profileDraft.state, profileDraft.zip_code]);
 
   const createEmptyHomeDraft = (): HomeProfile => ({
     id: '',
@@ -7375,6 +7405,70 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to save homeowner profile.'));
+    }
+  };
+
+  const skipInitialHomeSetup = () => {
+    window.localStorage.setItem(homeSetupStorageKey, 'true');
+    setHomeSetupSkipped(true);
+    setNotice('You can add your home anytime from Properties.');
+  };
+
+  const saveInitialHomeSetup = async () => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setSavingHomeSetup(true);
+    try {
+      const homeownerPayload = {
+        user_id: profile.id,
+        display_name: profileDraft.display_name || profile.full_name || '',
+        phone: homeSetupDraft.phone.trim(),
+        city: profileDraft.city || homeSetupDraft.city.trim(),
+        state: profileDraft.state || homeSetupDraft.state.trim(),
+        zip_code: profileDraft.zip_code || homeSetupDraft.zip_code.trim(),
+        profile_photo_path: profileDraft.profile_photo_path || '',
+      };
+      const { error: profileError } = await supabase.from('homeowner_profiles').upsert(homeownerPayload);
+      if (profileError) throw profileError;
+
+      const homePayload = {
+        homeowner_user_id: profile.id,
+        nickname: homeSetupDraft.nickname.trim() || 'Home',
+        address_line1: homeSetupDraft.address_line1.trim(),
+        address_line2: '',
+        city: homeSetupDraft.city.trim(),
+        state: homeSetupDraft.state.trim(),
+        zip_code: homeSetupDraft.zip_code.trim(),
+        home_type: '',
+        year_built: homeSetupDraft.year_built.trim(),
+        square_feet: homeSetupDraft.square_feet.trim(),
+        notes: homeSetupDraft.notes.trim(),
+        home_photo_path: '',
+      };
+      const { data: savedHome, error: homeError } = await supabase.from('homes').insert(homePayload).select('*').single();
+      if (homeError) throw homeError;
+
+      const normalizedSavedHome = savedHome as HomeProfile;
+      window.localStorage.setItem(STORAGE_KEYS.homeownerSelectedHome, normalizedSavedHome.id);
+      window.localStorage.setItem(homeSetupStorageKey, 'true');
+      setHomeSetupSkipped(true);
+      setSelectedHomeId(normalizedSavedHome.id);
+      setHome(normalizedSavedHome);
+      setHomes([normalizedSavedHome]);
+      setHomeowner(prev => ({
+        ...(prev || profileDraft),
+        phone: homeownerPayload.phone,
+        city: homeownerPayload.city,
+        state: homeownerPayload.state,
+        zip_code: homeownerPayload.zip_code,
+      }));
+      setNotice('Home profile saved.');
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save home profile.'));
+    } finally {
+      setSavingHomeSetup(false);
     }
   };
 
@@ -8133,6 +8227,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const completedHomeFields = homeProfileFields.filter(Boolean).length;
   const homeProfileScore = Math.round((completedHomeFields / homeProfileFields.length) * 100);
+  const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
   const homeownerOnboardingItems: Array<{
     label: string;
     helper: string;
@@ -9272,6 +9367,112 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {loading && <Notice tone="info" text="Loading homeowner profile..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+
+      {showInitialHomeSetupPrompt && (
+        <section className="mb-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">Home setup</p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-950">Tell us about your home</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                Add a few details so ServSync can organize requests, documents, reports, and service history around the right property. You can update this anytime.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">All fields are optional.</p>
+            </div>
+            <button type="button" onClick={skipInitialHomeSetup} disabled={savingHomeSetup} className={buttonClass('secondary')}>
+              Skip for now
+            </button>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Home nickname">
+              <input
+                className={inputClass()}
+                value={homeSetupDraft.nickname}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, nickname: event.target.value }))}
+                placeholder="Home"
+              />
+            </Field>
+            <Field label="Street address">
+              <input
+                className={inputClass()}
+                autoComplete="street-address"
+                value={homeSetupDraft.address_line1}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, address_line1: event.target.value }))}
+              />
+            </Field>
+            <Field label="City">
+              <input
+                className={inputClass()}
+                autoComplete="address-level2"
+                value={homeSetupDraft.city}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, city: event.target.value }))}
+              />
+            </Field>
+            <Field label="State">
+              <AutocompleteInput
+                id="initial-home-state"
+                value={homeSetupDraft.state}
+                onChange={state => setHomeSetupDraft(current => ({ ...current, state }))}
+                options={US_STATE_OPTIONS}
+                placeholder="Start typing a state..."
+              />
+            </Field>
+            <Field label="ZIP code">
+              <input
+                className={inputClass()}
+                autoComplete="postal-code"
+                spellCheck={false}
+                value={homeSetupDraft.zip_code}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, zip_code: event.target.value }))}
+              />
+            </Field>
+            <Field label="Year built">
+              <input
+                className={inputClass()}
+                inputMode="numeric"
+                value={homeSetupDraft.year_built}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, year_built: event.target.value }))}
+              />
+            </Field>
+            <Field label="Square feet">
+              <input
+                className={inputClass()}
+                inputMode="numeric"
+                value={homeSetupDraft.square_feet}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, square_feet: event.target.value }))}
+              />
+            </Field>
+            <Field label="Phone number">
+              <input
+                className={inputClass()}
+                type="tel"
+                autoComplete="tel"
+                spellCheck={false}
+                value={homeSetupDraft.phone}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, phone: formatPhoneInputValue(event.target.value) }))}
+              />
+            </Field>
+            <Field label="Notes">
+              <textarea
+                className={`${inputClass()} min-h-[88px] resize-y`}
+                {...writingAssistProps}
+                value={homeSetupDraft.notes}
+                onChange={event => setHomeSetupDraft(current => ({ ...current, notes: event.target.value }))}
+                placeholder="Access notes, home details, or anything you want to remember."
+              />
+            </Field>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void saveInitialHomeSetup()} disabled={savingHomeSetup} className={buttonClass('primary')}>
+              <ClipboardCheck size={16} />
+              {savingHomeSetup ? 'Saving...' : 'Save home profile'}
+            </button>
+            <button type="button" onClick={skipInitialHomeSetup} disabled={savingHomeSetup} className={buttonClass('secondary')}>
+              Skip for now
+            </button>
+          </div>
+        </section>
+      )}
 
       {homes.length !== 1 && homeownerTab !== 'requests' && (
         <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
