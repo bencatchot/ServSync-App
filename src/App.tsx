@@ -3356,6 +3356,7 @@ function hasPhrase(haystack: string, phrase: string) {
   const phraseTokens = normalizedPhrase.split(' ');
   if (phraseTokens.length === 1) {
     const target = stemToken(phraseTokens[0]);
+    if (target.length <= 2) return haystack.split(' ').some(token => token === target);
     return haystack.split(' ').some(token => {
       const stemmed = stemToken(token);
       return stemmed === target || token.startsWith(target) || target.startsWith(stemmed);
@@ -3397,7 +3398,7 @@ const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   'Lawn Care': ['lawn', 'grass', 'mowing', 'weed', 'fertilizer', 'sod', 'yard maintenance'],
   'Tree Service': ['tree', 'limb', 'branch', 'stump', 'tree removal', 'tree trimming'],
   Irrigation: ['sprinkler', 'irrigation', 'sprinkler head', 'zone valve', 'controller', 'watering system'],
-  'Pest Control': ['pest', 'bugs', 'ants', 'roaches', 'termite', 'rodent', 'mice', 'wasp', 'spider', 'droppings'],
+  'Pest Control': ['pest', 'pests', 'bug', 'bugs', 'roach', 'roaches', 'ant', 'ants', 'termite', 'termites', 'mouse', 'mice', 'rat', 'rats', 'rodent', 'rodents', 'spider', 'spiders', 'wasp', 'wasps', 'bee', 'bees', 'infestation', 'critter', 'critters', 'animal activity', 'pest activity', 'droppings'],
   Septic: ['septic', 'drain field', 'septic tank', 'sewage smell', 'backup outside'],
   'Well Service': ['well', 'well pump', 'pressure tank', 'no water', 'water pressure tank'],
   Insulation: ['insulation', 'attic insulation', 'drafty', 'hot room', 'cold room', 'air sealing', 'r value'],
@@ -3447,11 +3448,13 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   const roofContext = ['roof', 'ceiling stain', 'after rain', 'rain', 'shingle', 'attic leak', 'flashing', 'skylight'];
   const gutterContext = ['gutter', 'downspout', 'rainwater', 'overflow', 'overflowing'];
   const applianceWaterContext = ['dishwasher', 'washer', 'refrigerator', 'fridge', 'ice maker'];
+  const pestContext = ['pest', 'pests', 'bug', 'bugs', 'roach', 'roaches', 'ant', 'ants', 'termite', 'termites', 'mouse', 'mice', 'rat', 'rats', 'rodent', 'rodents', 'spider', 'spiders', 'wasp', 'wasps', 'bee', 'bees', 'infestation', 'critter', 'critters', 'animal activity', 'pest activity', 'droppings'];
   const leakMatches = matchingTerms(leakWords);
   const plumbingMatches = matchingTerms(plumbingContext);
   const roofMatches = matchingTerms(roofContext);
   const gutterMatches = matchingTerms(gutterContext);
   const applianceWaterMatches = matchingTerms(applianceWaterContext);
+  const pestMatches = matchingTerms(pestContext);
 
   if (leakMatches.length > 0 && roofMatches.length > 0) {
     issueBoosts.Roofing = { score: 9, reason: 'roof or rain leak source' };
@@ -3482,6 +3485,9 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   }
   if (hasAny(['gutter', 'downspout']) && hasAny(['overflow', 'overflowing', 'clog', 'clogged', 'rainwater', 'drain'])) {
     issueBoosts.Gutters = { score: 7, reason: 'gutter drainage symptom' };
+  }
+  if (pestMatches.length > 0) {
+    issueBoosts['Pest Control'] = { score: 10, reason: `pest concern: ${pestMatches[0]}` };
   }
 
   const scored = SERVICE_REQUEST_CATEGORIES
@@ -8398,6 +8404,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const requestDraftTitle = serviceRequestDraft.title || (serviceRequestDraft.category ? `${serviceRequestDraft.category} help needed` : 'Service help needed');
   const currentServiceRequestHomeId = serviceRequestDraft.home_id || selectedHome?.id || homes[0]?.id || '';
   const currentServiceRequestHome = homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
+  const requestComposerPropertyStepLabel = currentServiceRequestHome
+    ? currentServiceRequestHome.nickname || currentServiceRequestHome.address_line1 || 'Home selected'
+    : 'Property';
   const renderServiceRequestPropertyField = () => {
     if (homes.length === 0) return null;
     return (
@@ -10748,7 +10757,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
                 <div className="grid gap-2 sm:grid-cols-4">
                   {[
-                    ['property', 'Property'],
+                    ['property', requestComposerPropertyStepLabel],
                     ['issue', 'Issue'],
                     ['contractor', 'Contractor'],
                     ['review', 'Review'],
