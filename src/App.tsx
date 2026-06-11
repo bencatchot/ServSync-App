@@ -9374,55 +9374,51 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
 
-      <section className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">Viewing property</p>
-            <p className="mt-1 truncate text-sm font-bold text-slate-950">
-              {selectedHome?.nickname || homeDraft.nickname || 'No property selected'}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-slate-500">
-              {[selectedHome?.address_line1 || homeDraft.address_line1, selectedHome?.city || homeDraft.city, selectedHome?.state || homeDraft.state].filter(Boolean).join(', ') || 'Add property details to personalize your home record.'}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <select
-              className="min-w-[220px] rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              value={selectedHome?.id || ''}
-              onChange={event => selectHome(event.target.value)}
-            >
-              {homes.length === 0 ? (
-                <option value="">No saved properties yet</option>
-              ) : (
-                <>
-                  {!homeDraft.id && <option value="">New property draft</option>}
+      {homes.length !== 1 && homeownerTab !== 'requests' && (
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          {homes.length > 1 ? (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Property</p>
+                  <p className="mt-0.5 truncate text-sm font-bold text-slate-950">
+                    {selectedHome ? homeProfileDisplayLabel(selectedHome) : 'Selected property'}
+                  </p>
+                </div>
+                <select
+                  className="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  value={selectedHome?.id || ''}
+                  onChange={event => selectHome(event.target.value)}
+                >
                   {homes.map(candidate => (
                     <option key={candidate.id} value={candidate.id}>
                       {candidate.nickname || candidate.address_line1 || 'Unnamed property'}
                     </option>
                   ))}
-                </>
+                </select>
+              </div>
+              {dashboardUnassignedRecordCount > 0 && (
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Some older records are not assigned to a property. Use each tab's All properties or Unassigned view to find them.
+                </p>
               )}
-            </select>
-            <button type="button" onClick={startAddProperty} className={buttonClass('secondary')}>
-              <Plus size={15} />
-              Add property
-            </button>
-          </div>
-        </div>
-        {homes.length > 1 && (
-          <p className="mt-2 text-xs leading-5 text-blue-800">
-            {dashboardUnassignedRecordCount > 0
-              ? "Dashboard highlights activity for the selected property. Use each tab's All properties or Unassigned view to find older records that are not tied to a property yet."
-              : "Dashboard highlights activity for the selected property. Use each tab's All properties view to see records across every property."}
-          </p>
-        )}
-        {showDashboardUnassignedRecordNotice && (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-            Some older records are not assigned to a property. You can find them in each related tab under Unassigned.
-          </p>
-        )}
-      </section>
+            </>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-slate-700">Add a property to organize requests, records, and documents.</p>
+              <button type="button" onClick={startAddProperty} className={buttonClass('secondary')}>
+                <Plus size={15} />
+                Add property
+              </button>
+            </div>
+          )}
+          {showDashboardUnassignedRecordNotice && (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+              Some older records are not assigned to a property. You can find them in each related tab under Unassigned.
+            </p>
+          )}
+        </section>
+      )}
 
       {homeownerTab === 'overview' && (
         <div className="space-y-4">
