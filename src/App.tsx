@@ -3373,10 +3373,10 @@ type ServiceCategorySuggestion = {
 
 const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   HVAC: ['air conditioner', 'ac', 'a c', 'heat pump', 'furnace', 'thermostat', 'duct', 'air filter', 'hvac', 'not cooling', 'not heating', 'warm air', 'cold air', 'register', 'vent airflow'],
-  Plumbing: ['leak', 'drip', 'pipe', 'faucet', 'toilet', 'sink', 'shower', 'tub', 'drain', 'clog', 'water pressure', 'garbage disposal', 'water heater', 'sewer', 'supply line', 'hose bib'],
+  Plumbing: ['leak', 'drip', 'pipe', 'faucet', 'toilet', 'sink', 'under sink', 'water under sink', 'shower', 'tub', 'drain', 'clog', 'water pressure', 'garbage disposal', 'water heater', 'sewer', 'supply line', 'hose bib'],
   Electrical: ['outlet', 'breaker', 'light switch', 'switch', 'gfci', 'sparking', 'flickering', 'electrical', 'power', 'tripped', 'panel', 'ceiling fan wiring', 'smoke detector'],
-  Roofing: ['roof', 'shingle', 'flashing', 'roof leak', 'ceiling stain after rain', 'storm damage', 'ridge cap', 'roof vent', 'skylight leak'],
-  Gutters: ['gutter', 'downspout', 'water overflowing', 'fascia water', 'gutter leak', 'drain away', 'rainwater'],
+  Roofing: ['roof', 'shingle', 'flashing', 'roof leak', 'ceiling stain', 'stain on ceiling', 'ceiling stain after rain', 'storm damage', 'ridge cap', 'roof vent', 'skylight leak'],
+  Gutters: ['gutter', 'downspout', 'water overflowing', 'fascia water', 'gutter leak', 'drain away', 'rainwater', 'water outside'],
   Concrete: ['driveway', 'sidewalk', 'concrete', 'slab', 'patio crack', 'trip hazard', 'settled concrete'],
   Masonry: ['brick', 'mortar', 'stone', 'chimney brick', 'block wall', 'masonry', 'tuckpoint'],
   'Foundation Repair': ['foundation', 'settling', 'horizontal crack', 'stair step crack', 'crawlspace support', 'pier', 'beam sag', 'structural crack'],
@@ -3391,7 +3391,7 @@ const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   Siding: ['siding', 'vinyl siding', 'hardie', 'lap siding', 'siding damage', 'exterior wall panel'],
   Windows: ['window', 'glass', 'window lock', 'window seal', 'fogged window', 'screen', 'sash'],
   Doors: ['door', 'doorknob', 'door frame', 'threshold', 'weatherstrip', 'door lock', 'sticking door'],
-  'Garage Doors': ['garage door', 'garage opener', 'garage spring', 'garage track', 'remote opener'],
+  'Garage Doors': ['garage door', 'garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener', 'garage spring', 'garage track', 'remote opener'],
   Decks: ['deck', 'porch boards', 'railing', 'ledger board', 'deck stair', 'baluster'],
   Fencing: ['fence', 'gate', 'fence post', 'privacy fence', 'picket'],
   Landscaping: ['landscape', 'flower bed', 'mulch', 'grading', 'yard drainage', 'plants', 'bushes'],
@@ -3403,7 +3403,7 @@ const SERVICE_CATEGORY_MATCH_RULES: Record<string, string[]> = {
   'Well Service': ['well', 'well pump', 'pressure tank', 'no water', 'water pressure tank'],
   Insulation: ['insulation', 'attic insulation', 'drafty', 'hot room', 'cold room', 'air sealing', 'r value'],
   Chimney: ['chimney', 'fireplace', 'flue', 'damper', 'creosote', 'chimney cap'],
-  'Appliance Repair': ['refrigerator', 'fridge', 'dishwasher', 'oven', 'range', 'stove', 'washer', 'dryer', 'ice maker', 'appliance'],
+  'Appliance Repair': ['refrigerator', 'fridge', 'dishwasher', 'dishwasher not draining', 'oven', 'range', 'stove', 'washer', 'dryer', 'ice maker', 'appliance'],
   Locksmith: ['lock', 'locked out', 'key', 'rekey', 'deadbolt', 'smart lock'],
   'Cleaning Service': ['cleaning', 'deep clean', 'move out clean', 'house clean', 'maid', 'odor cleaning'],
   'Pressure Washing': ['pressure wash', 'power wash', 'soft wash', 'driveway cleaning', 'siding cleaning', 'mildew exterior'],
@@ -3442,6 +3442,12 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   const matchingTerms = (phrases: string[]) => phrases.filter(phrase => hasPhrase(normalized, phrase));
   const issueBoosts: Partial<Record<string, { score: number; reason: string }>> = {};
   const issuePenalties: Partial<Record<string, number>> = {};
+  const addBoost = (category: string, score: number, reason: string) => {
+    const existing = issueBoosts[category];
+    if (!existing || score > existing.score) {
+      issueBoosts[category] = { score, reason };
+    }
+  };
 
   const leakWords = ['leak', 'leaking', 'drip', 'dripping', 'water dripping', 'water leak', 'wet', 'water damage', 'moisture', 'damp', 'standing water'];
   const plumbingContext = ['sink', 'toilet', 'faucet', 'pipe', 'supply line', 'drain', 'shower', 'tub', 'vanity', 'garbage disposal', 'water heater', 'bathroom', 'kitchen'];
@@ -3457,15 +3463,15 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   const pestMatches = matchingTerms(pestContext);
 
   if (leakMatches.length > 0 && roofMatches.length > 0) {
-    issueBoosts.Roofing = { score: 9, reason: 'roof or rain leak source' };
+    addBoost('Roofing', 9, 'roof or rain leak source');
   } else if (leakMatches.length > 0 && gutterMatches.length > 0) {
-    issueBoosts.Gutters = { score: 9, reason: 'gutter drainage leak source' };
+    addBoost('Gutters', 9, 'gutter drainage leak source');
   } else if (leakMatches.length > 0 && plumbingMatches.length > 0) {
-    issueBoosts.Plumbing = { score: 10, reason: `plumbing leak near ${plumbingMatches[0]}` };
+    addBoost('Plumbing', 10, `plumbing leak near ${plumbingMatches[0]}`);
   } else if (leakMatches.length > 0 && applianceWaterMatches.length > 0) {
-    issueBoosts['Appliance Repair'] = { score: 8, reason: `appliance water issue near ${applianceWaterMatches[0]}` };
+    addBoost('Appliance Repair', 8, `appliance water issue near ${applianceWaterMatches[0]}`);
   } else if (leakMatches.length > 0) {
-    issueBoosts.Plumbing = { score: 5, reason: 'leak or water issue' };
+    addBoost('Plumbing', 5, 'leak or water issue');
   }
 
   if (leakMatches.length > 0) {
@@ -3475,19 +3481,51 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
   }
 
   if (hasAny(['sparking', 'outlet', 'breaker', 'gfci', 'flickering', 'tripped', 'no power'])) {
-    issueBoosts.Electrical = { score: 7, reason: 'electrical symptom' };
+    addBoost('Electrical', 7, 'electrical symptom');
   }
   if (hasAny(['not cooling', 'not heating', 'ac', 'a c', 'air conditioner', 'furnace', 'thermostat', 'heat pump'])) {
-    issueBoosts.HVAC = { score: 7, reason: 'heating or cooling symptom' };
+    addBoost('HVAC', 7, 'heating or cooling symptom');
   }
   if (hasAny(['refrigerator', 'fridge', 'dishwasher', 'oven', 'range', 'stove', 'washer', 'dryer', 'ice maker'])) {
-    issueBoosts['Appliance Repair'] = { score: 7, reason: 'appliance symptom' };
+    addBoost('Appliance Repair', 7, 'appliance symptom');
   }
   if (hasAny(['gutter', 'downspout']) && hasAny(['overflow', 'overflowing', 'clog', 'clogged', 'rainwater', 'drain'])) {
-    issueBoosts.Gutters = { score: 7, reason: 'gutter drainage symptom' };
+    addBoost('Gutters', 7, 'gutter drainage symptom');
   }
   if (pestMatches.length > 0) {
-    issueBoosts['Pest Control'] = { score: 10, reason: `pest concern: ${pestMatches[0]}` };
+    addBoost('Pest Control', 10, `pest concern: ${pestMatches[0]}`);
+  }
+  if (hasAny(['water under sink', 'under sink water', 'wet under sink'])) {
+    addBoost('Plumbing', 8, 'water issue under sink');
+  }
+  if (hasAny(['dishwasher not draining', 'dishwasher drain', 'dishwasher clogged'])) {
+    addBoost('Appliance Repair', 8, 'dishwasher issue');
+    addBoost('Plumbing', 5, 'possible drain issue');
+  }
+  if (hasAny(['garage door wont open', 'garage door won t open', 'garage door not opening', 'garage door stuck', 'garage opener'])) {
+    addBoost('Garage Doors', 9, 'garage door symptom');
+  }
+  if (hasAny(['noise in wall', 'sound in wall', 'scratching in wall', 'rattle in wall', 'humming in wall'])) {
+    addBoost('Pest Control', 5, 'possible activity in wall');
+    addBoost('Plumbing', 4, 'possible pipe or drain noise');
+    addBoost('HVAC', 4, 'possible air or duct noise');
+    addBoost('Electrical', 3, 'possible electrical noise');
+  }
+  if (hasAny(['bad smell', 'odor', 'smell in house', 'musty smell', 'sewer smell'])) {
+    addBoost('Plumbing', 5, 'possible drain or sewer odor');
+    addBoost('HVAC', 4, 'possible air system odor');
+    addBoost('Pest Control', 4, 'possible pest odor');
+    addBoost('Cleaning Service', 3, 'possible cleaning odor');
+  }
+  if (hasAny(['stain on ceiling', 'ceiling stain', 'water stain on ceiling', 'moisture stain on ceiling'])) {
+    addBoost('Roofing', 5, 'possible roof source');
+    addBoost('Plumbing', 5, 'possible plumbing source');
+    addBoost('HVAC', 3, 'possible condensation source');
+  }
+  if (hasAny(['water outside', 'standing water outside', 'water in yard', 'yard flooding', 'water pooling outside'])) {
+    addBoost('Plumbing', 5, 'possible exterior water line issue');
+    addBoost('Gutters', 5, 'possible drainage issue');
+    addBoost('Landscaping', 4, 'possible grading or yard drainage issue');
   }
 
   const scored = SERVICE_REQUEST_CATEGORIES
@@ -3513,7 +3551,7 @@ function suggestServiceCategories(problem: string, allowedCategories = SERVICE_R
     .sort((a, b) => b.score - a.score || a.category.localeCompare(b.category));
   if (scored.length > 0) {
     const topScore = scored[0].score;
-    return scored.filter(item => item.score >= Math.max(2, topScore - 4)).slice(0, 3);
+    return scored.filter(item => item.score >= Math.max(2, topScore - 5)).slice(0, 5);
   }
   return [{ category: 'Other', score: 1, reasons: ['No clear trade match'] }].filter(item => allowed.has(item.category.toLowerCase()));
 }
@@ -8392,7 +8430,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedRequestCategories = selectedRequestConnection ? serviceCategoriesForConnection(selectedRequestConnection) : SERVICE_REQUEST_CATEGORIES;
   const requestIssueText = serviceProblemText || serviceRequestDraft.description;
   const requestCategorySuggestions = suggestServiceCategories(requestIssueText, SERVICE_REQUEST_CATEGORIES);
-  const likelyRequestCategory = requestCategorySuggestions[0]?.category || '';
+  const topRequestCategorySuggestion = requestCategorySuggestions[0] ?? null;
+  const requestCategoryIsAmbiguous = Boolean(
+    requestIssueText.trim()
+    && (!topRequestCategorySuggestion
+      || topRequestCategorySuggestion.score < 6
+      || (requestCategorySuggestions[1] && topRequestCategorySuggestion.score - requestCategorySuggestions[1].score <= 2))
+  );
+  const connectionMatchesRequestCategory = (connection: HomeownerConnection, category = serviceRequestDraft.category) => {
+    if (!category) return false;
+    if (category === 'Other') return true;
+    return serviceCategoriesForConnection(connection).some(item => item.toLowerCase() === category.toLowerCase());
+  };
+  const connectedContractorsForWizard = [...activeConnections].sort((a, b) => {
+    const aMatches = connectionMatchesRequestCategory(a);
+    const bMatches = connectionMatchesRequestCategory(b);
+    if (aMatches !== bMatches) return aMatches ? -1 : 1;
+    return a.business_name.localeCompare(b.business_name);
+  });
   const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
   const discoverContractorsForRequest = directoryContractors
     .filter(contractor => !connectedContractorIds.has(contractor.id))
@@ -10822,19 +10877,73 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         value={serviceRequestDraft.description}
                         onChange={event => {
                           const nextValue = event.target.value;
+                          const nextSuggestions = suggestServiceCategories(nextValue, SERVICE_REQUEST_CATEGORIES);
                           setServiceProblemText(nextValue);
-                          setServiceRequestDraft(current => ({ ...current, description: nextValue }));
+                          setServiceRequestDraft(current => {
+                            const selectedStillFits = !current.category || nextSuggestions.some(suggestion => suggestion.category === current.category);
+                            return {
+                              ...current,
+                              description: nextValue,
+                              category: selectedStillFits ? current.category : '',
+                              connection_id: selectedStillFits ? current.connection_id : '',
+                            };
+                          });
                         }}
                         placeholder="Example: Water is dripping under my kitchen sink and the cabinet floor is wet."
                       />
                     </Field>
-                    {likelyRequestCategory && (
-                      <div className="rounded-xl border border-blue-100 bg-white p-3">
-                        <p className="text-sm font-semibold text-slate-950">Looks like this may be: {likelyRequestCategory}</p>
-                        <p className="mt-1 text-xs text-slate-500">You can change the service type before choosing a contractor.</p>
+                    {requestIssueText.trim() && (
+                      <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">Choose the contractor type that best fits this request.</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            ServSync can help sort the options, but you choose who to contact.
+                          </p>
+                        </div>
+                        {requestCategoryIsAmbiguous ? (
+                          <Notice tone="info" text="We may need a little more detail to narrow this down. Choose the closest contractor type or keep typing." />
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            The strongest match is shown first. You can still choose another type.
+                          </p>
+                        )}
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {requestCategorySuggestions.map((suggestion, index) => {
+                            const selected = serviceRequestDraft.category === suggestion.category;
+                            const isBestMatch = index === 0 && !requestCategoryIsAmbiguous && suggestion.category !== 'Other';
+                            return (
+                              <button
+                                key={suggestion.category}
+                                type="button"
+                                onClick={() => {
+                                  setServiceRequestDraft(current => ({
+                                    ...current,
+                                    category: suggestion.category,
+                                    connection_id: '',
+                                    title: current.title || `${suggestion.category} help needed`,
+                                  }));
+                                  setDirectoryCategory(suggestion.category);
+                                }}
+                                className={`rounded-xl border p-3 text-left transition ${selected ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-bold text-slate-950">{suggestion.category}</p>
+                                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${isBestMatch ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                                    {isBestMatch ? 'Best match' : 'Possible'}
+                                  </span>
+                                </div>
+                                {suggestion.reasons.length > 0 && (
+                                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                                    Matched: {suggestion.reasons.join(', ')}
+                                  </p>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
-                    <Field label="Service type">
+                    <Field label="Choose another service type">
                       <select
                         className={inputClass()}
                         value={serviceRequestDraft.category}
@@ -10844,9 +10953,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           setDirectoryCategory(nextCategory);
                         }}
                       >
-                        <option value="">Choose or keep typing</option>
+                        <option value="">Choose a contractor type</option>
                         {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
                       </select>
+                      <p className="mt-1 text-xs text-slate-500">Choose a contractor type before continuing.</p>
                     </Field>
                     <div className="flex flex-wrap gap-2">
                       {homeownerHasMultipleProperties && (
@@ -10864,7 +10974,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             setError('Describe what you need help with before continuing.');
                             return;
                           }
-                          const nextCategory = serviceRequestDraft.category || likelyRequestCategory || 'Other';
+                          if (!serviceRequestDraft.category) {
+                            setError('Choose the contractor type that best fits this request before continuing.');
+                            return;
+                          }
+                          const nextCategory = serviceRequestDraft.category;
                           setError('');
                           setServiceRequestDraft(current => ({
                             ...current,
@@ -10888,23 +11002,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div>
                       <p className="text-sm font-bold text-slate-950">Your connected contractors</p>
-                      <p className="mt-1 text-sm text-slate-500">Choose who you want to contact. ServSync does not choose for you.</p>
+                      <p className="mt-1 text-sm text-slate-500">Choose who you want to contact. Contractors matching {serviceRequestDraft.category || 'this request'} appear first.</p>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {activeConnections.length > 0 ? activeConnections.map(connection => (
-                        <button
-                          key={connection.connection_id}
-                          type="button"
-                          onClick={() => {
-                            setRequestContractorMode('connected');
-                            setServiceRequestDraft(current => ({ ...current, connection_id: connection.connection_id }));
-                          }}
-                          className={`rounded-xl border p-3 text-left transition ${serviceRequestDraft.connection_id === connection.connection_id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
-                        >
-                          <p className="text-sm font-bold text-slate-950">{connection.business_name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{serviceCategoriesForConnection(connection).join(', ')}</p>
-                        </button>
-                      )) : (
+                      {connectedContractorsForWizard.length > 0 ? connectedContractorsForWizard.map(connection => {
+                        const matchesSelectedType = connectionMatchesRequestCategory(connection);
+                        return (
+                          <button
+                            key={connection.connection_id}
+                            type="button"
+                            onClick={() => {
+                              setRequestContractorMode('connected');
+                              setServiceRequestDraft(current => ({ ...current, connection_id: connection.connection_id }));
+                            }}
+                            className={`rounded-xl border p-3 text-left transition ${serviceRequestDraft.connection_id === connection.connection_id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-bold text-slate-950">{connection.business_name}</p>
+                              {matchesSelectedType && serviceRequestDraft.category && (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                  Matches type
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">{serviceCategoriesForConnection(connection).join(', ')}</p>
+                          </button>
+                        );
+                      }) : (
                         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:col-span-2">
                           <p className="text-sm font-semibold text-amber-900">No connected contractors yet.</p>
                           <p className="mt-1 text-sm text-amber-800">You can find another contractor and request a connection first.</p>
