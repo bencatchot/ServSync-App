@@ -5331,6 +5331,19 @@ function appointmentResponseText(appointment: ServiceRequestAppointment, perspec
     : 'The homeowner requested this time. Confirm it, decline it, or propose another time.';
 }
 
+function serviceRequestAppointmentBadge(request: ServiceRequestSummary, perspective: 'homeowner' | 'contractor') {
+  const appointment = request.appointment;
+  if (!appointment || appointment.status === 'cancelled') return null;
+  if (appointment.status === 'confirmed') return { label: 'Scheduled', className: 'bg-emerald-100 text-emerald-700' };
+  if (appointment.status === 'completed') return { label: 'Completed appointment', className: 'bg-slate-100 text-slate-600' };
+  if (appointment.status === 'proposed') {
+    return appointment.proposed_by === perspective
+      ? { label: 'Appointment proposed', className: 'bg-blue-50 text-blue-700' }
+      : { label: 'Needs your response', className: 'bg-amber-100 text-amber-800' };
+  }
+  return null;
+}
+
 function notificationCategoryLabel(type: string) {
   if (type.includes('support')) return 'Support';
   if (type.includes('appointment')) return 'Calendar';
@@ -10724,6 +10737,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const isUpdating = updatingServiceRequestId === request.id;
               const lastMessage = request.messages[request.messages.length - 1];
               const propertyLabel = serviceRequestPropertyLabel(request);
+              const appointmentBadge = serviceRequestAppointmentBadge(request, 'homeowner');
               return (
                 <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
                   <button
@@ -10738,9 +10752,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${serviceRequestStatusClass(request.status)}`}>
                             {serviceRequestStatusLabel(request.status)}
                           </span>
-                          {contractorRequestNeedsFollowUp(request) && (
+                          {appointmentBadge && (
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${appointmentBadge.className}`}>
+                              {appointmentBadge.label}
+                            </span>
+                          )}
+                          {homeownerRequestNeedsResponse(request) && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-                              Follow-up needed
+                              Action needed
                             </span>
                           )}
                         </div>
@@ -11131,12 +11150,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               },
               {
                 id: 'scheduled',
-                title: 'Scheduled and appointment requests',
-                helper: 'Confirmed appointments and time changes that are already in motion.',
+                title: 'Scheduled and proposed appointments',
+                helper: 'Confirmed appointments and proposed times, including appointments waiting for your response.',
                 requests: propertyScopedServiceRequests.filter(r =>
                   !['closed', 'declined'].includes(r.status)
                   && Boolean(r.appointment)
-                  && !isHomeownerAttention(r)
                 ),
               },
               {

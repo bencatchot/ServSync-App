@@ -46,6 +46,7 @@ SQL_FILES=(
   "servsync-appointment-scheduling.sql"
   "servsync-appointment-counter-proposal.sql"
   "servsync-reschedule-appointment.sql"
+  "servsync-appointment-proposal-lifecycle.sql"
   "servsync-request-lifecycle.sql"
   "servsync-notifications.sql"
   "servsync-media-attachments.sql"
