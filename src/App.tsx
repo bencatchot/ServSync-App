@@ -9096,6 +9096,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (request.status === 'contractor_responded') return { label: 'Contractor responded', className: 'bg-blue-50 text-blue-700' };
     return { label: 'Waiting on contractor', className: 'bg-slate-100 text-slate-700' };
   };
+  const homeownerRequestSections: Array<{ id: HomeownerRequestView; title: string; helper: string; requests: ServiceRequestSummary[] }> = [
+    {
+      id: 'open_pending',
+      title: 'Open / Pending Requests',
+      helper: 'Requests still in motion, including waiting, proposed, scheduled, and recently completed visits.',
+      requests: propertyScopedServiceRequests.filter(r => !homeownerClosedRequestStatuses.includes(r.status)),
+    },
+    {
+      id: 'closed',
+      title: 'Closed Requests',
+      helper: 'Completed, declined, cancelled, or archived requests.',
+      requests: propertyScopedServiceRequests.filter(r => homeownerClosedRequestStatuses.includes(r.status)),
+    },
+    {
+      id: 'invoiced',
+      title: 'Invoiced Requests',
+      helper: 'Requests with sent, viewed, overdue, partially paid, or paid invoices.',
+      requests: propertyScopedServiceRequests.filter(requestHasInvoiceActivity),
+    },
+  ];
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
     const requestInvoices = requestInvoicesFor(request);
@@ -10579,6 +10599,73 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'requests' && (
         <div className="space-y-5">
+          {(() => {
+            const activeHomeownerRequestView = homeownerRequestSections.find(section => section.id === homeownerRequestView)?.id
+              ?? homeownerRequestSections[0].id;
+            return (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-950">Service Requests</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {homeownerHasMultipleProperties ? `Showing ${homeownerRequestScopeLabel}.` : `Requests for ${homeownerRequestScopeLabel}.`}
+                    </p>
+                  </div>
+                  {homeownerHasMultipleProperties && (
+                    <Field label="Property">
+                      <select
+                        className={`${inputClass()} min-w-[220px]`}
+                        value={homeownerRequestPropertyScope}
+                        onChange={event => {
+                          setHomeownerRequestPropertyScope(event.target.value as HomeownerRequestPropertyScope);
+                          setExpandedRequestIds(new Set());
+                        }}
+                      >
+                        <option value="selected">Selected property</option>
+                        <option value="all">All properties</option>
+                        <option value="unassigned">Unassigned</option>
+                      </select>
+                    </Field>
+                  )}
+                </div>
+                {shouldShowHomeownerUnassignedPropertyNotice(homeownerRequestPropertyScope, unassignedServiceRequestCount) && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                    <span>Some older requests are not assigned to a property. You can find them under Unassigned.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHomeownerRequestPropertyScope('unassigned');
+                        setExpandedRequestIds(new Set());
+                      }}
+                      className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
+                    >
+                      View Unassigned
+                    </button>
+                  </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {homeownerRequestSections.map(section => {
+                    const active = section.id === activeHomeownerRequestView;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setHomeownerRequestView(section.id)}
+                        className={`rounded-xl border px-3 py-2 text-left shadow-sm transition ${
+                          active
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
+                        <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           <Card title="Start a new service request" icon={<MessageSquare size={18} />}>
             {!requestComposerOpen ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -11172,29 +11259,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </div>
               );
             };
-            const requestSections: Array<{ id: HomeownerRequestView; title: string; helper: string; requests: ServiceRequestSummary[] }> = [
-              {
-                id: 'open_pending',
-                title: 'Open / Pending Requests',
-                helper: 'Requests still in motion, including waiting, proposed, scheduled, and recently completed visits.',
-                requests: propertyScopedServiceRequests.filter(r => !homeownerClosedRequestStatuses.includes(r.status)),
-              },
-              {
-                id: 'closed',
-                title: 'Closed Requests',
-                helper: 'Completed, declined, cancelled, or archived requests.',
-                requests: propertyScopedServiceRequests.filter(r => homeownerClosedRequestStatuses.includes(r.status)),
-              },
-              {
-                id: 'invoiced',
-                title: 'Invoiced Requests',
-                helper: 'Requests with sent, viewed, overdue, partially paid, or paid invoices.',
-                requests: propertyScopedServiceRequests.filter(requestHasInvoiceActivity),
-              },
-            ];
-            const activeHomeownerRequestView = requestSections.find(section => section.id === homeownerRequestView)?.id
-              ?? homeownerRequestView;
-            const selectedSection = requestSections.find(section => section.id === activeHomeownerRequestView) ?? requestSections[0];
+            const selectedSection = homeownerRequestSections.find(section => section.id === homeownerRequestView) ?? homeownerRequestSections[0];
             const filteredRequests = selectedSection.requests.filter(request => serviceRequestMatchesSearch(request, homeownerRequestSearch));
             const selectedRequestEmptyText = homeownerRequestPropertyScope === 'selected' && selectedHomeId && propertyScopedServiceRequests.length === 0
               ? 'No service requests for this property yet.'
@@ -11204,75 +11269,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
             return (
               <div className="space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <div className="grid gap-3 lg:grid-cols-[1fr_220px] lg:items-end">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Property scope</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-950">Showing requests for: {homeownerRequestScopeLabel}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        {homeownerHasMultipleProperties && unassignedServiceRequestCount > 0
-                          ? 'Use All properties to see every request, or Unassigned to find older requests that are not tied to a property yet.'
-                          : homeownerHasMultipleProperties
-                            ? 'Use All properties to see requests across every property.'
-                            : 'Use the menu to switch between selected, all, or unassigned requests.'}
-                      </p>
-                    </div>
-                    <Field label="Show">
-                      <select
-                        className={inputClass()}
-                        value={homeownerRequestPropertyScope}
-                        onChange={event => {
-                          setHomeownerRequestPropertyScope(event.target.value as HomeownerRequestPropertyScope);
-                          setExpandedRequestIds(new Set());
-                        }}
-                      >
-                        <option value="selected">Selected property</option>
-                        <option value="all">All properties</option>
-                        <option value="unassigned">Unassigned</option>
-                      </select>
-                    </Field>
-                  </div>
-                  {shouldShowHomeownerUnassignedPropertyNotice(homeownerRequestPropertyScope, unassignedServiceRequestCount) && (
-                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Some older requests are not assigned to a property. You can find them under Unassigned.</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setHomeownerRequestPropertyScope('unassigned');
-                          setExpandedRequestIds(new Set());
-                        }}
-                        className="text-left font-bold text-amber-900 underline-offset-2 hover:underline sm:text-right"
-                      >
-                        View Unassigned
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {requestSections.map(section => {
-                    const active = section.id === activeHomeownerRequestView;
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        onClick={() => setHomeownerRequestView(section.id)}
-                        className={`rounded-xl border px-3 py-2 text-left shadow-sm transition ${
-                          active
-                            ? 'border-blue-600 bg-blue-600 text-white'
-                            : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                        }`}
-                      >
-	                        <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
-	                        <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
-                      </button>
-                    );
-                  })}
-                </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                   <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_18rem] lg:items-end">
                     <div>
                       <p className="text-sm font-bold text-slate-950">{selectedSection.title}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{selectedSection.helper}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {homeownerHasMultipleProperties ? `Showing ${homeownerRequestScopeLabel}` : `Requests for ${homeownerRequestScopeLabel}`}
+                      </p>
                     </div>
                     <Field label="Search this bucket">
                       <input
