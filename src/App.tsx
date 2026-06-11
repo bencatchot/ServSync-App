@@ -6005,7 +6005,7 @@ function AuthPage({
         });
         onAuthed();
       } else {
-        setMessage('Account created. Check your email to confirm your ServSync account before signing in.');
+        setMessage('Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder.');
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to complete authentication.');
@@ -6311,7 +6311,7 @@ function LocalCustomerClaimPage({
         if (profileError) throw profileError;
         onAuthed();
       } else {
-        setAuthMessage('Account created. Check your email to confirm your ServSync account before signing in, then reopen this invite link.');
+        setAuthMessage('Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder, then reopen this invite link.');
       }
     } catch (err) {
       setAuthMessage(readableError(err, 'Unable to complete authentication.'));
