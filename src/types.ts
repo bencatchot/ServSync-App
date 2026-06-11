@@ -14,6 +14,8 @@ export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
 export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
+export type ContractorVisitEventStatus = 'scheduled' | 'completed' | 'cancelled';
+export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_waiting' | 'accepted' | 'declined' | 'countered';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
@@ -32,6 +34,7 @@ export interface ServiceRequestAppointment {
   id: string;
   request_id: string;
   contractor_id: string;
+  visit_event_id?: string | null;
   proposed_at: string;
   notes: string;
   status: AppointmentStatus;
@@ -727,6 +730,23 @@ export interface Inspection {
 }
 
 export type Job = Inspection;
+
+export interface ContractorVisitEvent {
+  id: string;
+  contractor_id: string;
+  inspection_id: string;
+  service_request_id: string | null;
+  homeowner_user_id: string | null;
+  local_contact_id: string | null;
+  scheduled_at: string;
+  notes: string;
+  share_with_homeowner: boolean;
+  status: ContractorVisitEventStatus;
+  homeowner_response_status: ContractorVisitHomeownerResponseStatus;
+  inspection?: Inspection | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface HomeDocument {
   id: string;

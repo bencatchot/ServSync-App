@@ -79,6 +79,7 @@ import type {
   ContractorAccountStatus,
   ConnectionAlertLevel,
   ConnectionAlertStatus,
+  ContractorVisitEvent,
   ContractorConnectionRequest,
   ContractorLocalContact,
   ContractorLocalHome,
@@ -11953,7 +11954,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [contractorResponseDrafts, setContractorResponseDrafts] = useState<Record<string, string>>({});
   const [contractorQuoteDrafts, setContractorQuoteDrafts] = useState<Record<string, { enabled: boolean; amount: string; scope: string }>>({});
-  const [appointmentDrafts, setAppointmentDrafts] = useState<Record<string, { enabled: boolean; proposedAt: string; notes: string }>>({});
   const [proposingAppointmentId, setProposingAppointmentId] = useState<string | null>(null);
   const [contractorCounterProposeDrafts, setContractorCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [respondingToHomeownerApptId, setRespondingToHomeownerApptId] = useState<string | null>(null);
@@ -11991,6 +11991,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   // Inspection system state
   const [inspectionTemplates, setInspectionTemplates] = useState<InspectionTemplate[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [contractorVisitEvents, setContractorVisitEvents] = useState<ContractorVisitEvent[]>([]);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
@@ -12014,6 +12015,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     template_source: 'blank' as FieldWorkTemplateSource,
     starter_template_id: 'starter-general-maintenance-field-work',
     workflow_kind: 'work_order' as FieldWorkflowKind,
+    schedule_enabled: false,
+    scheduled_at: '',
+    schedule_notes: '',
+    share_with_homeowner: false,
   });
   const [localFindings, setLocalFindings] = useState<Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>>({});
   const [inspectionClosedForReview, setInspectionClosedForReview] = useState(false);
@@ -12263,9 +12268,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
+          supabase
+            .from('contractor_visit_events')
+            .select('*, inspection:inspections(*)')
+            .eq('contractor_id', loadedContractor.id)
+            .order('scheduled_at', { ascending: true }),
           supabase
             .from('contractor_local_contacts')
             .select('*, homes:contractor_local_homes(*)')
@@ -12294,12 +12304,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ]);
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
+        if (!visitEventsRes.error) setContractorVisitEvents((visitEventsRes.data || []) as ContractorVisitEvent[]);
+        else setContractorVisitEvents([]);
         if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
       } else {
+        setContractorVisitEvents([]);
         setLocalContacts([]);
         setLocalClaimInvites([]);
       }
@@ -12848,34 +12861,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setError('');
     setUpdatingServiceRequestId(request.id);
     try {
-      const apptDraft = appointmentDrafts[request.id];
-      const schedulingAppointment = action === 'respond' && Boolean(apptDraft?.enabled);
-      const proposedDate = schedulingAppointment && apptDraft?.proposedAt ? new Date(apptDraft.proposedAt) : null;
-      if (schedulingAppointment && !apptDraft?.proposedAt) {
-        setError('Choose an appointment date and time before sending.');
-        return;
-      }
-      if (proposedDate && Number.isNaN(proposedDate.getTime())) {
-        setError('Choose a valid appointment date and time.');
-        return;
-      }
-      if (proposedDate && proposedDate <= new Date()) {
-        setError('Choose a future appointment date and time.');
-        return;
-      }
-
       const typedBody = action === 'respond'
         ? contractorResponseDrafts[request.id] || ''
         : action === 'decline'
           ? contractorResponseDrafts[request.id] || 'Contractor declined this request.'
           : contractorResponseDrafts[request.id] || 'Contractor closed this request.';
-      if (action === 'respond' && !typedBody.trim() && !schedulingAppointment) {
+      if (action === 'respond' && !typedBody.trim()) {
         setError('Add a response before sending.');
         return;
       }
-      const body = action === 'respond' && !typedBody.trim() && proposedDate
-        ? `Appointment proposed for ${formatDateTime(proposedDate.toISOString())}.`
-        : typedBody;
+      const body = typedBody;
 
       const nextStatus: ServiceRequestStatus = action === 'respond'
         ? 'contractor_responded'
@@ -12896,15 +12891,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       });
       if (updateError) throw updateError;
 
-      if (action === 'respond' && proposedDate) {
-        const { error: apptError } = await supabase.rpc('servsync_contractor_propose_appointment', {
-          p_request_id: request.id,
-          p_proposed_at: proposedDate.toISOString(),
-          p_notes: apptDraft.notes || '',
-        });
-        if (apptError) throw apptError;
-      }
-
       const cFiles = contractorResponseFiles[request.id] ?? [];
       if (cFiles.length > 0 && updateData?.message_id) {
         await uploadContractorMediaFiles(cFiles, request.id, updateData.message_id as string);
@@ -12912,10 +12898,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       setContractorResponseDrafts(current => ({ ...current, [request.id]: '' }));
       setContractorQuoteDrafts(current => ({ ...current, [request.id]: { enabled: false, amount: '', scope: '' } }));
-      setAppointmentDrafts(current => ({ ...current, [request.id]: { enabled: false, proposedAt: '', notes: '' } }));
       setContractorResponseFiles(current => ({ ...current, [request.id]: [] }));
       setNotice(action === 'respond'
-        ? proposedDate ? 'Appointment proposal sent to homeowner.' : 'Response sent.'
+        ? 'Response sent.'
         : action === 'decline' ? 'Request declined.' : 'Request closed.'
       );
       await loadContractor();
@@ -13812,6 +13797,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const confirmedAppointments = serviceRequests
     .filter(request => request.appointment?.status === 'confirmed')
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
+  const activeVisitEventCount = contractorVisitEvents.filter(event => event.status === 'scheduled').length;
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnContractorSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentConnectedHomeowners = connections.slice(0, 4);
@@ -14237,6 +14223,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
+      schedule_enabled: false,
+      scheduled_at: '',
+      schedule_notes: '',
+      share_with_homeowner: false,
     });
     setInspectionView('new');
     setContractorJobsView('new_jobs');
@@ -14261,6 +14251,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
+      schedule_enabled: false,
+      scheduled_at: '',
+      schedule_notes: '',
+      share_with_homeowner: false,
     });
     setInspectionView('new');
     setContractorJobsView('new_jobs');
@@ -14562,6 +14556,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ? Boolean(inspectionNewDraft.homeowner_user_id)
       : Boolean(inspectionNewDraft.local_contact_id);
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
+    const schedulingVisit = inspectionNewDraft.schedule_enabled && Boolean(inspectionNewDraft.scheduled_at);
+    const scheduledDate = schedulingVisit ? new Date(inspectionNewDraft.scheduled_at) : null;
+    if (inspectionNewDraft.schedule_enabled && !inspectionNewDraft.scheduled_at) {
+      setError('Choose a visit date and time, or turn scheduling off.');
+      return;
+    }
+    if (scheduledDate && Number.isNaN(scheduledDate.getTime())) {
+      setError('Choose a valid visit date and time.');
+      return;
+    }
+    if (scheduledDate && scheduledDate <= new Date()) {
+      setError('Choose a future visit date and time.');
+      return;
+    }
     setSavingInspection(true);
     try {
       const selectedConnectedConnection = inspectionNewDraft.subject_type === 'connected'
@@ -14633,6 +14641,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .select('*')
         .single();
       if (jobTypeError) throw jobTypeError;
+      let scheduledVisitResult: Record<string, unknown> | null = null;
+      const shareVisitWithHomeowner = Boolean(
+        scheduledDate
+        && inspectionNewDraft.share_with_homeowner
+        && inspectionNewDraft.subject_type === 'connected'
+        && inspectionNewDraft.service_request_id
+      );
+      if (scheduledDate) {
+        const { data: visitEventData, error: visitEventError } = await supabase.rpc('servsync_schedule_visit_event', {
+          p_inspection_id: newInspectionId,
+          p_scheduled_at: scheduledDate.toISOString(),
+          p_notes: inspectionNewDraft.schedule_notes || '',
+          p_share_with_homeowner: shareVisitWithHomeowner,
+        });
+        if (visitEventError) throw visitEventError;
+        scheduledVisitResult = (visitEventData || null) as Record<string, unknown> | null;
+      }
       const savedRooms = ((updatedJobData as Partial<Inspection> | null)?.rooms_with_findings ?? seedFindings)
         .map((room, index) => normalizeInspectionRoomData(room, index));
       const nextJobsFilterSubjectId = inspectionNewDraft.subject_type === 'connected'
@@ -14653,7 +14678,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         summary: trimmedScope,
         status: 'draft',
         job_type: requestedJobType,
-        job_status: 'draft',
+        job_status: scheduledDate ? 'scheduled' : 'draft',
         estimate_id: null,
         completed_at: null,
         closed_at: null,
@@ -14685,12 +14710,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspectionClosedForReview(false);
       setSelectedChecklistRoom(activeRoomSeed[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
+      if (scheduledDate && scheduledVisitResult?.visit_event_id) {
+        setContractorVisitEvents(prev => [{
+          id: String(scheduledVisitResult?.visit_event_id),
+          contractor_id: contractor?.id || '',
+          inspection_id: newInspectionId,
+          service_request_id: inspectionNewDraft.service_request_id || null,
+          homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
+          local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
+          scheduled_at: scheduledDate.toISOString(),
+          notes: inspectionNewDraft.schedule_notes || '',
+          share_with_homeowner: shareVisitWithHomeowner,
+          status: 'scheduled',
+          homeowner_response_status: shareVisitWithHomeowner ? 'shared_waiting' : 'not_shared',
+          inspection: newInspection,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, ...prev.filter(event => event.inspection_id !== newInspectionId)]);
+      }
       if (nextJobsFilterSubjectId) setJobsCustomerFilterSubjectId(nextJobsFilterSubjectId);
       setInspectionSubTab(isSimpleJobDraft ? 'inspect' : 'checklist');
       setInspectionView('detail');
       setContractorJobsView('open_jobs');
       setContractorTab('inspections');
       persistFieldWorkState({ inspectionId: newInspection.id, view: 'detail', subTab: isSimpleJobDraft ? 'inspect' : 'checklist', selectedRoom: activeRoomSeed[0]?.room ?? null });
+      if (scheduledDate) {
+        setNotice(shareVisitWithHomeowner
+          ? 'Visit created and calendar invite shared with homeowner.'
+          : 'Visit created and added to your calendar.');
+        await loadContractor();
+      }
     } catch (err) {
       setError(readableError(err, 'Failed to create job.'));
     } finally {
@@ -14883,6 +14932,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .select('*')
         .single();
       if (updateError) throw updateError;
+      const { error: visitEventError } = await supabase.rpc('servsync_complete_visit_event_for_job', {
+        p_inspection_id: insp.id,
+      });
+      if (visitEventError) throw visitEventError;
 
       const completedJob = (updated as Inspection) ?? {
         ...insp,
@@ -14894,6 +14947,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
       setActiveInspection(completedJob);
       setInspections(prev => prev.map(item => item.id === insp.id ? completedJob : item));
+      setContractorVisitEvents(prev => prev.map(event => event.inspection_id === insp.id
+        ? { ...event, status: 'completed', updated_at: completedAt }
+        : event
+      ));
       setContractorJobsView('closed_jobs');
       setNotice('Job marked completed. You can create an invoice when ready.');
     } catch (err) {
@@ -15540,7 +15597,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
         { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: connectionRequests.length, group: 'Homeowner Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorFollowUpCount || openServiceRequestCount, group: 'Homeowner Work' },
-        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: homeownerAppointmentRequests.length, group: 'Homeowner Work' },
+        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: homeownerAppointmentRequests.length || activeVisitEventCount, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
@@ -15824,7 +15881,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <OverviewCard icon={<MessageSquare size={18} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
             <OverviewCard icon={<Users size={18} />} label="Connected homeowners" value={String(connections.length)} helper="Approved connections" onClick={() => setContractorTab('connections')} />
             <OverviewCard icon={<UserRound size={18} />} label="Connection requests" value={String(connectionRequests.length)} helper="Waiting on your review" onClick={() => setContractorTab('connections')} />
-            <OverviewCard icon={<Calendar size={18} />} label="Calendar" value={String(confirmedAppointments.length)} helper={`${homeownerAppointmentRequests.length} homeowner time request${homeownerAppointmentRequests.length === 1 ? '' : 's'}`} onClick={() => setContractorTab('calendar')} />
+            <OverviewCard icon={<Calendar size={18} />} label="Calendar" value={String(activeVisitEventCount || confirmedAppointments.length)} helper={`${homeownerAppointmentRequests.length} homeowner time request${homeownerAppointmentRequests.length === 1 ? '' : 's'}`} onClick={() => setContractorTab('calendar')} />
             <OverviewCard icon={<MessageSquare size={18} />} label="ServSync support" value={String(openSupportInquiryCount)} helper={waitingOnContractorSupportCount > 0 ? `${waitingOnContractorSupportCount} waiting on you` : 'Feature requests and help'} onClick={() => setContractorTab('support')} />
           </div>
 
@@ -16475,6 +16532,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 connection.connection_id === request.connection_id
                 || connection.homeowner_user_id === request.homeowner_user_id
               );
+              const activeRequestVisit = inspections.find(inspection =>
+                inspection.service_request_id === request.id
+                && inspectionIsOpenJob(inspection)
+              ) ?? null;
               const toggleInlineRequest = () => {
                 setContractorExpandedRequestIds(current => {
                   const next = new Set(current);
@@ -16541,17 +16602,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </button>
                       <button
                         type="button"
-                        onClick={() => beginFieldWorkForHomeowner(requestConnection, {
-                          name: `${request.category} service visit — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
-                          serviceRequestId: request.id,
-                          homeId: request.home_id,
-                          workflowKind: 'work_order',
-                          templateSource: 'blank',
-                        })}
+                        onClick={() => {
+                          if (activeRequestVisit) {
+                            openInspection(activeRequestVisit);
+                            return;
+                          }
+                          beginFieldWorkForHomeowner(requestConnection, {
+                            name: `${request.category} service visit — ${request.homeowner_name || requestConnection.display_name || 'Homeowner'} — ${request.title}`,
+                            serviceRequestId: request.id,
+                            homeId: request.home_id,
+                            workflowKind: 'work_order',
+                            templateSource: 'blank',
+                          });
+                        }}
                         className={buttonClass('secondary')}
                       >
                         <ClipboardCheck size={15} />
-                        Create service visit
+                        {activeRequestVisit ? 'View service visit' : 'Create service visit'}
                       </button>
                     </div>
                   )}
@@ -16744,7 +16811,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {...writingAssistProps}
                               value={contractorResponseDrafts[request.id] ?? ''}
                               onChange={event => setContractorResponseDrafts(current => ({ ...current, [request.id]: event.target.value }))}
-                              placeholder="Send an update, ask a question, or explain next steps. Optional if you are only proposing an appointment."
+                              placeholder="Send an update, ask a question, or explain next steps."
                             />
                           </Field>
 
@@ -16815,41 +16882,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           )}
 
-                          {!['proposed', 'confirmed', 'completed'].includes(request.appointment?.status ?? '') && (
-                            <>
-                              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-blue-600"
-                                  checked={appointmentDrafts[request.id]?.enabled ?? false}
-                                  onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { proposedAt: '', notes: '' }), enabled: event.target.checked } }))}
-                                />
-                                Schedule appointment
-                              </label>
-                              {appointmentDrafts[request.id]?.enabled && (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <Field label="Date & time">
-                                    <input
-                                      className={inputClass()}
-                                      type="datetime-local"
-                                      value={appointmentDrafts[request.id]?.proposedAt ?? ''}
-                                      onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, notes: '' }), proposedAt: event.target.value } }))}
-                                    />
-                                  </Field>
-                                  <Field label="Notes (optional)">
-                                    <input
-                                      className={inputClass()}
-                                      {...writingAssistProps}
-                                      placeholder="What to expect, access needed, etc."
-                                      value={appointmentDrafts[request.id]?.notes ?? ''}
-                                      onChange={event => setAppointmentDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { enabled: true, proposedAt: '' }), notes: event.target.value } }))}
-                                    />
-                                  </Field>
-                                </div>
-                              )}
-                            </>
-                          )}
-
                           {closingExpandedId === request.id && (
                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                               <Field label="Closing summary (what was done)">
@@ -16890,11 +16922,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               disabled={isUpdating}
                               className={buttonClass('primary')}
                             >
-                              {isUpdating
-                                ? 'Sending...'
-                                : appointmentDrafts[request.id]?.enabled && appointmentDrafts[request.id]?.proposedAt
-                                  ? contractorResponseDrafts[request.id]?.trim() ? 'Send response + appointment' : 'Send appointment'
-                                  : 'Send response'}
+                              {isUpdating ? 'Sending...' : 'Send response'}
                             </button>
                             <button
                               type="button"
@@ -17174,8 +17202,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <Card title="Calendar" icon={<Calendar size={18} />}>
           <CalendarView
             requests={serviceRequests}
+            visitEvents={contractorVisitEvents}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
+            onOpenVisitEvent={event => {
+              const inspection = event.inspection ?? inspections.find(item => item.id === event.inspection_id) ?? null;
+              if (inspection) openInspection(inspection);
+            }}
           />
         </Card>
       )}
@@ -19606,6 +19639,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const activeRequestVisit = inspections.find(inspection =>
+                                          inspection.service_request_id === selectedWorkspaceRequest.id
+                                          && inspectionIsOpenJob(inspection)
+                                        ) ?? null;
+                                        if (activeRequestVisit) {
+                                          openInspection(activeRequestVisit, { stayInHomeownerWorkspace: true });
+                                          return;
+                                        }
                                         beginFieldWorkForHomeowner(conn, {
                                           name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
                                           serviceRequestId: selectedWorkspaceRequest.id,
@@ -19617,7 +19658,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       className={buttonClass('secondary')}
                                     >
                                       <ClipboardCheck size={15} />
-                                      Create service visit
+                                      {inspections.some(inspection => inspection.service_request_id === selectedWorkspaceRequest.id && inspectionIsOpenJob(inspection)) ? 'View service visit' : 'Create service visit'}
                                     </button>
                                   </div>
                                   <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
@@ -19662,6 +19703,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <button
                                           type="button"
                                           onClick={() => {
+                                            const activeRequestVisit = inspections.find(inspection =>
+                                              inspection.service_request_id === selectedWorkspaceRequest.id
+                                              && inspectionIsOpenJob(inspection)
+                                            ) ?? null;
+                                            if (activeRequestVisit) {
+                                              openInspection(activeRequestVisit, { stayInHomeownerWorkspace: true });
+                                              return;
+                                            }
                                             beginFieldWorkForHomeowner(conn, {
                                               name: `${selectedWorkspaceRequest.category} service visit — ${selectedWorkspaceRequest.homeowner_name || conn.display_name || 'Homeowner'} — ${selectedWorkspaceRequest.title}`,
                                               serviceRequestId: selectedWorkspaceRequest.id,
@@ -19672,7 +19721,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           }}
                                           className={buttonClass('secondary')}
                                         >
-                                          Create service visit
+                                          {inspections.some(inspection => inspection.service_request_id === selectedWorkspaceRequest.id && inspectionIsOpenJob(inspection)) ? 'View service visit' : 'Create service visit'}
                                         </button>
                                       </div>
                                     </div>
@@ -21302,7 +21351,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
           {/* ── NEW VIEW ── */}
           {inspectionView === 'new' && (
-            <Card title="New job" icon={<ClipboardList size={18} />}>
+            <Card title="Create Visit" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Choose job workflow</p>
@@ -21386,6 +21435,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           local_contact_id: subjectType === 'local' ? id : '',
                           local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
                           service_request_id: subjectType === 'connected' ? d.service_request_id : '',
+                          share_with_homeowner: subjectType === 'connected' && d.service_request_id ? d.share_with_homeowner : false,
                           template_source: keepCurrentCustomTemplate ? d.template_source : 'blank',
                           template_id: keepCurrentCustomTemplate ? d.template_id : '',
                           name: autoName || d.name,
@@ -21616,6 +21666,72 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </Field>
                   </>
                 )}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+                      checked={inspectionNewDraft.schedule_enabled}
+                      onChange={event => setInspectionNewDraft(d => ({
+                        ...d,
+                        schedule_enabled: event.target.checked,
+                        scheduled_at: event.target.checked ? d.scheduled_at : '',
+                        schedule_notes: event.target.checked ? d.schedule_notes : '',
+                        share_with_homeowner: event.target.checked ? d.share_with_homeowner : false,
+                      }))}
+                    />
+                    <span>
+                      Schedule this visit
+                      <span className="mt-0.5 block text-xs font-normal leading-5 text-slate-500">
+                        Optional. Create the visit without a date, or add it to your contractor calendar.
+                      </span>
+                    </span>
+                  </label>
+                  {inspectionNewDraft.schedule_enabled && (
+                    <div className="mt-3 space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Visit date & time">
+                          <input
+                            className={inputClass()}
+                            type="datetime-local"
+                            value={inspectionNewDraft.scheduled_at}
+                            onChange={event => setInspectionNewDraft(d => ({ ...d, scheduled_at: event.target.value }))}
+                          />
+                        </Field>
+                        <Field label="Schedule notes">
+                          <input
+                            className={inputClass()}
+                            {...writingAssistProps}
+                            value={inspectionNewDraft.schedule_notes}
+                            onChange={event => setInspectionNewDraft(d => ({ ...d, schedule_notes: event.target.value }))}
+                            placeholder="Access notes, arrival window, what to expect..."
+                          />
+                        </Field>
+                      </div>
+                      {inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.service_request_id ? (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-950">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600"
+                            checked={inspectionNewDraft.share_with_homeowner}
+                            onChange={event => setInspectionNewDraft(d => ({ ...d, share_with_homeowner: event.target.checked }))}
+                            disabled={!inspectionNewDraft.scheduled_at}
+                          />
+                          <span>
+                            Share calendar invite with homeowner
+                            <span className="mt-0.5 block text-xs font-normal leading-5 text-blue-800">
+                              The visit stays on your calendar either way. Sharing lets the homeowner accept, decline, or suggest a new time under the original request.
+                            </span>
+                          </span>
+                        </label>
+                      ) : (
+                        <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
+                          Homeowner calendar sharing is available only when creating a visit from a connected homeowner request. This scheduled visit will stay on your contractor calendar.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -21623,7 +21739,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     disabled={savingInspection || !inspectionNewDraft.name.trim() || (inspectionNewDraft.subject_type === 'connected' ? !inspectionNewDraft.homeowner_user_id : !inspectionNewDraft.local_contact_id)}
                     className={buttonClass('primary')}
                   >
-                    {savingInspection ? 'Creating…' : 'Create job'}
+                    {savingInspection ? 'Creating…' : 'Create visit'}
                   </button>
                   <button type="button" onClick={() => setInspectionView('list')} className={buttonClass('secondary')}>Cancel</button>
                 </div>
@@ -27397,12 +27513,16 @@ function EmptyState({ text }: { text: string }) {
 
 function CalendarView({
   requests,
+  visitEvents = [],
   perspective,
   onOpenRequest,
+  onOpenVisitEvent,
 }: {
   requests: ServiceRequestSummary[];
+  visitEvents?: ContractorVisitEvent[];
   perspective: 'homeowner' | 'contractor';
   onOpenRequest?: (request: ServiceRequestSummary) => void;
+  onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
 }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -27410,31 +27530,49 @@ function CalendarView({
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
 
-  type ApptEntry = { request: ServiceRequestSummary; appointment: ServiceRequestAppointment };
-  const apptMap: Record<string, ApptEntry[]> = {};
-  const appointments: ApptEntry[] = [];
+  type ApptEntry = { kind: 'appointment'; request: ServiceRequestSummary; appointment: ServiceRequestAppointment };
+  type VisitEntry = { kind: 'visit'; visitEvent: ContractorVisitEvent; request: ServiceRequestSummary | null };
+  type CalendarEntry = ApptEntry | VisitEntry;
+  const visitRequestIds = new Set(visitEvents.filter(event => event.service_request_id && event.status !== 'cancelled').map(event => event.service_request_id as string));
+  const apptMap: Record<string, CalendarEntry[]> = {};
+  const appointments: CalendarEntry[] = [];
+  const addEntry = (dateValue: string, entry: CalendarEntry) => {
+    const d = new Date(dateValue);
+    if (Number.isNaN(d.getTime())) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!apptMap[key]) apptMap[key] = [];
+    apptMap[key].push(entry);
+    appointments.push(entry);
+  };
   for (const r of requests) {
-    if (r.appointment) {
-      const d = new Date(r.appointment.proposed_at);
-      if (Number.isNaN(d.getTime())) continue;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      if (!apptMap[key]) apptMap[key] = [];
-      const entry = { request: r, appointment: r.appointment };
-      apptMap[key].push(entry);
-      appointments.push(entry);
+    if (r.appointment && !visitRequestIds.has(r.id)) {
+      addEntry(r.appointment.proposed_at, { kind: 'appointment', request: r, appointment: r.appointment });
     }
   }
-  appointments.sort((a, b) => new Date(a.appointment.proposed_at).getTime() - new Date(b.appointment.proposed_at).getTime());
+  for (const event of visitEvents) {
+    const request = event.service_request_id
+      ? requests.find(item => item.id === event.service_request_id) ?? null
+      : null;
+    addEntry(event.scheduled_at, { kind: 'visit', visitEvent: event, request });
+  }
+  const entryTime = (entry: CalendarEntry) => entry.kind === 'appointment'
+    ? entry.appointment.proposed_at
+    : entry.visitEvent.scheduled_at;
+  appointments.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
   Object.values(apptMap).forEach(dayEntries => {
-    dayEntries.sort((a, b) => new Date(a.appointment.proposed_at).getTime() - new Date(b.appointment.proposed_at).getTime());
+    dayEntries.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
   });
 
-  const upcoming = appointments.filter(({ appointment }) =>
-    new Date(appointment.proposed_at).getTime() >= now.getTime()
-    && !['cancelled', 'completed'].includes(appointment.status)
+  const upcoming = appointments.filter(entry =>
+    new Date(entryTime(entry)).getTime() >= now.getTime()
+    && (entry.kind === 'appointment'
+      ? !['cancelled', 'completed'].includes(entry.appointment.status)
+      : !['cancelled', 'completed'].includes(entry.visitEvent.status))
   );
-  const proposedForMe = appointments.filter(({ appointment }) =>
-    appointment.status === 'proposed' && appointment.proposed_by !== perspective
+  const proposedForMe = appointments.filter((entry): entry is ApptEntry =>
+    entry.kind === 'appointment'
+    && entry.appointment.status === 'proposed'
+    && entry.appointment.proposed_by !== perspective
   );
 
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -27472,13 +27610,72 @@ function CalendarView({
     cancelled: 'Cancelled',
   };
 
-  const renderAppointmentRow = ({ request, appointment }: ApptEntry, compact = false) => {
+  const visitEventStatusClass = (event: ContractorVisitEvent) => {
+    if (event.status === 'completed') return 'border-blue-200 bg-blue-50 text-blue-800';
+    if (event.status === 'cancelled') return 'border-red-200 bg-red-50 text-red-800';
+    if (event.homeowner_response_status === 'accepted') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    if (event.homeowner_response_status === 'declined' || event.homeowner_response_status === 'countered') return 'border-amber-200 bg-amber-50 text-amber-800';
+    return 'border-sky-200 bg-sky-50 text-sky-800';
+  };
+
+  const visitEventDotClass = (event: ContractorVisitEvent) => {
+    if (event.status === 'completed') return 'bg-blue-500';
+    if (event.status === 'cancelled') return 'bg-red-400';
+    if (event.homeowner_response_status === 'accepted') return 'bg-emerald-500';
+    if (event.homeowner_response_status === 'declined' || event.homeowner_response_status === 'countered') return 'bg-amber-500';
+    return 'bg-sky-500';
+  };
+
+  const visitResponseLabel = (event: ContractorVisitEvent) => {
+    if (event.status === 'completed') return 'Completed';
+    if (event.status === 'cancelled') return 'Cancelled';
+    if (event.homeowner_response_status === 'not_shared') return 'Contractor calendar';
+    if (event.homeowner_response_status === 'shared_waiting') return 'Shared — waiting for homeowner';
+    if (event.homeowner_response_status === 'accepted') return 'Homeowner accepted';
+    if (event.homeowner_response_status === 'declined') return 'Homeowner declined';
+    return 'New time suggested';
+  };
+
+  const renderAppointmentRow = (entry: CalendarEntry, compact = false) => {
+    if (entry.kind === 'visit') {
+      const { visitEvent, request } = entry;
+      const date = new Date(visitEvent.scheduled_at);
+      const inspection = visitEvent.inspection;
+      const title = inspection?.name || request?.title || 'Service visit';
+      const subject = request?.homeowner_name || (visitEvent.local_contact_id ? 'Local customer' : 'Customer');
+      return (
+        <button
+          key={`visit-${visitEvent.id}`}
+          type="button"
+          onClick={() => onOpenVisitEvent?.(visitEvent)}
+          className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${visitEventStatusClass(visitEvent)}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${visitEventDotClass(visitEvent)}`} />
+                <p className="font-semibold text-slate-950">{title}</p>
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                {subject} · {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </p>
+              {!compact && visitEvent.notes && <p className="mt-1 text-xs text-slate-600">{visitEvent.notes}</p>}
+              <p className="mt-1 text-xs font-semibold text-slate-700">{visitResponseLabel(visitEvent)}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-700">
+              Visit
+            </span>
+          </div>
+        </button>
+      );
+    }
+    const { request, appointment } = entry;
     const date = new Date(appointment.proposed_at);
     const otherParty = perspective === 'homeowner' ? request.contractor_name : (request.homeowner_name || 'Homeowner');
     const needsResponse = appointment.status === 'proposed' && appointment.proposed_by !== perspective;
     return (
       <button
-        key={`${request.id}-${appointment.id}`}
+        key={`appointment-${request.id}-${appointment.id}`}
         type="button"
         onClick={() => onOpenRequest?.(request)}
         className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${appointmentStatusClass(appointment.status)}`}
@@ -27560,12 +27757,18 @@ function CalendarView({
                     {inMonth ? dayNum : ''}
                   </div>
                   <div className="space-y-1">
-                    {dayAppts.slice(0, 3).map(({ request, appointment }) => {
-                      const time = new Date(appointment.proposed_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                    {dayAppts.slice(0, 3).map(entry => {
+                      const time = new Date(entryTime(entry)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                      const title = entry.kind === 'visit'
+                        ? entry.visitEvent.inspection?.name || entry.request?.title || 'Service visit'
+                        : entry.request.title;
+                      const className = entry.kind === 'visit'
+                        ? visitEventStatusClass(entry.visitEvent)
+                        : appointmentStatusClass(entry.appointment.status);
                       return (
-                        <div key={`${request.id}-${appointment.id}`} className={`rounded border px-1 py-0.5 text-xs leading-tight ${appointmentStatusClass(appointment.status)}`}>
+                        <div key={`${entry.kind}-${entry.kind === 'visit' ? entry.visitEvent.id : entry.appointment.id}`} className={`rounded border px-1 py-0.5 text-xs leading-tight ${className}`}>
                           <span className="font-semibold">{time}</span>
-                          <span className="block truncate">{request.title}</span>
+                          <span className="block truncate">{title}</span>
                         </div>
                       );
                     })}

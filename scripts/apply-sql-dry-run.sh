@@ -87,6 +87,7 @@ SQL_FILES=(
   "servsync-public-reviews.sql"
   "servsync-review-eligibility.sql"
   "servsync-service-request-home-id.sql"
+  "servsync-unified-visit-events.sql"
   "servsync-contractor-public-profile.sql"
   "servsync-discover.sql"
   "servsync-discover-analytics.sql"
