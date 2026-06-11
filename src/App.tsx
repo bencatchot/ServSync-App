@@ -4988,6 +4988,22 @@ function formatDateTime(value?: string | null) {
   });
 }
 
+const VISIT_TIME_OPTIONS = Array.from({ length: 29 }, (_, index) => {
+  const totalMinutes = (7 * 60) + (index * 30);
+  const hour24 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  const value = `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const hour12 = hour24 % 12 || 12;
+  const period = hour24 < 12 ? 'AM' : 'PM';
+  const label = `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+  return { value, label };
+});
+
+function combineLocalDateAndTime(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) return null;
+  return new Date(`${dateValue}T${timeValue}`);
+}
+
 const LOCAL_CLAIM_INVITE_STATUS_LABELS: Record<LocalCustomerClaimInviteStatus, string> = {
   pending: 'Invite pending',
   claimed: 'Claimed by homeowner',
@@ -12015,8 +12031,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     template_source: 'blank' as FieldWorkTemplateSource,
     starter_template_id: 'starter-general-maintenance-field-work',
     workflow_kind: 'work_order' as FieldWorkflowKind,
-    schedule_enabled: false,
-    scheduled_at: '',
+    scheduled_date: '',
+    scheduled_time: '',
     schedule_notes: '',
     share_with_homeowner: false,
   });
@@ -14223,8 +14239,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
-      schedule_enabled: false,
-      scheduled_at: '',
+      scheduled_date: '',
+      scheduled_time: '',
       schedule_notes: '',
       share_with_homeowner: false,
     });
@@ -14251,8 +14267,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       template_source: templateSource,
       starter_template_id: starterTemplateId,
       workflow_kind: workflowKind,
-      schedule_enabled: false,
-      scheduled_at: '',
+      scheduled_date: '',
+      scheduled_time: '',
       schedule_notes: '',
       share_with_homeowner: false,
     });
@@ -14556,12 +14572,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ? Boolean(inspectionNewDraft.homeowner_user_id)
       : Boolean(inspectionNewDraft.local_contact_id);
     if (!supabase || !hasSubject || !inspectionNewDraft.name.trim()) return;
-    const schedulingVisit = inspectionNewDraft.schedule_enabled && Boolean(inspectionNewDraft.scheduled_at);
-    const scheduledDate = schedulingVisit ? new Date(inspectionNewDraft.scheduled_at) : null;
-    if (inspectionNewDraft.schedule_enabled && !inspectionNewDraft.scheduled_at) {
-      setError('Choose a visit date and time, or turn scheduling off.');
-      return;
-    }
+    const scheduledDate = combineLocalDateAndTime(inspectionNewDraft.scheduled_date, inspectionNewDraft.scheduled_time);
     if (scheduledDate && Number.isNaN(scheduledDate.getTime())) {
       setError('Choose a valid visit date and time.');
       return;
@@ -21667,69 +21678,75 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </>
                 )}
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex cursor-pointer items-start gap-2 text-sm font-semibold text-slate-800">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
-                      checked={inspectionNewDraft.schedule_enabled}
-                      onChange={event => setInspectionNewDraft(d => ({
-                        ...d,
-                        schedule_enabled: event.target.checked,
-                        scheduled_at: event.target.checked ? d.scheduled_at : '',
-                        schedule_notes: event.target.checked ? d.schedule_notes : '',
-                        share_with_homeowner: event.target.checked ? d.share_with_homeowner : false,
-                      }))}
-                    />
-                    <span>
-                      Schedule this visit
-                      <span className="mt-0.5 block text-xs font-normal leading-5 text-slate-500">
-                        Optional. Create the visit without a date, or add it to your contractor calendar.
-                      </span>
-                    </span>
-                  </label>
-                  {inspectionNewDraft.schedule_enabled && (
-                    <div className="mt-3 space-y-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="Visit date & time">
-                          <input
-                            className={inputClass()}
-                            type="datetime-local"
-                            value={inspectionNewDraft.scheduled_at}
-                            onChange={event => setInspectionNewDraft(d => ({ ...d, scheduled_at: event.target.value }))}
-                          />
-                        </Field>
-                        <Field label="Schedule notes">
-                          <input
-                            className={inputClass()}
-                            {...writingAssistProps}
-                            value={inspectionNewDraft.schedule_notes}
-                            onChange={event => setInspectionNewDraft(d => ({ ...d, schedule_notes: event.target.value }))}
-                            placeholder="Access notes, arrival window, what to expect..."
-                          />
-                        </Field>
-                      </div>
-                      {inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.service_request_id ? (
-                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-950">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600"
-                            checked={inspectionNewDraft.share_with_homeowner}
-                            onChange={event => setInspectionNewDraft(d => ({ ...d, share_with_homeowner: event.target.checked }))}
-                            disabled={!inspectionNewDraft.scheduled_at}
-                          />
-                          <span>
-                            Share calendar invite with homeowner
-                            <span className="mt-0.5 block text-xs font-normal leading-5 text-blue-800">
-                              The visit stays on your calendar either way. Sharing lets the homeowner accept, decline, or suggest a new time under the original request.
-                            </span>
+                  <p className="text-sm font-semibold text-slate-900">Visit schedule</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Add a date and time if you want this visit on your calendar.
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <Field label="Visit date optional">
+                      <input
+                        className={inputClass()}
+                        type="date"
+                        value={inspectionNewDraft.scheduled_date}
+                        onChange={event => setInspectionNewDraft(d => ({
+                          ...d,
+                          scheduled_date: event.target.value,
+                          share_with_homeowner: event.target.value && d.scheduled_time ? d.share_with_homeowner : false,
+                        }))}
+                      />
+                    </Field>
+                    <Field label="Visit time optional">
+                      <select
+                        className={inputClass()}
+                        value={inspectionNewDraft.scheduled_time}
+                        onChange={event => setInspectionNewDraft(d => ({
+                          ...d,
+                          scheduled_time: event.target.value,
+                          share_with_homeowner: d.scheduled_date && event.target.value ? d.share_with_homeowner : false,
+                        }))}
+                      >
+                        <option value="">No time selected</option>
+                        {VISIT_TIME_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Schedule notes">
+                      <input
+                        className={inputClass()}
+                        {...writingAssistProps}
+                        value={inspectionNewDraft.schedule_notes}
+                        onChange={event => setInspectionNewDraft(d => ({ ...d, schedule_notes: event.target.value }))}
+                        placeholder="Access notes, arrival window..."
+                      />
+                    </Field>
+                  </div>
+                  {(inspectionNewDraft.scheduled_date || inspectionNewDraft.scheduled_time) && !(inspectionNewDraft.scheduled_date && inspectionNewDraft.scheduled_time) && (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-5 text-amber-900">
+                      Choose both a date and time to add this visit to your calendar. Otherwise, the visit will be created without a calendar event.
+                    </p>
+                  )}
+                  {inspectionNewDraft.scheduled_date && inspectionNewDraft.scheduled_time && (
+                    inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.service_request_id ? (
+                      <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-950">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600"
+                          checked={inspectionNewDraft.share_with_homeowner}
+                          onChange={event => setInspectionNewDraft(d => ({ ...d, share_with_homeowner: event.target.checked }))}
+                        />
+                        <span>
+                          Share calendar invite with homeowner
+                          <span className="mt-0.5 block text-xs font-normal leading-5 text-blue-800">
+                            The visit stays on your calendar either way. Sharing lets the homeowner accept, decline, or suggest a new time under the original request.
                           </span>
-                        </label>
-                      ) : (
-                        <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
-                          Homeowner calendar sharing is available only when creating a visit from a connected homeowner request. This scheduled visit will stay on your contractor calendar.
-                        </p>
-                      )}
-                    </div>
+                        </span>
+                      </label>
+                    ) : (
+                      <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
+                        Calendar sharing is available for connected homeowner requests. This scheduled visit will stay on your contractor calendar.
+                      </p>
+                    )
                   )}
                 </div>
                 <div className="flex gap-2">
