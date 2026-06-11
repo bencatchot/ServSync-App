@@ -122,6 +122,7 @@ import type {
 
 type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement' | 'trust-safety';
 type HomeownerRequestView = 'open_pending' | 'closed' | 'invoiced';
+type HomeownerRequestComposerStep = 'property' | 'issue' | 'contractor' | 'review';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
 type HomeownerWorkspaceRequestView = 'attention' | 'active' | 'closed';
 type HomeownerWorkspaceEstimateView = 'draft' | 'sent' | 'accepted' | 'closed';
@@ -6861,6 +6862,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeownerRequestPropertyScope, setHomeownerRequestPropertyScope] = useState<HomeownerRequestPropertyScope>('selected');
   const [homeownerRequestSearch, setHomeownerRequestSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerRequestSearch) ?? '');
   const [requestComposerOpen, setRequestComposerOpen] = useState(false);
+  const [requestComposerStep, setRequestComposerStep] = useState<HomeownerRequestComposerStep>('issue');
+  const [requestContractorMode, setRequestContractorMode] = useState<'connected' | 'discover'>('connected');
   const [homeownerReplyDrafts, setHomeownerReplyDrafts] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
@@ -7810,6 +7813,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         setError('Choose a connected contractor before creating a request.');
         return;
       }
+      if (homes.length === 0) {
+        setError('Add a property before creating a service request.');
+        return;
+      }
+      if (!serviceRequestDraft.home_id && !selectedHome?.id) {
+        setError('Choose the property this request is for before sending it.');
+        return;
+      }
       if (!serviceRequestDraft.category) {
         setError('Choose the type of service you need before sending the request.');
         return;
@@ -7845,6 +7856,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setServiceProblemText('');
       setRequestingConnectionId(null);
       setRequestComposerOpen(false);
+      setRequestComposerStep('issue');
+      setRequestContractorMode('connected');
       setNotice('Service request sent.');
       await loadHomeowner();
     } catch (err) {
@@ -8371,6 +8384,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
   const selectedRequestCategories = selectedRequestConnection ? serviceCategoriesForConnection(selectedRequestConnection) : SERVICE_REQUEST_CATEGORIES;
+  const requestIssueText = serviceProblemText || serviceRequestDraft.description;
+  const requestCategorySuggestions = suggestServiceCategories(requestIssueText, SERVICE_REQUEST_CATEGORIES);
+  const likelyRequestCategory = requestCategorySuggestions[0]?.category || '';
+  const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
+  const discoverContractorsForRequest = directoryContractors
+    .filter(contractor => !connectedContractorIds.has(contractor.id))
+    .filter(contractor => {
+      if (!serviceRequestDraft.category) return true;
+      return contractor.service_categories.some(category => category.toLowerCase() === serviceRequestDraft.category.toLowerCase());
+    })
+    .slice(0, 4);
+  const requestDraftTitle = serviceRequestDraft.title || (serviceRequestDraft.category ? `${serviceRequestDraft.category} help needed` : 'Service help needed');
   const currentServiceRequestHomeId = serviceRequestDraft.home_id || selectedHome?.id || homes[0]?.id || '';
   const currentServiceRequestHome = homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
   const renderServiceRequestPropertyField = () => {
@@ -10676,9 +10701,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onClick={() => {
                     setRequestComposerOpen(true);
                     setRequestingConnectionId(null);
+                    setRequestContractorMode('connected');
+                    setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
                     setServiceRequestDraft(current => ({
                       ...current,
-                      home_id: selectedHome?.id || selectedHomeId || current.home_id,
+                      home_id: homes.length === 1 ? homes[0].id : selectedHome?.id || selectedHomeId || current.home_id,
                     }));
                   }}
                   className={buttonClass('primary')}
@@ -10693,13 +10720,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div>
                     <p className="text-sm font-bold text-slate-950">Create request</p>
                     <p className="mt-1 text-sm text-slate-500">
-                      Start with the issue description if you are not sure which type of contractor to choose.
+                      ServSync helps organize the details. You choose the contractor and wording before sending.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setRequestComposerOpen(false);
+                      setRequestComposerStep('issue');
+                      setRequestContractorMode('connected');
                       setServiceProblemText('');
                       setNewRequestFiles([]);
                       setServiceRequestDraft({
@@ -10717,138 +10746,325 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </button>
                 </div>
 
-                <ServiceCategoryAdvisor
-                  value={serviceProblemText}
-                  onChange={setServiceProblemText}
-                  allowedCategories={SERVICE_REQUEST_CATEGORIES}
-                  onApply={category => applySuggestedServiceCategory(category, { allowedCategories: SERVICE_REQUEST_CATEGORIES })}
-                />
-
-                <div className="grid gap-3 md:grid-cols-[1fr_1fr_180px]">
-                  <Field label="Service type">
-                    <select
-                      className={inputClass()}
-                      value={serviceRequestDraft.category}
-                      onChange={event => {
-                        const nextCategory = event.target.value;
-                        const selectedConnection = activeConnections.find(c => c.connection_id === serviceRequestDraft.connection_id);
-                        const selectedContractor = selectedConnection ? contractorProfileById.get(selectedConnection.contractor_id) : null;
-                        const selectedStillMatches = !nextCategory || selectedContractor?.service_categories.some(c => c.toLowerCase() === nextCategory.toLowerCase());
-                        setServiceRequestDraft({
-                          ...serviceRequestDraft,
-                          category: nextCategory,
-                          connection_id: selectedStillMatches ? serviceRequestDraft.connection_id : '',
-                        });
-                        setDirectoryCategory(nextCategory);
-                      }}
-                    >
-                      <option value="">Choose service type</option>
-                      {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                    </select>
-                  </Field>
-
-                  <Field label="Connected contractor">
-                    <select
-                      className={inputClass()}
-                      value={serviceRequestDraft.connection_id}
-                      onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, connection_id: event.target.value })}
-                      disabled={!serviceRequestDraft.category || connectedContractorsForRequest.length === 0}
-                    >
-                      <option value="">{connectedContractorsForRequest.length === 0 ? 'No connected match' : 'Choose contractor'}</option>
-                      {connectedContractorsForRequest.map(connection => (
-                        <option key={connection.connection_id} value={connection.connection_id}>{connection.business_name}</option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Urgency">
-                    <select
-                      className={inputClass()}
-                      value={serviceRequestDraft.urgency}
-                      onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, urgency: event.target.value as ServiceRequestUrgency })}
-                    >
-                      {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
-                    </select>
-                  </Field>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {[
+                    ['property', 'Property'],
+                    ['issue', 'Issue'],
+                    ['contractor', 'Contractor'],
+                    ['review', 'Review'],
+                  ].map(([step, label], index) => {
+                    const active = requestComposerStep === step;
+                    return (
+                      <div key={step} className={`rounded-xl border px-3 py-2 text-xs font-bold ${active ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                        {index + 1}. {label}
+                      </div>
+                    );
+                  })}
                 </div>
-                {renderServiceRequestPropertyField()}
 
-                {serviceRequestDraft.category && connectedContractorsForRequest.length === 0 && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-sm font-semibold text-amber-900">No connected contractor matches {serviceRequestDraft.category}.</p>
-                    <p className="mt-1 text-sm text-amber-800">
-                      You can search public contractors from the Contractors tab and request a connection before sending the service request.
-                    </p>
-                    <button type="button" onClick={() => setHomeownerTab('contractors')} className={`${buttonClass('secondary')} mt-3`}>
-                      Search contractors
-                    </button>
+                {requestComposerStep === 'property' && (
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">Choose property</p>
+                      <p className="mt-1 text-sm text-slate-500">Every service request should be tied to a property.</p>
+                    </div>
+                    {homes.length > 0 ? (
+                      <Field label="Request for">
+                        <select
+                          className={inputClass()}
+                          value={currentServiceRequestHome?.id || ''}
+                          onChange={event => selectServiceRequestHome(event.target.value)}
+                        >
+                          <option value="">Choose property</option>
+                          {homes.map(candidate => (
+                            <option key={candidate.id} value={candidate.id}>{homeProfileDisplayLabel(candidate)}</option>
+                          ))}
+                        </select>
+                      </Field>
+                    ) : (
+                      <Notice tone="info" text="Add a property before sending a service request." />
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {homes.length === 0 && (
+                        <button type="button" onClick={() => { setHomeownerTab('home'); startAddProperty(); }} className={buttonClass('primary')}>
+                          <Plus size={16} />
+                          Add property
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setRequestComposerStep('issue')}
+                        disabled={!currentServiceRequestHome?.id}
+                        className={buttonClass('primary')}
+                      >
+                        Continue
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Short title">
-                    <input
-                      className={inputClass()}
-                      value={serviceRequestDraft.title}
-                      onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, title: event.target.value })}
-                      placeholder="Example: Leak under kitchen sink"
-                    />
-                  </Field>
-                  <Field label="Photos / videos">
-                    <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
-                      <Paperclip size={15} className="shrink-0 text-slate-400" />
-                      Attach files
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,video/*"
-                        className="sr-only"
+                {requestComposerStep === 'issue' && (
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <Field label="What do you need help with?">
+                      <textarea
+                        className={`${inputClass()} min-h-[120px]`}
+                        rows={5}
+                        {...writingAssistProps}
+                        value={serviceRequestDraft.description}
                         onChange={event => {
-                          const picked = Array.from(event.target.files ?? []);
-                          setNewRequestFiles(prev => [...prev, ...picked]);
-                          event.target.value = '';
+                          const nextValue = event.target.value;
+                          setServiceProblemText(nextValue);
+                          setServiceRequestDraft(current => ({ ...current, description: nextValue }));
                         }}
+                        placeholder="Example: Water is dripping under my kitchen sink and the cabinet floor is wet."
                       />
-                    </label>
-                  </Field>
-                </div>
-
-                <Field label="What do you need help with?">
-                  <textarea
-                    className={inputClass()}
-                    rows={4}
-                    {...writingAssistProps}
-                    value={serviceRequestDraft.description}
-                    onChange={event => setServiceRequestDraft({ ...serviceRequestDraft, description: event.target.value })}
-                    placeholder="Add enough detail for the contractor to understand the issue."
-                  />
-                </Field>
-
-                {newRequestFiles.length > 0 && (
-                  <ul className="space-y-1">
-                    {newRequestFiles.map((file, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">
-                        <span className="truncate">{file.name}</span>
-                        <button type="button" onClick={() => setNewRequestFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-slate-400 hover:text-red-400"><X size={13} /></button>
-                      </li>
-                    ))}
-                  </ul>
+                    </Field>
+                    {likelyRequestCategory && (
+                      <div className="rounded-xl border border-blue-100 bg-white p-3">
+                        <p className="text-sm font-semibold text-slate-950">Looks like this may be: {likelyRequestCategory}</p>
+                        <p className="mt-1 text-xs text-slate-500">You can change the service type before choosing a contractor.</p>
+                      </div>
+                    )}
+                    <Field label="Service type">
+                      <select
+                        className={inputClass()}
+                        value={serviceRequestDraft.category}
+                        onChange={event => {
+                          const nextCategory = event.target.value;
+                          setServiceRequestDraft(current => ({ ...current, category: nextCategory, connection_id: '' }));
+                          setDirectoryCategory(nextCategory);
+                        }}
+                      >
+                        <option value="">Choose or keep typing</option>
+                        {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                      </select>
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      {homeownerHasMultipleProperties && (
+                        <button type="button" onClick={() => setRequestComposerStep('property')} className={buttonClass('secondary')}>Back</button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const issue = serviceRequestDraft.description.trim() || serviceProblemText.trim();
+                          if (!currentServiceRequestHome?.id) {
+                            setRequestComposerStep('property');
+                            return;
+                          }
+                          if (!issue) {
+                            setError('Describe what you need help with before continuing.');
+                            return;
+                          }
+                          const nextCategory = serviceRequestDraft.category || likelyRequestCategory || 'Other';
+                          setError('');
+                          setServiceRequestDraft(current => ({
+                            ...current,
+                            home_id: currentServiceRequestHome.id,
+                            category: nextCategory,
+                            title: current.title || `${nextCategory} help needed`,
+                            description: current.description || issue,
+                          }));
+                          setDirectoryCategory(nextCategory);
+                          setRequestComposerStep('contractor');
+                        }}
+                        className={buttonClass('primary')}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void createServiceRequest()}
-                    disabled={savingServiceRequest || !serviceRequestDraft.connection_id}
-                    className={buttonClass('primary')}
-                  >
-                    <Send size={16} />
-                    {savingServiceRequest ? 'Sending...' : 'Send request'}
-                  </button>
-                  <button type="button" onClick={() => setHomeownerTab('contractors')} className={buttonClass('secondary')}>
-                    Find contractors
-                  </button>
-                </div>
+                {requestComposerStep === 'contractor' && (
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">Your connected contractors</p>
+                      <p className="mt-1 text-sm text-slate-500">Choose who you want to contact. ServSync does not choose for you.</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {activeConnections.length > 0 ? activeConnections.map(connection => (
+                        <button
+                          key={connection.connection_id}
+                          type="button"
+                          onClick={() => {
+                            setRequestContractorMode('connected');
+                            setServiceRequestDraft(current => ({ ...current, connection_id: connection.connection_id }));
+                          }}
+                          className={`rounded-xl border p-3 text-left transition ${serviceRequestDraft.connection_id === connection.connection_id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+                        >
+                          <p className="text-sm font-bold text-slate-950">{connection.business_name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{serviceCategoriesForConnection(connection).join(', ')}</p>
+                        </button>
+                      )) : (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:col-span-2">
+                          <p className="text-sm font-semibold text-amber-900">No connected contractors yet.</p>
+                          <p className="mt-1 text-sm text-amber-800">You can find another contractor and request a connection first.</p>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextMode = requestContractorMode === 'discover' ? 'connected' : 'discover';
+                        setRequestContractorMode(nextMode);
+                        if (nextMode === 'discover') {
+                          setServiceRequestDraft(current => ({ ...current, connection_id: '' }));
+                        }
+                      }}
+                      className={buttonClass('secondary')}
+                    >
+                      <Search size={15} />
+                      Find another contractor
+                    </button>
+                    {requestContractorMode === 'discover' && (
+                      <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Field label="Search category">
+                            <select
+                              className={inputClass()}
+                              value={serviceRequestDraft.category}
+                              onChange={event => {
+                                setServiceRequestDraft(current => ({ ...current, category: event.target.value, connection_id: '' }));
+                                setDirectoryCategory(event.target.value);
+                              }}
+                            >
+                              <option value="">All service types</option>
+                              {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                            </select>
+                          </Field>
+                        </div>
+                        {discoverContractorsForRequest.length > 0 ? (
+                          <div className="space-y-2">
+                            {discoverContractorsForRequest.map(contractor => (
+                              <div key={contractor.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-950">{contractor.business_name || 'Contractor'}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{[contractor.city, contractor.state].filter(Boolean).join(', ') || 'Location not listed'}</p>
+                                  </div>
+                                  <button type="button" onClick={() => void requestContractorConnection(contractor)} className={buttonClass('secondary')}>
+                                    Request connection
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Notice tone="info" text="No Discover contractors match this service type yet. You can adjust the category or search from Contractors." />
+                        )}
+                        <p className="text-xs leading-5 text-slate-500">
+                          Service requests can be sent after a contractor accepts your connection.
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setRequestComposerStep('issue')} className={buttonClass('secondary')}>Back</button>
+                      <button
+                        type="button"
+                        onClick={() => setRequestComposerStep('review')}
+                        disabled={requestContractorMode !== 'connected' || !serviceRequestDraft.connection_id}
+                        className={buttonClass('primary')}
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {requestComposerStep === 'review' && (
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Property</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{currentServiceRequestHome ? homeProfileDisplayLabel(currentServiceRequestHome) : 'Choose property'}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Contractor</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{selectedRequestConnection?.business_name || 'Choose contractor'}</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_160px_160px]">
+                      <Field label="Request title">
+                        <input
+                          className={inputClass()}
+                          value={serviceRequestDraft.title || requestDraftTitle}
+                          onChange={event => setServiceRequestDraft(current => ({ ...current, title: event.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Service type">
+                        <select
+                          className={inputClass()}
+                          value={serviceRequestDraft.category}
+                          onChange={event => setServiceRequestDraft(current => ({ ...current, category: event.target.value }))}
+                        >
+                          {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Urgency">
+                        <select
+                          className={inputClass()}
+                          value={serviceRequestDraft.urgency}
+                          onChange={event => setServiceRequestDraft(current => ({ ...current, urgency: event.target.value as ServiceRequestUrgency }))}
+                        >
+                          {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                    <Field label="Contractor-facing request text">
+                      <textarea
+                        className={inputClass()}
+                        rows={4}
+                        {...writingAssistProps}
+                        value={serviceRequestDraft.description}
+                        onChange={event => setServiceRequestDraft(current => ({ ...current, description: event.target.value }))}
+                      />
+                    </Field>
+                    {serviceProblemText && serviceProblemText !== serviceRequestDraft.description && (
+                      <button type="button" onClick={() => setServiceRequestDraft(current => ({ ...current, description: serviceProblemText }))} className={buttonClass('secondary')}>
+                        Use original wording
+                      </button>
+                    )}
+                    <Field label="Photos / videos">
+                      <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                        <Paperclip size={15} className="shrink-0 text-slate-400" />
+                        Attach files
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          className="sr-only"
+                          onChange={event => {
+                            const picked = Array.from(event.target.files ?? []);
+                            setNewRequestFiles(prev => [...prev, ...picked]);
+                            event.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </Field>
+                    {newRequestFiles.length > 0 && (
+                      <ul className="space-y-1">
+                        {newRequestFiles.map((file, i) => (
+                          <li key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">
+                            <span className="truncate">{file.name}</span>
+                            <button type="button" onClick={() => setNewRequestFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-slate-400 hover:text-red-400"><X size={13} /></button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setRequestComposerStep('contractor')} className={buttonClass('secondary')}>Back</button>
+                      <button
+                        type="button"
+                        onClick={() => void createServiceRequest()}
+                        disabled={savingServiceRequest || !serviceRequestDraft.connection_id}
+                        className={buttonClass('primary')}
+                      >
+                        <Send size={16} />
+                        {savingServiceRequest ? 'Sending...' : 'Send Request'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </Card>
