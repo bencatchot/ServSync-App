@@ -1,7 +1,8 @@
 // ServSync inspection-ai edge function
 // Analyzes contractor walkthrough notes and returns structured finding suggestions.
 // Deploy: supabase functions deploy inspection-ai
-// Env var required: ANTHROPIC_API_KEY
+// Env var required: OPENAI_API_KEY
+// Optional env var: OPENAI_MODEL
 
 const ALLOWED_ORIGINS = new Set([
   'https://servsync.app',
@@ -96,8 +97,8 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return jsonResponse({ error: 'Not authenticated.' }, 401, corsHeaders);
 
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return jsonResponse({ error: 'ANTHROPIC_API_KEY is not configured.' }, 500, corsHeaders);
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) return jsonResponse({ error: 'OPENAI_API_KEY is not configured.' }, 500, corsHeaders);
 
   // Verify caller is a contractor
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -158,47 +159,81 @@ Instructions:
 - Only return findings for items with notable observations (not everything is flagged)
 - Return at most 15 findings
 
-Respond ONLY with valid JSON array, no markdown, no explanation:
-[
-  {
-    "room": "exact room name from checklist",
-    "item": "exact item text from checklist",
-    "status": "Needs Repair",
-    "notes": "Brief observation about what was found",
-    "action": "Recommended next step"
-  }
-]`;
+Respond ONLY with valid JSON, no markdown, no explanation:
+{
+  "suggestions": [
+    {
+      "room": "exact room name from checklist",
+      "item": "exact item text from checklist",
+      "status": "Needs Repair",
+      "notes": "Brief observation about what was found",
+      "action": "Recommended next step"
+    }
+  ]
+}`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
+        model: Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini',
+        input: prompt,
+        max_output_tokens: 2048,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'inspection_finding_suggestions',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['suggestions'],
+              properties: {
+                suggestions: {
+                  type: 'array',
+                  maxItems: 15,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['room', 'item', 'status', 'notes', 'action'],
+                    properties: {
+                      room: { type: 'string' },
+                      item: { type: 'string' },
+                      status: { type: 'string', enum: ['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent'] },
+                      notes: { type: 'string' },
+                      action: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
     });
 
+    const openAiRes = await response.json();
     if (!response.ok) {
-      const err = await response.text();
-      console.error('Anthropic API error:', err);
+      console.error('OpenAI API error:', openAiRes?.error ?? 'AI service error');
       return jsonResponse({ error: 'AI service error. Try again.' }, 502, corsHeaders);
     }
 
-    const claudeRes = await response.json();
-    const rawText = claudeRes.content?.[0]?.text ?? '[]';
+    const rawText = openAiRes.output_text
+      || openAiRes.output?.flatMap((item: { content?: Array<{ type?: string; text?: string }> }) => item.content || [])
+        ?.find((part: { type?: string }) => part.type === 'output_text')?.text
+      || '[]';
 
     let suggestions: FindingSuggestion[] = [];
     try {
       const parsed = JSON.parse(rawText);
-      if (Array.isArray(parsed)) {
+      const parsedSuggestions = Array.isArray(parsed) ? parsed : parsed?.suggestions;
+      if (Array.isArray(parsedSuggestions)) {
         const validStatuses: FindingStatus[] = ['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent'];
-        suggestions = parsed
+        suggestions = parsedSuggestions
           .filter((s: unknown) => typeof s === 'object' && s !== null)
           .map((s: Record<string, unknown>) => ({
             room: String(s.room ?? ''),
@@ -211,7 +246,7 @@ Respond ONLY with valid JSON array, no markdown, no explanation:
           .slice(0, 15);
       }
     } catch {
-      console.error('Failed to parse Claude response:', rawText);
+      console.error('Failed to parse OpenAI response.');
       return jsonResponse({ error: 'Failed to parse AI response. Try again.' }, 502, corsHeaders);
     }
 
