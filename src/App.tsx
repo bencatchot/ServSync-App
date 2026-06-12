@@ -5972,12 +5972,117 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 }
 
 function LandingPage() {
+  const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
   const steps = [
-    'Homeowner finds or chooses a contractor.',
-    'Homeowner sends a clear service request.',
-    'Contractor responds with an estimate, visit, or next step.',
-    'Work moves into jobs, reports, invoices, and calendar events.',
-    'Records stay organized in the home service history.',
+    'Homeowner finds or connects with a contractor.',
+    'Homeowner sends a service request and shares the right available details.',
+    'Contractor reviews the request, responds, and sends an estimate or next step.',
+    'Work moves through scheduling, jobs, reports, invoices, and communication.',
+    'The contractor relationship and home service history stay connected for future work.',
+  ];
+  const featureCards: Array<{
+    id: string;
+    icon: React.ReactNode;
+    title: string;
+    text: string;
+    details: React.ReactNode;
+  }> = [
+    {
+      id: 'homeowners',
+      icon: <Home size={18} />,
+      title: 'For homeowners',
+      text: 'Build a home record, connect with contractors, request service, review estimates and invoices, and control what information gets shared.',
+      details: (
+        <>
+          <p>
+            Homeowners can use ServSync to organize home service records and work with contractors in a more structured way.
+          </p>
+          <p>
+            A connection means the homeowner chooses when to connect with a contractor, what available information is shared,
+            and how future service requests are handled through that relationship.
+          </p>
+          <p>
+            Instead of starting over every time something needs attention, homeowners can keep requests, estimates, invoices,
+            communication, and service history connected to the home.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'contractors',
+      icon: <Building2 size={18} />,
+      title: 'For contractors',
+      text: 'Manage homeowner requests, connections, estimates, jobs, invoices, reports, and ongoing customer relationships in one organized system.',
+      details: (
+        <>
+          <p>
+            ServSync helps small contractors manage the homeowner relationship, not just the individual job.
+          </p>
+          <p>
+            A contractor connection gives homeowners a more organized path to request service and gives the contractor a cleaner
+            way to manage follow-up, estimates, jobs, invoices, and customer history.
+          </p>
+          <p>
+            The goal is to help small contractors look professional, stay organized, and build repeat work without enterprise-level complexity.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'discover',
+      icon: <Compass size={18} />,
+      title: 'Discover and connect',
+      text: 'Homeowners can find local contractors and choose when to connect. Contractors can share helpful updates and recent work without relying only on paid leads.',
+      details: (
+        <>
+          <p>
+            ServSync Discover is designed to create a cleaner path from finding a contractor to actually working with one.
+          </p>
+          <p>
+            Instead of sorting through search results, comment threads, and scattered recommendations, homeowners can use ServSync
+            to find local contractors, review helpful context, choose when to connect, and send a clearer service request.
+          </p>
+          <p>
+            For contractors, Discover creates a way to be found by local homeowners and turn interest into organized requests,
+            estimates, jobs, invoices, and ongoing customer relationships.
+          </p>
+          <p>
+            ServSync is not a contractor verification service or guaranteed lead platform. The goal is to make discovery and follow-up
+            more organized and transparent.
+          </p>
+        </>
+      ),
+    },
+    {
+      id: 'permissions',
+      icon: <Lock size={18} />,
+      title: 'Permission-based sharing',
+      text: 'Homeowners choose what each contractor can see and can update or revoke access as needed.',
+      details: (
+        <>
+          <p>
+            When a homeowner connects with a contractor, ServSync lets the homeowner choose what the contractor can see.
+          </p>
+          <div>
+            <p className="font-semibold text-blue-50">Current sharing permissions can include:</p>
+            <ul className="mt-2 space-y-1">
+              {['Contact info', 'Home overview', 'Address', 'Preferred vendors', 'Photos'].map(item => (
+                <li key={item} className="flex gap-2">
+                  <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1B85FB]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p>
+            Nothing extra is shared unless the homeowner allows it. Access can also be changed, cleared, or revoked.
+          </p>
+          <p>
+            The goal is to help homeowners work with contractors while keeping clear control over each contractor relationship.
+          </p>
+        </>
+      ),
+    },
   ];
 
   return (
@@ -6005,10 +6110,18 @@ function LandingPage() {
           </button>
         </div>
         <div className="grid gap-3">
-          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Find local contractors, request service clearly, review estimates and invoices, and keep a record of work done on your home." />
-          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Get discovered, manage requests, send estimates and invoices, schedule work, and keep customer records organized without enterprise-level complexity." />
-          <FeatureRow icon={<Compass size={18} />} title="ServSync Discover" text="Discover is being built to help homeowners find local contractor profiles and give contractors a better way to share helpful service information as the platform grows." />
-          <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners choose what each contractor can see and can update or revoke access as needed." />
+          {featureCards.map(card => (
+            <FeatureRow
+              key={card.id}
+              id={`landing-feature-${card.id}`}
+              icon={card.icon}
+              title={card.title}
+              text={card.text}
+              details={card.details}
+              expanded={expandedFeature === card.id}
+              onToggle={() => setExpandedFeature(current => current === card.id ? null : card.id)}
+            />
+          ))}
         </div>
       </section>
 
@@ -6036,10 +6149,11 @@ function LandingPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">How ServSync works</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">From local search to home service history</h2>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">A better flow from connection to completed work</h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-slate-600">
-            Requests, estimates, jobs, invoices, reports, documents, and maintenance records stay connected instead of scattered.
+            ServSync helps homeowners find or connect with contractors, request service clearly, review estimates and invoices,
+            and keep home service records organized. Contractors can manage the work and maintain ongoing customer relationships in one place.
           </p>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-5">
@@ -6079,13 +6193,51 @@ function LandingPage() {
   );
 }
 
-function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+function FeatureRow({
+  id,
+  icon,
+  title,
+  text,
+  details,
+  expanded,
+  onToggle,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+  details?: React.ReactNode;
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
+  const detailId = `${id}-details`;
+
   return (
     <div className="flex gap-3 rounded-2xl border border-[#1B85FB]/20 bg-white/5 p-4">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0078FF]/15 text-[#1B85FB]">{icon}</div>
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-white">{title}</p>
         <p className="mt-1 text-sm text-blue-100/75">{text}</p>
+        {details && onToggle && (
+          <>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={Boolean(expanded)}
+              aria-controls={detailId}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline"
+            >
+              {expanded ? 'Show less' : 'Learn more'}
+              <ChevronDown size={13} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+            {expanded && (
+              <div id={detailId} className="mt-3 space-y-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm leading-6 text-blue-100/85">
+                <p className="font-bold text-white">What this means in ServSync</p>
+                {details}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
