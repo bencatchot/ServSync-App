@@ -4920,16 +4920,48 @@ function formatDateTime(value?: string | null) {
   });
 }
 
-const VISIT_TIME_OPTIONS = Array.from({ length: 29 }, (_, index) => {
-  const totalMinutes = (7 * 60) + (index * 30);
-  const hour24 = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-  const value = `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+function buildHalfHourTimeOptions(startHour: number, endHour: number) {
+  const optionCount = ((endHour - startHour) * 2) + 1;
+  return Array.from({ length: optionCount }, (_, index) => {
+    const totalMinutes = (startHour * 60) + (index * 30);
+    const hour24 = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    const value = `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    return { value, label: formatTimeOptionLabel(value) };
+  });
+}
+
+function formatTimeOptionLabel(value: string) {
+  const [hourPart, minutePart] = value.split(':');
+  const hour24 = Number(hourPart);
+  const minute = Number(minutePart);
+  if (!Number.isFinite(hour24) || !Number.isFinite(minute)) return value;
   const hour12 = hour24 % 12 || 12;
   const period = hour24 < 12 ? 'AM' : 'PM';
-  const label = `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
-  return { value, label };
-});
+  return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+const VISIT_TIME_OPTIONS = buildHalfHourTimeOptions(7, 21);
+const CALENDAR_EVENT_TIME_OPTIONS = buildHalfHourTimeOptions(6, 20);
+
+function calendarEventTimeOptions(currentTime: string) {
+  if (!currentTime || CALENDAR_EVENT_TIME_OPTIONS.some(option => option.value === currentTime)) {
+    return CALENDAR_EVENT_TIME_OPTIONS;
+  }
+
+  return [...CALENDAR_EVENT_TIME_OPTIONS, { value: currentTime, label: `${formatTimeOptionLabel(currentTime)} (current)` }]
+    .sort((a, b) => a.value.localeCompare(b.value));
+}
+
+function splitDateTimeLocalValue(value: string) {
+  const [dateValue = '', timeValue = ''] = value.split('T');
+  return { dateValue, timeValue: timeValue.slice(0, 5) };
+}
+
+function combineDateTimeLocalValue(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) return '';
+  return `${dateValue}T${timeValue}`;
+}
 
 function combineLocalDateAndTime(dateValue: string, timeValue: string) {
   if (!dateValue || !timeValue) return null;
@@ -28395,6 +28427,8 @@ function CalendarEventComposer({
     notes: event?.notes ?? '',
     local_contact_id: event?.local_contact_id ?? '',
   }));
+  const { dateValue: eventDateValue, timeValue: eventTimeValue } = splitDateTimeLocalValue(draft.starts_at);
+  const eventTimeOptions = calendarEventTimeOptions(eventTimeValue);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
@@ -28417,19 +28451,44 @@ function CalendarEventComposer({
             </select>
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Date & time">
-              <input type="datetime-local" className={inputClass()} value={draft.starts_at} onChange={e => setDraft(d => ({ ...d, starts_at: e.target.value }))} />
+            <Field label="Event date">
+              <input
+                type="date"
+                className={inputClass()}
+                value={eventDateValue}
+                onChange={e => setDraft(d => {
+                  const { timeValue } = splitDateTimeLocalValue(d.starts_at);
+                  return { ...d, starts_at: combineDateTimeLocalValue(e.target.value, timeValue) };
+                })}
+              />
             </Field>
+            <Field label="Event time">
+              <select
+                className={inputClass()}
+                value={eventTimeValue}
+                onChange={e => setDraft(d => {
+                  const { dateValue } = splitDateTimeLocalValue(d.starts_at);
+                  return { ...d, starts_at: combineDateTimeLocalValue(dateValue, e.target.value) };
+                })}
+              >
+                <option value="">Choose time</option>
+                {eventTimeOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Duration (minutes, optional)">
               <input type="number" min="1" max="1440" className={inputClass()} value={draft.duration_minutes} onChange={e => setDraft(d => ({ ...d, duration_minutes: e.target.value }))} placeholder="60" />
             </Field>
+            <Field label="Customer (optional)">
+              <select className={inputClass()} value={draft.local_contact_id} onChange={e => setDraft(d => ({ ...d, local_contact_id: e.target.value }))}>
+                <option value="">No customer</option>
+                {localContacts.map(contact => <option key={contact.id} value={contact.id}>{contact.display_name}</option>)}
+              </select>
+            </Field>
           </div>
-          <Field label="Customer (optional)">
-            <select className={inputClass()} value={draft.local_contact_id} onChange={e => setDraft(d => ({ ...d, local_contact_id: e.target.value }))}>
-              <option value="">No customer</option>
-              {localContacts.map(contact => <option key={contact.id} value={contact.id}>{contact.display_name}</option>)}
-            </select>
-          </Field>
           <Field label="Notes (optional)">
             <textarea rows={3} className={inputClass()} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
           </Field>

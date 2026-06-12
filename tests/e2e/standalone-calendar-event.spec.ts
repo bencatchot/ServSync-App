@@ -37,6 +37,7 @@ test.describe('standalone calendar events', () => {
 
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
     await page.getByRole('combobox', { name: 'Event type', exact: true }).selectOption('routine_inspection');
+    await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('10:00');
     await page.getByRole('spinbutton', { name: /Duration/i }).fill('45');
     await page.getByRole('textbox', { name: /Notes/i }).fill('E2E standalone calendar event — safe to delete.');
 
@@ -45,7 +46,7 @@ test.describe('standalone calendar events', () => {
     expect((await insertResponse).ok()).toBeTruthy();
 
     // Appears on the calendar (selected-day / upcoming list).
-    await expect(eventRow(title).first()).toBeVisible({ timeout: 30_000 });
+    await expect(eventRow(title).filter({ hasText: /10:00 AM/i }).first()).toBeVisible({ timeout: 30_000 });
 
     // ── Open detail ─────────────────────────────────────────────────────────--
     await eventRow(title).first().click();
@@ -57,10 +58,11 @@ test.describe('standalone calendar events', () => {
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(editedTitle);
+    await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('11:30');
     const updateResponse = page.waitForResponse(calendarEventsRequest('PATCH'));
     await page.getByRole('button', { name: /^Save changes$/i }).click();
     expect((await updateResponse).ok()).toBeTruthy();
-    await expect(eventRow(editedTitle).first()).toBeVisible({ timeout: 30_000 });
+    await expect(eventRow(editedTitle).filter({ hasText: /11:30 AM/i }).first()).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(title, { exact: true })).toHaveCount(0);
 
     // ── Delete ──────────────────────────────────────────────────────────────--
