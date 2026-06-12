@@ -214,6 +214,7 @@ type HomeTemplatePromptState = {
   existingTemplates: InspectionTemplate[];
   selectedTemplateId: string;
 };
+type AuthMode = 'signin' | 'signup' | 'reset';
 type ServSyncFieldWorkTemplate = {
   id: string;
   name: string;
@@ -3931,6 +3932,11 @@ function updateRoute(route: RouteName, query = '') {
   window.location.hash = query ? `/${route}?${query}` : `/${route}`;
 }
 
+function passwordResetRedirectTo(role: UserRole) {
+  const route: RouteName = role === 'contractor' ? 'contractor' : role === 'platform_admin' ? 'admin' : 'homeowner';
+  return `${window.location.origin}/#/${route}?mode=reset-password`;
+}
+
 function LegalLinks({ contractor = false, className = '' }: { contractor?: boolean; className?: string }) {
   const routes: Array<keyof typeof LEGAL_PAGES> = contractor
     ? ['terms', 'privacy', 'acceptable-use', 'contractor-agreement']
@@ -5593,7 +5599,9 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authMessage, setAuthMessage] = useState('');
+  const [passwordRecoveryActive, setPasswordRecoveryActive] = useState(false);
   const claimToken = route === 'homeowner' ? query.get('claim') || '' : '';
+  const passwordResetRouteRequested = query.get('mode') === 'reset-password';
 
   useEffect(() => {
     const onHashChange = () => setRouteState(currentRoute());
@@ -5637,7 +5645,10 @@ export default function App() {
       setLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecoveryActive(true);
+      }
       setSession(nextSession);
       void loadProfile(nextSession);
     });
@@ -5652,6 +5663,7 @@ export default function App() {
     await supabase?.auth.signOut();
     setSession(null);
     setProfile(null);
+    setPasswordRecoveryActive(false);
     updateRoute('home');
   };
 
@@ -5669,6 +5681,24 @@ export default function App() {
         <div className="rounded-2xl border border-[#E1E3E7] bg-white p-8 text-center text-sm font-semibold text-[#223D67] shadow-sm">
           Loading ServSync...
         </div>
+      </PublicShell>
+    );
+  }
+
+  if (passwordRecoveryActive || passwordResetRouteRequested) {
+    const resetRole: UserRole = route === 'admin' ? 'platform_admin' : route === 'contractor' ? 'contractor' : 'homeowner';
+    return (
+      <PublicShell route={route} profile={profile} onSignOut={signOut}>
+        <PasswordResetUpdatePage
+          session={session}
+          role={resetRole}
+          onExit={() => {
+            setPasswordRecoveryActive(false);
+            setSession(null);
+            setProfile(null);
+            updateRoute(resetRole === 'contractor' ? 'contractor' : resetRole === 'platform_admin' ? 'admin' : 'homeowner');
+          }}
+        />
       </PublicShell>
     );
   }
@@ -6073,6 +6103,120 @@ function FeatureRow({ icon, title, text }: { icon: React.ReactNode; title: strin
   );
 }
 
+function PasswordResetUpdatePage({
+  session,
+  role,
+  onExit,
+}: {
+  session: Session | null;
+  role: UserRole;
+  onExit: () => void;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const submit = async () => {
+    if (!supabase || !session) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      if (newPassword.length < 8) {
+        throw new Error('Use at least 8 characters for your new password.');
+      }
+      if (newPassword !== confirmPassword) {
+        throw new Error('The passwords do not match.');
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      await supabase.auth.signOut();
+      setSuccess(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage('Your password has been updated. You can now sign in with your new password.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Unable to update your password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!busy && newPassword && confirmPassword) void submit();
+  };
+
+  return (
+    <div className="mx-auto max-w-xl">
+      <div className="rounded-3xl border border-[#E1E3E7] bg-white p-6 shadow-sm">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">{ROLE_LABEL[role]}</p>
+          <h1 className="mt-2 text-3xl font-bold text-[#02132D]">Set a new password</h1>
+          <p className="mt-2 text-sm leading-6 text-[#223D67]">
+            Enter a new password for your ServSync account.
+          </p>
+        </div>
+
+        {success ? (
+          <div className="space-y-4">
+            <Notice tone="success" text={message || 'Your password has been updated. You can now sign in with your new password.'} />
+            <button type="button" onClick={onExit} className={buttonClass('primary')}>
+              <KeyRound size={16} />
+              Back to sign in
+            </button>
+          </div>
+        ) : session ? (
+          <form
+            className="space-y-4"
+            onSubmit={event => {
+              event.preventDefault();
+              if (!busy && newPassword && confirmPassword) void submit();
+            }}
+          >
+            <Field label="New password">
+              <input
+                className={inputClass()}
+                type="password"
+                value={newPassword}
+                onChange={event => setNewPassword(event.target.value)}
+                onKeyDown={submitOnEnter}
+                autoComplete="new-password"
+              />
+            </Field>
+            <Field label="Confirm new password">
+              <input
+                className={inputClass()}
+                type="password"
+                value={confirmPassword}
+                onChange={event => setConfirmPassword(event.target.value)}
+                onKeyDown={submitOnEnter}
+                autoComplete="new-password"
+              />
+            </Field>
+            <p className="text-xs text-slate-400">Use at least 8 characters.</p>
+            <button type="submit" disabled={busy || !newPassword || !confirmPassword} className={buttonClass('primary')}>
+              <KeyRound size={16} />
+              {busy ? 'Updating...' : 'Update password'}
+            </button>
+            {message && <Notice tone="error" text={message} />}
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <Notice tone="error" text="This password reset link is missing, expired, or has already been used. Request a new password reset email and try again." />
+            <button type="button" onClick={onExit} className={buttonClass('primary')}>
+              <KeyRound size={16} />
+              Back to sign in
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AuthPage({
   role,
   inviteCode,
@@ -6088,7 +6232,7 @@ function AuthPage({
   adminSigninOnly?: boolean;
   onAuthed: () => void;
 }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>((!adminSigninOnly && (inviteCode || referralCode || initialMode === 'signup')) ? 'signup' : 'signin');
+  const [mode, setMode] = useState<AuthMode>((!adminSigninOnly && (inviteCode || referralCode || initialMode === 'signup')) ? 'signup' : 'signin');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -6102,6 +6246,13 @@ function AuthPage({
     setBusy(true);
     setMessage('');
     try {
+      if (mode === 'reset') {
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: passwordResetRedirectTo(role),
+        });
+        setMessage('If an account exists for that email, we’ll send password reset instructions.');
+        return;
+      }
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -6141,7 +6292,9 @@ function AuthPage({
         setMessage('Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder.');
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Unable to complete authentication.');
+      setMessage(mode === 'reset'
+        ? 'If an account exists for that email, we’ll send password reset instructions.'
+        : err instanceof Error ? err.message : 'Unable to complete authentication.');
     } finally {
       setBusy(false);
     }
@@ -6150,7 +6303,7 @@ function AuthPage({
   const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    if (!busy && email && password) void submit();
+    if (!busy && email && (mode === 'reset' || password)) void submit();
   };
 
   const signupGuidance = role === 'contractor'
@@ -6171,14 +6324,18 @@ function AuthPage({
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0078FF]">{ROLE_LABEL[role]}</p>
           <h1 className="mt-2 text-3xl font-bold text-[#02132D]">
-            {mode === 'signin'
+            {mode === 'reset'
+              ? 'Reset your password'
+              : mode === 'signin'
               ? 'Sign in'
               : role === 'contractor'
                 ? 'Create contractor account'
                 : 'Create homeowner account'}
           </h1>
           <p className="mt-2 text-sm leading-6 text-[#223D67]">
-            {role === 'contractor'
+            {mode === 'reset'
+              ? 'Enter the email address for your ServSync account and we’ll send instructions to reset your password.'
+              : role === 'contractor'
               ? 'Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests.'
               : role === 'platform_admin'
                 ? 'Sign in with an existing ServSync admin account. Admin profiles are created manually.'
@@ -6207,7 +6364,7 @@ function AuthPage({
           className="space-y-4"
           onSubmit={event => {
             event.preventDefault();
-            if (!busy && email && password) void submit();
+            if (!busy && email && (mode === 'reset' || password)) void submit();
           }}
         >
           {mode === 'signup' && (
@@ -6218,9 +6375,11 @@ function AuthPage({
           <Field label="Email">
             <input className={inputClass()} type="email" value={email} onChange={event => setEmail(event.target.value)} onKeyDown={submitOnEnter} />
           </Field>
-          <Field label="Password">
-            <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
-          </Field>
+          {mode !== 'reset' && (
+            <Field label="Password">
+              <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
+            </Field>
+          )}
           {mode === 'signup' && (
             <p className="text-xs text-slate-400">Use a strong password. Short or weak passwords may be rejected.</p>
           )}
@@ -6245,11 +6404,13 @@ function AuthPage({
               </span>
             </label>
           )}
-          <button type="submit" disabled={busy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
+          <button type="submit" disabled={busy || !email || (mode !== 'reset' && !password) || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
             <KeyRound size={16} />
             {busy
               ? 'Working...'
-              : mode === 'signin'
+              : mode === 'reset'
+                ? 'Send reset instructions'
+                : mode === 'signin'
                 ? 'Sign in'
                 : role === 'contractor'
                   ? 'Create contractor account'
@@ -6257,6 +6418,19 @@ function AuthPage({
           </button>
           {message && <Notice tone="info" text={message} />}
         </form>
+        {mode === 'signin' && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode('reset');
+              setMessage('');
+              setPassword('');
+            }}
+            className="mt-3 text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
+          >
+            Forgot password?
+          </button>
+        )}
         <LegalLinks contractor={role === 'contractor'} className="mt-4 text-slate-400" />
         {!adminSigninOnly && (
           <div className="mt-6 border-t border-[#E1E3E7] pt-4">
@@ -6265,10 +6439,27 @@ function AuthPage({
               onClick={() => {
                 setMode(mode === 'signin' ? 'signup' : 'signin');
                 setAcceptedLegal(false);
+                setMessage('');
+                setPassword('');
               }}
               className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
             >
               {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+            </button>
+          </div>
+        )}
+        {adminSigninOnly && mode === 'reset' && (
+          <div className="mt-6 border-t border-[#E1E3E7] pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setMessage('');
+                setPassword('');
+              }}
+              className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
+            >
+              Back to sign in
             </button>
           </div>
         )}
