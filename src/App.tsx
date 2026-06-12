@@ -12550,7 +12550,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorCalendarEvents, setContractorCalendarEvents] = useState<ContractorCalendarEvent[]>([]);
   const [calendarEventComposerOpen, setCalendarEventComposerOpen] = useState(false);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
+  const [selectedVisitCalendarEvent, setSelectedVisitCalendarEvent] = useState<ContractorVisitEvent | null>(null);
   const [calendarEventBusy, setCalendarEventBusy] = useState(false);
+  const [visitCalendarEventBusy, setVisitCalendarEventBusy] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
@@ -14393,6 +14395,62 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const openCalendarEventDetail = (event: ContractorCalendarEvent) => {
     setEditingCalendarEvent(event);
     setCalendarEventComposerOpen(true);
+  };
+  const openVisitCalendarEventDetail = (event: ContractorVisitEvent) => {
+    setSelectedVisitCalendarEvent(event);
+  };
+  const closeVisitCalendarEventDetail = () => {
+    setSelectedVisitCalendarEvent(null);
+  };
+  const openVisitCalendarEventJob = (event: ContractorVisitEvent) => {
+    const inspection = event.inspection ?? inspections.find(item => item.id === event.inspection_id) ?? null;
+    if (!inspection) {
+      setError('Unable to open the job for this calendar event.');
+      return;
+    }
+    setSelectedVisitCalendarEvent(null);
+    openInspection(inspection);
+  };
+  const saveVisitCalendarEvent = async (event: ContractorVisitEvent, draft: { starts_at: string; notes: string; share_with_homeowner: boolean }) => {
+    if (!supabase) return;
+    if (!draft.starts_at) {
+      setError('Choose a date and time for this job calendar event.');
+      return;
+    }
+    setVisitCalendarEventBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      const scheduledAt = new Date(draft.starts_at);
+      if (Number.isNaN(scheduledAt.getTime())) {
+        setError('Choose a valid date and time for this job calendar event.');
+        return;
+      }
+      const { error: visitEventError } = await supabase.rpc('servsync_schedule_visit_event', {
+        p_inspection_id: event.inspection_id,
+        p_scheduled_at: scheduledAt.toISOString(),
+        p_notes: draft.notes || '',
+        p_share_with_homeowner: draft.share_with_homeowner,
+      });
+      if (visitEventError) throw visitEventError;
+
+      const updatedEvent: ContractorVisitEvent = {
+        ...event,
+        scheduled_at: scheduledAt.toISOString(),
+        notes: draft.notes || '',
+        share_with_homeowner: draft.share_with_homeowner,
+        status: 'scheduled',
+        homeowner_response_status: draft.share_with_homeowner ? 'shared_waiting' : 'not_shared',
+        updated_at: new Date().toISOString(),
+      };
+      setContractorVisitEvents(prev => prev.map(item => (item.id === event.id ? updatedEvent : item)));
+      setSelectedVisitCalendarEvent(updatedEvent);
+      setNotice('Job calendar event updated.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to update job calendar event.'));
+    } finally {
+      setVisitCalendarEventBusy(false);
+    }
   };
   const closeCalendarEventComposer = () => {
     setCalendarEventComposerOpen(false);
@@ -17970,13 +18028,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             calendarEvents={contractorCalendarEvents}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
-            onOpenVisitEvent={event => {
-              const inspection = event.inspection ?? inspections.find(item => item.id === event.inspection_id) ?? null;
-              if (inspection) openInspection(inspection);
-            }}
+            onOpenVisitEvent={openVisitCalendarEventDetail}
             onOpenCalendarEvent={openCalendarEventDetail}
           />
         </Card>
+      )}
+      {selectedVisitCalendarEvent && (
+        <VisitCalendarEventDetail
+          event={selectedVisitCalendarEvent}
+          inspection={selectedVisitCalendarEvent.inspection ?? inspections.find(item => item.id === selectedVisitCalendarEvent.inspection_id) ?? null}
+          request={selectedVisitCalendarEvent.service_request_id
+            ? serviceRequests.find(item => item.id === selectedVisitCalendarEvent.service_request_id) ?? null
+            : null}
+          busy={visitCalendarEventBusy}
+          onSave={draft => void saveVisitCalendarEvent(selectedVisitCalendarEvent, draft)}
+          onOpenJob={() => openVisitCalendarEventJob(selectedVisitCalendarEvent)}
+          onClose={closeVisitCalendarEventDetail}
+        />
       )}
       {calendarEventComposerOpen && (
         <CalendarEventComposer
@@ -28338,6 +28406,7 @@ function CalendarEventComposer({
   onClose: () => void;
 }) {
   const isEditing = Boolean(event);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState<CalendarEventDraft>(() => ({
     title: event?.title ?? '',
     event_type: event?.event_type ?? 'routine_inspection',
@@ -28355,9 +28424,29 @@ function CalendarEventComposer({
     ? 'Does not repeat'
     : `${calendarEventRecurrenceLabel(draft.recurrence_frequency)}${recurrenceEndCondition === 'date' && draft.recurrence_ends_at ? ` until ${new Date(`${draft.recurrence_ends_at}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' with no end date'}`;
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusFrame = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="my-8 w-full max-w-lg rounded-2xl border border-[#E1E3E7] bg-white p-6 shadow-2xl">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEditing ? 'Calendar event' : 'New calendar event'}
+        tabIndex={-1}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && !busy) onClose();
+        }}
+        className="my-8 w-full max-w-lg rounded-2xl border border-[#E1E3E7] bg-white p-6 shadow-2xl outline-none"
+      >
         <div className="mb-1 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-[#02132D]">{isEditing ? 'Calendar event' : 'New calendar event'}</h2>
           <button type="button" onClick={onClose} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={18} /></button>
@@ -28486,6 +28575,215 @@ function CalendarEventComposer({
             )}
             <button type="button" onClick={() => onSave(draft)} disabled={busy} className={buttonClass('primary')}>
               {busy ? 'Saving...' : isEditing ? 'Save changes' : 'Create event'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VisitCalendarEventDetail({
+  event,
+  inspection,
+  request,
+  busy,
+  onSave,
+  onOpenJob,
+  onClose,
+}: {
+  event: ContractorVisitEvent;
+  inspection: Inspection | null;
+  request: ServiceRequestSummary | null;
+  busy: boolean;
+  onSave: (draft: { starts_at: string; notes: string; share_with_homeowner: boolean }) => void;
+  onOpenJob: () => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [draft, setDraft] = useState(() => ({
+    starts_at: toDateTimeLocalValue(event.scheduled_at),
+    notes: event.notes ?? '',
+    share_with_homeowner: Boolean(event.share_with_homeowner),
+  }));
+  useEffect(() => {
+    setDraft({
+      starts_at: toDateTimeLocalValue(event.scheduled_at),
+      notes: event.notes ?? '',
+      share_with_homeowner: Boolean(event.share_with_homeowner),
+    });
+  }, [event.id, event.scheduled_at, event.notes, event.share_with_homeowner]);
+  const { dateValue: eventDateValue, timeValue: eventTimeValue } = splitDateTimeLocalValue(draft.starts_at);
+  const eventTimeOptions = calendarEventTimeOptions(eventTimeValue);
+  const canShareWithHomeowner = Boolean(event.service_request_id && event.homeowner_user_id);
+  const scheduledAt = new Date(event.scheduled_at);
+  const title = inspection?.name || request?.title || 'Scheduled service visit';
+  const subject = request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer');
+  const statusLabel = event.status === 'scheduled'
+    ? 'Scheduled'
+    : event.status === 'completed'
+      ? 'Completed'
+      : 'Cancelled';
+  const responseLabel = event.homeowner_response_status === 'not_shared'
+    ? 'Contractor calendar only'
+    : event.homeowner_response_status === 'shared_waiting'
+      ? 'Shared — waiting for homeowner'
+      : event.homeowner_response_status === 'accepted'
+        ? 'Homeowner accepted'
+        : event.homeowner_response_status === 'declined'
+          ? 'Homeowner declined'
+          : 'New time suggested';
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusFrame = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calendar event"
+        tabIndex={-1}
+        onKeyDown={keyboardEvent => {
+          if (keyboardEvent.key === 'Escape' && !busy) onClose();
+        }}
+        className="my-8 w-full max-w-lg rounded-2xl border border-[#E1E3E7] bg-white p-6 shadow-2xl outline-none"
+      >
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-[#02132D]">Calendar event</h2>
+          <button type="button" onClick={onClose} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={18} /></button>
+        </div>
+        <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+          Tied to a job
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Visit</p>
+            <h3 className="mt-1 text-xl font-bold text-slate-950">{title}</h3>
+            <p className="mt-1 text-sm text-slate-600">{subject}</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current date and time</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {Number.isNaN(scheduledAt.getTime())
+                  ? 'Scheduled time unavailable'
+                  : scheduledAt.toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{statusLabel}</p>
+              <p className="mt-1 text-xs text-slate-500">{responseLabel}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Event date">
+              <input
+                type="date"
+                className={inputClass()}
+                value={eventDateValue}
+                onChange={inputEvent => setDraft(current => {
+                  const { timeValue } = splitDateTimeLocalValue(current.starts_at);
+                  return { ...current, starts_at: combineDateTimeLocalValue(inputEvent.target.value, timeValue) };
+                })}
+              />
+            </Field>
+            <Field label="Event time">
+              <select
+                className={inputClass()}
+                value={eventTimeValue}
+                onChange={inputEvent => setDraft(current => {
+                  const { dateValue } = splitDateTimeLocalValue(current.starts_at);
+                  return { ...current, starts_at: combineDateTimeLocalValue(dateValue, inputEvent.target.value) };
+                })}
+              >
+                <option value="">Choose time</option>
+                {eventTimeOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Visit notes">
+            <textarea
+              rows={3}
+              className={inputClass()}
+              value={draft.notes}
+              onChange={inputEvent => setDraft(current => ({ ...current, notes: inputEvent.target.value }))}
+              placeholder="Add notes for this calendar event."
+            />
+          </Field>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Sharing</p>
+            {canShareWithHomeowner ? (
+              <label className="mt-2 flex items-start gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={draft.share_with_homeowner}
+                  onChange={inputEvent => setDraft(current => ({ ...current, share_with_homeowner: inputEvent.target.checked }))}
+                />
+                <span>Share calendar invite with homeowner</span>
+              </label>
+            ) : (
+              <p className="mt-1 text-sm text-slate-500">Calendar sharing is available for connected homeowner jobs.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Repeat</p>
+            <p className="mt-1 text-sm text-slate-700">Does not repeat. Recurrence is only supported for standalone calendar events right now.</p>
+          </div>
+
+          {inspection?.summary && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Job summary</p>
+              <p className="mt-1 text-sm text-slate-700">{inspection.summary}</p>
+            </div>
+          )}
+
+          {event.notes && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Visit notes</p>
+              <p className="mt-1 text-sm text-slate-700">{event.notes}</p>
+            </div>
+          )}
+
+          <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+            Open the linked job when you are ready to review the work order, checklist, report, or job workflow.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={onClose} className={buttonClass('secondary')}>
+            Close
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onOpenJob} disabled={!inspection || busy} className={buttonClass('secondary')}>
+              Open Job
+            </button>
+            <button type="button" onClick={() => onSave(draft)} disabled={busy} className={buttonClass('primary')}>
+              {busy ? 'Saving...' : 'Save event'}
             </button>
           </div>
         </div>
@@ -28639,6 +28937,18 @@ function CalendarView({
     return 'New time suggested';
   };
 
+  const openCalendarEntry = (entry: CalendarEntry) => {
+    if (entry.kind === 'standalone') {
+      onOpenCalendarEvent?.(entry.calendarEvent);
+      return;
+    }
+    if (entry.kind === 'visit') {
+      onOpenVisitEvent?.(entry.visitEvent);
+      return;
+    }
+    onOpenRequest?.(entry.request);
+  };
+
   const renderAppointmentRow = (entry: CalendarEntry, compact = false) => {
     if (entry.kind === 'standalone') {
       const { calendarEvent, occurrenceStartsAt } = entry;
@@ -28783,11 +29093,18 @@ function CalendarView({
               const isSelected = dateKey === selectedDate;
 
               return (
-                <button
+                <div
                   key={i}
-                  type="button"
                   onClick={() => { if (inMonth) setSelectedDate(dateKey); }}
-                  className={`min-h-[98px] p-1.5 text-left transition-colors ${inMonth ? 'bg-white hover:bg-blue-50' : 'bg-slate-50 opacity-50'} ${isSelected ? 'ring-2 ring-inset ring-blue-500' : ''}`}
+                  onKeyDown={event => {
+                    if (inMonth && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      setSelectedDate(dateKey);
+                    }
+                  }}
+                  role={inMonth ? 'button' : undefined}
+                  tabIndex={inMonth ? 0 : undefined}
+                  className={`min-h-[98px] p-1.5 text-left transition-colors ${inMonth ? 'cursor-pointer bg-white hover:bg-blue-50' : 'bg-slate-50 opacity-50'} ${isSelected ? 'ring-2 ring-inset ring-blue-500' : ''}`}
                 >
                   <div className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>
                     {inMonth ? dayNum : ''}
@@ -28811,17 +29128,25 @@ function CalendarView({
                           ? entry.calendarEvent.id
                           : entry.appointment.id;
                       return (
-                        <div key={`${entry.kind}-${entryId}`} className={`rounded border px-1 py-0.5 text-xs leading-tight ${className}`}>
+                        <button
+                          key={`${entry.kind}-${entryId}-${entryTime(entry)}`}
+                          type="button"
+                          onClick={event => {
+                            event.stopPropagation();
+                            openCalendarEntry(entry);
+                          }}
+                          className={`block w-full rounded border px-1 py-0.5 text-left text-xs leading-tight transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+                        >
                           <span className="font-semibold">{time}</span>
                           <span className="block truncate">{title}</span>
-                        </div>
+                        </button>
                       );
                     })}
                     {dayAppts.length > 3 && (
                       <p className="text-xs font-semibold text-slate-500">+{dayAppts.length - 3} more</p>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

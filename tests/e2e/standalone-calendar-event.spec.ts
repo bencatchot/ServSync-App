@@ -50,20 +50,28 @@ test.describe('standalone calendar events', () => {
     // Appears on the calendar (selected-day / upcoming list).
     await expect(eventRow(title).filter({ hasText: /10:00 AM/i }).first()).toBeVisible({ timeout: 30_000 });
 
-    // ── Open detail ─────────────────────────────────────────────────────────--
-    await eventRow(title).first().click();
-    await expect(page.getByRole('heading', { name: /^Calendar event$/i })).toBeVisible();
-    await expect(page.getByText(/^Not tied to a job$/i).first()).toBeVisible();
-    await expect(page.getByText(/Monthly with no end date/i)).toBeVisible();
-    const comingSoon = page.getByRole('button', { name: /Create Job from Event \(coming soon\)/i });
+    // ── Open detail from the month grid ───────────────────────────────────────
+    const calendarGridChip = main
+      .getByRole('button')
+      .filter({ hasText: title })
+      .filter({ hasText: /10:00 AM/i })
+      .filter({ hasNotText: /Not tied to a job/i })
+      .first();
+    await expect(calendarGridChip).toBeVisible();
+    await calendarGridChip.click();
+    const eventDialog = page.getByRole('dialog', { name: /^Calendar event$/i });
+    await expect(eventDialog).toBeVisible();
+    await expect(eventDialog.getByText(/^Not tied to a job$/i).first()).toBeVisible();
+    await expect(eventDialog.getByText(/Monthly with no end date/i)).toBeVisible();
+    const comingSoon = eventDialog.getByRole('button', { name: /Create Job from Event \(coming soon\)/i });
     await expect(comingSoon).toBeVisible();
     await expect(comingSoon).toBeDisabled();
 
     // ── Edit ──────────────────────────────────────────────────────────────────
-    await page.getByRole('textbox', { name: 'Title', exact: true }).fill(editedTitle);
-    await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('11:30');
-    await page.getByRole('combobox', { name: /^Repeat$/i }).selectOption('weekly');
-    await expect(page.getByText(/Weekly with no end date/i)).toBeVisible();
+    await eventDialog.getByRole('textbox', { name: 'Title', exact: true }).fill(editedTitle);
+    await eventDialog.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('11:30');
+    await eventDialog.getByRole('combobox', { name: /^Repeat$/i }).selectOption('weekly');
+    await expect(eventDialog.getByText(/Weekly with no end date/i)).toBeVisible();
     const updateResponse = page.waitForResponse(calendarEventsRequest('PATCH'));
     await page.getByRole('button', { name: /^Save changes$/i }).click();
     expect((await updateResponse).ok()).toBeTruthy();
@@ -73,9 +81,9 @@ test.describe('standalone calendar events', () => {
 
     // ── Delete ──────────────────────────────────────────────────────────────--
     await eventRow(editedTitle).first().click();
-    await expect(page.getByRole('heading', { name: /^Calendar event$/i })).toBeVisible();
+    await expect(eventDialog).toBeVisible();
     const deleteResponse = page.waitForResponse(calendarEventsRequest('DELETE'));
-    await page.getByRole('button', { name: /^Delete$/i }).click();
+    await eventDialog.getByRole('button', { name: /^Delete$/i }).click();
     expect((await deleteResponse).ok()).toBeTruthy();
     await expect(main.getByText(editedTitle, { exact: false })).toHaveCount(0, { timeout: 30_000 });
 
