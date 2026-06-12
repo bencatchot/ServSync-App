@@ -3900,7 +3900,7 @@ function TrustSafetyPanel({
   const sections = [
     {
       title: 'Homeowner control',
-      body: 'Homeowners choose when to connect with a contractor, request service, and share home information. Review what you share before sending requests, documents, photos, or reports.',
+      body: 'Homeowners choose when to connect with a contractor, request service, and share home information. Review what you share before sending requests, documents, or photos.',
     },
     {
       title: 'Contractor access boundaries',
@@ -3935,6 +3935,8 @@ function TrustSafetyPanel({
           </p>
         </div>
 
+        <PermissionSharingExplanation />
+
         <div className="grid gap-3 md:grid-cols-2">
           {sections.map(section => (
             <div key={section.title} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -3968,6 +3970,40 @@ function TrustSafetyPanel({
         )}
       </div>
     </Card>
+  );
+}
+
+function PermissionSharingExplanation() {
+  const permissionItems = [
+    'Contact info: name, phone, and email',
+    'Home overview: general home profile details',
+    'Address: exact street address',
+    'Preferred vendors: vendor list the homeowner chooses to share',
+    'Photos: photos uploaded by the homeowner',
+  ];
+
+  return (
+    <section className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+      <p className="text-sm font-bold text-blue-950">What this means in ServSync</p>
+      <p className="mt-2 text-sm leading-6 text-blue-900">
+        When a homeowner connects with a contractor, ServSync lets the homeowner choose what the contractor can see.
+      </p>
+      <p className="mt-3 text-sm font-semibold text-blue-950">Sharing permissions can include:</p>
+      <ul className="mt-2 space-y-1 text-sm leading-6 text-blue-900">
+        {permissionItems.map(item => (
+          <li key={item} className="flex gap-2">
+            <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-sm leading-6 text-blue-900">
+        Nothing extra is shared unless the homeowner allows it. Access can also be changed, cleared, or revoked.
+      </p>
+      <p className="mt-2 text-sm leading-6 text-blue-900">
+        The goal is to help homeowners work with contractors while keeping control over each contractor relationship.
+      </p>
+    </section>
   );
 }
 
@@ -4009,6 +4045,8 @@ function TrustSafetyPublicPage() {
           </button>
         </div>
       </section>
+
+      <PermissionSharingExplanation />
 
       <section className="grid gap-3 md:grid-cols-2">
         {sections.map(section => (
@@ -5970,7 +6008,7 @@ function LandingPage() {
           <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Find local contractors, request service clearly, review estimates and invoices, and keep a record of work done on your home." />
           <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Get discovered, manage requests, send estimates and invoices, schedule work, and keep customer records organized without enterprise-level complexity." />
           <FeatureRow icon={<Compass size={18} />} title="ServSync Discover" text="Discover is being built to help homeowners find local contractor profiles and give contractors a better way to share helpful service information as the platform grows." />
-          <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
+          <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners choose what each contractor can see and can update or revoke access as needed." />
         </div>
       </section>
 
