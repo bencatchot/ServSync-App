@@ -24,4 +24,5 @@ playwright-report/
 *.sln
 *.sw?
 .env
+.env.test.local
 supabase/.temp/
