@@ -16,6 +16,7 @@ export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
 export type ContractorVisitEventStatus = 'scheduled' | 'completed' | 'cancelled';
 export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_waiting' | 'accepted' | 'declined' | 'countered';
+export type CalendarEventType = 'routine_inspection' | 'follow_up' | 'reminder' | 'check_in' | 'other';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
@@ -744,6 +745,31 @@ export interface ContractorVisitEvent {
   status: ContractorVisitEventStatus;
   homeowner_response_status: ContractorVisitHomeownerResponseStatus;
   inspection?: Inspection | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventDraft {
+  title: string;
+  event_type: CalendarEventType;
+  starts_at: string;        // datetime-local input value
+  duration_minutes: string; // form string; '' = unset
+  notes: string;
+  local_contact_id: string; // '' = none
+}
+
+// Standalone contractor calendar event — not tied to a job/inspection.
+export interface ContractorCalendarEvent {
+  id: string;
+  contractor_id: string;
+  created_by: string | null;
+  title: string;
+  event_type: CalendarEventType;
+  starts_at: string;
+  duration_minutes: number | null;
+  notes: string;
+  local_contact_id: string | null;
+  homeowner_user_id: string | null;
   created_at: string;
   updated_at: string;
 }

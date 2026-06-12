@@ -85,6 +85,9 @@ import type {
   ConnectionAlertLevel,
   ConnectionAlertStatus,
   ContractorVisitEvent,
+  ContractorCalendarEvent,
+  CalendarEventType,
+  CalendarEventDraft,
   ContractorConnectionRequest,
   ContractorLocalContact,
   ContractorLocalHome,
@@ -12602,6 +12605,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspectionTemplates, setInspectionTemplates] = useState<InspectionTemplate[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [contractorVisitEvents, setContractorVisitEvents] = useState<ContractorVisitEvent[]>([]);
+  const [contractorCalendarEvents, setContractorCalendarEvents] = useState<ContractorCalendarEvent[]>([]);
+  const [calendarEventComposerOpen, setCalendarEventComposerOpen] = useState(false);
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
+  const [calendarEventBusy, setCalendarEventBusy] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
@@ -12897,7 +12904,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -12905,6 +12912,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .select('*, inspection:inspections(*)')
             .eq('contractor_id', loadedContractor.id)
             .order('scheduled_at', { ascending: true }),
+          supabase
+            .from('contractor_calendar_events')
+            .select('*')
+            .eq('contractor_id', loadedContractor.id)
+            .order('starts_at', { ascending: true }),
           supabase
             .from('contractor_local_contacts')
             .select('*, homes:contractor_local_homes(*)')
@@ -12935,6 +12947,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
         if (!visitEventsRes.error) setContractorVisitEvents((visitEventsRes.data || []) as ContractorVisitEvent[]);
         else setContractorVisitEvents([]);
+        if (!calendarEventsRes.error) setContractorCalendarEvents((calendarEventsRes.data || []) as ContractorCalendarEvent[]);
+        else setContractorCalendarEvents([]);
         if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
@@ -12942,6 +12956,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
       } else {
         setContractorVisitEvents([]);
+        setContractorCalendarEvents([]);
         setLocalContacts([]);
         setLocalClaimInvites([]);
       }
@@ -14427,6 +14442,91 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     .filter(request => request.appointment?.status === 'confirmed')
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
   const activeVisitEventCount = contractorVisitEvents.filter(event => event.status === 'scheduled').length;
+
+  // ── Standalone calendar events (not tied to a job) ──────────────────────────
+  const openNewCalendarEvent = () => {
+    setEditingCalendarEvent(null);
+    setCalendarEventComposerOpen(true);
+  };
+  const openCalendarEventDetail = (event: ContractorCalendarEvent) => {
+    setEditingCalendarEvent(event);
+    setCalendarEventComposerOpen(true);
+  };
+  const closeCalendarEventComposer = () => {
+    setCalendarEventComposerOpen(false);
+    setEditingCalendarEvent(null);
+  };
+
+  const saveCalendarEvent = async (draft: CalendarEventDraft) => {
+    if (!supabase || !contractor) return;
+    if (!draft.title.trim()) {
+      setError('Add a title for this calendar event.');
+      return;
+    }
+    if (!draft.starts_at) {
+      setError('Choose a date and time for this calendar event.');
+      return;
+    }
+    setCalendarEventBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      const payload = {
+        contractor_id: contractor.id,
+        title: draft.title.trim(),
+        event_type: draft.event_type,
+        starts_at: new Date(draft.starts_at).toISOString(),
+        duration_minutes: draft.duration_minutes.trim() ? Number(draft.duration_minutes) : null,
+        notes: draft.notes.trim(),
+        local_contact_id: draft.local_contact_id || null,
+      };
+      if (editingCalendarEvent) {
+        const { data, error: updErr } = await supabase
+          .from('contractor_calendar_events')
+          .update(payload)
+          .eq('id', editingCalendarEvent.id)
+          .select('*')
+          .single();
+        if (updErr) throw updErr;
+        setContractorCalendarEvents(prev => prev.map(ev => (ev.id === editingCalendarEvent.id ? (data as ContractorCalendarEvent) : ev)));
+        setNotice('Calendar event updated.');
+      } else {
+        const { data, error: insErr } = await supabase
+          .from('contractor_calendar_events')
+          .insert({ ...payload, created_by: profile.id })
+          .select('*')
+          .single();
+        if (insErr) throw insErr;
+        setContractorCalendarEvents(prev => [...prev, data as ContractorCalendarEvent]
+          .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()));
+        setNotice('Calendar event created.');
+      }
+      closeCalendarEventComposer();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save calendar event.'));
+    } finally {
+      setCalendarEventBusy(false);
+    }
+  };
+
+  const deleteCalendarEvent = async (event: ContractorCalendarEvent) => {
+    if (!supabase) return;
+    if (!window.confirm('Delete this calendar event? This cannot be undone.')) return;
+    setCalendarEventBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      const { error: delErr } = await supabase.from('contractor_calendar_events').delete().eq('id', event.id);
+      if (delErr) throw delErr;
+      setContractorCalendarEvents(prev => prev.filter(ev => ev.id !== event.id));
+      setNotice('Calendar event deleted.');
+      closeCalendarEventComposer();
+    } catch (err) {
+      setError(readableError(err, 'Unable to delete calendar event.'));
+    } finally {
+      setCalendarEventBusy(false);
+    }
+  };
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnContractorSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentConnectedHomeowners = connections.slice(0, 4);
@@ -17906,18 +18006,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       )}
 
       {contractorTab === 'calendar' && (
-        <Card title="Calendar" icon={<Calendar size={18} />}>
+        <Card
+          title="Calendar"
+          icon={<Calendar size={18} />}
+          action={
+            <button type="button" onClick={openNewCalendarEvent} className={buttonClass('primary')}>
+              <Plus size={14} />
+              New event
+            </button>
+          }
+        >
           <CalendarView
             requests={serviceRequests}
             visitEvents={contractorVisitEvents}
+            calendarEvents={contractorCalendarEvents}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
             onOpenVisitEvent={event => {
               const inspection = event.inspection ?? inspections.find(item => item.id === event.inspection_id) ?? null;
               if (inspection) openInspection(inspection);
             }}
+            onOpenCalendarEvent={openCalendarEventDetail}
           />
         </Card>
+      )}
+      {calendarEventComposerOpen && (
+        <CalendarEventComposer
+          event={editingCalendarEvent}
+          localContacts={localContacts}
+          busy={calendarEventBusy}
+          onSave={saveCalendarEvent}
+          onDelete={editingCalendarEvent ? () => deleteCalendarEvent(editingCalendarEvent) : undefined}
+          onClose={closeCalendarEventComposer}
+        />
       )}
 
       {contractorTab === 'invites' && (
@@ -28073,12 +28194,13 @@ function OverviewCard({
 }
 
 
-function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Card({ title, icon, children, action }: { title: string; icon: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
         <h2 className="text-sm font-bold text-[#02132D]">{title}</h2>
+        {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
     </section>
@@ -28224,18 +28346,131 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+const CALENDAR_EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string }[] = [
+  { value: 'routine_inspection', label: 'Routine inspection' },
+  { value: 'follow_up', label: 'Follow-up visit' },
+  { value: 'reminder', label: 'Reminder' },
+  { value: 'check_in', label: 'Customer check-in' },
+  { value: 'other', label: 'Other' },
+];
+
+function calendarEventTypeLabel(type: string) {
+  return CALENDAR_EVENT_TYPE_OPTIONS.find(option => option.value === type)?.label ?? 'Event';
+}
+
+function toDateTimeLocalValue(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function defaultCalendarEventStart() {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return toDateTimeLocalValue(d.toISOString());
+}
+
+function CalendarEventComposer({
+  event,
+  localContacts,
+  busy,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  event: ContractorCalendarEvent | null;
+  localContacts: ContractorLocalContact[];
+  busy: boolean;
+  onSave: (draft: CalendarEventDraft) => void;
+  onDelete?: () => void;
+  onClose: () => void;
+}) {
+  const isEditing = Boolean(event);
+  const [draft, setDraft] = useState<CalendarEventDraft>(() => ({
+    title: event?.title ?? '',
+    event_type: event?.event_type ?? 'routine_inspection',
+    starts_at: event ? toDateTimeLocalValue(event.starts_at) : defaultCalendarEventStart(),
+    duration_minutes: event?.duration_minutes ? String(event.duration_minutes) : '',
+    notes: event?.notes ?? '',
+    local_contact_id: event?.local_contact_id ?? '',
+  }));
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+      <div className="my-8 w-full max-w-lg rounded-2xl border border-[#E1E3E7] bg-white p-6 shadow-2xl">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-[#02132D]">{isEditing ? 'Calendar event' : 'New calendar event'}</h2>
+          <button type="button" onClick={onClose} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={18} /></button>
+        </div>
+        <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
+          Not tied to a job
+        </p>
+
+        <div className="space-y-4">
+          <Field label="Title">
+            <input className={inputClass()} value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Routine roof inspection" />
+          </Field>
+          <Field label="Event type">
+            <select className={inputClass()} value={draft.event_type} onChange={e => setDraft(d => ({ ...d, event_type: e.target.value as CalendarEventType }))}>
+              {CALENDAR_EVENT_TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Date & time">
+              <input type="datetime-local" className={inputClass()} value={draft.starts_at} onChange={e => setDraft(d => ({ ...d, starts_at: e.target.value }))} />
+            </Field>
+            <Field label="Duration (minutes, optional)">
+              <input type="number" min="1" max="1440" className={inputClass()} value={draft.duration_minutes} onChange={e => setDraft(d => ({ ...d, duration_minutes: e.target.value }))} placeholder="60" />
+            </Field>
+          </div>
+          <Field label="Customer (optional)">
+            <select className={inputClass()} value={draft.local_contact_id} onChange={e => setDraft(d => ({ ...d, local_contact_id: e.target.value }))}>
+              <option value="">No customer</option>
+              {localContacts.map(contact => <option key={contact.id} value={contact.id}>{contact.display_name}</option>)}
+            </select>
+          </Field>
+          <Field label="Notes (optional)">
+            <textarea rows={3} className={inputClass()} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
+          </Field>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" disabled className={`${buttonClass('secondary')} cursor-not-allowed opacity-60`} title="Coming soon">
+            Create Job from Event (coming soon)
+          </button>
+          <div className="flex items-center gap-2">
+            {isEditing && onDelete && (
+              <button type="button" onClick={onDelete} disabled={busy} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
+                Delete
+              </button>
+            )}
+            <button type="button" onClick={() => onSave(draft)} disabled={busy} className={buttonClass('primary')}>
+              {busy ? 'Saving...' : isEditing ? 'Save changes' : 'Create event'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CalendarView({
   requests,
   visitEvents = [],
+  calendarEvents = [],
   perspective,
   onOpenRequest,
   onOpenVisitEvent,
+  onOpenCalendarEvent,
 }: {
   requests: ServiceRequestSummary[];
   visitEvents?: ContractorVisitEvent[];
+  calendarEvents?: ContractorCalendarEvent[];
   perspective: 'homeowner' | 'contractor';
   onOpenRequest?: (request: ServiceRequestSummary) => void;
   onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
+  onOpenCalendarEvent?: (event: ContractorCalendarEvent) => void;
 }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -28245,7 +28480,8 @@ function CalendarView({
 
   type ApptEntry = { kind: 'appointment'; request: ServiceRequestSummary; appointment: ServiceRequestAppointment };
   type VisitEntry = { kind: 'visit'; visitEvent: ContractorVisitEvent; request: ServiceRequestSummary | null };
-  type CalendarEntry = ApptEntry | VisitEntry;
+  type StandaloneEntry = { kind: 'standalone'; calendarEvent: ContractorCalendarEvent };
+  type CalendarEntry = ApptEntry | VisitEntry | StandaloneEntry;
   const visitRequestIds = new Set(visitEvents.filter(event => event.service_request_id && event.status !== 'cancelled').map(event => event.service_request_id as string));
   const apptMap: Record<string, CalendarEntry[]> = {};
   const appointments: CalendarEntry[] = [];
@@ -28268,9 +28504,14 @@ function CalendarView({
       : null;
     addEntry(event.scheduled_at, { kind: 'visit', visitEvent: event, request });
   }
+  for (const calendarEvent of calendarEvents) {
+    addEntry(calendarEvent.starts_at, { kind: 'standalone', calendarEvent });
+  }
   const entryTime = (entry: CalendarEntry) => entry.kind === 'appointment'
     ? entry.appointment.proposed_at
-    : entry.visitEvent.scheduled_at;
+    : entry.kind === 'visit'
+      ? entry.visitEvent.scheduled_at
+      : entry.calendarEvent.starts_at;
   appointments.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
   Object.values(apptMap).forEach(dayEntries => {
     dayEntries.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
@@ -28280,7 +28521,9 @@ function CalendarView({
     new Date(entryTime(entry)).getTime() >= now.getTime()
     && (entry.kind === 'appointment'
       ? !['cancelled', 'completed'].includes(entry.appointment.status)
-      : !['cancelled', 'completed'].includes(entry.visitEvent.status))
+      : entry.kind === 'visit'
+        ? !['cancelled', 'completed'].includes(entry.visitEvent.status)
+        : true)
   );
   const proposedForMe = appointments.filter((entry): entry is ApptEntry =>
     entry.kind === 'appointment'
@@ -28350,6 +28593,36 @@ function CalendarView({
   };
 
   const renderAppointmentRow = (entry: CalendarEntry, compact = false) => {
+    if (entry.kind === 'standalone') {
+      const { calendarEvent } = entry;
+      const date = new Date(calendarEvent.starts_at);
+      return (
+        <button
+          key={`calendar-event-${calendarEvent.id}`}
+          type="button"
+          onClick={() => onOpenCalendarEvent?.(calendarEvent)}
+          className="w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left text-violet-900 transition hover:border-violet-300 hover:bg-violet-100"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+                <p className="font-semibold text-slate-950">{calendarEvent.title}</p>
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                {calendarEventTypeLabel(calendarEvent.event_type)} · {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {calendarEvent.duration_minutes ? ` · ${calendarEvent.duration_minutes} min` : ''}
+              </p>
+              {!compact && calendarEvent.notes && <p className="mt-1 text-xs text-slate-600">{calendarEvent.notes}</p>}
+              <p className="mt-1 text-xs font-semibold text-violet-700">Not tied to a job</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-violet-700">
+              Event
+            </span>
+          </div>
+        </button>
+      );
+    }
     if (entry.kind === 'visit') {
       const { visitEvent, request } = entry;
       const date = new Date(visitEvent.scheduled_at);
@@ -28474,12 +28747,21 @@ function CalendarView({
                       const time = new Date(entryTime(entry)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
                       const title = entry.kind === 'visit'
                         ? entry.visitEvent.inspection?.name || entry.request?.title || 'Service visit'
-                        : entry.request.title;
+                        : entry.kind === 'standalone'
+                          ? entry.calendarEvent.title
+                          : entry.request.title;
                       const className = entry.kind === 'visit'
                         ? visitEventStatusClass(entry.visitEvent)
-                        : appointmentStatusClass(entry.appointment.status);
+                        : entry.kind === 'standalone'
+                          ? 'border-violet-200 bg-violet-50 text-violet-800'
+                          : appointmentStatusClass(entry.appointment.status);
+                      const entryId = entry.kind === 'visit'
+                        ? entry.visitEvent.id
+                        : entry.kind === 'standalone'
+                          ? entry.calendarEvent.id
+                          : entry.appointment.id;
                       return (
-                        <div key={`${entry.kind}-${entry.kind === 'visit' ? entry.visitEvent.id : entry.appointment.id}`} className={`rounded border px-1 py-0.5 text-xs leading-tight ${className}`}>
+                        <div key={`${entry.kind}-${entryId}`} className={`rounded border px-1 py-0.5 text-xs leading-tight ${className}`}>
                           <span className="font-semibold">{time}</span>
                           <span className="block truncate">{title}</span>
                         </div>
@@ -28499,6 +28781,7 @@ function CalendarView({
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" /> Confirmed</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-500" /> Completed</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-400" /> Cancelled</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-500" /> Event (no job)</span>
           </div>
         </div>
 
