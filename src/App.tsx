@@ -8679,7 +8679,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedRequestConnection = serviceRequestDraft.connection_id
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
-  const selectedRequestCategories = selectedRequestConnection ? serviceCategoriesForConnection(selectedRequestConnection) : SERVICE_REQUEST_CATEGORIES;
   const requestIssueText = serviceProblemText || serviceRequestDraft.description;
   const requestClassification = classifyHomeownerRequest(requestIssueText, SERVICE_REQUEST_CATEGORIES);
   const requestCategorySuggestions = requestClassification.rankedServiceTypes;
@@ -8754,6 +8753,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const startServiceRequestForConnection = (connection: HomeownerConnection, category?: string) => {
     const categories = serviceCategoriesForConnection(connection);
+    setRequestComposerOpen(false);
+    setRequestComposerStep('issue');
+    setRequestContractorMode('connected');
     setRequestingConnectionId(connection.connection_id);
     setExpandedConnectionId(connection.connection_id);
     setNewRequestFiles([]);
@@ -10395,16 +10397,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'contractors' && (
         <div className="space-y-5">
           {requestingConnectionId && selectedRequestConnection && (
-            <Card title="Service request" icon={<MessageSquare size={18} />}>
+            <Card title={`Request service from ${selectedRequestConnection.business_name}`} icon={<MessageSquare size={18} />}>
               <div className="space-y-4">
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-bold text-blue-950">
-                        Requesting service from {selectedRequestConnection.business_name}
+                        Request service from {selectedRequestConnection.business_name}
                       </p>
                       <p className="mt-1 text-sm text-blue-800">
-                        This request goes directly to your connected contractor. They will see the details you enter here and any files you attach.
+                        This request will go directly to {selectedRequestConnection.business_name}. Describe what you need help with and include any details or photos that may help them understand the issue.
                       </p>
                     </div>
                     <button
@@ -10429,34 +10431,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </div>
                 </div>
 
-                <ServiceCategoryAdvisor
-                  value={serviceProblemText}
-                  onChange={setServiceProblemText}
-                  allowedCategories={selectedRequestCategories}
-                  onApply={category => applySuggestedServiceCategory(category, {
-                    connectionId: selectedRequestConnection.connection_id,
-                    allowedCategories: selectedRequestCategories,
-                  })}
-                />
                 {renderServiceRequestPropertyField()}
 
-                <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
-                  <Field label="Service type">
-                    <select
-                      className={inputClass()}
-                      value={serviceRequestDraft.category}
-                      onChange={event => setServiceRequestDraft(current => ({
-                        ...current,
-                        connection_id: selectedRequestConnection.connection_id,
-                        category: event.target.value,
-                      }))}
-                    >
-                      <option value="">Choose service type</option>
-                      {selectedRequestCategories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </Field>
+                <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
                   <Field label="Urgency">
                     <select
                       className={inputClass()}
@@ -10470,20 +10447,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
                     </select>
                   </Field>
+                  <Field label="Short title">
+                    <input
+                      className={inputClass()}
+                      {...writingAssistProps}
+                      value={serviceRequestDraft.title}
+                      onChange={event => setServiceRequestDraft(current => ({
+                        ...current,
+                        connection_id: selectedRequestConnection.connection_id,
+                        title: event.target.value,
+                      }))}
+                      placeholder="Example: Leak under kitchen sink"
+                    />
+                  </Field>
                 </div>
-                <Field label="Short title">
-                  <input
-                    className={inputClass()}
-                    {...writingAssistProps}
-                    value={serviceRequestDraft.title}
-                    onChange={event => setServiceRequestDraft(current => ({
-                      ...current,
-                      connection_id: selectedRequestConnection.connection_id,
-                      title: event.target.value,
-                    }))}
-                    placeholder="Example: Leak under kitchen sink"
-                  />
-                </Field>
                 <Field label="What do you need help with?">
                   <textarea
                     className={inputClass()}
@@ -10572,7 +10549,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 const isRevoked = connection.status === 'revoked';
                 const isDeclined = connection.status === 'declined';
                 const isPending = connection.status === 'pending';
-                const connectionServiceCategories = serviceCategoriesForConnection(connection);
 
                 return (
                   <div key={connection.connection_id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -10724,116 +10700,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 {isRequestingService ? 'Hide request' : 'Start request'}
                               </button>
                             </div>
-                            {isRequestingService && (
-                              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                                <div className="mb-3">
-                                  <p className="text-sm font-bold text-blue-950">Request service from {connection.business_name}</p>
-                                  <p className="mt-1 text-sm text-blue-800">
-                                    Send this request directly to this connected contractor.
-                                  </p>
-                                </div>
-                                <ServiceCategoryAdvisor
-                                  value={serviceProblemText}
-                                  onChange={setServiceProblemText}
-                                  allowedCategories={connectionServiceCategories}
-                                  onApply={category => applySuggestedServiceCategory(category, {
-                                    connectionId: connection.connection_id,
-                                    allowedCategories: connectionServiceCategories,
-                                  })}
-                                />
-                                {renderServiceRequestPropertyField()}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  <Field label="Service type">
-                                    <select
-                                      className={inputClass()}
-                                      value={serviceRequestDraft.connection_id === connection.connection_id ? serviceRequestDraft.category : ''}
-                                      onChange={event => setServiceRequestDraft(current => ({
-                                        ...current,
-                                        connection_id: connection.connection_id,
-                                        category: event.target.value,
-                                      }))}
-                                    >
-                                      <option value="">Choose service type</option>
-                                      {connectionServiceCategories.map(category => (
-                                        <option key={category} value={category}>{category}</option>
-                                      ))}
-                                    </select>
-                                  </Field>
-                                  <Field label="Urgency">
-                                    <select
-                                      className={inputClass()}
-                                      value={serviceRequestDraft.urgency}
-                                      onChange={event => setServiceRequestDraft(current => ({
-                                        ...current,
-                                        connection_id: connection.connection_id,
-                                        urgency: event.target.value as ServiceRequestUrgency,
-                                      }))}
-                                    >
-                                      {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
-                                    </select>
-                                  </Field>
-                                </div>
-                                <div className="mt-3 grid gap-3">
-                                  <Field label="Short title">
-                                    <input
-                                      className={inputClass()}
-                                      {...writingAssistProps}
-                                      value={serviceRequestDraft.title}
-                                      onChange={event => setServiceRequestDraft(current => ({
-                                        ...current,
-                                        connection_id: connection.connection_id,
-                                        title: event.target.value,
-                                      }))}
-                                      placeholder="Example: Leak under kitchen sink"
-                                    />
-                                  </Field>
-                                  <Field label="What do you need help with?">
-                                    <textarea
-                                      className={inputClass()}
-                                      rows={3}
-                                      {...writingAssistProps}
-                                      value={serviceRequestDraft.description}
-                                      onChange={event => setServiceRequestDraft(current => ({
-                                        ...current,
-                                        connection_id: connection.connection_id,
-                                        description: event.target.value,
-                                      }))}
-                                      placeholder="Add enough detail for the contractor to understand the issue."
-                                    />
-                                  </Field>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => void createServiceRequest()}
-                                    disabled={savingServiceRequest}
-                                    className={buttonClass('primary')}
-                                  >
-                                    <Send size={16} />
-                                    {savingServiceRequest ? 'Sending...' : 'Send request'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setRequestingConnectionId(null);
-                                      setServiceProblemText('');
-                                      setServiceRequestDraft({
-                                        connection_id: '',
-                                        home_id: selectedHome?.id || selectedHomeId || '',
-                                        category: '',
-                                        urgency: 'normal',
-                                        title: '',
-                                        description: '',
-                                      });
-                                    }}
-                                    disabled={savingServiceRequest}
-                                    className={buttonClass('secondary')}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            )}
                           </>
                         )}
                       </div>
@@ -10847,6 +10713,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           })()}
         </Card>
 
+        {!requestingConnectionId && (
         <Card title="Find or request service" icon={<MessageSquare size={18} />}>
             <div className="space-y-4">
               <ServiceCategoryAdvisor
@@ -11042,6 +10909,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               )}
             </div>
           </Card>
+        )}
 
       </div>
       )}
