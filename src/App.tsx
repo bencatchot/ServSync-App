@@ -5276,6 +5276,7 @@ function appointmentResponseText(appointment: ServiceRequestAppointment, perspec
 function notificationCategoryLabel(type: string) {
   if (type.includes('support')) return 'Support';
   if (type.includes('appointment')) return 'Calendar';
+  if (type.includes('invoice')) return 'Invoice';
   if (type.includes('estimate')) return 'Estimate';
   if (type.includes('quote')) return 'Quote';
   if (type.includes('connection')) return 'Connection';
@@ -5287,6 +5288,7 @@ function notificationCategoryLabel(type: string) {
 function notificationCategoryClass(type: string) {
   if (type.includes('support')) return 'bg-sky-100 text-sky-700';
   if (type.includes('appointment')) return 'bg-amber-100 text-amber-700';
+  if (type.includes('invoice')) return 'bg-teal-100 text-teal-700';
   if (type.includes('estimate')) return 'bg-emerald-100 text-emerald-700';
   if (type.includes('quote')) return 'bg-emerald-100 text-emerald-700';
   if (type.includes('connection')) return 'bg-blue-100 text-blue-700';
@@ -9683,6 +9685,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         unreadCount={unreadNotificationCount}
         onMarkRead={ids => void markNotificationsRead(ids)}
         onOpenNotification={notification => {
+          if (notification.invoice_id || notification.type.includes('invoice')) {
+            setHomeownerRecordSection('open_invoices');
+            setHomeownerTab('estimates');
+            return;
+          }
           if (notification.estimate_id) {
             setHomeownerTab('estimates');
             return;
@@ -26652,7 +26659,7 @@ function NotificationBell({
 
   const handleNotificationClick = (notification: AppNotification) => {
     if (!notification.read_at) onMarkRead([notification.id]);
-    if ((notification.request_id || notification.estimate_id || notification.support_inquiry_id || notification.type.includes('support') || notification.type.includes('connection')) && onOpenNotification) {
+    if ((notification.request_id || notification.estimate_id || notification.invoice_id || notification.support_inquiry_id || notification.type.includes('support') || notification.type.includes('connection') || notification.type.includes('invoice')) && onOpenNotification) {
       onOpenNotification(notification);
       setOpen(false);
     }

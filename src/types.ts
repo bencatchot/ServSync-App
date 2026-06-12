@@ -768,6 +768,7 @@ export interface AppNotification {
   body: string;
   request_id: string | null;
   estimate_id: string | null;
+  invoice_id: string | null;
   support_inquiry_id: string | null;
   read_at: string | null;
   created_at: string;
