@@ -19,6 +19,10 @@ test.describe('standalone calendar events', () => {
     const ts = timestampForRecord();
     const title = `E2E Calendar Event ${ts}`;
     const editedTitle = `E2E Calendar Event ${ts} edited`;
+    const selectedDate = new Date();
+    selectedDate.setDate(selectedDate.getDate() + 1);
+    const selectedDateValue = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+    const selectedDayPattern = new RegExp(`^${selectedDate.getDate()}\\b`);
 
     const calendarEventsRequest = (method: string) => (response: import('@playwright/test').Response) =>
       response.url().includes('/rest/v1/contractor_calendar_events') && response.request().method() === method;
@@ -29,11 +33,13 @@ test.describe('standalone calendar events', () => {
     await loginAs(page, 'contractor');
     await openSidebarTab(page, /^Calendar$/i);
     await waitForContractorWorkspaceReady(page);
+    await main.getByRole('button', { name: selectedDayPattern }).first().click();
 
     // ── Create ────────────────────────────────────────────────────────────────
     await main.getByRole('button', { name: /^New event$/i }).click();
     await expect(page.getByRole('heading', { name: /^New calendar event$/i })).toBeVisible();
     await expect(page.getByText(/^Not tied to a job$/i).first()).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Event date', exact: true })).toHaveValue(selectedDateValue);
 
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
     await page.getByRole('combobox', { name: 'Event type', exact: true }).selectOption('inspection_visit');

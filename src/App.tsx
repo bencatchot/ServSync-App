@@ -12555,6 +12555,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [calendarEventComposerOpen, setCalendarEventComposerOpen] = useState(false);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
   const [editingCalendarEventOccurrenceAt, setEditingCalendarEventOccurrenceAt] = useState<string | null>(null);
+  const [contractorCalendarSelectedDate, setContractorCalendarSelectedDate] = useState<string | null>(null);
   const [selectedVisitCalendarEvent, setSelectedVisitCalendarEvent] = useState<ContractorVisitEvent | null>(null);
   const [calendarEventBusy, setCalendarEventBusy] = useState(false);
   const [creatingJobFromCalendarEventKey, setCreatingJobFromCalendarEventKey] = useState<string | null>(null);
@@ -18255,6 +18256,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             calendarEvents={contractorCalendarEvents}
             calendarEventJobLinks={calendarEventJobLinks}
             calendarEventOccurrenceExclusions={calendarEventOccurrenceExclusions}
+            selectedDateValue={contractorCalendarSelectedDate}
+            onSelectedDateChange={setContractorCalendarSelectedDate}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
             onOpenVisitEvent={openVisitCalendarEventDetail}
@@ -18290,6 +18293,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {calendarEventComposerOpen && (
         <CalendarEventComposer
           event={editingCalendarEvent}
+          defaultDate={editingCalendarEvent ? null : contractorCalendarSelectedDate}
           occurrenceStartsAt={editingCalendarEventOccurrenceAt ?? editingCalendarEvent?.starts_at ?? null}
           linkedJob={editingCalendarEvent && editingCalendarEventOccurrenceAt
             ? calendarEventLinkForOccurrence(editingCalendarEvent.id, editingCalendarEventOccurrenceAt)
@@ -28657,14 +28661,19 @@ function toDateTimeLocalValue(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function defaultCalendarEventStart() {
+function defaultCalendarEventStart(dateValue?: string | null) {
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
+  if (dateValue && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${dateValue}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
   return toDateTimeLocalValue(d.toISOString());
 }
 
 function CalendarEventComposer({
   event,
+  defaultDate,
   occurrenceStartsAt,
   linkedJob,
   localContacts,
@@ -28678,6 +28687,7 @@ function CalendarEventComposer({
   onClose,
 }: {
   event: ContractorCalendarEvent | null;
+  defaultDate?: string | null;
   occurrenceStartsAt: string | null;
   linkedJob: ContractorCalendarEventJobLink | null;
   localContacts: ContractorLocalContact[];
@@ -28695,7 +28705,7 @@ function CalendarEventComposer({
   const [draft, setDraft] = useState<CalendarEventDraft>(() => ({
     title: event?.title ?? '',
     event_type: event?.event_type ?? 'service_visit',
-    starts_at: event ? toDateTimeLocalValue(event.starts_at) : defaultCalendarEventStart(),
+    starts_at: event ? toDateTimeLocalValue(event.starts_at) : defaultCalendarEventStart(defaultDate),
     duration_minutes: event?.duration_minutes ? String(event.duration_minutes) : '',
     notes: event?.notes ?? '',
     local_contact_id: event?.local_contact_id ?? '',
@@ -29225,6 +29235,8 @@ function CalendarView({
   calendarEvents = [],
   calendarEventJobLinks = [],
   calendarEventOccurrenceExclusions = [],
+  selectedDateValue,
+  onSelectedDateChange,
   perspective,
   onOpenRequest,
   onOpenVisitEvent,
@@ -29235,6 +29247,8 @@ function CalendarView({
   calendarEvents?: ContractorCalendarEvent[];
   calendarEventJobLinks?: ContractorCalendarEventJobLink[];
   calendarEventOccurrenceExclusions?: ContractorCalendarEventOccurrenceExclusion[];
+  selectedDateValue?: string | null;
+  onSelectedDateChange?: (date: string) => void;
   perspective: 'homeowner' | 'contractor';
   onOpenRequest?: (request: ServiceRequestSummary) => void;
   onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
@@ -29244,7 +29258,12 @@ function CalendarView({
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
+  const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(todayKey);
+  const selectedDate = selectedDateValue ?? internalSelectedDate;
+  const selectCalendarDate = (date: string) => {
+    setInternalSelectedDate(date);
+    onSelectedDateChange?.(date);
+  };
 
   type ApptEntry = { kind: 'appointment'; request: ServiceRequestSummary; appointment: ServiceRequestAppointment };
   type VisitEntry = { kind: 'visit'; visitEvent: ContractorVisitEvent; request: ServiceRequestSummary | null };
@@ -29508,7 +29527,7 @@ function CalendarView({
                   const today = new Date();
                   setYear(today.getFullYear());
                   setMonth(today.getMonth());
-                  setSelectedDate(todayKey);
+                  selectCalendarDate(todayKey);
                 }}
                 className={buttonClass('secondary')}
               >
@@ -29538,11 +29557,11 @@ function CalendarView({
               return (
                 <div
                   key={i}
-                  onClick={() => { if (inMonth) setSelectedDate(dateKey); }}
+                  onClick={() => { if (inMonth) selectCalendarDate(dateKey); }}
                   onKeyDown={event => {
                     if (inMonth && (event.key === 'Enter' || event.key === ' ')) {
                       event.preventDefault();
-                      setSelectedDate(dateKey);
+                      selectCalendarDate(dateKey);
                     }
                   }}
                   role={inMonth ? 'button' : undefined}
