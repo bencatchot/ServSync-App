@@ -47,6 +47,293 @@ interface FindingSuggestion {
   action: string;
 }
 
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function stemToken(value: string) {
+  return value
+    .replace(/ing$/, '')
+    .replace(/age$/, '')
+    .replace(/es$/, '')
+    .replace(/s$/, '');
+}
+
+function hasPhrase(haystack: string, phrase: string) {
+  const normalizedPhrase = normalizeText(phrase);
+  if (!normalizedPhrase) return false;
+  if (` ${haystack} `.includes(` ${normalizedPhrase} `)) return true;
+  const phraseTokens = normalizedPhrase.split(' ');
+  if (phraseTokens.length === 1) {
+    const target = stemToken(phraseTokens[0]);
+    if (target.length <= 2) return haystack.split(' ').some(token => token === target);
+    return haystack.split(' ').some(token => {
+      const stemmed = stemToken(token);
+      if (target.length <= 4) return stemmed === target;
+      return stemmed === target || (stemmed.length > 4 && token.startsWith(target));
+    });
+  }
+  return false;
+}
+
+function hasAny(lower: string, phrases: string[]) {
+  return phrases.some(phrase => hasPhrase(lower, phrase));
+}
+
+function normalizeRoomTerms(value: string) {
+  return value
+    .replace(/\bmaster bath\b/gi, 'primary bathroom')
+    .replace(/\bmaster bathroom\b/gi, 'primary bathroom')
+    .replace(/\bmaster bedroom\b/gi, 'primary bedroom');
+}
+
+function restoreTradeTerms(value: string) {
+  return value
+    .replace(/\bgfci\b/gi, 'GFCI')
+    .replace(/\bac\b/gi, 'AC')
+    .replace(/\bhvac\b/gi, 'HVAC');
+}
+
+function normalizeWhitespace(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim();
+}
+
+function punctuate(value: string) {
+  const trimmed = normalizeWhitespace(value);
+  if (!trimmed) return '';
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function sentenceCase(value: string) {
+  const normalized = restoreTradeTerms(normalizeRoomTerms(normalizeWhitespace(value)));
+  if (!normalized) return '';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function professionalizeFragment(value: string) {
+  const normalized = restoreTradeTerms(normalizeRoomTerms(normalizeWhitespace(value)));
+  if (!normalized) return '';
+  const withRecommendationSplit = normalized.replace(/\s*,?\s+(recommend(?:ed)?(?:\s+\w+)?)/i, '. $1');
+  return withRecommendationSplit
+    .split(/(?<=[.!?])\s+/)
+    .map(part => punctuate(sentenceCase(part)))
+    .join(' ');
+}
+
+function cleanInspectionNoteText(note: string, status: FindingStatus = 'Monitor') {
+  const lower = normalizeText(note);
+  if (!lower) return '';
+
+  if (hasPhrase(lower, 'toilet') && (hasPhrase(lower, 'running') || hasPhrase(lower, 'ball valve') || hasPhrase(lower, 'fill valve'))) {
+    const room = hasPhrase(lower, 'master bath') || hasPhrase(lower, 'master bathroom') || hasPhrase(lower, 'primary bathroom')
+      ? ' in the primary bathroom'
+      : '';
+    const recommendation = hasPhrase(lower, 'ball valve') || hasPhrase(lower, 'fill valve') || hasPhrase(lower, 'recommend')
+      ? ' Recommend replacing the fill valve or ball valve as needed.'
+      : '';
+    return `The toilet${room} is running.${recommendation}`;
+  }
+
+  if ((hasPhrase(lower, 'gfci') || hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle')) && hasAny(lower, ['not working', 'does not work', 'failed', 'failure'])) {
+    const device = hasPhrase(lower, 'gfci') ? 'GFCI outlet' : hasPhrase(lower, 'receptacle') ? 'receptacle' : 'outlet';
+    return `The ${device} is not working. Recommend repair or replacement by a qualified electrician.`;
+  }
+
+  if (hasPhrase(lower, 'water heater') && hasAny(lower, [
+    'no leak',
+    'no leaks',
+    'no damage',
+    'no concern',
+    'no concerns',
+    'no issue',
+    'no issues',
+    'good condition',
+    'working properly',
+    'looks good',
+  ])) {
+    return 'The water heater appears to be in good condition. No issues were observed.';
+  }
+
+  if (hasPhrase(lower, 'active leak') && hasPhrase(lower, 'bathroom sink')) {
+    return 'There is an active leak under the bathroom sink. Recommend addressing this immediately to prevent further water damage.';
+  }
+
+  if ((hasPhrase(lower, 'ac filter') || (hasPhrase(lower, 'filter') && hasPhrase(lower, 'ac'))) && (hasPhrase(lower, 'dirty') || hasPhrase(lower, 'replace') || hasPhrase(lower, 'replacing'))) {
+    return 'The AC filter is dirty. Recommend replacing the filter.';
+  }
+
+  if (hasPhrase(lower, 'ceiling fan') && (hasPhrase(lower, 'squeak') || hasPhrase(lower, 'squeaking') || hasPhrase(lower, 'noise'))) {
+    return 'The ceiling fan is squeaking. Monitor the fan noise and inspect the mounting or blades if it worsens.';
+  }
+
+  if (hasPhrase(lower, 'gutter') && hasPhrase(lower, 'cleaned') && (hasPhrase(lower, 'clog') || hasPhrase(lower, 'clogged'))) {
+    return 'The clogged gutter was cleaned onsite. Monitor during the next rain for proper drainage.';
+  }
+
+  const cleaned = professionalizeFragment(note);
+  if (status === 'Pass') {
+    return cleaned.replace(/\bLooks good no issues\b/i, 'Appears to be in good condition. No issues were observed');
+  }
+  return cleaned;
+}
+
+function cleanInspectionActionText(action: string) {
+  if (!action.trim()) return '';
+  return professionalizeFragment(action);
+}
+
+function statusFromFindingText(text: string): FindingStatus | null {
+  const lower = normalizeText(text);
+  const unresolved = hasAny(lower, [
+    'recommend',
+    'recommended',
+    'needs repair',
+    'requires repair',
+    'not fixed',
+    'not repaired',
+    'still leaking',
+    'estimate',
+    'quote',
+  ]);
+  const completed = hasAny(lower, [
+    'fixed',
+    'repaired',
+    'replaced',
+    'corrected',
+    'resolved',
+    'adjusted',
+    'tightened',
+    'secured',
+    'sealed',
+    'cleared',
+    'cleaned',
+    'reset',
+  ]) && !unresolved;
+  const clear = hasAny(lower, [
+    'no leak',
+    'no leaks',
+    'no damage',
+    'no concern',
+    'no concerns',
+    'no issue',
+    'no issues',
+    'good condition',
+    'normal operation',
+    'working properly',
+    'looks good',
+    'passed',
+  ]) && !unresolved;
+
+  if (completed) return 'Fixed On Site';
+  if (clear) return 'Pass';
+  if (hasAny(lower, [
+    'urgent',
+    'immediately',
+    'hazardous',
+    'dangerous',
+    'unsafe',
+    'active leak',
+    'actively leaking',
+    'active water intrusion',
+    'water intrusion',
+    'electrical hazard',
+    'gas odor',
+    'sewage backup',
+    'structural danger',
+    'immediate damage risk',
+  ])) return 'Urgent';
+  if (hasAny(lower, [
+    'recommend replacing',
+    'recommend replacement',
+    'recommended replacing',
+    'recommended replacement',
+    'recommend repair',
+    'needs repair',
+    'requires repair',
+    'should be repaired',
+    'not working',
+    'not functioning',
+    'does not work',
+    'failed',
+    'failure',
+    'broken',
+    'damaged',
+    'damage',
+    'defective',
+    'faulty',
+    'inoperable',
+    'malfunction',
+    'malfunctioning',
+    'leaking',
+    'leak',
+    'dripping',
+    'drip',
+    'running',
+    'keeps running',
+    'loose',
+    'clogged',
+    'clog',
+    'blocked',
+    'replace',
+    'replacing',
+    'replacement',
+    'repair',
+    'ball valve',
+    'fill valve',
+    'flapper',
+  ])) return 'Needs Repair';
+  if (hasAny(lower, [
+    'monitor',
+    'watch',
+    'minor',
+    'slight',
+    'early',
+    'developing',
+    'potential',
+    'possible',
+    'wear',
+    'worn',
+    'squeak',
+    'squeaking',
+    'noise',
+    'rattle',
+    'wobble',
+    'sticks',
+    'sticking',
+    'slow',
+    'weak',
+    'hairline',
+    'small stain',
+    'moisture stain',
+    'water stain',
+    'cosmetic',
+    'not normal',
+    'abnormal',
+  ])) return 'Monitor';
+  return null;
+}
+
+function severityRank(status: FindingStatus) {
+  const ranks: Record<FindingStatus, number> = {
+    Pass: 0,
+    Monitor: 1,
+    'Fixed On Site': 2,
+    'Needs Repair': 3,
+    Urgent: 4,
+  };
+  return ranks[status];
+}
+
+function saferFindingStatus(modelStatus: FindingStatus, notes: string, action: string): FindingStatus {
+  const inferred = statusFromFindingText(`${notes} ${action}`);
+  if (!inferred || inferred === 'Pass') return modelStatus;
+  if (modelStatus === 'Pass') return inferred;
+  return severityRank(inferred) > severityRank(modelStatus) ? inferred : modelStatus;
+}
+
 function jsonResponse(body: unknown, status = 200, headers = baseCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
@@ -149,13 +436,18 @@ Instructions:
 - Analyze the notes and identify distinct findings
 - Match each finding to the most relevant room and checklist item from the list above
 - Assign a status: Pass, Monitor, Fixed On Site, Needs Repair, or Urgent
-  - Urgent: immediate safety hazard, structural failure, active water intrusion
-  - Needs Repair: damage, defect, or malfunction requiring professional repair
+  - Urgent: immediate safety hazard, structural failure, active water intrusion, active leak, electrical hazard, sewage backup, or immediate damage risk
+  - Needs Repair: damage, defect, malfunction, running fixture, leak, broken/failed item, loose component, clogged item, or repair/replacement recommendation
   - Monitor: minor wear, potential issue, or item to watch at next visit
   - Fixed On Site: issue that was corrected during this visit
-  - Pass: no issues found
-- Write a concise observation note (1-2 sentences max)
-- Suggest a recommended action where applicable (leave empty string for Pass)
+  - Pass: only when notes clearly say the item is okay, working properly, acceptable, good condition, or no issue was found
+- Never classify repair recommendations as Pass. Wording like "recommend replacing", "needs repair", "not working", "running", "leaking", "damaged", "failed", "broken", "loose", or "clogged" must be Needs Repair unless Urgent applies.
+- Write clean, professional, homeowner-readable observation notes instead of raw dictated fragments
+- Capitalize, punctuate, and use complete sentences
+- Preserve the contractor's meaning without adding facts that were not stated
+- Normalize "master bath" or "master bathroom" to "primary bathroom" when used as a room reference
+- If the note mentions a running toilet and ball valve, wording should mention replacing the fill valve or ball valve as needed
+- Suggest a clear recommended action where applicable (leave empty string for Pass)
 - Only return findings for items with notable observations (not everything is flagged)
 - Return at most 15 findings
 
@@ -235,13 +527,19 @@ Respond ONLY with valid JSON, no markdown, no explanation:
         const validStatuses: FindingStatus[] = ['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent'];
         suggestions = parsedSuggestions
           .filter((s: unknown) => typeof s === 'object' && s !== null)
-          .map((s: Record<string, unknown>) => ({
-            room: String(s.room ?? ''),
-            item: String(s.item ?? ''),
-            status: validStatuses.includes(s.status as FindingStatus) ? (s.status as FindingStatus) : 'Monitor',
-            notes: String(s.notes ?? ''),
-            action: String(s.action ?? ''),
-          }))
+          .map((s: Record<string, unknown>) => {
+            const notes = String(s.notes ?? '');
+            const action = String(s.action ?? '');
+            const modelStatus = validStatuses.includes(s.status as FindingStatus) ? (s.status as FindingStatus) : 'Monitor';
+            const finalStatus = saferFindingStatus(modelStatus, notes, action);
+            return {
+              room: String(s.room ?? ''),
+              item: String(s.item ?? ''),
+              status: finalStatus,
+              notes: cleanInspectionNoteText(notes, finalStatus),
+              action: cleanInspectionActionText(action),
+            };
+          })
           .filter((s) => s.room && s.item)
           .slice(0, 15);
       }

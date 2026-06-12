@@ -52,6 +52,12 @@ import {
   cleanHomeownerRequestText,
   suggestServiceCategories,
 } from './requestClassifier';
+import {
+  cleanInspectionActionText,
+  cleanInspectionNoteText,
+  localDraftFromNote,
+  localSuggestedActionFromNote,
+} from './inspectionAssistant';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -1600,149 +1606,6 @@ const FINDING_STATUS_CONFIG: Record<FindingStatus, { color: string; dot: string 
   'Needs Repair': { color: 'bg-amber-50 text-amber-700 border border-amber-200',      dot: 'bg-amber-500' },
   'Urgent':       { color: 'bg-red-50 text-red-700 border border-red-200',            dot: 'bg-red-500' },
 };
-
-const LOCAL_DRAFT_RULES: Array<{ keywords: string[]; status: FindingStatus }> = [
-  { keywords: ['urgent', 'immediately', 'hazardous', 'dangerous', 'unsafe', 'critical', 'severe', 'failed', 'failure', 'emergency'], status: 'Urgent' },
-  { keywords: ['crack', 'cracked', 'broken', 'active leak', 'actively leaking', 'leak', 'leaking', 'missing', 'damage', 'damaged', 'rot', 'rotting', 'mold', 'mould', 'deteriorated', 'corroded', 'corrosion', 'rust', 'rusted', 'faulty', 'defective', 'inoperable', 'not working', 'repair', 'estimate', 'quote'], status: 'Needs Repair' },
-  { keywords: ['monitor', 'watch', 'minor', 'slight', 'beginning', 'early', 'developing', 'potential', 'possible', 'wear', 'worn', 'aging', 'age'], status: 'Monitor' },
-  { keywords: ['fixed', 'repaired', 'replaced', 'corrected', 'resolved', 'addressed', 'adjusted', 'tightened'], status: 'Fixed On Site' },
-];
-
-const LOCAL_DRAFT_REPAIR_PHRASES = [
-  'loose outlet',
-  'outlet loose',
-  'loose receptacle',
-  'receptacle loose',
-  'loose plug',
-  'loose switch',
-  'switch loose',
-  'electrical loose',
-  'sparking',
-  'spark',
-  'arcing',
-  'burnt',
-  'burned',
-  'hot outlet',
-  'hot switch',
-  'wobbling badly',
-  'badly wobbling',
-  'fan wobbling badly',
-  'ceiling fan wobbling badly',
-  'won t latch',
-  'wont latch',
-  'will not latch',
-  'won t open',
-  'wont open',
-  'will not open',
-  'unusable',
-];
-
-const LOCAL_DRAFT_MONITOR_PHRASES = [
-  'squeak',
-  'squeaks',
-  'squeaking',
-  'noisy',
-  'noise',
-  'hum',
-  'humming',
-  'rattle',
-  'rattles',
-  'rattling',
-  'wobble',
-  'wobbles',
-  'wobbling',
-  'loose',
-  'sticks',
-  'sticking',
-  'sticky',
-  'slow',
-  'weak',
-  'worn',
-  'minor',
-  'hairline',
-  'small stain',
-  'moisture stain',
-  'water stain',
-  'staining',
-  'cosmetic',
-  'early wear',
-  'not normal',
-  'abnormal',
-];
-
-const COMPLETED_WORK_PHRASES = [
-  'fixed',
-  'repaired',
-  'replaced',
-  'corrected',
-  'resolved',
-  'addressed',
-  'adjusted',
-  'tightened',
-  'secured',
-  'sealed',
-  'cleared',
-  'cleaned',
-  'reset',
-  'restored',
-  'tested good',
-  'tested ok',
-  'no longer',
-  'stopped leaking',
-  'stopped leak',
-  'squeak gone',
-  'noise gone',
-  'rattle gone',
-  'weight added',
-  'balanced',
-  'rebalanced',
-];
-
-const UNRESOLVED_WORK_PHRASES = [
-  'recommend',
-  'recommended',
-  'will create',
-  'will provide',
-  'will send',
-  'estimate',
-  'quote',
-  'not fixed',
-  'not repaired',
-  'unable to repair',
-  'could not repair',
-  'still leaking',
-  'still leaks',
-  'continues to leak',
-  'continued leak',
-  'needs repair',
-  'requires repair',
-  'recommend repair',
-  'should be repaired',
-  'have repaired',
-  'to be repaired',
-  'repair by',
-];
-
-const CLEAR_CONDITION_PHRASES = [
-  'no leak',
-  'no leaks',
-  'no active leak',
-  'no active leaks',
-  'no longer leaks',
-  'no longer leaking',
-  'no damage',
-  'no visible damage',
-  'no concern',
-  'no concerns',
-  'no issue',
-  'no issues',
-  'good condition',
-  'normal operation',
-  'operating normally',
-  'operates normally',
-  'working properly',
-  'working as expected',
-];
 
 const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
   { room: 'Exterior', items: [
@@ -3300,73 +3163,6 @@ async function generateInspectionPdf(
   const fileName = `${safeName}-Field-Work-${dateStr}.pdf`;
   pdf.save(fileName);
   return { blob: pdf.output('blob'), fileName };
-}
-
-function localDraftFromNote(note: string): FindingStatus {
-  const lower = normalizeText(note);
-  const hasAny = (phrases: string[]) => phrases.some(phrase => hasPhrase(lower, phrase));
-  const completedOnSite = hasAny(COMPLETED_WORK_PHRASES) && !hasAny(UNRESOLVED_WORK_PHRASES);
-  const clearlyOk = hasAny(CLEAR_CONDITION_PHRASES) && !hasAny(UNRESOLVED_WORK_PHRASES);
-
-  if (completedOnSite) return 'Fixed On Site';
-  if (clearlyOk) return 'Pass';
-  if (hasAny(LOCAL_DRAFT_REPAIR_PHRASES)) return 'Needs Repair';
-
-  for (const rule of LOCAL_DRAFT_RULES) {
-    if (rule.keywords.some(kw => hasPhrase(lower, kw))) return rule.status;
-  }
-  if (hasAny(LOCAL_DRAFT_MONITOR_PHRASES)) return 'Monitor';
-  return 'Pass';
-}
-
-function localSuggestedActionFromNote(note: string, status: FindingStatus): string {
-  const lower = normalizeText(note);
-  if (status === 'Pass') return '';
-  if (status === 'Urgent') return 'Address promptly and restrict use if safety is a concern.';
-
-  if (hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle') || hasPhrase(lower, 'switch')) {
-    return 'Secure or replace the loose electrical device.';
-  }
-  if (hasPhrase(lower, 'leak') || hasPhrase(lower, 'leaking') || hasPhrase(lower, 'drip')) {
-    return status === 'Fixed On Site'
-      ? 'Document completed leak repair and monitor for recurrence.'
-      : status === 'Needs Repair'
-      ? 'Repair the leak and verify the area is dry after repair.'
-      : 'Monitor for active moisture and repair if leaking returns.';
-  }
-  if (hasPhrase(lower, 'fan') && (hasPhrase(lower, 'squeak') || hasPhrase(lower, 'noise') || hasPhrase(lower, 'wobble'))) {
-    return status === 'Fixed On Site'
-      ? 'Document fan adjustment or repair and monitor during normal use.'
-      : status === 'Needs Repair'
-      ? 'Inspect fan mounting and blades before continued use.'
-      : 'Monitor fan noise and inspect mounting or blades if it worsens.';
-  }
-  if (hasPhrase(lower, 'door') && (hasPhrase(lower, 'stick') || hasPhrase(lower, 'sticking') || hasPhrase(lower, 'latch'))) {
-    return status === 'Fixed On Site'
-      ? 'Document door adjustment and monitor during normal use.'
-      : 'Monitor door operation and adjust hinges or latch if it worsens.';
-  }
-  if (hasPhrase(lower, 'drain') || hasPhrase(lower, 'clog')) {
-    return status === 'Fixed On Site'
-      ? 'Document cleared drainage and monitor for repeat blockage.'
-      : 'Monitor drainage and clear or inspect if it slows further.';
-  }
-  if (hasPhrase(lower, 'gutter') || hasPhrase(lower, 'downspout')) {
-    return status === 'Fixed On Site'
-      ? 'Document cleared gutter or downspout and monitor during routine maintenance.'
-      : 'Clean or monitor gutter flow during the next rain.';
-  }
-  if (hasPhrase(lower, 'stain') || hasPhrase(lower, 'moisture')) {
-    return status === 'Needs Repair'
-      ? 'Investigate moisture source and repair as needed.'
-      : 'Monitor stain for change and investigate if moisture returns or grows.';
-  }
-
-  return status === 'Needs Repair'
-    ? 'Repair or evaluate the concern and document completion.'
-    : status === 'Fixed On Site'
-      ? 'Document completed work and monitor during normal maintenance.'
-    : 'Monitor condition and follow up if it worsens.';
 }
 
 function normalizeText(value: string) {
@@ -6051,31 +5847,31 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 
 function LandingPage() {
   const steps = [
-    'Homeowner requests service.',
-    'Contractor sends an estimate.',
-    'Homeowner reviews and approves.',
-    'Contractor completes the job or report.',
-    'Invoice and records are saved to the home history.',
+    'Homeowner finds or chooses a contractor.',
+    'Homeowner sends a clear service request.',
+    'Contractor responds with an estimate, visit, or next step.',
+    'Work moves into jobs, reports, invoices, and calendar events.',
+    'Records stay organized in the home service history.',
   ];
 
   return (
     <div className="space-y-8">
       <section className="grid gap-8 rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Connect · Manage · Protect</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">ServSync Discover + service workflow</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            Organize home work from request to record.
+            Find local contractors. Keep the work organized.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100/80">
-            ServSync helps homeowners organize their home, connect with local contractors, request service, review estimates,
-            view invoices, and keep reports, documents, and maintenance history in one place.
+            ServSync helps homeowners request service from local contractors and helps small contractors manage requests,
+            estimates, jobs, invoices, calendar events, and home service history in one place.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('primary')}>
-              Create homeowner account <ArrowRight size={16} />
-            </button>
-            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('secondary')}>
+            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('primary')}>
               Create contractor account <ArrowRight size={16} />
+            </button>
+            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('secondary')}>
+              Create free homeowner account <ArrowRight size={16} />
             </button>
           </div>
           <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
@@ -6083,10 +5879,30 @@ function LandingPage() {
           </button>
         </div>
         <div className="grid gap-3">
-          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Build a home record, request service, review estimates and invoices, and control what information gets shared." />
-          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests." />
-          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful posts and recent work. Homeowners choose when to connect." />
+          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Find local contractors, request service clearly, review estimates and invoices, and keep a record of work done on your home." />
+          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Get discovered, manage requests, send estimates and invoices, schedule work, and keep customer records organized without enterprise-level complexity." />
+          <FeatureRow icon={<Compass size={18} />} title="ServSync Discover" text="Discover is being built to help homeowners find local contractor profiles and give contractors a better way to share helpful service information as the platform grows." />
           <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Why this exists</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner path than scattered recommendations</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Homeowners often ask for contractor recommendations in local groups, then end up with scattered names and little context.
+            ServSync is designed to give that process a cleaner path: find local contractors, send clearer requests, and keep the work
+            organized afterward.
+          </p>
+        </div>
+        <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Built for small teams</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">Practical tools without enterprise complexity</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            ServSync is designed for solo and small-team service contractors who need a professional way to manage requests,
+            estimates, scheduling, invoices, customer records, and repeat work without overcomplicated software.
+          </p>
         </div>
       </section>
 
@@ -6094,7 +5910,7 @@ function LandingPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">How ServSync works</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner loop for home work</h2>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">From local search to home service history</h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-slate-600">
             Requests, estimates, jobs, invoices, reports, documents, and maintenance records stay connected instead of scattered.
@@ -6123,6 +5939,15 @@ function LandingPage() {
           <p className="font-bold text-slate-950">ServSync is software</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">Contractors are responsible for their own work, credentials, estimates, invoices, reports, and services.</p>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Beta and trust</p>
+        <h2 className="mt-2 text-2xl font-bold text-slate-950">Built carefully. Improved honestly.</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+          ServSync is in beta and being shaped with feedback from contractors and homeowners. The goal is to build a useful,
+          affordable platform that improves over time without fake testimonials, inflated numbers, or exaggerated claims.
+        </p>
       </section>
     </div>
   );
@@ -23770,7 +23595,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         if (!room) return;
                                         const key = findingStateKey(room, singleNoteItem);
                                         const suggested = localDraftFromNote(singleNoteText);
-                                        setLocalFindings(prev => ({ ...prev, [key]: { status: suggested, notes: singleNoteText.trim(), action: localSuggestedActionFromNote(singleNoteText, suggested), due: '', photos: [] } }));
+                                        setLocalFindings(prev => ({ ...prev, [key]: { status: suggested, notes: cleanInspectionNoteText(singleNoteText, suggested), action: cleanInspectionActionText(localSuggestedActionFromNote(singleNoteText, suggested)), due: '', photos: [] } }));
                                         setSelectedChecklistRoom(roomIdentityKey(room));
                                         setSingleNoteText(''); setSingleNoteRoom(''); setSingleNoteItem('');
                                       }}
@@ -23804,6 +23629,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           const matchedExistingItem = bestItem ? checklistMatchConfidence(line, bestItem) > 0 : false;
                                           const detectedItem = matchedExistingItem && bestItem ? bestItem : suggestedChecklistItemFromNote(line, detectedRoom ?? 'General');
                                           const suggestedStatus = localDraftFromNote(line);
+                                          const suggestedAction = localSuggestedActionFromNote(line, suggestedStatus);
                                           return {
                                             id: crypto.randomUUID(),
                                             rawText: line,
@@ -23812,8 +23638,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             newChecklistItem: matchedExistingItem ? undefined : detectedItem,
                                             needsNewChecklistItem: !matchedExistingItem,
                                             suggestedStatus,
-                                            notes: line,
-                                            suggestedAction: localSuggestedActionFromNote(line, suggestedStatus),
+                                            notes: cleanInspectionNoteText(line, suggestedStatus),
+                                            suggestedAction: cleanInspectionActionText(suggestedAction),
                                             accepted: null,
                                           };
                                         });
@@ -23910,28 +23736,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             ? roomDisplayLabel(findRoomByIdentity(activeRooms, selectedChecklistRoom))
                                             : activeRooms[0] ? roomDisplayLabel(activeRooms[0]) : null;
                                           const aiResults = (data as Array<{ room: string; item: string; status: FindingStatus; notes: string; action: string }> || []).map(s => {
+                                            const cleanedNotes = cleanInspectionNoteText(s.notes, s.status);
+                                            const cleanedAction = cleanInspectionActionText(s.action);
                                             const detectedRoom = activeRooms.find(r => roomDisplayLabel(r).toLowerCase() === s.room?.toLowerCase())?.display_name
-                                              ?? detectRoomFromNote(`${s.room ?? ''} ${s.notes}`, roomNames, selectedRoomLabel);
+                                              ?? detectRoomFromNote(`${s.room ?? ''} ${cleanedNotes}`, roomNames, selectedRoomLabel);
                                             const detectedRoomRecord = detectedRoom ? activeRooms.find(r => roomDisplayLabel(r) === detectedRoom || r.room === detectedRoom) : null;
                                             const roomItems = detectedRoomRecord?.items ?? [];
                                             const exactItem = s.item
                                               ? roomItems.find(item => item.toLowerCase() === s.item.toLowerCase())
                                               : null;
-                                            const bestItem = exactItem ?? (roomItems.length > 0 ? findBestChecklistItem(`${s.item ?? ''} ${s.notes}`, roomItems) : null);
-                                            const matchedExistingItem = bestItem ? roomItems.includes(bestItem) && checklistMatchConfidence(`${s.item ?? ''} ${s.notes}`, bestItem) > 0 : false;
+                                            const bestItem = exactItem ?? (roomItems.length > 0 ? findBestChecklistItem(`${s.item ?? ''} ${cleanedNotes}`, roomItems) : null);
+                                            const matchedExistingItem = bestItem ? roomItems.includes(bestItem) && checklistMatchConfidence(`${s.item ?? ''} ${cleanedNotes}`, bestItem) > 0 : false;
                                             const detectedItem = matchedExistingItem && bestItem
                                               ? bestItem
-                                              : (s.item || suggestedChecklistItemFromNote(s.notes, detectedRoom ?? 'General'));
+                                              : (s.item || suggestedChecklistItemFromNote(cleanedNotes, detectedRoom ?? 'General'));
                                             return {
                                               id: crypto.randomUUID(),
-                                              rawText: s.notes,
+                                              rawText: cleanedNotes,
                                               detectedRoom,
                                               detectedItem,
                                               newChecklistItem: matchedExistingItem ? undefined : detectedItem,
                                               needsNewChecklistItem: !matchedExistingItem,
                                               suggestedStatus: s.status,
-                                              notes: s.notes,
-                                              suggestedAction: s.action,
+                                              notes: cleanedNotes,
+                                              suggestedAction: cleanedAction,
                                               accepted: null as boolean | null,
                                             };
                                           });
