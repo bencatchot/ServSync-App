@@ -63,9 +63,10 @@ test.describe('standalone calendar events', () => {
     await expect(eventDialog).toBeVisible();
     await expect(eventDialog.getByText(/^Not tied to a job$/i).first()).toBeVisible();
     await expect(eventDialog.getByText(/Monthly with no end date/i)).toBeVisible();
-    const comingSoon = eventDialog.getByRole('button', { name: /Create Job from Event \(coming soon\)/i });
-    await expect(comingSoon).toBeVisible();
-    await expect(comingSoon).toBeDisabled();
+    const createJobButton = eventDialog.getByRole('button', { name: /^Create Job from Event$/i });
+    await expect(createJobButton).toBeVisible();
+    await expect(createJobButton).toBeDisabled();
+    await expect(eventDialog.getByText(/Select a customer and save the event before creating a job/i)).toBeVisible();
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     await eventDialog.getByRole('textbox', { name: 'Title', exact: true }).fill(editedTitle);

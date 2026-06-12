@@ -92,6 +92,7 @@ import type {
   ConnectionAlertStatus,
   ContractorVisitEvent,
   ContractorCalendarEvent,
+  ContractorCalendarEventJobLink,
   CalendarEventRecurrenceFrequency,
   CalendarEventType,
   CalendarEventDraft,
@@ -12548,10 +12549,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [contractorVisitEvents, setContractorVisitEvents] = useState<ContractorVisitEvent[]>([]);
   const [contractorCalendarEvents, setContractorCalendarEvents] = useState<ContractorCalendarEvent[]>([]);
+  const [calendarEventJobLinks, setCalendarEventJobLinks] = useState<ContractorCalendarEventJobLink[]>([]);
   const [calendarEventComposerOpen, setCalendarEventComposerOpen] = useState(false);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
+  const [editingCalendarEventOccurrenceAt, setEditingCalendarEventOccurrenceAt] = useState<string | null>(null);
   const [selectedVisitCalendarEvent, setSelectedVisitCalendarEvent] = useState<ContractorVisitEvent | null>(null);
   const [calendarEventBusy, setCalendarEventBusy] = useState(false);
+  const [creatingJobFromCalendarEventKey, setCreatingJobFromCalendarEventKey] = useState<string | null>(null);
   const [visitCalendarEventBusy, setVisitCalendarEventBusy] = useState(false);
   const [localContacts, setLocalContacts] = useState<ContractorLocalContact[]>([]);
   const [localClaimInvites, setLocalClaimInvites] = useState<LocalCustomerClaimInvite[]>([]);
@@ -12848,7 +12852,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -12861,6 +12865,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('starts_at', { ascending: true }),
+          supabase
+            .from('contractor_calendar_event_job_links')
+            .select('*, inspection:inspections(*)')
+            .eq('contractor_id', loadedContractor.id)
+            .order('occurrence_starts_at', { ascending: true }),
           supabase
             .from('contractor_local_contacts')
             .select('*, homes:contractor_local_homes(*)')
@@ -12893,6 +12902,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         else setContractorVisitEvents([]);
         if (!calendarEventsRes.error) setContractorCalendarEvents((calendarEventsRes.data || []) as ContractorCalendarEvent[]);
         else setContractorCalendarEvents([]);
+        if (!calendarEventJobLinksRes.error) setCalendarEventJobLinks((calendarEventJobLinksRes.data || []) as ContractorCalendarEventJobLink[]);
+        else setCalendarEventJobLinks([]);
         if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
@@ -12901,6 +12912,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       } else {
         setContractorVisitEvents([]);
         setContractorCalendarEvents([]);
+        setCalendarEventJobLinks([]);
         setLocalContacts([]);
         setLocalClaimInvites([]);
       }
@@ -14392,8 +14404,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEditingCalendarEvent(null);
     setCalendarEventComposerOpen(true);
   };
-  const openCalendarEventDetail = (event: ContractorCalendarEvent) => {
+  const calendarEventOccurrenceKey = (eventId: string, occurrenceStartsAt: string) => {
+    const date = new Date(occurrenceStartsAt);
+    return `${eventId}:${Number.isNaN(date.getTime()) ? occurrenceStartsAt : date.toISOString()}`;
+  };
+  const calendarEventLinkForOccurrence = (eventId: string, occurrenceStartsAt: string) =>
+    calendarEventJobLinks.find(link => calendarEventOccurrenceKey(link.calendar_event_id, link.occurrence_starts_at) === calendarEventOccurrenceKey(eventId, occurrenceStartsAt)) ?? null;
+  const openCalendarEventDetail = (event: ContractorCalendarEvent, occurrenceStartsAt = event.starts_at) => {
     setEditingCalendarEvent(event);
+    setEditingCalendarEventOccurrenceAt(occurrenceStartsAt);
     setCalendarEventComposerOpen(true);
   };
   const openVisitCalendarEventDetail = (event: ContractorVisitEvent) => {
@@ -14455,6 +14474,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closeCalendarEventComposer = () => {
     setCalendarEventComposerOpen(false);
     setEditingCalendarEvent(null);
+    setEditingCalendarEventOccurrenceAt(null);
   };
 
   const saveCalendarEvent = async (draft: CalendarEventDraft) => {
@@ -14530,6 +14550,119 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     } catch (err) {
       setError(readableError(err, 'Unable to delete calendar event.'));
     } finally {
+      setCalendarEventBusy(false);
+    }
+  };
+  const openCalendarEventLinkedJob = async (link: ContractorCalendarEventJobLink | null) => {
+    if (!link) return;
+    const linkedJob = link.inspection ?? inspections.find(item => item.id === link.inspection_id) ?? null;
+    if (linkedJob) {
+      closeCalendarEventComposer();
+      openInspection(linkedJob);
+      setNotice('Opened the job created from this calendar event.');
+      return;
+    }
+    if (!supabase) {
+      setError('Unable to open the job for this calendar event.');
+      return;
+    }
+    try {
+      const { data, error: jobError } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', link.inspection_id)
+        .single();
+      if (jobError) throw jobError;
+      const job = data as Inspection;
+      setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
+      closeCalendarEventComposer();
+      openInspection(job);
+      setNotice('Opened the job created from this calendar event.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to open the job for this calendar event.'));
+    }
+  };
+  const createJobFromCalendarEvent = async (event: ContractorCalendarEvent, occurrenceStartsAt: string) => {
+    if (!supabase) return;
+    const occurrenceDate = new Date(occurrenceStartsAt);
+    if (Number.isNaN(occurrenceDate.getTime())) {
+      setError('Choose a valid calendar event occurrence before creating a job.');
+      return;
+    }
+    const existingLink = calendarEventLinkForOccurrence(event.id, occurrenceStartsAt);
+    if (existingLink) {
+      await openCalendarEventLinkedJob(existingLink);
+      return;
+    }
+    if (!event.local_contact_id && !event.homeowner_user_id) {
+      setError('Select a customer on this calendar event and save it before creating a job.');
+      return;
+    }
+    const linkKey = calendarEventOccurrenceKey(event.id, occurrenceStartsAt);
+    setCreatingJobFromCalendarEventKey(linkKey);
+    setCalendarEventBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_job_from_calendar_event', {
+        p_calendar_event_id: event.id,
+        p_occurrence_starts_at: occurrenceDate.toISOString(),
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { job_id?: string; visit_event_id?: string | null; created?: boolean };
+      if (!result.job_id) throw new Error('The job was created, but no job id was returned.');
+
+      const { data: jobData, error: jobError } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', result.job_id)
+        .single();
+      if (jobError) throw jobError;
+      const job = jobData as Inspection;
+
+      const visitEvent = result.visit_event_id
+        ? await supabase
+            .from('contractor_visit_events')
+            .select('*, inspection:inspections(*)')
+            .eq('id', result.visit_event_id)
+            .single()
+        : { data: null, error: null };
+      if (visitEvent.error) throw visitEvent.error;
+      const linkedVisitEvent = visitEvent.data as ContractorVisitEvent | null;
+
+      const nextLink: ContractorCalendarEventJobLink = {
+        id: crypto.randomUUID(),
+        contractor_id: event.contractor_id,
+        calendar_event_id: event.id,
+        occurrence_starts_at: occurrenceDate.toISOString(),
+        inspection_id: job.id,
+        visit_event_id: linkedVisitEvent?.id ?? result.visit_event_id ?? null,
+        created_by: profile.id,
+        created_at: new Date().toISOString(),
+        inspection: job,
+      };
+      setCalendarEventJobLinks(prev => [
+        nextLink,
+        ...prev.filter(link => calendarEventOccurrenceKey(link.calendar_event_id, link.occurrence_starts_at) !== linkKey),
+      ]);
+      setInspections(prev => [job, ...prev.filter(item => item.id !== job.id)]);
+      if (linkedVisitEvent) {
+        const visitWithJob: ContractorVisitEvent = {
+          ...linkedVisitEvent,
+          inspection: linkedVisitEvent.inspection ?? job,
+        };
+        setContractorVisitEvents(prev => [visitWithJob, ...prev.filter(item => item.id !== visitWithJob.id)]);
+        closeCalendarEventComposer();
+        setSelectedVisitCalendarEvent(visitWithJob);
+      } else {
+        closeCalendarEventComposer();
+        openInspection(job);
+      }
+      setNotice(result.created === false ? 'Opened the job already created from this calendar event.' : 'Job created from calendar event.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to create a job from this calendar event. Make sure the calendar event job links SQL has been applied.'));
+    } finally {
+      setCreatingJobFromCalendarEventKey(null);
       setCalendarEventBusy(false);
     }
   };
@@ -18026,6 +18159,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             requests={serviceRequests}
             visitEvents={contractorVisitEvents}
             calendarEvents={contractorCalendarEvents}
+            calendarEventJobLinks={calendarEventJobLinks}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
             onOpenVisitEvent={openVisitCalendarEventDetail}
@@ -18049,9 +18183,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {calendarEventComposerOpen && (
         <CalendarEventComposer
           event={editingCalendarEvent}
+          occurrenceStartsAt={editingCalendarEventOccurrenceAt ?? editingCalendarEvent?.starts_at ?? null}
+          linkedJob={editingCalendarEvent && editingCalendarEventOccurrenceAt
+            ? calendarEventLinkForOccurrence(editingCalendarEvent.id, editingCalendarEventOccurrenceAt)
+            : null}
           localContacts={localContacts}
           busy={calendarEventBusy}
           onSave={saveCalendarEvent}
+          creatingJob={Boolean(
+            editingCalendarEvent
+            && editingCalendarEventOccurrenceAt
+            && creatingJobFromCalendarEventKey === calendarEventOccurrenceKey(editingCalendarEvent.id, editingCalendarEventOccurrenceAt)
+          )}
+          onCreateJob={editingCalendarEvent && editingCalendarEventOccurrenceAt
+            ? () => void createJobFromCalendarEvent(editingCalendarEvent, editingCalendarEventOccurrenceAt)
+            : undefined}
+          onOpenLinkedJob={link => void openCalendarEventLinkedJob(link)}
           onDelete={editingCalendarEvent ? () => deleteCalendarEvent(editingCalendarEvent) : undefined}
           onClose={closeCalendarEventComposer}
         />
@@ -28392,16 +28539,26 @@ function defaultCalendarEventStart() {
 
 function CalendarEventComposer({
   event,
+  occurrenceStartsAt,
+  linkedJob,
   localContacts,
   busy,
   onSave,
+  creatingJob,
+  onCreateJob,
+  onOpenLinkedJob,
   onDelete,
   onClose,
 }: {
   event: ContractorCalendarEvent | null;
+  occurrenceStartsAt: string | null;
+  linkedJob: ContractorCalendarEventJobLink | null;
   localContacts: ContractorLocalContact[];
   busy: boolean;
   onSave: (draft: CalendarEventDraft) => void;
+  creatingJob: boolean;
+  onCreateJob?: () => void;
+  onOpenLinkedJob: (link: ContractorCalendarEventJobLink | null) => void;
   onDelete?: () => void;
   onClose: () => void;
 }) {
@@ -28423,6 +28580,19 @@ function CalendarEventComposer({
   const recurrenceSummary = draft.recurrence_frequency === 'none'
     ? 'Does not repeat'
     : `${calendarEventRecurrenceLabel(draft.recurrence_frequency)}${recurrenceEndCondition === 'date' && draft.recurrence_ends_at ? ` until ${new Date(`${draft.recurrence_ends_at}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' with no end date'}`;
+  const occurrenceDate = occurrenceStartsAt ? new Date(occurrenceStartsAt) : null;
+  const selectedOccurrenceLabel = occurrenceDate && !Number.isNaN(occurrenceDate.getTime())
+    ? occurrenceDate.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '';
+  const canCreateJobFromEvent = Boolean(isEditing && event && onCreateJob);
+  const eventHasCustomer = Boolean(event?.local_contact_id || event?.homeowner_user_id);
+  const eventIsRecurring = normalizeCalendarEventRecurrenceFrequency(event?.recurrence_frequency) !== 'none';
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -28454,6 +28624,17 @@ function CalendarEventComposer({
         <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
           Not tied to a job
         </p>
+        {isEditing && (
+          <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-900">
+            {linkedJob ? (
+              <span>This event occurrence is tied to a job.</span>
+            ) : eventIsRecurring ? (
+              <span>Create Job from Event will create a job for the selected occurrence only{selectedOccurrenceLabel ? ` (${selectedOccurrenceLabel})` : ''}. Future repeats stay as calendar events.</span>
+            ) : (
+              <span>Create Job from Event will turn this calendar event into a scheduled job visit.</span>
+            )}
+          </div>
+        )}
 
         <div className="space-y-4">
           <Field label="Title">
@@ -28564,9 +28745,28 @@ function CalendarEventComposer({
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-          <button type="button" disabled className={`${buttonClass('secondary')} cursor-not-allowed opacity-60`} title="Coming soon">
-            Create Job from Event (coming soon)
-          </button>
+          <div className="max-w-full">
+            {linkedJob ? (
+              <button type="button" onClick={() => onOpenLinkedJob(linkedJob)} disabled={busy} className={buttonClass('secondary')}>
+                Open Job
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCreateJob}
+                disabled={!canCreateJobFromEvent || busy || creatingJob || !eventHasCustomer}
+                className={buttonClass('secondary')}
+                title={!eventHasCustomer ? 'Select a customer and save this event before creating a job.' : undefined}
+              >
+                {creatingJob ? 'Creating job...' : 'Create Job from Event'}
+              </button>
+            )}
+            {isEditing && !linkedJob && !eventHasCustomer && (
+              <p className="mt-1 max-w-xs text-xs leading-5 text-amber-700">
+                Select a customer and save the event before creating a job.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {isEditing && onDelete && (
               <button type="button" onClick={onDelete} disabled={busy} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
@@ -28796,6 +28996,7 @@ function CalendarView({
   requests,
   visitEvents = [],
   calendarEvents = [],
+  calendarEventJobLinks = [],
   perspective,
   onOpenRequest,
   onOpenVisitEvent,
@@ -28804,10 +29005,11 @@ function CalendarView({
   requests: ServiceRequestSummary[];
   visitEvents?: ContractorVisitEvent[];
   calendarEvents?: ContractorCalendarEvent[];
+  calendarEventJobLinks?: ContractorCalendarEventJobLink[];
   perspective: 'homeowner' | 'contractor';
   onOpenRequest?: (request: ServiceRequestSummary) => void;
   onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
-  onOpenCalendarEvent?: (event: ContractorCalendarEvent) => void;
+  onOpenCalendarEvent?: (event: ContractorCalendarEvent, occurrenceStartsAt: string) => void;
 }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -28820,6 +29022,10 @@ function CalendarView({
   type StandaloneEntry = { kind: 'standalone'; calendarEvent: ContractorCalendarEvent; occurrenceStartsAt: string };
   type CalendarEntry = ApptEntry | VisitEntry | StandaloneEntry;
   const visitRequestIds = new Set(visitEvents.filter(event => event.service_request_id && event.status !== 'cancelled').map(event => event.service_request_id as string));
+  const linkedStandaloneOccurrenceKeys = new Set(calendarEventJobLinks.map(link => {
+    const date = new Date(link.occurrence_starts_at);
+    return `${link.calendar_event_id}:${Number.isNaN(date.getTime()) ? link.occurrence_starts_at : date.toISOString()}`;
+  }));
   const apptMap: Record<string, CalendarEntry[]> = {};
   const appointments: CalendarEntry[] = [];
   const monthGridStart = new Date(year, month, 1 - new Date(year, month, 1).getDay(), 0, 0, 0, 0);
@@ -28849,6 +29055,9 @@ function CalendarView({
   }
   for (const calendarEvent of calendarEvents) {
     recurringCalendarEventOccurrences(calendarEvent, recurrenceRangeStart, recurrenceRangeEnd).forEach(occurrence => {
+      const occurrenceDate = new Date(occurrence.startsAt);
+      const occurrenceKey = `${calendarEvent.id}:${Number.isNaN(occurrenceDate.getTime()) ? occurrence.startsAt : occurrenceDate.toISOString()}`;
+      if (linkedStandaloneOccurrenceKeys.has(occurrenceKey)) return;
       addEntry(occurrence.startsAt, { kind: 'standalone', calendarEvent, occurrenceStartsAt: occurrence.startsAt });
     });
   }
@@ -28939,7 +29148,7 @@ function CalendarView({
 
   const openCalendarEntry = (entry: CalendarEntry) => {
     if (entry.kind === 'standalone') {
-      onOpenCalendarEvent?.(entry.calendarEvent);
+      onOpenCalendarEvent?.(entry.calendarEvent, entry.occurrenceStartsAt);
       return;
     }
     if (entry.kind === 'visit') {
@@ -28958,7 +29167,7 @@ function CalendarView({
         <button
           key={`calendar-event-${calendarEvent.id}-${occurrenceStartsAt}`}
           type="button"
-          onClick={() => onOpenCalendarEvent?.(calendarEvent)}
+          onClick={() => onOpenCalendarEvent?.(calendarEvent, occurrenceStartsAt)}
           className="w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left text-violet-900 transition hover:border-violet-300 hover:bg-violet-100"
         >
           <div className="flex items-start justify-between gap-3">

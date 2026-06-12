@@ -84,6 +84,7 @@ SQL_FILES=(
   "servsync-unified-visit-events.sql"
   "servsync-standalone-calendar-events.sql"
   "servsync-recurring-calendar-events.sql"
+  "servsync-calendar-event-job-links.sql"
   "servsync-contractor-public-profile.sql"
   "servsync-discover.sql"
   "servsync-discover-analytics.sql"

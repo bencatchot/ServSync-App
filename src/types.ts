@@ -780,6 +780,18 @@ export interface ContractorCalendarEvent {
   updated_at: string;
 }
 
+export interface ContractorCalendarEventJobLink {
+  id: string;
+  contractor_id: string;
+  calendar_event_id: string;
+  occurrence_starts_at: string;
+  inspection_id: string;
+  visit_event_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  inspection?: Inspection | null;
+}
+
 export interface HomeDocument {
   id: string;
   homeowner_user_id: string;
