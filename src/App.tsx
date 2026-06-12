@@ -10,6 +10,7 @@ import {
   Camera,
   ClipboardList,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CheckCircle2,
   ClipboardCheck,
@@ -9783,7 +9784,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         />
       )}
 
-      {homes.length !== 1 && homeownerTab !== 'requests' && (
+      {homes.length !== 1 && !['requests', 'discover'].includes(homeownerTab) && (
         <section className="mb-4 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
           {homes.length > 1 ? (
             <>
@@ -12365,41 +12366,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'discover' && (
         <div className="space-y-5">
-          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Discover local posts</p>
-            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Helpful local posts and recent work</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-900">
-              Browse maintenance tips, contractor posts, and recent local work. Save useful posts for later, view profiles,
-              and choose when to connect or request service.
-            </p>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="max-w-2xl">
-                <p className="text-sm font-bold text-slate-950">Need to find or request a contractor?</p>
-                <p className="mt-1 text-sm leading-5 text-slate-500">
-                  Use My Contractors to search connected pros, browse contractor profiles, and start a homeowner-controlled service request.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHomeownerTab('contractors')}
-                className={buttonClass('secondary')}
-              >
-                <Users size={16} />
-                Go to My Contractors
-              </button>
-            </div>
-          </section>
-
           <section className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Recent Local Work</p>
-              <h2 className="mt-1 text-lg font-bold text-slate-950">Helpful local posts and recent work</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Contractors can share recent work, maintenance tips, or helpful local advice. Homeowners choose whether to view a profile,
-                connect, or request service.
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">ServSync Discover</p>
+              <h1 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Local contractor updates</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                See recent posts, services, availability, and helpful maintenance notes from contractors in your area. Open a post
+                to learn more about the contractor, view their profile, connect, or request service when available.
               </p>
             </div>
             <DiscoverFeed
@@ -27465,7 +27438,7 @@ function DiscoverFeed({
   const [filterRadiusMiles, setFilterRadiusMiles] = useState(String(DEFAULT_CONTRACTOR_SERVICE_RADIUS));
   const [filterKeyword, setFilterKeyword] = useState('');
   const [feedView, setFeedView] = useState<'all' | 'saved'>('all');
-  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [discoverLocationStatus, setDiscoverLocationStatus] = useState<'idle' | 'loading' | 'geocoded' | 'fallback'>('idle');
   const [discoverLocationMessage, setDiscoverLocationMessage] = useState('');
 
@@ -27750,6 +27723,19 @@ function DiscoverFeed({
       ].join(' '));
       return keywordTerms.every(term => searchableText.includes(term));
     });
+  const selectedPost = selectedPostId
+    ? [...visibleFeed, ...feed, ...savedFeed].find(item => item.post_id === selectedPostId) ?? null
+    : null;
+  const selectedPostConnectionStatus = selectedPost ? existingConnectionMap[selectedPost.contractor_id] : undefined;
+  const selectedPostSlug = selectedPost ? contractorSlugs[selectedPost.contractor_id] : undefined;
+  const selectedPostExternalReviewLinks = selectedPost ? normalizeExternalReviewLinks(selectedPost.external_review_links) : [];
+  const selectedPostServiceAreas = selectedPost?.service_areas || [];
+  const selectedPostTopKudos = selectedPost ? kudosCounts(selectedPost.reviews).slice(0, 4) : [];
+
+  const openPostDetail = (item: DiscoverFeedItem) => {
+    setSelectedPostId(item.post_id);
+    void recordPostView(item, 'homeowner_discover_expand');
+  };
 
   return (
     <div className="space-y-5">
@@ -27787,9 +27773,9 @@ function DiscoverFeed({
       {perspective === 'homeowner' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3">
-            <p className="text-sm font-bold text-slate-950">Filter Discover posts</p>
+            <p className="text-sm font-bold text-slate-950">Filter contractor posts</p>
             <p className="mt-1 text-sm text-slate-500">
-              Browse recent work, seasonal reminders, and maintenance tips shared publicly by local contractors.
+              Browse recent work, service updates, availability, and maintenance tips shared publicly by local contractors.
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               Search by ZIP or city to find contractors whose listed service areas match your area.
@@ -27986,13 +27972,12 @@ function DiscoverFeed({
           ? 'No saved posts yet. Save helpful contractor posts to revisit later.'
           : feed.length === 0
             ? perspective === 'homeowner'
-              ? 'No posts yet. Contractor photos and maintenance tips will appear here as pros share helpful work.'
+              ? 'Contractor posts will appear here as local pros start sharing updates, services, and availability.'
               : 'No posts yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
             : 'No posts match those filters yet.'} />
       )}
 
       {visibleFeed.map(item => {
-        const isExpanded = expandedPostId === item.post_id;
         const isOwnPost = item.contractor_id === contractorId;
         const topKudos = kudosCounts(item.reviews).slice(0, 4);
         const existingStatus = existingConnectionMap[item.contractor_id];
@@ -28001,7 +27986,19 @@ function DiscoverFeed({
         const serviceAreas = item.service_areas || [];
 
         return (
-          <div key={item.post_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div
+            key={item.post_id}
+            role="button"
+            tabIndex={0}
+            onClick={() => openPostDetail(item)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openPostDetail(item);
+              }
+            }}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
             {/* Card header */}
             <div className="px-5 py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -28069,7 +28066,7 @@ function DiscoverFeed({
                 </div>
 
                 {/* Rating + actions */}
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex shrink-0 flex-col items-end gap-2" onClick={event => event.stopPropagation()}>
                   {item.avg_rating !== null && (
                     <div className="flex items-center gap-1">
                       <StarDisplay rating={Math.round(item.avg_rating)} />
@@ -28149,80 +28146,222 @@ function DiscoverFeed({
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      setExpandedPostId(isExpanded ? null : item.post_id);
-                      if (!isExpanded) void recordPostView(item, 'homeowner_discover_expand');
-                    }}
+                    onClick={() => openPostDetail(item)}
                     className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
                   >
-                    {isExpanded ? 'Hide Post' : 'View Post'}
-                    <ChevronDown size={13} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    View Post
+                    <ChevronRight size={13} />
                   </button>
                 </div>
               </div>
             </div>
-
-            {/* Expanded detail */}
-            {isExpanded && (
-              <div className="space-y-4 border-t border-slate-200 px-5 pb-5 pt-4">
-                {item.description && (
-                  <p className="text-sm text-slate-700">{item.description}</p>
-                )}
-                {item.photos.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Photos</p>
-                    <div className="flex flex-wrap gap-2">
-                      {item.photos.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                          <img src={url} alt="" className="h-32 w-32 rounded-xl border border-slate-200 object-cover transition-opacity hover:opacity-90" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {item.business_summary && (
-                  <div>
-                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">About {item.business_name}</p>
-                    <p className="text-sm text-slate-700">{item.business_summary}</p>
-                  </div>
-                )}
-                {externalReviewLinks.length > 0 && perspective === 'homeowner' && (
-                  <div>
-                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">External Reviews</p>
-                    <p className="mb-2 text-xs leading-5 text-slate-500">
-                      These links open third-party review sites. They are separate from ServSync reviews.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {externalReviewLinks.map(link => (
-                        <a
-                          key={`${item.post_id}-${link.source}-${link.url}`}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={buttonClass('secondary')}
-                        >
-                          View {link.label || externalReviewSourceLabel(link.source)}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {item.reviews.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
-                    <div className="space-y-2">
-                      {item.reviews.map((review, i) => (
-                        <PublicReviewCard key={i} review={review} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <p className="text-xs text-slate-500">Posted {new Date(item.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              </div>
-            )}
           </div>
         );
       })}
+      {selectedPost && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="discover-post-detail-title"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setSelectedPostId(null);
+          }}
+        >
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-3xl sm:rounded-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Contractor post</p>
+                <h2 id="discover-post-detail-title" className="mt-1 text-xl font-bold text-slate-950">{selectedPost.title}</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedPost.business_name}
+                  {selectedPost.post_category ? ` · ${selectedPost.post_category}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPostId(null)}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close post detail"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-5 py-5">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  <MapPin size={12} />
+                  {[selectedPost.contractor_city, selectedPost.contractor_state].filter(Boolean).join(', ') || 'Location not listed'}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  Posted {new Date(selectedPost.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </span>
+                {selectedPost.avg_rating !== null && selectedPost.review_count > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
+                    <Star size={12} />
+                    {selectedPost.avg_rating.toFixed(1)} from {selectedPost.review_count} ServSync {selectedPost.review_count === 1 ? 'review' : 'reviews'}
+                  </span>
+                )}
+              </div>
+
+              {selectedPost.description && (
+                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{selectedPost.description}</p>
+              )}
+
+              {selectedPost.photos.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Photos</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {selectedPost.photos.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                        <img src={url} alt="" className="h-36 w-full rounded-xl border border-slate-200 object-cover transition-opacity hover:opacity-90" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(selectedPost.business_summary || selectedPost.categories.length > 0 || selectedPostServiceAreas.length > 0) && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-bold text-slate-950">{selectedPost.business_name}</p>
+                  {selectedPost.business_summary && (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{selectedPost.business_summary}</p>
+                  )}
+                  {selectedPost.categories.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {selectedPost.categories.slice(0, 8).map(category => (
+                        <span key={`${selectedPost.post_id}-${category}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {category}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {selectedPostServiceAreas.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Service area</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedPostServiceAreas.slice(0, 8).map((area, index) => (
+                          <span key={`${selectedPost.post_id}-modal-service-area-${index}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                            {contractorServiceAreaDisplay(area)}
+                          </span>
+                        ))}
+                        {selectedPostServiceAreas.length > 8 && (
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                            +{selectedPostServiceAreas.length - 8} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedPostTopKudos.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Common review notes</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedPostTopKudos.map(([k, count]) => (
+                      <span key={k} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        {k} <span className="opacity-60">x{count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedPostExternalReviewLinks.length > 0 && perspective === 'homeowner' && (
+                <div>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">External Reviews</p>
+                  <p className="mb-2 text-xs leading-5 text-slate-500">
+                    These links open third-party review sites. They are separate from ServSync reviews.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPostExternalReviewLinks.map(link => (
+                      <a
+                        key={`${selectedPost.post_id}-${link.source}-${link.url}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={buttonClass('secondary')}
+                      >
+                        View {link.label || externalReviewSourceLabel(link.source)}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedPost.reviews.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
+                  <div className="space-y-2">
+                    {selectedPost.reviews.map((review, i) => (
+                      <PublicReviewCard key={i} review={review} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+                {perspective === 'homeowner' && (
+                  <button
+                    type="button"
+                    disabled={savingPostId === selectedPost.post_id}
+                    onClick={() => void togglePostSave(selectedPost)}
+                    className={buttonClass(selectedPost.is_saved ? 'secondary' : 'primary')}
+                  >
+                    {savingPostId === selectedPost.post_id ? 'Saving...' : selectedPost.is_saved ? 'Saved' : 'Save Post'}
+                  </button>
+                )}
+                {perspective === 'homeowner' && selectedPostSlug && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void recordPostView(selectedPost, 'homeowner_discover_profile');
+                      setSelectedPostId(null);
+                      updateRoute('profile', `slug=${encodeURIComponent(selectedPostSlug)}`);
+                    }}
+                    className={buttonClass('secondary')}
+                  >
+                    View Contractor Profile
+                  </button>
+                )}
+                {perspective === 'homeowner' && (!selectedPostConnectionStatus || ['declined', 'revoked', 'dismissed'].includes(selectedPostConnectionStatus)) && (
+                  <button
+                    type="button"
+                    disabled={requestingContractorId === selectedPost.contractor_id}
+                    onClick={() => void requestConnection(selectedPost)}
+                    className={buttonClass('primary')}
+                  >
+                    {requestingContractorId === selectedPost.contractor_id ? 'Sending...' : selectedPostConnectionStatus ? 'Request again' : 'Connect'}
+                  </button>
+                )}
+                {perspective === 'homeowner' && selectedPostConnectionStatus === 'active' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRequestService?.(selectedPost.contractor_id, selectedPost.post_category || selectedPost.categories[0] || 'General Maintenance');
+                      setSelectedPostId(null);
+                    }}
+                    className={buttonClass('primary')}
+                  >
+                    Request Service
+                  </button>
+                )}
+                {perspective === 'homeowner' && selectedPostConnectionStatus === 'pending' && (
+                  <span className="inline-flex items-center rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+                    Connection pending
+                  </span>
+                )}
+                <button type="button" onClick={() => setSelectedPostId(null)} className={buttonClass('secondary')}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
