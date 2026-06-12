@@ -377,6 +377,7 @@ const STORAGE_KEYS = {
   contractorHomeownerRequestView: 'servsync.contractor.homeownerRequestView',
   contractorJobsCustomerFilter: 'servsync.contractor.jobsCustomerFilter',
   contractorJobsView: 'servsync.contractor.jobsView',
+  contractorProfileSetupSkipped: 'servsync.contractor.profileSetupSkipped',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
 
@@ -12462,6 +12463,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const contractorProfileSetupStorageKey = `${STORAGE_KEYS.contractorProfileSetupSkipped}:${profile.id}`;
+  const [contractorProfileSetupSkipped, setContractorProfileSetupSkipped] = useState(
+    () => window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true',
+  );
 
   useEffect(() => {
     if (!notice) return;
@@ -12474,6 +12479,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   useEffect(() => {
     setNotice('');
   }, [contractorTab]);
+
+  useEffect(() => {
+    setContractorProfileSetupSkipped(window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true');
+  }, [contractorProfileSetupStorageKey]);
+
   const [loading, setLoading] = useState(true);
   const restoredFieldWorkRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -14197,6 +14207,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     contractorDraft.business_summary,
   ];
   const contractorProfileScore = Math.round((contractorProfileFields.filter(Boolean).length / contractorProfileFields.length) * 100);
+  const contractorProfileOnboardingComplete = Boolean(contractorDraft.business_name.trim()) && contractorProfileScore >= 70;
+  const showInitialContractorProfileSetupPrompt = !loading
+    && contractorTab !== 'profile'
+    && !contractorProfileSetupSkipped
+    && !contractorProfileOnboardingComplete;
+  const dismissContractorProfileSetupPrompt = () => {
+    window.localStorage.setItem(contractorProfileSetupStorageKey, 'true');
+    setContractorProfileSetupSkipped(true);
+  };
+  const skipInitialContractorProfileSetup = () => {
+    dismissContractorProfileSetupPrompt();
+    setNotice('You can complete your business profile anytime from Business Profile.');
+  };
+  const startInitialContractorProfileSetup = () => {
+    dismissContractorProfileSetupPrompt();
+    setContractorTab('profile');
+    setNotice('Add the business details you want homeowners to see. You can update them anytime.');
+  };
   const contractorTradeSet = new Set(contractorDraft.service_categories.map(category => category.toLowerCase()));
   const starterTemplateAllowedForContractor = (trade: string) => contractorTradeSet.has(trade.toLowerCase());
   const starterTemplateRecommendedForContractor = (trade: string) =>
@@ -14455,7 +14483,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     {
       label: 'Complete company profile',
       helper: 'Add the basics homeowners see on your profile and documents.',
-      complete: Boolean(contractorDraft.business_name.trim()) && contractorProfileScore >= 70,
+      complete: contractorProfileOnboardingComplete,
       actionLabel: 'Complete profile',
       onAction: () => setContractorTab('profile'),
     },
@@ -16034,6 +16062,51 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
       {notice && <Notice tone="success" text={notice} />}
       {error && <Notice tone="error" text={error} />}
+
+      {showInitialContractorProfileSetupPrompt && (
+        <section className="mb-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">Business setup</p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-950">Set up your business profile</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                Add your business details so homeowners can recognize your company, understand your services, and feel confident working with you. You can skip this for now and update it anytime.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Nothing is required to keep using ServSync.</p>
+            </div>
+            <button type="button" onClick={skipInitialContractorProfileSetup} className={buttonClass('secondary')}>
+              Skip for Now
+            </button>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              'Business name',
+              'Phone number',
+              'Service area',
+              'Services offered',
+              'License number, if applicable',
+              'Website, if applicable',
+              'Business logo',
+              'Short business description',
+            ].map(item => (
+              <div key={item} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <CheckCircle2 size={15} className="shrink-0 text-blue-600" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={startInitialContractorProfileSetup} className={buttonClass('primary')}>
+              <Building2 size={16} />
+              Set Up Business Profile
+            </button>
+            <button type="button" onClick={skipInitialContractorProfileSetup} className={buttonClass('secondary')}>
+              Skip for Now
+            </button>
+          </div>
+        </section>
+      )}
+
       {homeTemplatePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
