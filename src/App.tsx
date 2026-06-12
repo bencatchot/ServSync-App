@@ -93,6 +93,7 @@ import type {
   ContractorVisitEvent,
   ContractorCalendarEvent,
   ContractorCalendarEventJobLink,
+  ContractorCalendarEventOccurrenceExclusion,
   CalendarEventRecurrenceFrequency,
   CalendarEventType,
   CalendarEventDraft,
@@ -12550,6 +12551,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorVisitEvents, setContractorVisitEvents] = useState<ContractorVisitEvent[]>([]);
   const [contractorCalendarEvents, setContractorCalendarEvents] = useState<ContractorCalendarEvent[]>([]);
   const [calendarEventJobLinks, setCalendarEventJobLinks] = useState<ContractorCalendarEventJobLink[]>([]);
+  const [calendarEventOccurrenceExclusions, setCalendarEventOccurrenceExclusions] = useState<ContractorCalendarEventOccurrenceExclusion[]>([]);
   const [calendarEventComposerOpen, setCalendarEventComposerOpen] = useState(false);
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
   const [editingCalendarEventOccurrenceAt, setEditingCalendarEventOccurrenceAt] = useState<string | null>(null);
@@ -12852,7 +12854,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -12868,6 +12870,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           supabase
             .from('contractor_calendar_event_job_links')
             .select('*, inspection:inspections(*)')
+            .eq('contractor_id', loadedContractor.id)
+            .order('occurrence_starts_at', { ascending: true }),
+          supabase
+            .from('contractor_calendar_event_occurrence_exclusions')
+            .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('occurrence_starts_at', { ascending: true }),
           supabase
@@ -12904,6 +12911,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         else setContractorCalendarEvents([]);
         if (!calendarEventJobLinksRes.error) setCalendarEventJobLinks((calendarEventJobLinksRes.data || []) as ContractorCalendarEventJobLink[]);
         else setCalendarEventJobLinks([]);
+        if (!calendarEventOccurrenceExclusionsRes.error) setCalendarEventOccurrenceExclusions((calendarEventOccurrenceExclusionsRes.data || []) as ContractorCalendarEventOccurrenceExclusion[]);
+        else setCalendarEventOccurrenceExclusions([]);
         if (!localContactsRes.error) setLocalContacts((localContactsRes.data || []) as ContractorLocalContact[]);
         if (!localClaimInvitesRes.error) setLocalClaimInvites((localClaimInvitesRes.data || []) as LocalCustomerClaimInvite[]);
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
@@ -12913,6 +12922,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setContractorVisitEvents([]);
         setContractorCalendarEvents([]);
         setCalendarEventJobLinks([]);
+        setCalendarEventOccurrenceExclusions([]);
         setLocalContacts([]);
         setLocalClaimInvites([]);
       }
@@ -14410,6 +14420,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const calendarEventLinkForOccurrence = (eventId: string, occurrenceStartsAt: string) =>
     calendarEventJobLinks.find(link => calendarEventOccurrenceKey(link.calendar_event_id, link.occurrence_starts_at) === calendarEventOccurrenceKey(eventId, occurrenceStartsAt)) ?? null;
+  const calendarEventExclusionForOccurrence = (eventId: string, occurrenceStartsAt: string) =>
+    calendarEventOccurrenceExclusions.find(exclusion => calendarEventOccurrenceKey(exclusion.calendar_event_id, exclusion.occurrence_starts_at) === calendarEventOccurrenceKey(eventId, occurrenceStartsAt)) ?? null;
   const openCalendarEventDetail = (event: ContractorCalendarEvent, occurrenceStartsAt = event.starts_at) => {
     setEditingCalendarEvent(event);
     setEditingCalendarEventOccurrenceAt(occurrenceStartsAt);
@@ -14582,11 +14594,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to open the job for this calendar event.'));
     }
   };
-  const createJobFromCalendarEvent = async (event: ContractorCalendarEvent, occurrenceStartsAt: string) => {
+  const createJobFromCalendarEvent = async (event: ContractorCalendarEvent, occurrenceStartsAt: string, jobType: string) => {
     if (!supabase) return;
     const occurrenceDate = new Date(occurrenceStartsAt);
     if (Number.isNaN(occurrenceDate.getTime())) {
       setError('Choose a valid calendar event occurrence before creating a job.');
+      return;
+    }
+    if (!CALENDAR_EVENT_JOB_TYPE_OPTIONS.some(option => option.value === jobType)) {
+      setError('Choose the type of job to create from this calendar event.');
       return;
     }
     const existingLink = calendarEventLinkForOccurrence(event.id, occurrenceStartsAt);
@@ -14607,6 +14623,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const { data, error: createError } = await supabase.rpc('servsync_create_job_from_calendar_event', {
         p_calendar_event_id: event.id,
         p_occurrence_starts_at: occurrenceDate.toISOString(),
+        p_job_type: jobType,
       });
       if (createError) throw createError;
       const result = (data || {}) as { job_id?: string; visit_event_id?: string | null; created?: boolean };
@@ -14663,6 +14680,83 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to create a job from this calendar event. Make sure the calendar event job links SQL has been applied.'));
     } finally {
       setCreatingJobFromCalendarEventKey(null);
+      setCalendarEventBusy(false);
+    }
+  };
+  const removeLinkedCalendarEvent = async (event: ContractorCalendarEvent, occurrenceStartsAt: string, mode: 'event_only' | 'event_and_job') => {
+    if (!supabase) return;
+    const occurrenceDate = new Date(occurrenceStartsAt);
+    if (Number.isNaN(occurrenceDate.getTime())) {
+      setError('Choose a valid calendar event occurrence before deleting it.');
+      return;
+    }
+    const link = calendarEventLinkForOccurrence(event.id, occurrenceStartsAt);
+    if (!link) {
+      setError('This calendar event is no longer tied to a job.');
+      return;
+    }
+    setCalendarEventBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: removeError } = await supabase.rpc('servsync_remove_calendar_event_job_link', {
+        p_calendar_event_id: event.id,
+        p_occurrence_starts_at: occurrenceDate.toISOString(),
+        p_delete_job: mode === 'event_and_job',
+      });
+      if (removeError) throw removeError;
+      const result = (data || {}) as {
+        calendar_event_deleted?: boolean;
+        exclusion_id?: string | null;
+        visit_event_id?: string | null;
+        job_id?: string | null;
+        job_deleted?: boolean;
+      };
+      const occurrenceKey = calendarEventOccurrenceKey(event.id, occurrenceDate.toISOString());
+      if (result.calendar_event_deleted) {
+        setContractorCalendarEvents(prev => prev.filter(item => item.id !== event.id));
+      } else if (result.exclusion_id && !calendarEventExclusionForOccurrence(event.id, occurrenceDate.toISOString())) {
+        const nextExclusion: ContractorCalendarEventOccurrenceExclusion = {
+          id: result.exclusion_id,
+          contractor_id: event.contractor_id,
+          calendar_event_id: event.id,
+          occurrence_starts_at: occurrenceDate.toISOString(),
+          reason: mode === 'event_and_job' ? 'event_and_job_deleted' : 'event_only_deleted',
+          created_by: profile.id,
+          created_at: new Date().toISOString(),
+        };
+        setCalendarEventOccurrenceExclusions(prev => [nextExclusion, ...prev]);
+      }
+      if (result.visit_event_id) {
+        setContractorVisitEvents(prev => prev.filter(item => item.id !== result.visit_event_id));
+      } else {
+        setContractorVisitEvents(prev => prev.filter(item => item.inspection_id !== link.inspection_id || item.scheduled_at !== link.occurrence_starts_at));
+      }
+      if (mode === 'event_and_job') {
+        setCalendarEventJobLinks(prev => prev.filter(item => calendarEventOccurrenceKey(item.calendar_event_id, item.occurrence_starts_at) !== occurrenceKey));
+        setInspections(prev => prev.filter(item => item.id !== link.inspection_id));
+      } else {
+        setCalendarEventJobLinks(prev => prev.map(item => calendarEventOccurrenceKey(item.calendar_event_id, item.occurrence_starts_at) === occurrenceKey
+          ? { ...item, visit_event_id: null }
+          : item
+        ));
+        setInspections(prev => prev.map(item => item.id === link.inspection_id && item.job_status === 'scheduled'
+          ? { ...item, job_status: 'draft' as const, updated_at: new Date().toISOString() }
+          : item
+        ));
+      }
+      closeCalendarEventComposer();
+      setSelectedVisitCalendarEvent(null);
+      setNotice(mode === 'event_and_job'
+        ? 'Calendar event and tied job deleted.'
+        : 'Calendar event removed. The tied job remains available in Jobs.'
+      );
+    } catch (err) {
+      setError(readableError(err, mode === 'event_and_job'
+        ? 'Unable to delete the calendar event and tied job.'
+        : 'Unable to delete the calendar event only.'
+      ));
+    } finally {
       setCalendarEventBusy(false);
     }
   };
@@ -18160,6 +18254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             visitEvents={contractorVisitEvents}
             calendarEvents={contractorCalendarEvents}
             calendarEventJobLinks={calendarEventJobLinks}
+            calendarEventOccurrenceExclusions={calendarEventOccurrenceExclusions}
             perspective="contractor"
             onOpenRequest={request => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
             onOpenVisitEvent={openVisitCalendarEventDetail}
@@ -18174,9 +18269,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           request={selectedVisitCalendarEvent.service_request_id
             ? serviceRequests.find(item => item.id === selectedVisitCalendarEvent.service_request_id) ?? null
             : null}
-          busy={visitCalendarEventBusy}
+          calendarEventLink={calendarEventJobLinks.find(link => link.visit_event_id === selectedVisitCalendarEvent.id || link.inspection_id === selectedVisitCalendarEvent.inspection_id) ?? null}
+          sourceCalendarEvent={(() => {
+            const link = calendarEventJobLinks.find(item => item.visit_event_id === selectedVisitCalendarEvent.id || item.inspection_id === selectedVisitCalendarEvent.inspection_id);
+            return link ? contractorCalendarEvents.find(item => item.id === link.calendar_event_id) ?? null : null;
+          })()}
+          busy={visitCalendarEventBusy || calendarEventBusy}
           onSave={draft => void saveVisitCalendarEvent(selectedVisitCalendarEvent, draft)}
           onOpenJob={() => openVisitCalendarEventJob(selectedVisitCalendarEvent)}
+          onDeleteCalendarEventLink={(() => {
+            const link = calendarEventJobLinks.find(item => item.visit_event_id === selectedVisitCalendarEvent.id || item.inspection_id === selectedVisitCalendarEvent.inspection_id);
+            const sourceEvent = link ? contractorCalendarEvents.find(item => item.id === link.calendar_event_id) ?? null : null;
+            return link && sourceEvent
+              ? mode => void removeLinkedCalendarEvent(sourceEvent, link.occurrence_starts_at, mode)
+              : undefined;
+          })()}
           onClose={closeVisitCalendarEventDetail}
         />
       )}
@@ -18196,10 +18303,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             && creatingJobFromCalendarEventKey === calendarEventOccurrenceKey(editingCalendarEvent.id, editingCalendarEventOccurrenceAt)
           )}
           onCreateJob={editingCalendarEvent && editingCalendarEventOccurrenceAt
-            ? () => void createJobFromCalendarEvent(editingCalendarEvent, editingCalendarEventOccurrenceAt)
+            ? jobType => void createJobFromCalendarEvent(editingCalendarEvent, editingCalendarEventOccurrenceAt, jobType)
             : undefined}
           onOpenLinkedJob={link => void openCalendarEventLinkedJob(link)}
           onDelete={editingCalendarEvent ? () => deleteCalendarEvent(editingCalendarEvent) : undefined}
+          onDeleteLinkedEvent={editingCalendarEvent && editingCalendarEventOccurrenceAt
+            ? mode => void removeLinkedCalendarEvent(editingCalendarEvent, editingCalendarEventOccurrenceAt, mode)
+            : undefined}
           onClose={closeCalendarEventComposer}
         />
       )}
@@ -28513,16 +28623,32 @@ function EmptyState({ text }: { text: string }) {
 }
 
 const CALENDAR_EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string }[] = [
-  { value: 'routine_inspection', label: 'Routine inspection' },
-  { value: 'follow_up', label: 'Follow-up visit' },
-  { value: 'reminder', label: 'Reminder' },
-  { value: 'check_in', label: 'Customer check-in' },
-  { value: 'other', label: 'Other' },
+  { value: 'service_visit', label: 'Service Visit' },
+  { value: 'inspection_visit', label: 'Inspection Visit' },
+  { value: 'estimate_visit', label: 'Estimate Visit' },
+  { value: 'follow_up_visit', label: 'Follow-Up Visit' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 function calendarEventTypeLabel(type: string) {
-  return CALENDAR_EVENT_TYPE_OPTIONS.find(option => option.value === type)?.label ?? 'Event';
+  const legacyLabels: Record<string, string> = {
+    routine_inspection: 'Inspection Visit',
+    follow_up: 'Follow-Up Visit',
+    reminder: 'Custom',
+    check_in: 'Service Visit',
+    other: 'Custom',
+  };
+  return CALENDAR_EVENT_TYPE_OPTIONS.find(option => option.value === type)?.label ?? legacyLabels[type] ?? 'Event';
 }
+
+const CALENDAR_EVENT_JOB_TYPE_OPTIONS: { value: string; label: string; helper: string }[] = [
+  { value: 'service_visit', label: 'Service job', helper: 'General service work, diagnosis, or a standard visit.' },
+  { value: 'repair', label: 'Repair job', helper: 'Work focused on fixing a known issue.' },
+  { value: 'install', label: 'Install job', helper: 'Installation or replacement work.' },
+  { value: 'estimate_visit', label: 'Estimate visit', helper: 'A visit to review scope and prepare pricing.' },
+  { value: 'inspection', label: 'Inspection / checklist job', helper: 'Structured inspection or report workflow.' },
+  { value: 'maintenance_visit', label: 'Maintenance / checklist job', helper: 'Routine maintenance using checklist-style tracking.' },
+];
 
 function toDateTimeLocalValue(iso: string) {
   const d = new Date(iso);
@@ -28548,6 +28674,7 @@ function CalendarEventComposer({
   onCreateJob,
   onOpenLinkedJob,
   onDelete,
+  onDeleteLinkedEvent,
   onClose,
 }: {
   event: ContractorCalendarEvent | null;
@@ -28557,16 +28684,17 @@ function CalendarEventComposer({
   busy: boolean;
   onSave: (draft: CalendarEventDraft) => void;
   creatingJob: boolean;
-  onCreateJob?: () => void;
+  onCreateJob?: (jobType: string) => void;
   onOpenLinkedJob: (link: ContractorCalendarEventJobLink | null) => void;
   onDelete?: () => void;
+  onDeleteLinkedEvent?: (mode: 'event_only' | 'event_and_job') => void;
   onClose: () => void;
 }) {
   const isEditing = Boolean(event);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState<CalendarEventDraft>(() => ({
     title: event?.title ?? '',
-    event_type: event?.event_type ?? 'routine_inspection',
+    event_type: event?.event_type ?? 'service_visit',
     starts_at: event ? toDateTimeLocalValue(event.starts_at) : defaultCalendarEventStart(),
     duration_minutes: event?.duration_minutes ? String(event.duration_minutes) : '',
     notes: event?.notes ?? '',
@@ -28575,6 +28703,9 @@ function CalendarEventComposer({
     recurrence_ends_at: calendarEventEndDateInputValue(event?.recurrence_ends_at),
   }));
   const [recurrenceEndCondition, setRecurrenceEndCondition] = useState<'none' | 'date'>(event?.recurrence_ends_at ? 'date' : 'none');
+  const [createJobPanelOpen, setCreateJobPanelOpen] = useState(false);
+  const [selectedJobType, setSelectedJobType] = useState('');
+  const [deleteLinkedPanelOpen, setDeleteLinkedPanelOpen] = useState(false);
   const { dateValue: eventDateValue, timeValue: eventTimeValue } = splitDateTimeLocalValue(draft.starts_at);
   const eventTimeOptions = calendarEventTimeOptions(eventTimeValue);
   const recurrenceSummary = draft.recurrence_frequency === 'none'
@@ -28593,6 +28724,7 @@ function CalendarEventComposer({
   const canCreateJobFromEvent = Boolean(isEditing && event && onCreateJob);
   const eventHasCustomer = Boolean(event?.local_contact_id || event?.homeowner_user_id);
   const eventIsRecurring = normalizeCalendarEventRecurrenceFrequency(event?.recurrence_frequency) !== 'none';
+  const selectedJobTypeLabel = CALENDAR_EVENT_JOB_TYPE_OPTIONS.find(option => option.value === selectedJobType)?.label ?? '';
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -28622,12 +28754,12 @@ function CalendarEventComposer({
           <button type="button" onClick={onClose} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={18} /></button>
         </div>
         <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
-          Not tied to a job
+          {linkedJob ? 'Tied to a job' : 'Not tied to a job'}
         </p>
         {isEditing && (
           <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs leading-5 text-violet-900">
             {linkedJob ? (
-              <span>This event occurrence is tied to a job.</span>
+              <span>This event occurrence is tied to a job. You can open the job or delete just the calendar event from this occurrence.</span>
             ) : eventIsRecurring ? (
               <span>Create Job from Event will create a job for the selected occurrence only{selectedOccurrenceLabel ? ` (${selectedOccurrenceLabel})` : ''}. Future repeats stay as calendar events.</span>
             ) : (
@@ -28739,6 +28871,64 @@ function CalendarEventComposer({
           <p className="rounded-lg bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800">
             {recurrenceSummary}
           </p>
+          {isEditing && !linkedJob && createJobPanelOpen && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <p className="text-sm font-bold text-blue-950">Choose the job type</p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">
+                Event type describes the calendar item only. Choose the job workflow you want ServSync to create.
+              </p>
+              <div className="mt-3 space-y-2">
+                {CALENDAR_EVENT_JOB_TYPE_OPTIONS.map(option => (
+                  <label key={option.value} className={`flex cursor-pointer gap-3 rounded-lg border p-3 text-sm transition ${selectedJobType === option.value ? 'border-blue-300 bg-white shadow-sm' : 'border-blue-100 bg-white/70 hover:border-blue-200'}`}>
+                    <input
+                      type="radio"
+                      name="calendar-event-job-type"
+                      className="mt-1"
+                      value={option.value}
+                      checked={selectedJobType === option.value}
+                      onChange={() => setSelectedJobType(option.value)}
+                    />
+                    <span>
+                      <span className="block font-semibold text-slate-950">{option.label}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-slate-600">{option.helper}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <button type="button" className={buttonClass('secondary')} onClick={() => setCreateJobPanelOpen(false)} disabled={busy || creatingJob}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={buttonClass('primary')}
+                  disabled={!selectedJobType || busy || creatingJob}
+                  onClick={() => selectedJobType && onCreateJob?.(selectedJobType)}
+                >
+                  {creatingJob ? 'Creating job...' : selectedJobTypeLabel ? `Create ${selectedJobTypeLabel}` : 'Create job'}
+                </button>
+              </div>
+            </div>
+          )}
+          {isEditing && linkedJob && deleteLinkedPanelOpen && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+              <p className="text-sm font-bold text-red-950">Delete this tied calendar event?</p>
+              <p className="mt-1 text-xs leading-5 text-red-800">
+                Choose whether to remove only the calendar event or remove both the calendar event and the job created from it.
+              </p>
+              <div className="mt-3 grid gap-2">
+                <button type="button" className={buttonClass('secondary')} disabled={busy} onClick={() => onDeleteLinkedEvent?.('event_only')}>
+                  Delete calendar event only
+                </button>
+                <button type="button" className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60" disabled={busy} onClick={() => onDeleteLinkedEvent?.('event_and_job')}>
+                  Delete calendar event and tied job
+                </button>
+                <button type="button" className={buttonClass('secondary')} disabled={busy} onClick={() => setDeleteLinkedPanelOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <Field label="Notes (optional)">
             <textarea rows={3} className={inputClass()} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
           </Field>
@@ -28753,7 +28943,7 @@ function CalendarEventComposer({
             ) : (
               <button
                 type="button"
-                onClick={onCreateJob}
+                onClick={() => setCreateJobPanelOpen(true)}
                 disabled={!canCreateJobFromEvent || busy || creatingJob || !eventHasCustomer}
                 className={buttonClass('secondary')}
                 title={!eventHasCustomer ? 'Select a customer and save this event before creating a job.' : undefined}
@@ -28769,7 +28959,7 @@ function CalendarEventComposer({
           </div>
           <div className="flex items-center gap-2">
             {isEditing && onDelete && (
-              <button type="button" onClick={onDelete} disabled={busy} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
+              <button type="button" onClick={linkedJob ? () => setDeleteLinkedPanelOpen(true) : onDelete} disabled={busy} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
                 Delete
               </button>
             )}
@@ -28787,17 +28977,23 @@ function VisitCalendarEventDetail({
   event,
   inspection,
   request,
+  calendarEventLink,
+  sourceCalendarEvent,
   busy,
   onSave,
   onOpenJob,
+  onDeleteCalendarEventLink,
   onClose,
 }: {
   event: ContractorVisitEvent;
   inspection: Inspection | null;
   request: ServiceRequestSummary | null;
+  calendarEventLink?: ContractorCalendarEventJobLink | null;
+  sourceCalendarEvent?: ContractorCalendarEvent | null;
   busy: boolean;
   onSave: (draft: { starts_at: string; notes: string; share_with_homeowner: boolean }) => void;
   onOpenJob: () => void;
+  onDeleteCalendarEventLink?: (mode: 'event_only' | 'event_and_job') => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -28806,6 +29002,7 @@ function VisitCalendarEventDetail({
     notes: event.notes ?? '',
     share_with_homeowner: Boolean(event.share_with_homeowner),
   }));
+  const [deleteCalendarEventPanelOpen, setDeleteCalendarEventPanelOpen] = useState(false);
   useEffect(() => {
     setDraft({
       starts_at: toDateTimeLocalValue(event.scheduled_at),
@@ -28955,6 +29152,31 @@ function VisitCalendarEventDetail({
             <p className="mt-1 text-sm text-slate-700">Does not repeat. Recurrence is only supported for standalone calendar events right now.</p>
           </div>
 
+          {calendarEventLink && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Created from calendar event</p>
+              <p className="mt-1 text-sm font-semibold text-blue-950">
+                {sourceCalendarEvent?.title ?? 'Original calendar event'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">
+                You can remove the calendar event while keeping the job, or remove both if the job has not started.
+              </p>
+              {deleteCalendarEventPanelOpen && (
+                <div className="mt-3 grid gap-2">
+                  <button type="button" className={buttonClass('secondary')} disabled={busy} onClick={() => onDeleteCalendarEventLink?.('event_only')}>
+                    Delete calendar event only
+                  </button>
+                  <button type="button" className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60" disabled={busy} onClick={() => onDeleteCalendarEventLink?.('event_and_job')}>
+                    Delete calendar event and tied job
+                  </button>
+                  <button type="button" className={buttonClass('secondary')} disabled={busy} onClick={() => setDeleteCalendarEventPanelOpen(false)}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {inspection?.summary && (
             <div className="rounded-xl border border-slate-200 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Job summary</p>
@@ -28979,6 +29201,11 @@ function VisitCalendarEventDetail({
             Close
           </button>
           <div className="flex flex-wrap items-center gap-2">
+            {calendarEventLink && (
+              <button type="button" onClick={() => setDeleteCalendarEventPanelOpen(true)} disabled={busy || !onDeleteCalendarEventLink} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60">
+                Delete calendar event
+              </button>
+            )}
             <button type="button" onClick={onOpenJob} disabled={!inspection || busy} className={buttonClass('secondary')}>
               Open Job
             </button>
@@ -28997,6 +29224,7 @@ function CalendarView({
   visitEvents = [],
   calendarEvents = [],
   calendarEventJobLinks = [],
+  calendarEventOccurrenceExclusions = [],
   perspective,
   onOpenRequest,
   onOpenVisitEvent,
@@ -29006,6 +29234,7 @@ function CalendarView({
   visitEvents?: ContractorVisitEvent[];
   calendarEvents?: ContractorCalendarEvent[];
   calendarEventJobLinks?: ContractorCalendarEventJobLink[];
+  calendarEventOccurrenceExclusions?: ContractorCalendarEventOccurrenceExclusion[];
   perspective: 'homeowner' | 'contractor';
   onOpenRequest?: (request: ServiceRequestSummary) => void;
   onOpenVisitEvent?: (event: ContractorVisitEvent) => void;
@@ -29025,6 +29254,10 @@ function CalendarView({
   const linkedStandaloneOccurrenceKeys = new Set(calendarEventJobLinks.map(link => {
     const date = new Date(link.occurrence_starts_at);
     return `${link.calendar_event_id}:${Number.isNaN(date.getTime()) ? link.occurrence_starts_at : date.toISOString()}`;
+  }));
+  const excludedStandaloneOccurrenceKeys = new Set(calendarEventOccurrenceExclusions.map(exclusion => {
+    const date = new Date(exclusion.occurrence_starts_at);
+    return `${exclusion.calendar_event_id}:${Number.isNaN(date.getTime()) ? exclusion.occurrence_starts_at : date.toISOString()}`;
   }));
   const apptMap: Record<string, CalendarEntry[]> = {};
   const appointments: CalendarEntry[] = [];
@@ -29058,6 +29291,7 @@ function CalendarView({
       const occurrenceDate = new Date(occurrence.startsAt);
       const occurrenceKey = `${calendarEvent.id}:${Number.isNaN(occurrenceDate.getTime()) ? occurrence.startsAt : occurrenceDate.toISOString()}`;
       if (linkedStandaloneOccurrenceKeys.has(occurrenceKey)) return;
+      if (excludedStandaloneOccurrenceKeys.has(occurrenceKey)) return;
       addEntry(occurrence.startsAt, { kind: 'standalone', calendarEvent, occurrenceStartsAt: occurrence.startsAt });
     });
   }

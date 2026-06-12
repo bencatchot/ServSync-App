@@ -36,7 +36,7 @@ test.describe('standalone calendar events', () => {
     await expect(page.getByText(/^Not tied to a job$/i).first()).toBeVisible();
 
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
-    await page.getByRole('combobox', { name: 'Event type', exact: true }).selectOption('routine_inspection');
+    await page.getByRole('combobox', { name: 'Event type', exact: true }).selectOption('inspection_visit');
     await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('10:00');
     await page.getByRole('combobox', { name: /^Repeat$/i }).selectOption('monthly');
     await expect(page.getByText(/Monthly with no end date/i)).toBeVisible();

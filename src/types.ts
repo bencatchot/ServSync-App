@@ -16,7 +16,7 @@ export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
 export type ContractorVisitEventStatus = 'scheduled' | 'completed' | 'cancelled';
 export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_waiting' | 'accepted' | 'declined' | 'countered';
-export type CalendarEventType = 'routine_inspection' | 'follow_up' | 'reminder' | 'check_in' | 'other';
+export type CalendarEventType = 'service_visit' | 'inspection_visit' | 'estimate_visit' | 'follow_up_visit' | 'custom';
 export type CalendarEventRecurrenceFrequency = 'none' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
@@ -790,6 +790,16 @@ export interface ContractorCalendarEventJobLink {
   created_by: string | null;
   created_at: string;
   inspection?: Inspection | null;
+}
+
+export interface ContractorCalendarEventOccurrenceExclusion {
+  id: string;
+  contractor_id: string;
+  calendar_event_id: string;
+  occurrence_starts_at: string;
+  reason: string;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface HomeDocument {
