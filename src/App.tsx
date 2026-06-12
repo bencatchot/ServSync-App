@@ -383,6 +383,7 @@ const STORAGE_KEYS = {
   homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
   homeownerHomeSetupSkipped: 'servsync.homeowner.homeSetupSkipped',
   homeownerWalkthroughSkipped: 'servsync.homeowner.walkthroughSkipped',
+  homeownerPendingContractorRequest: 'servsync.homeowner.pendingContractorRequest',
   contractorTab: 'servsync.contractor.activeTab',
   contractorHomeownerFilter: 'servsync.contractor.homeownerFilter',
   contractorHomeownerSearch: 'servsync.contractor.homeownerSearch',
@@ -6973,6 +6974,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [directoryCategory, setDirectoryCategory] = useState('');
   const [directoryLocation, setDirectoryLocation] = useState('');
+  const [directorySearch, setDirectorySearch] = useState('');
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
   const [permissionDrafts, setPermissionDrafts] = useState<Record<string, SharingPermissions>>({});
@@ -8615,16 +8617,39 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setSupportDraftFiles([]);
     setHomeownerTab('support');
   };
-  const filteredDirectoryContractors = directoryContractors.filter(contractor => {
-    const categoryMatch = !directoryCategory || contractor.service_categories.some(c => c.toLowerCase() === directoryCategory.toLowerCase());
-    const locationQuery = directoryLocation.trim().toLowerCase();
-    const locationMatch = !locationQuery
-      || contractor.city.toLowerCase().includes(locationQuery)
-      || contractor.state.toLowerCase().includes(locationQuery)
-      || contractor.zip_code.toLowerCase().includes(locationQuery)
-      || contractor.service_zip_codes.some(zip => zip.toLowerCase().includes(locationQuery));
-    return categoryMatch && locationMatch;
-  });
+  const directorySearchTerms = normalizeText(directorySearch).split(' ').filter(Boolean);
+  const filteredDirectoryContractors = directoryContractors
+    .filter(contractor => {
+      const categoryMatch = !directoryCategory || contractor.service_categories.some(c => c.toLowerCase() === directoryCategory.toLowerCase());
+      const locationQuery = directoryLocation.trim().toLowerCase();
+      const locationMatch = !locationQuery
+        || contractor.city.toLowerCase().includes(locationQuery)
+        || contractor.state.toLowerCase().includes(locationQuery)
+        || contractor.zip_code.toLowerCase().includes(locationQuery)
+        || contractor.service_zip_codes.some(zip => zip.toLowerCase().includes(locationQuery));
+      const searchableText = normalizeText([
+        contractor.business_name,
+        contractor.contact_name,
+        contractor.business_summary,
+        contractor.city,
+        contractor.state,
+        contractor.zip_code,
+        contractor.phone,
+        contractor.website_url,
+        contractor.service_categories.join(' '),
+        contractor.service_zip_codes.join(' '),
+      ].join(' '));
+      const textMatch = directorySearchTerms.length === 0 || directorySearchTerms.every(term => searchableText.includes(term));
+      return categoryMatch && locationMatch && textMatch;
+    })
+    .sort((a, b) => {
+      const aConnection = connectionByContractorId.get(a.id);
+      const bConnection = connectionByContractorId.get(b.id);
+      const aActive = aConnection?.status === 'active';
+      const bActive = bConnection?.status === 'active';
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      return (a.business_name || '').localeCompare(b.business_name || '');
+    });
   const selectedRequestConnection = serviceRequestDraft.connection_id
     ? activeConnections.find(connection => connection.connection_id === serviceRequestDraft.connection_id) ?? null
     : null;
@@ -8718,6 +8743,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       description: '',
     });
   };
+  const startServiceRequestForDirectoryContractor = (contractor: ContractorProfile, category?: string) => {
+    const connection = activeConnections.find(item => item.contractor_id === contractor.id);
+    if (!connection) {
+      setNotice(`Connect with ${contractor.business_name || 'this contractor'} before sending a service request.`);
+      return;
+    }
+    startServiceRequestForConnection(connection, category || directoryCategory || contractor.service_categories[0] || 'General Maintenance');
+  };
+
+  useEffect(() => {
+    const rawPending = window.localStorage.getItem(STORAGE_KEYS.homeownerPendingContractorRequest);
+    if (!rawPending || loading || activeConnections.length === 0) return;
+    try {
+      const pending = JSON.parse(rawPending) as { contractorId?: string; category?: string };
+      if (!pending.contractorId) return;
+      const connection = activeConnections.find(item => item.contractor_id === pending.contractorId);
+      if (!connection) return;
+      window.localStorage.removeItem(STORAGE_KEYS.homeownerPendingContractorRequest);
+      startServiceRequestForConnection(connection, pending.category);
+      setHomeownerTab('discover');
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEYS.homeownerPendingContractorRequest);
+    }
+  }, [activeConnections, loading]);
+
   const selectedPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedEstimateCount = estimates.filter(estimate => !estimate.home_id).length;
   const unassignedInvoiceCount = invoices.filter(invoice => !invoice.home_id).length;
@@ -12366,30 +12416,301 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'discover' && (
         <div className="space-y-5">
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Discover local posts</p>
-            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Helpful local posts and recent work</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">ServSync Discover</p>
+            <h1 className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">Find contractors who work in your area</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-900">
-              Browse maintenance tips, contractor posts, and recent local work. Save useful posts for later, view profiles,
-              and choose when to connect or request service.
+              Search by service need, review public contractor profiles, and send a structured request so the contractor gets
+              the details they need. ServSync keeps requests, estimates, jobs, invoices, and service history connected to your home.
             </p>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="max-w-2xl">
-                <p className="text-sm font-bold text-slate-950">Need to find or request a contractor?</p>
-                <p className="mt-1 text-sm leading-5 text-slate-500">
-                  Use My Contractors to search connected pros, browse contractor profiles, and start a homeowner-controlled service request.
-                </p>
+          {requestingConnectionId && selectedRequestConnection && (
+            <Card title={`Request service from ${selectedRequestConnection.business_name}`} icon={<MessageSquare size={18} />}>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-blue-950">
+                        This request goes directly to {selectedRequestConnection.business_name}
+                      </p>
+                      <p className="mt-1 text-sm text-blue-800">
+                        Describe what you need help with and include any details or photos that may help them understand the issue.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRequestingConnectionId(null);
+                        setNewRequestFiles([]);
+                        setServiceProblemText('');
+                        setServiceRequestDraft({
+                          connection_id: '',
+                          home_id: selectedHome?.id || selectedHomeId || '',
+                          category: '',
+                          urgency: 'normal',
+                          title: '',
+                          description: '',
+                        });
+                      }}
+                      className={buttonClass('secondary')}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                {renderServiceRequestPropertyField()}
+
+                <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                  <Field label="Urgency">
+                    <select
+                      className={inputClass()}
+                      value={serviceRequestDraft.urgency}
+                      onChange={event => setServiceRequestDraft(current => ({
+                        ...current,
+                        connection_id: selectedRequestConnection.connection_id,
+                        urgency: event.target.value as ServiceRequestUrgency,
+                      }))}
+                    >
+                      {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Short title">
+                    <input
+                      className={inputClass()}
+                      {...writingAssistProps}
+                      value={serviceRequestDraft.title}
+                      onChange={event => setServiceRequestDraft(current => ({
+                        ...current,
+                        connection_id: selectedRequestConnection.connection_id,
+                        title: event.target.value,
+                      }))}
+                      placeholder="Example: Leak under kitchen sink"
+                    />
+                  </Field>
+                </div>
+                <Field label="What do you need help with?">
+                  <textarea
+                    className={inputClass()}
+                    rows={4}
+                    {...writingAssistProps}
+                    value={serviceRequestDraft.description}
+                    onChange={event => setServiceRequestDraft(current => ({
+                      ...current,
+                      connection_id: selectedRequestConnection.connection_id,
+                      description: event.target.value,
+                    }))}
+                    placeholder="Add enough detail for the contractor to understand the issue."
+                  />
+                </Field>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Photos / Videos (optional)
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                    <Paperclip size={15} className="shrink-0 text-slate-400" />
+                    Attach files
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      className="sr-only"
+                      onChange={event => {
+                        const picked = Array.from(event.target.files ?? []);
+                        setNewRequestFiles(prev => [...prev, ...picked]);
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {newRequestFiles.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {newRequestFiles.map((file, i) => (
+                        <li key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setNewRequestFiles(prev => prev.filter((_, idx) => idx !== i))}
+                            className="ml-2 text-slate-400 hover:text-red-400"
+                          >
+                            <X size={13} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void createServiceRequest()}
+                    disabled={savingServiceRequest}
+                    className={buttonClass('primary')}
+                  >
+                    <Send size={16} />
+                    {savingServiceRequest ? 'Sending...' : 'Send request'}
+                  </button>
+                  <button type="button" onClick={() => setHomeownerTab('requests')} className={buttonClass('secondary')}>
+                    View requests
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setHomeownerTab('contractors')}
-                className={buttonClass('secondary')}
-              >
-                <Users size={16} />
-                Go to My Contractors
-              </button>
+            </Card>
+          )}
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Contractor search</p>
+                  <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-500">
+                    Find contractors by service type, business name, and service area. Connected contractors can receive a service request right away;
+                    others can receive a connection request first.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {filteredDirectoryContractors.length} {filteredDirectoryContractors.length === 1 ? 'contractor' : 'contractors'}
+                </span>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-[1fr_0.8fr_0.9fr_auto]">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="Search by contractor, service, or keyword"
+                    value={directorySearch}
+                    onChange={event => setDirectorySearch(event.target.value)}
+                  />
+                </div>
+                <select
+                  className={inputClass()}
+                  value={directoryCategory}
+                  onChange={event => setDirectoryCategory(event.target.value)}
+                >
+                  <option value="">All service types</option>
+                  {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                </select>
+                <div className="relative">
+                  <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="City, state, or ZIP"
+                    value={directoryLocation}
+                    onChange={event => setDirectoryLocation(event.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDirectorySearch('');
+                    setDirectoryCategory('');
+                    setDirectoryLocation('');
+                  }}
+                  className={buttonClass('secondary')}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid gap-3 xl:grid-cols-2">
+                {filteredDirectoryContractors.length === 0 ? (
+                  <div className="xl:col-span-2">
+                    <EmptyState text="No public contractor profiles match that search yet." />
+                  </div>
+                ) : (
+                  filteredDirectoryContractors.map(contractor => {
+                    const existingConnection = connectionByContractorId.get(contractor.id);
+                    const isConnected = existingConnection?.status === 'active';
+                    const isPending = existingConnection?.status === 'pending';
+                    const contractorLocation = [contractor.city, contractor.state].filter(Boolean).join(', ');
+                    return (
+                      <article key={contractor.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold text-slate-950">{contractor.business_name || 'Unnamed contractor'}</p>
+                              {existingConnection && (
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  isConnected
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : isPending
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {isConnected ? 'Connected' : isPending ? 'Pending' : existingConnection.status}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
+                              <MapPin size={13} />
+                              {contractorLocation || contractor.zip_code || 'Location not listed'}
+                            </p>
+                            {contractor.service_categories.length > 0 ? (
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {contractor.service_categories.slice(0, 6).map(category => (
+                                  <span key={category} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    {category}
+                                  </span>
+                                ))}
+                                {contractor.service_categories.length > 6 && (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                    +{contractor.service_categories.length - 6} more
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-xs font-semibold text-amber-700">Services not listed yet.</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-600">
+                          {contractor.business_summary || 'This contractor has not added a public business description yet.'}
+                        </p>
+                        <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+                          <p><span className="font-semibold text-slate-700">Service area:</span> {contractor.service_zip_codes.length > 0 ? contractor.service_zip_codes.slice(0, 5).join(', ') : 'Not listed yet'}</p>
+                          <p><span className="font-semibold text-slate-700">Phone:</span> {formatPhoneNumber(contractor.phone) || 'Not listed'}</p>
+                          {contractor.website_url && (
+                            <p className="sm:col-span-2">
+                              <a href={contractor.website_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 hover:text-blue-800">
+                                Visit website
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {contractor.slug && (
+                            <button
+                              type="button"
+                              onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                              className={buttonClass('secondary')}
+                            >
+                              View Profile
+                            </button>
+                          )}
+                          {isConnected ? (
+                            <button
+                              type="button"
+                              onClick={() => startServiceRequestForDirectoryContractor(contractor, directoryCategory || contractor.service_categories[0])}
+                              className={buttonClass('primary')}
+                            >
+                              <MessageSquare size={16} />
+                              Request Service
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void requestContractorConnection(contractor)}
+                              disabled={isPending}
+                              className={isPending ? buttonClass('secondary') : buttonClass('primary')}
+                            >
+                              <Link2 size={16} />
+                              {isPending ? 'Connection pending' : 'Connect to request'}
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </section>
 
@@ -12413,7 +12734,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
                 if (!connection) return;
                 startServiceRequestForConnection(connection, category);
-                setHomeownerTab('contractors');
+                setHomeownerTab('discover');
               }}
             />
           </section>
@@ -27255,6 +27576,15 @@ function ContractorPublicProfilePage({
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'discover');
     updateRoute('homeowner');
   };
+  const requestServiceFromProfile = () => {
+    if (!data || connectionStatus !== 'active') return;
+    window.localStorage.setItem(STORAGE_KEYS.homeownerTab, 'discover');
+    window.localStorage.setItem(STORAGE_KEYS.homeownerPendingContractorRequest, JSON.stringify({
+      contractorId: data.contractor_id,
+      category: data.categories[0] || 'General Maintenance',
+    }));
+    updateRoute('homeowner');
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -27330,6 +27660,12 @@ function ContractorPublicProfilePage({
               }`}>
                 {connectionStatus === 'active' ? 'Connected' : 'Connection request sent'}
               </span>
+              {connectionStatus === 'active' && (
+                <button type="button" onClick={requestServiceFromProfile} className={buttonClass('primary')}>
+                  <MessageSquare size={16} />
+                  Request Service
+                </button>
+              )}
               <button type="button" onClick={returnToHomeownerDiscover} className={buttonClass('secondary')}>
                 Back to Discover
               </button>
@@ -27759,7 +28095,8 @@ function DiscoverFeed({
             <div className="max-w-3xl">
               <p className="text-sm font-bold text-blue-950">Your Discover presence</p>
               <p className="mt-1 text-sm leading-6 text-blue-900">
-                Homeowners can discover your public profile and helpful posts. Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through Discover.
+                Homeowners can discover your public profile and helpful posts. Complete business details, services, service areas, and a clear description help homeowners understand whether your company is a fit.
+                Discover is homeowner-controlled: contractors can post useful local content, but cannot directly contact homeowners through Discover.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
                 <span className={`rounded-full px-3 py-1 ${contractorProfile?.public_profile_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
