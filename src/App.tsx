@@ -92,6 +92,7 @@ import type {
   ConnectionAlertStatus,
   ContractorVisitEvent,
   ContractorCalendarEvent,
+  CalendarEventRecurrenceFrequency,
   CalendarEventType,
   CalendarEventDraft,
   ContractorConnectionRequest,
@@ -4739,6 +4740,13 @@ function formatTimeOptionLabel(value: string) {
 
 const VISIT_TIME_OPTIONS = buildHalfHourTimeOptions(7, 21);
 const CALENDAR_EVENT_TIME_OPTIONS = buildHalfHourTimeOptions(6, 20);
+const CALENDAR_EVENT_RECURRENCE_OPTIONS: { value: CalendarEventRecurrenceFrequency; label: string }[] = [
+  { value: 'none', label: 'Does not repeat' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'annually', label: 'Annually' },
+];
 
 function calendarEventTimeOptions(currentTime: string) {
   if (!currentTime || CALENDAR_EVENT_TIME_OPTIONS.some(option => option.value === currentTime)) {
@@ -4762,6 +4770,83 @@ function combineDateTimeLocalValue(dateValue: string, timeValue: string) {
 function combineLocalDateAndTime(dateValue: string, timeValue: string) {
   if (!dateValue || !timeValue) return null;
   return new Date(`${dateValue}T${timeValue}`);
+}
+
+function normalizeCalendarEventRecurrenceFrequency(value: string | null | undefined): CalendarEventRecurrenceFrequency {
+  return value === 'weekly' || value === 'monthly' || value === 'quarterly' || value === 'annually' ? value : 'none';
+}
+
+function calendarEventRecurrenceLabel(frequency: CalendarEventRecurrenceFrequency) {
+  return CALENDAR_EVENT_RECURRENCE_OPTIONS.find(option => option.value === frequency)?.label ?? 'Does not repeat';
+}
+
+function calendarEventRecurrenceRule(frequency: CalendarEventRecurrenceFrequency) {
+  return frequency === 'none' ? null : `FREQ=${frequency.toUpperCase()}`;
+}
+
+function addMonthsClamped(date: Date, months: number) {
+  const next = new Date(date);
+  const day = next.getDate();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + months);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(day, lastDay));
+  return next;
+}
+
+function nextCalendarEventOccurrence(date: Date, frequency: CalendarEventRecurrenceFrequency) {
+  if (frequency === 'weekly') {
+    const next = new Date(date);
+    next.setDate(next.getDate() + 7);
+    return next;
+  }
+  if (frequency === 'monthly') return addMonthsClamped(date, 1);
+  if (frequency === 'quarterly') return addMonthsClamped(date, 3);
+  if (frequency === 'annually') return addMonthsClamped(date, 12);
+  return new Date(date);
+}
+
+function calendarEventRecurrenceSummary(event: Pick<ContractorCalendarEvent, 'recurrence_frequency' | 'recurrence_ends_at'>) {
+  const frequency = normalizeCalendarEventRecurrenceFrequency(event.recurrence_frequency);
+  if (frequency === 'none') return 'Does not repeat';
+  const label = calendarEventRecurrenceLabel(frequency).toLowerCase();
+  if (!event.recurrence_ends_at) return `Repeats ${label}`;
+  const endDate = new Date(event.recurrence_ends_at);
+  if (Number.isNaN(endDate.getTime())) return `Repeats ${label}`;
+  return `Repeats ${label} until ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+}
+
+function calendarEventEndDateInputValue(value: string | null | undefined) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function recurringCalendarEventOccurrences(event: ContractorCalendarEvent, rangeStart: Date, rangeEnd: Date) {
+  const frequency = normalizeCalendarEventRecurrenceFrequency(event.recurrence_frequency);
+  const first = new Date(event.starts_at);
+  if (Number.isNaN(first.getTime())) return [];
+  if (frequency === 'none') return [{ event, startsAt: event.starts_at }];
+
+  const endLimit = event.recurrence_ends_at ? new Date(event.recurrence_ends_at) : rangeEnd;
+  const finalEnd = Number.isNaN(endLimit.getTime()) || endLimit.getTime() > rangeEnd.getTime() ? rangeEnd : endLimit;
+  if (finalEnd.getTime() < first.getTime()) return [];
+
+  const occurrences: { event: ContractorCalendarEvent; startsAt: string }[] = [];
+  let current = new Date(first);
+  let guard = 0;
+  while (current.getTime() < rangeStart.getTime() && guard < 500) {
+    current = nextCalendarEventOccurrence(current, frequency);
+    guard += 1;
+  }
+  while (current.getTime() <= finalEnd.getTime() && guard < 700) {
+    occurrences.push({ event, startsAt: current.toISOString() });
+    current = nextCalendarEventOccurrence(current, frequency);
+    guard += 1;
+  }
+  return occurrences;
 }
 
 const LOCAL_CLAIM_INVITE_STATUS_LABELS: Record<LocalCustomerClaimInviteStatus, string> = {
@@ -14336,6 +14421,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         duration_minutes: draft.duration_minutes.trim() ? Number(draft.duration_minutes) : null,
         notes: draft.notes.trim(),
         local_contact_id: draft.local_contact_id || null,
+        recurrence_frequency: draft.recurrence_frequency,
+        recurrence_rule: calendarEventRecurrenceRule(draft.recurrence_frequency),
+        recurrence_ends_at: draft.recurrence_frequency !== 'none' && draft.recurrence_ends_at
+          ? new Date(`${draft.recurrence_ends_at}T23:59:59`).toISOString()
+          : null,
       };
       if (editingCalendarEvent) {
         const { data, error: updErr } = await supabase
@@ -14368,7 +14458,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const deleteCalendarEvent = async (event: ContractorCalendarEvent) => {
     if (!supabase) return;
-    if (!window.confirm('Delete this calendar event? This cannot be undone.')) return;
+    const frequency = normalizeCalendarEventRecurrenceFrequency(event.recurrence_frequency);
+    if (!window.confirm(frequency === 'none' ? 'Delete this calendar event? This cannot be undone.' : 'Delete this recurring calendar event series? This cannot be undone.')) return;
     setCalendarEventBusy(true);
     setNotice('');
     setError('');
@@ -28254,9 +28345,15 @@ function CalendarEventComposer({
     duration_minutes: event?.duration_minutes ? String(event.duration_minutes) : '',
     notes: event?.notes ?? '',
     local_contact_id: event?.local_contact_id ?? '',
+    recurrence_frequency: normalizeCalendarEventRecurrenceFrequency(event?.recurrence_frequency),
+    recurrence_ends_at: calendarEventEndDateInputValue(event?.recurrence_ends_at),
   }));
+  const [recurrenceEndCondition, setRecurrenceEndCondition] = useState<'none' | 'date'>(event?.recurrence_ends_at ? 'date' : 'none');
   const { dateValue: eventDateValue, timeValue: eventTimeValue } = splitDateTimeLocalValue(draft.starts_at);
   const eventTimeOptions = calendarEventTimeOptions(eventTimeValue);
+  const recurrenceSummary = draft.recurrence_frequency === 'none'
+    ? 'Does not repeat'
+    : `${calendarEventRecurrenceLabel(draft.recurrence_frequency)}${recurrenceEndCondition === 'date' && draft.recurrence_ends_at ? ` until ${new Date(`${draft.recurrence_ends_at}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' with no end date'}`;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
@@ -28317,6 +28414,61 @@ function CalendarEventComposer({
               </select>
             </Field>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Repeat">
+              <select
+                className={inputClass()}
+                value={draft.recurrence_frequency}
+                onChange={e => setDraft(d => {
+                  const frequency = e.target.value as CalendarEventRecurrenceFrequency;
+                  if (frequency === 'none') setRecurrenceEndCondition('none');
+                  return {
+                    ...d,
+                    recurrence_frequency: frequency,
+                    recurrence_ends_at: frequency === 'none' ? '' : d.recurrence_ends_at,
+                  };
+                })}
+              >
+                {CALENDAR_EVENT_RECURRENCE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </Field>
+            {draft.recurrence_frequency !== 'none' ? (
+              <Field label="End condition">
+                <select
+                  className={inputClass()}
+                  value={recurrenceEndCondition}
+                  onChange={e => {
+                    const condition = e.target.value === 'date' ? 'date' : 'none';
+                    setRecurrenceEndCondition(condition);
+                    if (condition === 'none') setDraft(d => ({ ...d, recurrence_ends_at: '' }));
+                  }}
+                >
+                  <option value="none">No end date</option>
+                  <option value="date">End after date</option>
+                </select>
+              </Field>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                One-time event
+              </div>
+            )}
+          </div>
+          {draft.recurrence_frequency !== 'none' && recurrenceEndCondition === 'date' && (
+            <Field label="End after date">
+              <input
+                type="date"
+                className={inputClass()}
+                value={draft.recurrence_ends_at}
+                min={eventDateValue || undefined}
+                onChange={e => setDraft(d => ({ ...d, recurrence_ends_at: e.target.value }))}
+              />
+            </Field>
+          )}
+          <p className="rounded-lg bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800">
+            {recurrenceSummary}
+          </p>
           <Field label="Notes (optional)">
             <textarea rows={3} className={inputClass()} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
           </Field>
@@ -28367,11 +28519,17 @@ function CalendarView({
 
   type ApptEntry = { kind: 'appointment'; request: ServiceRequestSummary; appointment: ServiceRequestAppointment };
   type VisitEntry = { kind: 'visit'; visitEvent: ContractorVisitEvent; request: ServiceRequestSummary | null };
-  type StandaloneEntry = { kind: 'standalone'; calendarEvent: ContractorCalendarEvent };
+  type StandaloneEntry = { kind: 'standalone'; calendarEvent: ContractorCalendarEvent; occurrenceStartsAt: string };
   type CalendarEntry = ApptEntry | VisitEntry | StandaloneEntry;
   const visitRequestIds = new Set(visitEvents.filter(event => event.service_request_id && event.status !== 'cancelled').map(event => event.service_request_id as string));
   const apptMap: Record<string, CalendarEntry[]> = {};
   const appointments: CalendarEntry[] = [];
+  const monthGridStart = new Date(year, month, 1 - new Date(year, month, 1).getDay(), 0, 0, 0, 0);
+  const monthGridEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  const upcomingEnd = new Date(now);
+  upcomingEnd.setDate(upcomingEnd.getDate() + 120);
+  const recurrenceRangeStart = new Date(Math.min(monthGridStart.getTime(), now.getTime()));
+  const recurrenceRangeEnd = new Date(Math.max(monthGridEnd.getTime(), upcomingEnd.getTime()));
   const addEntry = (dateValue: string, entry: CalendarEntry) => {
     const d = new Date(dateValue);
     if (Number.isNaN(d.getTime())) return;
@@ -28392,13 +28550,15 @@ function CalendarView({
     addEntry(event.scheduled_at, { kind: 'visit', visitEvent: event, request });
   }
   for (const calendarEvent of calendarEvents) {
-    addEntry(calendarEvent.starts_at, { kind: 'standalone', calendarEvent });
+    recurringCalendarEventOccurrences(calendarEvent, recurrenceRangeStart, recurrenceRangeEnd).forEach(occurrence => {
+      addEntry(occurrence.startsAt, { kind: 'standalone', calendarEvent, occurrenceStartsAt: occurrence.startsAt });
+    });
   }
   const entryTime = (entry: CalendarEntry) => entry.kind === 'appointment'
     ? entry.appointment.proposed_at
     : entry.kind === 'visit'
       ? entry.visitEvent.scheduled_at
-      : entry.calendarEvent.starts_at;
+      : entry.occurrenceStartsAt;
   appointments.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
   Object.values(apptMap).forEach(dayEntries => {
     dayEntries.sort((a, b) => new Date(entryTime(a)).getTime() - new Date(entryTime(b)).getTime());
@@ -28481,11 +28641,12 @@ function CalendarView({
 
   const renderAppointmentRow = (entry: CalendarEntry, compact = false) => {
     if (entry.kind === 'standalone') {
-      const { calendarEvent } = entry;
-      const date = new Date(calendarEvent.starts_at);
+      const { calendarEvent, occurrenceStartsAt } = entry;
+      const date = new Date(occurrenceStartsAt);
+      const recurrenceSummary = calendarEventRecurrenceSummary(calendarEvent);
       return (
         <button
-          key={`calendar-event-${calendarEvent.id}`}
+          key={`calendar-event-${calendarEvent.id}-${occurrenceStartsAt}`}
           type="button"
           onClick={() => onOpenCalendarEvent?.(calendarEvent)}
           className="w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left text-violet-900 transition hover:border-violet-300 hover:bg-violet-100"
@@ -28501,7 +28662,9 @@ function CalendarView({
                 {calendarEvent.duration_minutes ? ` · ${calendarEvent.duration_minutes} min` : ''}
               </p>
               {!compact && calendarEvent.notes && <p className="mt-1 text-xs text-slate-600">{calendarEvent.notes}</p>}
-              <p className="mt-1 text-xs font-semibold text-violet-700">Not tied to a job</p>
+              <p className="mt-1 text-xs font-semibold text-violet-700">
+                Not tied to a job{recurrenceSummary !== 'Does not repeat' ? ` · ${recurrenceSummary}` : ''}
+              </p>
             </div>
             <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-violet-700">
               Event

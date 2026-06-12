@@ -17,6 +17,7 @@ export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancel
 export type ContractorVisitEventStatus = 'scheduled' | 'completed' | 'cancelled';
 export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_waiting' | 'accepted' | 'declined' | 'countered';
 export type CalendarEventType = 'routine_inspection' | 'follow_up' | 'reminder' | 'check_in' | 'other';
+export type CalendarEventRecurrenceFrequency = 'none' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
@@ -756,6 +757,8 @@ export interface CalendarEventDraft {
   duration_minutes: string; // form string; '' = unset
   notes: string;
   local_contact_id: string; // '' = none
+  recurrence_frequency: CalendarEventRecurrenceFrequency;
+  recurrence_ends_at: string; // date input value; '' = no end date
 }
 
 // Standalone contractor calendar event — not tied to a job/inspection.
@@ -770,6 +773,9 @@ export interface ContractorCalendarEvent {
   notes: string;
   local_contact_id: string | null;
   homeowner_user_id: string | null;
+  recurrence_rule: string | null;
+  recurrence_frequency: CalendarEventRecurrenceFrequency | null;
+  recurrence_ends_at: string | null;
   created_at: string;
   updated_at: string;
 }

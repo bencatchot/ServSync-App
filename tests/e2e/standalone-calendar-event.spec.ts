@@ -38,6 +38,8 @@ test.describe('standalone calendar events', () => {
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
     await page.getByRole('combobox', { name: 'Event type', exact: true }).selectOption('routine_inspection');
     await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('10:00');
+    await page.getByRole('combobox', { name: /^Repeat$/i }).selectOption('monthly');
+    await expect(page.getByText(/Monthly with no end date/i)).toBeVisible();
     await page.getByRole('spinbutton', { name: /Duration/i }).fill('45');
     await page.getByRole('textbox', { name: /Notes/i }).fill('E2E standalone calendar event — safe to delete.');
 
@@ -52,6 +54,7 @@ test.describe('standalone calendar events', () => {
     await eventRow(title).first().click();
     await expect(page.getByRole('heading', { name: /^Calendar event$/i })).toBeVisible();
     await expect(page.getByText(/^Not tied to a job$/i).first()).toBeVisible();
+    await expect(page.getByText(/Monthly with no end date/i)).toBeVisible();
     const comingSoon = page.getByRole('button', { name: /Create Job from Event \(coming soon\)/i });
     await expect(comingSoon).toBeVisible();
     await expect(comingSoon).toBeDisabled();
@@ -59,10 +62,13 @@ test.describe('standalone calendar events', () => {
     // ── Edit ──────────────────────────────────────────────────────────────────
     await page.getByRole('textbox', { name: 'Title', exact: true }).fill(editedTitle);
     await page.getByRole('combobox', { name: 'Event time', exact: true }).selectOption('11:30');
+    await page.getByRole('combobox', { name: /^Repeat$/i }).selectOption('weekly');
+    await expect(page.getByText(/Weekly with no end date/i)).toBeVisible();
     const updateResponse = page.waitForResponse(calendarEventsRequest('PATCH'));
     await page.getByRole('button', { name: /^Save changes$/i }).click();
     expect((await updateResponse).ok()).toBeTruthy();
     await expect(eventRow(editedTitle).filter({ hasText: /11:30 AM/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(eventRow(editedTitle).filter({ hasText: /Repeats weekly/i }).first()).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(title, { exact: true })).toHaveCount(0);
 
     // ── Delete ──────────────────────────────────────────────────────────────--
