@@ -220,6 +220,49 @@ function hasAny(lower: string, phrases: string[]) {
   return phrases.some(phrase => hasPhrase(lower, phrase));
 }
 
+function normalizeRoomTerms(value: string) {
+  return value
+    .replace(/\bmaster bath\b/gi, 'primary bathroom')
+    .replace(/\bmaster bathroom\b/gi, 'primary bathroom')
+    .replace(/\bmaster bedroom\b/gi, 'primary bedroom');
+}
+
+function restoreTradeTerms(value: string) {
+  return value
+    .replace(/\bgfci\b/gi, 'GFCI')
+    .replace(/\bac\b/gi, 'AC')
+    .replace(/\bhvac\b/gi, 'HVAC');
+}
+
+function normalizeWhitespace(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim();
+}
+
+function punctuate(value: string) {
+  const trimmed = normalizeWhitespace(value);
+  if (!trimmed) return '';
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+function sentenceCase(value: string) {
+  const normalized = restoreTradeTerms(normalizeRoomTerms(normalizeWhitespace(value)));
+  if (!normalized) return '';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function professionalizeFragment(value: string) {
+  const normalized = restoreTradeTerms(normalizeRoomTerms(normalizeWhitespace(value)));
+  if (!normalized) return '';
+  const withRecommendationSplit = normalized.replace(/\s*,?\s+(recommend(?:ed)?(?:\s+\w+)?)/i, '. $1');
+  return withRecommendationSplit
+    .split(/(?<=[.!?])\s+/)
+    .map(part => punctuate(sentenceCase(part)))
+    .join(' ');
+}
+
 export function localDraftFromNote(note: string): FindingStatus {
   const lower = normalizeText(note);
   const completedOnSite = hasAny(lower, COMPLETED_WORK_PHRASES) && !hasAny(lower, UNRESOLVED_WORK_PHRASES);
@@ -233,6 +276,58 @@ export function localDraftFromNote(note: string): FindingStatus {
   return 'Pass';
 }
 
+export function cleanInspectionNoteText(note: string, status: FindingStatus = localDraftFromNote(note)): string {
+  const lower = normalizeText(note);
+  if (!lower) return '';
+
+  if (hasPhrase(lower, 'toilet') && (hasPhrase(lower, 'running') || hasPhrase(lower, 'ball valve') || hasPhrase(lower, 'fill valve'))) {
+    const room = hasPhrase(lower, 'master bath') || hasPhrase(lower, 'master bathroom') || hasPhrase(lower, 'primary bathroom')
+      ? ' in the primary bathroom'
+      : '';
+    const recommendation = hasPhrase(lower, 'ball valve') || hasPhrase(lower, 'fill valve') || hasPhrase(lower, 'recommend')
+      ? ' Recommend replacing the fill valve or ball valve as needed.'
+      : '';
+    return `The toilet${room} is running.${recommendation}`;
+  }
+
+  if ((hasPhrase(lower, 'gfci') || hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle')) && hasAny(lower, ['not working', 'does not work', 'failed', 'failure'])) {
+    const device = hasPhrase(lower, 'gfci') ? 'GFCI outlet' : hasPhrase(lower, 'receptacle') ? 'receptacle' : 'outlet';
+    return `The ${device} is not working. Recommend repair or replacement by a qualified electrician.`;
+  }
+
+  if (hasPhrase(lower, 'water heater') && hasAny(lower, CLEAR_CONDITION_PHRASES)) {
+    return 'The water heater appears to be in good condition. No issues were observed.';
+  }
+
+  if (hasPhrase(lower, 'active leak') && hasPhrase(lower, 'bathroom sink')) {
+    return 'There is an active leak under the bathroom sink. Recommend addressing this immediately to prevent further water damage.';
+  }
+
+  if ((hasPhrase(lower, 'ac filter') || (hasPhrase(lower, 'filter') && hasPhrase(lower, 'ac'))) && (hasPhrase(lower, 'dirty') || hasPhrase(lower, 'replace') || hasPhrase(lower, 'replacing'))) {
+    return 'The AC filter is dirty. Recommend replacing the filter.';
+  }
+
+  if (hasPhrase(lower, 'ceiling fan') && (hasPhrase(lower, 'squeak') || hasPhrase(lower, 'squeaking') || hasPhrase(lower, 'noise'))) {
+    return 'The ceiling fan is squeaking. Monitor the fan noise and inspect the mounting or blades if it worsens.';
+  }
+
+  if (hasPhrase(lower, 'gutter') && hasPhrase(lower, 'cleaned') && (hasPhrase(lower, 'clog') || hasPhrase(lower, 'clogged'))) {
+    return 'The clogged gutter was cleaned onsite. Monitor during the next rain for proper drainage.';
+  }
+
+  if (status === 'Pass' && hasAny(lower, CLEAR_CONDITION_PHRASES)) {
+    return professionalizeFragment(note)
+      .replace(/\bLooks good no issues\b/i, 'Appears to be in good condition. No issues were observed');
+  }
+
+  return professionalizeFragment(note);
+}
+
+export function cleanInspectionActionText(action: string): string {
+  if (!action.trim()) return '';
+  return professionalizeFragment(action);
+}
+
 export function localSuggestedActionFromNote(note: string, status: FindingStatus): string {
   const lower = normalizeText(note);
   if (status === 'Pass') return '';
@@ -244,7 +339,12 @@ export function localSuggestedActionFromNote(note: string, status: FindingStatus
       : 'Repair the running toilet and replace the fill valve or ball valve as needed.';
   }
   if (hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle') || hasPhrase(lower, 'switch')) {
-    return 'Secure or replace the loose electrical device.';
+    return hasAny(lower, ['not working', 'does not work', 'failed', 'failure']) || hasPhrase(lower, 'gfci')
+      ? 'Recommend repair or replacement by a qualified electrician.'
+      : 'Secure or replace the loose electrical device.';
+  }
+  if ((hasPhrase(lower, 'ac filter') || (hasPhrase(lower, 'filter') && hasPhrase(lower, 'ac'))) && (hasPhrase(lower, 'dirty') || hasPhrase(lower, 'replace') || hasPhrase(lower, 'replacing'))) {
+    return 'Replace the AC filter.';
   }
   if (hasPhrase(lower, 'leak') || hasPhrase(lower, 'leaking') || hasPhrase(lower, 'drip')) {
     return status === 'Fixed On Site'

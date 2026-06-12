@@ -53,6 +53,8 @@ import {
   suggestServiceCategories,
 } from './requestClassifier';
 import {
+  cleanInspectionActionText,
+  cleanInspectionNoteText,
   localDraftFromNote,
   localSuggestedActionFromNote,
 } from './inspectionAssistant';
@@ -23561,7 +23563,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         if (!room) return;
                                         const key = findingStateKey(room, singleNoteItem);
                                         const suggested = localDraftFromNote(singleNoteText);
-                                        setLocalFindings(prev => ({ ...prev, [key]: { status: suggested, notes: singleNoteText.trim(), action: localSuggestedActionFromNote(singleNoteText, suggested), due: '', photos: [] } }));
+                                        setLocalFindings(prev => ({ ...prev, [key]: { status: suggested, notes: cleanInspectionNoteText(singleNoteText, suggested), action: cleanInspectionActionText(localSuggestedActionFromNote(singleNoteText, suggested)), due: '', photos: [] } }));
                                         setSelectedChecklistRoom(roomIdentityKey(room));
                                         setSingleNoteText(''); setSingleNoteRoom(''); setSingleNoteItem('');
                                       }}
@@ -23595,6 +23597,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           const matchedExistingItem = bestItem ? checklistMatchConfidence(line, bestItem) > 0 : false;
                                           const detectedItem = matchedExistingItem && bestItem ? bestItem : suggestedChecklistItemFromNote(line, detectedRoom ?? 'General');
                                           const suggestedStatus = localDraftFromNote(line);
+                                          const suggestedAction = localSuggestedActionFromNote(line, suggestedStatus);
                                           return {
                                             id: crypto.randomUUID(),
                                             rawText: line,
@@ -23603,8 +23606,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             newChecklistItem: matchedExistingItem ? undefined : detectedItem,
                                             needsNewChecklistItem: !matchedExistingItem,
                                             suggestedStatus,
-                                            notes: line,
-                                            suggestedAction: localSuggestedActionFromNote(line, suggestedStatus),
+                                            notes: cleanInspectionNoteText(line, suggestedStatus),
+                                            suggestedAction: cleanInspectionActionText(suggestedAction),
                                             accepted: null,
                                           };
                                         });
@@ -23701,28 +23704,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             ? roomDisplayLabel(findRoomByIdentity(activeRooms, selectedChecklistRoom))
                                             : activeRooms[0] ? roomDisplayLabel(activeRooms[0]) : null;
                                           const aiResults = (data as Array<{ room: string; item: string; status: FindingStatus; notes: string; action: string }> || []).map(s => {
+                                            const cleanedNotes = cleanInspectionNoteText(s.notes, s.status);
+                                            const cleanedAction = cleanInspectionActionText(s.action);
                                             const detectedRoom = activeRooms.find(r => roomDisplayLabel(r).toLowerCase() === s.room?.toLowerCase())?.display_name
-                                              ?? detectRoomFromNote(`${s.room ?? ''} ${s.notes}`, roomNames, selectedRoomLabel);
+                                              ?? detectRoomFromNote(`${s.room ?? ''} ${cleanedNotes}`, roomNames, selectedRoomLabel);
                                             const detectedRoomRecord = detectedRoom ? activeRooms.find(r => roomDisplayLabel(r) === detectedRoom || r.room === detectedRoom) : null;
                                             const roomItems = detectedRoomRecord?.items ?? [];
                                             const exactItem = s.item
                                               ? roomItems.find(item => item.toLowerCase() === s.item.toLowerCase())
                                               : null;
-                                            const bestItem = exactItem ?? (roomItems.length > 0 ? findBestChecklistItem(`${s.item ?? ''} ${s.notes}`, roomItems) : null);
-                                            const matchedExistingItem = bestItem ? roomItems.includes(bestItem) && checklistMatchConfidence(`${s.item ?? ''} ${s.notes}`, bestItem) > 0 : false;
+                                            const bestItem = exactItem ?? (roomItems.length > 0 ? findBestChecklistItem(`${s.item ?? ''} ${cleanedNotes}`, roomItems) : null);
+                                            const matchedExistingItem = bestItem ? roomItems.includes(bestItem) && checklistMatchConfidence(`${s.item ?? ''} ${cleanedNotes}`, bestItem) > 0 : false;
                                             const detectedItem = matchedExistingItem && bestItem
                                               ? bestItem
-                                              : (s.item || suggestedChecklistItemFromNote(s.notes, detectedRoom ?? 'General'));
+                                              : (s.item || suggestedChecklistItemFromNote(cleanedNotes, detectedRoom ?? 'General'));
                                             return {
                                               id: crypto.randomUUID(),
-                                              rawText: s.notes,
+                                              rawText: cleanedNotes,
                                               detectedRoom,
                                               detectedItem,
                                               newChecklistItem: matchedExistingItem ? undefined : detectedItem,
                                               needsNewChecklistItem: !matchedExistingItem,
                                               suggestedStatus: s.status,
-                                              notes: s.notes,
-                                              suggestedAction: s.action,
+                                              notes: cleanedNotes,
+                                              suggestedAction: cleanedAction,
                                               accepted: null as boolean | null,
                                             };
                                           });
