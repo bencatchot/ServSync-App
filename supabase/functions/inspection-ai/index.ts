@@ -47,6 +47,188 @@ interface FindingSuggestion {
   action: string;
 }
 
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function stemToken(value: string) {
+  return value
+    .replace(/ing$/, '')
+    .replace(/age$/, '')
+    .replace(/es$/, '')
+    .replace(/s$/, '');
+}
+
+function hasPhrase(haystack: string, phrase: string) {
+  const normalizedPhrase = normalizeText(phrase);
+  if (!normalizedPhrase) return false;
+  if (` ${haystack} `.includes(` ${normalizedPhrase} `)) return true;
+  const phraseTokens = normalizedPhrase.split(' ');
+  if (phraseTokens.length === 1) {
+    const target = stemToken(phraseTokens[0]);
+    if (target.length <= 2) return haystack.split(' ').some(token => token === target);
+    return haystack.split(' ').some(token => {
+      const stemmed = stemToken(token);
+      if (target.length <= 4) return stemmed === target;
+      return stemmed === target || (stemmed.length > 4 && token.startsWith(target));
+    });
+  }
+  return false;
+}
+
+function hasAny(lower: string, phrases: string[]) {
+  return phrases.some(phrase => hasPhrase(lower, phrase));
+}
+
+function statusFromFindingText(text: string): FindingStatus | null {
+  const lower = normalizeText(text);
+  const unresolved = hasAny(lower, [
+    'recommend',
+    'recommended',
+    'needs repair',
+    'requires repair',
+    'not fixed',
+    'not repaired',
+    'still leaking',
+    'estimate',
+    'quote',
+  ]);
+  const completed = hasAny(lower, [
+    'fixed',
+    'repaired',
+    'replaced',
+    'corrected',
+    'resolved',
+    'adjusted',
+    'tightened',
+    'secured',
+    'sealed',
+    'cleared',
+    'cleaned',
+    'reset',
+  ]) && !unresolved;
+  const clear = hasAny(lower, [
+    'no leak',
+    'no leaks',
+    'no damage',
+    'no concern',
+    'no concerns',
+    'no issue',
+    'no issues',
+    'good condition',
+    'normal operation',
+    'working properly',
+    'looks good',
+    'passed',
+  ]) && !unresolved;
+
+  if (completed) return 'Fixed On Site';
+  if (clear) return 'Pass';
+  if (hasAny(lower, [
+    'urgent',
+    'immediately',
+    'hazardous',
+    'dangerous',
+    'unsafe',
+    'active leak',
+    'actively leaking',
+    'active water intrusion',
+    'water intrusion',
+    'electrical hazard',
+    'gas odor',
+    'sewage backup',
+    'structural danger',
+    'immediate damage risk',
+  ])) return 'Urgent';
+  if (hasAny(lower, [
+    'recommend replacing',
+    'recommend replacement',
+    'recommended replacing',
+    'recommended replacement',
+    'recommend repair',
+    'needs repair',
+    'requires repair',
+    'should be repaired',
+    'not working',
+    'not functioning',
+    'does not work',
+    'failed',
+    'failure',
+    'broken',
+    'damaged',
+    'damage',
+    'defective',
+    'faulty',
+    'inoperable',
+    'malfunction',
+    'malfunctioning',
+    'leaking',
+    'leak',
+    'dripping',
+    'drip',
+    'running',
+    'keeps running',
+    'loose',
+    'clogged',
+    'clog',
+    'blocked',
+    'replace',
+    'replacing',
+    'replacement',
+    'repair',
+    'ball valve',
+    'fill valve',
+    'flapper',
+  ])) return 'Needs Repair';
+  if (hasAny(lower, [
+    'monitor',
+    'watch',
+    'minor',
+    'slight',
+    'early',
+    'developing',
+    'potential',
+    'possible',
+    'wear',
+    'worn',
+    'squeak',
+    'squeaking',
+    'noise',
+    'rattle',
+    'wobble',
+    'sticks',
+    'sticking',
+    'slow',
+    'weak',
+    'hairline',
+    'small stain',
+    'moisture stain',
+    'water stain',
+    'cosmetic',
+    'not normal',
+    'abnormal',
+  ])) return 'Monitor';
+  return null;
+}
+
+function severityRank(status: FindingStatus) {
+  const ranks: Record<FindingStatus, number> = {
+    Pass: 0,
+    Monitor: 1,
+    'Fixed On Site': 2,
+    'Needs Repair': 3,
+    Urgent: 4,
+  };
+  return ranks[status];
+}
+
+function saferFindingStatus(modelStatus: FindingStatus, notes: string, action: string): FindingStatus {
+  const inferred = statusFromFindingText(`${notes} ${action}`);
+  if (!inferred || inferred === 'Pass') return modelStatus;
+  if (modelStatus === 'Pass') return inferred;
+  return severityRank(inferred) > severityRank(modelStatus) ? inferred : modelStatus;
+}
+
 function jsonResponse(body: unknown, status = 200, headers = baseCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
@@ -149,11 +331,12 @@ Instructions:
 - Analyze the notes and identify distinct findings
 - Match each finding to the most relevant room and checklist item from the list above
 - Assign a status: Pass, Monitor, Fixed On Site, Needs Repair, or Urgent
-  - Urgent: immediate safety hazard, structural failure, active water intrusion
-  - Needs Repair: damage, defect, or malfunction requiring professional repair
+  - Urgent: immediate safety hazard, structural failure, active water intrusion, active leak, electrical hazard, sewage backup, or immediate damage risk
+  - Needs Repair: damage, defect, malfunction, running fixture, leak, broken/failed item, loose component, clogged item, or repair/replacement recommendation
   - Monitor: minor wear, potential issue, or item to watch at next visit
   - Fixed On Site: issue that was corrected during this visit
-  - Pass: no issues found
+  - Pass: only when notes clearly say the item is okay, working properly, acceptable, good condition, or no issue was found
+- Never classify repair recommendations as Pass. Wording like "recommend replacing", "needs repair", "not working", "running", "leaking", "damaged", "failed", "broken", "loose", or "clogged" must be Needs Repair unless Urgent applies.
 - Write a concise observation note (1-2 sentences max)
 - Suggest a recommended action where applicable (leave empty string for Pass)
 - Only return findings for items with notable observations (not everything is flagged)
@@ -235,13 +418,18 @@ Respond ONLY with valid JSON, no markdown, no explanation:
         const validStatuses: FindingStatus[] = ['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent'];
         suggestions = parsedSuggestions
           .filter((s: unknown) => typeof s === 'object' && s !== null)
-          .map((s: Record<string, unknown>) => ({
-            room: String(s.room ?? ''),
-            item: String(s.item ?? ''),
-            status: validStatuses.includes(s.status as FindingStatus) ? (s.status as FindingStatus) : 'Monitor',
-            notes: String(s.notes ?? ''),
-            action: String(s.action ?? ''),
-          }))
+          .map((s: Record<string, unknown>) => {
+            const notes = String(s.notes ?? '');
+            const action = String(s.action ?? '');
+            const modelStatus = validStatuses.includes(s.status as FindingStatus) ? (s.status as FindingStatus) : 'Monitor';
+            return {
+              room: String(s.room ?? ''),
+              item: String(s.item ?? ''),
+              status: saferFindingStatus(modelStatus, notes, action),
+              notes,
+              action,
+            };
+          })
           .filter((s) => s.room && s.item)
           .slice(0, 15);
       }
