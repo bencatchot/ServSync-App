@@ -6019,31 +6019,31 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 
 function LandingPage() {
   const steps = [
-    'Homeowner requests service.',
-    'Contractor sends an estimate.',
-    'Homeowner reviews and approves.',
-    'Contractor completes the job or report.',
-    'Invoice and records are saved to the home history.',
+    'Homeowner finds or chooses a contractor.',
+    'Homeowner sends a clear service request.',
+    'Contractor responds with an estimate, visit, or next step.',
+    'Work moves into jobs, reports, invoices, and calendar events.',
+    'Records stay organized in the home service history.',
   ];
 
   return (
     <div className="space-y-8">
       <section className="grid gap-8 rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
         <div className="flex flex-col justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">Connect · Manage · Protect</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">ServSync Discover + service workflow</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
-            Organize home work from request to record.
+            Find local contractors. Keep the work organized.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-blue-100/80">
-            ServSync helps homeowners organize their home, connect with local contractors, request service, review estimates,
-            view invoices, and keep reports, documents, and maintenance history in one place.
+            ServSync helps homeowners request service from local contractors and helps small contractors manage requests,
+            estimates, jobs, invoices, calendar events, and home service history in one place.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('primary')}>
-              Create homeowner account <ArrowRight size={16} />
-            </button>
-            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('secondary')}>
+            <button type="button" onClick={() => updateRoute('contractor', 'mode=signup')} className={buttonClass('primary')}>
               Create contractor account <ArrowRight size={16} />
+            </button>
+            <button type="button" onClick={() => updateRoute('homeowner', 'mode=signup')} className={buttonClass('secondary')}>
+              Create free homeowner account <ArrowRight size={16} />
             </button>
           </div>
           <button type="button" onClick={() => updateRoute('trust-safety')} className="mt-4 w-fit text-sm font-semibold text-blue-100 underline-offset-4 hover:text-white hover:underline">
@@ -6051,10 +6051,30 @@ function LandingPage() {
           </button>
         </div>
         <div className="grid gap-3">
-          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Build a home record, request service, review estimates and invoices, and control what information gets shared." />
-          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Manage service jobs, inspections, estimates, invoices, reports, and homeowner-initiated requests." />
-          <FeatureRow icon={<Compass size={18} />} title="Discover without lead buying" text="Contractors can share helpful posts and recent work. Homeowners choose when to connect." />
+          <FeatureRow icon={<Home size={18} />} title="For homeowners" text="Find local contractors, request service clearly, review estimates and invoices, and keep a record of work done on your home." />
+          <FeatureRow icon={<Building2 size={18} />} title="For contractors" text="Get discovered, manage requests, send estimates and invoices, schedule work, and keep customer records organized without enterprise-level complexity." />
+          <FeatureRow icon={<Compass size={18} />} title="ServSync Discover" text="Discover is being built to help homeowners find local contractor profiles and give contractors a better way to share helpful service information as the platform grows." />
           <FeatureRow icon={<Lock size={18} />} title="Permission-based sharing" text="Homeowners stay in control of connections and shared home information." />
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Why this exists</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner path than scattered recommendations</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Homeowners often ask for contractor recommendations in local groups, then end up with scattered names and little context.
+            ServSync is designed to give that process a cleaner path: find local contractors, send clearer requests, and keep the work
+            organized afterward.
+          </p>
+        </div>
+        <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Built for small teams</p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-950">Practical tools without enterprise complexity</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            ServSync is designed for solo and small-team service contractors who need a professional way to manage requests,
+            estimates, scheduling, invoices, customer records, and repeat work without overcomplicated software.
+          </p>
         </div>
       </section>
 
@@ -6062,7 +6082,7 @@ function LandingPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">How ServSync works</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">A cleaner loop for home work</h2>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">From local search to home service history</h2>
           </div>
           <p className="max-w-xl text-sm leading-6 text-slate-600">
             Requests, estimates, jobs, invoices, reports, documents, and maintenance records stay connected instead of scattered.
@@ -6091,6 +6111,15 @@ function LandingPage() {
           <p className="font-bold text-slate-950">ServSync is software</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">Contractors are responsible for their own work, credentials, estimates, invoices, reports, and services.</p>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Beta and trust</p>
+        <h2 className="mt-2 text-2xl font-bold text-slate-950">Built carefully. Improved honestly.</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+          ServSync is in beta and being shaped with feedback from contractors and homeowners. The goal is to build a useful,
+          affordable platform that improves over time without fake testimonials, inflated numbers, or exaggerated claims.
+        </p>
       </section>
     </div>
   );
