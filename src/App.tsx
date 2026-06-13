@@ -59,6 +59,7 @@ import {
   localDraftFromNote,
   localSuggestedActionFromNote,
 } from './inspectionAssistant';
+import { cleanHumanTextInputOnBlur, cleanHumanWrittenText } from './textCleanup';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -4199,6 +4200,7 @@ const writingAssistProps = {
   spellCheck: true,
   autoCapitalize: 'sentences',
   autoCorrect: 'on',
+  onBlur: cleanHumanTextInputOnBlur,
 } as const;
 
 function invoiceStatusLabel(status: Invoice['status']) {
@@ -7620,7 +7622,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         actor_user_id: profile.id,
         actor_role: 'homeowner',
         message_type: 'user_message',
-        body: supportDraft.body.trim() || 'Screenshot attached.',
+        body: cleanHumanWrittenText(supportDraft.body) || 'Screenshot attached.',
         attachments,
       });
       if (messageError) throw messageError;
@@ -7650,7 +7652,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         actor_user_id: profile.id,
         actor_role: 'homeowner',
         message_type: 'user_message',
-        body: body || 'Screenshot attached.',
+        body: cleanHumanWrittenText(body) || 'Screenshot attached.',
         attachments,
       });
       if (messageError) throw messageError;
@@ -7753,12 +7755,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         ...(invoiceDocument ? { invoice_document_id: invoiceDocument.id } : {}),
         category: logDraft.category,
         title: logDraft.title.trim(),
-        description: logDraft.description.trim(),
+        description: cleanHumanWrittenText(logDraft.description),
         performed_at: logDraft.performed_at,
         contractor_name: logDraft.contractor_name.trim(),
         cost_cents: logDraft.cost ? dollarsToCents(logDraft.cost) : null,
         notes: [
-          logDraft.notes.trim(),
+          cleanHumanWrittenText(logDraft.notes),
           invoiceDocument ? `Invoice saved in Documents: ${invoiceDocument.file_name}` : '',
         ].filter(Boolean).join('\n'),
       };
@@ -7808,7 +7810,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setDocUploading(true);
     setError('');
     try {
-      await createHomeDocumentFromFile(file, docUploadType, docUploadNotes.trim(), { homeId: selectedHome?.id || selectedHomeId || null });
+      await createHomeDocumentFromFile(file, docUploadType, cleanHumanWrittenText(docUploadNotes), { homeId: selectedHome?.id || selectedHomeId || null });
       setDocUploadNotes('');
       setDocUploadType('other');
       await loadHomeowner();
@@ -7962,7 +7964,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         home_type: homeDraft.home_type,
         year_built: homeDraft.year_built,
         square_feet: homeDraft.square_feet,
-        notes: homeDraft.notes,
+        notes: cleanHumanWrittenText(homeDraft.notes),
         home_photo_path: homeDraft.home_photo_path || '',
       };
       const { data: savedHome, error: homeError } = await supabase.from('homes').upsert(homePayload).select('*').single();
@@ -8026,7 +8028,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         home_type: '',
         year_built: homeSetupDraft.year_built.trim(),
         square_feet: homeSetupDraft.square_feet.trim(),
-        notes: homeSetupDraft.notes.trim(),
+        notes: cleanHumanWrittenText(homeSetupDraft.notes),
         home_photo_path: '',
       };
       const { data: savedHome, error: homeError } = await supabase.from('homes').insert(homePayload).select('*').single();
@@ -8371,7 +8373,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         p_category: serviceRequestDraft.category,
         p_urgency: serviceRequestDraft.urgency,
         p_title: serviceRequestDraft.title,
-        p_description: serviceRequestDraft.description,
+        p_description: cleanHumanWrittenText(serviceRequestDraft.description),
         p_home_id: serviceRequestDraft.home_id || selectedHome?.id || null,
       });
       if (requestError) throw requestError;
@@ -8419,7 +8421,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       const { data: updateData, error: updateError } = await supabase.rpc('servsync_homeowner_update_service_request', {
         p_request_id: request.id,
-        p_body: body,
+        p_body: cleanHumanWrittenText(body),
         p_action: action,
       });
       if (updateError) throw updateError;
@@ -8578,7 +8580,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: reviewError } = await supabase.rpc('servsync_homeowner_submit_review', {
         p_request_id: request.id,
         p_rating: draft.rating,
-        p_body: draft.body.trim(),
+        p_body: cleanHumanWrittenText(draft.body),
         p_kudos: draft.kudos,
         p_reviewer_display_name: draft.displayName?.trim() ?? '',
         p_reviewer_location: draft.location?.trim() ?? '',
@@ -8621,7 +8623,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           return;
         }
         params.p_proposed_at = proposedDate.toISOString();
-        params.p_notes = notes ?? '';
+        params.p_notes = cleanHumanWrittenText(notes ?? '');
       }
       const { error: apptError } = await supabase.rpc('servsync_homeowner_respond_to_appointment', params);
       if (apptError) throw apptError;
@@ -8659,7 +8661,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: apptError } = await supabase.rpc('servsync_homeowner_propose_appointment', {
         p_request_id: request.id,
         p_proposed_at: proposedDate.toISOString(),
-        p_notes: draft.notes ?? '',
+        p_notes: cleanHumanWrittenText(draft.notes ?? ''),
       });
       if (apptError) throw apptError;
       setNotice('Reschedule request sent to contractor.');
@@ -8681,7 +8683,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     try {
       const { error: reopenError } = await supabase.rpc('servsync_homeowner_reopen_service_request', {
         p_request_id: request.id,
-        p_body: body,
+        p_body: cleanHumanWrittenText(body),
       });
       if (reopenError) throw reopenError;
       setNotice('Request reopened.');
@@ -13291,7 +13293,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         actor_user_id: profile.id,
         actor_role: 'contractor',
         message_type: 'user_message',
-        body: supportDraft.body.trim() || 'Screenshot attached.',
+        body: cleanHumanWrittenText(supportDraft.body) || 'Screenshot attached.',
         attachments,
       });
       if (messageError) throw messageError;
@@ -13321,7 +13323,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         actor_user_id: profile.id,
         actor_role: 'contractor',
         message_type: 'user_message',
-        body: body || 'Screenshot attached.',
+        body: cleanHumanWrittenText(body) || 'Screenshot attached.',
         attachments,
       });
       if (messageError) throw messageError;
@@ -13420,7 +13422,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         license_number: contractorDraft.license_number,
         insurance_status: contractorDraft.insurance_status,
         bonded_status: contractorDraft.bonded_status,
-        business_summary: contractorDraft.business_summary,
+        business_summary: cleanHumanWrittenText(contractorDraft.business_summary),
         external_review_links: externalReviewLinks.map(link => ({ ...link, updated_at: link.updated_at || new Date().toISOString() })),
         public_profile_enabled: contractorDraft.public_profile_enabled,
         account_status: contractorDraft.account_status,
@@ -13762,11 +13764,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       const { data: updateData, error: updateError } = await supabase.rpc('servsync_contractor_update_service_request', {
         p_request_id: request.id,
-        p_body: body,
+        p_body: cleanHumanWrittenText(body),
         p_new_status: nextStatus,
         p_quote_amount_cents: attachQuote ? dollarsToCents(quoteDraft.amount) : null,
-        p_quote_scope: attachQuote ? (quoteDraft.scope || '') : null,
-        p_closing_summary: nextStatus === 'closed' ? (closingSummaryDrafts[request.id] ?? '') : null,
+        p_quote_scope: attachQuote ? cleanHumanWrittenText(quoteDraft.scope || '') : null,
+        p_closing_summary: nextStatus === 'closed' ? cleanHumanWrittenText(closingSummaryDrafts[request.id] ?? '') : null,
       });
       if (updateError) throw updateError;
 
@@ -13829,7 +13831,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const { error: apptError } = await supabase.rpc('servsync_contractor_propose_appointment', {
         p_request_id: request.id,
         p_proposed_at: proposedDate.toISOString(),
-        p_notes: draft.notes ?? '',
+        p_notes: cleanHumanWrittenText(draft.notes ?? ''),
       });
       if (apptError) throw apptError;
       setNotice('Reschedule proposal sent to homeowner.');
@@ -13869,7 +13871,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           return;
         }
         params.p_proposed_at = proposedDate.toISOString();
-        params.p_notes = notes ?? '';
+        params.p_notes = cleanHumanWrittenText(notes ?? '');
       }
       const { error: apptError } = await supabase.rpc('servsync_contractor_respond_to_appointment', params);
       if (apptError) throw apptError;
@@ -13896,7 +13898,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     try {
       const { error: reopenError } = await supabase.rpc('servsync_contractor_reopen_service_request', {
         p_request_id: request.id,
-        p_body: body,
+        p_body: cleanHumanWrittenText(body),
       });
       if (reopenError) throw reopenError;
       setNotice('Request reopened.');
@@ -14056,9 +14058,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         home_id: subject.homeownerUserId ? property.home_id || null : null,
         local_home_id: subject.localContactId ? property.local_home_id || null : null,
         title: estimateDraft.title.trim(),
-        scope: estimateDraft.scope.trim(),
-        notes: estimateDraft.notes.trim(),
-        terms: estimateDraft.terms.trim(),
+        scope: cleanHumanWrittenText(estimateDraft.scope),
+        notes: cleanHumanWrittenText(estimateDraft.notes),
+        terms: cleanHumanWrittenText(estimateDraft.terms),
         status: 'draft',
         subtotal_cents: subtotalCents,
         total_cents: subtotalCents,
@@ -14163,9 +14165,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         local_home_id: (subject.localContactId || currentInvoice?.local_contact_id) ? property.local_home_id || null : null,
         invoice_number: invoiceDraft.invoice_number.trim(),
         title: invoiceDraft.title.trim(),
-        scope: invoiceDraft.scope.trim(),
-        notes: invoiceDraft.notes.trim(),
-        terms: invoiceDraft.terms.trim(),
+        scope: cleanHumanWrittenText(invoiceDraft.scope),
+        notes: cleanHumanWrittenText(invoiceDraft.notes),
+        terms: cleanHumanWrittenText(invoiceDraft.terms),
         status: 'draft',
         subtotal_cents: subtotalCents,
         tax_cents: taxCents,
@@ -14173,7 +14175,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         discount_cents: discountCents,
         discount_type: invoiceDraft.discount_type,
         discount_value: discountValue,
-        discount_reason: invoiceDraft.discount_reason.trim(),
+        discount_reason: cleanHumanWrittenText(invoiceDraft.discount_reason),
         total_cents: totalCents,
         amount_paid_cents: 0,
         due_at: invoiceDraft.due_at ? `${invoiceDraft.due_at}T12:00:00.000Z` : null,
@@ -14770,7 +14772,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const { error: visitEventError } = await supabase.rpc('servsync_schedule_visit_event', {
         p_inspection_id: event.inspection_id,
         p_scheduled_at: scheduledAt.toISOString(),
-        p_notes: draft.notes || '',
+        p_notes: cleanHumanWrittenText(draft.notes),
         p_share_with_homeowner: draft.share_with_homeowner,
       });
       if (visitEventError) throw visitEventError;
@@ -14778,7 +14780,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const updatedEvent: ContractorVisitEvent = {
         ...event,
         scheduled_at: scheduledAt.toISOString(),
-        notes: draft.notes || '',
+        notes: cleanHumanWrittenText(draft.notes),
         share_with_homeowner: draft.share_with_homeowner,
         status: 'scheduled',
         homeowner_response_status: draft.share_with_homeowner ? 'shared_waiting' : 'not_shared',
@@ -14819,7 +14821,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         event_type: draft.event_type,
         starts_at: new Date(draft.starts_at).toISOString(),
         duration_minutes: draft.duration_minutes.trim() ? Number(draft.duration_minutes) : null,
-        notes: draft.notes.trim(),
+        notes: cleanHumanWrittenText(draft.notes),
         local_contact_id: draft.local_contact_id || null,
         recurrence_frequency: draft.recurrence_frequency,
         recurrence_rule: calendarEventRecurrenceRule(draft.recurrence_frequency),
@@ -15595,8 +15597,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return {
         title: item,
         status: (local?.status ?? 'Pass') as FindingStatus,
-        notes: local?.notes ?? '',
-        action: local?.action ?? '',
+        notes: cleanHumanWrittenText(local?.notes ?? ''),
+        action: cleanHumanWrittenText(local?.action ?? ''),
         due: local?.due ?? '',
         photos: local?.photos ?? [],
       };
@@ -15780,14 +15782,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (!options?.silent) setError('Completed jobs must be reopened before editing.');
       return;
     }
+    const cleanedSummary = cleanHumanWrittenText(summary);
     const { error: updateError } = await supabase.rpc('servsync_update_inspection', {
       p_inspection_id: insp.id,
       p_rooms_with_findings: rooms,
-      p_summary: summary,
+      p_summary: cleanedSummary,
     });
     if (updateError) throw updateError;
-    setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: rooms, summary } : prev);
-    setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: rooms, summary } : i));
+    setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: rooms, summary: cleanedSummary } : prev);
+    setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: rooms, summary: cleanedSummary } : i));
     if (!options?.silent) setNotice('Progress saved.');
   };
 
@@ -15893,6 +15896,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         : selectedStarterTemplate?.rooms ?? []
       ).map((room, index) => normalizeTemplateRoom(room, index));
       const trimmedScope = inspectionNewDraft.scope.trim();
+      const cleanedScope = cleanHumanWrittenText(inspectionNewDraft.scope);
       const serviceTaskTitles = isSimpleJobDraft
         ? serviceTasksFromScope(trimmedScope, inspectionNewDraft.name)
         : [];
@@ -15931,7 +15935,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .from('inspections')
         .update({
           job_type: requestedJobType,
-          summary: trimmedScope,
+          summary: cleanedScope,
           rooms_with_findings: seedFindings,
           updated_at: new Date().toISOString(),
         })
@@ -15950,7 +15954,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         const { data: visitEventData, error: visitEventError } = await supabase.rpc('servsync_schedule_visit_event', {
           p_inspection_id: newInspectionId,
           p_scheduled_at: scheduledDate.toISOString(),
-          p_notes: inspectionNewDraft.schedule_notes || '',
+          p_notes: cleanHumanWrittenText(inspectionNewDraft.schedule_notes),
           p_share_with_homeowner: shareVisitWithHomeowner,
         });
         if (visitEventError) throw visitEventError;
@@ -15973,7 +15977,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         service_request_id: inspectionNewDraft.service_request_id || null,
         template_id: selectedTemplate?.id ?? null,
         name: inspectionNewDraft.name.trim(),
-        summary: trimmedScope,
+        summary: cleanedScope,
         status: 'draft',
         job_type: requestedJobType,
         job_status: scheduledDate ? 'scheduled' : 'draft',
@@ -16017,7 +16021,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           homeowner_user_id: inspectionNewDraft.subject_type === 'connected' ? inspectionNewDraft.homeowner_user_id : null,
           local_contact_id: inspectionNewDraft.subject_type === 'local' ? inspectionNewDraft.local_contact_id : null,
           scheduled_at: scheduledDate.toISOString(),
-          notes: inspectionNewDraft.schedule_notes || '',
+          notes: cleanHumanWrittenText(inspectionNewDraft.schedule_notes),
           share_with_homeowner: shareVisitWithHomeowner,
           status: 'scheduled',
           homeowner_response_status: shareVisitWithHomeowner ? 'shared_waiting' : 'not_shared',
@@ -16075,7 +16079,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setFinalizingInspection(true);
     try {
       const updatedRooms: InspectionRoomData[] = buildInspectionRoomsSnapshot();
-      const summaryText = inspectionSummary.trim() || buildInspectionSummaryText(updatedRooms);
+      const summaryText = inspectionSummary.trim()
+        ? cleanHumanWrittenText(inspectionSummary)
+        : cleanHumanWrittenText(buildInspectionSummaryText(updatedRooms));
       const finalInsp: Inspection = { ...insp, rooms_with_findings: updatedRooms, summary: summaryText };
 
       const homeownerConn = connections.find(c => c.homeowner_user_id === insp.homeowner_user_id);
@@ -16089,7 +16095,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const { blob, fileName } = await generateInspectionPdf(finalInsp, contractor.business_name, homeownerName, homeAddress, contractor.logo_url, {
         includeSummary: includeReportSummary,
         includeValueAdd: includeReportValueAdd,
-        valueAddText: reportValueAddText,
+        valueAddText: cleanHumanWrittenText(reportValueAddText),
       });
 
       const storagePath = insp.homeowner_user_id
@@ -16207,7 +16213,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setNotice('');
     setError('');
     const completedAt = new Date().toISOString();
-    const summaryText = inspectionSummary.trim() || insp.summary || '';
+    const summaryText = inspectionSummary.trim()
+      ? cleanHumanWrittenText(inspectionSummary)
+      : cleanHumanWrittenText(insp.summary || '');
     try {
       const updatedRooms = buildInspectionRoomsSnapshot();
       if (isSimpleServiceJob(insp)) {
@@ -16763,7 +16771,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_display_name: localContactDraft.display_name,
         p_phone: localContactDraft.phone,
         p_email: localContactDraft.email,
-        p_notes: localContactDraft.notes,
+        p_notes: cleanHumanWrittenText(localContactDraft.notes),
         p_home_nickname: localContactDraft.home_nickname,
         p_address_line1: localContactDraft.address_line1,
         p_address_line2: localContactDraft.address_line2,
@@ -16773,7 +16781,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_home_type: localContactDraft.home_type,
         p_year_built: localContactDraft.year_built,
         p_square_feet: localContactDraft.square_feet,
-        p_home_notes: localContactDraft.home_notes,
+        p_home_notes: cleanHumanWrittenText(localContactDraft.home_notes),
       });
       if (createError) throw createError;
 
@@ -23806,7 +23814,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {...writingAssistProps}
                                           defaultValue={row.finding.title}
                                           disabled={simpleJobReadonly}
-                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, event.target.value)}
+                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanWrittenText(event.target.value))}
                                         />
                                       </div>
                                       <button
@@ -24837,9 +24845,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       [activeInspection.id]: (prev[activeInspection.id] ?? []).map(line => line.id === lineId ? { ...line, ...updates } : line),
                     }));
                   };
-                  const finalSummaryText = inspectionSummary.trim() || buildInspectionSummaryText(reportRooms);
+                  const finalSummaryText = inspectionSummary.trim()
+                    ? cleanHumanWrittenText(inspectionSummary)
+                    : cleanHumanWrittenText(buildInspectionSummaryText(reportRooms));
                   const defaultValueAddText = buildValueAddText(reportRooms);
-                  const effectiveValueAddText = reportValueAddText.trim() || defaultValueAddText;
+                  const effectiveValueAddText = reportValueAddText.trim()
+                    ? cleanHumanWrittenText(reportValueAddText)
+                    : cleanHumanWrittenText(defaultValueAddText);
                   const linkedServiceRequest = activeInspection.service_request_id
                     ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
                     : null;
@@ -25363,7 +25375,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           onClick={async () => {
                             const previewInsp: Inspection = activeInspection.status === 'finalized'
                               ? activeInspection
-                              : { ...activeInspection, rooms_with_findings: reportRooms, summary: inspectionSummary };
+                              : { ...activeInspection, rooms_with_findings: reportRooms, summary: finalSummaryText };
                             await generateInspectionPdf(previewInsp, contractor?.business_name ?? '', homeownerLabel, homeAddress, contractor?.logo_url || contractorDraft.logo_url || null, {
                               includeSummary: includeReportSummary,
                               includeValueAdd: includeReportValueAdd,
@@ -25637,8 +25649,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
           account_status: draft.account_status,
           subscription_status: draft.subscription_status,
           monthly_price_cents: dollarsToCents(draft.monthly_price),
-          subscription_notes: draft.subscription_notes,
-          admin_notes: draft.admin_notes,
+          subscription_notes: cleanHumanWrittenText(draft.subscription_notes),
+          admin_notes: cleanHumanWrittenText(draft.admin_notes),
         })
         .eq('id', contractor.id);
       if (updateError) throw updateError;
@@ -25662,7 +25674,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         .from('contractor_invites')
         .update({
           reward_status: draft.reward_status,
-          reward_notes: draft.reward_notes,
+          reward_notes: cleanHumanWrittenText(draft.reward_notes),
         })
         .eq('id', invite.id);
       if (updateError) throw updateError;
@@ -25688,7 +25700,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         p_reward_status: draft.reward_status,
         p_reward_type: draft.reward_type.trim() || null,
         p_reward_amount_cents: draft.reward_amount.trim() ? dollarsToCents(draft.reward_amount) : null,
-        p_admin_notes: draft.admin_notes,
+        p_admin_notes: cleanHumanWrittenText(draft.admin_notes),
       });
       if (updateError) throw updateError;
       setNotice('Referral tracking updated.');
@@ -25710,7 +25722,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const { error: updateError } = await supabase.rpc('servsync_admin_update_connection_alert', {
         p_alert_id: row.alert_id,
         p_status: draft.status,
-        p_admin_notes: draft.admin_notes,
+        p_admin_notes: cleanHumanWrittenText(draft.admin_notes),
         p_next_follow_up_at: draft.next_follow_up_at ? new Date(`${draft.next_follow_up_at}T12:00:00`).toISOString() : null,
       });
       if (updateError) throw updateError;
@@ -25778,7 +25790,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
   const replyToSupportInquiryAsAdmin = async (inquiry: SupportInquiry) => {
     if (!supabase) return;
-    const body = (adminSupportReplyDrafts[inquiry.id] || '').trim();
+      const body = cleanHumanWrittenText(adminSupportReplyDrafts[inquiry.id] || '');
     if (!body) return;
     setSavingSupportInquiryId(inquiry.id);
     setNotice('');
@@ -28204,7 +28216,7 @@ function DiscoverFeed({
       const { error } = await supabase.rpc('servsync_create_contractor_post', {
         p_category: postDraft.category,
         p_title: postDraft.title.trim(),
-        p_description: postDraft.description.trim(),
+        p_description: cleanHumanWrittenText(postDraft.description),
         p_photos: photoUrls,
         p_city: postDraft.city.trim(),
         p_state: postDraft.state.trim(),
@@ -29710,7 +29722,7 @@ function CalendarEventComposer({
             </div>
           )}
           <Field label="Notes (optional)">
-            <textarea rows={3} className={inputClass()} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
+            <textarea rows={3} className={inputClass()} {...writingAssistProps} value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))} />
           </Field>
         </div>
 
@@ -29904,6 +29916,7 @@ function VisitCalendarEventDetail({
             <textarea
               rows={3}
               className={inputClass()}
+              {...writingAssistProps}
               value={draft.notes}
               onChange={inputEvent => setDraft(current => ({ ...current, notes: inputEvent.target.value }))}
               placeholder="Add notes for this calendar event."
