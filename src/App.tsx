@@ -14060,30 +14060,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const saveInvoiceDraft = async (subject: {
     homeownerUserId?: string | null;
     localContactId?: string | null;
-  }) => {
+  }, options?: { closeComposer?: boolean }) => {
     setNotice('');
     setError('');
     if (!supabase) {
       setError('Unable to save invoice draft because ServSync is still connecting. Refresh and try again.');
-      return;
+      return null;
     }
     if (!contractor?.id) {
       setError('Unable to save invoice draft because your contractor profile is still loading. Wait a moment and try again.');
-      return;
+      return null;
     }
     if (!invoiceDraft.title.trim()) {
       setError('Add an invoice title before saving.');
-      return;
+      return null;
     }
     const usableLines = (invoiceDraft.line_items ?? []).filter(line => line.description.trim());
     if (usableLines.length === 0) {
       setError('Add at least one line item before saving the invoice.');
-      return;
+      return null;
     }
     const currentInvoice = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) : null;
     if (currentInvoice && currentInvoice.status !== 'draft') {
       setError('Only draft invoices can be edited in this version.');
-      return;
+      return null;
     }
     setSavingInvoice(true);
     try {
@@ -14150,25 +14150,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         })));
       if (linesError) throw linesError;
 
+      const savedInvoice = await loadInvoiceById(invoiceId);
       setNotice(editingInvoiceId ? 'Invoice draft updated.' : 'Invoice draft saved.');
-      setInvoiceComposerOpen(false);
-      setEditingInvoiceId(null);
-      setInvoiceDraft(createBlankInvoiceDraft());
+      if (options?.closeComposer === false) {
+        setEditingInvoiceId(invoiceId);
+        setInvoiceDraft(invoiceDraftFromInvoice(savedInvoice));
+      } else {
+        setInvoiceComposerOpen(false);
+        setEditingInvoiceId(null);
+        setInvoiceDraft(createBlankInvoiceDraft());
+      }
       await loadContractor();
+      return savedInvoice;
     } catch (err) {
       setError(readableError(err, 'Unable to save invoice draft. Make sure the ServSync invoices SQL has been applied.'));
+      return null;
     } finally {
       setSavingInvoice(false);
     }
   };
 
   const sendInvoiceToHomeowner = async (invoice: Invoice) => {
-    if (!supabase) return;
+    if (!supabase) return false;
     setNotice('');
     setError('');
     if (!invoice.homeowner_user_id) {
       setError('Local-only invoices cannot be sent to a homeowner yet. Connect this customer to a ServSync homeowner before sending.');
-      return;
+      return false;
     }
     setUpdatingInvoiceId(invoice.id);
     try {
@@ -14178,8 +14186,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (sendError) throw sendError;
       setNotice('Invoice sent to homeowner.');
       await loadContractor();
+      return true;
     } catch (err) {
       setError(readableError(err, 'Unable to send invoice.'));
+      return false;
     } finally {
       setUpdatingInvoiceId(null);
     }
@@ -16163,8 +16173,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? { ...event, status: 'completed', updated_at: completedAt }
         : event
       ));
-      setContractorJobsView('closed_jobs');
-      setNotice('Job marked completed. You can create an invoice when ready.');
+      await createInvoiceFromJob(completedJob);
     } catch (err) {
       setError(readableError(err, 'Unable to complete this job.'));
     }
@@ -16258,6 +16267,40 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorTab('inspections');
     }
     persistFieldWorkState({ inspectionId: insp.id, view: 'detail', subTab: nextSubTab, selectedRoom: nextSelectedRoom });
+  };
+
+  const reopenJobFromInvoice = async (jobId: string) => {
+    if (!supabase) return;
+    const currentJob = inspections.find(item => item.id === jobId) ?? null;
+    if (currentJob?.status === 'finalized') {
+      setError('Filed report jobs cannot be reopened from the invoice screen yet. Open the job report if you need to review it.');
+      return;
+    }
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: updateError } = await supabase
+        .from('inspections')
+        .update({
+          job_status: 'in_progress',
+          completed_at: null,
+          closed_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+        .select('*')
+        .single();
+      if (updateError) throw updateError;
+      const reopenedJob = data as Inspection;
+      setInspections(prev => [reopenedJob, ...prev.filter(item => item.id !== reopenedJob.id)]);
+      setInvoiceComposerOpen(false);
+      setEditingInvoiceId(null);
+      setInvoiceDraft(createBlankInvoiceDraft());
+      openInspection(reopenedJob, { subTab: isSimpleServiceJob(reopenedJob) ? 'inspect' : undefined });
+      setNotice('Job reopened. You can update the job before finishing the invoice.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to reopen this job.'));
+    }
   };
 
   const resolveSuggestionTarget = (suggestion: WalkthroughSuggestion): { room: string; item: string } | null => {
@@ -21721,7 +21764,48 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => void saveInvoiceDraft(selectedJobsSubject)} disabled={savingInvoice} className={buttonClass('primary')}>
                             <Receipt size={15} />
-                            {savingInvoice ? 'Saving...' : editingInvoiceId ? 'Update invoice draft' : 'Save invoice draft'}
+                            {savingInvoice ? 'Saving...' : 'Save Invoice'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const savedInvoice = await saveInvoiceDraft(selectedJobsSubject, { closeComposer: false });
+                              if (!savedInvoice) return;
+                              const sent = await sendInvoiceToHomeowner(savedInvoice);
+                              if (sent) {
+                                setInvoiceComposerOpen(false);
+                                setEditingInvoiceId(null);
+                                setInvoiceDraft(createBlankInvoiceDraft());
+                              }
+                            }}
+                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId}
+                            className={buttonClass('primary')}
+                          >
+                            <Send size={15} />
+                            {savingInvoice || updatingInvoiceId === editingInvoiceId ? 'Sending...' : 'Save Invoice and Send to Homeowner'}
+                          </button>
+                          {invoiceDraft.job_id && (
+                            <button type="button" onClick={() => void reopenJobFromInvoice(invoiceDraft.job_id)} disabled={savingInvoice} className={buttonClass('secondary')}>
+                              <RotateCcw size={15} />
+                              Reopen Job
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const existingInvoice = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) ?? null : null;
+                              if (existingInvoice) {
+                                await voidInvoice(existingInvoice);
+                              }
+                              setInvoiceComposerOpen(false);
+                              setEditingInvoiceId(null);
+                              setInvoiceDraft(createBlankInvoiceDraft());
+                            }}
+                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <Trash2 size={15} />
+                            Delete
                           </button>
                           <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} disabled={savingInvoice} className={buttonClass('secondary')}>
                             Cancel
@@ -23126,35 +23210,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               : null;
             const linkedCalendarOccurrenceForJob = linkedCalendarEventJobLinkForJob?.occurrence_starts_at ?? linkedStandaloneCalendarEventForJob?.starts_at ?? null;
             const scheduledAtForJob = linkedVisitEventForJob?.scheduled_at ?? linkedCalendarOccurrenceForJob ?? null;
-            const openLinkedEstimateRecord = (estimate: Estimate) => {
-              const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
-              const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
-              setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-              setContractorTab('inspections');
-              setInspectionView('list');
-              setHomeownerWorkspaceEstimateView(estimate.status === 'draft' ? 'draft' : 'sent');
-              setInvoiceComposerOpen(false);
-              if (estimate.status === 'draft') {
-                setEditingEstimateId(estimate.id);
-                setEstimateDraft(estimateDraftFromEstimate(estimate));
-                setEstimateComposerOpen(true);
-                setContractorJobsView('new_financial');
-                return;
-              }
-              setEditingEstimateId(null);
-              setEstimateComposerOpen(false);
-              setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
-            };
-            const openLinkedCalendarForJob = () => {
-              if (linkedStandaloneCalendarEventForJob) {
-                openCalendarEventDetail(linkedStandaloneCalendarEventForJob, linkedCalendarOccurrenceForJob ?? linkedStandaloneCalendarEventForJob.starts_at);
-                return;
-              }
-              if (linkedVisitEventForJob) {
-                openVisitCalendarEventDetail(linkedVisitEventForJob);
-              }
-            };
-            const renderJobCardHeader = (nextActions: ReactNode) => (
+            const renderJobCardHeader = () => (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -23184,38 +23240,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </div>
                 </div>
 
-                <div className="space-y-3 p-4 sm:p-5">
+                <div className="p-4 sm:p-5">
                   <p className="text-xs leading-5 text-slate-500">{jobTypeHelperCopy(activeInspection)}</p>
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">Next action</p>
-                        <p className="mt-1 text-xs leading-5 text-blue-900">
-                          Keep the job moving from notes to completion, billing, or the linked calendar event.
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {nextActions}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             );
-            const goToReportReview = () => {
-              if (activeInspection.status === 'draft') {
-                setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(workingRooms));
-                setReportValueAddText(prev => prev.trim() ? prev : buildValueAddText(workingRooms));
-                setInspectionClosedForReview(true);
-              }
-              setInspectionSubTab('report');
-              setNotice('Report review is ready. Check the homeowner summary before filing.');
-            };
             if (isSimpleServiceJob(activeInspection)) {
               const approvedScopeRooms = workingRooms.filter(room => roomIsApprovedScope(room.room));
               const approvedWorkItems = approvedScopeRooms.flatMap(room => room.findings);
               const linkedEstimate = linkedEstimateForJob;
-              const linkedInvoice = linkedInvoiceForJob;
               const linkedServiceRequest = linkedServiceRequestForJob;
               const completed = inspectionIsClosedJob(activeInspection);
               const photoCount = workingFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
@@ -23346,39 +23379,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     ← Back to Jobs
                   </button>
 
-                  {renderJobCardHeader(
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => document.getElementById('simple-job-work-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                        className={buttonClass('secondary')}
-                      >
-                        <MessageSquare size={15} />
-                        Add Work Note
-                      </button>
-                      {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && (
-                        <button type="button" onClick={openLinkedCalendarForJob} className={buttonClass('secondary')}>
-                          <Calendar size={15} />
-                          Open Calendar Event
-                        </button>
-                      )}
-                      {linkedEstimate && (
-                        <button type="button" onClick={() => openLinkedEstimateRecord(linkedEstimate)} className={buttonClass('secondary')}>
-                          <FileText size={15} />
-                          Open Estimate
-                        </button>
-                      )}
-                      {linkedInvoice && (
-                        <button type="button" onClick={() => openInvoiceRecord(linkedInvoice)} className={buttonClass(linkedInvoice.status === 'draft' ? 'secondary' : 'primary')}>
-                          <Receipt size={15} />
-                          {linkedInvoice.status === 'draft' ? 'Edit Invoice' : 'Open Invoice'}
-                        </button>
-                      )}
-                    </>
-                  )}
+                  {renderJobCardHeader()}
 
-                  <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-                    <div className="space-y-4">
+                  <div className="space-y-4">
                       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div>
@@ -23549,46 +23552,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                     </div>
 
-                    <div className="space-y-4 self-start xl:sticky xl:top-4">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h3 className="text-sm font-bold text-slate-950">Completion</h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">Service jobs can be completed without generating an inspection-style report.</p>
-                        {completed ? (
-                          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
-                            <CheckCircle2 size={18} className="mx-auto text-emerald-600" />
-                            <p className="mt-1 text-sm font-semibold text-emerald-700">Job completed</p>
-                          </div>
-                        ) : (
-                          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-semibold text-amber-800">
-                            Complete this job from the controls at the bottom of the page.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <h3 className="text-sm font-bold text-slate-950">Invoice</h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">Create the invoice after the job is complete, or open the invoice already linked to this job.</p>
-                        {linkedInvoice ? (
-                          <button type="button" onClick={() => openInvoiceRecord(linkedInvoice)} className={`${buttonClass(linkedInvoice.status === 'draft' ? 'secondary' : 'primary')} mt-3 w-full justify-center`}>
-                            <Receipt size={15} />
-                            {linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={!completed || creatingInvoiceSourceId === `job:${activeInspection.id}`}
-                            onClick={() => void createInvoiceFromJob(activeInspection)}
-                            className={`${buttonClass('primary')} mt-3 w-full justify-center disabled:opacity-50`}
-                          >
-                            <Receipt size={15} />
-                            {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+	                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
@@ -23629,48 +23593,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   ← Back to Jobs
                 </button>
 
-                {renderJobCardHeader(
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setInspectionSubTab('inspect')}
-                      className={buttonClass('secondary')}
-                    >
-                      <MessageSquare size={15} />
-                      Add Work Note
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInspectionSubTab('inspect')}
-                      className={buttonClass('secondary')}
-                    >
-                      <Sparkles size={15} />
-                      Open Job Assistant
-                    </button>
-                    {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && (
-                      <button type="button" onClick={openLinkedCalendarForJob} className={buttonClass('secondary')}>
-                        <Calendar size={15} />
-                        Open Calendar Event
-                      </button>
-                    )}
-                    {linkedEstimateForJob && (
-                      <button type="button" onClick={() => openLinkedEstimateRecord(linkedEstimateForJob)} className={buttonClass('secondary')}>
-                        <FileText size={15} />
-                        Open Estimate
-                      </button>
-                    )}
-                    {linkedInvoiceForJob && (
-                      <button type="button" onClick={() => openInvoiceRecord(linkedInvoiceForJob)} className={buttonClass(linkedInvoiceForJob.status === 'draft' ? 'secondary' : 'primary')}>
-                        <Receipt size={15} />
-                        {linkedInvoiceForJob.status === 'draft' ? 'Edit Invoice' : 'Open Invoice'}
-                      </button>
-                    )}
-                    <button type="button" onClick={goToReportReview} className={buttonClass('primary')}>
-                      <FileText size={15} />
-                      Review Report
-                    </button>
-                  </>
-                )}
+	                {renderJobCardHeader()}
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100">
