@@ -23126,8 +23126,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               : null;
             const linkedCalendarOccurrenceForJob = linkedCalendarEventJobLinkForJob?.occurrence_starts_at ?? linkedStandaloneCalendarEventForJob?.starts_at ?? null;
             const scheduledAtForJob = linkedVisitEventForJob?.scheduled_at ?? linkedCalendarOccurrenceForJob ?? null;
-            const linkedCalendarLabelForJob = linkedStandaloneCalendarEventForJob?.title
-              ?? (linkedVisitEventForJob ? 'Job calendar event' : 'No linked calendar event');
             const openLinkedEstimateRecord = (estimate: Estimate) => {
               const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
               const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
@@ -23158,12 +23156,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             };
             const renderJobCardHeader = (nextActions: ReactNode) => (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Job Card</p>
-                      <h2 className="mt-1 truncate text-2xl font-bold text-slate-950">{activeInspection.name}</h2>
-                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">{jobTypeHelperCopy(activeInspection)}</p>
+                      <h2 className="mt-1 truncate text-xl font-bold text-slate-950">{activeInspection.name}</h2>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        {homeownerLabel || 'Customer not provided'}{homeAddress ? ` · ${homeAddress}` : ''}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
+                        {scheduledAtForJob && <span>Scheduled {formatDateTime(scheduledAtForJob)}</span>}
+                        {linkedStandaloneCalendarEventForJob && <span>Calendar: {linkedStandaloneCalendarEventForJob.title}</span>}
+                        {!linkedStandaloneCalendarEventForJob && linkedVisitEventForJob && <span>Calendar: job visit</span>}
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
@@ -23179,14 +23184,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </div>
                 </div>
 
-                <div className="space-y-4 p-4 sm:p-5">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <InfoBox label="Customer" value={homeownerLabel || 'Not provided'} />
-                    <InfoBox label="Home / address" value={homeAddress || 'Not provided'} />
-                    <InfoBox label="Schedule" value={scheduledAtForJob ? formatDateTime(scheduledAtForJob) : 'Not scheduled'} />
-                    <InfoBox label="Linked calendar event" value={linkedCalendarLabelForJob} />
-                  </div>
-
+                <div className="space-y-3 p-4 sm:p-5">
+                  <p className="text-xs leading-5 text-slate-500">{jobTypeHelperCopy(activeInspection)}</p>
                   <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
@@ -23375,69 +23374,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {linkedInvoice.status === 'draft' ? 'Edit Invoice' : 'Open Invoice'}
                         </button>
                       )}
-                      {!linkedInvoice && completed && (
-                        <button
-                          type="button"
-                          disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
-                          onClick={() => void createInvoiceFromJob(activeInspection)}
-                          className={buttonClass('primary')}
-                        >
-                          <Receipt size={15} />
-                          {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
-                        </button>
-                      )}
-                      {inspectionIsOpenJob(activeInspection) && (
-                        <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
-                          <CheckCircle2 size={15} />
-                          Complete Job
-                        </button>
-                      )}
                     </>
                   )}
 
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
-                        <p className="mt-1 text-xs text-slate-500">Save changes, complete the job, or remove a draft job.</p>
-                      </div>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} className={buttonClass('secondary')}>
-                          {savingInspection ? 'Saving...' : 'Save'}
-                        </button>
-                        {inspectionIsOpenJob(activeInspection) && (
-                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
-                            <CheckCircle2 size={15} />
-                            Complete Job
-                          </button>
-                        )}
-                        {completed && (
-                          <button
-                            type="button"
-                            disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
-                            onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromJob(activeInspection)}
-                            className={buttonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
-                          >
-                            <Receipt size={15} />
-                            {creatingInvoiceSourceId === `job:${activeInspection.id}`
-                              ? 'Creating...'
-                              : linkedInvoice
-                                ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
-                                : 'Create Invoice'}
-                          </button>
-                        )}
-                        {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
-                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
                     <div className="space-y-4">
-                      <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
@@ -23445,18 +23387,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
-                          <InfoBox label="Customer" value={homeownerLabel} />
-                          <InfoBox label="Service address" value={homeAddress || 'Not provided'} />
-                          <InfoBox label="Job status" value={inspectionJobStatusLabel(activeInspection)} />
                           <InfoBox label="Photos attached" value={String(photoCount)} />
-                        </div>
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          {linkedEstimate && <InfoBox label="Linked estimate" value={linkedEstimate.title || 'Accepted estimate'} />}
                           {linkedServiceRequest && <InfoBox label="Linked request" value={linkedServiceRequest.title || linkedServiceRequest.category || 'Service request'} />}
+                          {linkedEstimate && <InfoBox label="Linked estimate" value={linkedEstimate.title || 'Accepted estimate'} />}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-bold text-slate-950">Tasks / Work Items</h3>
@@ -23622,10 +23559,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="mt-1 text-sm font-semibold text-emerald-700">Job completed</p>
                           </div>
                         ) : (
-                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={`${buttonClass('primary')} mt-3 w-full justify-center`}>
-                            <CheckCircle2 size={15} />
-                            Complete Job
-                          </button>
+                          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-semibold text-amber-800">
+                            Complete this job from the controls at the bottom of the page.
+                          </p>
                         )}
                       </div>
 
@@ -23646,6 +23582,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           >
                             <Receipt size={15} />
                             {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
+                        <p className="mt-1 text-xs text-slate-500">Save changes, complete the job, or remove a draft job.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} className={buttonClass('secondary')}>
+                          {savingInspection ? 'Saving...' : 'Save'}
+                        </button>
+                        {inspectionIsOpenJob(activeInspection) && (
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
+                            <CheckCircle2 size={15} />
+                            Complete Job
+                          </button>
+                        )}
+                        {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
+                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                            <Trash2 size={13} /> Delete
                           </button>
                         )}
                       </div>
@@ -23717,22 +23678,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div>
                         <h3 className="text-sm font-bold text-slate-950">Job sections</h3>
                         <p className="mt-1 text-xs text-slate-500">Move between the checklist, notes, assistant, and report review.</p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 justify-end">
-                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft'} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
-                          {savingInspection ? 'Saving...' : 'Save'}
-                        </button>
-                        <button type="button" onClick={() => void saveActiveFieldWorkAsTemplate()} disabled={savingInspection} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
-                          Save as template
-                        </button>
-                        <button type="button" onClick={goToReportReview} className={buttonClass('primary')}>
-                          Review report
-                        </button>
-                        {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
-                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="text-xs font-medium border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5">
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        )}
                       </div>
                     </div>
                     <div className="flex gap-1 mt-4 flex-wrap">
@@ -24598,7 +24543,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 })()}
 
                 {/* ── REPORT SUB-TAB ── */}
-                {inspectionSubTab === 'report' && (() => {
+	                {inspectionSubTab === 'report' && (() => {
                   const reportRooms: InspectionRoomData[] = activeRooms.map((rm, index) => ({
                     ...roomIdentityFields(rm, index),
                     findings: rm.items.map(item => {
@@ -25205,8 +25150,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                     </div>
                   </div>
-                  );
-                })()}
+	                  );
+	                })()}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
+                      <p className="mt-1 text-xs text-slate-500">Save checklist changes, save this workflow as a template, or remove a draft job.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft'} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
+                        {savingInspection ? 'Saving...' : 'Save'}
+                      </button>
+                      <button type="button" onClick={() => void saveActiveFieldWorkAsTemplate()} disabled={savingInspection} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
+                        Save as template
+                      </button>
+                      {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
+                        <button type="button" onClick={() => void deleteInspection(activeInspection)} className="text-xs font-medium border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5">
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
               </div>
             );
