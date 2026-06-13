@@ -59,7 +59,7 @@ import {
   localDraftFromNote,
   localSuggestedActionFromNote,
 } from './inspectionAssistant';
-import { cleanHumanTextInputOnBlur, cleanHumanWrittenText } from './textCleanup';
+import { cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -4201,6 +4201,7 @@ const writingAssistProps = {
   autoCapitalize: 'sentences',
   autoCorrect: 'on',
   onBlur: cleanHumanTextInputOnBlur,
+  onKeyUp: cleanHumanTextInputOnKeyUp,
 } as const;
 
 function invoiceStatusLabel(status: Invoice['status']) {
