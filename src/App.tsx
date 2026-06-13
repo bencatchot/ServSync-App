@@ -955,6 +955,10 @@ function inspectionIsClosedJob(work: Pick<Inspection, 'status' | 'job_status'>) 
   return CLOSED_JOB_STATUSES.includes(inspectionJobStatus(work));
 }
 
+function inspectionCanSaveProgress(work: Pick<Inspection, 'status' | 'job_status'>) {
+  return work.status === 'draft' && OPEN_JOB_STATUSES.includes(inspectionJobStatus(work));
+}
+
 function inspectionJobStatusLabel(work: Pick<Inspection, 'status' | 'job_status'>) {
   const labels: Record<JobLifecycleStatus, string> = {
     draft: 'Draft',
@@ -14207,7 +14211,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setInvoiceDraft(createBlankInvoiceDraft());
         const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
         if (linkedJob) {
-          openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) ? 'inspect' : undefined });
+          openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
         } else {
           setInspectionView('list');
           setContractorJobsView('open_financial');
@@ -15758,6 +15762,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     options?: { silent?: boolean },
   ) => {
     if (!supabase) return;
+    if (!inspectionCanSaveProgress(insp)) {
+      if (!options?.silent) setError('Completed jobs must be reopened before editing.');
+      return;
+    }
     const { error: updateError } = await supabase.rpc('servsync_update_inspection', {
       p_inspection_id: insp.id,
       p_rooms_with_findings: rooms,
@@ -15780,7 +15788,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const shouldClearDraft = next && 'inspectionId' in next && next.inspectionId === null;
     const draftSnapshot = shouldClearDraft
       ? null
-      : activeInspection?.status === 'draft'
+      : activeInspection && inspectionCanSaveProgress(activeInspection)
         ? {
             inspectionId: activeInspection.id,
             rooms_with_findings: buildInspectionRoomsSnapshot(),
@@ -16447,7 +16455,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   }, [contractorTab, contractorJobsView, inspectionView, loading, inspections, activeInspection]);
 
   useEffect(() => {
-    if (!activeInspection || activeInspection.status !== 'draft' || finalizingInspection) return;
+    if (!activeInspection || !inspectionCanSaveProgress(activeInspection) || finalizingInspection) return;
     const signature = JSON.stringify({
       id: activeInspection.id,
       rooms: activeRooms,
@@ -16464,7 +16472,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [activeInspection?.id, activeInspection?.status, activeRooms, localFindings, inspectionSummary, finalizingInspection]);
+  }, [activeInspection?.id, activeInspection?.status, activeInspection?.job_status, activeRooms, localFindings, inspectionSummary, finalizingInspection]);
 
   const handleInspectionPhotoUpload = async (key: string, file: File) => {
     if (!supabase || !contractor || !activeInspection) return;
@@ -21899,7 +21907,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 setInvoiceDraft(createBlankInvoiceDraft());
                                 const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
                                 if (linkedJob) {
-                                  openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) ? 'inspect' : undefined });
+                                  openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
                                 } else {
                                   setInspectionView('list');
                                   setContractorJobsView('open_financial');
