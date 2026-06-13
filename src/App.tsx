@@ -290,7 +290,9 @@ type InvoiceDraftForm = {
   local_home_id?: string;
   due_at: string;
   tax: string;
+  discount_type: 'amount' | 'percentage';
   discount: string;
+  discount_reason: string;
   line_items: EstimateLineDraft[];
 };
 type TradeToolInputType = 'number' | 'text' | 'select';
@@ -355,7 +357,7 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
 };
 
 const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
-const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, discount_cents, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
+const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -585,7 +587,9 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
     local_home_id: '',
     due_at: '',
     tax: '',
+    discount_type: 'amount' as const,
     discount: '',
+    discount_reason: '',
     line_items: defaultLineItems,
     ...overrides,
   };
@@ -1390,6 +1394,10 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
 }
 
 function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
+  const taxableCents = Math.max(0, invoice.subtotal_cents - invoice.discount_cents);
+  const derivedTaxRate = taxableCents > 0 && invoice.tax_cents > 0
+    ? Number(((invoice.tax_cents / taxableCents) * 100).toFixed(4))
+    : 0;
   return {
     invoice_number: invoice.invoice_number,
     title: invoice.title,
@@ -1402,8 +1410,12 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
     home_id: invoice.home_id || '',
     local_home_id: invoice.local_home_id || '',
     due_at: invoice.due_at ? invoice.due_at.slice(0, 10) : '',
-    tax: centsToDollars(invoice.tax_cents),
-    discount: centsToDollars(invoice.discount_cents),
+    tax: String(Number(invoice.tax_rate_percent ?? derivedTaxRate) || ''),
+    discount_type: invoice.discount_type ?? 'amount',
+    discount: invoice.discount_type === 'percentage'
+      ? String(Number(invoice.discount_value ?? 0) || '')
+      : centsToDollars(invoice.discount_cents),
+    discount_reason: invoice.discount_reason ?? '',
     line_items: invoice.line_items?.length
       ? [...invoice.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -4122,8 +4134,30 @@ function estimateTotalCents(lines: EstimateLineDraft[] = []) {
   return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
 }
 
-function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount'>) {
-  return Math.max(0, estimateTotalCents(draft.line_items ?? []) + dollarsToCents(draft.tax) - dollarsToCents(draft.discount));
+function parsePercentValue(value: string) {
+  const numeric = Number(value.replace(/[%]/g, '').trim());
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return Math.min(numeric, 100);
+}
+
+function invoiceDiscountCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type'>) {
+  const subtotalCents = estimateTotalCents(draft.line_items ?? []);
+  if (draft.discount_type === 'percentage') {
+    return Math.min(subtotalCents, Math.round(subtotalCents * parsePercentValue(draft.discount) / 100));
+  }
+  return Math.min(subtotalCents, dollarsToCents(draft.discount));
+}
+
+function invoiceTaxableCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type'>) {
+  return Math.max(0, estimateTotalCents(draft.line_items ?? []) - invoiceDiscountCents(draft));
+}
+
+function invoiceTaxCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type'>) {
+  return Math.round(invoiceTaxableCents(draft) * parsePercentValue(draft.tax) / 100);
+}
+
+function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type'>) {
+  return invoiceTaxableCents(draft) + invoiceTaxCents(draft);
 }
 
 function formatMoney(cents: number) {
@@ -14091,10 +14125,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setSavingInvoice(true);
     try {
       const subtotalCents = estimateTotalCents(usableLines);
-      const taxCents = dollarsToCents(invoiceDraft.tax);
-      const discountCents = dollarsToCents(invoiceDraft.discount);
-      const totalCents = Math.max(0, subtotalCents + taxCents - discountCents);
+      const discountCents = invoiceDiscountCents({ ...invoiceDraft, line_items: usableLines });
+      const taxableCents = Math.max(0, subtotalCents - discountCents);
+      const taxRatePercent = parsePercentValue(invoiceDraft.tax);
+      const taxCents = Math.round(taxableCents * taxRatePercent / 100);
+      const totalCents = taxableCents + taxCents;
       const property = invoiceSourceProperty(invoiceDraft);
+      const discountValue = invoiceDraft.discount_type === 'percentage'
+        ? parsePercentValue(invoiceDraft.discount)
+        : dollarsToCents(invoiceDraft.discount) / 100;
       const invoicePayload = {
         contractor_id: contractor.id,
         homeowner_user_id: subject.homeownerUserId || currentInvoice?.homeowner_user_id || null,
@@ -14112,7 +14151,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         status: 'draft',
         subtotal_cents: subtotalCents,
         tax_cents: taxCents,
+        tax_rate_percent: taxRatePercent,
         discount_cents: discountCents,
+        discount_type: invoiceDraft.discount_type,
+        discount_value: discountValue,
+        discount_reason: invoiceDraft.discount_reason.trim(),
         total_cents: totalCents,
         amount_paid_cents: 0,
         due_at: invoiceDraft.due_at ? `${invoiceDraft.due_at}T12:00:00.000Z` : null,
@@ -14162,6 +14205,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setInvoiceComposerOpen(false);
         setEditingInvoiceId(null);
         setInvoiceDraft(createBlankInvoiceDraft());
+        const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
+        if (linkedJob) {
+          openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) ? 'inspect' : undefined });
+        } else {
+          setInspectionView('list');
+          setContractorJobsView('open_financial');
+          setContractorTab('inspections');
+        }
       }
       await loadContractor();
       return savedInvoice;
@@ -16864,7 +16915,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
       ]}
       activeTab={contractorTab}
-      onChange={tab => setContractorTab(tab as typeof contractorTab)}
+      onChange={tab => {
+        if (tab === 'inspections') {
+          setContractorTab('inspections');
+          setContractorJobsView('overview');
+          setInspectionView('list');
+          setActiveInspection(null);
+          setEstimateComposerOpen(false);
+          setEditingEstimateId(null);
+          setInvoiceComposerOpen(false);
+          setEditingInvoiceId(null);
+          setJobsListDateFilter('');
+          setJobsListStatusFilter('all');
+          setJobsListTypeFilter('all');
+          persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
+          return;
+        }
+        setContractorTab(tab as typeof contractorTab);
+      }}
       actions={<NotificationBell
         notifications={notifications}
         unreadCount={contractorUnreadNotificationCount}
@@ -21343,6 +21411,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {contractorJobsView === 'new_financial' && (
                 <Card title="New estimate or invoice" icon={<Receipt size={18} />}>
                   <div className="space-y-4">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
+                        <h3 className="mt-1 text-lg font-bold text-slate-950">Estimate / Invoice Workspace</h3>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">Create or edit a customer-facing financial record without the Jobs overview cards above it.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEstimateComposerOpen(false);
+                          setEditingEstimateId(null);
+                          setInvoiceComposerOpen(false);
+                          setEditingInvoiceId(null);
+                          setContractorJobsView('overview');
+                        }}
+                        className={buttonClass('secondary')}
+                      >
+                        Back to Jobs Overview
+                      </button>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
                       <Field label="Customer">
                         <select
@@ -21748,18 +21836,50 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                         </div>
 
-                        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1.2fr] md:items-end">
-                          <Field label="Tax">
-                            <input className={inputClass()} value={invoiceDraft.tax} onChange={event => setInvoiceDraft(d => ({ ...d, tax: event.target.value }))} placeholder="$0.00" />
+                        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1.2fr] md:items-end">
+                          <Field label="Discount type">
+                            <select
+                              className={inputClass()}
+                              value={invoiceDraft.discount_type}
+                              onChange={event => setInvoiceDraft(d => ({ ...d, discount_type: event.target.value as InvoiceDraftForm['discount_type'], discount: '' }))}
+                            >
+                              <option value="amount">Dollar amount</option>
+                              <option value="percentage">Percentage</option>
+                            </select>
                           </Field>
-                          <Field label="Discount">
-                            <input className={inputClass()} value={invoiceDraft.discount} onChange={event => setInvoiceDraft(d => ({ ...d, discount: event.target.value }))} placeholder="$0.00" />
+                          <Field label={invoiceDraft.discount_type === 'percentage' ? 'Discount percentage' : 'Discount amount'}>
+                            <input
+                              className={inputClass()}
+                              value={invoiceDraft.discount}
+                              onChange={event => setInvoiceDraft(d => ({ ...d, discount: event.target.value }))}
+                              placeholder={invoiceDraft.discount_type === 'percentage' ? '10%' : '$0.00'}
+                            />
+                          </Field>
+                          <Field label="Tax rate">
+                            <input className={inputClass()} value={invoiceDraft.tax} onChange={event => setInvoiceDraft(d => ({ ...d, tax: event.target.value }))} placeholder="8.25%" />
                           </Field>
                           <div className="rounded-xl border border-slate-200 bg-white p-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
                             <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
                             <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items ?? []))}</p>
+                            {invoiceDiscountCents(invoiceDraft) > 0 && (
+                              <p className="mt-1 text-xs text-slate-500">Discount {formatMoney(invoiceDiscountCents(invoiceDraft))}</p>
+                            )}
+                            <p className="mt-1 text-xs text-slate-500">Taxable amount {formatMoney(invoiceTaxableCents(invoiceDraft))}</p>
+                            <p className="mt-1 text-xs text-slate-500">Tax {formatMoney(invoiceTaxCents(invoiceDraft))}</p>
                           </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <Field label="Discount reason / description">
+                            <input
+                              className={inputClass()}
+                              {...writingAssistProps}
+                              value={invoiceDraft.discount_reason}
+                              onChange={event => setInvoiceDraft(d => ({ ...d, discount_reason: event.target.value }))}
+                              placeholder="Optional, e.g. courtesy discount, warranty adjustment, repeat customer..."
+                            />
+                          </Field>
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -21777,6 +21897,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 setInvoiceComposerOpen(false);
                                 setEditingInvoiceId(null);
                                 setInvoiceDraft(createBlankInvoiceDraft());
+                                const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
+                                if (linkedJob) {
+                                  openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) ? 'inspect' : undefined });
+                                } else {
+                                  setInspectionView('list');
+                                  setContractorJobsView('open_financial');
+                                  setContractorTab('inspections');
+                                }
                               }
                             }}
                             disabled={savingInvoice || updatingInvoiceId === editingInvoiceId}

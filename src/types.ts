@@ -125,7 +125,11 @@ export interface Invoice {
   status: InvoiceStatus;
   subtotal_cents: number;
   tax_cents: number;
+  tax_rate_percent?: number;
   discount_cents: number;
+  discount_type?: 'amount' | 'percentage';
+  discount_value?: number;
+  discount_reason?: string;
   total_cents: number;
   amount_paid_cents: number;
   issued_at: string | null;
@@ -149,7 +153,11 @@ export interface InvoiceDraft {
   issued_at: string;
   due_at: string;
   tax_cents: number;
+  tax_rate_percent?: number;
   discount_cents: number;
+  discount_type?: 'amount' | 'percentage';
+  discount_value?: number;
+  discount_reason?: string;
   line_items: Array<{
     line_type: EstimateLineType;
     description: string;
