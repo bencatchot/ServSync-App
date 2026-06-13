@@ -920,6 +920,21 @@ function jobTypeLabel(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' 
   return labels[(job.job_type || 'service_visit').trim()] ?? 'Service job';
 }
 
+function jobTypeHelperCopy(job: Pick<Inspection, 'job_type' | 'template_id' | 'name' | 'summary' | 'rooms_with_findings'>) {
+  if (isChecklistJob(job)) {
+    return job.job_type === 'maintenance_visit'
+      ? 'Record completed maintenance tasks and future recommendations.'
+      : 'Use checklist items and notes to document conditions.';
+  }
+  const helpers: Record<string, string> = {
+    service_visit: 'Track the issue, diagnosis, work performed, and recommendations.',
+    repair: 'Document the problem, repair performed, parts used, and follow-up needs.',
+    install: 'Track install notes, photos, and completion details.',
+    estimate_visit: 'Capture site notes and scope details for an estimate.',
+  };
+  return helpers[(job.job_type || 'service_visit').trim()] ?? helpers.service_visit;
+}
+
 const OPEN_JOB_STATUSES: JobLifecycleStatus[] = ['draft', 'scheduled', 'in_progress'];
 const CLOSED_JOB_STATUSES: JobLifecycleStatus[] = ['completed', 'closed', 'cancelled'];
 
@@ -23092,6 +23107,102 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               { id: 'inspect', title: 'Work Notes', helper: 'Record findings, photos, repairs', count: `${issueCountFin + fixedCountFin} updates` },
               { id: 'report', title: 'Report', helper: 'Review, download, and file PDF', count: activeInspection.status === 'finalized' ? 'Filed' : 'Draft' },
             ];
+            const linkedEstimateForJob = activeInspection.estimate_id
+              ? estimates.find(estimate => estimate.id === activeInspection.estimate_id) ?? null
+              : null;
+            const linkedInvoiceForJob = invoices.find(invoice =>
+              invoice.status !== 'void'
+              && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
+            ) ?? null;
+            const linkedServiceRequestForJob = activeInspection.service_request_id
+              ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
+              : null;
+            const linkedVisitEventForJob = contractorVisitEvents.find(event =>
+              event.inspection_id === activeInspection.id && event.status !== 'cancelled'
+            ) ?? null;
+            const linkedCalendarEventJobLinkForJob = calendarEventJobLinks.find(link => link.inspection_id === activeInspection.id) ?? null;
+            const linkedStandaloneCalendarEventForJob = linkedCalendarEventJobLinkForJob
+              ? contractorCalendarEvents.find(event => event.id === linkedCalendarEventJobLinkForJob.calendar_event_id) ?? null
+              : null;
+            const linkedCalendarOccurrenceForJob = linkedCalendarEventJobLinkForJob?.occurrence_starts_at ?? linkedStandaloneCalendarEventForJob?.starts_at ?? null;
+            const scheduledAtForJob = linkedVisitEventForJob?.scheduled_at ?? linkedCalendarOccurrenceForJob ?? null;
+            const linkedCalendarLabelForJob = linkedStandaloneCalendarEventForJob?.title
+              ?? (linkedVisitEventForJob ? 'Job calendar event' : 'No linked calendar event');
+            const openLinkedEstimateRecord = (estimate: Estimate) => {
+              const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
+              const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+              setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+              setContractorTab('inspections');
+              setInspectionView('list');
+              setHomeownerWorkspaceEstimateView(estimate.status === 'draft' ? 'draft' : 'sent');
+              setInvoiceComposerOpen(false);
+              if (estimate.status === 'draft') {
+                setEditingEstimateId(estimate.id);
+                setEstimateDraft(estimateDraftFromEstimate(estimate));
+                setEstimateComposerOpen(true);
+                setContractorJobsView('new_financial');
+                return;
+              }
+              setEditingEstimateId(null);
+              setEstimateComposerOpen(false);
+              setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+            };
+            const openLinkedCalendarForJob = () => {
+              if (linkedStandaloneCalendarEventForJob) {
+                openCalendarEventDetail(linkedStandaloneCalendarEventForJob, linkedCalendarOccurrenceForJob ?? linkedStandaloneCalendarEventForJob.starts_at);
+                return;
+              }
+              if (linkedVisitEventForJob) {
+                openVisitCalendarEventDetail(linkedVisitEventForJob);
+              }
+            };
+            const renderJobCardHeader = (nextActions: ReactNode) => (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Job Card</p>
+                      <h2 className="mt-1 truncate text-2xl font-bold text-slate-950">{activeInspection.name}</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">{jobTypeHelperCopy(activeInspection)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
+                        {inspectionJobStatusLabel(activeInspection)}
+                      </span>
+                      {linkedEstimateForJob && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Estimate linked</span>}
+                      {linkedInvoiceForJob && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Invoice linked</span>}
+                      {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">Calendar linked</span>}
+                      {urgentCountFin > 0 && <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"><AlertTriangle size={10}/>{urgentCountFin} urgent</span>}
+                      {issueCountFin > 0 && urgentCountFin === 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">{issueCountFin} open</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-4 sm:p-5">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <InfoBox label="Customer" value={homeownerLabel || 'Not provided'} />
+                    <InfoBox label="Home / address" value={homeAddress || 'Not provided'} />
+                    <InfoBox label="Schedule" value={scheduledAtForJob ? formatDateTime(scheduledAtForJob) : 'Not scheduled'} />
+                    <InfoBox label="Linked calendar event" value={linkedCalendarLabelForJob} />
+                  </div>
+
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">Next action</p>
+                        <p className="mt-1 text-xs leading-5 text-blue-900">
+                          Keep the job moving from notes to completion, billing, or the linked calendar event.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {nextActions}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
             const goToReportReview = () => {
               if (activeInspection.status === 'draft') {
                 setInspectionSummary(prev => prev.trim() ? prev : buildInspectionSummaryText(workingRooms));
@@ -23104,16 +23215,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             if (isSimpleServiceJob(activeInspection)) {
               const approvedScopeRooms = workingRooms.filter(room => roomIsApprovedScope(room.room));
               const approvedWorkItems = approvedScopeRooms.flatMap(room => room.findings);
-              const linkedEstimate = activeInspection.estimate_id
-                ? estimates.find(estimate => estimate.id === activeInspection.estimate_id) ?? null
-                : null;
-              const linkedInvoice = invoices.find(invoice =>
-                invoice.status !== 'void'
-                && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
-              ) ?? null;
-              const linkedServiceRequest = activeInspection.service_request_id
-                ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
-                : null;
+              const linkedEstimate = linkedEstimateForJob;
+              const linkedInvoice = linkedInvoiceForJob;
+              const linkedServiceRequest = linkedServiceRequestForJob;
               const completed = inspectionIsClosedJob(activeInspection);
               const photoCount = workingFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
               const simpleJobReadonly = activeInspection.status !== 'draft' || completed;
@@ -23243,19 +23347,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     ← Back to Jobs
                   </button>
 
+                  {renderJobCardHeader(
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('simple-job-work-notes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        className={buttonClass('secondary')}
+                      >
+                        <MessageSquare size={15} />
+                        Add Work Note
+                      </button>
+                      {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && (
+                        <button type="button" onClick={openLinkedCalendarForJob} className={buttonClass('secondary')}>
+                          <Calendar size={15} />
+                          Open Calendar Event
+                        </button>
+                      )}
+                      {linkedEstimate && (
+                        <button type="button" onClick={() => openLinkedEstimateRecord(linkedEstimate)} className={buttonClass('secondary')}>
+                          <FileText size={15} />
+                          Open Estimate
+                        </button>
+                      )}
+                      {linkedInvoice && (
+                        <button type="button" onClick={() => openInvoiceRecord(linkedInvoice)} className={buttonClass(linkedInvoice.status === 'draft' ? 'secondary' : 'primary')}>
+                          <Receipt size={15} />
+                          {linkedInvoice.status === 'draft' ? 'Edit Invoice' : 'Open Invoice'}
+                        </button>
+                      )}
+                      {!linkedInvoice && completed && (
+                        <button
+                          type="button"
+                          disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                          onClick={() => void createInvoiceFromJob(activeInspection)}
+                          className={buttonClass('primary')}
+                        >
+                          <Receipt size={15} />
+                          {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
+                        </button>
+                      )}
+                      {inspectionIsOpenJob(activeInspection) && (
+                        <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
+                          <CheckCircle2 size={15} />
+                          Complete Job
+                        </button>
+                      )}
+                    </>
+                  )}
+
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
-                            {inspectionJobStatusLabel(activeInspection)}
-                          </span>
-                          {linkedEstimate && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">Estimate linked</span>}
-                          {linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
-                        </div>
-                        <h2 className="mt-2 truncate text-xl font-bold text-slate-950">{activeInspection.name}</h2>
-                        <p className="mt-1 text-sm text-slate-500">{homeownerLabel}{homeAddress ? ` · ${homeAddress}` : ''}</p>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
+                        <p className="mt-1 text-xs text-slate-500">Save changes, complete the job, or remove a draft job.</p>
                       </div>
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} className={buttonClass('secondary')}>
@@ -23293,7 +23437,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                   <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
                     <div className="space-y-4">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
@@ -23524,20 +23668,55 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   ← Back to Jobs
                 </button>
 
+                {renderJobCardHeader(
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setInspectionSubTab('inspect')}
+                      className={buttonClass('secondary')}
+                    >
+                      <MessageSquare size={15} />
+                      Add Work Note
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInspectionSubTab('inspect')}
+                      className={buttonClass('secondary')}
+                    >
+                      <Sparkles size={15} />
+                      Open Job Assistant
+                    </button>
+                    {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && (
+                      <button type="button" onClick={openLinkedCalendarForJob} className={buttonClass('secondary')}>
+                        <Calendar size={15} />
+                        Open Calendar Event
+                      </button>
+                    )}
+                    {linkedEstimateForJob && (
+                      <button type="button" onClick={() => openLinkedEstimateRecord(linkedEstimateForJob)} className={buttonClass('secondary')}>
+                        <FileText size={15} />
+                        Open Estimate
+                      </button>
+                    )}
+                    {linkedInvoiceForJob && (
+                      <button type="button" onClick={() => openInvoiceRecord(linkedInvoiceForJob)} className={buttonClass(linkedInvoiceForJob.status === 'draft' ? 'secondary' : 'primary')}>
+                        <Receipt size={15} />
+                        {linkedInvoiceForJob.status === 'draft' ? 'Edit Invoice' : 'Open Invoice'}
+                      </button>
+                    )}
+                    <button type="button" onClick={goToReportReview} className={buttonClass('primary')}>
+                      <FileText size={15} />
+                      Review Report
+                    </button>
+                  </>
+                )}
+
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="font-bold text-slate-950 text-xl truncate">{activeInspection.name}</h2>
-                        <p className="mt-1 text-sm text-slate-500">{homeownerLabel}{homeAddress ? ` · ${homeAddress}` : ''}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
-                            {inspectionJobStatusLabel(activeInspection)}
-                          </span>
-                          {urgentCountFin > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 flex items-center gap-1"><AlertTriangle size={10}/>{urgentCountFin} urgent</span>}
-                          {issueCountFin > 0 && urgentCountFin === 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCountFin} open</span>}
-                          {fixedCountFin > 0 && <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-700">{fixedCountFin} fixed</span>}
-                        </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-950">Job sections</h3>
+                        <p className="mt-1 text-xs text-slate-500">Move between the checklist, notes, assistant, and report review.</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 justify-end">
                         <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft'} className="text-xs font-medium border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40">
