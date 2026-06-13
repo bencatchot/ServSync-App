@@ -5980,6 +5980,28 @@ function LandingPage() {
     'Work moves through scheduling, jobs, reports, invoices, and communication.',
     'The contractor relationship and home service history stay connected for future work.',
   ];
+  const practicalToolCards = [
+    {
+      title: 'Estimate and invoice tools',
+      body: 'Create reusable estimate templates, prepare customer-facing estimates, and generate invoices from organized work records.',
+      icon: <Receipt size={18} />,
+    },
+    {
+      title: 'Inspection and job workflows',
+      body: 'Use inspection templates, guided inspection workflows, reports, and job status tracking to keep service work documented.',
+      icon: <ClipboardList size={18} />,
+    },
+    {
+      title: 'Calendar and follow-up',
+      body: 'Schedule visits, manage standalone and recurring calendar events, and keep follow-up tied to customer records.',
+      icon: <Calendar size={18} />,
+    },
+    {
+      title: 'Customer and home history',
+      body: 'Keep service requests, jobs, invoices, reports, documents, and home records connected over time.',
+      icon: <Home size={18} />,
+    },
+  ];
   const featureCards: Array<{
     id: string;
     icon: React.ReactNode;
@@ -6017,6 +6039,11 @@ function LandingPage() {
             A ServSync connection is more than a lead or a one-time message. It links your contractor profile with a homeowner profile
             so requests, communication, estimates, jobs, invoices, permissions, and customer history can stay organized through one
             working relationship.
+          </p>
+          <p>
+            ServSync includes practical tools for common service workflows, including estimate templates, inspection templates, job tracking,
+            invoice templates, invoice generation, scheduling, customer records, and home service history. These tools are designed to help
+            small contractors keep work organized without adding enterprise-level complexity.
           </p>
           <p>
             The goal is to help small contractors build repeat customer relationships instead of treating every request like a disconnected
@@ -6136,9 +6163,34 @@ function LandingPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Built for small teams</p>
           <h2 className="mt-2 text-2xl font-bold text-slate-950">Practical tools without enterprise complexity</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            ServSync is designed for solo and small-team service contractors who need a professional way to manage requests,
-            estimates, scheduling, invoices, customer records, and repeat work without overcomplicated software.
+            ServSync is designed for solo and small-team service contractors who need practical tools for requests, estimate templates,
+            inspection templates, scheduling, invoices, customer records, and repeat work without overcomplicated software.
           </p>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Contractor workflow tools</p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">Practical tools for common service work</h2>
+          </div>
+          <p className="max-w-2xl text-sm leading-6 text-slate-600">
+            ServSync gives small contractors a structured place to manage estimates, inspections, jobs, invoices, scheduling,
+            customer records, and home service history. Templates and guided workflows help keep repeat work organized while the
+            platform continues to improve through beta feedback.
+          </p>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {practicalToolCards.map(card => (
+            <div key={card.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                {card.icon}
+              </div>
+              <p className="mt-3 font-bold text-slate-950">{card.title}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{card.body}</p>
+            </div>
+          ))}
         </div>
       </section>
 
