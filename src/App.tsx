@@ -14005,6 +14005,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('inspections');
   };
 
+  const closeActiveInvoiceEditor = () => {
+    const linkedJob = invoiceDraft.job_id ? inspections.find(item => item.id === invoiceDraft.job_id) ?? null : null;
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setInvoiceDraft(createBlankInvoiceDraft());
+    if (linkedJob) {
+      openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
+      return;
+    }
+    setInspectionView('list');
+    setContractorJobsView('open_financial');
+    setContractorTab('inspections');
+  };
+
   const saveEstimateDraft = async (subject: {
     homeownerUserId?: string | null;
     localContactId?: string | null;
@@ -21417,66 +21431,70 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               )}
 
               {contractorJobsView === 'new_financial' && (
-                <Card title="New estimate or invoice" icon={<Receipt size={18} />}>
+                <Card title={invoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : 'New estimate or invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
-                        <h3 className="mt-1 text-lg font-bold text-slate-950">Estimate / Invoice Workspace</h3>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">Create or edit a customer-facing financial record without the Jobs overview cards above it.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEstimateComposerOpen(false);
-                          setEditingEstimateId(null);
-                          setInvoiceComposerOpen(false);
-                          setEditingInvoiceId(null);
-                          setContractorJobsView('overview');
-                        }}
-                        className={buttonClass('secondary')}
-                      >
-                        Back to Jobs Overview
-                      </button>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
-                      <Field label="Customer">
-                        <select
-                          className={inputClass()}
-                          value={jobsCustomerFilterSubjectId ?? ''}
-                          onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
-                        >
-                          <option value="">Choose customer...</option>
-                          {connections.filter(c => c.status === 'active').map(c => (
-                            <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
-                          ))}
-                          {localContacts.map(contact => (
-                            <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <button
-                        type="button"
-                        disabled={!selectedJobsCustomerName}
-                        onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                        className={buttonClass('primary')}
-                      >
-                        <Plus size={15} />
-                        Create estimate
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!selectedJobsCustomerName}
-                        onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                        className={buttonClass('secondary')}
-                      >
-                        <Receipt size={15} />
-                        Create invoice
-                      </button>
-                    </div>
+                    {!invoiceComposerOpen && (
+                      <>
+                        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
+                            <h3 className="mt-1 text-lg font-bold text-slate-950">Estimate / Invoice Workspace</h3>
+                            <p className="mt-1 text-sm leading-6 text-slate-500">Create or edit a customer-facing financial record without the Jobs overview cards above it.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEstimateComposerOpen(false);
+                              setEditingEstimateId(null);
+                              setInvoiceComposerOpen(false);
+                              setEditingInvoiceId(null);
+                              setContractorJobsView('overview');
+                            }}
+                            className={buttonClass('secondary')}
+                          >
+                            Back to Jobs Overview
+                          </button>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+                          <Field label="Customer">
+                            <select
+                              className={inputClass()}
+                              value={jobsCustomerFilterSubjectId ?? ''}
+                              onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
+                            >
+                              <option value="">Choose customer...</option>
+                              {connections.filter(c => c.status === 'active').map(c => (
+                                <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                              ))}
+                              {localContacts.map(contact => (
+                                <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                              ))}
+                            </select>
+                          </Field>
+                          <button
+                            type="button"
+                            disabled={!selectedJobsCustomerName}
+                            onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                            className={buttonClass('primary')}
+                          >
+                            <Plus size={15} />
+                            Create estimate
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selectedJobsCustomerName}
+                            onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                            className={buttonClass('secondary')}
+                          >
+                            <Receipt size={15} />
+                            Create invoice
+                          </button>
+                        </div>
 
-                    {!selectedJobsCustomerName && (
-                      <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
+                        {!selectedJobsCustomerName && (
+                          <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
+                        )}
+                      </>
                     )}
 
                     {estimateComposerOpen && selectedJobsCustomerName && (
@@ -21714,7 +21732,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <p className="mt-0.5 text-xs text-slate-600">{selectedJobsCustomerAddress}</p>
                             )}
                           </div>
-                          <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                          <button type="button" onClick={closeActiveInvoiceEditor} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
                             Cancel
                           </button>
                         </div>
@@ -21934,9 +21952,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               if (existingInvoice) {
                                 await voidInvoice(existingInvoice);
                               }
-                              setInvoiceComposerOpen(false);
-                              setEditingInvoiceId(null);
-                              setInvoiceDraft(createBlankInvoiceDraft());
+                              closeActiveInvoiceEditor();
                             }}
                             disabled={savingInvoice || updatingInvoiceId === editingInvoiceId}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
@@ -21944,7 +21960,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <Trash2 size={15} />
                             Delete
                           </button>
-                          <button type="button" onClick={() => { setInvoiceComposerOpen(false); setEditingInvoiceId(null); }} disabled={savingInvoice} className={buttonClass('secondary')}>
+                          <button type="button" onClick={closeActiveInvoiceEditor} disabled={savingInvoice} className={buttonClass('secondary')}>
                             Cancel
                           </button>
                         </div>
