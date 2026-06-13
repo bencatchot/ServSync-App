@@ -5974,7 +5974,7 @@ function PublicReviewCard({ review }: { review: PublicReview }) {
 function LandingPage() {
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
   const steps = [
-    'Homeowner finds or connects with a contractor.',
+    'Homeowner finds a contractor and creates a ServSync connection.',
     'Homeowner sends a service request and shares the right available details.',
     'Contractor reviews the request, responds, and sends an estimate or next step.',
     'Work moves through scheduling, jobs, reports, invoices, and communication.',
@@ -5995,15 +5995,13 @@ function LandingPage() {
       details: (
         <>
           <p>
-            Homeowners can use ServSync to organize home service records and work with contractors in a more structured way.
+            A ServSync connection is more than contacting a contractor. It links your homeowner profile with a contractor profile
+            so service requests, communication, estimates, invoices, sharing permissions, and home service history can stay organized
+            through that relationship.
           </p>
           <p>
-            A connection means the homeowner chooses when to connect with a contractor, what available information is shared,
-            and how future service requests are handled through that relationship.
-          </p>
-          <p>
-            Instead of starting over every time something needs attention, homeowners can keep requests, estimates, invoices,
-            communication, and service history connected to the home.
+            That means future service does not have to start from scratch. The contractor relationship and related home records can carry
+            forward over time.
           </p>
         </>
       ),
@@ -6016,14 +6014,13 @@ function LandingPage() {
       details: (
         <>
           <p>
-            ServSync helps small contractors manage the homeowner relationship, not just the individual job.
+            A ServSync connection is more than a lead or a one-time message. It links your contractor profile with a homeowner profile
+            so requests, communication, estimates, jobs, invoices, permissions, and customer history can stay organized through one
+            working relationship.
           </p>
           <p>
-            A contractor connection gives homeowners a more organized path to request service and gives the contractor a cleaner
-            way to manage follow-up, estimates, jobs, invoices, and customer history.
-          </p>
-          <p>
-            The goal is to help small contractors look professional, stay organized, and build repeat work without enterprise-level complexity.
+            The goal is to help small contractors build repeat customer relationships instead of treating every request like a disconnected
+            one-time job.
           </p>
         </>
       ),
@@ -6040,14 +6037,14 @@ function LandingPage() {
           </p>
           <p>
             Instead of sorting through search results, comment threads, and scattered recommendations, homeowners can use ServSync
-            to find local contractors, review helpful context, choose when to connect, and send a clearer service request.
+            to find local contractors, review helpful context, and choose when to create a connection.
           </p>
           <p>
-            For contractors, Discover creates a way to be found by local homeowners and turn interest into organized requests,
-            estimates, jobs, invoices, and ongoing customer relationships.
+            Once connected, the relationship can support clearer service requests, communication, estimates, jobs, invoices, sharing
+            permissions, and ongoing home service history.
           </p>
           <p>
-            ServSync is not a contractor verification service or guaranteed lead platform. The goal is to make discovery and follow-up
+            ServSync should not be presented as a contractor verification service or guaranteed lead platform. The goal is to make discovery and follow-up
             more organized and transparent.
           </p>
         </>
