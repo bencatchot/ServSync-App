@@ -12706,6 +12706,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
   const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
+  const [jobsListDateFilter, setJobsListDateFilter] = useState('');
+  const [jobsListStatusFilter, setJobsListStatusFilter] = useState<JobLifecycleStatus | 'all'>('all');
+  const [jobsListTypeFilter, setJobsListTypeFilter] = useState('all');
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
   const [estimateComposerOpen, setEstimateComposerOpen] = useState(false);
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
@@ -21206,6 +21209,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
+              {contractorJobsView === 'overview' && (
               <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
@@ -21322,22 +21326,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         setInspectionView('list');
                         setShowTemplateLibrary(true);
                       }}
-                      className={`w-full rounded-xl border p-3 text-left transition ${
-                        contractorJobsView === 'templates'
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                      }`}
+                      className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`rounded-lg p-1.5 ${contractorJobsView === 'templates' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}><ClipboardList size={15} /></span>
+                        <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
 	                        <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
 	                      </div>
-	                      <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-600'}`}>Templates</p>
-	                      <p className={`mt-1 break-words text-xs leading-5 ${contractorJobsView === 'templates' ? 'text-blue-50' : 'text-slate-500'}`}>Workflow and estimate starters</p>
+	                      <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Templates</p>
+	                      <p className="mt-1 break-words text-xs leading-5 text-slate-500">Workflow and estimate starters</p>
                     </button>
                   </div>
                 </div>
               </section>
+              )}
 
               {contractorJobsView === 'new_financial' && (
                 <Card title="New estimate or invoice" icon={<Receipt size={18} />}>
@@ -21826,11 +21827,46 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const invoiceRecordsForView = contractorJobsView === 'open_financial'
                       ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
                       : (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
-                    if (records.length === 0 && invoiceRecordsForView.length === 0) {
-                      return <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />;
-                    }
+                    const listTitle = contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed Estimates / Invoices';
+                    const listDescription = contractorJobsView === 'open_financial'
+                      ? 'Estimate drafts, sent estimates, draft invoices, and unpaid invoices.'
+                      : 'Closed estimates and billed invoice records.';
                     return (
-                      <div className="space-y-2">
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused list</p>
+                              <h3 className="mt-1 text-lg font-bold text-slate-950">{listTitle}</h3>
+                              <p className="mt-1 text-sm leading-6 text-slate-500">{listDescription}</p>
+                            </div>
+                            <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
+                              Back to Jobs Overview
+                            </button>
+                          </div>
+                          <div className="mt-4 max-w-sm">
+                            <Field label="Customer">
+                              <select
+                                className={inputClass()}
+                                value={jobsCustomerFilterSubjectId ?? ''}
+                                onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
+                              >
+                                <option value="">All customers</option>
+                                {connections.filter(c => c.status === 'active').map(c => (
+                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                                ))}
+                                {localContacts.map(contact => (
+                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                                ))}
+                              </select>
+                            </Field>
+                          </div>
+                        </div>
+
+                        {records.length === 0 && invoiceRecordsForView.length === 0 ? (
+                          <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />
+                        ) : (
+                        <div className="space-y-2">
                         {invoiceRecordsForView.length > 0 && (
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div className="mb-2 flex items-center justify-between gap-3">
@@ -22057,6 +22093,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           );
                         })}
+                        </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -22066,15 +22104,126 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (
                 <Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'} icon={<ClipboardCheck size={18} />}>
                   {(() => {
-                    const records = contractorJobsView === 'open_jobs'
+                    const baseRecords = contractorJobsView === 'open_jobs'
                       ? (jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer : openJobs)
-                      : (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.slice(0, 10) : closedJobs.slice(0, 10));
-                    if (records.length === 0) {
-                      return <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} />;
-                    }
+                      : (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer : closedJobs);
+                    const filteredRecords = baseRecords.filter(insp => {
+                      const updatedDate = insp.updated_at ? new Date(insp.updated_at).toISOString().slice(0, 10) : '';
+                      const statusMatches = jobsListStatusFilter === 'all' || inspectionJobStatus(insp) === jobsListStatusFilter;
+                      const typeMatches = jobsListTypeFilter === 'all' || (insp.job_type || 'service_visit') === jobsListTypeFilter;
+                      const dateMatches = !jobsListDateFilter || updatedDate === jobsListDateFilter;
+                      return statusMatches && typeMatches && dateMatches;
+                    });
+                    const records = contractorJobsView === 'closed_jobs' ? filteredRecords.slice(0, 10) : filteredRecords;
+                    const listTitle = contractorJobsView === 'open_jobs' ? 'Open Jobs' : 'Closed Jobs';
+                    const listDescription = contractorJobsView === 'open_jobs'
+                      ? 'Draft, scheduled, and in-progress jobs that still need work.'
+                      : 'Completed, closed, and cancelled jobs.';
+                    const jobTypeFilterOptions = [
+                      { value: 'all', label: 'All job types' },
+                      { value: 'service_visit', label: 'Service job' },
+                      { value: 'repair', label: 'Repair job' },
+                      { value: 'install', label: 'Install job' },
+                      { value: 'estimate_visit', label: 'Estimate visit' },
+                      { value: 'inspection', label: 'Inspection / checklist job' },
+                      { value: 'maintenance_visit', label: 'Maintenance / checklist job' },
+                    ];
+                    const jobStatusFilterOptions = [
+                      { value: 'all', label: 'All statuses' },
+                      ...(contractorJobsView === 'open_jobs' ? OPEN_JOB_STATUSES : CLOSED_JOB_STATUSES).map(status => ({
+                        value: status,
+                        label: inspectionJobStatusLabel({ status: status === 'completed' ? 'finalized' : 'draft', job_status: status }),
+                      })),
+                    ];
+                    const clearJobFilters = () => {
+                      setJobsListDateFilter('');
+                      setJobsListStatusFilter('all');
+                      setJobsListTypeFilter('all');
+                    };
                     return (
-                      <div className="space-y-2">
-                        {records.map(insp => {
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused list</p>
+                              <h3 className="mt-1 text-lg font-bold text-slate-950">{listTitle}</h3>
+                              <p className="mt-1 text-sm leading-6 text-slate-500">{listDescription}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                clearJobFilters();
+                                setContractorJobsView('overview');
+                              }}
+                              className={buttonClass('secondary')}
+                            >
+                              Back to Jobs Overview
+                            </button>
+                          </div>
+                          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <Field label="Customer">
+                              <select
+                                className={inputClass()}
+                                value={jobsCustomerFilterSubjectId ?? ''}
+                                onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
+                              >
+                                <option value="">All customers</option>
+                                {connections.filter(c => c.status === 'active').map(c => (
+                                  <option key={c.connection_id} value={c.connection_id}>{c.display_name || 'Homeowner'} — ServSync homeowner</option>
+                                ))}
+                                {localContacts.map(contact => (
+                                  <option key={contact.id} value={`local:${contact.id}`}>{contact.display_name || 'New customer'} — New customer</option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Updated date">
+                              <input
+                                className={inputClass()}
+                                type="date"
+                                value={jobsListDateFilter}
+                                onChange={event => setJobsListDateFilter(event.target.value)}
+                              />
+                            </Field>
+                            <Field label="Status">
+                              <select
+                                className={inputClass()}
+                                value={jobsListStatusFilter}
+                                onChange={event => setJobsListStatusFilter(event.target.value as JobLifecycleStatus | 'all')}
+                              >
+                                {jobStatusFilterOptions.map(option => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Job type">
+                              <select
+                                className={inputClass()}
+                                value={jobsListTypeFilter}
+                                onChange={event => setJobsListTypeFilter(event.target.value)}
+                              >
+                                {jobTypeFilterOptions.map(option => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </Field>
+                          </div>
+                          {(jobsListDateFilter || jobsListStatusFilter !== 'all' || jobsListTypeFilter !== 'all' || jobsCustomerFilterSubjectId) && (
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                              <p className="text-xs font-medium text-slate-500">
+                                Showing {records.length} matching job{records.length === 1 ? '' : 's'}.
+                              </p>
+                              <button type="button" onClick={clearJobFilters} className="text-xs font-semibold text-blue-700 hover:text-blue-800">
+                                Clear date/status/type filters
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {records.length === 0 ? (
+                          <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} />
+                        ) : (
+                          <div className="space-y-2">
+                            {records.map(insp => {
                           const checklistStyle = isChecklistJob(insp);
                           const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
                           const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
@@ -22144,11 +22293,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </div>
                             </div>
                           );
-                        })}
-                        {contractorJobsView === 'closed_jobs' && (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
-                          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
-                            Showing the 10 most recent closed jobs. Search and deeper filters can be added as this list grows.
-                          </p>
+                            })}
+                            {contractorJobsView === 'closed_jobs' && (jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length) > 10 && (
+                              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                                Showing the 10 most recent closed jobs. Search and deeper filters can be added as this list grows.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
@@ -23198,9 +23349,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               invoice.status !== 'void'
               && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
             ) ?? null;
-            const linkedServiceRequestForJob = activeInspection.service_request_id
-              ? serviceRequests.find(request => request.id === activeInspection.service_request_id) ?? null
-              : null;
             const linkedVisitEventForJob = contractorVisitEvents.find(event =>
               event.inspection_id === activeInspection.id && event.status !== 'cancelled'
             ) ?? null;
@@ -23248,10 +23396,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             if (isSimpleServiceJob(activeInspection)) {
               const approvedScopeRooms = workingRooms.filter(room => roomIsApprovedScope(room.room));
               const approvedWorkItems = approvedScopeRooms.flatMap(room => room.findings);
-              const linkedEstimate = linkedEstimateForJob;
-              const linkedServiceRequest = linkedServiceRequestForJob;
               const completed = inspectionIsClosedJob(activeInspection);
-              const photoCount = workingFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
               const simpleJobReadonly = activeInspection.status !== 'draft' || completed;
               const simpleWorkRooms = workingRooms.filter(room => !roomIsApprovedScope(room.room));
               const simpleTaskRows = simpleWorkRooms.flatMap(room =>
@@ -23365,6 +23510,50 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   return updated;
                 });
               };
+              const renderSimpleTaskPhotoControls = (key: string, title: string, photos: string[] = []) => {
+                const isUploading = uploadingInspectionPhotoKey === key;
+                if (simpleJobReadonly && photos.length === 0) return null;
+                return (
+                  <div className="mt-3">
+                    {!simpleJobReadonly && (
+                      <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 ${isUploading ? 'pointer-events-none opacity-50' : ''}`}>
+                        <Camera size={13} />
+                        {isUploading ? 'Uploading...' : 'Upload Pictures'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={isUploading}
+                          onChange={event => {
+                            const file = event.target.files?.[0];
+                            if (file) void handleInspectionPhotoUpload(key, file);
+                            event.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                    {photos.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {photos.map((url, photoIndex) => (
+                          <div key={`${url}-${photoIndex}`} className="group relative overflow-hidden rounded-lg">
+                            <InspectionPhotoImage photo={url} alt={`${title} photo`} className="h-20 w-full object-cover" />
+                            {!simpleJobReadonly && (
+                              <button
+                                type="button"
+                                onClick={() => void removeInspectionPhoto(key, url)}
+                                className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                aria-label={`Remove photo from ${title}`}
+                              >
+                                <X size={10} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
               return (
                 <div className="space-y-4">
                   <button
@@ -23382,20 +23571,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   {renderJobCardHeader()}
 
                   <div className="space-y-4">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
-                            <p className="mt-1 text-xs text-slate-500">Service jobs track the work without forcing an inspection checklist.</p>
-                          </div>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <InfoBox label="Photos attached" value={String(photoCount)} />
-                          {linkedServiceRequest && <InfoBox label="Linked request" value={linkedServiceRequest.title || linkedServiceRequest.category || 'Service request'} />}
-                          {linkedEstimate && <InfoBox label="Linked estimate" value={linkedEstimate.title || 'Accepted estimate'} />}
-                        </div>
-                      </div>
-
                       <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -23412,6 +23587,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Approved work</p>
                             {approvedScopeRooms.flatMap(room => room.findings.map((item, index) => {
                               const taskComplete = item.status === 'Fixed On Site';
+                              const itemKey = findingStateKey(room, item.title);
                               return (
                                 <div key={`${room.room}-${item.title}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
                                   <div className="flex flex-wrap items-start gap-3">
@@ -23432,15 +23608,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       {taskComplete ? 'Complete' : 'Not complete'}
                                     </span>
                                   </div>
+                                  {renderSimpleTaskPhotoControls(itemKey, item.title, item.photos ?? [])}
                                   {item.notes && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{item.notes}</p>}
                                   {item.action && <p className="mt-2 text-sm font-medium text-blue-700">{item.action}</p>}
-                                  {(item.photos ?? []).length > 0 && (
-                                    <div className="mt-3 grid grid-cols-4 gap-2">
-                                      {(item.photos ?? []).map((url, pi) => (
-                                        <InspectionPhotoImage key={pi} photo={url} alt={item.title} className="h-20 w-full rounded-lg object-cover" />
-                                      ))}
-                                    </div>
-                                  )}
                                 </div>
                               );
                             }))}
@@ -23496,6 +23666,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         Remove
                                       </button>
                                     </div>
+                                    {renderSimpleTaskPhotoControls(row.key, row.finding.title, row.finding.photos ?? [])}
                                     <label className="mt-3 block text-xs font-semibold text-slate-500">Notes</label>
                                     <textarea
                                       className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
