@@ -113,6 +113,7 @@ import type {
   HomeProfile,
   HomeownerConnection,
   HomeownerProfile,
+  InvitePreview,
   LocalCustomerClaimInvite,
   LocalCustomerClaimInviteStatus,
   PlatformOverview,
@@ -5617,6 +5618,7 @@ export default function App() {
   const [authMessage, setAuthMessage] = useState('');
   const [passwordRecoveryActive, setPasswordRecoveryActive] = useState(false);
   const claimToken = route === 'homeowner' ? query.get('claim') || '' : '';
+  const contractorInviteCode = route === 'homeowner' ? query.get('invite') || '' : '';
   const passwordResetRouteRequested = query.get('mode') === 'reset-password';
 
   useEffect(() => {
@@ -5683,6 +5685,13 @@ export default function App() {
     updateRoute('home');
   };
 
+  const refreshAuthState = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.auth.getSession();
+    setSession(data.session);
+    await loadProfile(data.session);
+  };
+
   if (!supabaseConfigured) {
     return (
       <PublicShell route={route} profile={profile} onSignOut={signOut}>
@@ -5736,6 +5745,14 @@ export default function App() {
             onAuthed={() => void loadProfile(session)}
             onClaimed={() => updateRoute('homeowner')}
           />
+        ) : contractorInviteCode ? (
+          <ContractorReferralInvitePage
+            inviteCode={contractorInviteCode}
+            session={null}
+            profile={null}
+            onAuthed={refreshAuthState}
+            onDone={() => updateRoute('homeowner')}
+          />
         ) : (
           <AuthPage
             role={route === 'admin' ? 'platform_admin' : route === 'contractor' ? 'contractor' : 'homeowner'}
@@ -5772,6 +5789,20 @@ export default function App() {
           profile={profile}
           onAuthed={() => void loadProfile(session)}
           onClaimed={() => updateRoute('homeowner')}
+        />
+      </PublicShell>
+    );
+  }
+
+  if (contractorInviteCode) {
+    return (
+      <PublicShell route={route} profile={profile} onSignOut={signOut}>
+        <ContractorReferralInvitePage
+          inviteCode={contractorInviteCode}
+          session={session}
+          profile={profile}
+          onAuthed={refreshAuthState}
+          onDone={() => updateRoute('homeowner')}
         />
       </PublicShell>
     );
@@ -6710,6 +6741,497 @@ function AuthPage({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ContractorReferralInvitePage({
+  inviteCode,
+  session,
+  profile,
+  onAuthed,
+  onDone,
+}: {
+  inviteCode: string;
+  session: Session | null;
+  profile: Profile | null;
+  onAuthed: () => void | Promise<void>;
+  onDone: () => void;
+}) {
+  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(true);
+  const [previewError, setPreviewError] = useState('');
+  const [choice, setChoice] = useState<'connect' | 'account' | null>(null);
+  const [declined, setDeclined] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState(session?.user.email || '');
+  const [password, setPassword] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
+  const [permissions, setPermissions] = useState<SharingPermissions>(EMPTY_PERMISSIONS);
+  const [acceptBusy, setAcceptBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [existingConnection, setExistingConnection] = useState<HomeownerConnection | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(false);
+
+  const contractorName = preview?.business_name || 'A contractor';
+  const contractorLocation = [preview?.city, preview?.state].filter(Boolean).join(', ');
+  const isHomeowner = profile?.role === 'homeowner';
+  const isWrongRole = Boolean(profile && profile.role !== 'homeowner');
+  const canResolveAfterSignin = Boolean(profile && isHomeowner);
+  const inviteUnavailable = Boolean(previewError && !preview);
+
+  const loadInvitePreview = useCallback(async () => {
+    if (!supabase || !inviteCode) return null;
+    setLoadingPreview(true);
+    setPreviewError('');
+    try {
+      const { data, error: lookupError } = await supabase.rpc('servsync_lookup_invite', { p_invite_code: inviteCode });
+      if (!lookupError && data) {
+        const nextPreview = data as InvitePreview;
+        setPreview(nextPreview);
+        return nextPreview;
+      }
+
+      if (profile) {
+        const { data: contractor, error: contractorError } = await supabase
+          .from('contractor_profiles')
+          .select('id,business_name,city,state')
+          .eq('permanent_invite_code', inviteCode)
+          .maybeSingle();
+        if (!contractorError && contractor) {
+          const nextPreview = {
+            invite_id: '',
+            contractor_id: contractor.id,
+            business_name: contractor.business_name || '',
+            city: contractor.city || '',
+            state: contractor.state || '',
+          };
+          setPreview(nextPreview);
+          return nextPreview;
+        }
+      }
+
+      if (profile) {
+        throw lookupError || new Error('Invite link not found or no longer active.');
+      }
+      setPreview(null);
+      setPreviewError('');
+      return null;
+    } catch (err) {
+      setPreview(null);
+      setPreviewError(readableError(err, 'This contractor invitation is no longer available.'));
+      return null;
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [inviteCode, profile]);
+
+  useEffect(() => {
+    void loadInvitePreview();
+  }, [loadInvitePreview]);
+
+  useEffect(() => {
+    setEmail(session?.user.email || '');
+  }, [session?.user.email]);
+
+  useEffect(() => {
+    if (!supabase || !profile || profile.role !== 'homeowner' || !preview?.contractor_id) {
+      setExistingConnection(null);
+      return;
+    }
+    const client = supabase;
+    let mounted = true;
+    setCheckingConnection(true);
+    const loadConnection = async () => {
+      try {
+        const { data, error: connectionError } = await client
+          .from('homeowner_contractor_connections')
+          .select(`
+            id,
+            contractor_id,
+            status,
+            source,
+            created_at,
+            updated_at,
+            contractor:contractor_profiles(business_name,contact_name,email,phone,logo_url,city,state),
+            permissions:connection_permissions(*)
+          `)
+          .eq('homeowner_user_id', profile.id)
+          .eq('contractor_id', preview.contractor_id)
+          .maybeSingle();
+        if (!mounted) return;
+        if (connectionError) throw connectionError;
+        if (!data) {
+          setExistingConnection(null);
+          return;
+        }
+        const contractor = Array.isArray(data.contractor) ? data.contractor[0] : data.contractor;
+        const permissionRows = Array.isArray(data.permissions) ? data.permissions : data.permissions ? [data.permissions] : [];
+        setExistingConnection({
+          connection_id: data.id,
+          contractor_id: data.contractor_id,
+          business_name: contractor?.business_name || contractorName,
+          contact_name: contractor?.contact_name || '',
+          email: contractor?.email || '',
+          phone: contractor?.phone || '',
+          logo_url: contractor?.logo_url || '',
+          city: contractor?.city || '',
+          state: contractor?.state || '',
+          status: data.status as ConnectionStatus,
+          source: data.source || 'contractor_invite',
+          permissions: normalizeSharingPermissions(permissionRows[0]),
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        });
+      } catch {
+        if (mounted) setExistingConnection(null);
+      } finally {
+        if (mounted) setCheckingConnection(false);
+      }
+    };
+    void loadConnection();
+    return () => { mounted = false; };
+  }, [contractorName, preview?.contractor_id, profile]);
+
+  const submitAuth = async () => {
+    if (!supabase) return;
+    setAuthBusy(true);
+    setAuthMessage('');
+    try {
+      if (mode === 'signin') {
+        const { error: signinError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signinError) throw signinError;
+        await onAuthed();
+        return;
+      }
+
+      if (!acceptedLegal) {
+        throw new Error('Please agree to the Terms of Service and Privacy Policy before creating an account.');
+      }
+
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'homeowner',
+            referral_invite_code: choice === 'account' ? inviteCode : '',
+          },
+        },
+      });
+      if (signupError) throw signupError;
+
+      if (data.session && data.user) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email,
+          full_name: fullName,
+          role: 'homeowner',
+        });
+        if (profileError) throw profileError;
+        await onAuthed();
+        if (choice === 'account') {
+          setNotice('Your ServSync account is ready. You can connect with contractors whenever you choose.');
+        }
+      } else {
+        setAuthMessage(choice === 'connect'
+          ? 'Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder, then reopen this contractor invitation link.'
+          : 'Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder.');
+      }
+    } catch (err) {
+      setAuthMessage(readableError(err, 'Unable to complete authentication.'));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const acceptInvite = async () => {
+    if (!supabase || !profile || profile.role !== 'homeowner') return;
+    setAcceptBusy(true);
+    setNotice('');
+    setError('');
+    try {
+      let activePreview = preview;
+      if (!activePreview?.contractor_id) {
+        activePreview = await loadInvitePreview();
+      }
+      if (!activePreview?.contractor_id) {
+        throw new Error('This contractor invitation could not be loaded. Ask your contractor for a new invite link.');
+      }
+
+      if (activePreview.invite_id) {
+        const { error: acceptError } = await supabase.rpc('servsync_accept_contractor_invite', {
+          p_invite_code: inviteCode,
+          p_share_contact: permissions.share_contact,
+          p_share_home_overview: permissions.share_home_overview,
+          p_share_address: permissions.share_address,
+          p_share_preferred_vendors: permissions.share_preferred_vendors,
+          p_share_photos: permissions.share_photos,
+        });
+        if (acceptError) throw acceptError;
+      } else {
+        const { data: connection, error: connectionError } = await supabase
+          .from('homeowner_contractor_connections')
+          .upsert({
+            homeowner_user_id: profile.id,
+            contractor_id: activePreview.contractor_id,
+            invite_id: null,
+            status: 'active',
+            source: 'contractor_invite',
+          }, { onConflict: 'homeowner_user_id,contractor_id' })
+          .select('id')
+          .single();
+        if (connectionError) throw connectionError;
+
+        const { error: permissionError } = await supabase
+          .from('connection_permissions')
+          .upsert({
+            connection_id: connection.id,
+            share_contact: permissions.share_contact,
+            share_home_overview: permissions.share_home_overview,
+            share_address: permissions.share_address,
+            share_preferred_vendors: permissions.share_preferred_vendors,
+            share_photos: permissions.share_photos,
+          });
+        if (permissionError) throw permissionError;
+
+        const { error: auditError } = await supabase
+          .from('connection_audit_events')
+          .insert({
+            connection_id: connection.id,
+            actor_user_id: profile.id,
+            event_type: 'connection_approved',
+            event_details: { invite_code: inviteCode, invite_type: 'permanent_qr' },
+          });
+        if (auditError) throw auditError;
+      }
+
+      setNotice(`You’re connected with ${activePreview.business_name || contractorName}. You can now send service requests and share the information you choose.`);
+      setExistingConnection({
+        connection_id: existingConnection?.connection_id || '',
+        contractor_id: activePreview.contractor_id,
+        business_name: activePreview.business_name || contractorName,
+        contact_name: '',
+        email: '',
+        phone: '',
+        logo_url: '',
+        city: activePreview.city || '',
+        state: activePreview.state || '',
+        status: 'active',
+        source: 'contractor_invite',
+        permissions,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      setError(readableError(err, 'Unable to create this contractor connection.'));
+    } finally {
+      setAcceptBusy(false);
+    }
+  };
+
+  const submitOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (!authBusy && email && password) void submitAuth();
+  };
+
+  const renderAuthPanel = () => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex rounded-xl bg-slate-100 p-1">
+        {(['signup', 'signin'] as const).map(nextMode => (
+          <button
+            key={nextMode}
+            type="button"
+            onClick={() => {
+              setMode(nextMode);
+              setAuthMessage('');
+            }}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${mode === nextMode ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            {nextMode === 'signup' ? 'Create account' : 'Sign in'}
+          </button>
+        ))}
+      </div>
+      <form
+        className="space-y-4"
+        onSubmit={event => {
+          event.preventDefault();
+          if (!authBusy && email && password) void submitAuth();
+        }}
+      >
+        {mode === 'signup' && (
+          <Field label="Full name">
+            <input className={inputClass()} value={fullName} onChange={event => setFullName(event.target.value)} onKeyDown={submitOnEnter} />
+          </Field>
+        )}
+        <Field label="Email">
+          <input className={inputClass()} type="email" value={email} onChange={event => setEmail(event.target.value)} onKeyDown={submitOnEnter} />
+        </Field>
+        <Field label="Password">
+          <input className={inputClass()} type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={submitOnEnter} />
+        </Field>
+        {mode === 'signup' && (
+          <label className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={acceptedLegal}
+              onChange={event => setAcceptedLegal(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600"
+            />
+            <span>
+              I agree to the{' '}
+              <button type="button" onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/terms`, '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
+                Terms of Service
+              </button>
+              {' '}and{' '}
+              <button type="button" onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/privacy`, '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
+                Privacy Policy
+              </button>.
+            </span>
+          </label>
+        )}
+        <button type="submit" disabled={authBusy || !email || !password || (mode === 'signup' && !acceptedLegal)} className={buttonClass('primary')}>
+          <KeyRound size={16} />
+          {authBusy ? 'Working...' : mode === 'signup' ? 'Create homeowner account' : 'Sign in'}
+        </button>
+        {authMessage && <Notice tone="info" text={authMessage} />}
+      </form>
+      <LegalLinks className="mt-4 text-slate-400" />
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <section className="rounded-3xl border border-[#1B85FB]/25 bg-[#02132D] p-6 shadow-2xl shadow-black/20">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#1B85FB]">ServSync contractor invitation</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-white">
+          {loadingPreview && canResolveAfterSignin
+            ? 'Loading your contractor invitation...'
+            : `${contractorName} is inviting you to join ServSync and connect with them.`}
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100/80">
+          Create a free homeowner account to organize service requests, estimates, invoices, home records, and future maintenance with contractors you choose.
+        </p>
+        {contractorLocation && <p className="mt-3 text-xs font-semibold text-blue-100/70">{contractorLocation}</p>}
+      </section>
+
+      {declined ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Notice tone="info" text="You declined this contractor invitation. No connection was created." />
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            You can still create a ServSync homeowner account later or ask the contractor for a new invitation.
+          </p>
+          <button type="button" onClick={() => updateRoute('home')} className={`${buttonClass('secondary')} mt-4`}>
+            Back to ServSync
+          </button>
+        </div>
+      ) : inviteUnavailable ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
+          <p className="text-lg font-bold text-red-900">This contractor invitation is no longer available.</p>
+          <p className="mt-2 text-sm leading-6 text-red-800">Ask your contractor for a new invitation link.</p>
+          {previewError && <p className="mt-3 text-xs text-red-700">{previewError}</p>}
+        </div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-sm font-bold text-slate-950">Choose how to continue</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                ServSync connections are permission-based. Nothing extra is shared unless you choose to connect and approve what this contractor can see.
+              </p>
+              <div className="mt-4 space-y-3">
+                <button type="button" onClick={() => setChoice('connect')} className={`${buttonClass(choice === 'connect' ? 'primary' : 'secondary')} w-full justify-center`}>
+                  <Users size={16} />
+                  Create Account and Connect
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChoice('account');
+                    if (isHomeowner) setNotice('Your ServSync account is ready. You can connect with contractors whenever you choose.');
+                  }}
+                  className={`${buttonClass('secondary')} w-full justify-center`}
+                >
+                  <UserRound size={16} />
+                  Create Account Without Connecting
+                </button>
+                <button type="button" onClick={() => setDeclined(true)} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                  <X size={16} />
+                  Decline Request
+                </button>
+              </div>
+              <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+                Choose what service-related information this contractor can see. You can update these permissions later.
+              </p>
+              {loadingPreview && !profile && (
+                <p className="mt-3 text-xs text-slate-500">Contractor details may appear after you sign in.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {!choice ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-lg font-bold text-slate-950">Start by choosing an option.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  You can connect with {contractorName}, create a ServSync account without connecting, or decline this request.
+                </p>
+              </div>
+            ) : isWrongRole ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                <p className="text-lg font-bold text-amber-950">Use a homeowner account for this invitation.</p>
+                <p className="mt-2 text-sm leading-6 text-amber-800">
+                  You are currently signed in as {ROLE_LABEL[profile!.role]}. Sign out and reopen this contractor invitation with a homeowner account.
+                </p>
+              </div>
+            ) : !profile ? (
+              renderAuthPanel()
+            ) : choice === 'account' ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <Notice tone="success" text="Your ServSync account is ready. You can connect with contractors whenever you choose." />
+                <button type="button" onClick={onDone} className={`${buttonClass('primary')} mt-4`}>
+                  Go to homeowner dashboard
+                </button>
+              </div>
+            ) : existingConnection?.status === 'active' ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <Notice tone="success" text={`You’re already connected with ${existingConnection.business_name || contractorName}.`} />
+                <p className="mt-3 text-sm leading-6 text-emerald-900">
+                  You can send service requests and update sharing permissions from My Contractors.
+                </p>
+                <button type="button" onClick={onDone} className={`${buttonClass('primary')} mt-4`}>
+                  Go to homeowner dashboard
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-lg font-bold text-slate-950">Choose what to share with {contractorName}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  You control what this contractor can access. You can update these permissions later.
+                </p>
+                {checkingConnection && <p className="mt-3 text-xs text-slate-500">Checking existing connection...</p>}
+                <PermissionPicker permissions={permissions} onChange={setPermissions} />
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button type="button" disabled={acceptBusy || loadingPreview || !preview?.contractor_id} onClick={() => void acceptInvite()} className={buttonClass('primary')}>
+                    {acceptBusy ? 'Connecting...' : 'Approve and connect'}
+                  </button>
+                  <button type="button" disabled={acceptBusy} onClick={() => setChoice(null)} className={buttonClass('secondary')}>
+                    Back
+                  </button>
+                </div>
+                {notice && <div className="mt-4"><Notice tone="success" text={notice} /></div>}
+                {error && <div className="mt-4"><Notice tone="error" text={error} /></div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
