@@ -202,6 +202,7 @@ const cases = [
   ['broken', ['Handyman', 'General Maintenance'], { ambiguous: true }],
   ['not working', ['Handyman', 'General Maintenance'], { ambiguous: true }],
   ['coming up', ['Decks', 'Carpentry', 'Handyman'], { ambiguous: true }],
+  ['not sure need help fixing something', ['Handyman', 'General Maintenance'], { ambiguous: true }],
 ];
 
 let failures = 0;

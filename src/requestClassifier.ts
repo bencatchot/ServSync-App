@@ -137,6 +137,15 @@ const CARPENTRY_FALLBACK_TERMS = [
   'soffit',
 ];
 
+const VAGUE_HELP_REQUEST_TERMS = [
+  'not sure',
+  'need help',
+  'help fixing',
+  'fixing something',
+  'someone to look',
+  'take a look',
+];
+
 type CategoryRule = {
   category: string;
   phrases: string[];
@@ -945,10 +954,16 @@ function applyObjectSymptomRules(input: string, rules: ObjectSymptomRule[], scor
 function applyBroadFallbackRules(input: string, scores: Map<string, ServiceCategorySuggestion>) {
   const hasBroadAction = BROAD_ACTION_TERMS.some(term => hasPhrase(input, term));
   const hasCarpentryContext = CARPENTRY_FALLBACK_TERMS.some(term => hasPhrase(input, term));
+  const hasVagueHelpRequest = VAGUE_HELP_REQUEST_TERMS.some(term => hasPhrase(input, term));
 
   if (hasBroadAction) {
     addScore(scores, 'Handyman', 7, 'broad service action', 'general home project');
     addScore(scores, 'General Maintenance', 3, 'broad service action', 'general home project');
+  }
+
+  if (hasVagueHelpRequest) {
+    addScore(scores, 'Handyman', 6, 'general homeowner help request', 'vague help request');
+    addScore(scores, 'General Maintenance', 5, 'general homeowner help request', 'vague help request');
   }
 
   if (hasCarpentryContext) {

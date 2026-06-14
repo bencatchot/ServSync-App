@@ -7292,7 +7292,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeownerRequestSearch, setHomeownerRequestSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerRequestSearch) ?? '');
   const [requestComposerOpen, setRequestComposerOpen] = useState(false);
   const [requestComposerStep, setRequestComposerStep] = useState<HomeownerRequestComposerStep>('issue');
-  const [requestContractorMode, setRequestContractorMode] = useState<'connected' | 'discover'>('connected');
+  const [requestContractorFilter, setRequestContractorFilter] = useState<'all' | 'connected'>('all');
+  const [requestContractorLocationFilter, setRequestContractorLocationFilter] = useState('');
   const [homeownerReplyDrafts, setHomeownerReplyDrafts] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
@@ -8396,7 +8397,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setRequestingConnectionId(null);
       setRequestComposerOpen(false);
       setRequestComposerStep('issue');
-      setRequestContractorMode('connected');
+      setRequestContractorFilter('all');
+      setRequestContractorLocationFilter('');
       setNotice('Service request sent.');
       await loadHomeowner();
     } catch (err) {
@@ -8710,6 +8712,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contractor = contractorProfileById.get(connection.contractor_id);
     return contractor?.service_categories?.length ? contractor.service_categories : SERVICE_REQUEST_CATEGORIES;
   };
+  const contractorMatchesRequestLocation = (contractor?: ContractorProfile | null, connection?: HomeownerConnection | null) => {
+    const query = requestContractorLocationFilter.trim().toLowerCase();
+    if (!query) return true;
+    const searchableParts = [
+      contractor?.city,
+      contractor?.state,
+      contractor?.zip_code,
+      ...(contractor?.service_zip_codes ?? []),
+      connection?.city,
+      connection?.state,
+    ];
+    return searchableParts.some(part => (part || '').toLowerCase().includes(query));
+  };
   const dashboardPropertyMatches = (record: { home_id?: string | null }) => selectedHomeId ? record.home_id === selectedHomeId : true;
   const dashboardServiceRequests = serviceRequests.filter(dashboardPropertyMatches);
   const dashboardEstimates = estimates.filter(dashboardPropertyMatches);
@@ -8944,14 +8959,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const connectionMatchesRequestCategory = (connection: HomeownerConnection, category = serviceRequestDraft.category) => {
     return contractorCategoriesMatchRequest(serviceCategoriesForConnection(connection), category);
   };
-  const connectedContractorsForWizard = [...activeConnections].sort((a, b) => {
+  const connectedContractorsForWizard = activeConnections.filter(connection => (
+    contractorMatchesRequestLocation(contractorProfileById.get(connection.contractor_id), connection)
+  )).sort((a, b) => {
     const aMatches = connectionMatchesRequestCategory(a);
     const bMatches = connectionMatchesRequestCategory(b);
     if (aMatches !== bMatches) return aMatches ? -1 : 1;
     return a.business_name.localeCompare(b.business_name);
   });
   const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
-  const discoverContractorCandidates = directoryContractors.filter(contractor => !connectedContractorIds.has(contractor.id));
+  const discoverContractorCandidates = directoryContractors.filter(contractor => (
+    !connectedContractorIds.has(contractor.id) && contractorMatchesRequestLocation(contractor)
+  ));
   const discoverContractorsMatchingSelectedCategory = serviceRequestDraft.category
     ? discoverContractorCandidates.filter(contractor => contractorCategoriesMatchRequest(contractor.service_categories, serviceRequestDraft.category))
     : [];
@@ -8963,7 +8982,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       ? discoverContractorsMatchingSelectedCategory
       : discoverContractorsMatchingRecommendedCategories.length > 0
         ? discoverContractorsMatchingRecommendedCategories
-        : discoverContractorCandidates
+        : (!serviceRequestDraft.category && requestMatchingCategoryKeys.size === 0 ? discoverContractorCandidates : [])
   ).slice(0, 4);
   const discoverContractorFallbackActive = Boolean(
     serviceRequestDraft.category
@@ -9023,7 +9042,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const categories = serviceCategoriesForConnection(connection);
     setRequestComposerOpen(false);
     setRequestComposerStep('issue');
-    setRequestContractorMode('connected');
+    setRequestContractorFilter('all');
+    setRequestContractorLocationFilter('');
     setRequestingConnectionId(connection.connection_id);
     setExpandedConnectionId(connection.connection_id);
     setNewRequestFiles([]);
@@ -11270,7 +11290,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onClick={() => {
                     setRequestComposerOpen(true);
                     setRequestingConnectionId(null);
-                    setRequestContractorMode('connected');
+                    setRequestContractorFilter('all');
+                    setRequestContractorLocationFilter('');
                     setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
                     setServiceRequestDraft(current => ({
                       ...current,
@@ -11297,7 +11318,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     onClick={() => {
                       setRequestComposerOpen(false);
                       setRequestComposerStep('issue');
-                      setRequestContractorMode('connected');
+                      setRequestContractorFilter('all');
+                      setRequestContractorLocationFilter('');
                       setServiceProblemText('');
                       setNewRequestFiles([]);
                       setServiceRequestDraft({
@@ -11508,97 +11530,235 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
                 {requestComposerStep === 'contractor' && (
                   <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div>
-                      <p className="text-sm font-bold text-slate-950">Your connected contractors</p>
-                      <p className="mt-1 text-sm text-slate-500">Choose who you want to contact. Contractors matching {serviceRequestDraft.category || 'this request'} appear first.</p>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {connectedContractorsForWizard.length > 0 ? connectedContractorsForWizard.map(connection => {
-                        const matchesSelectedType = connectionMatchesRequestCategory(connection);
-                        return (
-                          <button
-                            key={connection.connection_id}
-                            type="button"
-                            onClick={() => {
-                              setRequestContractorMode('connected');
-                              setServiceRequestDraft(current => ({ ...current, connection_id: connection.connection_id }));
-                            }}
-                            className={`rounded-xl border p-3 text-left transition ${serviceRequestDraft.connection_id === connection.connection_id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-bold text-slate-950">{connection.business_name}</p>
-                              {matchesSelectedType && serviceRequestDraft.category && (
-                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                                  Matches type
-                                </span>
-                              )}
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">{serviceCategoriesForConnection(connection).join(', ')}</p>
-                          </button>
-                        );
-                      }) : (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 sm:col-span-2">
-                          <p className="text-sm font-semibold text-amber-900">No connected contractors yet.</p>
-                          <p className="mt-1 text-sm text-amber-800">You can find another contractor and request a connection first.</p>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">Choose a contractor</p>
+                        <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                          Connected contractors appear first. Other matching contractors are shown below, but a request can only be sent after the contractor accepts your connection.
+                        </p>
+                      </div>
+                      {selectedRequestConnection && (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                          Selected: <span className="font-bold">{selectedRequestConnection.business_name}</span>
                         </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextMode = requestContractorMode === 'discover' ? 'connected' : 'discover';
-                        setRequestContractorMode(nextMode);
-                        if (nextMode === 'discover') {
-                          setServiceRequestDraft(current => ({ ...current, connection_id: '' }));
-                        }
-                      }}
-                      className={buttonClass('secondary')}
-                    >
-                      <Search size={15} />
-                      Find another contractor
-                    </button>
-                    {requestContractorMode === 'discover' && (
-                      <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <Field label="Search category">
-                            <select
-                              className={inputClass()}
-                              value={serviceRequestDraft.category}
-                              onChange={event => {
-                                setServiceRequestDraft(current => ({ ...current, category: event.target.value, connection_id: '' }));
-                                setDirectoryCategory(event.target.value);
-                              }}
+
+                    <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
+                      <Field label="Contractor type">
+                        <select
+                          className={inputClass()}
+                          value={serviceRequestDraft.category}
+                          onChange={event => {
+                            setServiceRequestDraft(current => ({
+                              ...current,
+                              category: event.target.value,
+                              connection_id: '',
+                              title: current.title || (event.target.value ? `${event.target.value} help needed` : current.title),
+                            }));
+                            setDirectoryCategory(event.target.value);
+                          }}
+                        >
+                          <option value="">All service types</option>
+                          {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Show">
+                        <select
+                          className={inputClass()}
+                          value={requestContractorFilter}
+                          onChange={event => setRequestContractorFilter(event.target.value as 'all' | 'connected')}
+                        >
+                          <option value="all">All matching contractors</option>
+                          <option value="connected">Connected only</option>
+                        </select>
+                      </Field>
+                      <Field label="City, state, or ZIP">
+                        <input
+                          className={inputClass()}
+                          value={requestContractorLocationFilter}
+                          onChange={event => setRequestContractorLocationFilter(event.target.value)}
+                          placeholder="Optional"
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Connected contractors</p>
+                        <p className="mt-1 text-xs text-slate-500">These contractors can receive this request now. Matching contractors are sorted first.</p>
+                      </div>
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        {connectedContractorsForWizard.length > 0 ? connectedContractorsForWizard.map(connection => {
+                          const contractor = contractorProfileById.get(connection.contractor_id);
+                          const categories = serviceCategoriesForConnection(connection);
+                          const matchesSelectedType = connectionMatchesRequestCategory(connection);
+                          const locationLabel = [contractor?.city || connection.city, contractor?.state || connection.state].filter(Boolean).join(', ');
+                          const credentialLabels = [
+                            contractor?.license_number ? 'License listed' : '',
+                            contractor?.insurance_status ? 'Insurance listed' : '',
+                            contractor?.bonded_status ? 'Bonded listed' : '',
+                          ].filter(Boolean);
+                          return (
+                            <div
+                              key={connection.connection_id}
+                              className={`rounded-xl border p-3 transition ${serviceRequestDraft.connection_id === connection.connection_id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'}`}
                             >
-                              <option value="">All service types</option>
-                              {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                            </select>
-                          </Field>
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-bold text-slate-950">{connection.business_name}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{locationLabel || 'Location not listed'}</p>
+                                </div>
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Connected</span>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {matchesSelectedType && serviceRequestDraft.category && (
+                                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                                    Matches {serviceRequestDraft.category}
+                                  </span>
+                                )}
+                                {categories.slice(0, 4).map(category => (
+                                  <span key={category} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                    {category}
+                                  </span>
+                                ))}
+                              </div>
+                              {contractor?.business_summary && (
+                                <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-600">{contractor.business_summary}</p>
+                              )}
+                              {credentialLabels.length > 0 && (
+                                <p className="mt-3 text-xs font-medium text-slate-500">{credentialLabels.join(' · ')}</p>
+                              )}
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setServiceRequestDraft(current => ({ ...current, connection_id: connection.connection_id }));
+                                  }}
+                                  className={serviceRequestDraft.connection_id === connection.connection_id ? buttonClass('primary') : buttonClass('secondary')}
+                                >
+                                  {serviceRequestDraft.connection_id === connection.connection_id ? 'Selected' : 'Select contractor'}
+                                </button>
+                                {contractor?.slug && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                                    className={buttonClass('secondary')}
+                                  >
+                                    View profile
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 lg:col-span-2">
+                            <p className="text-sm font-semibold text-amber-900">No connected contractors yet.</p>
+                            <p className="mt-1 text-sm text-amber-800">You can request a connection from another matching contractor below.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {requestContractorFilter === 'all' && (
+                      <div className="space-y-3 rounded-xl border border-blue-100 bg-white p-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Other matching contractors</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              These contractors match the request type but are not connected yet. Request a connection before sending service requests.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDirectoryCategory(serviceRequestDraft.category);
+                              setHomeownerTab('discover');
+                            }}
+                            className={buttonClass('secondary')}
+                          >
+                            <Compass size={15} />
+                            View Discover feed
+                          </button>
                         </div>
                         {discoverContractorsForRequest.length > 0 ? (
-                          <div className="space-y-2">
+                          <div className="grid gap-3 lg:grid-cols-2">
                             {discoverContractorFallbackActive && (
-                              <Notice tone="info" text="We could not find an exact match, but these contractors may be able to help based on related contractor types." />
+                              <div className="lg:col-span-2">
+                                <Notice tone="info" text="We could not find an exact match, but these contractors may be able to help based on related contractor types." />
+                              </div>
                             )}
-                            {discoverContractorsForRequest.map(contractor => (
+                            {discoverContractorsForRequest.map(contractor => {
+                              const existingConnection = connectionByContractorId.get(contractor.id);
+                              const locationLabel = [contractor.city, contractor.state].filter(Boolean).join(', ');
+                              const credentialLabels = [
+                                contractor.license_number ? 'License listed' : '',
+                                contractor.insurance_status ? 'Insurance listed' : '',
+                                contractor.bonded_status ? 'Bonded listed' : '',
+                                contractor.website_url ? 'Website listed' : '',
+                              ].filter(Boolean);
+                              return (
                               <div key={contractor.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-sm font-bold text-slate-950">{contractor.business_name || 'Contractor'}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{[contractor.city, contractor.state].filter(Boolean).join(', ') || 'Location not listed'}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{locationLabel || 'Location not listed'}</p>
                                   </div>
-                                  <button type="button" onClick={() => void requestContractorConnection(contractor)} className={buttonClass('secondary')}>
-                                    Request connection
+                                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                                    existingConnection?.status === 'pending'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : existingConnection?.status
+                                        ? 'bg-slate-100 text-slate-600'
+                                        : 'bg-white text-slate-600'
+                                  }`}>
+                                    {existingConnection?.status === 'pending' ? 'Connection pending' : existingConnection?.status ? existingConnection.status : 'Not connected'}
+                                  </span>
+                                </div>
+                                {contractor.service_categories.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {contractor.service_categories.slice(0, 5).map(category => (
+                                      <span key={category} className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                        {category}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-600">
+                                  {contractor.business_summary || 'This contractor has not added a business description yet.'}
+                                </p>
+                                {credentialLabels.length > 0 && (
+                                  <p className="mt-3 text-xs font-medium text-slate-500">{credentialLabels.join(' · ')}</p>
+                                )}
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  {contractor.slug && (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      View profile
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => void requestContractorConnection(contractor)}
+                                    disabled={existingConnection?.status === 'pending'}
+                                    className={existingConnection?.status === 'pending' ? buttonClass('secondary') : buttonClass('primary')}
+                                  >
+                                    <Link2 size={15} />
+                                    {existingConnection?.status === 'pending' ? 'Connection requested' : 'Request connection'}
                                   </button>
                                 </div>
+                                <p className="mt-3 text-xs leading-5 text-slate-500">
+                                  Service requests can be sent after this contractor accepts your connection.
+                                </p>
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         ) : (
-                          <Notice tone="info" text="No Discover contractors match this service type yet. You can adjust the category or search from Contractors." />
+                          <Notice tone="info" text="No other Discover contractors match this service type yet. You can adjust the contractor type or browse the Discover feed." />
                         )}
-                        <p className="text-xs leading-5 text-slate-500">
-                          Service requests can be sent after a contractor accepts your connection.
-                        </p>
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
@@ -11606,7 +11766,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <button
                         type="button"
                         onClick={() => setRequestComposerStep('review')}
-                        disabled={requestContractorMode !== 'connected' || !serviceRequestDraft.connection_id}
+                        disabled={!serviceRequestDraft.connection_id}
                         className={buttonClass('primary')}
                       >
                         Continue
