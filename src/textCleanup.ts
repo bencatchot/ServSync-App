@@ -18,6 +18,8 @@ const HUMAN_TEXT_ACRONYMS = [
   'CO2',
 ] as const;
 
+const HUMAN_TEXT_LIVE_ACRONYMS = HUMAN_TEXT_ACRONYMS.filter(term => term !== 'CO');
+
 const HUMAN_TEXT_RUN_ON_STARTERS = [
   'customer wants',
   'customer said',
@@ -77,6 +79,16 @@ function containsUrlOrEmailLikeText(value: string) {
 
 function restoreHumanTextTradeTerms(value: string) {
   const withAcronyms = HUMAN_TEXT_ACRONYMS.reduce((text, term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), term);
+  }, value);
+  return withAcronyms.replace(/\b(\d+(?:\.\d+)?)(\s*)(v|a|psi|btu|cfm|gpm)\b/gi, (_match, amount: string, separator: string, unit: string) => {
+    return `${amount}${separator}${unit.toUpperCase()}`;
+  });
+}
+
+function restoreHumanTextTradeTermsLive(value: string) {
+  const withAcronyms = HUMAN_TEXT_LIVE_ACRONYMS.reduce((text, term) => {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return text.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), term);
   }, value);
@@ -166,7 +178,7 @@ function cleanHumanTextLiveLine(value: string) {
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\s+([.!?])/g, '$1')
     .replace(/([.!?])(?=[A-Za-z])/g, '$1 ');
-  return capitalizeHumanTextLiveSentences(restoreHumanTextTradeTerms(applyHumanTextLiveContractions(spaced)));
+  return capitalizeHumanTextLiveSentences(restoreHumanTextTradeTermsLive(applyHumanTextLiveContractions(spaced)));
 }
 
 export function cleanHumanWrittenTextLive(value: string) {
@@ -175,6 +187,31 @@ export function cleanHumanWrittenTextLive(value: string) {
     .split('\n')
     .map(line => cleanHumanTextLiveLine(line))
     .join('\n');
+}
+
+function isHumanTextLiveWordCharacter(char: string) {
+  return /[A-Za-z0-9'"]/u.test(char);
+}
+
+function liveWordRangeAtCursor(value: string, cursorPosition: number) {
+  let start = cursorPosition;
+  while (start > 0 && isHumanTextLiveWordCharacter(value[start - 1] ?? '')) start -= 1;
+  let end = cursorPosition;
+  while (end < value.length && isHumanTextLiveWordCharacter(value[end] ?? '')) end += 1;
+  return { start, end };
+}
+
+export function cleanHumanWrittenTextLiveAtCursor(value: string, cursorPosition: number) {
+  const { start, end } = liveWordRangeAtCursor(value, cursorPosition);
+  const before = value.slice(0, start);
+  const activeWord = value.slice(start, end);
+  const after = value.slice(end);
+  const cleanedBefore = cleanHumanWrittenTextLive(before);
+  const cleanedAfter = cleanHumanWrittenTextLive(after);
+  return {
+    value: `${cleanedBefore}${activeWord}${cleanedAfter}`,
+    cursorPosition: cleanedBefore.length + (cursorPosition - start),
+  };
 }
 
 function setNativeTextInputValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
@@ -210,9 +247,8 @@ export function cleanHumanTextInputOnKeyUp(event: KeyboardEvent<HTMLInputElement
   const selectionStart = element.selectionStart;
   const selectionEnd = element.selectionEnd;
   if (selectionStart === null || selectionEnd === null || selectionStart !== selectionEnd) return;
-  const cleaned = cleanHumanWrittenTextLive(element.value);
-  if (cleaned === element.value) return;
-  const nextSelectionStart = cleanHumanWrittenTextLive(element.value.slice(0, selectionStart)).length;
-  setNativeTextInputValue(element, cleaned);
-  element.setSelectionRange(nextSelectionStart, nextSelectionStart);
+  const cleaned = cleanHumanWrittenTextLiveAtCursor(element.value, selectionStart);
+  if (cleaned.value === element.value) return;
+  setNativeTextInputValue(element, cleaned.value);
+  element.setSelectionRange(cleaned.cursorPosition, cleaned.cursorPosition);
 }
