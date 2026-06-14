@@ -23591,7 +23591,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 });
               };
               const addSimpleTask = () => {
-                const title = simpleTaskTitleDraft.trim();
+                const title = cleanHumanWrittenText(simpleTaskTitleDraft);
                 if (!title) return;
                 const existingTask = simpleTaskRows.some(row => normalizeText(row.finding.title) === normalizeText(title));
                 if (existingTask) {
@@ -23813,6 +23813,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           key={`${row.key}-title`}
                                           className={`${inputClass()} mt-1`}
                                           {...writingAssistProps}
+                                          data-prose-cleanup="true"
                                           defaultValue={row.finding.title}
                                           disabled={simpleJobReadonly}
                                           onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanWrittenText(event.target.value))}
@@ -23851,6 +23852,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <input
                                 className={inputClass()}
                                 {...writingAssistProps}
+                                data-prose-cleanup="true"
                                 value={simpleTaskTitleDraft}
                                 onChange={event => setSimpleTaskTitleDraft(event.target.value)}
                                 onKeyDown={event => {
