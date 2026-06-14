@@ -250,6 +250,7 @@ type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar
 type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
+type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'website' | 'profileDetails' | 'discoverPosts';
 type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
@@ -7293,7 +7294,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [requestComposerOpen, setRequestComposerOpen] = useState(false);
   const [requestComposerStep, setRequestComposerStep] = useState<HomeownerRequestComposerStep>('issue');
   const [requestContractorFilter, setRequestContractorFilter] = useState<'all' | 'connected'>('all');
-  const [requestContractorLocationFilter, setRequestContractorLocationFilter] = useState('');
+  const [requestContractorAttributeFilters, setRequestContractorAttributeFilters] = useState<Record<RequestContractorAttributeFilter, boolean>>({
+    licensed: false,
+    insured: false,
+    bonded: false,
+    website: false,
+    profileDetails: false,
+    discoverPosts: false,
+  });
+  const [requestContractorInsight, setRequestContractorInsight] = useState<{ contractorId: string; view: 'profile' | 'posts' } | null>(null);
+  const [requestDiscoverPosts, setRequestDiscoverPosts] = useState<DiscoverFeedItem[]>([]);
+  const [requestDiscoverPostsLoading, setRequestDiscoverPostsLoading] = useState(false);
   const [homeownerReplyDrafts, setHomeownerReplyDrafts] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
@@ -7528,6 +7539,32 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     void loadHomeowner();
   }, [loadHomeowner]);
+
+  useEffect(() => {
+    if (!supabase || !requestComposerOpen || requestComposerStep !== 'contractor') return;
+    const client = supabase;
+    let cancelled = false;
+    setRequestDiscoverPostsLoading(true);
+    const loadRequestDiscoverPosts = async () => {
+      try {
+        const { data, error } = await client.rpc('servsync_discover_feed', {
+          p_category: null,
+          p_location: null,
+          p_radius_miles: null,
+          p_search_lat: null,
+          p_search_lng: null,
+        });
+        if (error) throw error;
+        if (!cancelled) setRequestDiscoverPosts((data || []) as DiscoverFeedItem[]);
+      } catch {
+        if (!cancelled) setRequestDiscoverPosts([]);
+      } finally {
+        if (!cancelled) setRequestDiscoverPostsLoading(false);
+      }
+    };
+    void loadRequestDiscoverPosts();
+    return () => { cancelled = true; };
+  }, [requestComposerOpen, requestComposerStep]);
 
   useEffect(() => {
     let cancelled = false;
@@ -8397,8 +8434,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setRequestingConnectionId(null);
       setRequestComposerOpen(false);
       setRequestComposerStep('issue');
-      setRequestContractorFilter('all');
-      setRequestContractorLocationFilter('');
+      resetRequestContractorFilters();
       setNotice('Service request sent.');
       await loadHomeowner();
     } catch (err) {
@@ -8702,6 +8738,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const contractorProfileById = new Map(directoryContractors.map(c => [c.id, c]));
   const connectionByContractorId = new Map(connections.map(connection => [connection.contractor_id, connection]));
   const activeConnections = connections.filter(connection => connection.status === 'active');
+  const requestDiscoverPostsByContractor = requestDiscoverPosts.reduce<Map<string, DiscoverFeedItem[]>>((map, post) => {
+    const existing = map.get(post.contractor_id) ?? [];
+    existing.push(post);
+    map.set(post.contractor_id, existing);
+    return map;
+  }, new Map());
+  const resetRequestContractorFilters = () => {
+    setRequestContractorFilter('all');
+    setRequestContractorAttributeFilters({
+      licensed: false,
+      insured: false,
+      bonded: false,
+      website: false,
+      profileDetails: false,
+      discoverPosts: false,
+    });
+  };
+  const toggleRequestContractorAttributeFilter = (filter: RequestContractorAttributeFilter) => {
+    setRequestContractorAttributeFilters(current => ({ ...current, [filter]: !current[filter] }));
+  };
   const connectedContractorsForRequest = activeConnections.filter(connection => {
     if (!serviceRequestDraft.category) return true;
     const contractor = contractorProfileById.get(connection.contractor_id);
@@ -8712,9 +8768,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contractor = contractorProfileById.get(connection.contractor_id);
     return contractor?.service_categories?.length ? contractor.service_categories : SERVICE_REQUEST_CATEGORIES;
   };
+  const requestServiceHome = homes.find(candidate => candidate.id === (serviceRequestDraft.home_id || selectedHome?.id || selectedHomeId))
+    ?? selectedHome
+    ?? homes[0]
+    ?? null;
+  const requestServiceLocationLabel = requestServiceHome
+    ? [
+      requestServiceHome.address_line1 || requestServiceHome.nickname,
+      requestServiceHome.city,
+      requestServiceHome.state,
+      requestServiceHome.zip_code,
+    ].filter(Boolean).join(', ')
+    : '';
   const contractorMatchesRequestLocation = (contractor?: ContractorProfile | null, connection?: HomeownerConnection | null) => {
-    const query = requestContractorLocationFilter.trim().toLowerCase();
-    if (!query) return true;
+    if (!requestServiceHome) return true;
+    const locationTerms = [
+      requestServiceHome.zip_code,
+      requestServiceHome.city,
+      requestServiceHome.state,
+    ].filter(Boolean).map(term => term.toLowerCase());
+    if (locationTerms.length === 0) return true;
     const searchableParts = [
       contractor?.city,
       contractor?.state,
@@ -8723,7 +8796,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       connection?.city,
       connection?.state,
     ];
-    return searchableParts.some(part => (part || '').toLowerCase().includes(query));
+    const searchableText = searchableParts.filter(Boolean).join(' ').toLowerCase();
+    return locationTerms.some(term => searchableText.includes(term));
+  };
+  const contractorHasRequestAttribute = (contractor: ContractorProfile | undefined, contractorId: string, filter: RequestContractorAttributeFilter) => {
+    if (!contractor) return false;
+    switch (filter) {
+      case 'licensed':
+        return Boolean(contractor.license_number);
+      case 'insured':
+        return Boolean(contractor.insurance_status);
+      case 'bonded':
+        return Boolean(contractor.bonded_status);
+      case 'website':
+        return Boolean(contractor.website_url);
+      case 'profileDetails':
+        return Boolean(contractor.business_summary || contractor.logo_url || contractor.service_categories.length > 0);
+      case 'discoverPosts':
+        return (requestDiscoverPostsByContractor.get(contractorId)?.length ?? 0) > 0;
+      default:
+        return true;
+    }
+  };
+  const contractorMatchesRequestAttributeFilters = (contractor: ContractorProfile | undefined, contractorId: string) => {
+    const activeFilters = Object.entries(requestContractorAttributeFilters)
+      .filter(([, enabled]) => enabled)
+      .map(([filter]) => filter as RequestContractorAttributeFilter);
+    return activeFilters.every(filter => contractorHasRequestAttribute(contractor, contractorId, filter));
   };
   const dashboardPropertyMatches = (record: { home_id?: string | null }) => selectedHomeId ? record.home_id === selectedHomeId : true;
   const dashboardServiceRequests = serviceRequests.filter(dashboardPropertyMatches);
@@ -8961,6 +9060,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const connectedContractorsForWizard = activeConnections.filter(connection => (
     contractorMatchesRequestLocation(contractorProfileById.get(connection.contractor_id), connection)
+    && contractorMatchesRequestAttributeFilters(contractorProfileById.get(connection.contractor_id), connection.contractor_id)
   )).sort((a, b) => {
     const aMatches = connectionMatchesRequestCategory(a);
     const bMatches = connectionMatchesRequestCategory(b);
@@ -8969,7 +9069,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   });
   const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
   const discoverContractorCandidates = directoryContractors.filter(contractor => (
-    !connectedContractorIds.has(contractor.id) && contractorMatchesRequestLocation(contractor)
+    requestContractorFilter === 'all'
+    && !connectedContractorIds.has(contractor.id)
+    && contractorMatchesRequestLocation(contractor)
+    && contractorMatchesRequestAttributeFilters(contractor, contractor.id)
   ));
   const discoverContractorsMatchingSelectedCategory = serviceRequestDraft.category
     ? discoverContractorCandidates.filter(contractor => contractorCategoriesMatchRequest(contractor.service_categories, serviceRequestDraft.category))
@@ -8989,9 +9092,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     && discoverContractorsMatchingSelectedCategory.length === 0
     && discoverContractorsMatchingRecommendedCategories.length > 0
   );
+  const activeRequestFilterCount = (requestContractorFilter === 'connected' ? 1 : 0)
+    + Object.values(requestContractorAttributeFilters).filter(Boolean).length;
+  const requestContractorResultsEmpty = connectedContractorsForWizard.length === 0
+    && (requestContractorFilter === 'connected' || discoverContractorsForRequest.length === 0);
   const requestDraftTitle = serviceRequestDraft.title || (serviceRequestDraft.category ? `${serviceRequestDraft.category} help needed` : 'Service help needed');
   const currentServiceRequestHomeId = serviceRequestDraft.home_id || selectedHome?.id || homes[0]?.id || '';
-  const currentServiceRequestHome = homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
+  const currentServiceRequestHome = requestServiceHome ?? homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
   const requestComposerPropertyStepLabel = currentServiceRequestHome
     ? currentServiceRequestHome.nickname || currentServiceRequestHome.address_line1 || 'Home selected'
     : 'Property';
@@ -9042,8 +9149,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const categories = serviceCategoriesForConnection(connection);
     setRequestComposerOpen(false);
     setRequestComposerStep('issue');
-    setRequestContractorFilter('all');
-    setRequestContractorLocationFilter('');
+    resetRequestContractorFilters();
     setRequestingConnectionId(connection.connection_id);
     setExpandedConnectionId(connection.connection_id);
     setNewRequestFiles([]);
@@ -11290,8 +11396,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onClick={() => {
                     setRequestComposerOpen(true);
                     setRequestingConnectionId(null);
-                    setRequestContractorFilter('all');
-                    setRequestContractorLocationFilter('');
+                    resetRequestContractorFilters();
                     setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
                     setServiceRequestDraft(current => ({
                       ...current,
@@ -11318,8 +11423,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     onClick={() => {
                       setRequestComposerOpen(false);
                       setRequestComposerStep('issue');
-                      setRequestContractorFilter('all');
-                      setRequestContractorLocationFilter('');
+                      resetRequestContractorFilters();
                       setServiceProblemText('');
                       setNewRequestFiles([]);
                       setServiceRequestDraft({
@@ -11544,43 +11648,57 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       )}
                     </div>
 
-                    <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px]">
-                      <Field label="Contractor type">
-                        <select
-                          className={inputClass()}
-                          value={serviceRequestDraft.category}
-                          onChange={event => {
-                            setServiceRequestDraft(current => ({
-                              ...current,
-                              category: event.target.value,
-                              connection_id: '',
-                              title: current.title || (event.target.value ? `${event.target.value} help needed` : current.title),
-                            }));
-                            setDirectoryCategory(event.target.value);
-                          }}
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900">
+                      {requestServiceLocationLabel
+                        ? `Showing contractors near ${requestServiceLocationLabel}.`
+                        : 'Using your selected service address to find matching contractors.'}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Filters</p>
+                          <p className="mt-1 text-xs text-slate-500">Choose none, one, or many. Results update as you select filters.</p>
+                        </div>
+                        <button type="button" onClick={resetRequestContractorFilters} className={buttonClass('secondary')}>
+                          Clear filters
+                        </button>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRequestContractorFilter(current => current === 'connected' ? 'all' : 'connected')}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                            requestContractorFilter === 'connected'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'
+                          }`}
                         >
-                          <option value="">All service types</option>
-                          {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Show">
-                        <select
-                          className={inputClass()}
-                          value={requestContractorFilter}
-                          onChange={event => setRequestContractorFilter(event.target.value as 'all' | 'connected')}
-                        >
-                          <option value="all">All matching contractors</option>
-                          <option value="connected">Connected only</option>
-                        </select>
-                      </Field>
-                      <Field label="City, state, or ZIP">
-                        <input
-                          className={inputClass()}
-                          value={requestContractorLocationFilter}
-                          onChange={event => setRequestContractorLocationFilter(event.target.value)}
-                          placeholder="Optional"
-                        />
-                      </Field>
+                          Connected only
+                        </button>
+                        {([
+                          ['licensed', 'Licensed'],
+                          ['insured', 'Insured'],
+                          ['bonded', 'Bonded'],
+                          ['website', 'Has website'],
+                          ['profileDetails', 'Has profile details'],
+                          ['discoverPosts', requestDiscoverPostsLoading ? 'Checking posts...' : 'Has Discover posts'],
+                        ] as Array<[RequestContractorAttributeFilter, string]>).map(([filter, label]) => (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => toggleRequestContractorAttributeFilter(filter)}
+                            disabled={filter === 'discoverPosts' && requestDiscoverPostsLoading}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                              requestContractorAttributeFilters[filter]
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="space-y-3">
@@ -11594,6 +11712,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           const categories = serviceCategoriesForConnection(connection);
                           const matchesSelectedType = connectionMatchesRequestCategory(connection);
                           const locationLabel = [contractor?.city || connection.city, contractor?.state || connection.state].filter(Boolean).join(', ');
+                          const contractorPosts = requestDiscoverPostsByContractor.get(connection.contractor_id) ?? [];
                           const credentialLabels = [
                             contractor?.license_number ? 'License listed' : '',
                             contractor?.insurance_status ? 'Insurance listed' : '',
@@ -11639,13 +11758,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 >
                                   {serviceRequestDraft.connection_id === connection.connection_id ? 'Selected' : 'Select contractor'}
                                 </button>
-                                {contractor?.slug && (
+                                {contractor && (
                                   <button
                                     type="button"
-                                    onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                                    onClick={() => setRequestContractorInsight({ contractorId: contractor.id, view: 'profile' })}
                                     className={buttonClass('secondary')}
                                   >
-                                    View profile
+                                    View Contractor Profile
+                                  </button>
+                                )}
+                                {contractorPosts.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRequestContractorInsight({ contractorId: connection.contractor_id, view: 'posts' })}
+                                    className={buttonClass('secondary')}
+                                  >
+                                    View Discover Feed
                                   </button>
                                 )}
                               </div>
@@ -11669,17 +11797,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               These contractors match the request type but are not connected yet. Request a connection before sending service requests.
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDirectoryCategory(serviceRequestDraft.category);
-                              setHomeownerTab('discover');
-                            }}
-                            className={buttonClass('secondary')}
-                          >
-                            <Compass size={15} />
-                            View Discover feed
-                          </button>
                         </div>
                         {discoverContractorsForRequest.length > 0 ? (
                           <div className="grid gap-3 lg:grid-cols-2">
@@ -11691,6 +11808,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             {discoverContractorsForRequest.map(contractor => {
                               const existingConnection = connectionByContractorId.get(contractor.id);
                               const locationLabel = [contractor.city, contractor.state].filter(Boolean).join(', ');
+                              const contractorPosts = requestDiscoverPostsByContractor.get(contractor.id) ?? [];
                               const credentialLabels = [
                                 contractor.license_number ? 'License listed' : '',
                                 contractor.insurance_status ? 'Insurance listed' : '',
@@ -11730,13 +11848,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   <p className="mt-3 text-xs font-medium text-slate-500">{credentialLabels.join(' · ')}</p>
                                 )}
                                 <div className="mt-4 flex flex-wrap gap-2">
-                                  {contractor.slug && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRequestContractorInsight({ contractorId: contractor.id, view: 'profile' })}
+                                    className={buttonClass('secondary')}
+                                  >
+                                    View Contractor Profile
+                                  </button>
+                                  {contractorPosts.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                                      onClick={() => setRequestContractorInsight({ contractorId: contractor.id, view: 'posts' })}
                                       className={buttonClass('secondary')}
                                     >
-                                      View profile
+                                      View Discover Feed
                                     </button>
                                   )}
                                   <button
@@ -11757,10 +11882,112 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             })}
                           </div>
                         ) : (
-                          <Notice tone="info" text="No other Discover contractors match this service type yet. You can adjust the contractor type or browse the Discover feed." />
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-sm font-semibold text-slate-800">No contractors found for the selected filters.</p>
+                            <button type="button" onClick={resetRequestContractorFilters} className={`${buttonClass('secondary')} mt-3`}>
+                              Clear filters
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}
+                    {requestContractorResultsEmpty && activeRequestFilterCount > 0 && requestContractorFilter === 'connected' && (
+                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-sm font-semibold text-slate-800">No contractors found for the selected filters.</p>
+                        <button type="button" onClick={resetRequestContractorFilters} className={`${buttonClass('secondary')} mt-3`}>
+                          Clear filters
+                        </button>
+                      </div>
+                    )}
+                    {requestContractorInsight && (() => {
+                      const contractor = contractorProfileById.get(requestContractorInsight.contractorId);
+                      const connection = connectionByContractorId.get(requestContractorInsight.contractorId);
+                      const posts = requestDiscoverPostsByContractor.get(requestContractorInsight.contractorId) ?? [];
+                      const locationLabel = [contractor?.city || connection?.city, contractor?.state || connection?.state].filter(Boolean).join(', ');
+                      const categories = contractor?.service_categories?.length
+                        ? contractor.service_categories
+                        : connection ? serviceCategoriesForConnection(connection) : [];
+                      return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true">
+                          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                  {requestContractorInsight.view === 'profile' ? 'Contractor profile' : 'Contractor Discover feed'}
+                                </p>
+                                <h3 className="mt-1 text-lg font-bold text-slate-950">{contractor?.business_name || connection?.business_name || 'Contractor'}</h3>
+                                <p className="mt-1 text-sm text-slate-500">{locationLabel || 'Location not listed'}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setRequestContractorInsight(null)}
+                                className="rounded-full border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                                aria-label="Close contractor details"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+
+                            {requestContractorInsight.view === 'profile' ? (
+                              <div className="mt-4 space-y-4">
+                                {categories.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {categories.map(category => (
+                                      <span key={category} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                        {category}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                <p className="text-sm leading-6 text-slate-600">
+                                  {contractor?.business_summary || 'This contractor has not added a business description yet.'}
+                                </p>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {contractor?.website_url && (
+                                    <a href={contractor.website_url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300">
+                                      Website listed
+                                    </a>
+                                  )}
+                                  {contractor?.license_number && (
+                                    <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600">License listed</div>
+                                  )}
+                                  {contractor?.insurance_status && (
+                                    <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600">Insurance listed</div>
+                                  )}
+                                  {contractor?.bonded_status && (
+                                    <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600">Bonded listed</div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-4 space-y-3">
+                                {posts.length > 0 ? posts.slice(0, 5).map(post => (
+                                  <div key={post.post_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-bold text-slate-950">{post.title}</p>
+                                      {post.post_category && (
+                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{post.post_category}</span>
+                                      )}
+                                    </div>
+                                    {post.description && (
+                                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{post.description}</p>
+                                    )}
+                                  </div>
+                                )) : (
+                                  <Notice tone="info" text="No Discover posts are available for this contractor yet." />
+                                )}
+                              </div>
+                            )}
+
+                            <div className="mt-5 flex flex-wrap justify-end gap-2">
+                              <button type="button" onClick={() => setRequestContractorInsight(null)} className={buttonClass('secondary')}>
+                                Back to contractor selection
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => setRequestComposerStep('issue')} className={buttonClass('secondary')}>Back</button>
                       <button
