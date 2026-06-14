@@ -11961,27 +11961,93 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               </div>
                             ) : (
                               <div className="mt-4 space-y-3">
-                                {posts.length > 0 ? posts.slice(0, 5).map(post => (
-                                  <div key={post.post_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <p className="text-sm font-bold text-slate-950">{post.title}</p>
-                                      {post.post_category && (
-                                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{post.post_category}</span>
-                                      )}
+                                {posts.length > 0 ? posts.slice(0, 5).map(post => {
+                                  const serviceAreas = post.service_areas || [];
+                                  const topKudos = (() => {
+                                    const counts: Record<string, number> = {};
+                                    post.reviews.forEach(review => review.kudos.forEach(kudo => {
+                                      counts[kudo] = (counts[kudo] ?? 0) + 1;
+                                    }));
+                                    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+                                  })();
+                                  return (
+                                    <div key={post.post_id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                      <div className="px-4 py-3">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <p className="font-bold text-slate-950">{post.business_name}</p>
+                                              {post.post_category && (
+                                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{post.post_category}</span>
+                                              )}
+                                            </div>
+                                            <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                                              <MapPin size={12} className="shrink-0" />
+                                              {[post.contractor_city, post.contractor_state].filter(Boolean).join(', ') || 'Location not listed'}
+                                              <span className="text-slate-300">·</span>
+                                              <span>Posted {new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                            </p>
+                                          </div>
+                                          {post.avg_rating !== null && post.review_count > 0 && (
+                                            <div className="flex shrink-0 items-center gap-1 text-sm font-bold text-slate-950">
+                                              <Star size={14} className="fill-amber-400 text-amber-400" />
+                                              {post.avg_rating.toFixed(1)}
+                                              <span className="text-xs font-medium text-slate-500">({post.review_count})</span>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        <p className="mt-3 text-base font-semibold text-slate-950">{post.title}</p>
+                                        {post.description && (
+                                          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">{post.description}</p>
+                                        )}
+
+                                        {post.photos.length > 0 && (
+                                          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                                            {post.photos.slice(0, 6).map((url, index) => (
+                                              <a key={`${post.post_id}-request-photo-${index}`} href={url} target="_blank" rel="noopener noreferrer">
+                                                <img src={url} alt="" className="h-24 w-24 shrink-0 rounded-xl border border-slate-200 object-cover transition-opacity hover:opacity-90" />
+                                              </a>
+                                            ))}
+                                          </div>
+                                        )}
+
+                                        {(post.categories.length > 0 || serviceAreas.length > 0 || topKudos.length > 0) && (
+                                          <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {post.categories.slice(0, 4).map(category => (
+                                              <span key={`${post.post_id}-request-category-${category}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                                {category}
+                                              </span>
+                                            ))}
+                                            {serviceAreas.slice(0, 3).map((area, index) => (
+                                              <span key={`${post.post_id}-request-area-${index}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                                {contractorServiceAreaDisplay(area)}
+                                              </span>
+                                            ))}
+                                            {topKudos.map(([kudo, count]) => (
+                                              <span key={`${post.post_id}-request-kudo-${kudo}`} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                {kudo} <span className="opacity-60">x{count}</span>
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    {post.description && (
-                                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{post.description}</p>
-                                    )}
-                                  </div>
-                                )) : (
+                                  );
+                                }) : (
                                   <Notice tone="info" text="No Discover posts are available for this contractor yet." />
+                                )}
+                                {posts.length > 5 && (
+                                  <p className="text-xs leading-5 text-slate-500">
+                                    Showing the latest 5 posts from this contractor.
+                                  </p>
                                 )}
                               </div>
                             )}
 
                             <div className="mt-5 flex flex-wrap justify-end gap-2">
                               <button type="button" onClick={() => setRequestContractorInsight(null)} className={buttonClass('secondary')}>
-                                Back to contractor selection
+                                Back to request
                               </button>
                             </div>
                           </div>
@@ -12018,8 +12084,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <Field label="Request title">
                         <input
                           className={inputClass()}
+                          {...writingAssistProps}
                           value={serviceRequestDraft.title || requestDraftTitle}
                           onChange={event => setServiceRequestDraft(current => ({ ...current, title: event.target.value }))}
+                          onBlur={event => setServiceRequestDraft(current => ({ ...current, title: cleanHumanWrittenText(event.target.value) }))}
                         />
                       </Field>
                       <Field label="Service type">
@@ -12035,28 +12103,36 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <select
                           className={inputClass()}
                           value={serviceRequestDraft.urgency}
-                          onChange={event => setServiceRequestDraft(current => ({ ...current, urgency: event.target.value as ServiceRequestUrgency }))}
+                          onChange={event => setServiceRequestDraft(current => ({ ...current, urgency: event.target.value as HomeownerServiceRequestDraft['urgency'] }))}
                         >
-                          {SERVICE_REQUEST_URGENCY_OPTIONS.map(urgency => <option key={urgency} value={urgency}>{urgency}</option>)}
+                          <option value="low">Low</option>
+                          <option value="normal">Normal</option>
+                          <option value="urgent">Urgent</option>
                         </select>
                       </Field>
                     </div>
-                    <Field label="Contractor-facing request text">
+                    <Field label="Message to contractor">
                       <textarea
+                        rows={5}
                         className={inputClass()}
-                        rows={4}
                         {...writingAssistProps}
                         value={serviceRequestDraft.description}
                         onChange={event => setServiceRequestDraft(current => ({ ...current, description: event.target.value }))}
+                        onBlur={event => setServiceRequestDraft(current => ({ ...current, description: cleanHumanWrittenText(event.target.value) }))}
                       />
                     </Field>
-                    {serviceProblemText && serviceProblemText !== serviceRequestDraft.description && (
-                      <button type="button" onClick={() => setServiceRequestDraft(current => ({ ...current, description: serviceProblemText }))} className={buttonClass('secondary')}>
-                        Use original wording
-                      </button>
-                    )}
-                    <Field label="Photos / videos">
-                      <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                    <button
+                      type="button"
+                      onClick={() => setServiceRequestDraft(current => ({ ...current, description: serviceProblemText }))}
+                      className={buttonClass('secondary')}
+                    >
+                      Use original wording
+                    </button>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Photos / Videos (optional)
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
                         <Paperclip size={15} className="shrink-0 text-slate-400" />
                         Attach files
                         <input
@@ -12064,24 +12140,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           multiple
                           accept="image/*,video/*"
                           className="sr-only"
-                          onChange={event => {
-                            const picked = Array.from(event.target.files ?? []);
+                          onChange={e => {
+                            const picked = Array.from(e.target.files ?? []);
                             setNewRequestFiles(prev => [...prev, ...picked]);
-                            event.target.value = '';
+                            e.target.value = '';
                           }}
                         />
                       </label>
-                    </Field>
-                    {newRequestFiles.length > 0 && (
-                      <ul className="space-y-1">
-                        {newRequestFiles.map((file, i) => (
-                          <li key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">
-                            <span className="truncate">{file.name}</span>
-                            <button type="button" onClick={() => setNewRequestFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-slate-400 hover:text-red-400"><X size={13} /></button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                      {newRequestFiles.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {newRequestFiles.map((file, i) => (
+                            <li key={i} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600">
+                              <span className="truncate">{file.name}</span>
+                              <button type="button" onClick={() => setNewRequestFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-slate-400 hover:text-red-400"><X size={13} /></button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => setRequestComposerStep('contractor')} className={buttonClass('secondary')}>Back</button>
                       <button
@@ -12090,7 +12166,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         disabled={savingServiceRequest || !serviceRequestDraft.connection_id}
                         className={buttonClass('primary')}
                       >
-                        <Send size={16} />
                         {savingServiceRequest ? 'Sending...' : 'Send Request'}
                       </button>
                     </div>
