@@ -90,6 +90,53 @@ const GENERIC_OR_LOCATION_TERMS = new Set([
   'floor',
 ]);
 
+const BROAD_ACTION_TERMS = [
+  'build',
+  'repair',
+  'fix',
+  'install',
+  'replace',
+  'mount',
+  'hang',
+  'assemble',
+  'remove',
+  'patch',
+  'adjust',
+  'maintain',
+  'troubleshoot',
+  'inspect',
+  'finish',
+  'remodel',
+  'update',
+];
+
+const CARPENTRY_FALLBACK_TERMS = [
+  'build',
+  'pergola',
+  'deck',
+  'fence',
+  'gate',
+  'trim',
+  'molding',
+  'cabinet',
+  'door',
+  'window',
+  'frame',
+  'framing',
+  'wood',
+  'stairs',
+  'railing',
+  'shelf',
+  'shelves',
+  'built in',
+  'built-in',
+  'porch',
+  'patio cover',
+  'gazebo',
+  'fascia',
+  'soffit',
+];
+
 type CategoryRule = {
   category: string;
   phrases: string[];
@@ -119,7 +166,7 @@ type TradeObjectRule = {
 
 const TRADE_OBJECT_RULES: TradeObjectRule[] = [
   {
-    objects: ['deck', 'deck board', 'deck boards', 'porch', 'porch board', 'porch boards'],
+    objects: ['deck', 'deck board', 'deck boards', 'porch', 'porch board', 'porch boards', 'pergola', 'gazebo', 'patio cover'],
     matches: [
       { category: 'Decks', score: 12, reason: 'deck or porch object' },
       { category: 'Carpentry', score: 9, reason: 'wood structure object' },
@@ -180,6 +227,7 @@ const TRADE_OBJECT_RULES: TradeObjectRule[] = [
     objects: ['fence', 'gate', 'fence post', 'fence board'],
     matches: [
       { category: 'Fencing', score: 12, reason: 'fence or gate object' },
+      { category: 'Carpentry', score: 9, reason: 'wood fence or gate object' },
       { category: 'Handyman', score: 8, reason: 'small fence or gate repair object' },
     ],
   },
@@ -189,18 +237,27 @@ const TRADE_OBJECT_RULES: TradeObjectRule[] = [
   },
   {
     objects: ['window'],
-    matches: [{ category: 'Windows', score: 13, reason: 'window object' }],
+    matches: [
+      { category: 'Windows', score: 13, reason: 'window object' },
+      { category: 'Carpentry', score: 6, reason: 'window trim or framing object' },
+      { category: 'Handyman', score: 5, reason: 'small window repair object' },
+    ],
   },
   {
     objects: ['door'],
     matches: [
       { category: 'Doors', score: 12, reason: 'door object' },
+      { category: 'Carpentry', score: 8, reason: 'door framing or trim object' },
       { category: 'Handyman', score: 8, reason: 'small door repair object' },
     ],
   },
   {
     objects: ['drywall'],
-    matches: [{ category: 'Drywall', score: 13, reason: 'drywall object' }],
+    matches: [
+      { category: 'Drywall', score: 13, reason: 'drywall object' },
+      { category: 'Handyman', score: 7, reason: 'small drywall repair object' },
+      { category: 'Painting', score: 5, reason: 'paint finish may follow drywall repair' },
+    ],
   },
   {
     objects: ['paint'],
@@ -499,6 +556,61 @@ const OBJECT_SYMPTOM_RULES: ObjectSymptomRule[] = [
 
 const PHRASE_RULES: CategoryRule[] = [
   {
+    category: 'Carpentry',
+    score: 13,
+    reason: 'wood structure request',
+    phrases: [
+      'build pergola',
+      'install pergola',
+      'repair pergola',
+      'install trim',
+      'repair trim',
+      'install cabinet',
+      'repair cabinet',
+      'build shelves',
+      'install shelves',
+      'build shelf',
+      'install shelf',
+      'patio cover',
+      'build gazebo',
+      'install gazebo',
+    ],
+  },
+  {
+    category: 'Handyman',
+    score: 10,
+    reason: 'small project or repair request',
+    phrases: [
+      'build pergola',
+      'install pergola',
+      'repair pergola',
+      'build deck',
+      'repair deck',
+      'repair fence',
+      'install door',
+      'repair drywall',
+      'install outlet',
+      'fix toilet',
+      'mount',
+      'hang',
+      'assemble',
+      'patch',
+      'adjust',
+    ],
+  },
+  {
+    category: 'Decks',
+    score: 10,
+    reason: 'deck structure request',
+    phrases: ['build deck', 'install deck', 'repair deck', 'deck repair'],
+  },
+  {
+    category: 'Fencing',
+    score: 11,
+    reason: 'fence or gate request',
+    phrases: ['repair fence', 'install fence', 'build fence', 'repair gate', 'install gate'],
+  },
+  {
     category: 'Roofing',
     score: 12,
     reason: 'roof shingle condition',
@@ -584,6 +696,7 @@ const PHRASE_RULES: CategoryRule[] = [
     score: 11,
     reason: 'electrical symptom',
     phrases: [
+      'install outlet',
       'outlet not working',
       'no power to outlet',
       'breaker tripping',
@@ -675,7 +788,7 @@ const PHRASE_RULES: CategoryRule[] = [
   { category: 'Plumbing', score: 23, reason: 'possible water source issue', phrases: ['water pooling outside'] },
   { category: 'Windows', score: 9, reason: 'window symptom', phrases: ['window leaking', 'window wont open', 'broken window', 'draft around window'] },
   { category: 'Doors', score: 9, reason: 'door symptom', phrases: ['door sticks', 'door wont latch', 'draft around door', 'exterior door leaking'] },
-  { category: 'Drywall', score: 9, reason: 'drywall or wall symptom', phrases: ['drywall hole', 'hole in wall', 'wall crack', 'ceiling crack', 'water stain on drywall', 'texture repair'] },
+  { category: 'Drywall', score: 9, reason: 'drywall or wall symptom', phrases: ['drywall hole', 'hole in wall', 'wall crack', 'ceiling crack', 'water stain on drywall', 'texture repair', 'repair drywall', 'patch drywall'] },
   { category: 'Roofing', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
   { category: 'Plumbing', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
   { category: 'HVAC', score: 10, reason: 'possible ceiling stain source', phrases: ['stain on ceiling'] },
@@ -715,6 +828,9 @@ const TRADE_SPECIFIC_SINGLE_TERMS: Record<string, string[]> = {
   'Pest Control': ['termites', 'termite', 'bees', 'wasps', 'rats', 'mice', 'rodents', 'roaches', 'ants', 'droppings'],
   'Appliance Repair': ['dishwasher', 'refrigerator', 'freezer', 'washer', 'dryer', 'oven'],
   Gutters: ['gutter', 'gutters', 'downspout'],
+  Decks: ['deck', 'porch'],
+  Fencing: ['fence', 'gate'],
+  Doors: ['door'],
   Drywall: ['drywall'],
   Painting: ['paint'],
   Tile: ['tile'],
@@ -826,6 +942,23 @@ function applyObjectSymptomRules(input: string, rules: ObjectSymptomRule[], scor
   }
 }
 
+function applyBroadFallbackRules(input: string, scores: Map<string, ServiceCategorySuggestion>) {
+  const hasBroadAction = BROAD_ACTION_TERMS.some(term => hasPhrase(input, term));
+  const hasCarpentryContext = CARPENTRY_FALLBACK_TERMS.some(term => hasPhrase(input, term));
+
+  if (hasBroadAction) {
+    addScore(scores, 'Handyman', 7, 'broad service action', 'general home project');
+    addScore(scores, 'General Maintenance', 3, 'broad service action', 'general home project');
+  }
+
+  if (hasCarpentryContext) {
+    addScore(scores, 'Carpentry', hasBroadAction ? 9 : 6, 'wood or structure context', 'carpentry context');
+    if (hasBroadAction) {
+      addScore(scores, 'Handyman', 5, 'wood or structure project may be handyman work', 'carpentry context');
+    }
+  }
+}
+
 function onlyGenericOrLocationWords(input: string) {
   const tokens = Array.from(tokenSet(input));
   return tokens.length > 0 && tokens.every(token => GENERIC_OR_LOCATION_TERMS.has(token));
@@ -850,6 +983,7 @@ export function classifyHomeownerRequest(
   applyObjectSymptomRules(input, OBJECT_SYMPTOM_RULES, scores);
   applyRules(input, PHRASE_RULES, scores);
   applyRules(input, AMBIGUOUS_CONTEXT_RULES, scores);
+  applyBroadFallbackRules(input, scores);
 
   const tokens = tokenSet(input);
   for (const [category, terms] of Object.entries(TRADE_SPECIFIC_SINGLE_TERMS)) {
@@ -877,14 +1011,32 @@ export function classifyHomeownerRequest(
   if (hasPhrase(input, 'deck railing')) {
     addScore(scores, 'Decks', 8, 'deck railing context', 'deck railing');
   }
+  if (hasPhrase(input, 'soft deck board')) {
+    addScore(scores, 'Handyman', 8, 'small deck repair possible', 'soft deck board');
+  }
   if (hasPhrase(input, 'siding dirty')) {
     addScore(scores, 'Pressure Washing', 12, 'exterior surface cleaning', 'siding dirty');
+  }
+  if (hasPhrase(input, 'gate wont close') || hasPhrase(input, 'gate won t close')) {
+    addScore(scores, 'Handyman', 10, 'small gate adjustment possible', 'gate will not close');
+  }
+  if (hasPhrase(input, 'door sticks') || hasPhrase(input, 'door wont latch') || hasPhrase(input, 'door won t latch') || hasPhrase(input, 'draft around door')) {
+    addScore(scores, 'Handyman', 10, 'small door adjustment possible', 'door adjustment');
   }
   if (hasPhrase(input, 'deadbolt stuck')) {
     addScore(scores, 'Doors', 12, 'door hardware issue possible', 'deadbolt stuck');
   }
+  if (hasPhrase(input, 'repair drywall') || hasPhrase(input, 'patch drywall')) {
+    addScore(scores, 'Handyman', 22, 'small drywall repair may be handyman work', 'repair drywall');
+    addScore(scores, 'Painting', 22, 'paint finish may follow drywall repair', 'repair drywall');
+  }
   if (hasPhrase(input, 'lawn brown spots')) {
     addScore(scores, 'Irrigation', 8, 'lawn spots may relate to irrigation', 'lawn brown spots');
+  }
+  const hasRoofLeakContext = ['roof', 'attic', 'ceiling', 'shingle', 'shingles', 'flashing', 'fascia', 'soffit'].some(phrase => hasPhrase(input, phrase));
+  if (hasPhrase(input, 'water leak') && !hasRoofLeakContext) {
+    addScore(scores, 'Plumbing', 30, 'water leak usually starts with plumbing review', 'water leak');
+    scores.delete('Roofing');
   }
   if (hasPhrase(input, 'leak in attic')) {
     scores.delete('Pest Control');

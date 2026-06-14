@@ -8928,10 +8928,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const requestClassification = classifyHomeownerRequest(requestIssueText, SERVICE_REQUEST_CATEGORIES);
   const requestCategorySuggestions = requestClassification.rankedServiceTypes;
   const requestCategoryIsAmbiguous = requestClassification.ambiguous;
-  const connectionMatchesRequestCategory = (connection: HomeownerConnection, category = serviceRequestDraft.category) => {
-    if (!category) return false;
+  const requestMatchingCategories = [
+    serviceRequestDraft.category,
+    ...requestCategorySuggestions.map(suggestion => suggestion.category),
+  ].filter((category): category is string => Boolean(category && category !== 'Other'));
+  const requestMatchingCategoryKeys = new Set(requestMatchingCategories.map(category => category.toLowerCase()));
+  const contractorCategoriesMatchRequest = (categories: string[], category = serviceRequestDraft.category) => {
     if (category === 'Other') return true;
-    return serviceCategoriesForConnection(connection).some(item => item.toLowerCase() === category.toLowerCase());
+    if (category) {
+      return categories.some(item => item.toLowerCase() === category.toLowerCase());
+    }
+    if (requestMatchingCategoryKeys.size === 0) return false;
+    return categories.some(item => requestMatchingCategoryKeys.has(item.toLowerCase()));
+  };
+  const connectionMatchesRequestCategory = (connection: HomeownerConnection, category = serviceRequestDraft.category) => {
+    return contractorCategoriesMatchRequest(serviceCategoriesForConnection(connection), category);
   };
   const connectedContractorsForWizard = [...activeConnections].sort((a, b) => {
     const aMatches = connectionMatchesRequestCategory(a);
@@ -8940,13 +8951,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return a.business_name.localeCompare(b.business_name);
   });
   const connectedContractorIds = new Set(activeConnections.map(connection => connection.contractor_id));
-  const discoverContractorsForRequest = directoryContractors
-    .filter(contractor => !connectedContractorIds.has(contractor.id))
-    .filter(contractor => {
-      if (!serviceRequestDraft.category) return true;
-      return contractor.service_categories.some(category => category.toLowerCase() === serviceRequestDraft.category.toLowerCase());
-    })
-    .slice(0, 4);
+  const discoverContractorCandidates = directoryContractors.filter(contractor => !connectedContractorIds.has(contractor.id));
+  const discoverContractorsMatchingSelectedCategory = serviceRequestDraft.category
+    ? discoverContractorCandidates.filter(contractor => contractorCategoriesMatchRequest(contractor.service_categories, serviceRequestDraft.category))
+    : [];
+  const discoverContractorsMatchingRecommendedCategories = requestMatchingCategoryKeys.size > 0
+    ? discoverContractorCandidates.filter(contractor => contractorCategoriesMatchRequest(contractor.service_categories, ''))
+    : [];
+  const discoverContractorsForRequest = (
+    discoverContractorsMatchingSelectedCategory.length > 0
+      ? discoverContractorsMatchingSelectedCategory
+      : discoverContractorsMatchingRecommendedCategories.length > 0
+        ? discoverContractorsMatchingRecommendedCategories
+        : discoverContractorCandidates
+  ).slice(0, 4);
+  const discoverContractorFallbackActive = Boolean(
+    serviceRequestDraft.category
+    && discoverContractorsMatchingSelectedCategory.length === 0
+    && discoverContractorsMatchingRecommendedCategories.length > 0
+  );
   const requestDraftTitle = serviceRequestDraft.title || (serviceRequestDraft.category ? `${serviceRequestDraft.category} help needed` : 'Service help needed');
   const currentServiceRequestHomeId = serviceRequestDraft.home_id || selectedHome?.id || homes[0]?.id || '';
   const currentServiceRequestHome = homes.find(candidate => candidate.id === currentServiceRequestHomeId) ?? selectedHome ?? homes[0] ?? null;
@@ -11351,6 +11374,23 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
                 {requestComposerStep === 'issue' && (
                   <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <Field label="Who should this go to?">
+                      <select
+                        className={inputClass()}
+                        value={serviceRequestDraft.category}
+                        onChange={event => {
+                          const nextCategory = event.target.value;
+                          setServiceRequestDraft(current => ({ ...current, category: nextCategory, connection_id: '' }));
+                          setDirectoryCategory(nextCategory);
+                        }}
+                      >
+                        <option value="">Not sure — recommend based on my request</option>
+                        {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                      </select>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Choose a contractor type if you know it, or describe the issue below and ServSync will recommend where to send it.
+                      </p>
+                    </Field>
                     <Field label="What do you need help with?">
                       <textarea
                         className={`${inputClass()} min-h-[120px]`}
@@ -11425,21 +11465,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         </div>
                       </div>
                     )}
-                    <Field label="Choose another service type">
-                      <select
-                        className={inputClass()}
-                        value={serviceRequestDraft.category}
-                        onChange={event => {
-                          const nextCategory = event.target.value;
-                          setServiceRequestDraft(current => ({ ...current, category: nextCategory, connection_id: '' }));
-                          setDirectoryCategory(nextCategory);
-                        }}
-                      >
-                        <option value="">Choose a contractor type</option>
-                        {SERVICE_REQUEST_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                      </select>
-                      <p className="mt-1 text-xs text-slate-500">Choose a contractor type before continuing.</p>
-                    </Field>
                     <div className="flex flex-wrap gap-2">
                       {homeownerHasMultipleProperties && (
                         <button type="button" onClick={() => setRequestComposerStep('property')} className={buttonClass('secondary')}>Back</button>
@@ -11551,6 +11576,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         </div>
                         {discoverContractorsForRequest.length > 0 ? (
                           <div className="space-y-2">
+                            {discoverContractorFallbackActive && (
+                              <Notice tone="info" text="We could not find an exact match, but these contractors may be able to help based on related contractor types." />
+                            )}
                             {discoverContractorsForRequest.map(contractor => (
                               <div key={contractor.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
