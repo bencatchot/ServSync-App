@@ -110,7 +110,7 @@ The product should be judged against the core loop: Homeowner Request -> Contrac
 | Completion | Finalization/report filing exists. | Make closeout sequence clearer. |
 | Invoice | First-class invoices exist. | Keep invoice action rail focused. |
 | Home Timeline | Maintenance log/documents exist, but no unified timeline table/view. | Build Home Timeline v1. |
-| Reminder | Calendar recurrence exists, but no dedicated homeowner maintenance reminder workflow. | Build Reminder v1 after timeline. |
+| Reminder | Manual homeowner Home Reminder workflow is the next narrow step. It should attach to homes and Home History context without notification automation. | Build Reminder v1 before automation. |
 
 # 7. Current Build Audit Summary
 
@@ -254,7 +254,7 @@ The roadmap should stay disciplined. The app already has many features. The next
 | 3 | General connection-level messaging | Allows questions without forcing service requests. |
 | 4 | Job terminology cleanup | Simple service contractors should not feel trapped in inspection language. |
 | 5 | Home Timeline v1 | Turns completed work into lasting homeowner value. |
-| 6 | Maintenance Reminder v1 | Completes the final step of the MVP loop. |
+| 6 | Home Reminder v1 | Completes the final step of the MVP loop with manual homeowner follow-ups before notification automation. |
 | 7 | Dashboard and notification accuracy | Builds trust and reduces confusion. |
 | 8 | Mobile core-loop QA | Contractors will use this in the field. |
 | 9 | Beta onboarding and feedback capture | Turns early users into product direction. |

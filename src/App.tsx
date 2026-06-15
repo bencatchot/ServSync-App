@@ -84,6 +84,8 @@ import type {
   InspectionTemplateRoom,
   Invoice,
   JobLifecycleStatus,
+  HomeReminder,
+  HomeReminderStatus,
   MaintenanceLogEntry,
   PublicReview,
   ConnectionStatus,
@@ -208,6 +210,15 @@ type HomeownerServiceRequestDraft = {
   urgency: ServiceRequestUrgency;
   title: string;
   description: string;
+};
+type HomeReminderDraft = {
+  home_id: string;
+  maintenance_log_id: string | null;
+  service_request_id: string | null;
+  invoice_id: string | null;
+  title: string;
+  notes: string;
+  due_on: string;
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
 type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
@@ -7843,11 +7854,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [docPendingDelete, setDocPendingDelete] = useState<HomeDocument | null>(null);
   const [homeownerDocumentPropertyScope, setHomeownerDocumentPropertyScope] = useState<HomeownerDocumentPropertyScope>('selected');
   const [maintenanceLog, setMaintenanceLog] = useState<MaintenanceLogEntry[]>([]);
+  const [homeReminders, setHomeReminders] = useState<HomeReminder[]>([]);
   const [logFormOpen, setLogFormOpen] = useState(false);
   const [logDraft, setLogDraft] = useState<{ service_request_id: string | null; category: string; title: string; description: string; performed_at: string; contractor_name: string; cost: string; notes: string }>({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
   const [logInvoiceFile, setLogInvoiceFile] = useState<File | null>(null);
   const [logInvoiceNotice, setLogInvoiceNotice] = useState('');
   const [homeownerMaintenancePropertyScope, setHomeownerMaintenancePropertyScope] = useState<HomeownerMaintenancePropertyScope>('selected');
+  const [reminderFormOpen, setReminderFormOpen] = useState(false);
+  const [homeReminderDraft, setHomeReminderDraft] = useState<HomeReminderDraft>({
+    home_id: selectedHomeId,
+    maintenance_log_id: null,
+    service_request_id: null,
+    invoice_id: null,
+    title: '',
+    notes: '',
+    due_on: new Date().toISOString().slice(0, 10),
+  });
+  const [savingHomeReminder, setSavingHomeReminder] = useState(false);
+  const [updatingHomeReminderId, setUpdatingHomeReminderId] = useState<string | null>(null);
   const [savingLogEntry, setSavingLogEntry] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const [quickLogDrafts, setQuickLogDrafts] = useState<Record<string, boolean>>({});
@@ -7997,7 +8021,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setLoading(true);
     setError('');
     try {
-      const [profileRes, homeRes, connectionsRes, directoryRes, serviceRequestsRes, estimatesRes, invoicesRes, notifRes, logRes, docsRes, supportRes] = await Promise.all([
+      const [profileRes, homeRes, connectionsRes, directoryRes, serviceRequestsRes, estimatesRes, invoicesRes, notifRes, logRes, remindersRes, docsRes, supportRes] = await Promise.all([
         supabase.from('homeowner_profiles').select('*').eq('user_id', profile.id).maybeSingle(),
         supabase.from('homes').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: true }),
         supabase.rpc('servsync_get_homeowner_connections'),
@@ -8007,6 +8031,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         supabase.from('invoices').select(INVOICE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
         supabase.from('notifications').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('home_maintenance_log').select('*').eq('homeowner_user_id', profile.id).order('performed_at', { ascending: false }),
+        supabase.from('home_reminders').select('*').eq('homeowner_user_id', profile.id).order('due_on', { ascending: true }),
         supabase.from('home_documents').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: false }),
         supabase.from('support_inquiries').select('*, messages:support_inquiry_messages(*)').eq('requester_user_id', profile.id).order('updated_at', { ascending: false }),
       ]);
@@ -8050,6 +8075,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       }, {}));
       if (!notifRes.error) setNotifications((notifRes.data || []) as AppNotification[]);
       if (!logRes.error) setMaintenanceLog((logRes.data || []) as MaintenanceLogEntry[]);
+      if (!remindersRes.error) setHomeReminders((remindersRes.data || []) as HomeReminder[]);
       if (!docsRes.error) setHomeDocuments((docsRes.data || []) as HomeDocument[]);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
     } catch (err) {
@@ -8236,6 +8262,40 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
 
   const emptyLogDraft = () => ({ service_request_id: null, category: '', title: '', description: '', performed_at: new Date().toISOString().slice(0,10), contractor_name: '', cost: '', notes: '' });
+  const dateInputValue = (date: Date) => {
+    const copy = new Date(date);
+    copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
+    return copy.toISOString().slice(0, 10);
+  };
+  const defaultHomeReminderDueDate = () => {
+    const due = new Date();
+    due.setDate(due.getDate() + 30);
+    return dateInputValue(due);
+  };
+  const emptyHomeReminderDraft = (): HomeReminderDraft => ({
+    home_id: selectedHome?.id || selectedHomeId || '',
+    maintenance_log_id: null,
+    service_request_id: null,
+    invoice_id: null,
+    title: '',
+    notes: '',
+    due_on: defaultHomeReminderDueDate(),
+  });
+  const reminderDueState = (reminder: HomeReminder) => {
+    if (reminder.status === 'completed') return { label: 'Completed', className: 'bg-emerald-100 text-emerald-700' };
+    if (reminder.status === 'dismissed') return { label: 'Dismissed', className: 'bg-slate-100 text-slate-600' };
+    const today = dateInputValue(new Date());
+    if (reminder.due_on < today) return { label: 'Overdue', className: 'bg-red-100 text-red-700' };
+    if (reminder.due_on === today) return { label: 'Due today', className: 'bg-amber-100 text-amber-700' };
+    return { label: 'Upcoming', className: 'bg-blue-50 text-blue-700' };
+  };
+  const openHomeReminderComposer = (options: Partial<HomeReminderDraft> = {}) => {
+    setHomeReminderDraft({ ...emptyHomeReminderDraft(), ...options });
+    setReminderFormOpen(true);
+    setLogFormOpen(false);
+    setNotice('');
+    setError('');
+  };
 
   const applyInvoiceFileToLogDraft = (file: File) => {
     const parsed = invoiceDraftFromFileName(file.name);
@@ -8364,6 +8424,72 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to delete Home History entry.'));
     } finally {
       setDeletingLogId(null);
+    }
+  };
+
+  const saveHomeReminder = async () => {
+    if (!supabase) return;
+    const title = cleanHumanWrittenText(homeReminderDraft.title);
+    const notes = cleanHumanWrittenText(homeReminderDraft.notes);
+    if (!title) {
+      setError('Add a reminder title before saving.');
+      return;
+    }
+    if (!homeReminderDraft.due_on) {
+      setError('Choose a due date before saving the reminder.');
+      return;
+    }
+    setSavingHomeReminder(true);
+    setError('');
+    setNotice('');
+    try {
+      const { error: insertError } = await supabase.from('home_reminders').insert({
+        homeowner_user_id: profile.id,
+        home_id: homeReminderDraft.home_id || null,
+        maintenance_log_id: homeReminderDraft.maintenance_log_id,
+        service_request_id: homeReminderDraft.service_request_id,
+        invoice_id: homeReminderDraft.invoice_id,
+        title,
+        notes,
+        due_on: homeReminderDraft.due_on,
+        status: 'open',
+      });
+      if (insertError) throw insertError;
+      setHomeReminderDraft(emptyHomeReminderDraft());
+      setReminderFormOpen(false);
+      setNotice('Home Reminder saved. It will appear on your dashboard and in Home History.');
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save Home Reminder.'));
+    } finally {
+      setSavingHomeReminder(false);
+    }
+  };
+
+  const updateHomeReminderStatus = async (reminder: HomeReminder, status: HomeReminderStatus) => {
+    if (!supabase) return;
+    setUpdatingHomeReminderId(reminder.id);
+    setError('');
+    setNotice('');
+    try {
+      const now = new Date().toISOString();
+      const payload = {
+        status,
+        completed_at: status === 'completed' ? now : null,
+        dismissed_at: status === 'dismissed' ? now : null,
+      };
+      const { error: updateError } = await supabase
+        .from('home_reminders')
+        .update(payload)
+        .eq('id', reminder.id)
+        .eq('homeowner_user_id', profile.id);
+      if (updateError) throw updateError;
+      setHomeReminders(current => current.map(item => item.id === reminder.id ? { ...item, ...payload } : item));
+      setNotice(status === 'completed' ? 'Home Reminder marked complete.' : 'Home Reminder dismissed.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to update Home Reminder.'));
+    } finally {
+      setUpdatingHomeReminderId(null);
     }
   };
 
@@ -9393,6 +9519,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const dashboardInvoices = invoices.filter(dashboardPropertyMatches);
   const dashboardHomeDocuments = homeDocuments.filter(dashboardPropertyMatches);
   const dashboardMaintenanceLog = maintenanceLog.filter(dashboardPropertyMatches);
+  const dashboardHomeReminders = homeReminders.filter(dashboardPropertyMatches);
   const homeownerHasMultipleProperties = homes.length > 1;
   const shouldShowHomeownerUnassignedPropertyNotice = (propertyScope: 'selected' | 'all' | 'unassigned', unassignedCount: number) =>
     homeownerHasMultipleProperties && Boolean(selectedHomeId) && propertyScope === 'selected' && unassignedCount > 0;
@@ -9402,6 +9529,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ...invoices,
     ...homeDocuments,
     ...maintenanceLog,
+    ...homeReminders,
   ].filter(record => !record.home_id).length;
   const showDashboardUnassignedRecordNotice = homeownerTab === 'overview'
     && shouldShowHomeownerUnassignedPropertyNotice('selected', dashboardUnassignedRecordCount);
@@ -9446,6 +9574,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentLogEntries = dashboardMaintenanceLog.slice(0, 3);
+  const openDashboardHomeReminders = dashboardHomeReminders
+    .filter(reminder => reminder.status === 'open')
+    .sort((a, b) => a.due_on.localeCompare(b.due_on))
+    .slice(0, 4);
   const selectedMaintenancePropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedMaintenanceLogCount = maintenanceLog.filter(entry => !entry.home_id).length;
   const homeownerMaintenancePropertyMatches = (entry: Pick<MaintenanceLogEntry, 'home_id'>) => {
@@ -9454,6 +9586,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return selectedHomeId ? entry.home_id === selectedHomeId : !entry.home_id;
   };
   const propertyScopedMaintenanceLog = maintenanceLog.filter(homeownerMaintenancePropertyMatches);
+  const propertyScopedHomeReminders = homeReminders.filter(reminder => {
+    if (homeownerMaintenancePropertyScope === 'all') return true;
+    if (homeownerMaintenancePropertyScope === 'unassigned') return !reminder.home_id;
+    return selectedHomeId ? reminder.home_id === selectedHomeId : !reminder.home_id;
+  });
   const homeownerMaintenanceScopeLabel = homeownerMaintenancePropertyScope === 'all'
     ? 'all properties'
     : homeownerMaintenancePropertyScope === 'unassigned'
@@ -9466,6 +9603,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const estimateById = new Map(estimates.map(estimate => [estimate.id, estimate]));
   const invoiceById = new Map(invoices.map(invoice => [invoice.id, invoice]));
   const requestById = new Map(serviceRequests.map(request => [request.id, request]));
+  const remindersByMaintenanceLogId = homeReminders.reduce<Record<string, HomeReminder[]>>((groups, reminder) => {
+    if (!reminder.maintenance_log_id) return groups;
+    groups[reminder.maintenance_log_id] = [...(groups[reminder.maintenance_log_id] || []), reminder];
+    return groups;
+  }, {});
   const homeHistoryEntryTypeChips = (entry: MaintenanceLogEntry) => {
     const chips: Array<{ label: string; className: string }> = [];
     if (!entry.service_request_id && !entry.estimate_id && !entry.inspection_id && !entry.report_document_id && !entry.invoice_document_id && !entry.invoice_id) {
@@ -11234,7 +11376,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-4">
             <Card title="My contractors" icon={<Users size={18} />}>
               <div className="space-y-3">
                 {activeConnections.length === 0 ? (
@@ -11272,6 +11414,37 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                   Open Home History
                 </button>
+              </div>
+            </Card>
+
+            <Card title="Upcoming reminders" icon={<Bell size={18} />}>
+              <div className="space-y-3">
+                {openDashboardHomeReminders.length === 0 ? (
+                  <EmptyState text="No open Home Reminders yet." />
+                ) : (
+                  openDashboardHomeReminders.map(reminder => {
+                    const dueState = reminderDueState(reminder);
+                    return (
+                      <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="min-w-0 text-sm font-semibold text-slate-800">{reminder.title}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                    Open Home History
+                  </button>
+                  <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); openHomeReminderComposer(); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                    Add reminder
+                  </button>
+                </div>
               </div>
             </Card>
 
@@ -13327,6 +13500,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Receipts attached</p>
                 <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedMaintenanceLog.filter(entry => entry.invoice_document_id).length}</p>
               </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Open reminders</p>
+                <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedHomeReminders.filter(reminder => reminder.status === 'open').length}</p>
+              </div>
               {(() => {
                 const total = propertyScopedMaintenanceLog.reduce((s, e) => s + (e.cost_cents ?? 0), 0);
                 return total > 0 ? (
@@ -13356,7 +13533,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         : 'Completed work, filed reports, receipts, invoices, warranty notes, service notes, and follow-up context belong here so future service does not start from scratch.'}
                   </p>
                   <p className="mt-2 text-xs leading-5 text-emerald-800">
-                    Reminder tools are not built yet; for now, use notes to capture future follow-up needs.
+                    Home Reminders are manual follow-up notes you create for yourself. They do not send automatic emails, texts, or push alerts yet.
                   </p>
                 </div>
                 <Field label="View">
@@ -13389,7 +13566,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               {[
                 ['Completed work', 'Keep finished service visits, repairs, inspections, and job summaries attached to the right property.'],
                 ['Reports and receipts', 'Store filed job reports, invoices, receipts, warranties, permits, and other documents without merging them into the private Documents tab.'],
-                ['Future context', 'Capture warranty details, service notes, and follow-up needs now. Reminder tools can connect here later.'],
+                ['Future context', 'Capture warranty details, service notes, and manual Home Reminders for follow-up needs. Automation can come later.'],
               ].map(([title, body]) => (
                 <div key={title} className="rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-sm font-bold text-slate-950">{title}</p>
@@ -13399,16 +13576,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
 
             {!logFormOpen ? (
-              <button type="button" className={buttonClass('primary')}
-                onClick={() => {
-                  setLogDraft(emptyLogDraft());
-                  setLogInvoiceFile(null);
-                  setLogInvoiceNotice('');
-                  setLogFormOpen(true);
-                }}
-              >
-                <Plus size={16} />Add history entry
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass('primary')}
+                  onClick={() => {
+                    setLogDraft(emptyLogDraft());
+                    setLogInvoiceFile(null);
+                    setLogInvoiceNotice('');
+                    setReminderFormOpen(false);
+                    setLogFormOpen(true);
+                  }}
+                >
+                  <Plus size={16} />Add history entry
+                </button>
+                <button type="button" className={buttonClass('secondary')} onClick={() => openHomeReminderComposer()}>
+                  <Bell size={16} />Add Home Reminder
+                </button>
+              </div>
             ) : (
               <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-800">New home history entry</p>
@@ -13528,6 +13711,147 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
 
+            {reminderFormOpen && (
+              <div className="mt-4 space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+                <div>
+                  <p className="text-sm font-bold text-blue-950">New Home Reminder</p>
+                  <p className="mt-1 text-xs leading-5 text-blue-800">
+                    Create a manual follow-up reminder for your own dashboard. ServSync will not send automatic alerts yet.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Reminder title">
+                    <input
+                      className={inputClass()}
+                      {...writingAssistProps}
+                      value={homeReminderDraft.title}
+                      onChange={event => setHomeReminderDraft(current => ({ ...current, title: event.target.value }))}
+                      placeholder="e.g. Replace HVAC filter"
+                    />
+                  </Field>
+                  <Field label="Due date">
+                    <input
+                      className={inputClass()}
+                      type="date"
+                      value={homeReminderDraft.due_on}
+                      onChange={event => setHomeReminderDraft(current => ({ ...current, due_on: event.target.value }))}
+                    />
+                  </Field>
+                  {homes.length > 0 && (
+                    <Field label="Property">
+                      <select
+                        className={inputClass()}
+                        value={homeReminderDraft.home_id}
+                        onChange={event => setHomeReminderDraft(current => ({ ...current, home_id: event.target.value }))}
+                      >
+                        <option value="">No property selected</option>
+                        {homes.map(candidate => (
+                          <option key={candidate.id} value={candidate.id}>{homeProfileDisplayLabel(candidate)}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                </div>
+                {homeReminderDraft.maintenance_log_id && (
+                  <p className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-800">
+                    Linked to this Home History record.
+                  </p>
+                )}
+                <Field label="Notes — optional">
+                  <textarea
+                    className={inputClass()}
+                    rows={3}
+                    {...writingAssistProps}
+                    value={homeReminderDraft.notes}
+                    onChange={event => setHomeReminderDraft(current => ({ ...current, notes: event.target.value }))}
+                    placeholder="Add warranty details, what to check, or who to call."
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={buttonClass('primary')} disabled={savingHomeReminder} onClick={() => void saveHomeReminder()}>
+                    <Bell size={16} />{savingHomeReminder ? 'Saving...' : 'Save reminder'}
+                  </button>
+                  <button
+                    type="button"
+                    className={buttonClass('secondary')}
+                    disabled={savingHomeReminder}
+                    onClick={() => {
+                      setReminderFormOpen(false);
+                      setHomeReminderDraft(emptyHomeReminderDraft());
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {propertyScopedHomeReminders.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Home Reminders</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Manual follow-ups for this Home History scope. These do not send automatic alerts yet.
+                    </p>
+                  </div>
+                  <button type="button" className={buttonClass('secondary')} onClick={() => openHomeReminderComposer()}>
+                    <Bell size={15} />Add reminder
+                  </button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {propertyScopedHomeReminders
+                    .slice()
+                    .sort((a, b) => {
+                      if (a.status === b.status) return a.due_on.localeCompare(b.due_on);
+                      return a.status === 'open' ? -1 : 1;
+                    })
+                    .map(reminder => {
+                      const dueState = reminderDueState(reminder);
+                      const linkedEntry = reminder.maintenance_log_id ? maintenanceLog.find(entry => entry.id === reminder.maintenance_log_id) : null;
+                      return (
+                        <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold text-slate-950">{reminder.title}</p>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                {linkedEntry && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Linked to Home History</span>}
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                {linkedEntry ? ` · ${linkedEntry.title}` : ''}
+                              </p>
+                              {reminder.notes && <p className="mt-1 text-xs leading-5 text-slate-500">{reminder.notes}</p>}
+                            </div>
+                            {reminder.status === 'open' && (
+                              <div className="flex shrink-0 flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={updatingHomeReminderId === reminder.id}
+                                  onClick={() => void updateHomeReminderStatus(reminder, 'completed')}
+                                  className={buttonClass('secondary')}
+                                >
+                                  <CheckCircle2 size={15} />Complete
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={updatingHomeReminderId === reminder.id}
+                                  onClick={() => void updateHomeReminderStatus(reminder, 'dismissed')}
+                                  className={buttonClass('secondary')}
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             {/* Log list */}
             {propertyScopedMaintenanceLog.length === 0 && !logFormOpen && (
               <p className="mt-4 text-sm text-slate-500">
@@ -13548,6 +13872,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   const entryEstimate = entry.estimate_id ? estimateById.get(entry.estimate_id) : null;
                   const entryInvoice = entry.invoice_id ? invoiceById.get(entry.invoice_id) : null;
                   const entryTypeChips = homeHistoryEntryTypeChips(entry);
+                  const entryReminders = remindersByMaintenanceLogId[entry.id] || [];
                   return (
                   <div key={entry.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -13583,6 +13908,48 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         )}
                         {entry.description && <p className="mt-1.5 text-sm text-slate-700">{entry.description}</p>}
                         {entry.notes && <p className="mt-1 text-xs text-slate-500 italic">{entry.notes}</p>}
+                        {entryReminders.length > 0 && (
+                          <div className="mt-2 space-y-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Linked Home Reminders</p>
+                            {entryReminders.map(reminder => {
+                              const dueState = reminderDueState(reminder);
+                              return (
+                                <div key={reminder.id} className="flex flex-col gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-semibold text-slate-900">{reminder.title}</p>
+                                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                      Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      {reminder.notes ? ` · ${reminder.notes}` : ''}
+                                    </p>
+                                  </div>
+                                  {reminder.status === 'open' && (
+                                    <div className="flex shrink-0 flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={updatingHomeReminderId === reminder.id}
+                                        onClick={() => void updateHomeReminderStatus(reminder, 'completed')}
+                                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                                      >
+                                        Complete
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={updatingHomeReminderId === reminder.id}
+                                        onClick={() => void updateHomeReminderStatus(reminder, 'dismissed')}
+                                        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                                      >
+                                        Dismiss
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         {(entryRequest || entryEstimate || entryInvoice || reportDocument || invoiceDocument) && (
                           <div className="mt-2 flex flex-wrap gap-3">
                             {entryRequest && (
@@ -13637,6 +14004,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             )}
                           </div>
                         )}
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => openHomeReminderComposer({
+                              home_id: entry.home_id || selectedHome?.id || selectedHomeId || '',
+                              maintenance_log_id: entry.id,
+                              service_request_id: entry.service_request_id,
+                              invoice_id: entry.invoice_id || null,
+                              title: `Follow up: ${entry.title}`,
+                            })}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                          >
+                            <Bell size={13} />
+                            Add follow-up reminder
+                          </button>
+                        </div>
                       </div>
                       <button type="button"
                         disabled={deletingLogId === entry.id}
