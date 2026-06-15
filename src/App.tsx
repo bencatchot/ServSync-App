@@ -8302,7 +8302,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         ? await createHomeDocumentFromFile(
             logInvoiceFile,
             'receipt',
-            `Invoice/receipt for maintenance log${logDraft.title.trim() ? `: ${logDraft.title.trim()}` : ''}`,
+            `Invoice/receipt for Home History${logDraft.title.trim() ? `: ${logDraft.title.trim()}` : ''}`,
           )
         : null;
       const linkedLogRequest = logDraft.service_request_id
@@ -8957,7 +8957,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setRequestComposerOpen(false);
       setRequestComposerStep('issue');
       resetRequestContractorFilters();
-      setNotice('Service request sent.');
+      setNotice('Service request sent. Your contractor can review the details, reply, schedule time, or send an estimate.');
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to create service request.'));
@@ -9034,7 +9034,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         p_action: action,
       });
       if (estimateError) throw estimateError;
-      setNotice(action === 'accept' ? 'Estimate accepted.' : 'Estimate declined.');
+      setNotice(action === 'accept'
+        ? 'Estimate accepted. Your contractor can now create or schedule the job from this approval.'
+        : 'Estimate declined. The contractor can revise it if needed.'
+      );
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to respond to estimate.'));
@@ -9069,7 +9072,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       return;
     }
     if (maintenanceLog.some(entry => entry.estimate_id === estimate.id)) {
-      setNotice('This estimate is already filed in your maintenance log.');
+      setNotice('This estimate is already filed in Home History.');
       return;
     }
 
@@ -9811,8 +9814,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
     {
       id: 'accepted',
-      title: 'Accepted',
-      helper: 'Approved estimates',
+      title: 'Accepted Estimates',
+      helper: 'Approved; contractor creates the job next',
       emptyText: 'No accepted estimates yet.',
       count: acceptedEstimates.length,
       totalCents: sumEstimateCents(acceptedEstimates),
@@ -9926,6 +9929,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Download size={16} />
             Download PDF
           </button>
+          {invoice.status === 'paid' && (
+            <button
+              type="button"
+              onClick={() => setHomeownerTab('log')}
+              className={buttonClass('secondary')}
+            >
+              <ClipboardList size={16} />
+              View Home History
+            </button>
+          )}
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
@@ -9933,7 +9946,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
                 Payment is handled directly with your contractor. Contact them for payment instructions.
                 <span className="mt-1 block text-xs text-blue-800">
-                  ServSync is a software platform. Contractors are responsible for their own work, invoices, licenses, insurance, and services.
+                  After the invoice is handled, related reports, receipts, and notes can live in Home History for this property.
                 </span>
               </div>
             )}
@@ -10045,20 +10058,32 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   {estimate.inspection_id && <p>The contractor has created a job from this approved estimate.</p>}
                   {linkedInvoice && <p>An invoice is linked to this estimate with status: {invoiceStatusLabel(linkedInvoice.status)}.</p>}
                   {estimateFiled && <p>A copy has been saved to your Documents and Home History.</p>}
-                  {!estimate.inspection_id && !linkedInvoice && !estimateFiled && <p>Your contractor can use this approved estimate to start the job.</p>}
+                  {!estimate.inspection_id && !linkedInvoice && !estimateFiled && (
+                    <p>Next step: your contractor can create or schedule the job from this approved estimate.</p>
+                  )}
                 </div>
               </div>
             )}
             {estimate.status === 'accepted' && (
-              <button
-                type="button"
-                onClick={() => void fileEstimateToHomeRecords(estimate, contractorName)}
-                disabled={filingEstimateId === estimate.id || estimateFiled}
-                className={estimateFiled ? buttonClass('secondary') : buttonClass('primary')}
-              >
-                <FolderOpen size={16} />
-                {estimateFiled ? 'Filed to records' : filingEstimateId === estimate.id ? 'Filing...' : 'File to Documents & Log'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void fileEstimateToHomeRecords(estimate, contractorName)}
+                  disabled={filingEstimateId === estimate.id || estimateFiled}
+                  className={estimateFiled ? buttonClass('secondary') : buttonClass('primary')}
+                >
+                  <FolderOpen size={16} />
+                  {estimateFiled ? 'Filed to Home History' : filingEstimateId === estimate.id ? 'Filing...' : 'File to Home History'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHomeownerTab('log')}
+                  className={buttonClass('secondary')}
+                >
+                  <ClipboardList size={16} />
+                  View Home History
+                </button>
+              </div>
             )}
             {estimate.scope && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{estimate.scope}</p>}
             {estimate.line_items && estimate.line_items.length > 0 && (
@@ -10160,7 +10185,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
           <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
           <p className="mt-1 text-sm text-blue-800">
-            Drafts stay private to the contractor. Anything shown here has been sent to you.
+            Drafts stay private to the contractor. Sent estimates need your decision, accepted estimates move the work toward a job, and invoices are the billing step after work is ready.
           </p>
         </div>
 
@@ -10400,6 +10425,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div>
                   <p className="text-sm font-semibold text-slate-950">{statusText}</p>
                   <p className="text-xs text-slate-500">{estimate.title} · ${(estimate.total_cents / 100).toFixed(2)}</p>
+                  {estimate.status === 'accepted' && (
+                    <p className="mt-1 text-xs font-medium text-emerald-700">
+                      Next step: contractor creates or schedules the job.
+                    </p>
+                  )}
                 </div>
                 {estimate.status === 'sent' && (
                   <button
@@ -11131,7 +11161,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   ))
                 )}
                 <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-                  Open maintenance log
+                  Open Home History
                 </button>
               </div>
             </Card>
@@ -11207,7 +11237,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
             <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-              Property-specific filtering will be added as requests, documents, estimates, invoices, jobs, reports, and maintenance logs are linked to individual homes.
+              Property-specific filtering will expand as requests, documents, estimates, invoices, jobs, reports, and Home History records are linked to individual homes.
             </p>
           </Card>
         </div>
@@ -12680,6 +12710,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         </ul>
                       )}
                     </div>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900">
+                      After you send this, the contractor can reply, schedule a visit, send an estimate, create the job, and send an invoice when the work is ready to bill.
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => setRequestComposerStep('contractor')} className={buttonClass('secondary')}>Back</button>
                       <button
@@ -13013,11 +13046,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               onClick={() => setReviewDrafts(prev => ({ ...prev, [request.id]: { open: true, rating: 0, kudos: [], body: '', displayName: '', location: '' } }))}
                             ><Star size={15} />Leave a review</button>
                           ) : null}
-                          {/* Log this job */}
+                          {/* Save this job to Home History */}
                           {!maintenanceLog.some(e => e.service_request_id === request.id) && (
                             quickLogDrafts[request.id] ? (
                               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-sm font-semibold text-slate-950">Log this job</p>
+                                <p className="text-sm font-semibold text-slate-950">Save this job to Home History</p>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   <Field label="Date work was done">
                                     <input className={inputClass()} type="date"
@@ -13041,7 +13074,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </Field>
                                 <div className="flex flex-wrap gap-2">
                                   <button type="button" className={buttonClass('primary')} disabled={savingLogEntry} onClick={() => void saveLogEntry()}>
-                                    <ClipboardList size={15} />{savingLogEntry ? 'Saving...' : 'Save to log'}
+                                    <ClipboardList size={15} />{savingLogEntry ? 'Saving...' : 'Save to Home History'}
                                   </button>
                                   <button type="button" className={buttonClass('secondary')} onClick={() => setQuickLogDrafts(p => ({ ...p, [request.id]: false }))}>Cancel</button>
                                 </div>
@@ -13061,11 +13094,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   });
                                   setQuickLogDrafts(p => ({ ...p, [request.id]: true }));
                                 }}
-                              ><ClipboardList size={15} />Log this job</button>
+                              ><ClipboardList size={15} />Save to Home History</button>
                             )
                           )}
                           {maintenanceLog.some(e => e.service_request_id === request.id) && (
-                            <p className="text-xs text-slate-400 flex items-center gap-1"><ClipboardList size={13} /> Logged in maintenance log</p>
+                            <p className="text-xs text-slate-400 flex items-center gap-1"><ClipboardList size={13} /> Saved in Home History</p>
                           )}
                           {/* Reopen section */}
                           {reopenDrafts[request.id]?.open ? (
@@ -13190,7 +13223,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
 
           {/* Add entry form */}
-          <Card title="Maintenance log" icon={<ClipboardList size={18} />}>
+          <Card title="Home History" icon={<ClipboardList size={18} />}>
             <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="min-w-0">
@@ -13200,10 +13233,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </p>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
                     {homeownerHasMultipleProperties && unassignedMaintenanceLogCount > 0
-                      ? 'Use All properties to see every maintenance entry, or Unassigned to find older entries that are not tied to a property yet.'
+                      ? 'Use All properties to see completed work, reports, invoices, and notes across your homes, or Unassigned to find older entries that are not tied to a property yet.'
                       : homeownerHasMultipleProperties
-                        ? 'Use All properties to see home history across every property.'
-                        : 'Use the menu to switch between selected, all, or unassigned history.'}
+                        ? 'Use All properties to see completed work, reports, invoices, and notes across every property.'
+                        : 'Completed work, reports, invoices, and follow-up notes belong here so future service does not start from scratch.'}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-emerald-800">
+                    Reminder tools are not built yet; for now, use notes to capture future follow-up needs.
                   </p>
                 </div>
                 <Field label="View">
@@ -13241,11 +13277,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   setLogFormOpen(true);
                 }}
               >
-                <Plus size={16} />Add log entry
+                <Plus size={16} />Add history entry
               </button>
             ) : (
               <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-800">New log entry</p>
+                <p className="text-sm font-semibold text-slate-800">New home history entry</p>
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -13369,7 +13405,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   ? 'No maintenance history for this property yet.'
                   : homeownerMaintenancePropertyScope === 'unassigned'
                     ? 'No unassigned maintenance entries.'
-                    : 'No log entries yet. Add your first entry or log a job from a closed service request.'}
+                    : 'No home history entries yet. Add your first entry or save completed work from a closed service request.'}
               </p>
             )}
             {propertyScopedMaintenanceLog.length > 0 && (
@@ -16337,6 +16373,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
   const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
+  const acceptedEstimatesNeedingJobs = estimates.filter(estimate => estimate.status === 'accepted' && !estimateHasLinkedJob(estimate));
   const onboardingCustomerCount = connections.length + localContacts.length;
   const onboardingSentEstimateCount = estimates.filter(estimate => estimate.status !== 'draft').length;
   const onboardingSentInvoiceCount = invoices.filter(invoice => invoice.status !== 'draft').length;
@@ -17083,7 +17120,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     if (!options?.skipConfirmation) {
       const confirmed = window.confirm(insp.homeowner_user_id
-        ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to their maintenance log. This cannot be undone.'
+        ? 'Finalize this job report? The PDF will be saved to the homeowner\'s Documents and the completed work will be added to Home History. This cannot be undone.'
         : 'Finalize this new customer job report? The PDF will be stored with this contractor record, but it will not be sent to a ServSync homeowner until that customer has a profile.'
       );
       if (!confirmed) return;
@@ -17160,7 +17197,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       }
       setNotice(insp.homeowner_user_id
-        ? 'Job report finalized, saved to homeowner Documents, and added to their maintenance log.'
+        ? 'Job report finalized, saved to homeowner Documents, and added to Home History.'
         : 'New customer job report finalized.'
       );
     } catch (err) {
@@ -17212,7 +17249,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       setNotice(insp.service_request_id
         ? 'Job completed, report sent, and linked service request closed for the homeowner.'
-        : 'Homeowner notified. The report is available in their Documents and maintenance log.'
+        : 'Homeowner notified. The report is available in their Documents and Home History.'
       );
     } catch (err) {
       setError(readableError(err, 'Unable to send report notification to homeowner.'));
@@ -18206,6 +18243,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </div>
           )}
+          {acceptedEstimatesNeedingJobs.length > 0 && (
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-emerald-950">
+                    {acceptedEstimatesNeedingJobs.length} accepted estimate{acceptedEstimatesNeedingJobs.length === 1 ? '' : 's'} need job creation
+                  </p>
+                  <p className="mt-1 text-sm text-emerald-800">
+                    Homeowners have approved the pricing. Create the job next so the work, invoice, and home history stay connected.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContractorTab('inspections');
+                    setContractorJobsView('open_financial');
+                    setInspectionView('list');
+                    setHomeownerWorkspaceEstimateView('accepted');
+                  }}
+                  className={buttonClass('primary')}
+                >
+                  <ClipboardCheck size={16} />
+                  Review accepted estimates
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
               <div className="p-4 sm:p-5">
@@ -18302,9 +18366,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </div>
           </section>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <OverviewCard icon={<MessageSquare size={18} />} label="Open requests" value={String(openServiceRequestCount)} helper={`${contractorFollowUpCount} need action · ${urgentServiceRequests.length} urgent`} onClick={() => setContractorTab('requests')} />
             <OverviewCard icon={<Users size={18} />} label="Connected homeowners" value={String(connections.length)} helper="Approved connections" onClick={() => setContractorTab('connections')} />
+            <OverviewCard icon={<ClipboardCheck size={18} />} label="Estimates needing jobs" value={String(acceptedEstimatesNeedingJobs.length)} helper="Approved by homeowners" onClick={() => { setContractorTab('inspections'); setContractorJobsView('open_financial'); setInspectionView('list'); }} />
             <OverviewCard icon={<UserRound size={18} />} label="Connection requests" value={String(connectionRequests.length)} helper="Waiting on your review" onClick={() => setContractorTab('connections')} />
             <OverviewCard icon={<Calendar size={18} />} label="Calendar" value={String(activeVisitEventCount || confirmedAppointments.length)} helper={`${homeownerAppointmentRequests.length} homeowner time request${homeownerAppointmentRequests.length === 1 ? '' : 's'}`} onClick={() => setContractorTab('calendar')} />
             <OverviewCard icon={<MessageSquare size={18} />} label="ServSync support" value={String(openSupportInquiryCount)} helper={waitingOnContractorSupportCount > 0 ? `${waitingOnContractorSupportCount} waiting on you` : 'Feature requests and help'} onClick={() => setContractorTab('support')} />
@@ -21935,6 +22000,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               </p>
                                               {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                               {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
+                                              {estimate.status === 'accepted' && !hasLinkedJob && (
+                                                <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
+                                                  Next step: create the job from this approved estimate.
+                                                </p>
+                                              )}
                                             </div>
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
@@ -22348,6 +22418,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </div>
 
                 <div className="space-y-4">
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Core workflow</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">
+                          Request → Estimate → Approval → Job → Invoice → Home History
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-blue-900">
+                          Keep the next action moving from approved pricing into scheduled work, then into billing and homeowner records.
+                        </p>
+                      </div>
+                      {acceptedEstimatesNeedingJobs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setContractorJobsView('open_financial')}
+                          className={buttonClass('primary')}
+                        >
+                          <ClipboardCheck size={15} />
+                          {acceptedEstimatesNeedingJobs.length} need jobs
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <div className="mb-2 flex items-center gap-2">
                       <ClipboardCheck size={16} className="text-blue-700" />
@@ -23185,6 +23279,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
                                   {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                   {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
+                                  {estimate.status === 'accepted' && !hasLinkedJob && (
+                                    <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
+                                      Next step: create the job from this approved estimate before closeout.
+                                    </p>
+                                  )}
                                 </div>
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
@@ -23432,6 +23531,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </p>
                                   {!checklistStyle && insp.summary && (
                                     <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>
+                                  )}
+                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && (
+                                    <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
+                                      Next step: create the invoice for this completed job.
+                                    </p>
+                                  )}
+                                  {!checklistStyle && linkedInvoice && (
+                                    <p className="mt-2 text-xs font-medium text-emerald-700">
+                                      Invoice status: {invoiceStatusLabel(linkedInvoice.status)}
+                                    </p>
                                   )}
                                 </div>
                                 {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
@@ -24563,6 +24672,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                 <div className="p-4 sm:p-5">
                   <p className="text-xs leading-5 text-slate-500">{jobTypeHelperCopy(activeInspection)}</p>
+                  {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && (
+                    <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
+                      Next step: create an invoice so the completed job has a billing record.
+                    </p>
+                  )}
+                  {linkedInvoiceForJob && (
+                    <p className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                      Invoice linked: {invoiceStatusLabel(linkedInvoiceForJob.status)}.
+                    </p>
+                  )}
                 </div>
               </div>
             );

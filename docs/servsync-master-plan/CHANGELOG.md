@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/core-loop-navigation-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added UI-only core loop navigation guidance across homeowner requests, homeowner estimate/invoice records, contractor accepted-estimate follow-up, contractor Jobs overview, completed job invoice prompts, and Home History labels.
+- Reason for change: Make the existing Homeowner Request -> Contractor Estimate -> Homeowner Approval -> Job -> Completion -> Invoice -> Home History flow easier to follow without changing schema, RPCs, Edge Functions, or production settings.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - This is a navigation/copy cleanup only. A true unified Home Timeline and reminder system are still future roadmap work.
+  - Manual preview review should confirm the added guidance feels helpful rather than repetitive on mobile.
+
+## 2026-06-15
+
 - Branch: `main`
 - Files changed:
   - `AGENTS.md`
