@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/sql-provenance-cleanup-v1`
+- Files changed:
+  - `servsync-estimate-job-support.sql`
+  - `servsync-home-specific-inspection-templates.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added tracked SQL provenance patches for accepted-estimate-to-job support and home-specific inspection templates, and included them in the blank-schema install sequence.
+- Reason for change: Reduce risk from loose untracked SQL files by capturing the currently needed schema/RLS pieces in reviewed tracked SQL without applying SQL or changing app behavior.
+- Tests/checks run:
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `git diff --check`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production yet.
+  - The loose files `servsync-estimate-to-job.sql` and `servsync-home-specific-templates.sql` still exist locally and should not be deleted until the tracked replacements are reviewed and applied as needed.
+  - `scripts/apply-sql-dry-run.sh` has a separate SQL sequence and should be reviewed before using it to validate this provenance cleanup on a throwaway database.
+
+## 2026-06-15
+
 - Branch: `feature/home-reminders-v1`
 - Files changed:
   - `src/App.tsx`
