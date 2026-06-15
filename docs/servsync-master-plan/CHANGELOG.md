@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/home-history-smoke-test-cleanup`
+- Files changed:
+  - `tests/e2e/homeowner-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the homeowner smoke test to expect the current Home History heading instead of stale homeowner-visible “Maintenance log” wording.
+- Reason for change: Keep the read-only homeowner smoke test aligned with current product language after Home History replaced homeowner-visible maintenance log wording.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts`
+- Known risks or follow-ups:
+  - None.
+
+## 2026-06-15
+
 - Branch: `feature/service-requests-heading-cleanup`
 - Files changed:
   - `src/App.tsx`

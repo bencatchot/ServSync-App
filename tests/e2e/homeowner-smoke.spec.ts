@@ -39,7 +39,7 @@ test.describe('homeowner read-only smoke', () => {
 
     await openSidebarTab(page, /Home History/i);
     await expectActiveTabHeading(page, /^Home History$/i);
-    await expect(main.getByRole('heading', { level: 2, name: /^Maintenance log$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { level: 2, name: /^Home History$/i })).toBeVisible();
 
     await openSidebarTab(page, /^Calendar\b/i);
     await expectActiveTabHeading(page, /^Calendar$/i);
