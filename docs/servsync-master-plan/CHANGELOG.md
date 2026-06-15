@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/service-requests-heading-cleanup`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Changed the homeowner Service Requests tab's inner duplicate heading from `h1` to `h2` while preserving visible text and styling.
+- Reason for change: Keep the app shell active-tab heading as the single page-level `h1` and resolve a Playwright strict-mode selector conflict in the homeowner smoke test.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts` reached past the Service Requests step, then failed on an existing stale Home History expectation for `Maintenance log`.
+- Known risks or follow-ups:
+  - Update the homeowner smoke test's Home History expectation in a separate approved test cleanup.
+
+## 2026-06-15
+
 - Branch: `feature/sql-provenance-cleanup-v1`
 - Files changed:
   - `servsync-estimate-job-support.sql`
