@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/home-reminders-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `servsync-home-reminders.sql`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added proposed schema/RLS for homeowner-owned Home Reminders and a homeowner UI for creating manual follow-up reminders from Home History, viewing upcoming reminders on the dashboard, and marking reminders complete or dismissed.
+- Reason for change: Complete the final manual follow-up step of the core MVP loop without building notification automation, recurrence, calendar sync, contractor-side reminders, or a full scheduler.
+- Tests/checks run:
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - SQL must be applied to sandbox before authenticated preview testing.
+  - V1 reminders are manual in-app records only; no push, email, text, cron, recurring automation, or calendar sync was added.
+  - Contractor-side reminders and automatic reminders from jobs/invoices remain deferred.
+
+## 2026-06-15
+
 - Branch: `feature/invoice-home-history-filing-v1`
 - Files changed:
   - `src/App.tsx`

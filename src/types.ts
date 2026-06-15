@@ -520,6 +520,25 @@ export interface MaintenanceLogEntry {
   updated_at: string;
 }
 
+export type HomeReminderStatus = 'open' | 'completed' | 'dismissed';
+
+export interface HomeReminder {
+  id: string;
+  homeowner_user_id: string;
+  home_id: string | null;
+  maintenance_log_id: string | null;
+  service_request_id: string | null;
+  invoice_id: string | null;
+  title: string;
+  notes: string;
+  due_on: string;
+  status: HomeReminderStatus;
+  completed_at: string | null;
+  dismissed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ServiceRequestReview {
   id: string;
   request_id: string;
