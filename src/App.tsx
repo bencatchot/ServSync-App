@@ -4221,6 +4221,26 @@ function invoiceStatusLabel(status: Invoice['status']) {
   return status.replace(/_/g, ' ');
 }
 
+function estimateStatusLabel(status: Estimate['status']) {
+  const labels: Record<Estimate['status'], string> = {
+    draft: 'Draft',
+    sent: 'Sent to homeowner',
+    accepted: 'Accepted',
+    declined: 'Declined',
+    expired: 'Expired',
+    revised: 'Revised',
+  };
+  return labels[status] ?? status;
+}
+
+function estimateStatusClass(status: Estimate['status']) {
+  if (status === 'draft') return 'bg-amber-100 text-amber-700';
+  if (status === 'accepted') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'declined' || status === 'expired') return 'bg-slate-100 text-slate-600';
+  if (status === 'revised') return 'bg-violet-100 text-violet-700';
+  return 'bg-blue-100 text-blue-700';
+}
+
 function invoiceStatusClass(status: Invoice['status']) {
   if (status === 'draft') return 'bg-amber-100 text-amber-700';
   if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
@@ -4368,7 +4388,7 @@ async function createEstimatePdf(
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   pdf.setTextColor(71, 85, 105);
-  pdf.text(`Status: ${estimate.status}`, margin, y);
+  pdf.text(`Status: ${estimateStatusLabel(estimate.status)}`, margin, y);
   pdf.text(`Updated: ${new Date(estimate.updated_at).toLocaleDateString('en-US')}`, margin, y + 5);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
@@ -10278,8 +10298,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 break-words font-bold text-slate-950">{estimate.title}</p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${estimate.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : estimate.status === 'declined' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-                {estimate.status}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>
+                {estimateStatusLabel(estimate.status)}
               </span>
               {estimateFiled && (
                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
@@ -10691,7 +10711,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 ? 'Estimate accepted'
                 : estimate.status === 'declined'
                   ? 'Estimate declined'
-                  : `Estimate ${estimate.status}`;
+                  : `Estimate ${estimateStatusLabel(estimate.status).toLowerCase()}`;
             return (
               <div key={estimate.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
                 <div>
@@ -15952,6 +15972,36 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
   };
 
+  const openEstimateRecord = (estimate: Estimate) => {
+    const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
+    const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+    setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+    setContractorTab('inspections');
+    setInspectionView('list');
+    setHomeownerWorkspaceEstimateView(
+      estimate.status === 'draft'
+        ? 'draft'
+        : estimate.status === 'accepted'
+          ? 'accepted'
+          : ['declined', 'expired', 'revised'].includes(estimate.status)
+            ? 'closed'
+            : 'sent',
+    );
+    setInvoiceComposerOpen(false);
+    if (estimate.status === 'draft') {
+      setEditingEstimateId(estimate.id);
+      setEstimateDraft(estimateDraftFromEstimate(estimate));
+      setEstimateAssistantText('');
+      setEstimateAssistantNotice('');
+      setEstimateComposerOpen(true);
+      setContractorJobsView('new_financial');
+      return;
+    }
+    setEditingEstimateId(null);
+    setEstimateComposerOpen(false);
+    setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+  };
+
   const loadInvoiceById = async (invoiceId: string) => {
     if (!supabase) throw new Error('Supabase is not configured.');
     const { data, error: invoiceError } = await supabase
@@ -17073,6 +17123,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
   };
+  const activeInvoiceDraftRecord = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) ?? null : null;
+  const invoiceDraftCanSendToHomeowner = Boolean(selectedJobsSubject.homeownerUserId || activeInvoiceDraftRecord?.homeowner_user_id);
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
   const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
   const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
@@ -19600,6 +19652,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 inspection.service_request_id === request.id
                 && inspectionIsOpenJob(inspection)
               ) ?? null;
+              const linkedRequestEstimate = estimates.find(estimate =>
+                estimate.service_request_id === request.id
+                && estimateDocumentLabel(estimate) !== 'Invoice'
+                && !['declined', 'expired', 'revised'].includes(estimate.status)
+              ) ?? null;
               const toggleInlineRequest = () => {
                 setContractorExpandedRequestIds(current => {
                   const next = new Set(current);
@@ -19637,6 +19694,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               Quote
                             </span>
                           )}
+                          {linkedRequestEstimate && (
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${estimateStatusClass(linkedRequestEstimate.status)}`}>
+                              Estimate {estimateStatusLabel(linkedRequestEstimate.status)}
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           {request.homeowner_name || 'Homeowner'}{request.homeowner_city ? ` · ${request.homeowner_city}` : ''} · {request.category} · {urgencyLabel(request.urgency)} · {formatDateTime(request.updated_at)}
@@ -19660,9 +19722,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <button
                         type="button"
                         onClick={toggleInlineRequest}
-                        className={buttonClass('primary')}
+                        className={buttonClass('secondary')}
                       >
                         Review / respond
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setJobsCustomerFilterSubjectId(requestConnection.connection_id);
+                          if (linkedRequestEstimate) {
+                            openEstimateRecord(linkedRequestEstimate);
+                            return;
+                          }
+                          beginEstimateDraftForCustomer(request.homeowner_name || requestConnection.display_name || 'Homeowner', {
+                            serviceRequestId: request.id,
+                            homeId: request.home_id,
+                          });
+                        }}
+                        className={buttonClass('primary')}
+                      >
+                        <FileText size={15} />
+                        {linkedRequestEstimate ? 'Open Estimate' : 'Create Estimate'}
                       </button>
                       <button
                         type="button"
@@ -21774,7 +21854,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                   <p className="truncate text-sm font-semibold text-slate-900">{record.title}</p>
-                                                  <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {record.status}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{estimateDocumentLabel(record)} · {estimateStatusLabel(record.status)}</p>
                                                   {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
                                                     <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
                                                   )}
@@ -22565,8 +22645,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div>
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-950">{estimate.title}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimate.status === 'draft' ? 'bg-amber-100 text-amber-700' : estimate.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                  {estimate.status}
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>
+                                                  {estimateStatusLabel(estimate.status)}
                                                 </span>
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">
@@ -22633,11 +22713,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             )}
                                             {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
                                               <>
+                                                {!hasLinkedJob && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void createJobFromAcceptedEstimate(estimate)}
+                                                    disabled={convertingEstimateId === estimate.id}
+                                                    className={buttonClass('primary')}
+                                                  >
+                                                    <ClipboardCheck size={15} />
+                                                    {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
+                                                  </button>
+                                                )}
+                                                {hasLinkedJob && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void openLinkedJobForEstimate(estimate)}
+                                                    disabled={convertingEstimateId === estimate.id}
+                                                    className={buttonClass('primary')}
+                                                  >
+                                                    <ClipboardCheck size={15} />
+                                                    View Job
+                                                  </button>
+                                                )}
                                                 <button
                                                   type="button"
                                                   onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromEstimate(estimate)}
                                                   disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
-                                                  className={buttonClass('primary')}
+                                                  className={buttonClass('secondary')}
                                                 >
                                                   <Receipt size={15} />
                                                   {creatingInvoiceSourceId === `estimate:${estimate.id}`
@@ -22645,15 +22747,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     : linkedInvoice
                                                       ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
                                                       : 'Create Invoice'}
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
-                                                  disabled={convertingEstimateId === estimate.id}
-                                                  className={buttonClass('secondary')}
-                                                >
-                                                  <ClipboardCheck size={15} />
-                                                  {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
                                                 </button>
                                               </>
                                             )}
@@ -23597,6 +23690,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                         </div>
 
+                        {!invoiceDraftCanSendToHomeowner && (
+                          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                            Save this invoice as a draft now. Connect this customer to a ServSync homeowner before sending it through the portal.
+                          </p>
+                        )}
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => void saveInvoiceDraft(selectedJobsSubject)} disabled={savingInvoice} className={buttonClass('primary')}>
                             <Receipt size={15} />
@@ -23622,11 +23720,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 }
                               }
                             }}
-                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId}
+                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner}
                             className={buttonClass('primary')}
                           >
                             <Send size={15} />
-                            {savingInvoice || updatingInvoiceId === editingInvoiceId ? 'Sending...' : 'Save Invoice and Send to Homeowner'}
+                            {savingInvoice || updatingInvoiceId === editingInvoiceId
+                              ? 'Sending...'
+                              : invoiceDraftCanSendToHomeowner
+                                ? 'Save Invoice and Send to Homeowner'
+                                : 'Connect homeowner to send'}
                           </button>
                           {invoiceDraft.job_id && (
                             <button type="button" onClick={() => void reopenJobFromInvoice(invoiceDraft.job_id)} disabled={savingInvoice} className={buttonClass('secondary')}>
@@ -23764,39 +23866,46 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                     </div>
                                     {invoice.status === 'draft' && (
-                                      <div className="mt-3 flex flex-wrap gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => void sendInvoiceToHomeowner(invoice)}
-                                          disabled={updatingInvoiceId === invoice.id}
-                                          className={buttonClass('primary')}
-                                        >
-                                          <Send size={15} />
-                                          {updatingInvoiceId === invoice.id ? 'Sending...' : 'Send Invoice'}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-                                            setEditingInvoiceId(invoice.id);
-                                            setInvoiceDraft(invoiceDraftFromInvoice(invoice));
-                                            setInvoiceComposerOpen(true);
-                                            setEstimateComposerOpen(false);
-                                            setContractorJobsView('new_financial');
-                                          }}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          Edit draft
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => void voidInvoice(invoice)}
-                                          disabled={updatingInvoiceId === invoice.id}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          <X size={15} />
-                                          Void
-                                        </button>
+                                      <div className="mt-3 space-y-2">
+                                        {!invoice.homeowner_user_id && (
+                                          <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
+                                            Connect this customer to a ServSync homeowner before sending the invoice through the portal.
+                                          </p>
+                                        )}
+                                        <div className="flex flex-wrap gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => void sendInvoiceToHomeowner(invoice)}
+                                            disabled={updatingInvoiceId === invoice.id || !invoice.homeowner_user_id}
+                                            className={buttonClass('primary')}
+                                          >
+                                            <Send size={15} />
+                                            {updatingInvoiceId === invoice.id ? 'Sending...' : invoice.homeowner_user_id ? 'Send Invoice' : 'Connect homeowner to send'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+                                              setEditingInvoiceId(invoice.id);
+                                              setInvoiceDraft(invoiceDraftFromInvoice(invoice));
+                                              setInvoiceComposerOpen(true);
+                                              setEstimateComposerOpen(false);
+                                              setContractorJobsView('new_financial');
+                                            }}
+                                            className={buttonClass('secondary')}
+                                          >
+                                            Edit draft
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => void voidInvoice(invoice)}
+                                            disabled={updatingInvoiceId === invoice.id}
+                                            className={buttonClass('secondary')}
+                                          >
+                                            <X size={15} />
+                                            Void
+                                          </button>
+                                        </div>
                                       </div>
                                     )}
                                     {invoiceCanMarkPaid(invoice.status) && (
@@ -23830,7 +23939,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
                         {records.length > 0 && (
-                          <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Legacy estimate records</p>
+                          <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estimate records</p>
                         )}
                         {records.map(estimate => {
                           const isInvoice = estimateDocumentLabel(estimate) === 'Invoice';
@@ -23847,7 +23956,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isInvoice ? 'bg-slate-900 text-white' : 'bg-blue-100 text-blue-700'}`}>{isInvoice ? 'Invoice' : 'Estimate'}</span>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimate.status === 'draft' ? 'bg-amber-100 text-amber-700' : estimate.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{estimate.status}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>{estimateStatusLabel(estimate.status)}</span>
                                   </div>
                                   <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
@@ -23904,6 +24013,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 )}
                                 {estimate.status === 'accepted' && !isInvoice && (
                                   <>
+                                    {!hasLinkedJob && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void createJobFromAcceptedEstimate(estimate)}
+                                        disabled={convertingEstimateId === estimate.id}
+                                        className={buttonClass('primary')}
+                                      >
+                                        <ClipboardCheck size={15} />
+                                        {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
+                                      </button>
+                                    )}
+                                    {hasLinkedJob && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void openLinkedJobForEstimate(estimate)}
+                                        disabled={convertingEstimateId === estimate.id}
+                                        className={buttonClass('primary')}
+                                      >
+                                        <ClipboardCheck size={15} />
+                                        View Job
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -23912,7 +24043,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         else void createInvoiceFromEstimate(estimate);
                                       }}
                                       disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
-                                      className={buttonClass('primary')}
+                                      className={buttonClass('secondary')}
                                     >
                                       <Receipt size={15} />
                                       {creatingInvoiceSourceId === `estimate:${estimate.id}`
@@ -23920,15 +24051,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         : linkedInvoice
                                           ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
                                           : 'Create Invoice'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => hasLinkedJob ? void openLinkedJobForEstimate(estimate) : void createJobFromAcceptedEstimate(estimate)}
-                                      disabled={convertingEstimateId === estimate.id}
-                                      className={buttonClass('secondary')}
-                                    >
-                                      <ClipboardCheck size={15} />
-                                      {hasLinkedJob ? 'View Job' : convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
                                     </button>
                                   </>
                                 )}
@@ -27096,13 +27218,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {activeInspection.status === 'draft' && !inspectionClosedForReview ? 'Close to Preview PDF' : 'Download Preview PDF'}
                         </button>
 
+                        {activeInspection.status !== 'finalized' && (
+                          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-800">
+                            Finalize this report before creating the invoice from the completed work.
+                          </p>
+                        )}
                         <button
                           type="button"
-                          disabled={creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                          disabled={activeInspection.status !== 'finalized' || creatingInvoiceSourceId === `job:${activeInspection.id}`}
+                          title={activeInspection.status !== 'finalized' ? 'Finalize the report before creating an invoice.' : 'Create or open the invoice for this completed work.'}
                           onClick={() => void createInvoiceFromJob(activeInspection)}
-                          className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700"
+                          className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <FileText size={14} /> {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : 'Create Invoice'}
+                          <FileText size={14} /> {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : activeInspection.status === 'finalized' ? 'Create Invoice' : 'Finalize Report First'}
                         </button>
 
                         <button
