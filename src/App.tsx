@@ -482,7 +482,7 @@ const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-u
     title: 'Privacy Policy',
     sections: [
       { title: 'Information collected', body: 'ServSync may collect account, profile, contact, contractor business, connection, request, estimate, invoice, report, notification, support, and usage-related information.' },
-      { title: 'Home/property information', body: 'Homeowners may store home profile details, addresses, photos, documents, maintenance logs, and service history. Final policy should explain the sensitivity of this information.' },
+      { title: 'Home/property information', body: 'Homeowners may store home profile details, addresses, photos, documents, Home History records, and service history. Final policy should explain the sensitivity of this information.' },
       { title: 'Documents/photos/uploads', body: 'Uploaded content may include property-sensitive or personal information. Final policy should explain storage, access, sharing, deletion, and support access practices.' },
       { title: 'Connections and permissions', body: 'Homeowners control sharing permissions for each contractor connection. Final policy should describe what contractors can see when sharing is enabled.' },
       { title: 'How information is used', body: 'ServSync uses information to provide accounts, contractor discovery, service requests, reports, estimates, invoices, documents, notifications, support, and platform administration.' },
@@ -3907,7 +3907,7 @@ function PrivacyDataRequestsPanel({
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
           {role === 'homeowner' ? (
             <p>
-              Home documents, photos, reports, requests, estimates, invoices, and maintenance logs may contain sensitive home information.
+              Home documents, photos, reports, requests, estimates, invoices, and Home History records may contain sensitive home information.
               Review sharing permissions before sharing data with contractors.
             </p>
           ) : (
@@ -8343,10 +8343,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setLogInvoiceNotice('');
       setLogFormOpen(false);
       setQuickLogDrafts({});
-      setNotice(invoiceDocument ? 'Log entry saved and invoice stored in Documents.' : 'Log entry saved.');
+      setNotice(invoiceDocument ? 'Home History entry saved and invoice stored in Documents.' : 'Home History entry saved.');
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to save log entry.'));
+      setError(readableError(err, 'Unable to save Home History entry.'));
     } finally {
       setSavingLogEntry(false);
     }
@@ -8360,7 +8360,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (deleteError) throw deleteError;
       setMaintenanceLog(prev => prev.filter(e => e.id !== id));
     } catch (err) {
-      setError(readableError(err, 'Unable to delete log entry.'));
+      setError(readableError(err, 'Unable to delete Home History entry.'));
     } finally {
       setDeletingLogId(null);
     }
@@ -9124,7 +9124,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           throw insertError;
         }
       }
-      setNotice('Estimate filed to Documents and Maintenance Log.');
+      setNotice('Estimate filed to Documents and Home History.');
       await loadHomeowner();
     } catch (err) {
       setError(readableError(err, 'Unable to file estimate to your home records.'));
@@ -9425,6 +9425,36 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         : 'unassigned history';
   const recentDocuments = dashboardHomeDocuments.slice(0, 3);
   const homeDocumentById = new Map(homeDocuments.map(doc => [doc.id, doc]));
+  const estimateById = new Map(estimates.map(estimate => [estimate.id, estimate]));
+  const requestById = new Map(serviceRequests.map(request => [request.id, request]));
+  const homeHistoryEntryTypeChips = (entry: MaintenanceLogEntry) => {
+    const chips: Array<{ label: string; className: string }> = [];
+    if (!entry.service_request_id && !entry.estimate_id && !entry.inspection_id && !entry.report_document_id && !entry.invoice_document_id) {
+      chips.push({ label: 'Manual entry', className: 'bg-slate-100 text-slate-600' });
+    }
+    if (entry.service_request_id) chips.push({ label: 'From request', className: 'bg-blue-50 text-blue-700' });
+    if (entry.estimate_id) chips.push({ label: 'Estimate filed', className: 'bg-violet-50 text-violet-700' });
+    if (entry.inspection_id || entry.report_document_id) chips.push({ label: 'Job report', className: 'bg-indigo-50 text-indigo-700' });
+    if (entry.invoice_document_id) chips.push({ label: 'Receipt/invoice attached', className: 'bg-emerald-50 text-emerald-700' });
+    return chips;
+  };
+  const openHomeHistoryRequest = (requestId: string) => {
+    const request = requestById.get(requestId);
+    if (!request) return;
+    setHomeownerRequestPropertyScope(request.home_id ? 'all' : 'unassigned');
+    setHomeownerRequestView(homeownerRequestQueueFor(request));
+    setExpandedRequestIds(new Set([request.id]));
+    setHomeownerTab('requests');
+  };
+  const openHomeHistoryEstimate = (estimateId: string) => {
+    const estimate = estimateById.get(estimateId);
+    if (!estimate) return;
+    setHomeownerRecordPropertyScope(estimate.home_id ? 'all' : 'unassigned');
+    setHomeownerRecordSection(estimate.status === 'sent' ? 'needs_review' : estimate.status === 'accepted' ? 'accepted' : 'closed');
+    setViewingInvoiceId(null);
+    setViewingEstimateId(estimate.id);
+    setHomeownerTab('estimates');
+  };
   const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedHomeDocumentCount = homeDocuments.filter(doc => !doc.home_id).length;
   const homeownerDocumentPropertyMatches = (doc: Pick<HomeDocument, 'home_id'>) => {
@@ -9516,7 +9546,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
     {
       label: 'View your home history',
-      helper: 'See maintenance entries, completed work, and filed reports.',
+      helper: 'See completed work, filed reports, receipts, and service notes.',
       complete: maintenanceLog.length > 0,
       actionLabel: 'View history',
       onAction: () => {
@@ -10644,7 +10674,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           }
           if (!notification.request_id) {
             const category = notificationCategoryLabel(notification.type);
-            setHomeownerTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'estimates' : category === 'Job' || category === 'Home History' ? 'documents' : category === 'Connection' ? 'contractors' : 'requests');
+            setHomeownerTab(category === 'Calendar' ? 'calendar' : category === 'Estimate' ? 'estimates' : category === 'Job' ? 'documents' : category === 'Home History' ? 'log' : category === 'Connection' ? 'contractors' : 'requests');
             return;
           }
           const request = serviceRequests.find(item => item.id === notification.request_id);
@@ -10849,7 +10879,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </button>
                   <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className={buttonClass('secondary')}>
                     <ClipboardList size={16} />
-                    Log maintenance
+                    Add history entry
                   </button>
                 </div>
               </div>
@@ -11148,7 +11178,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Card title="Recent home history" icon={<ClipboardList size={18} />}>
               <div className="space-y-3">
                 {recentLogEntries.length === 0 ? (
-                  <EmptyState text="No maintenance history yet." />
+                  <EmptyState text="No home history yet." />
                 ) : (
                   recentLogEntries.map(entry => (
                     <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -13205,10 +13235,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="space-y-4">
           {/* Stats row */}
           {propertyScopedMaintenanceLog.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-	                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Total jobs logged</p>
+	                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">History records</p>
 	                <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedMaintenanceLog.length}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Reports filed</p>
+                <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedMaintenanceLog.filter(entry => entry.report_document_id || entry.inspection_id).length}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <p className="break-words text-xs font-semibold uppercase leading-5 tracking-wide text-slate-400">Receipts attached</p>
+                <p className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{propertyScopedMaintenanceLog.filter(entry => entry.invoice_document_id).length}</p>
               </div>
               {(() => {
                 const total = propertyScopedMaintenanceLog.reduce((s, e) => s + (e.cost_cents ?? 0), 0);
@@ -13233,10 +13271,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </p>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
                     {homeownerHasMultipleProperties && unassignedMaintenanceLogCount > 0
-                      ? 'Use All properties to see completed work, reports, invoices, and notes across your homes, or Unassigned to find older entries that are not tied to a property yet.'
+                      ? 'Use All properties to see completed work, filed reports, receipts, invoices, warranty notes, and service notes across your homes, or Unassigned to find older entries that are not tied to a property yet.'
                       : homeownerHasMultipleProperties
-                        ? 'Use All properties to see completed work, reports, invoices, and notes across every property.'
-                        : 'Completed work, reports, invoices, and follow-up notes belong here so future service does not start from scratch.'}
+                        ? 'Use All properties to see completed work, filed reports, receipts, invoices, warranty notes, and service notes across every property.'
+                        : 'Completed work, filed reports, receipts, invoices, warranty notes, service notes, and follow-up context belong here so future service does not start from scratch.'}
                   </p>
                   <p className="mt-2 text-xs leading-5 text-emerald-800">
                     Reminder tools are not built yet; for now, use notes to capture future follow-up needs.
@@ -13256,7 +13294,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
               {shouldShowHomeownerUnassignedPropertyNotice(homeownerMaintenancePropertyScope, unassignedMaintenanceLogCount) && (
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                  <span>Some older maintenance entries are not assigned to a property. You can find them under Unassigned.</span>
+                  <span>Some older Home History records are not assigned to a property. You can find them under Unassigned.</span>
                   <button
                     type="button"
                     onClick={() => setHomeownerMaintenancePropertyScope('unassigned')}
@@ -13266,6 +13304,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </button>
                 </div>
               )}
+            </div>
+
+            <div className="mb-4 grid gap-3 md:grid-cols-3">
+              {[
+                ['Completed work', 'Keep finished service visits, repairs, inspections, and job summaries attached to the right property.'],
+                ['Reports and receipts', 'Store filed job reports, invoices, receipts, warranties, permits, and other documents without merging them into the private Documents tab.'],
+                ['Future context', 'Capture warranty details, service notes, and follow-up needs now. Reminder tools can connect here later.'],
+              ].map(([title, body]) => (
+                <div key={title} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-sm font-bold text-slate-950">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+                </div>
+              ))}
             </div>
 
             {!logFormOpen ? (
@@ -13287,7 +13338,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <div>
                       <p className="text-sm font-bold text-blue-950">Upload invoice or receipt</p>
                       <p className="mt-1 text-sm text-blue-800">
-                        Add a photo or PDF now. ServSync will save it in Documents as a receipt and link it to this log entry.
+                        Add a photo or PDF now. ServSync will save it in Documents as a receipt and link it to this Home History entry.
                       </p>
                       <p className="mt-1 text-xs text-blue-700">
                         Only upload documents you have the right to share. Receipts and invoices may contain sensitive information.
@@ -13402,9 +13453,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {propertyScopedMaintenanceLog.length === 0 && !logFormOpen && (
               <p className="mt-4 text-sm text-slate-500">
                 {homeownerMaintenancePropertyScope === 'selected' && selectedHomeId
-                  ? 'No maintenance history for this property yet.'
+                  ? 'No home history records for this property yet.'
                   : homeownerMaintenancePropertyScope === 'unassigned'
-                    ? 'No unassigned maintenance entries.'
+                    ? 'No unassigned home history records.'
                     : 'No home history entries yet. Add your first entry or save completed work from a closed service request.'}
               </p>
             )}
@@ -13414,6 +13465,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   const invoiceDocument = entry.invoice_document_id ? homeDocumentById.get(entry.invoice_document_id) : null;
                   const reportDocument = entry.report_document_id ? homeDocumentById.get(entry.report_document_id) : null;
                   const entryPropertyLabel = propertyRecordLabel(entry, { homes });
+                  const entryRequest = entry.service_request_id ? requestById.get(entry.service_request_id) : null;
+                  const entryEstimate = entry.estimate_id ? estimateById.get(entry.estimate_id) : null;
+                  const entryTypeChips = homeHistoryEntryTypeChips(entry);
                   return (
                   <div key={entry.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -13423,18 +13477,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {entry.category && (
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{entry.category}</span>
                           )}
-                          {entry.service_request_id && (
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">From request</span>
-                          )}
-                          {entry.inspection_id && (
-                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">Job</span>
-                          )}
-                          {reportDocument && (
-                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Report filed</span>
-                          )}
-                          {invoiceDocument && (
-                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice attached</span>
-                          )}
+                          {entryTypeChips.map(chip => (
+                            <span key={chip.label} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${chip.className}`}>{chip.label}</span>
+                          ))}
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
                           {new Date(entry.performed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -13453,8 +13498,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         )}
                         {entry.description && <p className="mt-1.5 text-sm text-slate-700">{entry.description}</p>}
                         {entry.notes && <p className="mt-1 text-xs text-slate-500 italic">{entry.notes}</p>}
-                        {(reportDocument || invoiceDocument) && (
+                        {(entryRequest || entryEstimate || reportDocument || invoiceDocument) && (
                           <div className="mt-2 flex flex-wrap gap-3">
+                            {entryRequest && (
+                              <button
+                                type="button"
+                                onClick={() => openHomeHistoryRequest(entryRequest.id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                              >
+                                <ClipboardList size={13} />
+                                View request
+                              </button>
+                            )}
+                            {entryEstimate && (
+                              <button
+                                type="button"
+                                onClick={() => openHomeHistoryEstimate(entryEstimate.id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                              >
+                                <Receipt size={13} />
+                                View estimate
+                              </button>
+                            )}
                             {reportDocument && (
                               <button
                                 type="button"
@@ -13472,7 +13537,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
                               >
                                 <Receipt size={13} />
-                                View invoice
+                                View receipt / invoice
                               </button>
                             )}
                           </div>

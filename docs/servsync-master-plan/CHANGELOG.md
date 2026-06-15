@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/home-history-v1-cleanup`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Improved the homeowner Home History tab with clearer “what belongs here” guidance, record counts, source/type chips, linked request/estimate/report/receipt actions, and more consistent Home History wording.
+- Reason for change: Make existing `home_maintenance_log` records feel like the homeowner-facing destination for completed work, filed reports, receipts/invoices, notes, warranty details, and follow-up context without changing schema or building reminders.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Invoice-to-history filing is deferred because the current Home History model links receipt documents but does not have a durable `invoice_id` link.
+  - A full unified Home Timeline and reminder workflow remain future roadmap work.
+
+## 2026-06-15
+
 - Branch: `feature/core-loop-navigation-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
