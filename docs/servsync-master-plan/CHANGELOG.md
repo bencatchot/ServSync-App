@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/homeowner-calendar-event-modal-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a read-only homeowner calendar event detail modal so clicking a homeowner calendar appointment shows event/request context before navigating away.
+- Reason for change: Make the homeowner calendar interaction consistent with the contractor calendar detail experience while keeping appointment response actions in the existing Service Requests workflow.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+- Known risks or follow-ups:
+  - Manual preview review should confirm the modal feels clear on mobile and that optional estimate, invoice, and Home History actions appear only when linked records exist.
+
+## 2026-06-15
+
 - Branch: `feature/home-history-smoke-test-cleanup`
 - Files changed:
   - `tests/e2e/homeowner-smoke.spec.ts`
