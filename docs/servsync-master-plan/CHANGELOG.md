@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/invoice-home-history-filing-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `servsync-invoice-home-history.sql`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a proposed SQL patch and homeowner UI flow for filing visible non-draft, non-void invoices to Home History through a durable `invoice_id` relationship, with duplicate prevention and structured invoice data as the source.
+- Reason for change: Complete the invoice-to-Home-History step of the core MVP loop without creating duplicate Home History rows or storing unnecessary duplicate invoice PDFs.
+- Tests/checks run:
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - SQL must be applied to sandbox before authenticated preview testing.
+  - Existing document-backed receipt uploads remain separate from structured invoice-linked Home History entries.
+  - Contractor-side filing, payment processing, reminders, and backfill of older invoices remain deferred.
+
+## 2026-06-15
+
 - Branch: `feature/home-history-v1-cleanup`
 - Files changed:
   - `src/App.tsx`

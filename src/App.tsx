@@ -7863,6 +7863,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [filingEstimateId, setFilingEstimateId] = useState<string | null>(null);
+  const [filingInvoiceId, setFilingInvoiceId] = useState<string | null>(null);
   const [homeownerRecordSearch, setHomeownerRecordSearch] = useState('');
   const [homeownerRecordSection, setHomeownerRecordSection] = useState<HomeownerRecordSection | null>(null);
   const [homeownerRecordPropertyScope, setHomeownerRecordPropertyScope] = useState<HomeownerRecordPropertyScope>('selected');
@@ -9133,6 +9134,43 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
+  const fileInvoiceToHomeHistory = async (invoice: Invoice) => {
+    if (!supabase) return;
+    if (invoice.status === 'draft' || invoice.status === 'void') {
+      setError('Only visible active or paid invoices can be filed to Home History.');
+      return;
+    }
+
+    const alreadyFiled = maintenanceLog.some(entry => entry.invoice_id === invoice.id);
+    const recordLabel = invoice.status === 'paid' ? 'receipt/invoice record' : 'invoice record';
+    if (alreadyFiled) {
+      setNotice(`This ${recordLabel} is already filed in Home History.`);
+      return;
+    }
+
+    setNotice('');
+    setError('');
+    setFilingInvoiceId(invoice.id);
+    try {
+      const { data, error: fileError } = await supabase.rpc('servsync_file_invoice_to_home_history', {
+        p_invoice_id: invoice.id,
+      });
+      if (fileError) throw fileError;
+
+      const created = typeof data === 'object' && data !== null && 'created' in data
+        ? Boolean((data as { created?: unknown }).created)
+        : true;
+      setNotice(created
+        ? `${recordLabel.charAt(0).toUpperCase()}${recordLabel.slice(1)} filed to Home History.`
+        : `This ${recordLabel} is already filed in Home History.`);
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to file invoice to Home History.'));
+    } finally {
+      setFilingInvoiceId(null);
+    }
+  };
+
   const submitReview = async (request: ServiceRequestSummary) => {
     if (!supabase) return;
     const draft = reviewDrafts[request.id];
@@ -9426,16 +9464,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const recentDocuments = dashboardHomeDocuments.slice(0, 3);
   const homeDocumentById = new Map(homeDocuments.map(doc => [doc.id, doc]));
   const estimateById = new Map(estimates.map(estimate => [estimate.id, estimate]));
+  const invoiceById = new Map(invoices.map(invoice => [invoice.id, invoice]));
   const requestById = new Map(serviceRequests.map(request => [request.id, request]));
   const homeHistoryEntryTypeChips = (entry: MaintenanceLogEntry) => {
     const chips: Array<{ label: string; className: string }> = [];
-    if (!entry.service_request_id && !entry.estimate_id && !entry.inspection_id && !entry.report_document_id && !entry.invoice_document_id) {
+    if (!entry.service_request_id && !entry.estimate_id && !entry.inspection_id && !entry.report_document_id && !entry.invoice_document_id && !entry.invoice_id) {
       chips.push({ label: 'Manual entry', className: 'bg-slate-100 text-slate-600' });
     }
     if (entry.service_request_id) chips.push({ label: 'From request', className: 'bg-blue-50 text-blue-700' });
     if (entry.estimate_id) chips.push({ label: 'Estimate filed', className: 'bg-violet-50 text-violet-700' });
     if (entry.inspection_id || entry.report_document_id) chips.push({ label: 'Job report', className: 'bg-indigo-50 text-indigo-700' });
     if (entry.invoice_document_id) chips.push({ label: 'Receipt/invoice attached', className: 'bg-emerald-50 text-emerald-700' });
+    if (entry.invoice_id) {
+      const invoice = invoiceById.get(entry.invoice_id);
+      chips.push({
+        label: invoice?.status === 'paid' ? 'Receipt/invoice filed' : 'Invoice filed',
+        className: 'bg-emerald-50 text-emerald-700',
+      });
+    }
     return chips;
   };
   const openHomeHistoryRequest = (requestId: string) => {
@@ -9453,6 +9499,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setHomeownerRecordSection(estimate.status === 'sent' ? 'needs_review' : estimate.status === 'accepted' ? 'accepted' : 'closed');
     setViewingInvoiceId(null);
     setViewingEstimateId(estimate.id);
+    setHomeownerTab('estimates');
+  };
+  const openHomeHistoryInvoice = (invoiceId: string) => {
+    const invoice = invoiceById.get(invoiceId);
+    if (!invoice) return;
+    setHomeownerRecordPropertyScope(invoice.home_id ? 'all' : 'unassigned');
+    setHomeownerRecordSection(['paid', 'void'].includes(invoice.status) ? 'closed' : 'open_invoices');
+    setViewingEstimateId(null);
+    setViewingInvoiceId(invoice.id);
     setHomeownerTab('estimates');
   };
   const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
@@ -9909,6 +9964,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const isOpen = viewingInvoiceId === invoice.id;
     const cardTone = options.showPaymentGuidance ? 'invoice' : 'closed';
     const propertyLabel = propertyRecordLabel(invoice, { homes });
+    const invoiceFiled = maintenanceLog.some(entry => entry.invoice_id === invoice.id);
+    const invoiceFileable = invoice.status !== 'draft' && invoice.status !== 'void';
+    const invoiceRecordLabel = invoice.status === 'paid' ? 'receipt/invoice record' : 'invoice record';
 
     return (
       <div key={invoice.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
@@ -9960,18 +10018,39 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             Download PDF
           </button>
           {invoice.status === 'paid' && (
+            invoiceFiled ? (
             <button
               type="button"
-              onClick={() => setHomeownerTab('log')}
+              onClick={() => {
+                setHomeownerMaintenancePropertyScope(invoice.home_id ? 'all' : 'unassigned');
+                setHomeownerTab('log');
+              }}
               className={buttonClass('secondary')}
             >
               <ClipboardList size={16} />
               View Home History
             </button>
+            ) : null
+          )}
+          {invoiceFileable && (
+            <button
+              type="button"
+              onClick={() => void fileInvoiceToHomeHistory(invoice)}
+              disabled={filingInvoiceId === invoice.id || invoiceFiled}
+              className={buttonClass(invoiceFiled ? 'secondary' : 'primary')}
+            >
+              <ClipboardList size={16} />
+              {invoiceFiled ? 'Filed to Home History' : filingInvoiceId === invoice.id ? 'Filing...' : 'File to Home History'}
+            </button>
           )}
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
+            {invoiceFiled && (
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-900">
+                This {invoiceRecordLabel} is filed in Home History using the invoice record. No duplicate PDF was stored.
+              </div>
+            )}
             {options.showPaymentGuidance && (
               <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
                 Payment is handled directly with your contractor. Contact them for payment instructions.
@@ -13467,6 +13546,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   const entryPropertyLabel = propertyRecordLabel(entry, { homes });
                   const entryRequest = entry.service_request_id ? requestById.get(entry.service_request_id) : null;
                   const entryEstimate = entry.estimate_id ? estimateById.get(entry.estimate_id) : null;
+                  const entryInvoice = entry.invoice_id ? invoiceById.get(entry.invoice_id) : null;
                   const entryTypeChips = homeHistoryEntryTypeChips(entry);
                   return (
                   <div key={entry.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -13496,9 +13576,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             Not assigned to a property
                           </p>
                         )}
+                        {entryInvoice && (
+                          <p className="mt-0.5 text-xs font-medium text-emerald-700">
+                            Invoice status: {invoiceStatusLabel(entryInvoice.status)}
+                          </p>
+                        )}
                         {entry.description && <p className="mt-1.5 text-sm text-slate-700">{entry.description}</p>}
                         {entry.notes && <p className="mt-1 text-xs text-slate-500 italic">{entry.notes}</p>}
-                        {(entryRequest || entryEstimate || reportDocument || invoiceDocument) && (
+                        {(entryRequest || entryEstimate || entryInvoice || reportDocument || invoiceDocument) && (
                           <div className="mt-2 flex flex-wrap gap-3">
                             {entryRequest && (
                               <button
@@ -13518,6 +13603,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               >
                                 <Receipt size={13} />
                                 View estimate
+                              </button>
+                            )}
+                            {entryInvoice && (
+                              <button
+                                type="button"
+                                onClick={() => openHomeHistoryInvoice(entryInvoice.id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                              >
+                                <Receipt size={13} />
+                                View invoice
                               </button>
                             )}
                             {reportDocument && (

@@ -505,6 +505,7 @@ export interface MaintenanceLogEntry {
   home_id?: string | null;
   service_request_id: string | null;
   estimate_id: string | null;
+  invoice_id?: string | null;
   inspection_id: string | null;
   report_document_id: string | null;
   invoice_document_id: string | null;
