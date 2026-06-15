@@ -7893,6 +7893,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeownerRecordPropertyScope, setHomeownerRecordPropertyScope] = useState<HomeownerRecordPropertyScope>('selected');
   const [homeownerRecordContractorFilter, setHomeownerRecordContractorFilter] = useState('all');
   const [homeownerRecordSort, setHomeownerRecordSort] = useState<'newest' | 'oldest'>('newest');
+  const [selectedHomeownerCalendarRequest, setSelectedHomeownerCalendarRequest] = useState<ServiceRequestSummary | null>(null);
   const [updatingAppointmentRequestId, setUpdatingAppointmentRequestId] = useState<string | null>(null);
   const [counterProposeDrafts, setCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [homeownerRescheduleDrafts, setHomeownerRescheduleDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
@@ -9651,6 +9652,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setViewingEstimateId(null);
     setViewingInvoiceId(invoice.id);
     setHomeownerTab('estimates');
+  };
+  const openHomeownerCalendarRequest = (request: ServiceRequestSummary) => {
+    setSelectedHomeownerCalendarRequest(null);
+    setHomeownerRequestPropertyScope(request.home_id ? 'all' : 'unassigned');
+    setHomeownerRequestView(homeownerRequestQueueFor(request));
+    setExpandedRequestIds(new Set([request.id]));
+    setHomeownerTab('requests');
+  };
+  const openHomeownerCalendarEstimate = (estimate: Estimate) => {
+    setSelectedHomeownerCalendarRequest(null);
+    openHomeHistoryEstimate(estimate.id);
+  };
+  const openHomeownerCalendarInvoice = (invoice: Invoice) => {
+    setSelectedHomeownerCalendarRequest(null);
+    openHomeHistoryInvoice(invoice.id);
+  };
+  const openHomeownerCalendarHistory = (request: ServiceRequestSummary) => {
+    setSelectedHomeownerCalendarRequest(null);
+    setHomeownerMaintenancePropertyScope(request.home_id ? 'all' : 'unassigned');
+    setHomeownerTab('log');
   };
   const selectedDocumentPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedHomeDocumentCount = homeDocuments.filter(doc => !doc.home_id).length;
@@ -13472,13 +13493,23 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <CalendarView
             requests={serviceRequests}
             perspective="homeowner"
-            onOpenRequest={request => {
-              setHomeownerRequestView(homeownerRequestQueueFor(request));
-              setExpandedRequestIds(new Set([request.id]));
-              setHomeownerTab('requests');
-            }}
+            onOpenRequest={request => setSelectedHomeownerCalendarRequest(request)}
           />
         </Card>
+      )}
+      {selectedHomeownerCalendarRequest?.appointment && (
+        <HomeownerCalendarEventDetail
+          request={selectedHomeownerCalendarRequest}
+          appointment={selectedHomeownerCalendarRequest.appointment}
+          estimates={requestEstimatesFor(selectedHomeownerCalendarRequest)}
+          invoices={requestInvoicesFor(selectedHomeownerCalendarRequest)}
+          historyEntries={maintenanceLog.filter(entry => entry.service_request_id === selectedHomeownerCalendarRequest.id)}
+          onClose={() => setSelectedHomeownerCalendarRequest(null)}
+          onViewRequest={() => openHomeownerCalendarRequest(selectedHomeownerCalendarRequest)}
+          onViewEstimate={estimate => openHomeownerCalendarEstimate(estimate)}
+          onViewInvoice={invoice => openHomeownerCalendarInvoice(invoice)}
+          onViewHomeHistory={() => openHomeownerCalendarHistory(selectedHomeownerCalendarRequest)}
+        />
       )}
 
       {homeownerTab === 'estimates' && renderHomeownerEstimatesInvoicesPage()}
@@ -29022,6 +29053,171 @@ function ServiceRequestAppointmentCard({
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
           {statusLabel[appointment.status]}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function HomeownerCalendarEventDetail({
+  request,
+  appointment,
+  estimates,
+  invoices,
+  historyEntries,
+  onClose,
+  onViewRequest,
+  onViewEstimate,
+  onViewInvoice,
+  onViewHomeHistory,
+}: {
+  request: ServiceRequestSummary;
+  appointment: ServiceRequestAppointment;
+  estimates: Estimate[];
+  invoices: Invoice[];
+  historyEntries: MaintenanceLogEntry[];
+  onClose: () => void;
+  onViewRequest: () => void;
+  onViewEstimate: (estimate: Estimate) => void;
+  onViewInvoice: (invoice: Invoice) => void;
+  onViewHomeHistory: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const appointmentDate = new Date(appointment.proposed_at);
+  const linkedEstimate = estimates.find(estimate => ['sent', 'accepted'].includes(estimate.status)) ?? estimates[0] ?? null;
+  const linkedInvoice = invoices.find(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)) ?? invoices[0] ?? null;
+  const statusLabel: Record<AppointmentStatus, string> = {
+    proposed: 'Proposed',
+    confirmed: 'Confirmed',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+  };
+  const requestStatusLabel: Record<ServiceRequestStatus, string> = {
+    open: 'Open',
+    contractor_responded: 'Contractor responded',
+    homeowner_replied: 'Homeowner replied',
+    declined: 'Declined',
+    closed: 'Closed',
+  };
+  const proposedByLabel = appointment.proposed_by === 'contractor' ? 'Contractor proposed' : 'You proposed';
+  const detailRows = [
+    { label: 'Contractor', value: request.contractor_name },
+    { label: 'Property', value: [request.home_label, request.home_address].filter(Boolean).join(' · ') },
+    { label: 'Service type', value: request.category },
+    { label: 'Request status', value: requestStatusLabel[request.status] ?? request.status },
+  ].filter(row => row.value);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusFrame = window.requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calendar event"
+        tabIndex={-1}
+        onKeyDown={keyboardEvent => {
+          if (keyboardEvent.key === 'Escape') onClose();
+        }}
+        className="my-8 w-full max-w-lg rounded-2xl border border-[#E1E3E7] bg-white p-5 shadow-2xl outline-none sm:p-6"
+      >
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-[#02132D]">Calendar event</h2>
+          <button type="button" onClick={onClose} className="text-[#223D67]/70 hover:text-[#02132D]"><X size={18} /></button>
+        </div>
+        <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+          Homeowner appointment
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Visit</p>
+            <h3 className="mt-1 break-words text-xl font-bold text-slate-950">{request.title}</h3>
+            {request.description && <p className="mt-2 text-sm leading-6 text-slate-600">{request.description}</p>}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Date and time</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {Number.isNaN(appointmentDate.getTime())
+                  ? 'Appointment time unavailable'
+                  : appointmentDate.toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{statusLabel[appointment.status]}</p>
+              <p className="mt-1 text-xs text-slate-500">{proposedByLabel}</p>
+            </div>
+          </div>
+
+          {detailRows.length > 0 && (
+            <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3">
+              {detailRows.map(row => (
+                <div key={row.label} className="grid gap-0.5 sm:grid-cols-[120px_1fr] sm:gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{row.label}</p>
+                  <p className="break-words text-sm font-medium text-slate-800">{row.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {appointment.notes && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Appointment notes</p>
+              <p className="mt-1 text-sm leading-6 text-slate-700">{appointment.notes}</p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
+            Appointment changes and responses stay in Service Requests for now, so the full request thread and contractor messages remain together.
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={onClose} className={buttonClass('secondary')}>
+            Close
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {historyEntries.length > 0 && (
+              <button type="button" onClick={onViewHomeHistory} className={buttonClass('secondary')}>
+                <ClipboardList size={15} />
+                View Home History
+              </button>
+            )}
+            {linkedEstimate && (
+              <button type="button" onClick={() => onViewEstimate(linkedEstimate)} className={buttonClass('secondary')}>
+                <Receipt size={15} />
+                View estimate
+              </button>
+            )}
+            {linkedInvoice && (
+              <button type="button" onClick={() => onViewInvoice(linkedInvoice)} className={buttonClass('secondary')}>
+                <Receipt size={15} />
+                View invoice
+              </button>
+            )}
+            <button type="button" onClick={onViewRequest} className={buttonClass('primary')}>
+              <MessageSquare size={15} />
+              View service request
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
