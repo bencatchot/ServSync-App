@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/beta-core-loop-testability-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added stable test hooks and accessible labels across the sandbox core-loop path, including request, estimate, accepted-estimate job creation, job work item, invoice, Home History, and reminder form surfaces.
+- Reason for change: Make the next full core-loop Playwright E2E branch more reliable after the manual sandbox run passed but exposed brittle selectors around cards, job work-item completion, invoice filing, and linked reminders.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Targeted local sandbox hook/accessibility check for request, estimate, accepted-estimate job creation, job checkbox, Complete Job, invoice, Home History, and reminder form surfaces
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - This branch does not add the full core-loop E2E test; it prepares the UI for that next branch.
+  - Contractor Service Request cards with existing draft estimates should still receive manual preview attention because the manual run observed a draft-estimate visibility inconsistency.
+
+## 2026-06-16
+
 - Branch: `feature/beta-qa-docs-refresh-v1`
 - Files changed:
   - `docs/BETA_READINESS_CHECKLIST.md`

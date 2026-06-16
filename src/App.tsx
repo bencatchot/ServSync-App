@@ -10156,7 +10156,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const invoiceRecordLabel = invoice.status === 'paid' ? 'receipt/invoice record' : 'invoice record';
 
     return (
-      <div key={invoice.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
+      <div
+        key={invoice.id}
+        data-testid="homeowner-invoice-card"
+        data-record-id={invoice.id}
+        data-record-title={invoice.title || 'Invoice'}
+        className={homeownerRecordCardChrome(cardTone, isOpen)}
+      >
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -10224,6 +10230,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               type="button"
               onClick={() => void fileInvoiceToHomeHistory(invoice)}
               disabled={filingInvoiceId === invoice.id || invoiceFiled}
+              data-testid="homeowner-file-invoice-to-home-history"
+              aria-label={`${invoiceFiled ? 'Filed invoice in Home History' : 'File invoice to Home History'}: ${invoice.title || 'Invoice'}`}
               className={buttonClass(invoiceFiled ? 'secondary' : 'primary')}
             >
               <ClipboardList size={16} />
@@ -10300,7 +10308,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const propertyLabel = propertyRecordLabel(estimate, { homes });
 
     return (
-      <div key={estimate.id} className={homeownerRecordCardChrome(cardTone, isOpen)}>
+      <div
+        key={estimate.id}
+        data-testid="homeowner-estimate-card"
+        data-record-id={estimate.id}
+        data-record-title={estimate.title}
+        className={homeownerRecordCardChrome(cardTone, isOpen)}
+      >
         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -10428,6 +10442,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   type="button"
                   onClick={() => void respondToEstimate(estimate, 'accept')}
                   disabled={updatingEstimateId === estimate.id}
+                  data-testid="homeowner-accept-estimate"
+                  aria-label={`Accept estimate ${estimate.title}`}
                   className={buttonClass('primary')}
                 >
                   <CheckCircle2 size={16} />
@@ -13130,7 +13146,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const displayBadge = homeownerRequestDisplayBadge(request);
               const requestNeedsAction = homeownerRequestNeedsAction(request);
               return (
-                <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
+                <div
+                  key={request.id}
+                  data-testid="homeowner-service-request-card"
+                  data-record-id={request.id}
+                  data-record-title={request.title}
+                  className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                >
                   <button
                     type="button"
                     onClick={() => setExpandedRequestIds(prev => { const n = new Set(prev); n.has(request.id) ? n.delete(request.id) : n.add(request.id); return n; })}
@@ -13828,7 +13850,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
 
             {reminderFormOpen && (
-              <div className="mt-4 space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+              <div data-testid="home-reminder-form" className="mt-4 space-y-4 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
                 <div>
                   <p className="text-sm font-bold text-blue-950">New Home Reminder</p>
                   <p className="mt-1 text-xs leading-5 text-blue-800">
@@ -13990,7 +14012,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   const entryTypeChips = homeHistoryEntryTypeChips(entry);
                   const entryReminders = remindersByMaintenanceLogId[entry.id] || [];
                   return (
-                  <div key={entry.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div
+                    key={entry.id}
+                    data-testid="home-history-entry-card"
+                    data-record-id={entry.id}
+                    data-record-title={entry.title}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -14130,6 +14158,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               invoice_id: entry.invoice_id || null,
                               title: `Follow up: ${entry.title}`,
                             })}
+                            data-testid="home-history-add-follow-up-reminder"
+                            aria-label={`Add follow-up reminder for ${entry.title}`}
                             className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700"
                           >
                             <Bell size={13} />
@@ -19731,7 +19761,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 });
               };
               return (
-                <div key={request.id} className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}>
+                <div
+                  key={request.id}
+                  data-testid="contractor-service-request-card"
+                  data-record-id={request.id}
+                  data-record-title={request.title}
+                  className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm border-l-4 ${serviceRequestStatusAccent(request.status)}`}
+                >
                   <button
                     type="button"
                     onClick={toggleInlineRequest}
@@ -19804,6 +19840,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             homeId: request.home_id,
                           });
                         }}
+                        data-testid={linkedRequestEstimate ? 'contractor-open-estimate-from-request' : 'contractor-create-estimate-from-request'}
+                        aria-label={`${linkedRequestEstimate ? 'Open estimate' : 'Create estimate'} for ${request.title}`}
                         className={buttonClass('primary')}
                       >
                         <FileText size={15} />
@@ -22769,6 +22807,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   type="button"
                                                   onClick={() => void sendEstimateToHomeowner(estimate)}
                                                   disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
+                                                  data-testid="contractor-send-estimate"
+                                                  aria-label={`Send estimate ${estimate.title} to homeowner`}
                                                   className={buttonClass('primary')}
                                                 >
                                                   <Send size={15} />
@@ -22783,6 +22823,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     type="button"
                                                     onClick={() => void createJobFromAcceptedEstimate(estimate)}
                                                     disabled={convertingEstimateId === estimate.id}
+                                                    data-testid="contractor-create-job-from-accepted-estimate"
+                                                    aria-label={`Create job from accepted estimate ${estimate.title}`}
                                                     className={buttonClass('primary')}
                                                   >
                                                     <ClipboardCheck size={15} />
@@ -23786,6 +23828,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               }
                             }}
                             disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner}
+                            data-testid="contractor-save-and-send-invoice"
                             className={buttonClass('primary')}
                           >
                             <Send size={15} />
@@ -23897,7 +23940,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const lineCount = invoice.line_items?.length ?? 0;
                                 const propertyLabel = recordPropertyLabelForContractor(invoice);
                                 return (
-                                  <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                  <div
+                                    key={invoice.id}
+                                    data-testid="contractor-invoice-card"
+                                    data-record-id={invoice.id}
+                                    data-record-title={invoice.title || 'Invoice draft'}
+                                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                                  >
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -23942,6 +23991,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             type="button"
                                             onClick={() => void sendInvoiceToHomeowner(invoice)}
                                             disabled={updatingInvoiceId === invoice.id || !invoice.homeowner_user_id}
+                                            data-testid="contractor-send-invoice"
+                                            aria-label={`Send invoice ${invoice.title || 'Invoice draft'} to homeowner`}
                                             className={buttonClass('primary')}
                                           >
                                             <Send size={15} />
@@ -24016,7 +24067,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
                           return (
-                            <div key={estimate.id} className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
+                            <div
+                              key={estimate.id}
+                              data-testid="contractor-estimate-card"
+                              data-record-id={estimate.id}
+                              data-record-title={estimate.title}
+                              className={`rounded-xl border bg-white p-4 shadow-sm ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}
+                            >
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -24070,7 +24127,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     >
                                       Edit draft
                                     </button>
-                                    <button type="button" onClick={() => void sendEstimateToHomeowner(estimate)} disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id} className={buttonClass('primary')}>
+                                    <button
+                                      type="button"
+                                      onClick={() => void sendEstimateToHomeowner(estimate)}
+                                      disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
+                                      data-testid="contractor-send-estimate"
+                                      aria-label={`Send estimate ${estimate.title} to homeowner`}
+                                      className={buttonClass('primary')}
+                                    >
                                       <Send size={15} />
                                       {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
                                     </button>
@@ -24083,6 +24147,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="button"
                                         onClick={() => void createJobFromAcceptedEstimate(estimate)}
                                         disabled={convertingEstimateId === estimate.id}
+                                        data-testid="contractor-create-job-from-accepted-estimate"
+                                        aria-label={`Create job from accepted estimate ${estimate.title}`}
                                         className={buttonClass('primary')}
                                       >
                                         <ClipboardCheck size={15} />
@@ -24272,6 +24338,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div
                               key={insp.id}
                               data-testid="contractor-job-row"
+                              data-record-id={insp.id}
+                              data-record-title={insp.name}
                               className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}
                             >
                               <div className="flex flex-wrap items-center gap-3">
@@ -25642,11 +25710,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               const taskComplete = item.status === 'Fixed On Site';
                               const itemKey = findingStateKey(room, item.title);
                               return (
-                                <div key={`${room.room}-${item.title}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                                <div
+                                  key={`${room.room}-${item.title}-${index}`}
+                                  data-testid="contractor-approved-work-item"
+                                  data-work-title={item.title}
+                                  className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3"
+                                >
                                   <div className="flex flex-wrap items-start gap-3">
                                     <label className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-slate-950">
                                       <input
                                         type="checkbox"
+                                        aria-label={`Complete approved work: ${item.title}`}
+                                        data-testid="contractor-approved-work-checkbox"
                                         checked={taskComplete}
                                         disabled={simpleJobReadonly}
                                         onChange={event => setSimpleTaskValue(room, item.title, {
@@ -25684,11 +25759,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {simpleTaskRows.map(row => {
                                 const taskComplete = row.finding.status === 'Fixed On Site';
                                 return (
-                                  <div key={row.key} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                  <div key={row.key} data-testid="contractor-work-item" data-work-title={row.finding.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <div className="flex flex-wrap items-start gap-3">
                                       <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
                                         <input
                                           type="checkbox"
+                                          aria-label={`${taskComplete ? 'Mark incomplete' : 'Complete work item'}: ${row.finding.title}`}
+                                          data-testid="contractor-work-item-checkbox"
                                           checked={taskComplete}
                                           disabled={simpleJobReadonly}
                                           onChange={event => setSimpleTaskValue({ room: row.room, room_id: row.roomKey }, row.finding.title, {
@@ -25782,14 +25859,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
-                        <p className="mt-1 text-xs text-slate-500">Save changes, complete the job, or remove a draft job.</p>
+                        <p className="mt-1 text-xs text-slate-500">Save changes, then complete the job when the work items are ready.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} className={buttonClass('secondary')}>
+                          <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} data-testid="contractor-save-job-progress" className={buttonClass('secondary')}>
                           {savingInspection ? 'Saving...' : 'Save'}
                         </button>
                         {inspectionIsOpenJob(activeInspection) && (
-                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} className={buttonClass('primary')}>
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} disabled={savingInspection} data-testid="contractor-complete-job" className={buttonClass('primary')}>
                             <CheckCircle2 size={15} />
                             Complete Job
                           </button>
