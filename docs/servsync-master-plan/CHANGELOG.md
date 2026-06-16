@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/storage-media-access-e2e-v1`
+- Files changed:
+  - `tests/e2e/storage-media-access.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a guarded sandbox-only Playwright storage/media access spec that verifies private home document, support attachment, finalized report media, and finalized report document access boundaries across primary and secondary homeowner/contractor test accounts.
+- Reason for change: Turn the approved sandbox storage fixture setup into repeatable beta-critical storage/media access verification without changing app code, schema, RLS, storage policies, Edge Functions, Vercel settings, users, or production data.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/storage-media-access.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/rls-cross-user.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - The new spec depends on the approved `Storage QA 20260616134147` sandbox fixture records and is not intended for production.
+  - Contractor viewer/team-member media tests, contractor-assets own-folder hardening, production smoke accounts, and broad sandbox cleanup remain deferred.
+
+## 2026-06-16
+
 - Branch: `feature/local-draft-signout-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
