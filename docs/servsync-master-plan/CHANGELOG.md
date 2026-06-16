@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/contractor-beta-one-pager-v1`
+- Files changed:
+  - `docs/CONTRACTOR_BETA_ONE_PAGER.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a contractor-facing private beta one-pager with concise positioning, beta fit, testable workflows, limitations, feedback guidance, getting-started steps, and short text/email versions.
+- Reason for change: Prepare a practical founder-sendable contractor beta handout for the first 2 to 3 trusted contractors without overpromising payments, QuickBooks, automatic reminders, native mobile apps, full calendar sync, public marketplace lead generation, or other future capabilities.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation/content-only; no app code, tests, SQL, schema, RLS, storage policies, Edge Functions, Vercel settings, environment variables, users, production data, deploys, or beta messages were changed or sent.
+  - Homeowner beta one-pager, FAQ, landing page sections, social ad concepts, and short video scripts remain future marketing artifacts.
+
+## 2026-06-16
+
 - Branch: `feature/marketing-product-inventory-v1`
 - Files changed:
   - `docs/MARKETING_PRODUCT_INVENTORY.md`
