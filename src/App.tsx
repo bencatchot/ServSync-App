@@ -413,6 +413,22 @@ const STORAGE_KEYS = {
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
 
+const SIGN_OUT_LOCAL_STORAGE_KEYS = [
+  STORAGE_KEYS.fieldWorkState,
+  STORAGE_KEYS.homeownerRequestSearch,
+  STORAGE_KEYS.contractorHomeownerSearch,
+  STORAGE_KEYS.contractorSelectedHomeowner,
+  STORAGE_KEYS.contractorJobsCustomerFilter,
+] as const;
+
+function clearSensitiveLocalStateOnSignOut() {
+  try {
+    SIGN_OUT_LOCAL_STORAGE_KEYS.forEach(key => window.localStorage.removeItem(key));
+  } catch {
+    // Local storage cleanup should never block Supabase sign-out.
+  }
+}
+
 type WalkthroughStep = {
   title: string;
   body: string;
@@ -5710,6 +5726,7 @@ export default function App() {
 
   const signOut = async () => {
     await supabase?.auth.signOut();
+    clearSensitiveLocalStateOnSignOut();
     setSession(null);
     setProfile(null);
     setPasswordRecoveryActive(false);
@@ -6440,6 +6457,7 @@ function PasswordResetUpdatePage({
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       await supabase.auth.signOut();
+      clearSensitiveLocalStateOnSignOut();
       setSuccess(true);
       setNewPassword('');
       setConfirmPassword('');

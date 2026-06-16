@@ -355,7 +355,7 @@ Before using production smoke accounts:
 - [ ] Add a mobile read-only Playwright project or formal mobile manual QA checklist.
 - [ ] Decide whether and when to create production smoke accounts.
 - [ ] Run a focused mobile polish pass.
-- [ ] Add sign-out cleanup for sensitive local draft storage.
+- [x] Add sign-out cleanup for sensitive local draft storage.
 - [ ] Create clearly labeled demo/sample data only after approval.
 - [ ] Improve contractor marketing/onboarding copy.
 - [ ] Add lightweight beta tester instructions inside Support or onboarding.
