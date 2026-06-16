@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/beta-qa-docs-refresh-v1`
+- Files changed:
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Refreshed the beta QA documentation to match the current Playwright scripts, sandbox-only authenticated testing model, production public-smoke policy, sandbox account/data plan, Home History/Home Reminders checks, mobile QA gate, RLS/privacy checks, and controlled-beta versus public go-live distinction.
+- Reason for change: Reduce beta workflow confusion before creating smoke accounts, adding deeper E2E coverage, or inviting controlled beta users.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation-only; no app code, tests, SQL, schema, Edge Functions, Vercel settings, environment variables, users, or data were changed.
+  - Full core-loop E2E coverage, production smoke account policy, mobile QA automation, and RLS/cross-user testing remain follow-up work.
+
+## 2026-06-16
+
 - Branch: `feature/master-plan-status-refresh-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`

@@ -1,30 +1,96 @@
 # ServSync Private Beta Readiness Checklist
 
-Internal operating checklist for deciding whether ServSync is ready to invite live contractor beta testers.
+Internal operating checklist for deciding whether ServSync is ready to invite live contractor and homeowner beta testers.
 
 ## 1. Beta Launch Decision
 
-- [ ] Launch as a private beta only.
+- [ ] Launch as a controlled private beta only.
 - [ ] Invite a limited group of trusted contractors first.
+- [ ] Pair each contractor with one or more known/friendly homeowner testers when possible.
 - [ ] Keep broad public launch on hold.
-- [ ] Use fake/test data freely until real beta users begin.
+- [ ] Use fake/test data freely only in sandbox/preview.
 - [ ] Remove or clearly separate junk data before any real user account is used for customer-facing work.
 - [ ] Treat beta feedback as product discovery, not final validation.
+- [ ] Do not promise push/email/text reminders, payment processing, QuickBooks, native mobile apps, or full calendar sync.
 
-## 2. Required Technical Checks
+## 2. Beta QA Operating Model
+
+- [ ] Authenticated testing happens in sandbox/preview by default.
+- [ ] Production checks are public/read-only only until production smoke accounts are separately approved.
+- [ ] Production smoke accounts have an approved credential storage and allowed-actions policy before use.
+- [ ] No production mutation happens without explicit approval.
+- [ ] Sandbox/preview uses the expected Supabase project, not production.
+- [ ] Test credentials stay in local env files or a password manager, never in commits/docs/chats/logs.
+- [ ] `.env.test.local` is not committed.
+- [ ] Screenshots, videos, traces, and Playwright reports are not committed.
+
+## 3. Required Technical Checks
 
 - [ ] `npm run typecheck` passes.
 - [ ] `npm run build` passes.
-- [ ] Playwright smoke tests pass against the intended beta URL.
-- [ ] Vercel deploy succeeds.
+- [ ] `git diff --check` passes for release branches.
+- [ ] Playwright read-only smoke tests pass against the intended sandbox/preview URL.
+- [ ] Mutating Playwright tests pass against sandbox/preview when the release touches those flows.
+- [ ] Vercel deploy succeeds on `serv-sync-app-refresh`.
 - [ ] Deployed commit matches the commit intended for beta testing.
+- [ ] No old `serv-sync-app` check appears on new commits.
 - [ ] No unrelated files are included in commits.
-- [ ] No credentials are committed.
-- [ ] No `.env` files are committed.
-- [ ] No screenshots, videos, traces, or Playwright reports are committed.
-- [ ] Test credentials remain in environment variables only.
+- [ ] No credentials, `.env` files, SQL secrets, screenshots, videos, traces, or reports are committed.
+- [ ] Production public URL loads after merge/deploy.
 
-## 3. Contractor Account Readiness
+## 4. Sandbox QA Account Plan
+
+Primary sandbox accounts:
+
+- [ ] Primary contractor test account exists.
+- [ ] Primary contractor profile is complete enough for service area, business profile, estimates, jobs, invoices, calendar, and Discover testing.
+- [ ] Primary homeowner test account exists.
+- [ ] Primary homeowner has at least one home/property.
+- [ ] Primary homeowner and primary contractor have an active connection.
+- [ ] Required sharing permissions are enabled for connected-contractor workflow testing.
+
+RLS/cross-user sandbox accounts:
+
+- [ ] Secondary homeowner test account exists.
+- [ ] Secondary homeowner owns a separate home/property.
+- [ ] Secondary contractor test account exists.
+- [ ] Secondary contractor has a separate contractor profile.
+- [ ] Secondary accounts are not connected to primary records unless a specific test creates that relationship.
+- [ ] Secondary accounts can be used to verify unrelated records are not visible.
+
+## 5. Sandbox Reusable Test Data
+
+- [ ] Active homeowner service request with no estimate.
+- [ ] Service request with a sent estimate.
+- [ ] Accepted estimate with no linked job.
+- [ ] Accepted estimate with linked job.
+- [ ] Job in progress.
+- [ ] Checklist/report job before finalization.
+- [ ] Finalized/completed job with report.
+- [ ] Completed job with no invoice.
+- [ ] Draft invoice.
+- [ ] Local-only draft invoice that cannot be sent through the homeowner portal.
+- [ ] Sent/viewed invoice.
+- [ ] Paid/closed invoice where supported.
+- [ ] Invoice filed to Home History.
+- [ ] Home History manual entry.
+- [ ] Home History report-linked entry.
+- [ ] Home History invoice-linked entry.
+- [ ] Open manual Home Reminder.
+- [ ] Completed Home Reminder.
+- [ ] Dismissed Home Reminder.
+- [ ] Home document upload.
+- [ ] Service request attachment/photo if media testing is in scope.
+- [ ] Contractor Discover post with real sandbox media if Discover testing is in scope.
+
+Test data rules:
+
+- [ ] Test records use clear prefixes such as `E2E Test`, `Smoke Test`, or `PR Preview Test`.
+- [ ] App UI and existing app workflows are preferred over direct SQL.
+- [ ] Direct sandbox SQL is used only after separate approval.
+- [ ] No test/demo records are created in production unless production smoke accounts are approved.
+
+## 6. Contractor Account Readiness
 
 - [ ] Contractor can sign up.
 - [ ] Contractor can log in.
@@ -42,20 +108,22 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Property selector works for connected homeowner.
 - [ ] Job can be created for a connected homeowner.
 - [ ] Job can be created for the intended property.
-- [ ] Inspection/service job flow works.
+- [ ] Service job flow works.
 - [ ] Checklist/report workflow can be completed.
 - [ ] Report can be finalized/filed.
 - [ ] Estimate can be created.
 - [ ] Estimate can be sent.
+- [ ] Accepted estimate clearly leads to Create Job where appropriate.
 - [ ] Invoice can be created.
-- [ ] Invoice can be sent.
+- [ ] Invoice can be sent to a connected homeowner where supported.
+- [ ] Local-only invoice send guidance is clear when no connected homeowner exists.
 - [ ] Invoice can be marked paid where supported.
 - [ ] Calendar loads.
 - [ ] Appointment-related views do not show stale/fake summary counts.
 - [ ] Support/feedback entry point works.
 - [ ] Feedback can be drafted without exposing private customer details unnecessarily.
 
-## 4. Homeowner Account Readiness
+## 7. Homeowner Account Readiness
 
 - [ ] Homeowner can sign up.
 - [ ] Homeowner can log in.
@@ -71,22 +139,35 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Documents can be deleted with confirmation.
 - [ ] Estimates/invoices can be viewed.
 - [ ] Estimate review flow works.
+- [ ] Accepted estimate guidance explains the contractor creates, schedules, or completes the job/work next.
 - [ ] Invoice view/download flow works.
+- [ ] Eligible invoice can be filed to Home History.
+- [ ] Filing the same invoice again does not create duplicate Home History rows.
+- [ ] Home History shows completed work, filed reports, invoice/service records, notes, and warranty/follow-up context.
+- [ ] Manual Home Reminder can be created.
+- [ ] Manual Home Reminder can be completed.
+- [ ] Manual Home Reminder can be dismissed.
+- [ ] Reminder copy clearly says reminders are manual and do not send automatic emails, texts, or push alerts.
 - [ ] Service request can be created.
 - [ ] Service request uses the intended property.
 - [ ] Contractor connection request works.
 - [ ] Connected contractor appears correctly.
-- [ ] Home history/maintenance log works.
 - [ ] Calendar loads.
+- [ ] Homeowner calendar event modal opens for appointment events where test data exists.
 - [ ] Support/feedback entry point works.
 - [ ] Feedback can be drafted without asking for sensitive home details unnecessarily.
 
-## 5. Privacy And Trust Checks
+## 8. Privacy, RLS, And Trust Checks
 
-- [ ] Homeowner private documents are not visible to contractors.
-- [ ] Connected contractors cannot browse the homeowner private document library.
+- [ ] Homeowner cannot read another homeowner profile/home/documents.
+- [ ] Homeowner cannot read another homeowner invoices, Home History, reminders, requests, reports, or private files.
+- [ ] Contractor cannot read another contractor profile, customers, jobs, estimates, invoices, templates, or calendar records.
+- [ ] Contractor cannot read homeowner contact/home details unless permissioned.
+- [ ] Connected contractors cannot browse the homeowner private document library unless explicitly supported.
+- [ ] Unconnected contractors cannot see private homeowner details.
 - [ ] Contractor-filed reports appear only where intended.
 - [ ] Contractor-filed report documents inherit the intended property where available.
+- [ ] Secondary homeowner/contractor test accounts verify negative access cases.
 - [ ] External Reviews and ServSync Reviews are clearly separate.
 - [ ] ServSync Reviews only come from completed ServSync work.
 - [ ] No fake ratings are shown.
@@ -101,13 +182,14 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Trust & Safety page is reachable.
 - [ ] Terms, Privacy, Acceptable Use, and trust/legal links are reachable from public/auth areas where appropriate.
 
-## 6. Multi-Property Checks
+## 9. Multi-Property Checks
 
 - [ ] Homeowner with one property is not shown irrelevant property warnings.
 - [ ] Homeowner with multiple properties can switch properties.
 - [ ] Dashboard follows selected property.
 - [ ] Documents follow selected property.
-- [ ] Maintenance history follows selected property.
+- [ ] Home History follows selected property.
+- [ ] Home Reminders follow selected property where applicable.
 - [ ] Estimates/invoices follow selected property.
 - [ ] Service requests follow selected property.
 - [ ] Old unassigned records remain accessible from Unassigned views.
@@ -117,26 +199,84 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Job creation for connected homeowners uses the selected property.
 - [ ] Property labels are clear enough to avoid choosing the wrong home.
 
-## 7. Mobile / Responsive Checks
+## 10. Mobile / Responsive Checks
+
+Homeowner mobile checks:
+
+- [ ] Homeowner dashboard is usable on phone width.
+- [ ] Service Requests cards and actions wrap cleanly.
+- [ ] Estimates / Invoices cards and actions wrap cleanly.
+- [ ] Home History cards, chips, linked actions, and reminder controls fit.
+- [ ] Reminders dashboard card and Home History reminder controls are usable.
+- [ ] Calendar and homeowner calendar event modal remain usable.
+- [ ] Documents and Support views remain usable.
+
+Contractor mobile checks:
 
 - [ ] Contractor dashboard is usable on phone width.
-- [ ] Homeowner dashboard is usable on phone width.
-- [ ] Contractor Homeowners/Customers sidebar behaves properly on desktop.
 - [ ] Contractor Homeowners/Customers layout stacks or adapts cleanly on small screens.
+- [ ] Service Requests cards and Create/Open Estimate actions are usable.
+- [ ] Jobs overview and job cards are usable.
+- [ ] Estimates / Invoices cards and actions are usable.
+- [ ] Calendar event detail modal remains usable.
+- [ ] Business Profile service area and ZIP coverage controls are usable.
 - [ ] Cards/tiles do not overflow text.
 - [ ] Buttons do not clip long labels.
 - [ ] No horizontal scrolling appears on common mobile widths.
 - [ ] Key actions are tappable.
 - [ ] Forms remain usable on phone width.
-- [ ] Calendar and Support views remain usable on phone width.
 
-## 8. Beta Tester Onboarding Plan
+## 11. Core Loop QA Gate
+
+Before inviting controlled beta users, run a full sandbox pass for:
+
+- [ ] Homeowner creates service request.
+- [ ] Contractor reviews request.
+- [ ] Contractor creates/sends estimate.
+- [ ] Homeowner reviews/accepts estimate.
+- [ ] Contractor sees accepted estimate and creates job.
+- [ ] Contractor completes/finalizes job or report.
+- [ ] Contractor creates/sends invoice.
+- [ ] Homeowner views invoice.
+- [ ] Homeowner files invoice to Home History.
+- [ ] Homeowner sees invoice-linked Home History entry.
+- [ ] Homeowner creates manual Home Reminder.
+- [ ] Homeowner completes or dismisses reminder.
+
+E2E coverage gap:
+
+- [ ] Add a sandbox-only full core-loop Playwright test or documented manual equivalent before broader beta.
+- [ ] Avoid brittle assertions for long helper copy.
+- [ ] Prefer stable roles, headings, status chips, and unique E2E record names.
+
+## 12. Production Smoke Policy
+
+Current policy:
+
+- [ ] Production checks are public/read-only only.
+- [ ] `https://servsync.app` loads.
+- [ ] Public/auth/legal/trust pages render.
+- [ ] Sign-in page renders.
+- [ ] No obvious public runtime/console errors.
+- [ ] Vercel production deployment succeeds on `serv-sync-app-refresh`.
+- [ ] No authenticated production mutation is performed.
+
+Before using production smoke accounts:
+
+- [ ] Dedicated production smoke homeowner account is approved.
+- [ ] Dedicated production smoke contractor account is approved.
+- [ ] Credential storage is approved outside the repo.
+- [ ] Allowed actions are documented.
+- [ ] Smoke records are clearly labeled and isolated from real beta customer records.
+- [ ] Production smoke accounts are not personal/founder accounts.
+
+## 13. Beta Tester Onboarding Plan
 
 - [ ] Start with 3 to 5 trusted contractors.
 - [ ] Give each contractor a short test mission.
 - [ ] Ask contractors to add a customer.
 - [ ] Ask contractors to create a job.
-- [ ] Ask contractors to complete field work or an inspection checklist.
+- [ ] Ask contractors to complete service work or a checklist/report workflow.
 - [ ] Ask contractors to file a report.
 - [ ] Ask contractors to create and send an estimate.
 - [ ] Ask contractors to create and send an invoice.
@@ -144,49 +284,65 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Ask homeowners to view a filed report.
 - [ ] Ask homeowners to upload a document.
 - [ ] Ask homeowners to create a service request.
+- [ ] Ask homeowners to view/file an invoice to Home History.
+- [ ] Ask homeowners to create a manual Home Reminder.
 - [ ] Ask testers to submit bugs, confusion, and feature suggestions through the in-app Support/feedback flow.
 - [ ] Review feedback daily during the first beta week.
 
-## 9. Known Non-Blockers For Private Beta
+## 14. Known Non-Blockers For Private Beta
 
 - [ ] Stripe/payment processing is not live yet.
+- [ ] QuickBooks is not live yet.
+- [ ] Push/email/text reminder automation can wait.
+- [ ] Recurring reminders, scheduler/cron, and full calendar sync can wait.
+- [ ] Native mobile apps can wait.
 - [ ] Advanced admin analytics are not required yet.
 - [ ] Full email automation can wait if invite links are manual/copy-link.
 - [ ] Broad public marketing site can wait.
-- [ ] Deep workflow Playwright tests can be added after smoke tests.
 - [ ] Full mobile redesign can wait if core flows remain usable.
 - [ ] Bulk reassignment/backfill tools for old unassigned records can wait.
 - [ ] Contractor response templates and advanced automation can wait.
-- [ ] Public marketplace growth features can wait.
+- [ ] Public marketplace growth and deeper Discover/feed strategy can wait.
+- [ ] Contractor call tracking remains no-priority backlog.
 
-## 10. Beta Blockers
+## 15. Beta Blockers
 
 - [ ] Login failures.
 - [ ] Signup failures.
+- [ ] Password reset failure.
 - [ ] Users seeing other users' data.
-- [ ] Homeowner private documents visible to contractors.
+- [ ] Homeowner private documents visible to contractors unexpectedly.
 - [ ] Contractor-filed reports visible to the wrong homeowner or property.
 - [ ] Estimates broken.
 - [ ] Invoices broken.
 - [ ] Report filing broken.
+- [ ] Invoice-to-Home-History filing broken.
+- [ ] Home Reminders broken.
 - [ ] Claim invite flow broken.
 - [ ] Service request creation broken.
 - [ ] Property selection saving records to the wrong property.
 - [ ] Playwright smoke tests failing.
+- [ ] Full sandbox core-loop manual pass blocked.
+- [ ] RLS/privacy verification blocked or failing.
+- [ ] Critical mobile flow unusable.
 - [ ] `npm run typecheck` failing.
 - [ ] `npm run build` failing.
 - [ ] Vercel deploy failing.
 - [ ] Confusing stale/fake metrics shown to users.
 - [ ] Unsupported trust, privacy, compliance, or verification claims visible in the app.
 
-## 11. Recommended Next Build Tasks
+## 16. Recommended Next Build / QA Tasks
 
-- [ ] Add deeper Playwright mutating workflow tests.
-- [ ] Add a contractor workflow test for local customer, job, report, estimate, and invoice.
-- [ ] Add a homeowner workflow test for property, document, request, and financial record viewing.
+- [ ] Refresh this checklist after each major beta-readiness decision.
+- [ ] Add a full sandbox core-loop Playwright test.
+- [ ] Add invoice-to-Home-History Playwright coverage.
+- [ ] Add Home Reminders Playwright coverage.
+- [ ] Add RLS/cross-user verification tests or a documented manual checklist.
+- [ ] Add a mobile read-only Playwright project or formal mobile manual QA checklist.
+- [ ] Decide whether and when to create production smoke accounts.
 - [ ] Run a focused mobile polish pass.
-- [ ] Compact contractor/customer detail related-record previews into cleaner rows.
-- [ ] Create demo/sample data that is clearly labeled as fake.
+- [ ] Add sign-out cleanup for sensitive local draft storage.
+- [ ] Create clearly labeled demo/sample data only after approval.
 - [ ] Improve contractor marketing/onboarding copy.
 - [ ] Add lightweight beta tester instructions inside Support or onboarding.
 - [ ] Add a simple internal beta feedback review process.
