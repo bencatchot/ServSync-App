@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/rls-cross-user-e2e-v1`
+- Files changed:
+  - `tests/e2e/helpers/env.ts`
+  - `tests/e2e/rls-cross-user.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added secondary sandbox credential support and a guarded Playwright RLS/cross-user spec that checks homeowner, contractor, and connection boundaries with sandbox-only Supabase sessions.
+- Reason for change: Turn the beta RLS account/data setup into repeatable cross-user access verification before inviting controlled beta users.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/rls-cross-user.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - The new spec depends on the approved sandbox RLS QA fixture records and is not intended for production.
+  - Storage signed URL negative checks and contractor viewer/team-member role checks remain deferred.
+
+## 2026-06-16
+
 - Branch: `feature/full-core-loop-e2e-v1`
 - Files changed:
   - `tests/e2e/full-core-loop.spec.ts`
