@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/marketing-product-inventory-v1`
+- Files changed:
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a marketing product inventory and source-of-truth brief that separates ServSync live, beta, manual, and future-facing capabilities for future marketing plans, flyers, ads, landing-page copy, and video scripts.
+- Reason for change: Give future marketing work a grounded feature/function inventory with claim guardrails so controlled-beta messaging stays honest and does not overpromise payments, QuickBooks, automatic reminders, native mobile apps, full calendar sync, broad marketplace behavior, or unsupported trust/security claims.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation-only; no app code, tests, SQL, schema, RLS, storage policies, Edge Functions, Vercel settings, environment variables, users, production data, deploys, or marketing campaigns were changed or launched.
+  - Recommended next marketing assets remain future work: one-page contractor/homeowner flyers, FAQ, landing-page sections, social ad concepts, and short video scripts.
+
+## 2026-06-16
+
 - Branch: `feature/beta-invite-message-kit-v1`
 - Files changed:
   - `docs/BETA_INVITE_MESSAGES.md`
