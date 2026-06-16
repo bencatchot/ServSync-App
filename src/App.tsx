@@ -178,6 +178,41 @@ type AdminOutreachMessageDraft = {
   subject: string;
   body: string;
 };
+type AdminInviteLeadStatus = 'new' | 'researching' | 'contacted' | 'followed_up' | 'joined' | 'declined' | 'no_response' | 'bad_contact_info' | 'duplicate';
+type AdminInviteLead = {
+  id: string;
+  homeowner_user_id: string;
+  business_name: string;
+  location: string;
+  trade_category: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  website_url: string | null;
+  social_url: string | null;
+  homeowner_note: string | null;
+  homeowner_status: HomeownerContractorInviteLeadStatus;
+  admin_status: AdminInviteLeadStatus;
+  outreach_attempt_count: number;
+  last_outreach_at: string | null;
+  next_follow_up_at: string | null;
+  matched_contractor_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type AdminInviteLeadDraft = {
+  homeowner_status: HomeownerContractorInviteLeadStatus;
+  admin_status: AdminInviteLeadStatus;
+  outreach_attempt_count: string;
+  last_outreach_at: string;
+  next_follow_up_at: string;
+  matched_contractor_id: string;
+};
+type AdminInviteLeadOutreachDraft = {
+  subject: string;
+  emailBody: string;
+  textBody: string;
+};
 type WalkthroughSuggestion = {
   id: string;
   rawText: string;
@@ -395,6 +430,27 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
 const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
 const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
 const HOMEOWNER_CONTRACTOR_INVITE_LEAD_SELECT = 'id, business_name, location, trade_category, contact_name, homeowner_status, created_at, updated_at';
+const ADMIN_INVITE_LEAD_SELECT = [
+  'id',
+  'homeowner_user_id',
+  'business_name',
+  'location',
+  'trade_category',
+  'contact_name',
+  'phone',
+  'email',
+  'website_url',
+  'social_url',
+  'homeowner_note',
+  'homeowner_status',
+  'admin_status',
+  'outreach_attempt_count',
+  'last_outreach_at',
+  'next_follow_up_at',
+  'matched_contractor_id',
+  'created_at',
+  'updated_at',
+].join(', ');
 
 const HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS: Record<HomeownerContractorInviteLeadStatus, string> = {
   submitted: 'Submitted',
@@ -403,6 +459,31 @@ const HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS: Record<HomeownerContractorInvit
   contractor_declined: 'Contractor declined',
   no_response_30_days: 'No response after 30 days',
 };
+
+const ADMIN_INVITE_LEAD_STATUS_OPTIONS: { value: AdminInviteLeadStatus; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'researching', label: 'Researching' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'followed_up', label: 'Followed up' },
+  { value: 'joined', label: 'Joined' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'no_response', label: 'No response' },
+  { value: 'bad_contact_info', label: 'Bad contact info' },
+  { value: 'duplicate', label: 'Duplicate' },
+];
+
+const HOMEOWNER_CONTRACTOR_INVITE_STATUS_OPTIONS: { value: HomeownerContractorInviteLeadStatus; label: string }[] = [
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'invite_sent', label: 'Invite sent' },
+  { value: 'contractor_joined', label: 'Contractor joined' },
+  { value: 'contractor_declined', label: 'Contractor declined' },
+  { value: 'no_response_30_days', label: 'No response after 30 days' },
+];
+
+const ADMIN_INVITE_LEAD_STATUS_LABELS = ADMIN_INVITE_LEAD_STATUS_OPTIONS.reduce<Record<AdminInviteLeadStatus, string>>((labels, option) => {
+  labels[option.value] = option.label;
+  return labels;
+}, {} as Record<AdminInviteLeadStatus, string>);
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -4878,6 +4959,45 @@ If you want, I can help you walk through the easiest way to invite customers or 
 Thanks,
 Ben
 ServSync`,
+  };
+}
+
+function adminInviteLeadDraftFromLead(lead: AdminInviteLead): AdminInviteLeadDraft {
+  return {
+    homeowner_status: lead.homeowner_status || 'submitted',
+    admin_status: lead.admin_status || 'new',
+    outreach_attempt_count: String(lead.outreach_attempt_count ?? 0),
+    last_outreach_at: lead.last_outreach_at ? lead.last_outreach_at.slice(0, 10) : '',
+    next_follow_up_at: lead.next_follow_up_at ? lead.next_follow_up_at.slice(0, 10) : '',
+    matched_contractor_id: lead.matched_contractor_id || '',
+  };
+}
+
+function inviteLeadOutreachName(lead: Pick<AdminInviteLead, 'contact_name' | 'business_name'>) {
+  return lead.contact_name?.trim() || lead.business_name?.trim() || 'there';
+}
+
+function inviteLeadOutreachMessage(lead: AdminInviteLead): AdminInviteLeadOutreachDraft {
+  const contractorName = inviteLeadOutreachName(lead);
+  const signupLink = '[Sign-Up Link]';
+  return {
+    subject: 'A local homeowner invited you to ServSync',
+    emailBody: `Hi ${contractorName},
+
+A local homeowner requested that ${lead.business_name} be invited to join ServSync.
+
+ServSync helps contractors connect with homeowners and keep service requests, estimates, jobs, invoices, and customer records organized in one place.
+
+Contractors can start with a 30-day free trial to see if ServSync is a good fit.
+
+You can learn more or create your contractor profile here:
+
+${signupLink}
+
+Thanks,
+Ben Catchot
+ServSync`,
+    textBody: `Hi ${contractorName}, this is Ben with ServSync. A local homeowner requested that ${lead.business_name} be invited to join ServSync. ServSync helps contractors connect with homeowners and keep requests, estimates, jobs, invoices, and customer records organized. Contractors can start with a 30-day free trial here: ${signupLink}`,
   };
 }
 
@@ -27484,20 +27604,26 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [contractors, setContractors] = useState<ContractorProfile[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
+  const [inviteLeads, setInviteLeads] = useState<AdminInviteLead[]>([]);
   const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
   const [connectionOverviews, setConnectionOverviews] = useState<PlatformConnectionOverview[]>([]);
   const [adminConnectionHistory, setAdminConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [adminDrafts, setAdminDrafts] = useState<Record<string, AdminContractorDraft>>({});
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, InviteRewardDraft>>({});
+  const [inviteLeadDrafts, setInviteLeadDrafts] = useState<Record<string, AdminInviteLeadDraft>>({});
   const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
   const [contractorAdoption, setContractorAdoption] = useState<AdminContractorAdoption[]>([]);
   const [connectionAlertDrafts, setConnectionAlertDrafts] = useState<Record<string, AdminConnectionAlertDraft>>({});
   const [connectionOutreachDrafts, setConnectionOutreachDrafts] = useState<Record<string, AdminOutreachMessageDraft>>({});
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'referrals' | 'support' | 'reports'>('overview');
+  const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
+  const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
+  const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'support' | 'reports'>('overview');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
+  const [inviteLeadSearch, setInviteLeadSearch] = useState('');
+  const [inviteLeadStatusFilter, setInviteLeadStatusFilter] = useState<'all' | AdminInviteLeadStatus>('all');
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | SupportInquiryStatus>('all');
   const [supportSearch, setSupportSearch] = useState('');
@@ -27505,6 +27631,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [savingSupportInquiryId, setSavingSupportInquiryId] = useState<string | null>(null);
   const [savingContractorId, setSavingContractorId] = useState<string | null>(null);
   const [savingInviteId, setSavingInviteId] = useState<string | null>(null);
+  const [savingInviteLeadId, setSavingInviteLeadId] = useState<string | null>(null);
   const [savingReferralId, setSavingReferralId] = useState<string | null>(null);
   const [savingConnectionAlertId, setSavingConnectionAlertId] = useState<string | null>(null);
   const [reportHealth, setReportHealth] = useState<AdminPlatformHealth | null>(null);
@@ -27522,11 +27649,12 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setLoading(true);
     setError('');
     try {
-      const [profilesRes, contractorsRes, connectionsRes, invitesRes, referralRes, connectionOverviewRes, adoptionRes, supportRes] = await Promise.all([
+      const [profilesRes, contractorsRes, connectionsRes, invitesRes, inviteLeadsRes, referralRes, connectionOverviewRes, adoptionRes, supportRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('contractor_profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_connections').select('status'),
         supabase.from('contractor_invites').select('*').order('created_at', { ascending: false }),
+        supabase.from('homeowner_contractor_invite_leads').select(ADMIN_INVITE_LEAD_SELECT).order('created_at', { ascending: false }),
         supabase.rpc('servsync_admin_referrals'),
         supabase.rpc('servsync_admin_connection_overview'),
         supabase.rpc('servsync_admin_contractor_adoption'),
@@ -27536,11 +27664,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       if (contractorsRes.error) throw contractorsRes.error;
       if (connectionsRes.error) throw connectionsRes.error;
       if (invitesRes.error) throw invitesRes.error;
+      if (inviteLeadsRes.error) throw inviteLeadsRes.error;
       if (connectionOverviewRes.error) throw connectionOverviewRes.error;
 
       const profiles = (profilesRes.data || []) as Profile[];
       const connections = (connectionsRes.data || []) as { status: string }[];
       const loadedInvites = (invitesRes.data || []) as ContractorInvite[];
+      const loadedInviteLeads = (inviteLeadsRes.data || []) as unknown as AdminInviteLead[];
       const loadedReferrals = referralRes.error ? [] : (referralRes.data || []) as AdminReferral[];
       const loadedConnectionOverviews = (connectionOverviewRes.data || []) as PlatformConnectionOverview[];
       const loadedAdoption = adoptionRes.error ? [] : (adoptionRes.data || []) as AdminContractorAdoption[];
@@ -27565,6 +27695,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const loadedContractors = (contractorsRes.data || []) as ContractorProfile[];
       setContractors(loadedContractors);
       setInvites(loadedInvites);
+      setInviteLeads(loadedInviteLeads);
       setAdminReferrals(loadedReferrals);
       setConnectionOverviews(loadedConnectionOverviews);
       setContractorAdoption(loadedAdoption);
@@ -27576,6 +27707,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       }, {}));
       setInviteDrafts(loadedInvites.reduce<Record<string, InviteRewardDraft>>((drafts, invite) => {
         drafts[invite.id] = inviteDraftFromInvite(invite);
+        return drafts;
+      }, {}));
+      setInviteLeadDrafts(loadedInviteLeads.reduce<Record<string, AdminInviteLeadDraft>>((drafts, lead) => {
+        drafts[lead.id] = adminInviteLeadDraftFromLead(lead);
         return drafts;
       }, {}));
       setAdminReferralDrafts(loadedReferrals.reduce<Record<string, AdminReferralDraft>>((drafts, referral) => {
@@ -27633,6 +27768,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }));
   };
 
+  const updateInviteLeadDraft = (leadId: string, nextDraft: AdminInviteLeadDraft) => {
+    setInviteLeadDrafts(current => ({
+      ...current,
+      [leadId]: nextDraft,
+    }));
+  };
+
   const updateAdminReferralDraft = (referralId: string, nextDraft: AdminReferralDraft) => {
     setAdminReferralDrafts(current => ({
       ...current,
@@ -27668,6 +27810,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setConnectionOutreachDrafts(current => ({
       ...current,
       [alertId]: nextDraft,
+    }));
+  };
+
+  const updateInviteLeadOutreachDraft = (leadId: string, nextDraft: AdminInviteLeadOutreachDraft) => {
+    setInviteLeadOutreachDrafts(current => ({
+      ...current,
+      [leadId]: nextDraft,
     }));
   };
 
@@ -27719,6 +27868,63 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setError(readableError(err, 'Unable to update invite reward tracking.'));
     } finally {
       setSavingInviteId(null);
+    }
+  };
+
+  const prepareInviteLeadOutreach = (lead: AdminInviteLead) => {
+    setInviteLeadOutreachDrafts(current => ({
+      ...current,
+      [lead.id]: current[lead.id] || inviteLeadOutreachMessage(lead),
+    }));
+    setActiveInviteLeadOutreachId(lead.id);
+  };
+
+  const saveInviteLead = async (lead: AdminInviteLead) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setSavingInviteLeadId(lead.id);
+    try {
+      const draft = inviteLeadDrafts[lead.id] || adminInviteLeadDraftFromLead(lead);
+      const outreachCount = Math.max(0, Number.parseInt(draft.outreach_attempt_count || '0', 10) || 0);
+      const { error: updateError } = await supabase
+        .from('homeowner_contractor_invite_leads')
+        .update({
+          homeowner_status: draft.homeowner_status,
+          admin_status: draft.admin_status,
+          outreach_attempt_count: outreachCount,
+          last_outreach_at: draft.last_outreach_at ? new Date(`${draft.last_outreach_at}T12:00:00`).toISOString() : null,
+          next_follow_up_at: draft.next_follow_up_at ? new Date(`${draft.next_follow_up_at}T12:00:00`).toISOString() : null,
+          matched_contractor_id: draft.matched_contractor_id || null,
+        })
+        .eq('id', lead.id);
+      if (updateError) throw updateError;
+      setNotice(`Invite lead for ${lead.business_name} updated.`);
+      await loadAdmin();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update contractor invite lead.'));
+    } finally {
+      setSavingInviteLeadId(null);
+    }
+  };
+
+  const copyInviteLeadEmail = async (lead: AdminInviteLead) => {
+    const draft = inviteLeadOutreachDrafts[lead.id] || inviteLeadOutreachMessage(lead);
+    try {
+      await navigator.clipboard.writeText(`Subject: ${draft.subject}\n\n${draft.emailBody}`);
+      setNotice('Invite email copied. Send it manually, then update the lead status when done.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to copy invite email.'));
+    }
+  };
+
+  const copyInviteLeadText = async (lead: AdminInviteLead) => {
+    const draft = inviteLeadOutreachDrafts[lead.id] || inviteLeadOutreachMessage(lead);
+    try {
+      await navigator.clipboard.writeText(draft.textBody);
+      setNotice('Invite text copied. Send it manually, then update the lead status when done.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to copy invite text.'));
     }
   };
 
@@ -27856,6 +28062,9 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
   const openSupportCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const pendingReferralCount = adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
+  const newInviteLeadCount = inviteLeads.filter(lead => lead.admin_status === 'new').length;
+  const profilesById = new Map(profiles.map(item => [item.id, item]));
+  const contractorsById = new Map(contractors.map(item => [item.id, item]));
   const adoptionByContractorId = new Map(contractorAdoption.map(row => [row.contractor_id, row]));
   const connectionAlertCount = contractorAdoption.filter(isConnectionAlertNeedsOutreach).length;
   const filteredContractors = contractors.filter(contractor => {
@@ -27874,6 +28083,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     { label: 'Contractors', value: overview?.contractors ?? 0, icon: Building2 },
     { label: 'Connection alerts', value: connectionAlertCount, icon: AlertTriangle },
     { label: 'Active Connections', value: overview?.active_connections ?? 0, icon: Link2 },
+    { label: 'Invite Leads', value: newInviteLeadCount, icon: Mail },
     { label: 'Active Invites', value: overview?.active_invites ?? 0, icon: Mail },
     { label: 'Referral Review', value: pendingReferralCount, icon: Receipt },
     { label: 'Open Support', value: openSupportCount, icon: MessageSquare },
@@ -27909,6 +28119,24 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     ].filter(Boolean).join(' ').toLowerCase();
     return matchesStatus && (!search || haystack.includes(search));
   });
+  const filteredInviteLeads = inviteLeads.filter(lead => {
+    const search = inviteLeadSearch.trim().toLowerCase();
+    const homeowner = profilesById.get(lead.homeowner_user_id);
+    const haystack = [
+      lead.business_name,
+      lead.location,
+      lead.trade_category,
+      lead.contact_name,
+      lead.phone,
+      lead.email,
+      lead.website_url,
+      lead.social_url,
+      homeowner?.full_name,
+      homeowner?.email,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchesStatus = inviteLeadStatusFilter === 'all' || lead.admin_status === inviteLeadStatusFilter;
+    return matchesStatus && (!search || haystack.includes(search));
+  });
 
   return (
     <SidebarLayout
@@ -27917,6 +28145,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         { id: 'overview',     label: 'Overview',    icon: <LayoutDashboard size={17} /> },
         { id: 'contractors',  label: 'Contractors', icon: <Building2 size={17} /> },
         { id: 'connections',  label: 'Connections', icon: <Users size={17} /> },
+        { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
@@ -27948,7 +28177,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                 setAdminTab('contractors');
                 return;
               }
-              setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
+              setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Invite Leads' ? 'invite_leads' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
             }}
           />
         ))}
@@ -28338,6 +28567,230 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                 </div>
               </div>
             ))
+          )}
+        </div>
+      </Card>
+      )}
+
+      {adminTab === 'invite_leads' && (
+      <Card title="Contractor invite leads" icon={<Mail size={18} />}>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
+            <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
+              <Field label="Search invite leads">
+                <input
+                  className={inputClass()}
+                  value={inviteLeadSearch}
+                  onChange={event => setInviteLeadSearch(event.target.value)}
+                  placeholder="Business, location, contact, email, phone, or homeowner"
+                />
+              </Field>
+              <Field label="Admin status">
+                <select
+                  className={inputClass()}
+                  value={inviteLeadStatusFilter}
+                  onChange={event => setInviteLeadStatusFilter(event.target.value as 'all' | AdminInviteLeadStatus)}
+                >
+                  <option value="all">All statuses</option>
+                  {ADMIN_INVITE_LEAD_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                </select>
+              </Field>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-400">
+              Homeowner-submitted contractor invite leads are separate from service requests, connection requests, Discover, and contractor search.
+              Outreach is manual; nothing is emailed or texted automatically from ServSync.
+            </p>
+          </div>
+
+          {inviteLeads.length === 0 ? (
+            <EmptyState text="No contractor invite leads have been submitted yet." />
+          ) : filteredInviteLeads.length === 0 ? (
+            <EmptyState text="No contractor invite leads match those filters." />
+          ) : (
+            filteredInviteLeads.map(lead => {
+              const draft = inviteLeadDrafts[lead.id] || adminInviteLeadDraftFromLead(lead);
+              const isSaving = savingInviteLeadId === lead.id;
+              const homeowner = profilesById.get(lead.homeowner_user_id);
+              const matchedContractor = lead.matched_contractor_id ? contractorsById.get(lead.matched_contractor_id) : null;
+              const outreachDraft = inviteLeadOutreachDrafts[lead.id];
+
+              return (
+                <div key={lead.id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-bold text-white">{lead.business_name}</p>
+                      <p className="mt-1 text-sm text-slate-300">
+                        {lead.location}
+                        {lead.trade_category ? ` · ${lead.trade_category}` : ''}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Submitted {formatDateTime(lead.created_at)}
+                        {homeowner ? ` by ${homeowner.full_name || homeowner.email || homeowner.id.slice(0, 8)}` : ` by homeowner ${lead.homeowner_user_id.slice(0, 8)}`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">
+                        {HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS[lead.homeowner_status] ?? 'Submitted'}
+                      </span>
+                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                        {ADMIN_INVITE_LEAD_STATUS_LABELS[lead.admin_status] ?? 'New'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoBox label="Contact name" value={lead.contact_name || 'Not provided'} />
+                    <InfoBox label="Phone" value={formatPhoneNumber(lead.phone) || 'Not provided'} />
+                    <InfoBox label="Email" value={lead.email || 'Not provided'} />
+                    <InfoBox label="Matched contractor" value={matchedContractor?.business_name || 'Not matched'} />
+                    <InfoBox label="Website" value={lead.website_url || 'Not provided'} />
+                    <InfoBox label="Facebook/social" value={lead.social_url || 'Not provided'} />
+                    <InfoBox label="Last outreach" value={formatDateTime(lead.last_outreach_at)} />
+                    <InfoBox label="Next follow-up" value={formatDateTime(lead.next_follow_up_at)} />
+                  </div>
+
+                  {lead.homeowner_note && (
+                    <div className="mt-4 rounded-lg border border-slate-600 bg-slate-800/60 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Homeowner note</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{lead.homeowner_note}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[180px_220px_150px_160px_160px_1fr_auto]">
+                    <Field label="Admin status">
+                      <select
+                        className={inputClass()}
+                        value={draft.admin_status}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, admin_status: event.target.value as AdminInviteLeadStatus })}
+                      >
+                        {ADMIN_INVITE_LEAD_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Homeowner status">
+                      <select
+                        className={inputClass()}
+                        value={draft.homeowner_status}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, homeowner_status: event.target.value as HomeownerContractorInviteLeadStatus })}
+                      >
+                        {HOMEOWNER_CONTRACTOR_INVITE_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Outreach count">
+                      <input
+                        className={inputClass()}
+                        inputMode="numeric"
+                        value={draft.outreach_attempt_count}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, outreach_attempt_count: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="Last outreach">
+                      <input
+                        type="date"
+                        className={inputClass()}
+                        value={draft.last_outreach_at}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, last_outreach_at: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="Next follow-up">
+                      <input
+                        type="date"
+                        className={inputClass()}
+                        value={draft.next_follow_up_at}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, next_follow_up_at: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="Matched contractor">
+                      <select
+                        className={inputClass()}
+                        value={draft.matched_contractor_id}
+                        onChange={event => updateInviteLeadDraft(lead.id, { ...draft, matched_contractor_id: event.target.value })}
+                      >
+                        <option value="">Not matched</option>
+                        {contractors.map(contractor => (
+                          <option key={contractor.id} value={contractor.id}>
+                            {contractor.business_name || contractor.email || contractor.id.slice(0, 8)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => void saveInviteLead(lead)}
+                        disabled={isSaving}
+                        className={buttonClass('primary')}
+                      >
+                        <ClipboardCheck size={16} />
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-slate-600 bg-slate-900/50 p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">Manual outreach templates</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Copy these into your email or text app. ServSync does not send outreach automatically.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => prepareInviteLeadOutreach(lead)}
+                        className={buttonClass('secondary')}
+                      >
+                        <Mail size={16} />
+                        Prepare outreach
+                      </button>
+                    </div>
+
+                    {activeInviteLeadOutreachId === lead.id && outreachDraft && (
+                      <div className="mt-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
+                        <Field label="Email subject">
+                          <input
+                            className={inputClass()}
+                            {...writingAssistProps}
+                            value={outreachDraft.subject}
+                            onChange={event => updateInviteLeadOutreachDraft(lead.id, { ...outreachDraft, subject: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="Email template">
+                          <textarea
+                            className={inputClass()}
+                            rows={10}
+                            {...writingAssistProps}
+                            value={outreachDraft.emailBody}
+                            onChange={event => updateInviteLeadOutreachDraft(lead.id, { ...outreachDraft, emailBody: event.target.value })}
+                          />
+                        </Field>
+                        <Field label="Text template">
+                          <textarea
+                            className={inputClass()}
+                            rows={4}
+                            {...writingAssistProps}
+                            value={outreachDraft.textBody}
+                            onChange={event => updateInviteLeadOutreachDraft(lead.id, { ...outreachDraft, textBody: event.target.value })}
+                          />
+                        </Field>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void copyInviteLeadEmail(lead)} className={buttonClass('primary')}>
+                            <ClipboardCheck size={16} />
+                            Copy email
+                          </button>
+                          <button type="button" onClick={() => void copyInviteLeadText(lead)} className={buttonClass('secondary')}>
+                            <ClipboardCheck size={16} />
+                            Copy text
+                          </button>
+                          <button type="button" onClick={() => setActiveInviteLeadOutreachId(null)} className={buttonClass('secondary')}>
+                            Close preview
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </Card>
