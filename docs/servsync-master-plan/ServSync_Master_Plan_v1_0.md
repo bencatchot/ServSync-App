@@ -32,7 +32,7 @@ Recommended workflow: keep this Word document for human reading and review. If C
 
 # 1. Executive Summary
 
-ServSync is a homeowner-contractor marketplace with contractor software. It is designed to help homeowners find local service contractors, connect with them in a controlled way, communicate clearly, request work, review estimates and invoices, and preserve a service history for their home. On the contractor side, ServSync gives solo and small-team contractors practical software tools for requests, estimates, jobs, invoices, reports, calendar events, customer/home records, and future reminders.
+ServSync is a homeowner-contractor marketplace with contractor software. It is designed to help homeowners find local service contractors, connect with them in a controlled way, communicate clearly, request work, review estimates and invoices, preserve a Home History for their property, and create manual follow-up reminders. On the contractor side, ServSync gives solo and small-team contractors practical software tools for requests, estimates, jobs, invoices, reports, calendar events, customer/home records, and workflow follow-up.
 
 The product should not be positioned as only contractor software or only a lead marketplace. Its strategic difference is the connection between the two: discovery plus the workflow that happens after discovery. The strongest simple platform message remains: Find local contractors. Keep the work organized.
 
@@ -99,31 +99,31 @@ ServSync should not try to look like a smaller ServiceTitan or a generic Angi al
 
 # 6. Core MVP Loop
 
-The product should be judged against the core loop: Homeowner Request -> Contractor Estimate -> Homeowner Approval -> Job -> Completion -> Invoice -> Home Timeline -> Reminder. The current app has many pieces of this loop, but the audit shows the experience needs to feel more linear and obvious.
+The product should be judged against the core loop: Homeowner Request -> Contractor Estimate -> Homeowner Approval -> Job -> Completion -> Invoice -> Home History -> Reminder. Recent v1 cleanup work has made this loop more visible and easier to follow for both homeowners and contractors. The remaining work is deeper workflow hardening, automation, end-to-end coverage, and beta readiness rather than basic loop discovery.
 
 | Step | Current understanding | Priority |
 | --- | --- | --- |
-| Homeowner Request | Homeowners can create requests tied to homes/properties. Direct connected-contractor flow exists. | Stabilize and simplify. |
-| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, and PDF download exist. | Keep estimate path clear from invoice path. |
-| Homeowner Approval | Accept/decline status and RPCs exist. | Make acceptance outcome obvious. |
-| Job | Jobs are backed by inspections table; simple service jobs and checklist jobs exist. | Reduce inspection language for simple jobs. |
-| Completion | Finalization/report filing exists. | Make closeout sequence clearer. |
-| Invoice | First-class invoices exist. | Keep invoice action rail focused. |
-| Home Timeline | Maintenance log/documents exist, but no unified timeline table/view. | Build Home Timeline v1. |
-| Reminder | Manual homeowner Home Reminder workflow is the next narrow step. It should attach to homes and Home History context without notification automation. | Build Reminder v1 before automation. |
+| Homeowner Request | Homeowners can create requests tied to homes/properties. Direct connected-contractor flow exists. Recent UI copy clarifies what happens after a request is sent and after an estimate is accepted. | Harden end-to-end coverage and beta QA. |
+| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, and PDF download exist. Recent contractor cleanup makes Create/Open Estimate and accepted-estimate next steps clearer. | Keep estimate path clear from invoice path and expand test coverage. |
+| Homeowner Approval | Accept/decline status and RPCs exist. Homeowner accepted-estimate copy now explains that the contractor's next step is to create, schedule, or complete the job/work. | Validate the full approval-to-job handoff in beta. |
+| Job | Jobs are backed by inspections table; simple service jobs and checklist/report jobs exist. Contractor-facing terminology has been partially cleaned up, while internal schema names may still use inspection terminology. | Continue reducing user-facing inspection language where it confuses service work. |
+| Completion | Finalization/report filing exists. Recent contractor cleanup keeps invoice creation behind report finalization for checklist/report jobs. | Add broader regression coverage for closeout paths. |
+| Invoice | First-class invoices exist. Homeowner invoices can be filed to Home History through a durable invoice relationship without duplicate PDF storage. | Keep invoice actions focused and test invoice-to-history filing. |
+| Home History | Home History is the homeowner-facing destination for completed work, filed reports, invoices/receipts, notes, warranty context, and service records. It uses existing maintenance-log/database structures internally. | Avoid overbuilding a new timeline until beta feedback proves the need. |
+| Reminder | Homeowner-only manual Home Reminders v1 is shipped. It supports in-app reminders tied to homes/Home History context without email, text, push, recurrence, scheduler, or calendar sync automation. | Keep automation future-facing until manual reminders are validated. |
 
 # 7. Current Build Audit Summary
 
-The repository audit shows ServSync has progressed far beyond a simple prototype. It contains request, estimate, job, invoice, connection, permission, Discover, calendar, notification, document, report, and admin concepts. The risk is not lack of features; the risk is too many partially connected feature areas without one clean path for beta users.
+The repository audit shows ServSync has progressed far beyond a simple prototype. It contains request, estimate, job, invoice, connection, permission, Discover, calendar, notification, document, report, reminder, and admin concepts. The recent PR #1-#11 sequence improved the core-loop path, Home History, manual reminders, SQL provenance, smoke-test expectations, calendar event details, and user-facing terminology. The risk is now less about finding the loop and more about beta readiness, end-to-end reliability, mobile density, and avoiding overpromising unbuilt automation.
 
 | Area | Status | Beta concern |
 | --- | --- | --- |
-| Requests | Working/partially mature | Needs clearer next-action workflow. |
-| Estimates | Working | Potential overlap with legacy quote concepts. |
-| Invoices | Working | Needs visual distinction and clear lifecycle. |
-| Jobs | Working but inspection-backed | Terminology can confuse ordinary service contractors. |
-| Timeline | Partially built through log/documents | Not a unified home timeline yet. |
-| Reminders | Mostly missing as dedicated workflow | Final MVP loop step not complete. |
+| Requests | Working and clearer after homeowner/contractor core-loop copy updates | Needs full request-to-invoice E2E coverage. |
+| Estimates | Working with clearer accepted-estimate handoff | Continue avoiding overlap with invoice actions. |
+| Invoices | Working, including invoice-to-Home-History filing v1 | Payment processing and contractor-side filing remain deferred. |
+| Jobs | Working but inspection-backed internally | Continue user-facing terminology cleanup without renaming schema casually. |
+| Home History | Homeowner-facing v1 is shipped on top of existing maintenance-log structures | Do not build a separate timeline table until beta feedback justifies it. |
+| Reminders | Homeowner-only manual reminders v1 is shipped | No push/email/text alerts, recurrence, scheduler, or calendar sync yet. |
 | Connections | Working | Needs contextual connection request messaging/media. |
 | Permissions | Working for limited categories | Do not overclaim sharing categories. |
 | Mobile | Responsive but dense | Needs core-loop mobile QA before broad beta. |
@@ -136,7 +136,7 @@ The homeowner experience should feel lightweight. Most homeowners will likely ha
 - Homeowner can browse Discover and contractor profiles.
 - Homeowner can request a connection with a contractor and include a message/photos.
 - Homeowner can grant permission to share implemented categories: contact info, home overview, address, preferred vendors, photos.
-- Homeowner can submit service requests, review estimates, approve/decline, view invoices, and access home service history.
+- Homeowner can submit service requests, review estimates, approve/decline, view invoices, file eligible invoices to Home History, create manual reminders, and access home service history.
 - Homeowner should be able to communicate with a contractor without starting a service request.
 
 # 9. Contractor Experience
@@ -148,7 +148,7 @@ The contractor experience should be practical, not bloated. The contractor shoul
 - Contractor receives contextual connection requests with homeowner message, optional photos, and permission choices.
 - Contractor can communicate without forcing every conversation into a service request.
 - Contractor can convert serious needs into requests, estimates, jobs, invoices, and service records.
-- Contractor should see clear next actions instead of hunting across tabs.
+- Contractor should see clear next actions instead of hunting across tabs. Recent cleanup work made request-to-estimate, accepted-estimate-to-job, completed-job-to-invoice, and service/checklist terminology clearer without changing stored status values or internal database names.
 
 # 10. Discover Marketplace Strategy
 
@@ -243,22 +243,32 @@ ServSync should be positioned as beta because the job workflow and communication
 | Feedback emphasis | Ask contractors where the job workflow feels wrong or too slow. |
 | Marketplace learning | Measure whether Discover/connection creates real contractor interest. |
 
+Current beta-readiness notes:
+
+- Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are created.
+- Preview/sandbox should remain the default place for authenticated testing.
+- Full end-to-end coverage for the core loop remains future work.
+- Mobile visual QA remains important because contractor and homeowner cards can become dense.
+- Local Vercel CLI account/project mismatch is a non-blocking tooling cleanup item.
+
 # 16. Roadmap Priorities
 
-The roadmap should stay disciplined. The app already has many features. The next work should reduce confusion, improve the core loop, and add the missing pieces that support the marketplace/connection differentiator.
+The roadmap should stay disciplined. The app already has many features. Recent cleanup work made the core loop clearer and shipped v1 Home History, invoice-to-Home-History filing, homeowner manual reminders, SQL provenance cleanup, calendar event details, and terminology improvements. The next work should harden beta readiness, improve test coverage, and add marketplace/connection differentiators in small audited branches.
 
 | Priority | Workstream | Why it matters |
 | --- | --- | --- |
-| 1 | Core loop navigation cleanup | Users need a clear next action from request to invoice. |
-| 2 | Connection request message/photos/property/permissions | This strengthens the main differentiator. |
-| 3 | General connection-level messaging | Allows questions without forcing service requests. |
-| 4 | Job terminology cleanup | Simple service contractors should not feel trapped in inspection language. |
-| 5 | Home Timeline v1 | Turns completed work into lasting homeowner value. |
-| 6 | Home Reminder v1 | Completes the final step of the MVP loop with manual homeowner follow-ups before notification automation. |
-| 7 | Dashboard and notification accuracy | Builds trust and reduces confusion. |
-| 8 | Mobile core-loop QA | Contractors will use this in the field. |
+| 1 | Beta readiness and release checklist | Confirms the cleaned-up core loop is dependable enough for friendly beta users. |
+| 2 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
+| 3 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
+| 4 | Production smoke account plan | Enables safe authenticated production smoke without using personal or fragile accounts. |
+| 5 | Connection request message/photos/property/permissions | This strengthens the main differentiator. |
+| 6 | General connection-level messaging | Allows questions without forcing service requests. |
+| 7 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
+| 8 | Dashboard and notification accuracy | Builds trust and reduces confusion. Notification automation remains future-facing. |
 | 9 | Beta onboarding and feedback capture | Turns early users into product direction. |
-| 10 | Payments/Stripe and QuickBooks later | Important, but after core loop is reliable. |
+| 10 | Payments/Stripe, QuickBooks, push/email/text automation, native mobile apps, and full calendar sync later | Important, but after the core loop and beta operations are reliable. |
+
+SQL provenance note: tracked replacements for estimate-to-job support and home-specific inspection templates are now in main. If old loose SQL files such as `servsync-estimate-to-job.sql` or `servsync-home-specific-templates.sql` are encountered outside the repo, do not apply them directly; use the reviewed tracked SQL patches instead.
 
 # 17. Codex Operating Rules
 
@@ -298,15 +308,17 @@ These items need more founder input or beta learning before they can be finalize
 | What homeowner features can be monetized? | Storage limits/add-ons possible later. | Do not monetize too early if it slows homeowner growth. |
 | How deep should team tools go? | Per-user pricing later; enterprise/team workflow later. | Do not build enterprise product too early. |
 | Should general messaging be before or after connection? | Connection request message before; general thread after connection. | Confirm in design phase. |
+| Should contractor call tracking be prioritized? | No-priority backlog for calls made/received outside the app. | Revisit only after beta proves a strong workflow need. |
 
 # 20. Immediate Next Steps
 
-1. Use this updated document as the master planning baseline.
-2. Review the new Discover, connection request, messaging, and pricing sections with the founder.
-3. Create a Markdown companion version for GitHub/Codex readability.
-4. Ask Codex only for an audit of the current connection/profile flow before implementation.
+1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
+2. Run a focused beta-readiness/release-checklist audit before starting another major feature.
+3. Decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
+4. Audit the current connection/profile flow before implementing contextual connection requests.
 5. Do not ask Codex to implement the new connection request flow until the desired UI and data model are defined.
 6. After approval, create a narrow Codex prompt for a planning audit: contractor profile CTA, connection request modal/page, message/photos/property/permissions fields, and general messaging implications.
+7. Keep QuickBooks, payments/Stripe, push/email/text automation, native mobile apps, full calendar sync, and contractor call tracking future-facing until the beta loop is stable.
 
 # Appendix A: Draft Codex Audit Prompt for Connection Flow
 

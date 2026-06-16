@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/master-plan-status-refresh-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Refreshed the master plan status language after PRs #1-#11 to mark shipped v1 core-loop clarity, Home History, invoice-to-Home-History filing, manual Home Reminders, SQL provenance cleanup, calendar details, smoke-test cleanup, and terminology cleanup while keeping deeper automation and integrations future-facing.
+- Reason for change: Keep the planning baseline aligned with the current shipped product state before starting another product branch.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed headings/tables
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - This is documentation-only and does not change app behavior, schema, Vercel, Supabase, or deployment settings.
+  - Beta-readiness audit, full E2E core-loop coverage, production smoke account setup, mobile visual QA, and Discover/connection strategy remain future work.
+
+## 2026-06-16
+
 - Branch: `feature/navigation-terminology-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
