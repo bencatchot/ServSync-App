@@ -143,11 +143,16 @@ Run live Supabase or app-level tests for:
 
 ### Local browser storage
 
-Field work draft state is stored in `localStorage`. This is useful for avoiding lost work, but it may contain customer/job/report notes on the local device.
+Field work draft state is stored in `localStorage` while the contractor is working. This is useful for avoiding lost work, but it may contain customer/job/report notes on the local device.
 
-Recommended fix:
+Current status:
 
-- Clear sensitive local draft state on sign-out.
+- Sensitive field-work draft state is cleared on sign-out.
+- Lightweight search/selected-customer context keys are also cleared on sign-out.
+- Harmless setup, walkthrough, active-tab, and view preferences are preserved.
+
+Future improvement:
+
 - Consider a visible "clear local drafts" control.
 - Avoid using shared/public devices for contractor work.
 
@@ -279,7 +284,7 @@ For public go-live:
 2. Re-run dependency audit and plan safe Vite/dependency upgrades if needed.
 3. Continue SQL deployment discipline, ideally through migrations.
 4. Re-verify private media storage and signed URL access boundaries.
-5. Add sign-out cleanup for sensitive local draft storage.
+5. Consider a visible "clear local drafts" control for users on shared devices.
 6. Confirm Edge Function secrets are scoped correctly.
 7. Re-check legal/support/billing/storage-retention language.
 8. Add storage usage reporting for homeowner documents and contractor media.

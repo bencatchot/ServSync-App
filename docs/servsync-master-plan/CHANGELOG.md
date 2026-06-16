@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/local-draft-signout-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/signout-local-storage.spec.ts`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added targeted sign-out cleanup for sensitive ServSync local browser state, including contractor field-work drafts and lightweight homeowner/contractor search or selected-customer context, while preserving harmless setup, walkthrough, active-tab, and view preferences.
+- Reason for change: Address the beta/go-live local draft storage risk found in the sign-out audit without wiping unrelated browser storage or changing Supabase auth behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/signout-local-storage.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - A future user-facing "clear local drafts" control may still be useful for shared-device situations.
+
+## 2026-06-16
+
 - Branch: `feature/mobile-qa-smoke-v1`
 - Files changed:
   - `tests/e2e/mobile-smoke.spec.ts`
