@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/homeowner-beta-one-pager-v1`
+- Files changed:
+  - `docs/HOMEOWNER_BETA_ONE_PAGER.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a homeowner-facing private beta one-pager with clear positioning, beta fit, testable homeowner workflows, limitations, feedback guidance, getting-started steps, and short text/email versions.
+- Reason for change: Prepare a practical founder-sendable homeowner beta handout for friendly homeowner testers paired with trusted beta contractors without overpromising payments, QuickBooks, automatic reminders, native mobile apps, full calendar sync, broad marketplace behavior, public self-serve launch, or other future capabilities.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation/content-only; no app code, tests, SQL, schema, RLS, storage policies, Edge Functions, Vercel settings, environment variables, users, production data, deploys, or beta messages were changed or sent.
+  - FAQ, landing page sections, social ad concepts, and short video scripts remain future marketing artifacts.
+
+## 2026-06-16
+
 - Branch: `feature/contractor-beta-one-pager-v1`
 - Files changed:
   - `docs/CONTRACTOR_BETA_ONE_PAGER.md`
