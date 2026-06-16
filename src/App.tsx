@@ -9582,6 +9582,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor'
   ).length;
   const dashboardNeedsReviewEstimates = dashboardEstimates.filter(estimate => estimate.status === 'sent');
+  const dashboardAcceptedWorkEstimates = dashboardEstimates
+    .filter(estimate => estimate.status === 'accepted')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 3);
   const dashboardOpenInvoiceRecords = dashboardInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
   const pendingEstimateCount = dashboardNeedsReviewEstimates.length;
   const openHomeownerInvoiceCount = dashboardOpenInvoiceRecords.length;
@@ -10083,7 +10087,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     {
       id: 'accepted',
       title: 'Accepted Estimates',
-      helper: 'Approved; contractor creates the job next',
+      helper: 'Approved; contractor creates or schedules the job next',
       emptyText: 'No accepted estimates yet.',
       count: acceptedEstimates.length,
       totalCents: sumEstimateCents(acceptedEstimates),
@@ -10238,7 +10242,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm text-blue-900">
                 Payment is handled directly with your contractor. Contact them for payment instructions.
                 <span className="mt-1 block text-xs text-blue-800">
-                  After the invoice is handled, related reports, receipts, and notes can live in Home History for this property.
+                  Home History is where completed work and filed invoice/service records stay for future reference. Filing uses the invoice record and does not store a duplicate PDF.
                 </span>
               </div>
             )}
@@ -10288,6 +10292,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contractorName = homeownerRecordContractorName(estimate.contractor_id);
     const estimateFiled = maintenanceLog.some(entry => entry.estimate_id === estimate.id);
     const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+    const linkedRequest = estimate.service_request_id
+      ? serviceRequests.find(request => request.id === estimate.service_request_id) ?? null
+      : null;
     const isOpen = viewingEstimateId === estimate.id;
     const cardTone = options.needsReview ? 'attention' : options.accepted ? 'accepted' : 'closed';
     const propertyLabel = propertyRecordLabel(estimate, { homes });
@@ -10337,6 +10344,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Download size={16} />
             Download PDF
           </button>
+          {linkedRequest && (
+            <button
+              type="button"
+              onClick={() => openRequestFromDashboard(linkedRequest)}
+              className={buttonClass('secondary')}
+            >
+              <MessageSquare size={16} />
+              View Request
+            </button>
+          )}
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
@@ -10351,7 +10368,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   {linkedInvoice && <p>An invoice is linked to this estimate with status: {invoiceStatusLabel(linkedInvoice.status)}.</p>}
                   {estimateFiled && <p>A copy has been saved to your Documents and Home History.</p>}
                   {!estimate.inspection_id && !linkedInvoice && !estimateFiled && (
-                    <p>Next step: your contractor can create or schedule the job from this approved estimate.</p>
+                    <p>Waiting for your contractor to create or schedule the job from this approved estimate. No extra action is needed from you unless they message you.</p>
                   )}
                 </div>
               </div>
@@ -10477,7 +10494,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
           <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
           <p className="mt-1 text-sm text-blue-800">
-            Drafts stay private to the contractor. Sent estimates need your decision, accepted estimates move the work toward a job, and invoices are the billing step after work is ready.
+            Drafts stay private to the contractor. Sent estimates need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
           </p>
         </div>
 
@@ -10705,6 +10722,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Related updates</p>
         <div className="mt-3 space-y-2">
           {requestEstimates.map(estimate => {
+            const linkedEstimateInvoice = requestInvoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
             const statusText = estimate.status === 'sent'
               ? 'Estimate available'
               : estimate.status === 'accepted'
@@ -10719,7 +10737,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <p className="text-xs text-slate-500">{estimate.title} · ${(estimate.total_cents / 100).toFixed(2)}</p>
                   {estimate.status === 'accepted' && (
                     <p className="mt-1 text-xs font-medium text-emerald-700">
-                      Next step: contractor creates or schedules the job.
+                      {estimate.inspection_id
+                        ? 'Job created from this approved estimate.'
+                        : linkedEstimateInvoice
+                          ? `Invoice linked: ${invoiceStatusLabel(linkedEstimateInvoice.status)}.`
+                          : 'Waiting for contractor to create or schedule the job.'}
                     </p>
                   )}
                 </div>
@@ -11383,10 +11405,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
             <Card title="Active work" icon={<ClipboardCheck size={18} />}>
               <div className="space-y-3">
-                {activeServiceRequests.length === 0 ? (
-                  <EmptyState text="No active service requests." />
+                {activeServiceRequests.length === 0 && dashboardAcceptedWorkEstimates.length === 0 ? (
+                  <EmptyState text="No active service requests or approved work yet." />
                 ) : (
-                  activeServiceRequests.map(request => {
+                  <>
+                  {activeServiceRequests.map(request => {
                     const propertyLabel = serviceRequestPropertyLabel(request);
                     return (
                       <button
@@ -11411,7 +11434,49 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         </div>
                       </button>
                     );
-                  })
+                  })}
+                  {dashboardAcceptedWorkEstimates.length > 0 && (
+                    <div className={activeServiceRequests.length > 0 ? 'border-t border-slate-200 pt-3' : ''}>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-700">Approved work</p>
+                      <div className="space-y-2">
+                        {dashboardAcceptedWorkEstimates.map(estimate => {
+                          const linkedInvoice = dashboardInvoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                          const propertyLabel = propertyRecordLabel(estimate, { homes });
+                          const nextStep = estimate.inspection_id
+                            ? 'Job created from this estimate.'
+                            : linkedInvoice
+                              ? `Invoice linked: ${invoiceStatusLabel(linkedInvoice.status)}.`
+                              : 'Waiting for contractor to create or schedule the job.';
+                          return (
+                            <button
+                              key={estimate.id}
+                              type="button"
+                              onClick={() => {
+                                setHomeownerRecordPropertyScope('selected');
+                                setHomeownerRecordSection('accepted');
+                                setViewingInvoiceId(null);
+                                setViewingEstimateId(estimate.id);
+                                setHomeownerTab('estimates');
+                              }}
+                              className="w-full rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-800">{estimate.title}</p>
+                                  <p className="mt-1 text-xs text-emerald-700">{nextStep}</p>
+                                  {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+                                </div>
+                                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                  Accepted
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             </Card>
@@ -13616,7 +13681,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div className="mb-4 grid gap-3 md:grid-cols-3">
               {[
                 ['Completed work', 'Keep finished service visits, repairs, inspections, and job summaries attached to the right property.'],
-                ['Reports and receipts', 'Store filed job reports, invoices, receipts, warranties, permits, and other documents without merging them into the private Documents tab.'],
+                ['Reports and receipts', 'Store filed job reports, invoices, receipts, warranties, permits, and other documents. Invoice filings use the invoice record without storing duplicate PDFs.'],
                 ['Future context', 'Capture warranty details, service notes, and manual Home Reminders for follow-up needs. Automation can come later.'],
               ].map(([title, body]) => (
                 <div key={title} className="rounded-xl border border-slate-200 bg-white p-3">

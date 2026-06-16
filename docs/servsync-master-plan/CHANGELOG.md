@@ -4,6 +4,25 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-16
+
+- Branch: `feature/homeowner-core-loop-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Improved homeowner-side core loop guidance by clarifying accepted-estimate handoff copy, adding linked request access from estimate cards, surfacing approved work on the homeowner dashboard from existing accepted estimates, and tightening invoice/Home History language around completed work records and duplicate PDF avoidance.
+- Reason for change: Help homeowners understand the request -> estimate approval -> contractor job/scheduling -> invoice -> Home History path without changing schema, RPCs, Edge Functions, reminders automation, or backend behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Manual preview review should confirm accepted-estimate cards, request linked updates, dashboard approved-work cards, and invoice/Home History guidance feel clear on mobile.
+  - Broader end-to-end test coverage for the full homeowner request-to-invoice-to-Home-History loop remains a follow-up.
+
 ## 2026-06-15
 
 - Branch: `feature/contractor-core-loop-cleanup-v1`
