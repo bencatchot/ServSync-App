@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/admin-homeowners-overview-tile-fix-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed the platform-admin overview Homeowners tile by adding a read-only Homeowners admin tab, rendering basic homeowner account profile information from already-loaded profile data, and routing the Homeowners overview tile to that tab.
+- Reason for change: The Homeowners overview tile was clickable but fell through to the default overview route, so it appeared to do nothing while the Contractors tile routed correctly.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Read-only admin UI fix; no SQL/schema/RLS, Supabase/Vercel/env settings, production data, user records, deploys, homeowner profile editing, exports, deletes, impersonation, notifications, or automation changed.
+  - Authenticated admin visual verification still requires an approved platform-admin sandbox/preview account.
+
+## 2026-06-16
+
 - Branch: `feature/codex-workflow-template-v1`
 - Files changed:
   - `docs/CODEX_WORKFLOW_TEMPLATE.md`
