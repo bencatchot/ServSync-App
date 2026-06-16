@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/codex-workflow-template-v1`
+- Files changed:
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added an internal ChatGPT <-> Codex workflow template for starting new ServSync planning/build chats, including role definitions, standard audit/implementation/verification/merge/post-merge prompt templates, guardrails, and master plan/changelog rules.
+- Reason for change: Provide a reusable workflow reference so ChatGPT and Codex keep ServSync work scoped, auditable, and gated by explicit approval before implementation, merges, deploys, SQL, env/settings, or production data changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Markdown sanity review
+  - Changed-file secret scan
+- Known risks or follow-ups:
+  - Documentation-only; no app code, tests, SQL/schema/RLS/storage policies, Supabase/Vercel/env settings, users, production data, deploys, or merges changed.
+  - Master plan was not updated because this is workflow/process documentation and does not change product direction, roadmap decisions, user workflows, feature definitions, or implementation strategy.
+
+## 2026-06-16
+
 - Branch: `feature/invite-leads-label-contrast-v1`
 - Files changed:
   - `src/App.tsx`
