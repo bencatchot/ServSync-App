@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/beta-invite-message-kit-v1`
+- Files changed:
+  - `docs/BETA_INVITE_MESSAGES.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a controlled beta invite message kit with contractor and homeowner invite drafts, short text-message versions, agree-to-join follow-up copy, first-test checklists, known-limitations wording, and first-use feedback prompts.
+- Reason for change: Prepare practical founder-facing beta outreach content for the first 2 to 3 trusted contractors and friendly homeowner testers while keeping private beta expectations honest and clear.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation/content-only; no app code, tests, SQL, schema, RLS, storage policies, Edge Functions, Vercel settings, environment variables, users, production data, deploys, or beta invitations were changed or sent.
+  - Payments/Stripe, QuickBooks, push/email/text reminders, recurring reminders, native mobile apps, full calendar sync, and broad Discover/feed marketplace behavior remain not live and should not be promised.
+
+## 2026-06-16
+
 - Branch: `feature/controlled-beta-launch-docs-v1`
 - Files changed:
   - `docs/BETA_LAUNCH_PLAN.md`
