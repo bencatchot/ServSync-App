@@ -17,7 +17,7 @@ export async function loginAs(page: Page, role: TestRole) {
   } else {
     await expect(page.getByRole('heading', { name: /^Sign in$/i })).toBeHidden({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: /^Properties$/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Estimates \/ Invoices$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Estimates \/ Invoices(?: \d+)?$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Discover$/i })).toBeVisible();
   }
 }
