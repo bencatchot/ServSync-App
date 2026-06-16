@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/full-core-loop-e2e-v1`
+- Files changed:
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/helpers/auth.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the first focused sandbox-only Playwright E2E for the full core loop from homeowner service request through contractor estimate, homeowner approval, contractor job completion, invoice sending, homeowner invoice filing to Home History, and linked manual Home Reminder creation.
+- Reason for change: Turn the proven manual sandbox core-loop run into repeatable automated coverage using the stable hooks added in the prior testability cleanup.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - This mutating test creates timestamped sandbox records and is intended for deliberate sandbox/preview runs only.
+  - The shared homeowner login helper now accepts the existing `Estimates / Invoices` navigation badge suffix when present.
+  - Production authenticated testing remains blocked by policy unless dedicated production smoke accounts are approved later.
+
+## 2026-06-16
+
 - Branch: `feature/beta-core-loop-testability-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
