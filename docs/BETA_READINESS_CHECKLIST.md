@@ -2,6 +2,12 @@
 
 Internal operating checklist for deciding whether ServSync is ready to invite live contractor and homeowner beta testers.
 
+Related controlled beta docs:
+
+- [Controlled Beta Launch Plan](./BETA_LAUNCH_PLAN.md)
+- [Private Beta Tester Guide](./BETA_TESTER_GUIDE.md)
+- [Beta Feedback Triage](./BETA_FEEDBACK_TRIAGE.md)
+
 ## 1. Beta Launch Decision
 
 - [ ] Launch as a controlled private beta only.
@@ -12,6 +18,7 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] Remove or clearly separate junk data before any real user account is used for customer-facing work.
 - [ ] Treat beta feedback as product discovery, not final validation.
 - [ ] Do not promise push/email/text reminders, payment processing, QuickBooks, native mobile apps, or full calendar sync.
+- [x] Controlled beta launch docs are created and linked from this checklist.
 
 ## 2. Beta QA Operating Model
 
@@ -358,5 +365,5 @@ Before using production smoke accounts:
 - [x] Add sign-out cleanup for sensitive local draft storage.
 - [ ] Create clearly labeled demo/sample data only after approval.
 - [ ] Improve contractor marketing/onboarding copy.
-- [ ] Add lightweight beta tester instructions inside Support or onboarding.
-- [ ] Add a simple internal beta feedback review process.
+- [x] Add lightweight beta tester instructions as a private beta guide.
+- [x] Add a simple internal beta feedback triage process.
