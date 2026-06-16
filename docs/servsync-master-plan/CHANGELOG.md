@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/invite-leads-label-contrast-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Improved label contrast in the platform-admin Invite Leads queue by applying higher-contrast label styling to the dark admin filter, detail/edit, and manual outreach fields.
+- Reason for change: Make the Invite a Contractor admin review queue easier to read and use on the dark admin background without changing workflow behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - UI-only contrast fix; no SQL/schema/RLS, notifications, automation, production data, or deploy changes are included.
+  - Authenticated admin visual verification remains pending until an approved admin preview/sandbox account is available.
+
+## 2026-06-16
+
 - Branch: `feature/invite-contractor-admin-review-queue-v1`
 - Files changed:
   - `src/App.tsx`
