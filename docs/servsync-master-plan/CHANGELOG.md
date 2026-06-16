@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/controlled-beta-launch-docs-v1`
+- Files changed:
+  - `docs/BETA_LAUNCH_PLAN.md`
+  - `docs/BETA_TESTER_GUIDE.md`
+  - `docs/BETA_FEEDBACK_TRIAGE.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added controlled private beta launch documentation, including a launch plan, tester guide, and internal feedback triage template, and linked those docs from the beta readiness checklist.
+- Reason for change: Prepare practical, honest beta operating materials for a small private beta without implying public go-live, payment readiness, reminder automation, QuickBooks, native mobile, full calendar sync, or broad marketplace readiness.
+- Tests/checks run:
+  - `git diff --check`
+  - Markdown sanity review of changed docs
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Documentation-only; no app code, tests, SQL, schema, RLS, storage policies, Edge Functions, Vercel settings, environment variables, users, production data, deploys, or public launch changes were made.
+  - Production smoke accounts, payment/Stripe activation, QuickBooks, push/email/text reminders, recurring reminders, native mobile apps, full calendar sync, and broad Discover/feed marketplace behavior remain future-facing.
+
+## 2026-06-16
+
 - Branch: `feature/storage-media-access-e2e-v1`
 - Files changed:
   - `tests/e2e/storage-media-access.spec.ts`
