@@ -27618,7 +27618,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'support' | 'reports'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'support' | 'reports'>('overview');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
@@ -28078,6 +28078,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
     return adoption.connection_level === adminConnectionFilter;
   });
+  const homeownerProfiles = profiles.filter(item => item.role === 'homeowner');
   const stats = [
     { label: 'Homeowners', value: overview?.homeowners ?? 0, icon: Home },
     { label: 'Contractors', value: overview?.contractors ?? 0, icon: Building2 },
@@ -28143,6 +28144,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       brand={{ name: 'ServSync', subtitle: 'Admin Panel' }}
       tabs={[
         { id: 'overview',     label: 'Overview',    icon: <LayoutDashboard size={17} /> },
+        { id: 'homeowners',   label: 'Homeowners',  icon: <Home size={17} /> },
         { id: 'contractors',  label: 'Contractors', icon: <Building2 size={17} /> },
         { id: 'connections',  label: 'Connections', icon: <Users size={17} /> },
         { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
@@ -28170,18 +28172,50 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
             icon={<Icon size={18} />}
             label={label}
             value={String(value)}
-            helper={label === 'Contractors' ? 'Manage accounts' : label === 'Connection alerts' ? 'Needs onboarding nudge' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
+            helper={label === 'Homeowners' ? 'Review accounts' : label === 'Contractors' ? 'Manage accounts' : label === 'Connection alerts' ? 'Needs onboarding nudge' : label === 'Active Connections' ? 'Relationship health' : label === 'Active Invites' ? 'Track referral flow' : label === 'Open Support' ? 'User requests and replies' : 'Platform health'}
             onClick={() => {
               if (label === 'Connection alerts') {
                 setAdminConnectionFilter('needs_outreach');
                 setAdminTab('contractors');
                 return;
               }
-              setAdminTab(label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Invite Leads' ? 'invite_leads' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
+              setAdminTab(label === 'Homeowners' ? 'homeowners' : label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Invite Leads' ? 'invite_leads' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
             }}
           />
         ))}
       </div>
+      )}
+
+      {adminTab === 'homeowners' && (
+      <Card title="Homeowner accounts" icon={<Home size={18} />}>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            Read-only profile basics for platform support. Home details, addresses, documents, service history, and private homeowner records are intentionally not shown here.
+          </p>
+          {homeownerProfiles.length === 0 ? (
+            <EmptyState text="No homeowner accounts yet." />
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {homeownerProfiles.map(homeowner => (
+                <div key={homeowner.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="font-bold text-slate-950">{homeowner.full_name || 'Unnamed homeowner'}</p>
+                  <p className="mt-1 break-words text-sm text-slate-600">{homeowner.email || 'No email on profile'}</p>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-500">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Created</span>
+                      <span className="text-right font-semibold text-slate-700">{formatDateTime(homeowner.created_at)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Updated</span>
+                      <span className="text-right font-semibold text-slate-700">{formatDateTime(homeowner.updated_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
       )}
 
       {adminTab === 'contractors' && (
