@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/invite-contractor-sql-privilege-hardening-v1`
+- Files changed:
+  - `servsync-homeowner-contractor-invite-leads-privilege-hardening.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a tracked follow-up SQL hardening patch for homeowner contractor invite leads that revokes unintended broad table and RPC privileges, then re-grants only the minimum intended authenticated select, column-limited insert, column-limited admin update, and authenticated RPC execute surface.
+- Reason for change: Production metadata verification showed broad `anon` and `authenticated` table ACLs, including metadata-level DELETE, plus public RPC execute visibility. RLS and RPC checks still blocked effective unauthorized access, but the metadata-level privilege surface needed to be tightened before UI work.
+- Tests/checks run:
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `git diff --check`
+  - Changed-file secret scan
+- Known risks or follow-ups:
+  - SQL was not applied to sandbox or production in this branch.
+  - This branch does not add homeowner UI, admin UI, notifications, outreach templates, email/text automation, or deploy changes.
+  - Homeowner own-row select still exposes row columns, including `admin_notes`, until a future admin-only view/RPC/table hardening is approved.
+
+## 2026-06-16
+
 - Branch: `feature/invite-contractor-sql-rls-foundation-v1`
 - Files changed:
   - `servsync-homeowner-contractor-invite-leads.sql`
