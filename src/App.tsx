@@ -27908,6 +27908,26 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
+  const startInviteLeadReview = async (lead: AdminInviteLead) => {
+    if (!supabase || lead.admin_status !== 'new') return;
+    setNotice('');
+    setError('');
+    setSavingInviteLeadId(lead.id);
+    try {
+      const { error: updateError } = await supabase
+        .from('homeowner_contractor_invite_leads')
+        .update({ admin_status: 'researching' })
+        .eq('id', lead.id);
+      if (updateError) throw updateError;
+      setNotice(`Invite lead for ${lead.business_name} marked as researching.`);
+      await loadAdmin();
+    } catch (err) {
+      setError(readableError(err, 'Unable to start contractor invite lead review.'));
+    } finally {
+      setSavingInviteLeadId(null);
+    }
+  };
+
   const copyInviteLeadEmail = async (lead: AdminInviteLead) => {
     const draft = inviteLeadOutreachDrafts[lead.id] || inviteLeadOutreachMessage(lead);
     try {
@@ -28669,6 +28689,17 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
                         {ADMIN_INVITE_LEAD_STATUS_LABELS[lead.admin_status] ?? 'New'}
                       </span>
+                      {lead.admin_status === 'new' && (
+                        <button
+                          type="button"
+                          onClick={() => void startInviteLeadReview(lead)}
+                          disabled={isSaving}
+                          className={buttonClass('primary')}
+                        >
+                          <ClipboardCheck size={16} />
+                          {isSaving ? 'Saving...' : 'Start review'}
+                        </button>
+                      )}
                     </div>
                   </div>
 

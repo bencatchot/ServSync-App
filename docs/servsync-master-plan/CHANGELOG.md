@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/admin-invite-leads-badge-review-action-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a platform-admin "Start review" action for new contractor invite leads that moves the lead from `new` to `researching`, allowing the Invite Leads badge to represent leads still waiting for first admin attention.
+- Reason for change: The Invite Leads tab badge counted `new` leads, but viewing the tab or copying manual outreach text did not persist a reviewed state, so the badge could remain visible after admin interaction.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - UI-only admin badge cleanup; no SQL/schema/RLS/RPC, Supabase/Vercel/env settings, production data, user records, notifications, automation, broad notification infrastructure, deploys, or unrelated admin redesign changes are included.
+  - Authenticated admin visual verification still requires an approved platform-admin sandbox/preview account.
+
+## 2026-06-16
+
 - Branch: `feature/admin-homeowners-overview-tile-fix-v1`
 - Files changed:
   - `src/App.tsx`
