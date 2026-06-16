@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/invite-contractor-sql-rls-foundation-v1`
+- Files changed:
+  - `servsync-homeowner-contractor-invite-leads.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the tracked SQL/RLS foundation for homeowner-submitted contractor invite leads, including constrained lead statuses, duplicate-review indexes, homeowner-owned select/insert policies, platform-admin read/status update policies, and a guarded homeowner submission RPC.
+- Reason for change: Prepare the database layer for the future "Invite a contractor to ServSync" homeowner growth feature while keeping it separate from service requests, connection requests, contractor search, Discover posts, existing contractor invite records, UI, notifications, and outreach automation.
+- Tests/checks run:
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `git diff --check`
+  - Changed-file secret scan
+- Known risks or follow-ups:
+  - SQL was not applied to sandbox, production, or a throwaway blank schema in this branch.
+  - This branch does not add homeowner UI, admin UI, notifications, outreach templates, email/text automation, test data, or production SQL application.
+  - Future PRs should add homeowner submission/status UI, admin review/update UI, copyable outreach templates, and targeted E2E/RLS coverage after SQL review and sandbox application.
+
+## 2026-06-16
+
 - Branch: `feature/homeowner-beta-one-pager-v1`
 - Files changed:
   - `docs/HOMEOWNER_BETA_ONE_PAGER.md`

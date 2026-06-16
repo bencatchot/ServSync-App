@@ -41,6 +41,7 @@ SQL_FILES=(
   "servsync-fix-invite-code-gen.sql"
   "servsync-preserve-original-connection-source.sql"
   "servsync-invite-reward-tracking.sql"
+  "servsync-homeowner-contractor-invite-leads.sql"
   "servsync-contractor-team-access.sql"
   "servsync-connection-detail-fields.sql"
   "servsync-homeowner-connection-requests.sql"
