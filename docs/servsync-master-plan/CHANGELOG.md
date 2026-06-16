@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/invite-contractor-homeowner-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/homeowner-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added homeowner-facing "Invite a contractor to ServSync" UI v1 with a Contractors-tab invite button, homeowner-safe invite status list, shared invite modal, and Service Requests helper link.
+- Reason for change: Let homeowners recommend contractors for ServSync follow-up while keeping the feature separate from service requests, connection requests, contractor search, Discover posts, admin review, and notification automation.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts`
+  - Changed-file secret scan
+- Known risks or follow-ups:
+  - The UI intentionally selects only homeowner-safe invite lead fields and does not render admin/status outreach fields.
+  - Follow-up work remains for admin review UI, outreach templates, notifications or automation, and contractor claim/connection flows.
+
+## 2026-06-16
+
 - Branch: `feature/invite-contractor-sql-privilege-hardening-v1`
 - Files changed:
   - `servsync-homeowner-contractor-invite-leads-privilege-hardening.sql`

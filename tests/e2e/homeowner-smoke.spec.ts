@@ -32,6 +32,20 @@ test.describe('homeowner read-only smoke', () => {
     await openSidebarTab(page, /Service Requests/i);
     await expectActiveTabHeading(page, /^Service Requests$/i);
     await expect(main.getByRole('heading', { level: 2, name: /^Start a new service request$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Don’t see your contractor\? Invite them to join ServSync\.$/i })).toBeVisible();
+
+    await openSidebarTab(page, /^Contractors\b/i);
+    await expectActiveTabHeading(page, /^Contractors$/i);
+    await expect(main.getByRole('button', { name: /^Invite a contractor to ServSync$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { level: 2, name: /^My contractor invites$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { level: 2, name: /^Find or request service$/i })).toHaveCount(0);
+    await main.getByRole('button', { name: /^Invite a contractor to ServSync$/i }).click();
+    const inviteDialog = page.getByRole('dialog', { name: /^Invite a contractor to ServSync$/i });
+    await expect(inviteDialog).toBeVisible();
+    await expect(inviteDialog.getByLabel(/^Business name$/i)).toBeVisible();
+    await expect(inviteDialog.getByLabel(/^Location$/i)).toBeVisible();
+    await inviteDialog.getByRole('button', { name: /^Close contractor invite$/i }).click();
+    await expect(inviteDialog).toHaveCount(0);
 
     await openSidebarTab(page, /Estimates \/ Invoices/i);
     await expectActiveTabHeading(page, /^Estimates \/ Invoices$/i);
