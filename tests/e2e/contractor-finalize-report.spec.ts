@@ -17,7 +17,7 @@ test.describe('contractor mutating report finalization', () => {
     const consoleErrors = captureMajorConsoleErrors(page);
     const main = page.getByRole('main');
     const timestamp = timestampForRecord();
-    const jobName = `E2E Inspection Job ${timestamp}`;
+    const jobName = `E2E Checklist Report Job ${timestamp}`;
     const findingNote = `E2E Report Finding ${timestamp}: exterior trim damage observed during Playwright report finalization test.`;
     const recommendedAction = `E2E follow-up action ${timestamp}: inspect and repair exterior trim.`;
 
@@ -34,7 +34,7 @@ test.describe('contractor mutating report finalization', () => {
     await expect(main.getByRole('heading', { name: /^New job$/i })).toBeVisible();
     await expect(main.getByText(new RegExp(`Creating job for:\\s*${escapeRegExp(customerName)}`, 'i'))).toBeVisible();
 
-    await main.getByRole('button', { name: /Inspection Job/i }).click();
+    await main.getByRole('button', { name: /Checklist \/ Report Job/i }).click();
     const starterTemplateSelect = main.locator('select:has(option[value="starter:starter-general-maintenance-field-work"])');
     await expect(starterTemplateSelect).toBeVisible();
     await starterTemplateSelect.selectOption('starter:starter-general-maintenance-field-work');

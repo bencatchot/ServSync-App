@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/navigation-terminology-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-finalize-report.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Tightened user-facing contractor navigation and terminology by broadening Jobs wording, clarifying service job versus checklist/report language, replacing beta-facing legacy ZIP copy, and making closed/billed buckets clearer without changing stored statuses.
+- Reason for change: Reduce beta-user confusion after the core-loop cleanups while preserving homeowner wording, internal database field names, schema, RPCs, RLS, and app behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Manual preview review should confirm the contractor Jobs overview, customer workspace job/report cards, Business Profile ZIP coverage copy, and mobile button wrapping feel clear.
+  - Some internal code/type names still use inspection/fieldwork terminology because the underlying schema has not been renamed.
+
+## 2026-06-16
+
 - Branch: `feature/homeowner-core-loop-cleanup-v1`
 - Files changed:
   - `src/App.tsx`

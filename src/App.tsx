@@ -17219,7 +17219,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closedJobsForSelectedCustomer = selectedJobsCustomerWork.filter(inspectionIsClosedJob);
   const workflowDisplayLabelForDraft = (kind: FieldWorkflowKind, mode: JobWorkflowMode, templateSource: FieldWorkTemplateSource = 'blank') => {
     if (mode === 'simple' && templateSource === 'blank') return 'Service Job';
-    if (mode === 'checklist' && templateSource === 'blank') return 'Inspection Job';
+    if (mode === 'checklist' && templateSource === 'blank') return 'Checklist / Report Job';
     return FIELD_WORK_KIND_LABEL[kind];
   };
   const buildFieldWorkName = (connection: ContractorConnectedHomeowner, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
@@ -19544,10 +19544,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <div className="mt-4 border-t border-[#E1E3E7] pt-4">
                 {contractorDraft.service_zip_codes.length > 0 && (
                   <p className="mb-2 text-xs font-semibold text-[#223D67]/70">
-                    Legacy ZIP coverage: {fromList(contractorDraft.service_zip_codes)}
+                    Additional ZIP coverage: {fromList(contractorDraft.service_zip_codes)}
                   </p>
                 )}
-                <Field label="Legacy service ZIP codes">
+                <Field label="Additional service ZIP codes">
                   <input
                     className={inputClass()}
                     value={fromList(contractorDraft.service_zip_codes)}
@@ -19556,7 +19556,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   />
                 </Field>
                 <p className="mt-1 text-xs leading-5 text-[#223D67]/60">
-                  These ZIPs are preserved for existing directory matching while service-area cards roll out.
+                  These ZIPs are preserved for directory matching while service-area cards roll out.
                 </p>
               </div>
             </div>
@@ -21189,7 +21189,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         },
                       ] : []),
                       {
-                        label: 'Work orders',
+                        label: 'Service jobs',
                         value: String(workOrderRecords.length),
                         helper: `${workOrderDraftCount} draft${workOrderDraftCount === 1 ? '' : 's'} · ${workOrderFinalCount} filed`,
                         icon: <ClipboardCheck size={16} />,
@@ -21201,7 +21201,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         },
                       },
                       {
-                        label: 'Inspections',
+                        label: 'Checklist reports',
                         value: String(inspectionRecords.length),
                         helper: `${inspectionDraftCount} draft${inspectionDraftCount === 1 ? '' : 's'} · ${inspectionFinalCount} filed`,
                         icon: <ClipboardList size={16} />,
@@ -21527,13 +21527,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                   <div className="mb-3 flex items-center justify-between gap-3">
                                     <div>
-                                      <h3 className="font-bold text-slate-950">Recent inspections</h3>
+                                      <h3 className="font-bold text-slate-950">Recent checklist reports</h3>
                                       <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed</p>
                                     </div>
                                     <button type="button" onClick={() => { if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId); setContractorJobsView('open_jobs'); setContractorTab('inspections'); }} className="text-xs font-semibold text-blue-700 hover:text-blue-800">View in Jobs</button>
                                   </div>
                                   {recentInspections.length === 0 ? (
-                                    <EmptyState text="No inspection jobs yet for this workspace." />
+                                    <EmptyState text="No checklist report jobs yet for this workspace." />
                                   ) : (
                                     <div className="space-y-2">
                                       {recentInspections.map(insp => {
@@ -21835,7 +21835,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   >
                                     <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
                                     <p className="mt-2 text-sm font-bold">Create job</p>
-                                    <p className="mt-1 text-xs text-blue-700">Inspection, job, or service workflow</p>
+                                    <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
                                   </button>
                                   <button
                                     type="button"
@@ -21988,7 +21988,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="flex items-center justify-between mb-3">
                                   <div>
-                                    <h3 className="font-bold text-slate-950">Work orders</h3>
+                                    <h3 className="font-bold text-slate-950">Service jobs</h3>
                                     <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed report{fwFinalCount === 1 ? '' : 's'}</p>
                                   </div>
                                   <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined }); } else if (localCustomer) { beginFieldWorkForLocalContact(localCustomer); } }} className={buttonClass('primary')}>
@@ -22008,7 +22008,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                     </div>
                                     <div className="grid gap-3 md:grid-cols-2">
-                                      <Field label="Work order type">
+                                      <Field label="Job type">
                                         <select className={inputClass()} value={inspectionNewDraft.workflow_kind} onChange={e => {
                                           const nextKind = e.target.value as FieldWorkflowKind;
                                           const nextStarter = sortedServSyncFieldWorkTemplates.find(t => t.kind === nextKind) ?? sortedServSyncFieldWorkTemplates[0];
@@ -22108,7 +22108,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                 <div className="flex items-center justify-between mb-3">
                                   <div>
-                                    <h3 className="font-bold text-slate-950">Inspections</h3>
+                                    <h3 className="font-bold text-slate-950">Checklist reports</h3>
                                     <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed report{inspectionFinalCount === 1 ? '' : 's'}</p>
                                   </div>
                                   <button
@@ -22123,11 +22123,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     className={buttonClass('primary')}
                                   >
                                     <Plus size={14} />
-                                    Create inspection
+                                    Create checklist report
                                   </button>
                                 </div>
                                 {inspectionRecords.length === 0 ? (
-                                  <EmptyState text="No inspection jobs yet for this homeowner." />
+                                  <EmptyState text="No checklist report jobs yet for this homeowner." />
                                 ) : (
                                   <div className="space-y-2">
                                     {inspectionRecords.map(insp => {
@@ -23181,9 +23181,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div className="grid gap-2 md:grid-cols-3">
                       {([
-                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Inspection or service work', icon: <Plus size={15} /> },
+                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} /> },
                         { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
-                        { id: 'closed_jobs', label: 'Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
+                        { id: 'closed_jobs', label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -23222,7 +23222,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {([
                         { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
                         { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} /> },
-                        { id: 'closed_financial', label: 'Closed Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Closed estimates and billed invoices', icon: <Receipt size={15} /> },
+                        { id: 'closed_financial', label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -23835,7 +23835,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const invoiceRecordsForView = contractorJobsView === 'open_financial'
                       ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
                       : (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
-                    const listTitle = contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed Estimates / Invoices';
+                    const listTitle = contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed / Billed Records';
                     const listDescription = contractorJobsView === 'open_financial'
                       ? 'Estimate drafts, sent estimates, draft invoices, and unpaid invoices.'
                       : 'Closed estimates and billed invoice records.';
@@ -24148,7 +24148,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       return statusMatches && typeMatches && dateMatches;
                     });
                     const records = contractorJobsView === 'closed_jobs' ? filteredRecords.slice(0, 10) : filteredRecords;
-                    const listTitle = contractorJobsView === 'open_jobs' ? 'Open Jobs' : 'Closed Jobs';
+                    const listTitle = contractorJobsView === 'open_jobs' ? 'Open Jobs' : 'Completed / Closed Jobs';
                     const listDescription = contractorJobsView === 'open_jobs'
                       ? 'Draft, scheduled, and in-progress jobs that still need work.'
                       : 'Completed, closed, and cancelled jobs.';
@@ -24915,7 +24915,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {contractorJobsView === 'overview' && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {inspections.length === 0 ? (
-                  <EmptyState text="No jobs yet. Create an inspection, repair visit, maintenance visit, or assessment to get started." />
+                  <EmptyState text="No jobs yet. Create a service job for repairs or installs, or use a checklist/report workflow for inspections and maintenance visits." />
                 ) : (
                   <div className="space-y-2">
                     {inspections.slice(0, 5).map(insp => {
@@ -24961,7 +24961,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
           {/* ── NEW VIEW ── */}
           {inspectionView === 'new' && (
-            <Card title="Create Visit" icon={<ClipboardList size={18} />}>
+            <Card title="Create Job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Choose job workflow</p>
@@ -25003,7 +25003,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="flex items-start gap-3">
                         <span className="rounded-lg bg-slate-100 p-2 text-slate-700"><ClipboardList size={17} /></span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-bold text-slate-950">Inspection Job</span>
+                          <span className="block text-sm font-bold text-slate-950">Checklist / Report Job</span>
                           <span className="mt-1 block break-words text-xs leading-5 text-slate-500">For inspections, maintenance checks, evaluations, and customer-facing reports with checklist findings.</span>
                         </span>
                       </div>
@@ -25254,7 +25254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           job_type: source === 'starter' && starter?.kind === 'maintenance' ? 'maintenance_visit' : 'inspection',
                         }));
                       }}>
-                        <option value="blank">Blank Inspection</option>
+                        <option value="blank">Blank checklist report</option>
                         {inspectionHomeTemplatesForNewJob.length > 0 && (
                           <optgroup label="This Home's Templates">
                             {inspectionHomeTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
@@ -25355,7 +25355,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     disabled={savingInspection || !inspectionNewDraft.name.trim() || (inspectionNewDraft.subject_type === 'connected' ? !inspectionNewDraft.homeowner_user_id : !inspectionNewDraft.local_contact_id)}
                     className={buttonClass('primary')}
                   >
-                    {savingInspection ? 'Creating…' : 'Create visit'}
+                    {savingInspection ? 'Creating…' : 'Create job'}
                   </button>
                   <button type="button" onClick={() => setInspectionView('list')} className={buttonClass('secondary')}>Cancel</button>
                 </div>
