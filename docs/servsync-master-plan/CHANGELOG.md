@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/invite-contractor-admin-review-queue-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a platform-admin Invite Leads queue for homeowner-submitted contractor invite leads, including explicit safe-column loading, search/status filtering, lead detail cards, admin/homeowner status updates, outreach tracking fields, matched-contractor selection, and copyable manual email/text outreach templates.
+- Reason for change: Give ServSync owners a manual review and follow-up workflow for the homeowner-facing "Invite a contractor to ServSync" feature while keeping invite leads separate from service requests, connection requests, contractor search, Discover, notifications, and automation.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This branch intentionally does not select, render, or edit `admin_notes`; private/internal notes should wait for a separate DB-level hardening step.
+  - Outreach templates are copy-only and do not send email/text automatically or increment outreach counts automatically.
+  - No SQL/schema/RLS, notifications, 30-day no-response automation, contractor claim flow, Discover integration, production data, or deploy changes are included.
+
+## 2026-06-16
+
 - Branch: `feature/invite-contractor-homeowner-ui-v1`
 - Files changed:
   - `src/App.tsx`
