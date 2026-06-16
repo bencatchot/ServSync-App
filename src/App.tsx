@@ -12095,24 +12095,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Card>
           )}
 
-        <Card
-          title="My contractors"
-          icon={<Users size={18} />}
-          action={(
-            <button
-              type="button"
-              onClick={() => setContractorInviteModalOpen(true)}
-              className={buttonClass('primary')}
-            >
-              <Send size={16} />
-              Invite a contractor to ServSync
-            </button>
-          )}
-        >
+        <Card title="My contractors" icon={<Users size={18} />}>
           {(() => {
             const visibleConnections = connections.filter(connection => connection.status !== 'dismissed');
             return (
           <div className="space-y-3">
+            <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-bold text-blue-950">Have a contractor you already trust?</p>
+              <button
+                type="button"
+                onClick={() => setContractorInviteModalOpen(true)}
+                className={`${buttonClass('primary')} w-full shrink-0 justify-center px-5 py-2.5 shadow-md sm:w-auto`}
+              >
+                <Plus size={17} />
+                Invite a contractor to ServSync
+              </button>
+            </div>
             {visibleConnections.length === 0 ? (
               <EmptyState text="No contractor connections yet." />
             ) : (
