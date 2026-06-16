@@ -36,7 +36,7 @@ Playwright currently runs one desktop Chromium project:
 - screenshots/videos/traces retained on failure
 - optional Vercel Preview bypass header support through `VERCEL_AUTOMATION_BYPASS_SECRET`
 
-Mobile viewport coverage is not automated yet. Use the mobile QA checklist in `docs/BETA_READINESS_CHECKLIST.md` until a mobile Playwright project is added.
+Mobile coverage starts with one read-only smoke spec that uses test-local mobile device emulation. There is intentionally no broad global mobile Playwright project yet because mutating/core-loop tests should not run across every mobile project automatically.
 
 ## Required Environment Variables
 
@@ -91,6 +91,30 @@ Coverage:
 - Support/feedback entry points
 - current homeowner-facing Home History wording
 - major console error capture
+
+## Mobile Read-Only Smoke
+
+Use:
+
+```bash
+npm run qa:e2e:mobile
+```
+
+This runs:
+
+- `tests/e2e/mobile-smoke.spec.ts`
+
+Coverage:
+
+- homeowner mobile login/dashboard load
+- homeowner mobile drawer navigation to Service Requests, Estimates / Invoices, Home History, and Calendar
+- homeowner Home Reminders visibility through Dashboard/Home History surfaces
+- contractor mobile login/dashboard load
+- contractor mobile drawer navigation to Homeowners, Service Requests, Jobs, Calendar, and Business Profile
+- basic no-obvious-horizontal-overflow checks on the covered mobile screens
+- major console error capture
+
+This test is read-only and authenticated. Run it only against localhost, Vercel Preview, or another approved sandbox URL. Do not use a broad mobile project to run mutating tests, full core-loop tests, or production authenticated checks.
 
 ## Mutating Sandbox Tests
 
@@ -193,6 +217,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 
 - contractor smoke navigation
 - homeowner smoke navigation
+- mobile read-only homeowner/contractor navigation smoke
 - support/feedback entry-point smoke checks
 - contractor creates local E2E customer
 - contractor creates E2E service job
@@ -202,18 +227,16 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - contractor Discover geocoding/radius coverage
 - contractor standalone calendar event create/edit/delete, when run directly
 - connected-homeowner invoice notification flow, when run directly
+- full homeowner request -> contractor estimate -> homeowner approval -> job -> invoice -> Home History -> reminder flow, when run directly
+- RLS/cross-user access-boundary checks, when run directly
 
 ## Current Not Covered Yet
 
-- full homeowner request -> contractor estimate -> homeowner approval -> job -> invoice -> Home History -> reminder flow
-- homeowner service request creation in an E2E happy path
 - homeowner estimate accept/decline E2E path
-- contractor create job from accepted estimate E2E path
-- homeowner invoice-to-Home-History filing E2E path
 - Home Reminder create/complete/dismiss E2E path
-- RLS/cross-user browser-level negative tests
+- RLS/cross-user browser-level negative tests beyond direct Supabase client checks
+- mobile full workflow automation
 - production smoke accounts
-- mobile viewport automated tests
 - payment/Stripe flows
 - QuickBooks or external accounting integrations
 
@@ -231,8 +254,8 @@ Use placeholder values only in docs. Real values belong in local environment fil
 4. Add RLS/cross-user checks:
    use secondary homeowner/contractor accounts to confirm unrelated records are not visible.
 
-5. Add a mobile read-only smoke project:
-   start with dashboard/navigation/card overflow checks before automating full mobile workflows.
+5. Expand mobile QA carefully:
+   keep the first automated layer read-only, then add targeted mobile workflow checks only after manual beta QA identifies the riskiest screens.
 
 ## Sandbox Test Data Rules
 

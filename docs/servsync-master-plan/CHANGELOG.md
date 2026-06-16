@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/mobile-qa-smoke-v1`
+- Files changed:
+  - `tests/e2e/mobile-smoke.spec.ts`
+  - `package.json`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a read-only mobile Playwright smoke spec with test-local mobile device emulation and documented the mobile QA operating model without adding a global mobile project.
+- Reason for change: Start beta mobile coverage with low-risk authenticated navigation/load checks for high-risk homeowner and contractor screens while keeping mutating/core-loop mobile automation future-facing.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/mobile-smoke.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - This branch does not automate full mobile workflows, field-use scenarios, or mutating mobile coverage.
+  - Manual mobile QA remains required for dense cards, forms, modals, and contractor field workflows.
+
+## 2026-06-16
+
 - Branch: `feature/rls-cross-user-e2e-v1`
 - Files changed:
   - `tests/e2e/helpers/env.ts`

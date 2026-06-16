@@ -30,6 +30,7 @@ Internal operating checklist for deciding whether ServSync is ready to invite li
 - [ ] `npm run build` passes.
 - [ ] `git diff --check` passes for release branches.
 - [ ] Playwright read-only smoke tests pass against the intended sandbox/preview URL.
+- [ ] Mobile read-only smoke test passes against the intended sandbox/preview URL.
 - [ ] Mutating Playwright tests pass against sandbox/preview when the release touches those flows.
 - [ ] Vercel deploy succeeds on `serv-sync-app-refresh`.
 - [ ] Deployed commit matches the commit intended for beta testing.
@@ -201,10 +202,18 @@ Test data rules:
 
 ## 10. Mobile / Responsive Checks
 
+Automated mobile smoke:
+
+- [ ] `npm run qa:e2e:mobile` passes against sandbox/preview.
+- [ ] Mobile smoke remains read-only.
+- [ ] Mutating/core-loop tests are not run through a broad global mobile project.
+
 Homeowner mobile checks:
 
 - [ ] Homeowner dashboard is usable on phone width.
+- [ ] Homeowner mobile drawer opens, closes, and switches tabs reliably.
 - [ ] Service Requests cards and actions wrap cleanly.
+- [ ] Request creation remains usable on phone width.
 - [ ] Estimates / Invoices cards and actions wrap cleanly.
 - [ ] Home History cards, chips, linked actions, and reminder controls fit.
 - [ ] Reminders dashboard card and Home History reminder controls are usable.
@@ -214,10 +223,14 @@ Homeowner mobile checks:
 Contractor mobile checks:
 
 - [ ] Contractor dashboard is usable on phone width.
+- [ ] Contractor mobile drawer opens, closes, and switches tabs reliably.
 - [ ] Contractor Homeowners/Customers layout stacks or adapts cleanly on small screens.
 - [ ] Service Requests cards and Create/Open Estimate actions are usable.
+- [ ] Estimate creation remains usable on phone width.
 - [ ] Jobs overview and job cards are usable.
+- [ ] Job completion/report workflow remains usable on phone width.
 - [ ] Estimates / Invoices cards and actions are usable.
+- [ ] Invoice creation/send state remains usable on phone width.
 - [ ] Calendar event detail modal remains usable.
 - [ ] Business Profile service area and ZIP coverage controls are usable.
 - [ ] Cards/tiles do not overflow text.
@@ -225,6 +238,7 @@ Contractor mobile checks:
 - [ ] No horizontal scrolling appears on common mobile widths.
 - [ ] Key actions are tappable.
 - [ ] Forms remain usable on phone width.
+- [ ] Full mobile workflow automation remains future work until manual mobile QA identifies stable, high-value targets.
 
 ## 11. Core Loop QA Gate
 
