@@ -28577,7 +28577,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
-              <Field label="Search invite leads">
+              <Field label="Search invite leads" labelClassName="text-slate-200">
                 <input
                   className={inputClass()}
                   value={inviteLeadSearch}
@@ -28585,7 +28585,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                   placeholder="Business, location, contact, email, phone, or homeowner"
                 />
               </Field>
-              <Field label="Admin status">
+              <Field label="Admin status" labelClassName="text-slate-200">
                 <select
                   className={inputClass()}
                   value={inviteLeadStatusFilter}
@@ -28651,13 +28651,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
                   {lead.homeowner_note && (
                     <div className="mt-4 rounded-lg border border-slate-600 bg-slate-800/60 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Homeowner note</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Homeowner note</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{lead.homeowner_note}</p>
                     </div>
                   )}
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-[180px_220px_150px_160px_160px_1fr_auto]">
-                    <Field label="Admin status">
+                    <Field label="Admin status" labelClassName="text-slate-100">
                       <select
                         className={inputClass()}
                         value={draft.admin_status}
@@ -28666,7 +28666,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         {ADMIN_INVITE_LEAD_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
                       </select>
                     </Field>
-                    <Field label="Homeowner status">
+                    <Field label="Homeowner status" labelClassName="text-slate-100">
                       <select
                         className={inputClass()}
                         value={draft.homeowner_status}
@@ -28675,7 +28675,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         {HOMEOWNER_CONTRACTOR_INVITE_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
                       </select>
                     </Field>
-                    <Field label="Outreach count">
+                    <Field label="Outreach count" labelClassName="text-slate-100">
                       <input
                         className={inputClass()}
                         inputMode="numeric"
@@ -28683,7 +28683,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         onChange={event => updateInviteLeadDraft(lead.id, { ...draft, outreach_attempt_count: event.target.value })}
                       />
                     </Field>
-                    <Field label="Last outreach">
+                    <Field label="Last outreach" labelClassName="text-slate-100">
                       <input
                         type="date"
                         className={inputClass()}
@@ -28691,7 +28691,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         onChange={event => updateInviteLeadDraft(lead.id, { ...draft, last_outreach_at: event.target.value })}
                       />
                     </Field>
-                    <Field label="Next follow-up">
+                    <Field label="Next follow-up" labelClassName="text-slate-100">
                       <input
                         type="date"
                         className={inputClass()}
@@ -28699,7 +28699,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         onChange={event => updateInviteLeadDraft(lead.id, { ...draft, next_follow_up_at: event.target.value })}
                       />
                     </Field>
-                    <Field label="Matched contractor">
+                    <Field label="Matched contractor" labelClassName="text-slate-100">
                       <select
                         className={inputClass()}
                         value={draft.matched_contractor_id}
@@ -28746,7 +28746,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
                     {activeInviteLeadOutreachId === lead.id && outreachDraft && (
                       <div className="mt-4 space-y-3 rounded-lg border border-slate-700 bg-slate-800 p-3">
-                        <Field label="Email subject">
+                        <Field label="Email subject" labelClassName="text-slate-100">
                           <input
                             className={inputClass()}
                             {...writingAssistProps}
@@ -28754,7 +28754,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                             onChange={event => updateInviteLeadOutreachDraft(lead.id, { ...outreachDraft, subject: event.target.value })}
                           />
                         </Field>
-                        <Field label="Email template">
+                        <Field label="Email template" labelClassName="text-slate-100">
                           <textarea
                             className={inputClass()}
                             rows={10}
@@ -28763,7 +28763,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                             onChange={event => updateInviteLeadOutreachDraft(lead.id, { ...outreachDraft, emailBody: event.target.value })}
                           />
                         </Field>
-                        <Field label="Text template">
+                        <Field label="Text template" labelClassName="text-slate-100">
                           <textarea
                             className={inputClass()}
                             rows={4}
@@ -31960,10 +31960,10 @@ function ServiceCategorySelector({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, labelClassName = 'text-[#223D67]/75' }: { label: string; children: React.ReactNode; labelClassName?: string }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/75">{label}</span>
+      <span className={`mb-1 block text-xs font-semibold uppercase tracking-[0.12em] ${labelClassName}`}>{label}</span>
       {children}
     </label>
   );
