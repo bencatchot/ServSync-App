@@ -11,6 +11,7 @@
     "qa": "npm run typecheck && npm run build",
     "qa:e2e": "npm run typecheck && npm run build && npm run test:e2e",
     "qa:e2e:geocoding": "playwright test tests/e2e/discover-geocoding-radius.spec.ts",
+    "qa:e2e:mobile": "playwright test tests/e2e/mobile-smoke.spec.ts",
     "qa:e2e:mutating": "playwright test tests/e2e/contractor-create-customer.spec.ts tests/e2e/contractor-create-job.spec.ts tests/e2e/contractor-create-estimate.spec.ts tests/e2e/contractor-create-invoice.spec.ts tests/e2e/contractor-finalize-report.spec.ts tests/e2e/discover-geocoding-radius.spec.ts",
     "qa:e2e:readonly": "playwright test tests/e2e/contractor-smoke.spec.ts tests/e2e/homeowner-smoke.spec.ts",
     "test:e2e": "playwright test",
