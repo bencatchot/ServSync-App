@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-15
 
+- Branch: `feature/contractor-core-loop-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Improved contractor-side core loop guidance by surfacing Create/Open Estimate from service request cards, making Create Job the primary next action for accepted estimates without jobs, polishing estimate status labels, replacing confusing estimate-record wording, clarifying local-only invoice send guidance, and gating checklist-job invoice creation behind report finalization.
+- Reason for change: Help contractors follow the intended request -> estimate -> accepted estimate -> job -> completed job -> invoice flow without changing schema, RPCs, Edge Functions, or backend behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/contractor-smoke.spec.ts`
+  - Secret scan on changed diff
+- Known risks or follow-ups:
+  - Manual preview review should confirm the request-card actions, accepted-estimate ordering, and checklist-job report/invoice sidebar feel clear on mobile.
+  - Broader end-to-end test coverage for the full contractor revenue loop remains a follow-up.
+
+## 2026-06-15
+
 - Branch: `feature/homeowner-calendar-event-modal-v1`
 - Files changed:
   - `src/App.tsx`
