@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-pending-review-rpc-v1`
+- Files changed:
+  - `servsync-contextual-connection-pending-review-rpc.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow read-only SQL/RPC patch for contractor pending contextual connection request review so contractor owners/admin/office users can retrieve pending request messages and masked selected-property permission summaries before accepting or declining.
+- Reason for change: Phase 2 audit found that `connection_request_contexts` is readable for pending requests but `connection_shared_properties` contractor SELECT is active-only; a SECURITY DEFINER review RPC provides the needed pending-request context without granting contractors direct `homes` access or broadening table RLS.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static SQL/RLS/RPC inspection
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production in this branch; separate approval is required before applying and verifying the patch.
+  - Phase 2B frontend work is still needed to consume this RPC, migrate contractor accept/decline to `servsync_respond_to_connection_request`, and add homeowner active connection shared-property management.
+
 - Branch: `feature/contextual-connection-homeowner-ui-v1`
 - Files changed:
   - `src/App.tsx`
