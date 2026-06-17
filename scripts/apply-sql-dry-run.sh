@@ -78,6 +78,7 @@ SQL_FILES=(
   "servsync-field-work-draft-delete.sql"
   "servsync-estimates.sql"
   "servsync-estimate-templates.sql"
+  "servsync-contractor-saved-estimate-charges.sql"
   "servsync-job-lifecycle.sql"
   "servsync-invoices-schema.sql"
   "servsync-invoice-discount-details.sql"

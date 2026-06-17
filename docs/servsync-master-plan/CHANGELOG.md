@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/estimate-saved-charges-sql-v1`
+- Files changed:
+  - `servsync-contractor-saved-estimate-charges.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the SQL/RLS foundation for contractor saved estimate charges and hardened existing estimate template access with team-aware read policies and owner/admin/office estimate-settings management policies.
+- Reason for change: Prepare the backend layer for future contractor Estimate Settings, reusable flat/hourly saved charges, and continued estimate template use without adding UI, auto-loading charges, changing historical estimates, or introducing payments, QuickBooks, accounting, or tax behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL was not applied to sandbox or production in this branch.
+  - This branch does not add contractor UI, estimate composer changes, saved-charge quick-pick behavior, template editor UI, payment/accounting/tax behavior, Supabase/Vercel/env setting changes, production data, or deploy changes.
+  - Future work should add contractor Estimate Settings UI, saved-charge quick-pick integration, focused E2E/RLS coverage, and sandbox SQL verification after review.
+
+## 2026-06-16
+
 - Branch: `feature/admin-invite-leads-badge-review-action-v1`
 - Files changed:
   - `src/App.tsx`
