@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/codex-risk-based-fast-track-v1`
+- Files changed:
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added risk-based fast-track guidance to the Codex workflow template so low-risk documentation/content/internal-template tasks can be audited and implemented in one pass while medium/high-risk app, data, SQL, auth, storage, env, production, or core workflow tasks keep full approval gates.
+- Reason for change: Make the ChatGPT <-> Codex workflow faster for clearly bounded low-risk work without weakening guardrails for changes that could affect app behavior, user data, permissions, production systems, or live feature claims.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Markdown sanity review
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation/process-only; no app code, tests, SQL/schema/RLS/RPC/storage policies, Supabase/Vercel/env settings, DNS, users, production data, deploys, or merges changed.
+  - Master plan was not updated because this clarifies the operating workflow and does not change product direction, roadmap decisions, user workflows, feature definitions, or implementation strategy.
+
 - Branch: `ops/retrigger-vercel-main-deploy-pr35-v1`
 - Files changed:
   - `docs/servsync-master-plan/CHANGELOG.md`
