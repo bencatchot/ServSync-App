@@ -107,6 +107,7 @@ import type {
   ContextualConnectionPropertyPermission,
   ContextualConnectionRequestResult,
   ContractorConnectionRequest,
+  ContractorPendingConnectionSharedProperty,
   ContractorLocalContact,
   ContractorLocalHome,
   ContractorProfile,
@@ -14998,12 +14999,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('created_at', { ascending: false }),
-          supabase
-            .from('homeowner_contractor_connections')
-            .select('*')
-            .eq('contractor_id', loadedContractor.id)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false }),
+          supabase.rpc('servsync_contractor_pending_connection_requests'),
           supabase.rpc('servsync_contractor_team'),
           supabase
             .from('contractor_service_areas')
@@ -15033,7 +15029,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const loadedConnections = (connectionsRes.data || []) as ContractorConnectedHomeowner[];
       const connectionIds = [
         ...loadedConnections.map(connection => connection.connection_id),
-        ...loadedRequests.map(request => request.id),
+        ...loadedRequests.map(request => request.connection_id),
       ];
       const historyRes = connectionIds.length
         ? await supabase
@@ -15630,23 +15626,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!supabase) return;
     setNotice('');
     setError('');
-    setUpdatingRequestId(request.id);
+    setUpdatingRequestId(request.connection_id);
     try {
-      const { error: updateError } = await supabase
-        .from('homeowner_contractor_connections')
-        .update({ status })
-        .eq('id', request.id);
-      if (updateError) throw updateError;
-
-      const { error: auditError } = await supabase
-        .from('connection_audit_events')
-        .insert({
-          connection_id: request.id,
-          actor_user_id: profile.id,
-          event_type: status === 'active' ? 'connection_request_accepted' : 'connection_request_declined',
-          event_details: { source: request.source },
-        });
-      if (auditError) throw auditError;
+      const { error: responseError } = await supabase.rpc('servsync_respond_to_connection_request', {
+        p_connection_id: request.connection_id,
+        p_response: status === 'active' ? 'accept' : 'decline',
+      });
+      if (responseError) throw responseError;
 
       setNotice(status === 'active' ? 'Connection request accepted. The homeowner can now choose what to share.' : 'Connection request declined.');
       await loadContractor();
@@ -19473,7 +19459,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <div className="space-y-3">
                 {connectionRequests.slice(0, 3).map(request => (
                   <button
-                    key={request.id}
+                    key={request.connection_id}
                     type="button"
                     onClick={() => setContractorTab('connections')}
                     className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
@@ -21214,7 +21200,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         const unclaimedLocalContacts = localContacts.filter(contact => !contact.homeowner_user_id && !contact.claimed_at);
 
         const activeSubjects: Subject[] = [
-          ...connectionRequests.map(r => ({ kind: 'request' as const, id: `request:${r.id}`, request: r })),
+          ...connectionRequests.map(r => ({ kind: 'request' as const, id: `request:${r.connection_id}`, request: r })),
           ...activeConnList.map(c => ({ kind: 'connection' as const, id: c.connection_id, isActive: true, connection: c })),
           ...unclaimedLocalContacts.map(c => ({ kind: 'local' as const, id: `local:${c.id}`, contact: c })),
         ];
@@ -21233,7 +21219,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         };
         const subjectSearchText = (subject: Subject) => {
           if (subject.kind === 'request') {
-            return normalizeText(['pending request', subject.request.status, subject.request.id].filter(Boolean).join(' '));
+            return normalizeText([
+              'pending request',
+              subject.request.status,
+              subject.request.connection_id,
+              subject.request.request_context?.message,
+              subject.request.shared_properties.map(property => property.label).join(' '),
+            ].filter(Boolean).join(' '));
           }
           if (subject.kind === 'connection') {
             const conn = subject.connection;
@@ -21294,7 +21286,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       type="button"
                       onClick={() => {
                         setHomeownerFilter('active');
-                        setSelectedHomeownerSubjectId(`request:${connectionRequests[0].id}`);
+                        setSelectedHomeownerSubjectId(`request:${connectionRequests[0].connection_id}`);
                         setShowLocalContactForm(false);
                         setHomeownerMobileDetailOpen(true);
                       }}
@@ -21493,18 +21485,79 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 ) : selectedSubject.kind === 'request' ? (
                   (() => {
                     const reqSubject = selectedSubject.request;
-                    const isUpdating = updatingRequestId === reqSubject.id;
+                    const isUpdating = updatingRequestId === reqSubject.connection_id;
+                    const requestMessage = reqSubject.request_context?.message?.trim() || '';
+                    const sharedProperties = reqSubject.shared_properties || [];
+                    const contactSummary = reqSubject.contact_summary || { display_name: 'Homeowner' };
+                    const contactLocation = [contactSummary.city, contactSummary.state, contactSummary.zip_code].filter(Boolean).join(' ');
                     return (
                       <div className="p-4 sm:p-6">
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 max-w-2xl mx-auto">
+                        <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Pending connection request</p>
                               <h3 className="mt-2 text-lg font-bold text-slate-950">A homeowner is waiting for your approval</h3>
-                              <p className="mt-2 text-sm text-slate-700">Requested {formatDateTime(reqSubject.created_at)}. Their contact details stay private until you accept and they choose what to share.</p>
+                              <p className="mt-2 text-sm text-slate-700">
+                                Requested {formatDateTime(reqSubject.created_at)} from {connectionSourceLabel(reqSubject.source).toLowerCase()}.
+                                Review what they chose to share before accepting.
+                              </p>
                             </div>
                             <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">{reqSubject.status}</span>
                           </div>
+
+                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            <SharedField label="Homeowner" value={contactSummary.display_name || 'Homeowner'} allowed />
+                            <SharedField label="Phone" value={contactSummary.phone} allowed={reqSubject.share_contact} />
+                            <SharedField label="Location" value={contactLocation} allowed={reqSubject.share_contact} />
+                            <SharedField label="Photos / media" value="Deferred" allowed={false} />
+                          </div>
+
+                          <div className="mt-5 rounded-xl border border-amber-200 bg-white/80 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Homeowner message</p>
+                            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                              {requestMessage || 'No message included.'}
+                            </p>
+                          </div>
+
+                          <div className="mt-5 space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-slate-950">Selected properties</p>
+                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-800">
+                                {sharedProperties.length} selected
+                              </span>
+                            </div>
+                            {sharedProperties.length === 0 ? (
+                              <EmptyState text="No selected property details were returned for this request." />
+                            ) : sharedProperties.map((property, index) => {
+                              const allowedLabels = pendingSharedPropertyPermissionLabels(property);
+                              return (
+                                <div key={property.home_id || `${reqSubject.connection_id}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-bold text-slate-950">{property.label || `Shared property ${index + 1}`}</p>
+                                      <p className="mt-1 text-xs font-semibold text-slate-500">Address: {pendingSharedPropertyAddress(property)}</p>
+                                    </div>
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                                      Property {index + 1}
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {allowedLabels.length > 0 ? allowedLabels.map(label => (
+                                      <span key={label} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                                        {label}
+                                      </span>
+                                    )) : (
+                                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">No details shared</span>
+                                    )}
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                                      Photos not shared
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
                           <div className="mt-5 flex flex-wrap gap-2">
                             <button type="button" disabled={isUpdating} onClick={() => void updateConnectionRequest(reqSubject, 'active')} className={buttonClass('primary')}>
                               <CheckCircle2 size={16} />
@@ -21515,7 +21568,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </button>
                           </div>
                           <div className="mt-5">
-                            <ConnectionHistory events={connectionHistory[reqSubject.id] || []} />
+                            <ConnectionHistory events={connectionHistory[reqSubject.connection_id] || []} />
                           </div>
                         </div>
                       </div>
@@ -30926,6 +30979,21 @@ function SharedField({ label, value, allowed }: { label: string; value?: string 
       </p>
     </div>
   );
+}
+
+function pendingSharedPropertyAddress(property: ContractorPendingConnectionSharedProperty) {
+  if (!property.share_address) return 'Not shared';
+  const street = [property.address_line1, property.address_line2].filter(Boolean).join(', ');
+  const locality = [property.city, property.state, property.zip_code].filter(Boolean).join(' ');
+  return [street, locality].filter(Boolean).join(' · ') || 'Not shared';
+}
+
+function pendingSharedPropertyPermissionLabels(property: ContractorPendingConnectionSharedProperty) {
+  const labels: string[] = [];
+  if (property.share_home_overview) labels.push('Home overview');
+  if (property.share_address) labels.push('Address');
+  if (property.share_preferred_vendors) labels.push('Preferred vendors');
+  return labels;
 }
 
 function connectedHomeList(connection: ContractorConnectedHomeowner): ContractorConnectedHomeownerHome[] {

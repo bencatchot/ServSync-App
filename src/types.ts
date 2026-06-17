@@ -388,13 +388,44 @@ export interface ContractorConnectedHomeowner {
   source: string;
 }
 
+export interface ContractorPendingConnectionContactSummary {
+  display_name: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+}
+
+export interface ContractorPendingConnectionRequestContext {
+  message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractorPendingConnectionSharedProperty {
+  home_id: string;
+  label: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  share_home_overview: boolean;
+  share_address: boolean;
+  share_preferred_vendors: boolean;
+  share_photos: boolean;
+  updated_at: string;
+}
+
 export interface ContractorConnectionRequest {
-  id: string;
-  homeowner_user_id: string;
+  connection_id: string;
   contractor_id: string;
-  invite_id: string | null;
   status: ConnectionStatus;
   source: string;
+  share_contact: boolean;
+  contact_summary: ContractorPendingConnectionContactSummary;
+  request_context: ContractorPendingConnectionRequestContext | null;
+  shared_properties: ContractorPendingConnectionSharedProperty[];
   created_at: string;
   updated_at: string;
 }
