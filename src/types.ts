@@ -20,6 +20,7 @@ export type CalendarEventType = 'service_visit' | 'inspection_visit' | 'estimate
 export type CalendarEventRecurrenceFrequency = 'none' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
+export type EstimateChargeType = 'flat' | 'hourly';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
@@ -185,6 +186,22 @@ export interface EstimateTemplate {
   notes: string;
   terms: string;
   line_items: EstimateTemplateLineItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractorSavedEstimateCharge {
+  id: string;
+  contractor_id: string;
+  name: string;
+  description: string;
+  line_type: EstimateLineType;
+  charge_type: EstimateChargeType;
+  amount_cents: number;
+  default_quantity: number;
+  unit: string | null;
+  active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-16
 
+- Branch: `feature/estimate-settings-saved-charges-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added contractor Business Profile / Estimate Settings UI for managing saved estimate charges, including explicit saved-charge loading, create/edit, activate/deactivate controls, validation for names, nonnegative amounts, positive default quantities, and flat/hourly display support.
+- Reason for change: Let contractor owners/admin/office users manage reusable estimate charge settings after the saved-charge SQL/RLS foundation was applied, while keeping saved charges separate from estimate creation until a future quick-pick integration.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This branch does not add saved-charge quick-pick behavior to the estimate composer and does not auto-load charges into estimates.
+  - No SQL/schema/RLS/RPC, Supabase/Vercel/env settings, production data, deploys, payments, QuickBooks, accounting, or tax behavior changed.
+  - Future work should add estimate composer quick-pick integration and focused E2E/RLS coverage.
+
+## 2026-06-16
+
 - Branch: `feature/estimate-saved-charges-sql-v1`
 - Files changed:
   - `servsync-contractor-saved-estimate-charges.sql`
