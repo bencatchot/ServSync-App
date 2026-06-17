@@ -1710,6 +1710,11 @@ const EMPTY_PERMISSIONS: SharingPermissions = {
   share_photos: false,
 };
 
+type ActiveSharedPropertyDraft = {
+  share_contact: boolean;
+  properties: ContextualConnectionPropertyPermission[];
+};
+
 const TRADE_OPTIONS = [
   'HVAC',
   'Plumbing',
@@ -8066,7 +8071,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
-  const [permissionDrafts, setPermissionDrafts] = useState<Record<string, SharingPermissions>>({});
+  const [activeSharingDrafts, setActiveSharingDrafts] = useState<Record<string, ActiveSharedPropertyDraft>>({});
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [savingConnectionId, setSavingConnectionId] = useState<string | null>(null);
   const [revokingConnectionId, setRevokingConnectionId] = useState<string | null>(null);
@@ -8350,8 +8355,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
       if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
-      setPermissionDrafts(loadedConnections.reduce<Record<string, SharingPermissions>>((drafts, connection) => {
-        drafts[connection.connection_id] = normalizeSharingPermissions(connection.permissions);
+      setActiveSharingDrafts(loadedConnections.reduce<Record<string, ActiveSharedPropertyDraft>>((drafts, connection) => {
+        drafts[connection.connection_id] = activeSharingDraftFromConnection(connection, loadedHomes, loadedHome?.id ?? '');
         return drafts;
       }, {}));
       if (!notifRes.error) setNotifications((notifRes.data || []) as AppNotification[]);
@@ -9110,46 +9115,95 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setHomeownerTab('home');
   };
 
-  const updatePermissionDraft = (connectionId: string, nextPermissions: SharingPermissions) => {
-    setPermissionDrafts(current => ({
-      ...current,
-      [connectionId]: nextPermissions,
+  const updateActiveSharingDraft = (
+    connectionId: string,
+    updater: (draft: ActiveSharedPropertyDraft) => ActiveSharedPropertyDraft,
+  ) => {
+    setActiveSharingDrafts(current => {
+      const connection = connections.find(item => item.connection_id === connectionId);
+      const existing = current[connectionId] || (connection
+        ? activeSharingDraftFromConnection(connection, homes, selectedHome?.id || selectedHomeId)
+        : { share_contact: false, properties: [] });
+      return {
+        ...current,
+        [connectionId]: updater(existing),
+      };
+    });
+  };
+
+  const toggleActiveSharingHome = (connection: HomeownerConnection, homeId: string, checked: boolean) => {
+    if (!homes.some(candidate => candidate.id === homeId)) return;
+    updateActiveSharingDraft(connection.connection_id, draft => {
+      const currentProperties = draft.properties.filter(property => property.home_id !== homeId);
+      return {
+        ...draft,
+        properties: checked
+          ? [...currentProperties, defaultContextualPropertyPermission(homeId)]
+          : currentProperties,
+      };
+    });
+  };
+
+  const updateActiveSharingProperty = (
+    connection: HomeownerConnection,
+    homeId: string,
+    patch: Partial<ContextualConnectionPropertyPermission>,
+  ) => {
+    if (!homes.some(candidate => candidate.id === homeId)) return;
+    updateActiveSharingDraft(connection.connection_id, draft => ({
+      ...draft,
+      properties: draft.properties.map(property => property.home_id === homeId
+        ? { ...property, ...patch, share_photos: false }
+        : property),
     }));
   };
 
-  const saveConnectionPermissions = async (connection: HomeownerConnection) => {
+  const resetActiveSharingDraft = (connection: HomeownerConnection) => {
+    setActiveSharingDrafts(current => ({
+      ...current,
+      [connection.connection_id]: activeSharingDraftFromConnection(connection, homes, selectedHome?.id || selectedHomeId),
+    }));
+  };
+
+  const saveActiveSharedProperties = async (connection: HomeownerConnection) => {
     if (!supabase) return;
     setNotice('');
     setError('');
     setSavingConnectionId(connection.connection_id);
     try {
-      const draft = permissionDrafts[connection.connection_id] || normalizeSharingPermissions(connection.permissions);
-      const { error: permissionError } = await supabase
-        .from('connection_permissions')
-        .upsert({
-          connection_id: connection.connection_id,
-          share_contact: draft.share_contact,
-          share_home_overview: draft.share_home_overview,
-          share_address: draft.share_address,
-          share_preferred_vendors: draft.share_preferred_vendors,
-          share_photos: draft.share_photos,
-        });
-      if (permissionError) throw permissionError;
+      const draft = activeSharingDrafts[connection.connection_id] || activeSharingDraftFromConnection(connection, homes, selectedHome?.id || selectedHomeId);
+      const allowedHomeIds = new Set(homes.map(candidate => candidate.id));
+      const selectedProperties = draft.properties
+        .filter(property => property.home_id && allowedHomeIds.has(property.home_id))
+        .map(property => ({
+          home_id: property.home_id,
+          share_home_overview: Boolean(property.share_home_overview),
+          share_address: Boolean(property.share_address),
+          share_preferred_vendors: Boolean(property.share_preferred_vendors),
+          share_photos: false,
+        }));
+      const selectedHomeIds = selectedProperties.map(property => property.home_id);
+      if (selectedProperties.length === 0) {
+        throw new Error('Select at least one property for this contractor. To remove all access, revoke the connection.');
+      }
+      if (new Set(selectedHomeIds).size !== selectedHomeIds.length) {
+        throw new Error('Each property can only be selected once.');
+      }
+      if (selectedProperties.some(property => !contextualPropertyHasPermission(property))) {
+        throw new Error('Choose at least one service-relevant detail to share for each selected property.');
+      }
 
-      const { error: auditError } = await supabase
-        .from('connection_audit_events')
-        .insert({
-          connection_id: connection.connection_id,
-          actor_user_id: profile.id,
-          event_type: 'permissions_updated',
-          event_details: draft,
-        });
-      if (auditError) throw auditError;
+      const { error: permissionError } = await supabase.rpc('servsync_update_connection_shared_properties', {
+        p_connection_id: connection.connection_id,
+        p_share_contact: Boolean(draft.share_contact),
+        p_property_permissions: selectedProperties,
+      });
+      if (permissionError) throw permissionError;
 
       setNotice(`Sharing updated for ${connection.business_name}.`);
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to update sharing permissions.'));
+      setError(readableError(err, 'Unable to update shared property access.'));
     } finally {
       setSavingConnectionId(null);
     }
@@ -12267,7 +12321,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             ) : (
               visibleConnections.map(connection => {
                 const isExpanded = expandedConnectionId === connection.connection_id;
-                const draft = permissionDrafts[connection.connection_id] || normalizeSharingPermissions(connection.permissions);
+                const draft = activeSharingDrafts[connection.connection_id] || activeSharingDraftFromConnection(connection, homes, selectedHome?.id || selectedHomeId);
                 const isSaving = savingConnectionId === connection.connection_id;
                 const isRevoking = revokingConnectionId === connection.connection_id;
                 const isDismissing = dismissingConnectionId === connection.connection_id;
@@ -12275,6 +12329,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 const isRevoked = connection.status === 'revoked';
                 const isDeclined = connection.status === 'declined';
                 const isPending = connection.status === 'pending';
+                const selectedSharingHomeIds = new Set(draft.properties.map(property => property.home_id));
 
                 return (
                   <div key={connection.connection_id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -12339,15 +12394,135 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           </div>
                         ) : (
                           <>
-                            <PermissionPicker
-                              permissions={draft}
-                              onChange={nextPermissions => updatePermissionDraft(connection.connection_id, nextPermissions)}
-                            />
+                            <div className="mt-4 space-y-4">
+                              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+                                Choose which properties this contractor can access and what they can see for each one. Contact info is connection-level access.
+                              </div>
+
+                              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                                  checked={draft.share_contact}
+                                  onChange={event => updateActiveSharingDraft(connection.connection_id, current => ({
+                                    ...current,
+                                    share_contact: event.target.checked,
+                                  }))}
+                                  disabled={isSaving || isRevoking}
+                                />
+                                <span>
+                                  <span className="block text-sm font-bold text-slate-900">Share my contact info</span>
+                                  <span className="block text-xs leading-5 text-slate-500">Name, phone, and location stay shared at the contractor relationship level.</span>
+                                </span>
+                              </label>
+
+                              <div>
+                                <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Shared properties</p>
+                                <p className="mt-1 text-sm text-slate-500">Select at least one property. To remove all access, revoke the connection.</p>
+                                {homes.length === 0 ? (
+                                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                    Add a property before editing shared property access.
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                    {homes.map(homeOption => (
+                                      <label key={homeOption.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50">
+                                        <input
+                                          type="checkbox"
+                                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                                          checked={selectedSharingHomeIds.has(homeOption.id)}
+                                          onChange={event => toggleActiveSharingHome(connection, homeOption.id, event.target.checked)}
+                                          disabled={isSaving || isRevoking}
+                                        />
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm font-semibold text-slate-950">{contextualHomeLabel(homeOption)}</span>
+                                          <span className="mt-1 block truncate text-xs text-slate-500">{[homeOption.city, homeOption.state].filter(Boolean).join(', ') || 'Location not listed'}</span>
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {draft.properties.length > 0 && (
+                                <div className="space-y-3">
+                                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Per-property permissions</p>
+                                  {draft.properties.map((property, index) => {
+                                    const propertyHome = homes.find(candidate => candidate.id === property.home_id);
+                                    if (!propertyHome) return null;
+                                    return (
+                                      <div key={property.home_id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                          <div>
+                                            <p className="text-sm font-bold text-slate-950">{contextualHomeLabel(propertyHome)}</p>
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">Choose what this contractor may see for this property.</p>
+                                          </div>
+                                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">Property {index + 1}</span>
+                                        </div>
+                                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                            <input
+                                              type="checkbox"
+                                              className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                                              checked={property.share_home_overview}
+                                              onChange={event => updateActiveSharingProperty(connection, property.home_id, { share_home_overview: event.target.checked })}
+                                              disabled={isSaving || isRevoking}
+                                            />
+                                            <span>
+                                              <span className="block text-sm font-semibold text-slate-950">Home overview</span>
+                                              <span className="mt-1 block text-xs leading-5 text-slate-500">Basic service-relevant property details.</span>
+                                            </span>
+                                          </label>
+                                          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                            <input
+                                              type="checkbox"
+                                              className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                                              checked={property.share_address}
+                                              onChange={event => updateActiveSharingProperty(connection, property.home_id, { share_address: event.target.checked })}
+                                              disabled={isSaving || isRevoking}
+                                            />
+                                            <span>
+                                              <span className="block text-sm font-semibold text-slate-950">Address</span>
+                                              <span className="mt-1 block text-xs leading-5 text-slate-500">Street address for this selected property.</span>
+                                            </span>
+                                          </label>
+                                          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                            <input
+                                              type="checkbox"
+                                              className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                                              checked={property.share_preferred_vendors}
+                                              onChange={event => updateActiveSharingProperty(connection, property.home_id, { share_preferred_vendors: event.target.checked })}
+                                              disabled={isSaving || isRevoking}
+                                            />
+                                            <span>
+                                              <span className="block text-sm font-semibold text-slate-950">Preferred vendors</span>
+                                              <span className="mt-1 block text-xs leading-5 text-slate-500">Vendor notes already saved for this property.</span>
+                                            </span>
+                                          </label>
+                                          <label className="flex cursor-not-allowed items-start gap-3 rounded-xl border border-slate-200 bg-slate-100 p-3 opacity-75">
+                                            <input
+                                              type="checkbox"
+                                              className="mt-1 h-4 w-4 rounded border-slate-300"
+                                              checked={false}
+                                              disabled
+                                            />
+                                            <span>
+                                              <span className="block text-sm font-semibold text-slate-700">Photos</span>
+                                              <span className="mt-1 block text-xs leading-5 text-slate-500">Deferred for a later phase. Photos are not shared.</span>
+                                            </span>
+                                          </label>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                             <div className="mt-4 flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                onClick={() => void saveConnectionPermissions(connection)}
-                                disabled={isSaving || isRevoking}
+                                onClick={() => void saveActiveSharedProperties(connection)}
+                                disabled={isSaving || isRevoking || homes.length === 0}
                                 className={buttonClass('primary')}
                               >
                                 <ClipboardCheck size={16} />
@@ -12355,11 +12530,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               </button>
                               <button
                                 type="button"
-                                onClick={() => updatePermissionDraft(connection.connection_id, EMPTY_PERMISSIONS)}
+                                onClick={() => resetActiveSharingDraft(connection)}
                                 disabled={isRevoking}
                                 className={buttonClass('secondary')}
                               >
-                                Clear all sharing
+                                Reset changes
                               </button>
                               <button
                                 type="button"
@@ -30655,6 +30830,44 @@ function defaultContextualPropertyPermission(homeId: string): ContextualConnecti
 
 function contextualPropertyHasPermission(property: ContextualConnectionPropertyPermission) {
   return property.share_home_overview || property.share_address || property.share_preferred_vendors;
+}
+
+function activeSharingDraftFromConnection(
+  connection: HomeownerConnection,
+  homes: HomeProfile[],
+  preferredHomeId = '',
+): ActiveSharedPropertyDraft {
+  const permissions = normalizeSharingPermissions(connection.permissions);
+  const availableHomeIds = new Set(homes.map(home => home.id));
+  const properties = (connection.shared_properties || [])
+    .filter(property => availableHomeIds.has(property.home_id))
+    .map(property => ({
+      home_id: property.home_id,
+      share_home_overview: Boolean(property.share_home_overview),
+      share_address: Boolean(property.share_address),
+      share_preferred_vendors: Boolean(property.share_preferred_vendors),
+      share_photos: false,
+    }));
+
+  if (properties.length > 0) {
+    return { share_contact: Boolean(permissions.share_contact), properties };
+  }
+
+  const fallbackHome = homes.find(home => home.id === preferredHomeId) ?? homes[0] ?? null;
+  if (fallbackHome && (permissions.share_home_overview || permissions.share_address || permissions.share_preferred_vendors)) {
+    return {
+      share_contact: Boolean(permissions.share_contact),
+      properties: [{
+        home_id: fallbackHome.id,
+        share_home_overview: Boolean(permissions.share_home_overview),
+        share_address: Boolean(permissions.share_address),
+        share_preferred_vendors: Boolean(permissions.share_preferred_vendors),
+        share_photos: false,
+      }],
+    };
+  }
+
+  return { share_contact: Boolean(permissions.share_contact), properties: [] };
 }
 
 function ContextualConnectionRequestModal({
