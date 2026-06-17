@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-product-spec-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the master plan with the approved contextual connection request product direction: one homeowner-contractor connection, multiple shared properties under that connection, per-property permissions for implemented property categories, relationship-level contact sharing, copy-from-property permission setup, contractor customer-view guardrails, existing-record routing for open work/history, beta-safe migration direction, and phased implementation guidance.
+- Reason for change: Define the product/spec baseline before any SQL/RLS/RPC or app implementation for contextual connection requests and multi-property permission access.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Documentation sanity review for roadmap-vs-live wording
+  - Changelog duplicate label/heading check
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation/product-spec only; no app code, tests, SQL/schema/RLS/RPC/storage policies, Supabase/Vercel/env settings, DNS, users, production data, deploys, or merges changed.
+  - Future implementation still needs separate approval for SQL/RLS/RPC foundation, homeowner UI, contractor review UI, active connection editing, routing polish, and optional media/photo support.
+  - Optional connection request photos/media remain later-phase because storage, media access, and RLS handling must be designed safely before implementation.
+
 - Branch: `feature/codex-risk-based-fast-track-v1`
 - Files changed:
   - `docs/CODEX_WORKFLOW_TEMPLATE.md`

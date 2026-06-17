@@ -48,7 +48,7 @@ The first commercial focus should stay on solo and small contractors. These user
 | Homeowner pricing | Free for core homeowner use during early beta and launch |
 | Marketplace differentiator | Discover exposure plus connection-based workflow |
 | Contractor profile CTA | Connect |
-| Connection request | Should include message, optional photos, property context, and permission selection |
+| Connection request | Should include message, selected property context, and permission selection; photos/media are a later phase after storage/RLS design |
 | Messaging direction | Homeowner should be able to communicate with a contractor without creating a service request |
 | Beta pricing direction | 30-day free trial, likely $20/mo premium after beta, possible $5/mo basic Discover/communication tier |
 | Most evolving workflow | Job workflow based on beta user feedback |
@@ -134,7 +134,7 @@ The homeowner experience should feel lightweight. Most homeowners will likely ha
 
 - Homeowner can create an account and add basic home/property info.
 - Homeowner can browse Discover and contractor profiles.
-- Homeowner can request a connection with a contractor and include a message/photos.
+- Homeowner can request a connection with a contractor and include a message, selected property context, and permission choices. Photos/media should come later after storage and RLS handling are designed safely.
 - Homeowner can grant permission to share implemented categories: contact info, home overview, address, preferred vendors, photos.
 - Homeowner can submit service requests, review estimates, approve/decline, view invoices, file eligible invoices to Home History, create manual reminders, and access home service history.
 - Homeowner should be able to communicate with a contractor without starting a service request.
@@ -145,8 +145,8 @@ The contractor experience should be practical, not bloated. The contractor shoul
 
 - Contractor creates a profile with business details, service area, trade type, and future Discover content.
 - Contractor can be found by homeowners in Discover/search/feed experiences.
-- Contractor receives contextual connection requests with homeowner message, optional photos, and permission choices.
-- Contractor can communicate without forcing every conversation into a service request.
+- Contractor receives contextual connection requests with homeowner message, selected property context, and permission choices. Photos/media should come later after storage and RLS handling are designed safely.
+- Contractor can reply within homeowner-initiated allowed communication threads without forcing every conversation into a service request, but a connection alone should not grant unrestricted contractor-initiated messaging.
 - Contractor can convert serious needs into requests, estimates, jobs, invoices, and service records.
 - Contractor should see clear next actions instead of hunting across tabs. Recent cleanup work made request-to-estimate, accepted-estimate-to-job, completed-job-to-invoice, and service/checklist terminology clearer without changing stored status values or internal database names.
 
@@ -169,20 +169,61 @@ The Discover tab should not show a generic property selector at the top for sing
 
 A ServSync connection is not just a message. It is an app-level relationship between homeowner and contractor. It enables permission-based sharing and makes future requests, estimates, jobs, invoices, and home records easier to manage. This is one of the strongest differentiators in the product.
 
-| New decision to add to roadmap<br>When a homeowner clicks Connect on a contractor profile, they should be shown a request connection screen where they can enter a message, optionally upload photos, select the relevant property, and choose what information they want to share. The contractor should receive context instead of a blind connection request. |
+| Approved direction<br>When a homeowner clicks Connect on a contractor profile, they should be shown a contextual connection request flow where they can select one or more properties, choose per-property permissions, copy permissions from another selected property, add a message, and send the request. The contractor should receive context instead of a blind connection request. Photos/media are intentionally deferred from the first implementation slice until storage, media access, and RLS handling are designed safely. |
 | --- |
+
+## 11.1 Connection Model
+
+ServSync should keep one homeowner-contractor connection as the relationship model. Do not create separate contractor customer records or separate connection rows per property. A homeowner may share one or more properties with a contractor under the same connection, and the contractor should see one connected homeowner/customer with shared properties listed underneath that relationship.
+
+This keeps the relationship simple while still supporting multi-property homeowners:
+
+- One connection represents the relationship between the homeowner and contractor.
+- Shared properties live under that one connection.
+- Each shared property can have its own property-specific permissions.
+- The contractor customer list should not duplicate the same homeowner once for each shared property.
+- Contractor-side property selection should be limited to explicitly shared properties or to properties tied to another already allowed homeowner-initiated workflow.
+
+## 11.2 Contextual Connection Request Fields
 
 | Connection request field | Purpose |
 | --- | --- |
-| Home/property | Shows which home the context relates to. |
+| Properties | Lets the homeowner choose one or more properties to share under the connection. |
+| Per-property permissions | Lets the homeowner control what information is shared for each selected property. |
+| Copy permissions from property | Lets the homeowner copy one selected property's permissions to another selected property. |
 | Message box | Lets homeowner ask a question or explain why they want to connect. |
-| Optional photos | Allows visual context without forcing a service request. |
-| Permission selection | Lets homeowner control what the contractor can see. |
 | Request Connection button | Sends contextual request to contractor. |
 
 - The request should not automatically become a service request unless the homeowner chooses that path.
 - The contractor should be able to accept, decline, or respond/ask for more information depending on workflow design.
-- After connection, homeowner and contractor should have a general communication thread in addition to request-specific messaging.
+- After connection, a future general communication thread may be added in addition to request-specific messaging, but that remains a separate workflow decision after contextual connection requests and must preserve homeowner initiation/control.
+- Optional photos/media should be treated as a later phase, not part of the first contextual connection request implementation slice.
+
+## 11.3 Contractor Customer View After Connection
+
+The contractor-side customer view should continue to show one connected homeowner/customer. Shared properties should appear under that customer relationship and route to existing work areas rather than creating a separate open-work management system.
+
+Suggested customer actions:
+
+- View shared profile.
+- View shared properties.
+- View open Jobs/Estimates/Invoices.
+- View Homeowner History.
+
+The open Jobs/Estimates/Invoices shortcut should be customer-specific and should route to existing records. If open items exist, the contractor should select the relevant estimate, job, or invoice and open the existing location. If no open items exist, use the empty state: "No open jobs, estimates, or invoices for this homeowner."
+
+The Homeowner History shortcut should reuse existing completed/closed jobs, finalized reports, and closed/billed records where possible. It should not expose the full homeowner Home History unless a future explicit permission category is approved. History must be limited to records visible to that contractor through shared properties or another allowed workflow.
+
+## 11.4 Contractor Guardrails
+
+The connection should not become a broad permission to initiate any workflow on behalf of the homeowner.
+
+- Contractor cannot create a service request for the homeowner.
+- Contractor cannot send an estimate unless tied to a homeowner-initiated request or another existing allowed workflow.
+- Contractor cannot create a job unless tied to an accepted estimate or another existing allowed workflow.
+- Contractor cannot initiate general messaging unless the homeowner started the communication.
+- Contractor can reply only where the homeowner has initiated communication through an allowed workflow.
+- Contractor property selection for jobs/work must be limited to explicitly shared properties or properties tied to an already allowed homeowner-initiated workflow.
 
 # 12. General Messaging Without Service Request
 
@@ -212,6 +253,36 @@ Permission-based sharing should remain honest and limited to what is implemented
 - Future permission categories could include documents, service history, reports, estimates, invoices, or notes, but these should not be marketed as current unless implemented.
 - Connection permissions should be clear before, during, and after the connection request.
 - Homeowners should be able to understand and revoke/modify access where supported.
+
+## 13.1 Per-Property Permission Direction
+
+For multi-property connection sharing, property-specific permissions should use only currently supported app categories unless a future approved implementation adds more categories:
+
+- Home overview.
+- Address.
+- Preferred vendors.
+- Photos.
+
+Contact info should remain connection-level unless a later audit proves the data model needs otherwise. Contact info belongs to the homeowner-contractor relationship, not to a specific property. If a contractor can contact the homeowner, that permission should be understood as relationship-level access.
+
+Do not add or market new permission categories as live until they are implemented and covered by RLS/test coverage.
+
+## 13.2 Permission Copy UI Direction
+
+The preferred MVP control for multi-property permission setup is:
+
+Copy permissions from: [Property dropdown] [Apply to this property]
+
+This lets a homeowner configure one selected property and copy those settings to another selected property without hiding the fact that each property can have its own access rules. A top-level "apply same permissions to all selected properties" shortcut may be considered later, but the copy-from-property control is the preferred first implementation because it keeps the per-property model explicit.
+
+## 13.3 Existing Active Connection Migration Direction
+
+The SQL/RLS implementation must make an explicit migration or fallback decision for existing active connections. Recommended beta-safe direction:
+
+- Preserve existing visibility behavior by seeding shared-property rows for homes that are already visible under the current connection-level permission model.
+- Do not silently expand contractor access beyond the current model.
+- Add a future homeowner editing/re-confirmation path so property access can be reduced or refined.
+- Avoid mutating historical connection data without a narrow reviewed SQL plan and explicit SQL application approval.
 
 # 14. Pricing Strategy
 
@@ -261,7 +332,7 @@ The roadmap should stay disciplined. The app already has many features. Recent c
 | 2 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
 | 3 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
 | 4 | Production smoke account plan | Enables safe authenticated production smoke without using personal or fragile accounts. |
-| 5 | Connection request message/photos/property/permissions | This strengthens the main differentiator. |
+| 5 | Contextual connection request with message, selected properties, and per-property permissions | This strengthens the main differentiator. Photos/media should follow later after storage/RLS design. |
 | 6 | General connection-level messaging | Allows questions without forcing service requests. |
 | 7 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
 | 8 | Dashboard and notification accuracy | Builds trust and reduces confusion. Notification automation remains future-facing. |
@@ -315,13 +386,25 @@ These items need more founder input or beta learning before they can be finalize
 1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
 2. Run a focused beta-readiness/release-checklist audit before starting another major feature.
 3. Decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
-4. Audit the current connection/profile flow before implementing contextual connection requests.
-5. Do not ask Codex to implement the new connection request flow until the desired UI and data model are defined.
-6. After approval, create a narrow Codex prompt for a planning audit: contractor profile CTA, connection request modal/page, message/photos/property/permissions fields, and general messaging implications.
+4. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
+5. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
+6. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.
 7. Keep QuickBooks, payments/Stripe, push/email/text automation, native mobile apps, full calendar sync, and contractor call tracking future-facing until the beta loop is stable.
 
-# Appendix A: Draft Codex Audit Prompt for Connection Flow
+# Appendix A: Contextual Connection Implementation Breakdown
+
+Use this breakdown as the approved product direction for future implementation prompts. It is not implementation approval by itself.
+
+1. Product spec/master plan update.
+2. SQL/RLS/RPC foundation for one connection with shared properties and per-property permissions.
+3. Homeowner contextual connection request UI without photos.
+4. Contractor pending request review UI.
+5. Active connection per-property sharing editor.
+6. Contractor workspace routing polish for shared properties, open items, and history.
+7. Optional media/photo support with storage/RLS tests.
+
+# Appendix B: Draft Codex Audit Prompt for Connection Flow
 
 Use this prompt only when ready to ask Codex for an audit. It is not an implementation approval prompt.
 
-Audit the current ServSync contractor profile, Discover, connection request, permissions, and messaging flow. Do not modify files. Report where the app currently supports: contractor profile CTA, connection request creation, homeowner message/context, photo upload, property/home context, permission selection, contractor accept/decline, and any general homeowner-contractor messaging outside service requests. Identify minimal frontend, backend, schema, RLS, and notification changes needed to support a contextual connection request: homeowner clicks Connect, enters a message, optionally uploads photos, selects property, selects sharing permissions, and sends a request to the contractor. Also identify whether general connection-level messaging should be built in the same PR or separate PR. Return a risk-rated implementation plan in small PRs. Do not implement.
+Audit the current ServSync contractor profile, Discover, connection request, permissions, and messaging flow. Do not modify files. Report where the app currently supports: contractor profile CTA, connection request creation, homeowner message/context, property/home context, permission selection, contractor accept/decline, and any general homeowner-contractor messaging outside service requests. Identify minimal frontend, backend, schema, RLS, and notification changes needed to support the first contextual connection request implementation: homeowner clicks Connect, enters a message, selects one or more properties, sets per-property permissions, and sends a request to the contractor. Treat photos/media as a later phase that needs separate storage/RLS design. Also identify whether general connection-level messaging should be built in the same PR or separate PR. Return a risk-rated implementation plan in small PRs. Do not implement.
