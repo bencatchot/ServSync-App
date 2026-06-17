@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-sql-foundation-v1`
+- Files changed:
+  - `servsync-connection-shared-properties.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the SQL/RLS/RPC foundation for contextual homeowner-contractor connection requests with per-property shared permissions under one connection, durable request context message storage, homeowner submit/update RPCs, a narrow contractor response RPC, contractor connected-homeowner visibility based on explicit shared-property rows, beta-safe backfill from existing global home-overview sharing, a source-tagged temporary compatibility bridge for existing global permission saves, and a guardrail requiring contractor-created homeowner jobs to use an explicitly shared property unless tied to a homeowner-initiated service request.
+- Reason for change: Implement the first approved SQL foundation slice for the PR #38 contextual connection product direction while keeping contact sharing connection-level and deferring frontend UI, media/photo storage, general messaging, and broader workflow changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - SQL syntax/dry-run inspection without applying SQL
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production; separate approval and verification are required before application.
+  - App UI/types are unchanged in this slice, so later approved PRs are still needed for homeowner contextual request UI, contractor pending-request review UI, active connection permission editing, removal or narrowing of the temporary legacy compatibility bridge, and focused RLS/E2E coverage.
+  - Photos/media remain later-phase and are not exposed by this SQL foundation.
+
 - Branch: `feature/contextual-connection-product-spec-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
