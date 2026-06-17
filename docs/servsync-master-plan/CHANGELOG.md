@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `ops/retrigger-vercel-main-deploy-pr35-v1`
+- Files changed:
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added an operational no-op changelog note to trigger a fresh GitHub -> Vercel production deployment event after PR #35 was already merged to `main` but did not create a visible Production deployment.
+- Reason for change: Vercel missed the automatic Production deployment for merge commit `74e881ffd0243d2e7367fdd9cc077c02272a297b`, leaving `servsync.app` on the prior PR #34 bundle even though `main` includes the PR #35 saved-charge quick-pick code.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This is a docs-only deployment-trigger PR. It does not change app behavior, tests, SQL/schema/RLS/RPC, Supabase/Vercel/env settings, DNS, production data, users, or manual deployment state.
+  - After this PR is merged, verify that Vercel creates a Production deployment from the new `main` commit and that `servsync.app` includes the PR #35 quick-pick bundle.
+
 - Branch: `feature/estimate-saved-charge-quick-pick-v1`
 - Files changed:
   - `src/App.tsx`
