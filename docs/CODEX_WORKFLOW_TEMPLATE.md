@@ -21,19 +21,133 @@ This is an internal workflow template only. It is not product strategy, marketin
 3. User gives the prompt to Codex.
 4. Codex audits and reports findings.
 5. User brings the Codex report back to ChatGPT.
-6. ChatGPT reviews the report and prepares an approval or implementation prompt.
-7. Codex implements only approved work.
-8. Codex reports changed files, checks, risks, and PR link when applicable.
-9. User brings the Codex result back to ChatGPT.
-10. ChatGPT prepares a verification or merge-approval prompt.
-11. Codex verifies or merges only when explicitly approved.
-12. Continue the loop until the task is complete.
+6. ChatGPT and the user decide whether to use the full approval loop or Builder Mode.
+7. ChatGPT prepares an approval, Builder Mode proceed, or implementation prompt.
+8. Codex implements only approved work.
+9. Codex reports changed files, checks, risks, and PR link when applicable.
+10. User brings the Codex result back to ChatGPT.
+11. ChatGPT prepares a verification or merge-approval prompt.
+12. Codex verifies or merges only when explicitly approved.
+13. Continue the loop until the task is complete.
+
+## Builder Mode
+
+Builder Mode is the faster workflow for approved feature/fix implementation after the initial audit has already happened. It is meant to reduce routine back-and-forth while preserving hard gates for production, SQL, permissions, auth, environment settings, and user data.
+
+Use Builder Mode when:
+
+1. ChatGPT and the user have brainstormed the desired feature or fix and defined the intended outcome.
+2. ChatGPT has given Codex an initial audit prompt.
+3. Codex has audited the repo and recommended an implementation path.
+4. The user has brought the audit back to ChatGPT.
+5. ChatGPT and the user agree the path is good.
+6. ChatGPT gives Codex a Builder Mode proceed prompt with approved scope, stop conditions, and final return format.
+
+Once Builder Mode is approved, Codex may implement the approved scope without returning for approval on routine coding decisions. Routine coding decisions include local component structure, small helper functions, naming that follows existing patterns, minor copy needed to make the approved UI coherent, and focused tests or validation needed for the approved change.
+
+Builder Mode may include:
+
+- Creating or switching to the approved feature branch.
+- Editing in-scope files.
+- Running local validation.
+- Committing approved changes.
+- Pushing the feature branch to GitHub.
+- Opening or updating a pull request.
+- Triggering Vercel Preview or sandbox deployments that normally happen from feature branches or PRs.
+
+Builder Mode does not allow:
+
+- Merging the PR branch into `main` without explicit user approval.
+- Manually deploying production without explicit user approval.
+- Applying SQL without explicit user approval.
+- Changing RLS, RPC, storage policies, auth, permissions, Supabase settings, Vercel settings, env values, production data, or user records without explicit user approval.
+- Expanding into another user-facing workflow, data behavior, permission rule, database behavior, production setting, or core lifecycle behavior outside the approved scope.
+
+If Codex discovers that the implementation may affect another user-facing workflow, data behavior, permission rule, database behavior, production setting, or core lifecycle behavior outside the approved scope, it must stop and ask before continuing.
+
+Important wording:
+
+- Do not say Codex cannot "push" generally. Pushing a feature branch or PR branch is allowed after Builder Mode approval.
+- "Merge" means combining the PR branch into `main`; this can trigger production deployment and requires explicit approval.
+- Vercel Preview or sandbox deployments from feature branches are allowed more liberally when they are part of the approved Builder Mode workflow.
+- Production remains protected by requiring explicit approval before merge to `main` or manual production deploy.
+
+After Builder Mode approval, ChatGPT's role is to interpret Codex reports/questions, help the user understand risks, and help decide when Codex asks for approval. ChatGPT should not micromanage every routine file change once the implementation path is approved.
+
+## Builder Mode Proceed Prompt Template
+
+```text
+TASK TYPE
+Builder Mode implementation approved. Audit has already been completed and approved. Implement the approved scope without returning for approval on routine coding decisions.
+
+TASK
+[Task name]
+
+Repo:
+[Repo URL]
+
+Branch:
+[feature/branch-name]
+
+Risk level:
+[Low / Medium / High]
+
+Approved outcome:
+- [Outcome 1]
+- [Outcome 2]
+
+Approved implementation path:
+- [Implementation path item 1]
+- [Implementation path item 2]
+
+Builder Mode permission:
+- Codex may create/use the approved branch.
+- Codex may modify only the approved in-scope files.
+- Codex may make routine coding decisions that stay inside the approved scope.
+- Codex may run validation.
+- Codex may commit, push the feature branch, open/update a PR, and allow normal Vercel Preview/sandbox deployments.
+
+Stop conditions:
+- Stop if unapproved files need to change.
+- Stop if the implementation may affect another user-facing workflow, data behavior, permission rule, database behavior, production setting, or core lifecycle behavior outside the approved scope.
+- Stop if SQL/RLS/RPC/storage/auth/permissions/env/settings changes are needed and not explicitly approved.
+- Stop if production data/user records would be touched.
+- Stop if validation fails and the fix would exceed the approved scope.
+
+Not approved:
+- Do not merge into main.
+- Do not manually deploy production.
+- Do not apply SQL.
+- Do not change Supabase/Vercel/env/settings.
+- Do not create users or touch production data.
+- Do not start unrelated follow-up work.
+
+Validation required:
+- git status --short --branch
+- git diff --check
+- [Task-specific checks]
+- changed-file secret-value scan
+
+Return:
+ACTION
+RISK LEVEL ASSESSED
+BUILDER MODE USED: YES / NO
+FILES CHANGED
+SUMMARY OF CHANGES
+VALIDATION RUN
+STOP CONDITIONS ENCOUNTERED: YES / NO
+PR LINK, IF OPENED
+RISKS / FOLLOW-UPS
+STATUS
+```
 
 ## Risk-Based Fast Track
 
 Not every task needs the same level of back-and-forth. Match the workflow to the risk level, and keep the scope explicit. Faster paths are acceptable only when the task is low-risk, clearly bounded, and does not touch app behavior, user data, permissions, SQL, auth, storage, production, env, or deploy settings.
 
 If Codex discovers that a task is riskier than expected, it must stop and report instead of continuing.
+
+Builder Mode can be used after the initial audit for low-risk or medium-risk implementation work, and for high-risk work only when the approved prompt narrowly defines the safe implementation path and keeps all high-risk operations behind explicit stop conditions. Builder Mode is not permission to merge, deploy production, apply SQL, change env/settings, create users, or touch production data.
 
 ### Low-Risk Fast-Track Path
 
@@ -68,7 +182,9 @@ Use this block in future Codex prompts when risk-based routing matters:
 ```text
 Risk-Based Workflow Instruction:
 - If this task is documentation-only, content-only, harmless copy cleanup, or an internal template update, briefly audit and then implement in the same pass if the scope is clear.
-- If this task changes app behavior, data flow, permissions, SQL, RLS, auth, storage, Edge Functions, environment variables, production data, user access, or core workflow logic, stop after audit and wait for explicit approval before implementing.
+- If this task changes app behavior, data flow, permissions, SQL, RLS, auth, storage, Edge Functions, environment variables, production data, user access, or core workflow logic, stop after audit and wait for explicit approval before implementing unless a Builder Mode proceed prompt has already approved the implementation path.
+- If Builder Mode is approved, implement in-scope work without routine approval, and you may branch, commit, push, open/update a PR, and trigger normal Vercel Preview/sandbox deployments.
+- Builder Mode does not permit merge to main, manual production deploy, SQL application, env/settings changes, user creation, or production data changes without explicit approval.
 - If you discover the task is riskier than expected, stop and report instead of continuing.
 - Never merge, deploy production, apply SQL, change env/settings, create users, or touch production data without explicit approval.
 ```
@@ -78,7 +194,7 @@ Feature/function work and marketing work must remain separate. Marketing/content
 ## Non-Negotiable Guardrails
 
 - Codex must audit before coding unless explicitly told otherwise.
-- Codex must not change code without explicit approval.
+- Codex must not change code without explicit approval, a low-risk one-pass prompt, or a Builder Mode proceed prompt.
 - Codex must not merge without explicit approval.
 - Codex must not deploy production manually without explicit approval.
 - Codex must not apply SQL without explicit approval.
@@ -94,6 +210,8 @@ Feature/function work and marketing work must remain separate. Marketing/content
 - Codex must keep changelog entry labels consistent with the existing changelog style.
 - Codex must keep feature work separate from marketing work.
 - Codex must not treat roadmap ideas as live features.
+- Codex may push approved feature branches and open PRs when the implementation prompt or Builder Mode explicitly allows it.
+- Codex must treat merge to `main` as a separate approval gate because it can trigger production deployment.
 
 ## Master Plan And Changelog Rules
 
@@ -217,6 +335,9 @@ Risk level:
 Audit + implement in one pass allowed:
 [YES / NO]
 
+Builder Mode approved after audit:
+[YES / NO]
+
 Required starting state:
 - Fetch origin.
 - Checkout main.
@@ -271,6 +392,7 @@ Return:
 ACTION
 RISK LEVEL ASSESSED
 FAST-TRACK USED: YES / NO
+BUILDER MODE USED: YES / NO
 WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
@@ -460,6 +582,7 @@ STATUS
 ACTION
 RISK LEVEL ASSESSED
 FAST-TRACK USED: YES / NO
+BUILDER MODE USED: YES / NO
 WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
@@ -526,7 +649,7 @@ STATUS
 Copy this into a new ChatGPT chat:
 
 ```text
-I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. For medium/high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep the full audit -> approval -> implementation loop. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
+I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
 ```
 
 ## Notes

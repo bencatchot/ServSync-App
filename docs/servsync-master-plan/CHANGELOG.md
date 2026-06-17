@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `docs/builder-mode-workflow-v1`
+- Files changed:
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a Builder Mode workflow to the Codex workflow template so Codex can proceed faster after an approved audit by making routine in-scope implementation decisions, committing, pushing, opening PRs, and using normal Preview/sandbox deployment flow while preserving explicit approval gates for merge to `main`, production deploys, SQL, permissions, auth, env/settings, users, and production data.
+- Reason for change: Reduce unnecessary ChatGPT/Codex back-and-forth for approved implementation work while keeping production, database, permission, and user-data changes protected.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Markdown sanity review
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This is documentation/process-only and does not change app code, SQL/schema/RLS/RPC/storage policies, Supabase Edge Functions, Vercel/env/config files, production data, user records, or deployment behavior.
+
 - Branch: `feature/contextual-connection-active-sharing-ui-v1`
 - Files changed:
   - `src/App.tsx`
