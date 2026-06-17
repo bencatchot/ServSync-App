@@ -72,6 +72,7 @@ import type {
   ContractorPublicProfile,
   DiscoverFeedItem,
   Estimate,
+  EstimateChargeType,
   EstimateLineType,
   EstimateTemplate,
   EstimateTemplateLineItem,
@@ -92,6 +93,7 @@ import type {
   ContractorConnectedHomeowner,
   ContractorConnectedHomeownerHome,
   ContractorAccountStatus,
+  ContractorSavedEstimateCharge,
   ConnectionAlertLevel,
   ConnectionAlertStatus,
   ContractorVisitEvent,
@@ -336,6 +338,17 @@ type EstimateLineDraft = {
   quantity: string;
   unit: string;
   unit_price: string;
+};
+type SavedEstimateChargeDraft = {
+  name: string;
+  description: string;
+  line_type: EstimateLineType;
+  charge_type: EstimateChargeType;
+  amount: string;
+  default_quantity: string;
+  unit: string;
+  active: boolean;
+  sort_order: string;
 };
 type EstimateDraft = {
   title: string;
@@ -706,6 +719,35 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     line_items: [createEstimateLineDraft()],
     ...overrides,
   };
+}
+
+function createBlankSavedEstimateChargeDraft(overrides: Partial<SavedEstimateChargeDraft> = {}): SavedEstimateChargeDraft {
+  return {
+    name: '',
+    description: '',
+    line_type: 'labor',
+    charge_type: 'flat',
+    amount: '',
+    default_quantity: '1',
+    unit: '',
+    active: true,
+    sort_order: '0',
+    ...overrides,
+  };
+}
+
+function savedEstimateChargeDraftFromRecord(charge: ContractorSavedEstimateCharge): SavedEstimateChargeDraft {
+  return createBlankSavedEstimateChargeDraft({
+    name: charge.name,
+    description: charge.description || '',
+    line_type: charge.line_type,
+    charge_type: charge.charge_type,
+    amount: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
+    default_quantity: String(Number(charge.default_quantity || 1)),
+    unit: charge.unit || '',
+    active: charge.active,
+    sort_order: String(charge.sort_order || 0),
+  });
 }
 
 function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
@@ -1765,6 +1807,19 @@ const UNIVERSAL_REFERRAL_STATUS_OPTIONS: UniversalReferralStatus[] = ['pending',
 const UNIVERSAL_REFERRAL_REWARD_STATUS_OPTIONS: UniversalReferralRewardStatus[] = ['pending', 'approved', 'denied', 'paid', 'not_eligible'];
 const SERVICE_REQUEST_URGENCY_OPTIONS: ServiceRequestUrgency[] = ['low', 'normal', 'urgent'];
 const SERVICE_REQUEST_CATEGORIES = [...TRADE_OPTIONS, 'Other'];
+const ESTIMATE_LINE_TYPE_OPTIONS: EstimateLineType[] = ['labor', 'material', 'equipment', 'fee', 'other'];
+const ESTIMATE_LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
+  labor: 'Labor',
+  material: 'Material',
+  equipment: 'Equipment',
+  fee: 'Fee',
+  other: 'Other',
+};
+const ESTIMATE_CHARGE_TYPE_OPTIONS: EstimateChargeType[] = ['flat', 'hourly'];
+const ESTIMATE_CHARGE_TYPE_LABELS: Record<EstimateChargeType, string> = {
+  flat: 'Flat',
+  hourly: 'Hourly',
+};
 const KUDOS_OPTIONS = [
   'Great communication',
   'On time',
@@ -14647,6 +14702,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
+  const [savedEstimateCharges, setSavedEstimateCharges] = useState<ContractorSavedEstimateCharge[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
   const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
@@ -14680,6 +14736,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
+  const [savedEstimateChargeDraft, setSavedEstimateChargeDraft] = useState<SavedEstimateChargeDraft>(() => createBlankSavedEstimateChargeDraft());
+  const [editingSavedEstimateChargeId, setEditingSavedEstimateChargeId] = useState<string | null>(null);
+  const [savingSavedEstimateCharge, setSavingSavedEstimateCharge] = useState(false);
+  const [togglingSavedEstimateChargeId, setTogglingSavedEstimateChargeId] = useState<string | null>(null);
   const [renamingInspectionTemplateId, setRenamingInspectionTemplateId] = useState<string | null>(null);
   const [archivingInspectionTemplateId, setArchivingInspectionTemplateId] = useState<string | null>(null);
   const [restoringInspectionTemplateId, setRestoringInspectionTemplateId] = useState<string | null>(null);
@@ -15040,7 +15100,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -15088,6 +15148,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .select('*')
             .eq('contractor_id', loadedContractor.id)
             .order('updated_at', { ascending: false }),
+          supabase
+            .from('contractor_saved_estimate_charges')
+            .select('id, contractor_id, name, description, line_type, charge_type, amount_cents, default_quantity, unit, active, sort_order, created_at, updated_at')
+            .eq('contractor_id', loadedContractor.id)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
@@ -15104,6 +15170,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
+        if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
       } else {
         setContractorVisitEvents([]);
         setContractorCalendarEvents([]);
@@ -15111,6 +15178,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setCalendarEventOccurrenceExclusions([]);
         setLocalContacts([]);
         setLocalClaimInvites([]);
+        setSavedEstimateCharges([]);
       }
     } catch (err) {
       setError(readableError(err, 'Unable to load contractor workspace.'));
@@ -16543,6 +16611,100 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to delete estimate template.'));
     } finally {
       setDeletingEstimateTemplateId(null);
+    }
+  };
+
+  const resetSavedEstimateChargeDraft = () => {
+    setEditingSavedEstimateChargeId(null);
+    setSavedEstimateChargeDraft(createBlankSavedEstimateChargeDraft());
+  };
+
+  const editSavedEstimateCharge = (charge: ContractorSavedEstimateCharge) => {
+    setEditingSavedEstimateChargeId(charge.id);
+    setSavedEstimateChargeDraft(savedEstimateChargeDraftFromRecord(charge));
+  };
+
+  const saveSavedEstimateCharge = async () => {
+    if (!supabase || !contractor?.id) return;
+    const name = savedEstimateChargeDraft.name.trim();
+    const amountValue = Number(savedEstimateChargeDraft.amount.replace(/[$,]/g, '').trim() || '0');
+    const defaultQuantity = Number(savedEstimateChargeDraft.default_quantity);
+    const sortOrder = Number(savedEstimateChargeDraft.sort_order);
+    if (!name) {
+      setError('Add a saved charge name before saving.');
+      return;
+    }
+    if (!Number.isFinite(amountValue) || amountValue < 0) {
+      setError('Enter an amount or rate of zero or more.');
+      return;
+    }
+    if (!Number.isFinite(defaultQuantity) || defaultQuantity <= 0) {
+      setError('Default quantity must be greater than zero.');
+      return;
+    }
+    setNotice('');
+    setError('');
+    setSavingSavedEstimateCharge(true);
+    const payload = {
+      contractor_id: contractor.id,
+      name,
+      description: savedEstimateChargeDraft.description.trim(),
+      line_type: savedEstimateChargeDraft.line_type,
+      charge_type: savedEstimateChargeDraft.charge_type,
+      amount_cents: dollarsToCents(savedEstimateChargeDraft.amount),
+      default_quantity: Number(defaultQuantity.toFixed(2)),
+      unit: savedEstimateChargeDraft.unit.trim() || (savedEstimateChargeDraft.charge_type === 'hourly' ? 'hour' : null),
+      active: savedEstimateChargeDraft.active,
+      sort_order: Number.isFinite(sortOrder) ? Math.trunc(sortOrder) : 0,
+    };
+    try {
+      const mutation = editingSavedEstimateChargeId
+        ? supabase
+            .from('contractor_saved_estimate_charges')
+            .update({
+              name: payload.name,
+              description: payload.description,
+              line_type: payload.line_type,
+              charge_type: payload.charge_type,
+              amount_cents: payload.amount_cents,
+              default_quantity: payload.default_quantity,
+              unit: payload.unit,
+              active: payload.active,
+              sort_order: payload.sort_order,
+            })
+            .eq('id', editingSavedEstimateChargeId)
+        : supabase
+            .from('contractor_saved_estimate_charges')
+            .insert(payload);
+      const { error: saveError } = await mutation;
+      if (saveError) throw saveError;
+      setNotice(editingSavedEstimateChargeId ? 'Saved charge updated.' : 'Saved charge created.');
+      resetSavedEstimateChargeDraft();
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this charge. Make sure you have estimate settings access.'));
+    } finally {
+      setSavingSavedEstimateCharge(false);
+    }
+  };
+
+  const toggleSavedEstimateChargeActive = async (charge: ContractorSavedEstimateCharge) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setTogglingSavedEstimateChargeId(charge.id);
+    try {
+      const { error: updateError } = await supabase
+        .from('contractor_saved_estimate_charges')
+        .update({ active: !charge.active })
+        .eq('id', charge.id);
+      if (updateError) throw updateError;
+      setNotice(charge.active ? 'Saved charge deactivated.' : 'Saved charge reactivated.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update this saved charge.'));
+    } finally {
+      setTogglingSavedEstimateChargeId(null);
     }
   };
 
@@ -18589,6 +18751,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const canManageInspectionTemplates = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
+  const canManageEstimateSettings = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
 
   const inspectionTemplateStats = (template: InspectionTemplate) => ({
     sectionCount: template.rooms.length,
@@ -19608,6 +19771,197 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="mb-5 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#02132D]">Estimate Settings</p>
+              <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
+                Save common flat charges and hourly rates for your contractor account. These stay in settings for now and do not automatically load into estimates.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center sm:min-w-[220px]">
+              <InfoBox label="Saved" value={String(savedEstimateCharges.length)} />
+              <InfoBox label="Active" value={String(savedEstimateCharges.filter(charge => charge.active).length)} />
+            </div>
+          </div>
+
+          {!contractor?.id ? (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Save the business profile once before adding saved estimate charges.
+            </p>
+          ) : canManageEstimateSettings ? (
+            <div className="mt-4 rounded-lg border border-[#E1E3E7] bg-[#F7F9FC] p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#02132D]">{editingSavedEstimateChargeId ? 'Edit saved charge' : 'Add saved charge'}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-[#223D67]/70">
+                    Use flat charges for fixed fees and hourly charges for saved labor rates.
+                  </p>
+                </div>
+                {editingSavedEstimateChargeId && (
+                  <button type="button" onClick={resetSavedEstimateChargeDraft} className={buttonClass('secondary')}>
+                    Cancel edit
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                <Field label="Name">
+                  <input
+                    className={inputClass()}
+                    value={savedEstimateChargeDraft.name}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, name: event.target.value }))}
+                    placeholder="Service call fee"
+                  />
+                </Field>
+                <Field label="Line type">
+                  <select
+                    className={inputClass()}
+                    value={savedEstimateChargeDraft.line_type}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, line_type: event.target.value as EstimateLineType }))}
+                  >
+                    {ESTIMATE_LINE_TYPE_OPTIONS.map(lineType => (
+                      <option key={lineType} value={lineType}>{ESTIMATE_LINE_TYPE_LABELS[lineType]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Charge type">
+                  <select
+                    className={inputClass()}
+                    value={savedEstimateChargeDraft.charge_type}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({
+                      ...current,
+                      charge_type: event.target.value as EstimateChargeType,
+                      unit: current.unit.trim() || (event.target.value === 'hourly' ? 'hour' : current.unit),
+                    }))}
+                  >
+                    {ESTIMATE_CHARGE_TYPE_OPTIONS.map(chargeType => (
+                      <option key={chargeType} value={chargeType}>{ESTIMATE_CHARGE_TYPE_LABELS[chargeType]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={savedEstimateChargeDraft.charge_type === 'hourly' ? 'Rate' : 'Amount'}>
+                  <input
+                    className={inputClass()}
+                    inputMode="decimal"
+                    value={savedEstimateChargeDraft.amount}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, amount: event.target.value }))}
+                    placeholder="125.00"
+                  />
+                </Field>
+                <Field label="Default quantity">
+                  <input
+                    className={inputClass()}
+                    inputMode="decimal"
+                    value={savedEstimateChargeDraft.default_quantity}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, default_quantity: event.target.value }))}
+                    placeholder="1"
+                  />
+                </Field>
+                <Field label="Unit">
+                  <input
+                    className={inputClass()}
+                    value={savedEstimateChargeDraft.unit}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, unit: event.target.value }))}
+                    placeholder={savedEstimateChargeDraft.charge_type === 'hourly' ? 'hour' : 'each'}
+                  />
+                </Field>
+                <Field label="Sort order">
+                  <input
+                    className={inputClass()}
+                    inputMode="numeric"
+                    value={savedEstimateChargeDraft.sort_order}
+                    onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, sort_order: event.target.value }))}
+                    placeholder="0"
+                  />
+                </Field>
+                <div className="flex items-end">
+                  <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
+                    <input
+                      type="checkbox"
+                      checked={savedEstimateChargeDraft.active}
+                      onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, active: event.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
+                    />
+                    Active
+                  </label>
+                </div>
+                <div className="lg:col-span-4">
+                  <Field label="Description">
+                    <textarea
+                      className={inputClass()}
+                      rows={2}
+                      value={savedEstimateChargeDraft.description}
+                      onChange={event => setSavedEstimateChargeDraft(current => ({ ...current, description: event.target.value }))}
+                      placeholder="Optional internal note or scope reminder"
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={savingSavedEstimateCharge}
+                  onClick={() => void saveSavedEstimateCharge()}
+                  className={buttonClass('primary')}
+                >
+                  <Plus size={16} />
+                  {savingSavedEstimateCharge ? 'Saving...' : editingSavedEstimateChargeId ? 'Save charge' : 'Add charge'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              You can view saved estimate charges, but only the contractor owner, admin, or office role can change estimate settings.
+            </p>
+          )}
+
+          <div className="mt-4 space-y-3">
+            {savedEstimateCharges.length === 0 ? (
+              <EmptyState text="No saved estimate charges yet." />
+            ) : (
+              savedEstimateCharges.map(charge => (
+                <div key={charge.id} className="rounded-xl border border-[#E1E3E7] bg-[#F7F9FC] p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-bold text-[#02132D]">{charge.name}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${charge.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                          {charge.active ? 'Active' : 'Inactive'}
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#223D67]">
+                          {ESTIMATE_LINE_TYPE_LABELS[charge.line_type]} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]}
+                        </span>
+                      </div>
+                      {charge.description && <p className="mt-1 text-sm leading-5 text-[#223D67]/75">{charge.description}</p>}
+                      <p className="mt-2 text-xs text-[#223D67]/70">
+                        {formatMoney(charge.amount_cents)}{charge.charge_type === 'hourly' ? '/hr' : ''} · default {Number(charge.default_quantity)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')} · sort {charge.sort_order}
+                      </p>
+                      <p className="mt-1 text-xs text-[#223D67]/55">
+                        Updated {new Date(charge.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                    {canManageEstimateSettings && (
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <button type="button" onClick={() => editSavedEstimateCharge(charge)} className={buttonClass('secondary')}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={togglingSavedEstimateChargeId === charge.id}
+                          onClick={() => void toggleSavedEstimateChargeActive(charge)}
+                          className={buttonClass('secondary')}
+                        >
+                          {togglingSavedEstimateChargeId === charge.id ? 'Updating...' : charge.active ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
