@@ -4,6 +4,25 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-17
+
+- Branch: `feature/estimate-saved-charge-quick-pick-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added active saved-charge quick-pick controls to the contractor estimate composer so contractors can manually add saved flat or hourly charges into a draft as normal editable estimate line items.
+- Reason for change: Complete the next Contractor Estimate Defaults & Templates slice after the saved-charge SQL/RLS foundation and Estimate Settings UI, while keeping saved charges manual, contractor-only, and separate from estimate templates and automatic estimate loading.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This branch does not auto-load saved charges, does not persist saved-charge IDs on estimate line items, does not change homeowner estimate/PDF behavior beyond normal line-item content, and does not add SQL/schema/RLS/RPC, Supabase/Vercel/env settings, payments, QuickBooks, accounting, tax, production data, or deploy changes.
+  - Authenticated preview testing should verify the quick-pick in the contractor estimate composer with the secondary sandbox contractor account if local setup supports it.
+
 ## 2026-06-16
 
 - Branch: `feature/estimate-settings-saved-charges-ui-v1`
