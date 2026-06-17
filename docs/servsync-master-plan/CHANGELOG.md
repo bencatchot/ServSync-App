@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/homes-field-work-privilege-hardening-v1`
+- Files changed:
+  - `servsync-homes-field-work-privilege-hardening.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow follow-up SQL hardening patch that removes broad `public.homes` table privileges from `PUBLIC`, `anon`, and `authenticated`, re-grants only owner-flow `SELECT`, `INSERT`, and `UPDATE` access for authenticated users under existing RLS, and conditionally revokes client EXECUTE access from the legacy 7-argument `servsync_create_field_work` overload when present.
+- Reason for change: A security audit found pre-existing metadata-level grants that were broader than needed and a production-only legacy field-work overload without the newer shared-property guardrail; this patch tightens privileges without changing `public.homes` RLS, dropping functions, changing frontend behavior, applying SQL, or deploying.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static SQL privilege inspection
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production in this branch; separate approval is required before applying and verifying the patch.
+  - Follow-up sandbox verification should confirm homeowner-owned home SELECT/INSERT/UPDATE still works under RLS, anon/unrelated users cannot access homes, contractors cannot directly read homes, and the current 8-argument field-work RPC remains available while the legacy 7-argument overload is not client-executable.
+
 - Branch: `feature/contextual-connection-shared-properties-rls-fix-v1`
 - Files changed:
   - `servsync-connection-shared-properties-rls-fix.sql`

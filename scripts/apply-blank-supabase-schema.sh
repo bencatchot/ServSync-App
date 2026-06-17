@@ -89,6 +89,7 @@ SQL_FILES=(
   "servsync-service-request-home-id.sql"
   "servsync-connection-shared-properties.sql"
   "servsync-connection-shared-properties-rls-fix.sql"
+  "servsync-homes-field-work-privilege-hardening.sql"
   "servsync-unified-visit-events.sql"
   "servsync-standalone-calendar-events.sql"
   "servsync-recurring-calendar-events.sql"
