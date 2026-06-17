@@ -29,6 +29,52 @@ This is an internal workflow template only. It is not product strategy, marketin
 11. Codex verifies or merges only when explicitly approved.
 12. Continue the loop until the task is complete.
 
+## Risk-Based Fast Track
+
+Not every task needs the same level of back-and-forth. Match the workflow to the risk level, and keep the scope explicit. Faster paths are acceptable only when the task is low-risk, clearly bounded, and does not touch app behavior, user data, permissions, SQL, auth, storage, production, env, or deploy settings.
+
+If Codex discovers that a task is riskier than expected, it must stop and report instead of continuing.
+
+### Low-Risk Fast-Track Path
+
+Low-risk work may include documentation-only changes, content-only changes, harmless copy or wording cleanup, internal templates, non-app marketing docs, and other bounded edits that do not affect app behavior, user data, permissions, SQL, auth, storage, production, env, or deploy settings.
+
+For low-risk work, Codex may briefly audit the relevant docs/files, implement the approved change in the same pass, run validation, commit/push/open a PR if requested, and report changed files, checks, risks, and the PR link.
+
+Still required:
+
+- No merge without explicit approval.
+- No production deploy without explicit approval.
+- No SQL/env/settings/data/user changes without explicit approval.
+- Changelog update when files/docs change and changelog practice requires it.
+- Master plan update only when appropriate.
+- Changed-file secret scan.
+- Clear return report with risk level, fast-track use, validation, risks, and stop conditions.
+
+### Medium-Risk Path
+
+Medium-risk work includes app UI or app behavior changes that do not touch SQL/RLS/auth/storage/env/production data. Examples include labels, helper text, layout polish, data-testid additions, minor frontend-only user experience changes, or simple non-sensitive workflow display improvements.
+
+For medium-risk work, Codex may audit and implement in one pass only if the user explicitly authorizes "audit + implement in one pass." Otherwise, Codex should audit first and wait for approval.
+
+### High-Risk Full Approval Path
+
+High-risk work requires audit first and explicit approval before implementation. High-risk work includes SQL, schema, RPC, RLS, storage policies, auth, permissions, user access, private data, production data, Supabase/Vercel/env settings, Edge Functions, payments, accounting integrations, file/media access, core request/estimate/job/invoice lifecycle behavior, and anything that could expose, corrupt, delete, duplicate, or misroute user data.
+
+### Risk-Based Workflow Instruction
+
+Use this block in future Codex prompts when risk-based routing matters:
+
+```text
+Risk-Based Workflow Instruction:
+- If this task is documentation-only, content-only, harmless copy cleanup, or an internal template update, briefly audit and then implement in the same pass if the scope is clear.
+- If this task changes app behavior, data flow, permissions, SQL, RLS, auth, storage, Edge Functions, environment variables, production data, user access, or core workflow logic, stop after audit and wait for explicit approval before implementing.
+- If you discover the task is riskier than expected, stop and report instead of continuing.
+- Never merge, deploy production, apply SQL, change env/settings, create users, or touch production data without explicit approval.
+```
+
+Feature/function work and marketing work must remain separate. Marketing/content docs can be low-risk, but app feature implementation is not automatically low-risk. Roadmap ideas must not be treated as live features.
+
 ## Non-Negotiable Guardrails
 
 - Codex must audit before coding unless explicitly told otherwise.
@@ -80,6 +126,12 @@ TASK
 Repo:
 [Repo URL]
 
+Risk level:
+[Low / Medium / High]
+
+Audit + implement in one pass allowed:
+NO
+
 Required starting state:
 - Fetch origin.
 - Checkout main.
@@ -98,6 +150,17 @@ Scope:
 Out of scope:
 - [What not to inspect/change]
 
+Files allowed to change:
+- None. Audit only.
+
+Files not allowed to change:
+- All files. Audit only.
+
+Stop conditions:
+- If implementation is needed, stop and report.
+- If the task is riskier than described, stop and report.
+- If SQL/env/settings/data/user/deploy changes appear necessary, stop and report.
+
 Master plan check:
 - Classify whether this task affects product direction, roadmap, workflows, feature definitions, implementation strategy, marketing, QA, or SQL/schema/RLS/RPC/storage.
 - Do not update the master plan in this audit.
@@ -114,9 +177,13 @@ Questions to answer:
 
 Return:
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 WHAT WAS CHECKED
 FINDINGS
 ISSUES FOUND
+STOP CONDITIONS ENCOUNTERED: YES / NO
 CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
@@ -143,6 +210,12 @@ Branch:
 
 Repo:
 [Repo URL]
+
+Risk level:
+[Low / Medium / High]
+
+Audit + implement in one pass allowed:
+[YES / NO]
 
 Required starting state:
 - Fetch origin.
@@ -171,6 +244,12 @@ Files not allowed to change:
 - Production data or user records.
 - [Other exclusions]
 
+Stop conditions:
+- If the task is riskier than the approved risk level, stop and report.
+- If unapproved files must change, stop and report.
+- If SQL/env/settings/data/user/deploy changes are needed, stop and report.
+- If implementation would affect feature/marketing boundaries or turn roadmap ideas into live features, stop and report.
+
 Master plan rules:
 - Update the master plan only if this changes product direction, roadmap decisions, user workflows, feature definitions, or implementation strategy.
 - If not updating, report why.
@@ -190,6 +269,9 @@ Validation required:
 
 Return:
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
 CHANGELOG / MASTER PLAN CHECK
@@ -201,6 +283,7 @@ CHANGELOG / MASTER PLAN CHECK
 - Confirm no duplicate PR number/item number/heading was introduced:
 CHANGELOG UPDATE
 VALIDATION RUN
+STOP CONDITIONS ENCOUNTERED: YES / NO
 RISKS / FOLLOW-UPS
 PR LINK, IF OPENED
 STATUS
@@ -224,6 +307,9 @@ Expected branch:
 Latest commit to review:
 [commit SHA]
 
+Risk level:
+[Low / Medium / High]
+
 Verify:
 - PR is open and mergeable.
 - Source branch and target branch are correct.
@@ -235,8 +321,21 @@ Verify:
 - Required tests/checks passed.
 - Vercel project is correct if relevant.
 
+Files allowed to change:
+- [Expected changed files]
+
+Files not allowed to change:
+- [Unexpected files / SQL/env/settings/data/user/deploy files]
+
+Stop conditions:
+- If unexpected files or riskier behavior are found, report NEEDS FIXES or BLOCKED.
+- If checks/deployment status are pending, report pending instead of marking ready.
+
 Return:
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 BRANCH STATUS
 CHANGED FILES
 REVIEW SUMMARY
@@ -249,6 +348,7 @@ CHANGELOG / MASTER PLAN CHECK
 - Confirm no duplicate PR number/item number/heading was introduced:
 CHECKS STATUS
 ISSUES FOUND
+STOP CONDITIONS ENCOUNTERED: YES / NO
 UPDATE NEEDED: YES / NO
 STATUS: READY TO MERGE / NEEDS FIXES / BLOCKED
 RECOMMENDED NEXT STEP
@@ -335,9 +435,13 @@ STATUS
 
 ```text
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 WHAT WAS CHECKED
 FINDINGS
 ISSUES FOUND
+STOP CONDITIONS ENCOUNTERED: YES / NO
 CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
@@ -354,6 +458,9 @@ STATUS
 
 ```text
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
 CHANGELOG / MASTER PLAN CHECK
@@ -365,6 +472,7 @@ CHANGELOG / MASTER PLAN CHECK
 - Confirm no duplicate PR number/item number/heading was introduced:
 CHANGELOG UPDATE
 VALIDATION RUN
+STOP CONDITIONS ENCOUNTERED: YES / NO
 RISKS / FOLLOW-UPS
 PR LINK
 STATUS
@@ -374,6 +482,9 @@ STATUS
 
 ```text
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 BRANCH STATUS
 CHANGED FILES
 REVIEW SUMMARY
@@ -386,6 +497,7 @@ CHANGELOG / MASTER PLAN CHECK
 - Confirm no duplicate PR number/item number/heading was introduced:
 CHECKS STATUS
 ISSUES FOUND
+STOP CONDITIONS ENCOUNTERED: YES / NO
 UPDATE NEEDED: YES / NO
 STATUS
 RECOMMENDED NEXT STEP
@@ -395,12 +507,16 @@ RECOMMENDED NEXT STEP
 
 ```text
 ACTION
+RISK LEVEL ASSESSED
+FAST-TRACK USED: YES / NO
+WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 TARGET TESTED
 DEPLOYMENT STATUS
 VERIFICATION RESULTS
 PRODUCTION DATA CHANGES
 SQL / DEPLOY STATUS
 ISSUES FOUND
+STOP CONDITIONS ENCOUNTERED: YES / NO
 RECOMMENDED NEXT STEP
 STATUS
 ```
@@ -410,7 +526,7 @@ STATUS
 Copy this into a new ChatGPT chat:
 
 ```text
-I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined. Do not jump straight to implementation. First help me define the task, then give me a Codex audit prompt. I will paste Codex's reply back here, and you will help me decide the next Codex prompt. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
+I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. For medium/high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep the full audit -> approval -> implementation loop. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
 ```
 
 ## Notes
