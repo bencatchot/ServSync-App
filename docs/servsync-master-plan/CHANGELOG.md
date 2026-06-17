@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-active-sharing-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added homeowner active shared-property management UI in the Contractors tab so active connections can be edited with connection-level contact sharing and per-property Home overview, Address, and Preferred vendors permissions while keeping Photos/media disabled and deferred.
+- Reason for change: Complete the next contextual connection UI slice by replacing active global permission editing with the deployed `servsync_update_connection_shared_properties` RPC and explicit shared-property drafts.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This branch does not change SQL/schema/RLS/RPC files, Supabase/Vercel/env settings, storage policies, production data, contractor pending review UI, contractor connected-home active display, invite/referral-link acceptance, service request/job/estimate/invoice flows, general messaging, or photos/media sharing.
+  - Authenticated sandbox/preview smoke is recommended before merge with a homeowner account that has at least two homes and an active contractor connection.
+
 - Branch: `feature/contextual-connection-contractor-review-ui-v1`
 - Files changed:
   - `src/App.tsx`
