@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-homeowner-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Phase 1 homeowner contextual connection request UI with a reusable modal for selecting a contractor, optional request message, connection-level contact sharing, one or more homeowner properties, and per-property permissions for home overview, address, and preferred vendors while keeping photos/media deferred.
+- Reason for change: Move primary homeowner connection request entry points onto the contextual connection RPC foundation so new requests can carry explicit per-property sharing choices under one homeowner-contractor connection.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Contractor invite/referral-link acceptance, contractor pending request review, active connection shared-property management, connected-home property permission display, and photos/media sharing remain separate later-phase work.
+  - This branch does not change SQL/schema/RLS/RPC files, Supabase/Vercel/env settings, storage policies, production data, service request/job/estimate/invoice flows, or contractor UI.
+
 - Branch: `feature/homes-field-work-privilege-hardening-v1`
 - Files changed:
   - `servsync-homes-field-work-privilege-hardening.sql`

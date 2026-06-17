@@ -103,6 +103,9 @@ import type {
   CalendarEventRecurrenceFrequency,
   CalendarEventType,
   CalendarEventDraft,
+  ContextualConnectionContractorTarget,
+  ContextualConnectionPropertyPermission,
+  ContextualConnectionRequestResult,
   ContractorConnectionRequest,
   ContractorLocalContact,
   ContractorLocalHome,
@@ -8067,8 +8070,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [savingConnectionId, setSavingConnectionId] = useState<string | null>(null);
   const [revokingConnectionId, setRevokingConnectionId] = useState<string | null>(null);
   const [dismissingConnectionId, setDismissingConnectionId] = useState<string | null>(null);
-  const [reconnectingConnectionId, setReconnectingConnectionId] = useState<string | null>(null);
-  const [reconnectDraftConnectionId, setReconnectDraftConnectionId] = useState<string | null>(null);
+  const [contextualConnectionTarget, setContextualConnectionTarget] = useState<ContextualConnectionContractorTarget | null>(null);
+  const [contextualConnectionInitialHomeId, setContextualConnectionInitialHomeId] = useState<string>('');
+  const [submittingContextualConnection, setSubmittingContextualConnection] = useState(false);
+  const [contextualConnectionError, setContextualConnectionError] = useState('');
   const [contractorInviteLeads, setContractorInviteLeads] = useState<HomeownerContractorInviteLead[]>([]);
   const [contractorInviteModalOpen, setContractorInviteModalOpen] = useState(false);
   const [submittingContractorInvite, setSubmittingContractorInvite] = useState(false);
@@ -9032,6 +9037,71 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setServiceRequestDraft(current => ({ ...current, home_id: homeId }));
   };
 
+  const openContextualConnectionRequest = (
+    contractor: ContextualConnectionContractorTarget,
+    preferredHomeId = selectedHome?.id || selectedHomeId || '',
+  ) => {
+    const existing = connections.find(connection => connection.contractor_id === contractor.id);
+    setNotice('');
+    setError('');
+    setContextualConnectionError('');
+    if (existing?.status === 'active') {
+      setNotice(`You are already connected with ${contractor.business_name}.`);
+      return;
+    }
+    setContextualConnectionInitialHomeId(preferredHomeId);
+    setContextualConnectionTarget(contractor);
+  };
+
+  const contractorTargetFromProfile = (contractor: ContractorProfile): ContextualConnectionContractorTarget => ({
+    id: contractor.id,
+    business_name: contractor.business_name,
+    city: contractor.city,
+    state: contractor.state,
+    logo_url: contractor.logo_url,
+    service_categories: contractor.service_categories,
+  });
+
+  const contractorTargetFromConnection = (connection: HomeownerConnection): ContextualConnectionContractorTarget => ({
+    id: connection.contractor_id,
+    business_name: connection.business_name,
+    city: connection.city,
+    state: connection.state,
+    logo_url: connection.logo_url,
+  });
+
+  const submitContextualConnectionRequest = async (draft: ContextualConnectionSubmitDraft) => {
+    if (!supabase || !contextualConnectionTarget) return;
+    setNotice('');
+    setError('');
+    setContextualConnectionError('');
+    setSubmittingContextualConnection(true);
+    try {
+      const { data, error: submitError } = await supabase.rpc('servsync_submit_contextual_connection_request', {
+        p_contractor_id: contextualConnectionTarget.id,
+        p_request_message: draft.message,
+        p_share_contact: draft.share_contact,
+        p_property_permissions: draft.properties.map(property => ({
+          home_id: property.home_id,
+          share_home_overview: property.share_home_overview,
+          share_address: property.share_address,
+          share_preferred_vendors: property.share_preferred_vendors,
+          share_photos: false,
+        })),
+      });
+      if (submitError) throw submitError;
+      const result = Array.isArray(data) ? data[0] as ContextualConnectionRequestResult | undefined : data as ContextualConnectionRequestResult | null;
+      setNotice(`Connection request sent to ${contextualConnectionTarget.business_name}${result?.property_count ? ` for ${result.property_count} ${result.property_count === 1 ? 'property' : 'properties'}` : ''}.`);
+      setContextualConnectionTarget(null);
+      setContextualConnectionInitialHomeId('');
+      await loadHomeowner();
+    } catch (err) {
+      setContextualConnectionError(readableError(err, 'Unable to send connection request.'));
+    } finally {
+      setSubmittingContextualConnection(false);
+    }
+  };
+
   const startAddProperty = () => {
     setSelectedHomeId('');
     setHome(createEmptyHomeDraft());
@@ -9168,118 +9238,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
-  const requestReconnect = async (connection: HomeownerConnection, proposedPermissions: SharingPermissions) => {
-    if (!supabase) return;
-    setNotice('');
-    setError('');
-    setReconnectingConnectionId(connection.connection_id);
-    try {
-      const { error: connectionError } = await supabase
-        .from('homeowner_contractor_connections')
-        .update({ status: 'pending' })
-        .eq('id', connection.connection_id)
-        .eq('homeowner_user_id', profile.id);
-      if (connectionError) throw connectionError;
-
-      const { error: permissionError } = await supabase
-        .from('connection_permissions')
-        .upsert({
-          connection_id: connection.connection_id,
-          share_contact: proposedPermissions.share_contact,
-          share_home_overview: proposedPermissions.share_home_overview,
-          share_address: proposedPermissions.share_address,
-          share_preferred_vendors: proposedPermissions.share_preferred_vendors,
-          share_photos: proposedPermissions.share_photos,
-        });
-      if (permissionError) throw permissionError;
-
-      const { error: auditError } = await supabase
-        .from('connection_audit_events')
-        .insert({
-          connection_id: connection.connection_id,
-          actor_user_id: profile.id,
-          event_type: 'reconnect_requested',
-          event_details: {
-            contractor_id: connection.contractor_id,
-            proposed_permissions: proposedPermissions,
-          },
-        });
-      if (auditError) throw auditError;
-
-      setNotice(`Reconnect request sent to ${connection.business_name}.`);
-      setReconnectDraftConnectionId(null);
-      await loadHomeowner();
-    } catch (err) {
-      setError(readableError(err, 'Unable to request reconnect.'));
-    } finally {
-      setReconnectingConnectionId(null);
-    }
-  };
-
-  const requestContractorConnection = async (contractor: ContractorProfile) => {
-    if (!supabase) return;
-    setNotice('');
-    setError('');
-    try {
-      const existing = connections.find(connection => connection.contractor_id === contractor.id);
-      if (existing) {
-        if (existing.status === 'pending') {
-          setNotice(`You already have a pending connection request with ${contractor.business_name}.`);
-          return;
-        }
-        if (existing.status === 'active') {
-          setNotice(`You are already connected with ${contractor.business_name}.`);
-          return;
-        }
-        const { error: reconnectError } = await supabase
-          .from('homeowner_contractor_connections')
-          .update({ status: 'pending' })
-          .eq('id', existing.connection_id)
-          .eq('homeowner_user_id', profile.id);
-        if (reconnectError) throw reconnectError;
-
-        const { error: auditError } = await supabase
-          .from('connection_audit_events')
-          .insert({
-            connection_id: existing.connection_id,
-            actor_user_id: profile.id,
-            event_type: existing.status === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
-            event_details: { contractor_id: contractor.id, previous_status: existing.status },
-          });
-        if (auditError) throw auditError;
-
-        setNotice(`Connection request sent to ${contractor.business_name}.`);
-        await loadHomeowner();
-        return;
-      }
-
-      const { data, error: requestError } = await supabase
-        .from('homeowner_contractor_connections')
-        .insert({
-          homeowner_user_id: profile.id,
-          contractor_id: contractor.id,
-          status: 'pending',
-          source: 'homeowner_request',
-        })
-        .select('id')
-        .single();
-      if (requestError) throw requestError;
-
-      const { error: auditError } = await supabase
-        .from('connection_audit_events')
-        .insert({
-          connection_id: data.id,
-          actor_user_id: profile.id,
-          event_type: 'connection_requested',
-          event_details: { contractor_id: contractor.id },
-        });
-      if (auditError) throw auditError;
-
-      setNotice(`Connection request sent to ${contractor.business_name}.`);
-      await loadHomeowner();
-    } catch (err) {
-      setError(readableError(err, 'Unable to request contractor connection.'));
-    }
+  const requestContractorConnection = (contractor: ContractorProfile) => {
+    openContextualConnectionRequest(contractorTargetFromProfile(contractor));
   };
 
   const resetContractorInviteDraft = () => {
@@ -12310,8 +12270,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 const isSaving = savingConnectionId === connection.connection_id;
                 const isRevoking = revokingConnectionId === connection.connection_id;
                 const isDismissing = dismissingConnectionId === connection.connection_id;
-                const isReconnecting = reconnectingConnectionId === connection.connection_id;
-                const isChoosingReconnect = reconnectDraftConnectionId === connection.connection_id;
                 const isRequestingService = requestingConnectionId === connection.connection_id;
                 const isRevoked = connection.status === 'revoked';
                 const isDeclined = connection.status === 'declined';
@@ -12354,57 +12312,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         {(isRevoked || isDeclined) ? (
                           <div className="mt-4 space-y-3">
                             <Notice tone="info" text={isDeclined ? 'This contractor declined the connection request. You can request again or hide this contractor from My Contractors.' : 'This connection has been revoked. The contractor can no longer see shared home or contact details.'} />
-                            {isChoosingReconnect ? (
-                              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                                <p className="text-sm font-bold text-blue-950">Choose proposed sharing</p>
-                                <p className="mt-1 text-sm text-blue-800">
-                                  These permissions only apply if {connection.business_name} accepts the reconnect request.
-                                </p>
-                                <PermissionPicker
-                                  permissions={draft}
-                                  onChange={nextPermissions => updatePermissionDraft(connection.connection_id, nextPermissions)}
-                                />
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => void requestReconnect(connection, draft)}
-                                    disabled={isReconnecting}
-                                    className={buttonClass('primary')}
-                                  >
-                                    <Link2 size={16} />
-                                    {isReconnecting ? 'Sending...' : 'Submit reconnect request'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setReconnectDraftConnectionId(null)}
-                                    disabled={isReconnecting}
-                                    className={buttonClass('secondary')}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setReconnectDraftConnectionId(connection.connection_id)}
-                                  className={buttonClass('primary')}
-                                >
-                                  <Link2 size={16} />
-                                  {isDeclined ? 'Request again' : 'Request reconnect'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void dismissConnection(connection)}
-                                  disabled={isDismissing}
-                                  className={buttonClass('secondary')}
-                                >
-                                  <X size={16} />
-                                  {isDismissing ? 'Hiding...' : 'Hide from My Contractors'}
-                                </button>
-                              </div>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openContextualConnectionRequest(contractorTargetFromConnection(connection))}
+                                className={buttonClass('primary')}
+                              >
+                                <Link2 size={16} />
+                                {isDeclined ? 'Request again' : 'Request reconnect'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void dismissConnection(connection)}
+                                disabled={isDismissing}
+                                className={buttonClass('secondary')}
+                              >
+                                <X size={16} />
+                                {isDismissing ? 'Hiding...' : 'Hide from My Contractors'}
+                              </button>
+                            </div>
                           </div>
                         ) : isPending ? (
                           <div className="mt-4 space-y-3">
@@ -14660,7 +14586,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               contractorId={null}
               connections={connections}
               contractorSlugs={Object.fromEntries(directoryContractors.map(contractor => [contractor.id, contractor.slug]))}
-              onConnectionRequested={loadHomeowner}
+              onRequestConnection={contractor => openContextualConnectionRequest(contractor)}
               onRequestService={(contractorId, category) => {
                 const connection = connections.find(item => item.contractor_id === contractorId && item.status === 'active');
                 if (!connection) return;
@@ -14701,6 +14627,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           onCreate={() => void createSupportInquiry()}
           onReply={inquiry => void replyToSupportInquiry(inquiry)}
           saving={savingSupport}
+        />
+      )}
+
+      {contextualConnectionTarget && (
+        <ContextualConnectionRequestModal
+          key={contextualConnectionTarget.id}
+          contractor={contextualConnectionTarget}
+          homes={homes}
+          initialHomeId={contextualConnectionInitialHomeId}
+          submitting={submittingContextualConnection}
+          error={contextualConnectionError}
+          onSubmit={submitContextualConnectionRequest}
+          onClose={() => {
+            if (submittingContextualConnection) return;
+            setContextualConnectionTarget(null);
+            setContextualConnectionInitialHomeId('');
+            setContextualConnectionError('');
+          }}
         />
       )}
 
@@ -30630,6 +30574,346 @@ function PermissionChips({ permissions }: { permissions: SharingPermissions }) {
   );
 }
 
+type ContextualConnectionSubmitDraft = {
+  message: string;
+  share_contact: boolean;
+  properties: ContextualConnectionPropertyPermission[];
+};
+
+function contextualContractorLabel(contractor: ContextualConnectionContractorTarget) {
+  const location = [contractor.city, contractor.state].filter(Boolean).join(', ');
+  return location ? `${contractor.business_name} · ${location}` : contractor.business_name;
+}
+
+function contextualHomeLabel(home: HomeProfile) {
+  const location = [home.address_line1, home.city, home.state].filter(Boolean).join(', ');
+  return home.nickname || location || 'Property';
+}
+
+function defaultContextualPropertyPermission(homeId: string): ContextualConnectionPropertyPermission {
+  return {
+    home_id: homeId,
+    share_home_overview: true,
+    share_address: false,
+    share_preferred_vendors: false,
+    share_photos: false,
+  };
+}
+
+function contextualPropertyHasPermission(property: ContextualConnectionPropertyPermission) {
+  return property.share_home_overview || property.share_address || property.share_preferred_vendors;
+}
+
+function ContextualConnectionRequestModal({
+  contractor,
+  homes,
+  initialHomeId,
+  submitting,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  contractor: ContextualConnectionContractorTarget;
+  homes: HomeProfile[];
+  initialHomeId?: string;
+  submitting: boolean;
+  error?: string;
+  onSubmit: (draft: ContextualConnectionSubmitDraft) => Promise<void>;
+  onClose: () => void;
+}) {
+  const firstHomeId = initialHomeId && homes.some(home => home.id === initialHomeId)
+    ? initialHomeId
+    : homes.length === 1 ? homes[0].id : '';
+  const [message, setMessage] = useState('');
+  const [shareContact, setShareContact] = useState(false);
+  const [propertyDrafts, setPropertyDrafts] = useState<Record<string, ContextualConnectionPropertyPermission>>(() => (
+    firstHomeId ? { [firstHomeId]: defaultContextualPropertyPermission(firstHomeId) } : {}
+  ));
+  const [copySources, setCopySources] = useState<Record<string, string>>({});
+  const [localError, setLocalError] = useState('');
+
+  const selectedProperties = homes
+    .map(home => propertyDrafts[home.id])
+    .filter((property): property is ContextualConnectionPropertyPermission => Boolean(property));
+  const selectedHomeIds = new Set(selectedProperties.map(property => property.home_id));
+
+  const toggleHome = (homeId: string, checked: boolean) => {
+    setLocalError('');
+    setPropertyDrafts(current => {
+      if (checked) {
+        if (current[homeId]) return current;
+        return { ...current, [homeId]: defaultContextualPropertyPermission(homeId) };
+      }
+      const next = { ...current };
+      delete next[homeId];
+      return next;
+    });
+    setCopySources(current => {
+      const next = { ...current };
+      delete next[homeId];
+      return next;
+    });
+  };
+
+  const updateProperty = (homeId: string, patch: Partial<ContextualConnectionPropertyPermission>) => {
+    setLocalError('');
+    setPropertyDrafts(current => ({
+      ...current,
+      [homeId]: {
+        ...(current[homeId] || defaultContextualPropertyPermission(homeId)),
+        ...patch,
+        share_photos: false,
+      },
+    }));
+  };
+
+  const copyPermissions = (targetHomeId: string) => {
+    const sourceHomeId = copySources[targetHomeId];
+    const source = sourceHomeId ? propertyDrafts[sourceHomeId] : null;
+    if (!source || source.home_id === targetHomeId) return;
+    updateProperty(targetHomeId, {
+      share_home_overview: source.share_home_overview,
+      share_address: source.share_address,
+      share_preferred_vendors: source.share_preferred_vendors,
+      share_photos: false,
+    });
+  };
+
+  const submit = async () => {
+    setLocalError('');
+    if (selectedProperties.length === 0) {
+      setLocalError('Select at least one property for this connection request.');
+      return;
+    }
+    if (selectedProperties.some(property => !contextualPropertyHasPermission(property))) {
+      setLocalError('Choose at least one service-relevant detail to share for each selected property.');
+      return;
+    }
+
+    await onSubmit({
+      message: cleanHumanWrittenText(message).trim(),
+      share_contact: shareContact,
+      properties: selectedProperties.map(property => ({ ...property, share_photos: false })),
+    });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="contextual-connection-request-title"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget && !submitting) onClose();
+      }}
+    >
+      <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-3xl sm:rounded-2xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Connection request</p>
+            <h2 id="contextual-connection-request-title" className="mt-1 text-xl font-bold text-slate-950">
+              Share property access with {contractor.business_name}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">{contextualContractorLabel(contractor)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Close connection request"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-5 py-5">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <p className="text-sm font-bold text-blue-950">You choose what each property shares.</p>
+            <p className="mt-1 text-sm leading-6 text-blue-800">
+              Pick one or more properties and share only the service-relevant details this contractor should see if they accept.
+              Contact info is controlled separately for the connection.
+            </p>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+              checked={shareContact}
+              onChange={event => setShareContact(event.target.checked)}
+              disabled={submitting}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-950">Share my contact info with this contractor</span>
+              <span className="mt-1 block text-sm leading-5 text-slate-500">
+                This is connection-level access. Property details below stay separate per property.
+              </span>
+            </span>
+          </label>
+
+          <Field label="Optional message">
+            <textarea
+              className={inputClass()}
+              rows={3}
+              maxLength={500}
+              value={message}
+              onChange={event => setMessage(event.target.value)}
+              disabled={submitting}
+              placeholder="Example: We are considering you for HVAC maintenance at our main home."
+            />
+          </Field>
+
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Properties</p>
+            {homes.length === 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-900">Add a property before requesting a contractor connection.</p>
+                <p className="mt-1 text-sm leading-6 text-amber-800">
+                  The new connection request flow needs at least one homeowner property so permissions can be set clearly.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {homes.map(home => (
+                  <label key={home.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                      checked={selectedHomeIds.has(home.id)}
+                      onChange={event => toggleHome(home.id, event.target.checked)}
+                      disabled={submitting}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-950">{contextualHomeLabel(home)}</span>
+                      <span className="mt-1 block truncate text-xs text-slate-500">{[home.city, home.state].filter(Boolean).join(', ') || 'Location not listed'}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedProperties.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Per-property permissions</p>
+              {selectedProperties.map(property => {
+                const home = homes.find(candidate => candidate.id === property.home_id);
+                const otherSelectedHomes = homes.filter(candidate => selectedHomeIds.has(candidate.id) && candidate.id !== property.home_id);
+                return (
+                  <div key={property.home_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">{home ? contextualHomeLabel(home) : 'Selected property'}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Choose the service-relevant details this contractor may see for this property.</p>
+                      </div>
+                      {otherSelectedHomes.length > 0 && (
+                        <div className="grid gap-2 sm:grid-cols-[minmax(150px,1fr)_auto]">
+                          <select
+                            className={inputClass()}
+                            value={copySources[property.home_id] || ''}
+                            onChange={event => setCopySources(current => ({ ...current, [property.home_id]: event.target.value }))}
+                            disabled={submitting}
+                            aria-label={`Copy permissions source for ${home ? contextualHomeLabel(home) : 'property'}`}
+                          >
+                            <option value="">Copy permissions from...</option>
+                            {otherSelectedHomes.map(sourceHome => (
+                              <option key={sourceHome.id} value={sourceHome.id}>{contextualHomeLabel(sourceHome)}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => copyPermissions(property.home_id)}
+                            disabled={submitting || !copySources[property.home_id]}
+                            className={buttonClass('secondary')}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                          checked={property.share_home_overview}
+                          onChange={event => updateProperty(property.home_id, { share_home_overview: event.target.checked })}
+                          disabled={submitting}
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-950">Home overview</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">Basic service-relevant property details.</span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                          checked={property.share_address}
+                          onChange={event => updateProperty(property.home_id, { share_address: event.target.checked })}
+                          disabled={submitting}
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-950">Address</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">Street address for this selected property.</span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                          checked={property.share_preferred_vendors}
+                          onChange={event => updateProperty(property.home_id, { share_preferred_vendors: event.target.checked })}
+                          disabled={submitting}
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-950">Preferred vendors</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">Any vendor notes already saved for this property.</span>
+                        </span>
+                      </label>
+                      <label className="flex cursor-not-allowed items-start gap-3 rounded-xl border border-slate-200 bg-slate-100 p-3 opacity-75">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-slate-300"
+                          checked={false}
+                          disabled
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-700">Photos</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">Deferred for a later phase.</span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {(localError || error) && <Notice tone="error" text={localError || error || 'Unable to submit connection request.'} />}
+
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} disabled={submitting} className={buttonClass('secondary')}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={submitting || homes.length === 0}
+              className={buttonClass('primary')}
+            >
+              <Link2 size={16} />
+              {submitting ? 'Sending request...' : 'Send connection request'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SharedField({ label, value, allowed }: { label: string; value?: string | null; allowed: boolean }) {
   return (
     <div className={`rounded-lg border px-2.5 py-2 ${allowed ? 'border-[#E1E3E7] bg-white' : 'border-[#E1E3E7] bg-[#F7F9FC]'}`}>
@@ -30865,9 +31149,11 @@ function ContractorPublicProfilePage({
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [homeownerHomes, setHomeownerHomes] = useState<HomeProfile[]>([]);
+  const [connectionModalOpen, setConnectionModalOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [requestDone, setRequestDone] = useState(false);
+  const [requestError, setRequestError] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -30878,60 +31164,62 @@ function ContractorPublicProfilePage({
       setData(profile);
 
       if (currentProfile?.role === 'homeowner') {
-        const { data: conn } = await supabase
-          .from('homeowner_contractor_connections')
-          .select('id,status')
-          .eq('homeowner_user_id', currentProfile.id)
-          .eq('contractor_id', profile.contractor_id)
-          .maybeSingle();
+        const [connectionRes, homesRes] = await Promise.all([
+          supabase
+            .from('homeowner_contractor_connections')
+            .select('id,status')
+            .eq('homeowner_user_id', currentProfile.id)
+            .eq('contractor_id', profile.contractor_id)
+            .maybeSingle(),
+          supabase
+            .from('homes')
+            .select('*')
+            .eq('homeowner_user_id', currentProfile.id)
+            .order('created_at', { ascending: true }),
+        ]);
+        const conn = connectionRes.data;
         if (conn) {
-          setConnectionId(conn.id as string);
           setConnectionStatus(conn.status as string);
         }
+        if (!homesRes.error) setHomeownerHomes((homesRes.data || []) as HomeProfile[]);
       }
       setLoading(false);
     };
     void load();
   }, [slug, currentProfile?.id]);
 
-  const requestConnection = async () => {
+  const publicContractorTarget = data ? {
+    id: data.contractor_id,
+    business_name: data.business_name,
+    city: data.city,
+    state: data.state,
+    logo_url: data.logo_url,
+    service_categories: data.categories,
+  } satisfies ContextualConnectionContractorTarget : null;
+
+  const submitConnectionRequest = async (draft: ContextualConnectionSubmitDraft) => {
     if (!supabase || !data || !currentProfile) return;
     setRequesting(true);
+    setRequestError('');
     try {
-      if (connectionId && connectionStatus && ['declined', 'revoked', 'dismissed'].includes(connectionStatus)) {
-        const { error: updateError } = await supabase
-          .from('homeowner_contractor_connections')
-          .update({ status: 'pending' })
-          .eq('id', connectionId)
-          .eq('homeowner_user_id', currentProfile.id);
-        if (updateError) throw updateError;
-        await supabase.from('connection_audit_events').insert({
-          connection_id: connectionId,
-          actor_user_id: currentProfile.id,
-          event_type: connectionStatus === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
-          event_details: { contractor_id: data.contractor_id, source: 'public_profile', previous_status: connectionStatus },
-        });
-        setConnectionStatus('pending');
-        setRequestDone(true);
-        return;
-      }
-      const { data: conn, error } = await supabase
-        .from('homeowner_contractor_connections')
-        .insert({ homeowner_user_id: currentProfile.id, contractor_id: data.contractor_id, status: 'pending', source: 'homeowner_request' })
-        .select('id')
-        .single();
+      const { error } = await supabase.rpc('servsync_submit_contextual_connection_request', {
+        p_contractor_id: data.contractor_id,
+        p_request_message: draft.message,
+        p_share_contact: draft.share_contact,
+        p_property_permissions: draft.properties.map(property => ({
+          home_id: property.home_id,
+          share_home_overview: property.share_home_overview,
+          share_address: property.share_address,
+          share_preferred_vendors: property.share_preferred_vendors,
+          share_photos: false,
+        })),
+      });
       if (error) throw error;
-      if (conn?.id) {
-        setConnectionId(conn.id);
-        await supabase.from('connection_audit_events').insert({
-          connection_id: conn.id,
-          actor_user_id: currentProfile.id,
-          event_type: 'connection_requested',
-          event_details: { contractor_id: data.contractor_id, source: 'public_profile' },
-        });
-      }
+      setConnectionModalOpen(false);
       setConnectionStatus('pending');
       setRequestDone(true);
+    } catch (err) {
+      setRequestError(readableError(err, 'Unable to request contractor connection.'));
     } finally {
       setRequesting(false);
     }
@@ -31024,9 +31312,10 @@ function ContractorPublicProfilePage({
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm font-semibold text-blue-950">Connect before requesting service</p>
               <p className="mt-1 text-sm text-blue-800">
-                Send a connection request first. After the contractor accepts, you choose what home information to share.
+                Send a connection request first. Choose the properties and service-relevant details this contractor may see if they accept.
               </p>
-              <button type="button" onClick={() => void requestConnection()} disabled={requesting} className={`${buttonClass('primary')} mt-3`}>
+              {requestError && <div className="mt-3"><Notice tone="error" text={requestError} /></div>}
+              <button type="button" onClick={() => setConnectionModalOpen(true)} disabled={requesting} className={`${buttonClass('primary')} mt-3`}>
                 <Link2 size={16} />
                 {requesting ? 'Sending request…' : connectionStatus ? `Request again with ${data.business_name}` : `Request connection with ${data.business_name}`}
               </button>
@@ -31052,6 +31341,22 @@ function ContractorPublicProfilePage({
           )}
         </div>
       </section>
+
+      {publicContractorTarget && connectionModalOpen && (
+        <ContextualConnectionRequestModal
+          key={publicContractorTarget.id}
+          contractor={publicContractorTarget}
+          homes={homeownerHomes}
+          submitting={requesting}
+          error={requestError}
+          onSubmit={submitConnectionRequest}
+          onClose={() => {
+            if (requesting) return;
+            setConnectionModalOpen(false);
+            setRequestError('');
+          }}
+        />
+      )}
 
       {/* About + credentials */}
       <div className="grid gap-5 md:grid-cols-[1fr_auto]">
@@ -31154,7 +31459,7 @@ function DiscoverFeed({
   contractorProfile,
   connections,
   contractorSlugs = {},
-  onConnectionRequested,
+  onRequestConnection,
   onRequestService,
 }: {
   perspective: 'homeowner' | 'contractor';
@@ -31163,7 +31468,7 @@ function DiscoverFeed({
   contractorProfile?: ContractorProfile | null;
   connections: HomeownerConnection[];
   contractorSlugs?: Record<string, string>;
-  onConnectionRequested?: () => void | Promise<void>;
+  onRequestConnection?: (contractor: ContextualConnectionContractorTarget) => void;
   onRequestService?: (contractorId: string, category: string) => void;
 }) {
   const [feed, setFeed] = useState<DiscoverFeedItem[]>([]);
@@ -31186,9 +31491,7 @@ function DiscoverFeed({
   const [postNotice, setPostNotice] = useState('');
   const [postError, setPostError] = useState('');
 
-  const [requestingContractorId, setRequestingContractorId] = useState<string | null>(null);
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
-  const [localConnectionStatuses, setLocalConnectionStatuses] = useState<Record<string, ConnectionStatus>>({});
   const [actionNotice, setActionNotice] = useState('');
   const [actionError, setActionError] = useState('');
 
@@ -31338,69 +31641,18 @@ function DiscoverFeed({
   };
 
   const requestConnection = async (item: DiscoverFeedItem) => {
-    if (!supabase) return;
-    setRequestingContractorId(item.contractor_id);
-    setActionNotice('');
-    setActionError('');
-    try {
-      const existing = connections.find(connection => connection.contractor_id === item.contractor_id);
-      if (existing) {
-        if (existing.status === 'active') {
-          setActionNotice(`You are already connected with ${item.business_name}.`);
-          return;
-        }
-        if (existing.status === 'pending') {
-          setActionNotice(`You already have a pending connection request with ${item.business_name}.`);
-          return;
-        }
-        const { error: updateError } = await supabase
-          .from('homeowner_contractor_connections')
-          .update({ status: 'pending' })
-          .eq('id', existing.connection_id)
-          .eq('homeowner_user_id', userId);
-        if (updateError) throw updateError;
-        await supabase.from('connection_audit_events').insert({
-          connection_id: existing.connection_id,
-          actor_user_id: userId,
-          event_type: existing.status === 'dismissed' ? 'connection_requested_after_dismissal' : 'reconnect_requested',
-          event_details: { contractor_id: item.contractor_id, source: 'discover', previous_status: existing.status },
-        });
-        setLocalConnectionStatuses(prev => ({ ...prev, [item.contractor_id]: 'pending' }));
-        setActionNotice(`Connection request sent to ${item.business_name}.`);
-        await onConnectionRequested?.();
-        return;
-      }
-      const { error } = await supabase.from('homeowner_contractor_connections').insert({
-        homeowner_user_id: userId,
-        contractor_id: item.contractor_id,
-        status: 'pending',
-        source: 'homeowner_request',
+    if (onRequestConnection) {
+      onRequestConnection({
+        id: item.contractor_id,
+        business_name: item.business_name,
+        city: item.contractor_city,
+        state: item.contractor_state,
+        service_categories: item.categories,
       });
-      if (error) throw error;
-      const { data: connData } = await supabase
-        .from('homeowner_contractor_connections')
-        .select('id')
-        .eq('homeowner_user_id', userId)
-        .eq('contractor_id', item.contractor_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (connData?.id) {
-        await supabase.from('connection_audit_events').insert({
-          connection_id: connData.id,
-          actor_user_id: userId,
-          event_type: 'connection_requested',
-          event_details: { contractor_id: item.contractor_id, source: 'discover' },
-        });
-      }
-      setLocalConnectionStatuses(prev => ({ ...prev, [item.contractor_id]: 'pending' }));
-      setActionNotice(`Connection request sent to ${item.business_name}.`);
-      await onConnectionRequested?.();
-    } catch (err) {
-      setActionError(readableError(err, 'Unable to request that connection.'));
-    } finally {
-      setRequestingContractorId(null);
+      setSelectedPostId(null);
+      return;
     }
+    setActionError('Open this from the homeowner portal so you can choose property access for the request.');
   };
 
   const togglePostSave = async (item: DiscoverFeedItem) => {
@@ -31435,7 +31687,7 @@ function DiscoverFeed({
   const existingConnectionMap = connections.reduce<Record<string, ConnectionStatus>>((map, c) => {
     map[c.contractor_id] = c.status;
     return map;
-  }, { ...localConnectionStatuses });
+  }, {});
 
   const savedFeedCount = savedFeed.length;
   const feedForView = perspective === 'homeowner' && feedView === 'saved'
@@ -31844,11 +32096,10 @@ function DiscoverFeed({
                   {perspective === 'homeowner' && (!existingStatus || ['declined', 'revoked', 'dismissed'].includes(existingStatus)) && (
                     <button
                       type="button"
-                      disabled={requestingContractorId === item.contractor_id}
                       onClick={() => void requestConnection(item)}
                       className={buttonClass('primary')}
                     >
-                      {requestingContractorId === item.contractor_id ? 'Sending...' : existingStatus ? 'Request again' : 'Request connection'}
+                      {existingStatus ? 'Request again' : 'Request connection'}
                     </button>
                   )}
                   {perspective === 'homeowner' && existingStatus === 'active' && (
@@ -32066,11 +32317,10 @@ function DiscoverFeed({
                 {perspective === 'homeowner' && (!selectedPostConnectionStatus || ['declined', 'revoked', 'dismissed'].includes(selectedPostConnectionStatus)) && (
                   <button
                     type="button"
-                    disabled={requestingContractorId === selectedPost.contractor_id}
                     onClick={() => void requestConnection(selectedPost)}
                     className={buttonClass('primary')}
                   >
-                    {requestingContractorId === selectedPost.contractor_id ? 'Sending...' : selectedPostConnectionStatus ? 'Request again' : 'Connect'}
+                    {selectedPostConnectionStatus ? 'Request again' : 'Connect'}
                   </button>
                 )}
                 {perspective === 'homeowner' && selectedPostConnectionStatus === 'active' && (

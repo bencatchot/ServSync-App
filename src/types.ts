@@ -351,6 +351,8 @@ export interface HomeownerConnection {
   status: ConnectionStatus;
   source: string;
   permissions: SharingPermissions;
+  shared_properties?: HomeownerConnectionSharedProperty[];
+  request_context?: ConnectionRequestContext | null;
   created_at: string;
   updated_at: string;
 }
@@ -412,6 +414,46 @@ export interface SharingPermissions {
   share_address: boolean;
   share_preferred_vendors: boolean;
   share_photos: boolean;
+}
+
+export interface ContextualConnectionPropertyPermission {
+  home_id: string;
+  share_home_overview: boolean;
+  share_address: boolean;
+  share_preferred_vendors: boolean;
+  share_photos: boolean;
+}
+
+export interface HomeownerConnectionSharedProperty extends ContextualConnectionPropertyPermission {
+  id?: string;
+  nickname?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  updated_at?: string;
+}
+
+export interface ConnectionRequestContext {
+  message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContextualConnectionContractorTarget {
+  id: string;
+  business_name: string;
+  city?: string | null;
+  state?: string | null;
+  logo_url?: string | null;
+  service_categories?: string[];
+}
+
+export interface ContextualConnectionRequestResult {
+  connection_id: string;
+  status: ConnectionStatus;
+  property_count: number;
 }
 
 export interface InvitePreview {
