@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-contractor-review-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Phase 2B-1 contractor review UI support for pending contextual connection requests by loading the new read-only pending-request RPC, showing the homeowner request message and masked selected-property permission summary, and routing accept/decline actions through the existing contextual response RPC.
+- Reason for change: Let contractor managers review contextual homeowner connection requests with the per-property context needed for approval while avoiding direct pending shared-property table reads and direct legacy connection table updates.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated preview/sandbox smoke is still recommended to verify the contractor review UI with real pending contextual request data.
+  - Active connection shared-property management, connected-home permission-display polish, invite/referral acceptance migration, and photos/media sharing remain later-phase work.
+  - This branch does not change SQL/schema/RLS/RPC files, Supabase/Vercel/env settings, storage policies, production data, service request/job/estimate/invoice flows, homeowner active connection management, or contractor connected-home display behavior.
+
 - Branch: `feature/contextual-connection-pending-review-rpc-v1`
 - Files changed:
   - `servsync-contextual-connection-pending-review-rpc.sql`
