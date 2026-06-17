@@ -146,7 +146,7 @@ The contractor experience should be practical, not bloated. The contractor shoul
 - Contractor creates a profile with business details, service area, trade type, and future Discover content.
 - Contractor can be found by homeowners in Discover/search/feed experiences.
 - Contractor receives contextual connection requests with homeowner message, selected property context, and permission choices. Photos/media should come later after storage and RLS handling are designed safely.
-- Contractor can communicate without forcing every conversation into a service request.
+- Contractor can reply within homeowner-initiated allowed communication threads without forcing every conversation into a service request, but a connection alone should not grant unrestricted contractor-initiated messaging.
 - Contractor can convert serious needs into requests, estimates, jobs, invoices, and service records.
 - Contractor should see clear next actions instead of hunting across tabs. Recent cleanup work made request-to-estimate, accepted-estimate-to-job, completed-job-to-invoice, and service/checklist terminology clearer without changing stored status values or internal database names.
 
@@ -196,7 +196,7 @@ This keeps the relationship simple while still supporting multi-property homeown
 
 - The request should not automatically become a service request unless the homeowner chooses that path.
 - The contractor should be able to accept, decline, or respond/ask for more information depending on workflow design.
-- After connection, homeowner and contractor should have a general communication thread in addition to request-specific messaging, but that remains a separate workflow decision after contextual connection requests.
+- After connection, a future general communication thread may be added in addition to request-specific messaging, but that remains a separate workflow decision after contextual connection requests and must preserve homeowner initiation/control.
 - Optional photos/media should be treated as a later phase, not part of the first contextual connection request implementation slice.
 
 ## 11.3 Contractor Customer View After Connection
