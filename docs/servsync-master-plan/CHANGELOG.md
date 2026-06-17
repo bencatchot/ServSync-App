@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-17
 
+- Branch: `feature/contextual-connection-shared-properties-rls-fix-v1`
+- Files changed:
+  - `servsync-connection-shared-properties-rls-fix.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow follow-up SQL/RLS patch for contextual connection shared-property reads by moving the contractor shared-property row eligibility check into a `SECURITY DEFINER` helper and updating only the contractor SELECT policy to use that helper.
+- Reason for change: Sandbox verification showed direct contractor SELECT from `public.connection_shared_properties` returned no rows because the contractor policy joined homeowner-owned `public.homes` under caller RLS; the fix preserves contractor shared-property reads without granting contractors direct `homes` access or changing homeowner/platform-admin policies.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static SQL/RLS inspection
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production in this branch; separate approval is required before applying and verifying the patch.
+  - Follow-up sandbox verification should confirm direct contractor SELECT now returns only eligible shared-property rows and that field-work guardrails still reject unshared homeowner properties.
+
 - Branch: `feature/contextual-connection-sql-foundation-v1`
 - Files changed:
   - `servsync-connection-shared-properties.sql`
