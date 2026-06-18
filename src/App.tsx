@@ -351,6 +351,7 @@ type EstimateLineDraft = {
   unit: string;
   unit_price: string;
   builderGenerated?: boolean;
+  editor_source_note?: string;
 };
 type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry' | 'Other';
 type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
@@ -359,6 +360,7 @@ type EstimateDraftBuilderLineSeed = {
   line_type: EstimateLineType;
   description: string;
   customer_description?: string;
+  editor_source_note?: string;
   quantity?: string;
   unit?: string;
   keywords?: string[];
@@ -876,8 +878,15 @@ function savedEstimateChargeDraftFromRecord(charge: ContractorSavedEstimateCharg
 }
 
 function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharge) {
+  return charge.name;
+}
+
+function savedEstimateChargeEditorNote(charge: ContractorSavedEstimateCharge) {
   const description = charge.description?.trim();
-  return description ? `${charge.name} - ${description}` : charge.name;
+  return [
+    `Added from saved charge: ${charge.name}.`,
+    description ? `Saved charge note: ${description}` : '',
+  ].filter(Boolean).join(' ');
 }
 
 function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge): EstimateLineDraft {
@@ -885,10 +894,11 @@ function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge)
     line_type: normalizeEstimateLineType(charge.line_type),
     description: savedEstimateChargeLineDescription(charge),
     line_title: charge.name,
-    customer_description: charge.description || '',
+    customer_description: '',
     quantity: String(Number(charge.default_quantity || 1)),
     unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each'),
     unit_price: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
+    editor_source_note: savedEstimateChargeEditorNote(charge),
   });
 }
 
@@ -1447,47 +1457,47 @@ function contextualEstimateBuilderSeeds({
     hasSink && {
       line_type: 'material',
       description: 'Sink',
-      customer_description: 'Replacement sink for the kitchen installation.',
+      editor_source_note: 'Suggested because the rough scope mentions replacing the kitchen sink.',
       unit: 'each',
       keywords: ['sink', 'kitchen sink'],
     },
     hasFaucet && {
       line_type: 'material',
       description: 'Faucet / hardware',
-      customer_description: 'Sink faucet and related faucet hardware for installation.',
+      editor_source_note: 'Suggested because the rough scope mentions a new sink faucet.',
       unit: 'each',
       keywords: ['faucet', 'hardware'],
     },
     hasGarbageDisposal && {
       line_type: 'material',
       description: 'Garbage disposal',
-      customer_description: 'Garbage disposal unit for the kitchen sink replacement.',
+      editor_source_note: 'Suggested because the rough scope mentions garbage disposal.',
       unit: 'each',
       keywords: ['garbage disposal', 'disposal unit', 'disposer'],
     },
     {
       line_type: 'material',
       description: 'Installation hardware',
-      customer_description: 'Mounting hardware and disposal installation hardware as needed.',
+      editor_source_note: 'Suggested as a common material allowance for this installation.',
       unit: 'lot',
       keywords: ['installation hardware', 'mounting hardware', 'hardware'],
     },
     {
       line_type: 'material',
       description: 'Fittings / connections',
-      customer_description: 'Fittings, drain connections, and supply connection materials related to the sink, faucet, and disposal installation.',
+      editor_source_note: 'Suggested as a common plumbing connection allowance for this scope.',
       unit: 'lot',
       keywords: ['fittings', 'connections', 'drain', 'supply'],
     },
   ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
   const laborSeeds: EstimateDraftBuilderLineSeed[] = laborMode === 'job_total'
-    ? [{ line_type: 'labor', description: 'Labor', customer_description: 'Labor to remove existing components and complete the approved kitchen sink installation scope.', unit: 'hour', keywords: ['labor', 'install', 'replace', 'remove'] }]
+    ? [{ line_type: 'labor', description: 'Labor', editor_source_note: 'Suggested because the scope includes removal and installation work.', unit: 'hour', keywords: ['labor', 'install', 'replace', 'remove'] }]
     : [
-        hasSink && { line_type: 'labor', description: 'Sink installation labor', customer_description: 'Labor for sink removal, preparation, and installation.', unit: 'hour', keywords: ['sink labor', 'sink installation', 'labor'] },
-        hasFaucet && { line_type: 'labor', description: 'Faucet installation labor', customer_description: 'Labor to install and connect the sink faucet.', unit: 'hour', keywords: ['faucet labor', 'faucet installation', 'labor'] },
-        hasGarbageDisposal && { line_type: 'labor', description: 'Garbage disposal installation labor', customer_description: 'Labor to install and connect the garbage disposal.', unit: 'hour', keywords: ['garbage disposal labor', 'disposal installation', 'labor'] },
-        { line_type: 'labor', description: 'Fittings / connections labor', customer_description: 'Labor for drain, fitting, and supply connection work related to the installation.', unit: 'hour', keywords: ['fittings labor', 'connections labor', 'labor'] },
+        hasSink && { line_type: 'labor', description: 'Sink installation labor', editor_source_note: 'Suggested because the rough scope mentions replacing the kitchen sink.', unit: 'hour', keywords: ['sink labor', 'sink installation', 'labor'] },
+        hasFaucet && { line_type: 'labor', description: 'Faucet installation labor', editor_source_note: 'Suggested because the rough scope mentions a new sink faucet.', unit: 'hour', keywords: ['faucet labor', 'faucet installation', 'labor'] },
+        hasGarbageDisposal && { line_type: 'labor', description: 'Garbage disposal installation labor', editor_source_note: 'Suggested because the rough scope mentions garbage disposal.', unit: 'hour', keywords: ['garbage disposal labor', 'disposal installation', 'labor'] },
+        { line_type: 'labor', description: 'Fittings / connections labor', editor_source_note: 'Suggested as common labor for drain, fitting, and supply connection work.', unit: 'hour', keywords: ['fittings labor', 'connections labor', 'labor'] },
       ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
   const feeSeeds: EstimateDraftBuilderLineSeed[] = [];
@@ -1574,6 +1584,18 @@ function findSavedChargeMatchForEstimateBuilder(seed: EstimateDraftBuilderLineSe
   return best.charge;
 }
 
+function estimateBuilderEditorSourceNote(seed: EstimateDraftBuilderLineSeed) {
+  if (seed.editor_source_note) return seed.editor_source_note;
+  const sourceTerms = (seed.keywords || [])
+    .slice(0, 3)
+    .map(keyword => keyword.trim())
+    .filter(Boolean)
+    .join(', ');
+  return sourceTerms
+    ? `Suggested from rough scope: ${sourceTerms}.`
+    : 'Suggested from the rough scope and selected trade.';
+}
+
 function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges: ContractorSavedEstimateCharge[], jobType: EstimateDraftBuilderJobType) {
   const matchedCharge = findSavedChargeMatchForEstimateBuilder(seed, charges);
   if (matchedCharge) {
@@ -1581,6 +1603,7 @@ function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges
       line: {
         ...estimateLineDraftFromSavedCharge(matchedCharge),
         builderGenerated: true,
+        editor_source_note: `${estimateBuilderEditorSourceNote(seed)} Matched saved charge: ${matchedCharge.name}.`,
       },
       matched: true,
     };
@@ -1590,11 +1613,12 @@ function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges
       line_type: seed.line_type,
       description: estimateBuilderDefaultLineDescription(seed, jobType),
       line_title: estimateBuilderDefaultLineDescription(seed, jobType),
-      customer_description: seed.customer_description || '',
+      customer_description: '',
       quantity: seed.quantity || '1',
       unit: seed.unit || 'each',
       unit_price: '',
       builderGenerated: true,
+      editor_source_note: estimateBuilderEditorSourceNote(seed),
     }),
     matched: false,
   };
@@ -2013,6 +2037,7 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            editor_source_note: `Suggested by saved estimate template: ${template.name}.`,
           }))
       : [createEstimateLineDraft()],
   };
@@ -2033,12 +2058,13 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             line_title: line.line_title || line.description || '',
-            customer_description: line.customer_description || '',
+            customer_description: '',
             model_spec: line.model_spec || '',
             supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            editor_source_note: `Suggested by ${template.name} template.`,
           }))
       : [createEstimateLineDraft()],
   };
@@ -2471,7 +2497,7 @@ function starterEstimateLines(lines: TradeStarterTemplateBlueprint['estimateLine
       line_type: line.line_type,
       description: line.description.trim() || lineTitle,
       line_title: lineTitle,
-      customer_description: line.customer_description?.trim() || '',
+      customer_description: '',
       model_spec: line.model_spec?.trim() || '',
       supply_status: line.supply_status ?? null,
       quantity: line.quantity ?? 1,
@@ -3239,13 +3265,13 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     notes: 'Pricing, equipment selection, permit needs, electrical requirements, and site conditions must be verified before sending.',
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines([
-      { line_type: 'fee', description: 'System replacement assessment', line_title: 'System replacement assessment', customer_description: 'Review existing HVAC equipment, accessible connections, replacement requirements, and site conditions before finalizing the replacement scope.' },
-      { line_type: 'material', description: 'Indoor HVAC equipment', line_title: 'Indoor HVAC equipment', customer_description: 'Indoor heating or air-handling equipment required for the approved system replacement.' },
-      { line_type: 'material', description: 'Outdoor HVAC equipment', line_title: 'Outdoor HVAC equipment', customer_description: 'Outdoor condenser or heat pump equipment required for the approved system replacement.' },
-      { line_type: 'material', description: 'Line set, drain, and transition materials', line_title: 'Line set, drain, and transition materials', customer_description: 'Refrigerant line, condensate, duct transition, pad, disconnect, and installation materials as needed for the replacement.' },
-      { line_type: 'labor', description: 'Remove existing HVAC equipment', line_title: 'Remove existing HVAC equipment', customer_description: 'Labor to safely remove existing accessible HVAC equipment included in the approved replacement scope.', unit: 'hour' },
-      { line_type: 'labor', description: 'Install replacement HVAC system', line_title: 'Install replacement HVAC system', customer_description: 'Labor to set, connect, start up, and test the replacement HVAC system after contractor review.', unit: 'hour' },
-      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance', customer_description: 'Permit, inspection, refrigerant recovery, or disposal allowance when required by the approved scope.' },
+      { line_type: 'fee', description: 'System replacement assessment', line_title: 'System replacement assessment' },
+      { line_type: 'material', description: 'Indoor HVAC equipment', line_title: 'Indoor HVAC equipment' },
+      { line_type: 'material', description: 'Outdoor HVAC equipment', line_title: 'Outdoor HVAC equipment' },
+      { line_type: 'material', description: 'Line set, drain, and transition materials', line_title: 'Line set, drain, and transition materials' },
+      { line_type: 'labor', description: 'Remove existing HVAC equipment', line_title: 'Remove existing HVAC equipment', unit: 'hour' },
+      { line_type: 'labor', description: 'Install replacement HVAC system', line_title: 'Install replacement HVAC system', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance' },
     ]),
   },
   {
@@ -3256,12 +3282,12 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     notes: 'Confirm water heater type, capacity, access, venting, drain pan, shutoffs, code requirements, and permit needs before sending.',
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines([
-      { line_type: 'fee', description: 'Water heater replacement assessment', line_title: 'Water heater replacement assessment', customer_description: 'Review the existing water heater, accessible plumbing connections, code requirements, and replacement conditions.' },
-      { line_type: 'material', description: 'Replacement water heater', line_title: 'Replacement water heater', customer_description: 'Replacement water heater equipment selected for the approved scope.' },
-      { line_type: 'material', description: 'Water heater connection materials', line_title: 'Water heater connection materials', customer_description: 'Supply connectors, valves, fittings, drain pan, discharge piping, venting, or expansion tank materials as needed.' },
-      { line_type: 'labor', description: 'Remove existing water heater', line_title: 'Remove existing water heater', customer_description: 'Labor to disconnect and remove the existing water heater included in the approved replacement scope.', unit: 'hour' },
-      { line_type: 'labor', description: 'Install replacement water heater', line_title: 'Install replacement water heater', customer_description: 'Labor to set, connect, fill, start, and test the replacement water heater after contractor review.', unit: 'hour' },
-      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance', customer_description: 'Permit, inspection, or disposal allowance when required by the approved scope.' },
+      { line_type: 'fee', description: 'Water heater replacement assessment', line_title: 'Water heater replacement assessment' },
+      { line_type: 'material', description: 'Replacement water heater', line_title: 'Replacement water heater' },
+      { line_type: 'material', description: 'Water heater connection materials', line_title: 'Water heater connection materials' },
+      { line_type: 'labor', description: 'Remove existing water heater', line_title: 'Remove existing water heater', unit: 'hour' },
+      { line_type: 'labor', description: 'Install replacement water heater', line_title: 'Install replacement water heater', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance' },
     ]),
   },
   {
@@ -3272,12 +3298,12 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     notes: 'Confirm panel capacity, circuit route, charger/device specifications, permit needs, utility requirements, and inspection requirements before sending.',
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines([
-      { line_type: 'fee', description: 'Electrical circuit assessment', line_title: 'Electrical circuit assessment', customer_description: 'Review panel capacity, accessible routing, device requirements, and installation conditions before finalizing the circuit scope.' },
-      { line_type: 'material', description: 'Breaker, wire, conduit, and boxes', line_title: 'Breaker, wire, conduit, and boxes', customer_description: 'Breaker, wiring, conduit, boxes, fittings, and related materials for the approved circuit installation.' },
-      { line_type: 'material', description: 'Device or charger connection materials', line_title: 'Device or charger connection materials', customer_description: 'Receptacle, disconnect, mounting, charger connection, or device materials included in the approved scope.' },
-      { line_type: 'labor', description: 'Install dedicated circuit', line_title: 'Install dedicated circuit', customer_description: 'Labor to install the approved circuit, routing, connections, labeling, and testing.', unit: 'hour' },
-      { line_type: 'labor', description: 'Install device or EV charger', line_title: 'Install device or EV charger', customer_description: 'Labor to mount, connect, and test the approved device or EV charger where included in the scope.', unit: 'hour' },
-      { line_type: 'fee', description: 'Permit or inspection allowance', line_title: 'Permit or inspection allowance', customer_description: 'Permit or inspection allowance when required by the approved electrical scope.' },
+      { line_type: 'fee', description: 'Electrical circuit assessment', line_title: 'Electrical circuit assessment' },
+      { line_type: 'material', description: 'Breaker, wire, conduit, and boxes', line_title: 'Breaker, wire, conduit, and boxes' },
+      { line_type: 'material', description: 'Device or charger connection materials', line_title: 'Device or charger connection materials' },
+      { line_type: 'labor', description: 'Install dedicated circuit', line_title: 'Install dedicated circuit', unit: 'hour' },
+      { line_type: 'labor', description: 'Install device or EV charger', line_title: 'Install device or EV charger', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit or inspection allowance', line_title: 'Permit or inspection allowance' },
     ]),
   },
   {
@@ -3288,12 +3314,12 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     notes: 'Confirm dimensions, framing condition, fastener/connectors, railing/stair requirements, finish expectations, permits, and site access before sending.',
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines([
-      { line_type: 'fee', description: 'Deck scope assessment and measurements', line_title: 'Deck scope assessment and measurements', customer_description: 'Review deck conditions, confirm measurements, and identify repair or build requirements before finalizing the scope.' },
-      { line_type: 'material', description: 'Deck framing materials', line_title: 'Deck framing materials', customer_description: 'Framing lumber, posts, beams, joists, hangers, connectors, and fasteners required for the approved deck scope.' },
-      { line_type: 'material', description: 'Decking, railing, and finish materials', line_title: 'Decking, railing, and finish materials', customer_description: 'Deck boards, railing components, stairs, trim, hardware, and finish materials included in the approved scope.' },
-      { line_type: 'labor', description: 'Deck demolition or preparation', line_title: 'Deck demolition or preparation', customer_description: 'Labor for demolition, preparation, layout, or existing-material removal included in the approved scope.', unit: 'hour' },
-      { line_type: 'labor', description: 'Deck repair or build labor', line_title: 'Deck repair or build labor', customer_description: 'Labor to complete the approved deck repair, framing, decking, railing, stair, or finish work.', unit: 'hour' },
-      { line_type: 'fee', description: 'Permit, disposal, or access allowance', line_title: 'Permit, disposal, or access allowance', customer_description: 'Permit, disposal, delivery, or access allowance when required by the approved deck scope.' },
+      { line_type: 'fee', description: 'Deck scope assessment and measurements', line_title: 'Deck scope assessment and measurements' },
+      { line_type: 'material', description: 'Deck framing materials', line_title: 'Deck framing materials' },
+      { line_type: 'material', description: 'Decking, railing, and finish materials', line_title: 'Decking, railing, and finish materials' },
+      { line_type: 'labor', description: 'Deck demolition or preparation', line_title: 'Deck demolition or preparation', unit: 'hour' },
+      { line_type: 'labor', description: 'Deck repair or build labor', line_title: 'Deck repair or build labor', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, disposal, or access allowance', line_title: 'Permit, disposal, or access allowance' },
     ]),
   },
   {
@@ -3304,10 +3330,10 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     notes: 'Confirm the final repair scope, materials, pricing, access limits, and any follow-up work before sending.',
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines([
-      { line_type: 'fee', description: 'Service call / diagnostic fee', line_title: 'Service call / diagnostic fee', customer_description: 'Initial visit to review the reported concern, inspect accessible conditions, and recommend next steps.' },
-      { line_type: 'labor', description: 'Labor for requested work', line_title: 'Labor for requested work', customer_description: 'Labor to complete the approved service or repair scope after contractor review.', unit: 'hour' },
-      { line_type: 'material', description: 'Materials and supplies allowance', line_title: 'Materials and supplies allowance', customer_description: 'Materials, parts, supplies, or consumables needed for the approved service scope.' },
-      { line_type: 'other', description: 'Project scope item to be confirmed', line_title: 'Project scope item to be confirmed', customer_description: 'Additional scope item to confirm or remove before sending the estimate.' },
+      { line_type: 'fee', description: 'Service call / diagnostic fee', line_title: 'Service call / diagnostic fee' },
+      { line_type: 'labor', description: 'Labor for requested work', line_title: 'Labor for requested work', unit: 'hour' },
+      { line_type: 'material', description: 'Materials and supplies allowance', line_title: 'Materials and supplies allowance' },
+      { line_type: 'other', description: 'Project scope item to be confirmed', line_title: 'Project scope item to be confirmed' },
     ]),
   },
 ]);
@@ -17520,113 +17546,117 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     itemLabel: 'estimate' | 'invoice';
     onChange: (updates: Partial<EstimateLineDraft>) => void;
     onRemove: () => void;
-  }) => (
-    <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
-        <Field label="Type">
-          <select
-            className={inputClass()}
-            value={line.line_type}
-            onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
-          >
-            {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
-              <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Title">
-          <input
-            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} title`}
-            className={inputClass()}
-            {...writingAssistProps}
-            value={line.line_title}
-            onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-            placeholder="Labor, material, trip fee..."
-          />
-        </Field>
-        <Field label="Qty">
-          <input
-            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
-            className={inputClass()}
-            type="number"
-            min="0"
-            step="0.01"
-            value={line.quantity}
-            onChange={event => onChange({ quantity: event.target.value })}
-          />
-        </Field>
-        <Field label="Unit">
-          <input
-            className={inputClass()}
-            value={line.unit}
-            onChange={event => onChange({ unit: event.target.value })}
-          />
-        </Field>
-        <Field label="Unit price">
-          <input
-            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
-            className={inputClass()}
-            value={line.unit_price}
-            onChange={event => onChange({ unit_price: event.target.value })}
-            placeholder="$0.00"
-          />
-        </Field>
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-            {draftLineTotalLabel(line)}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-          aria-label={`Remove ${itemLabel} line ${index + 1}`}
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
-      <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">
-          Customer details
-        </summary>
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <Field label="Customer description">
-            <textarea
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} customer description`}
-              className={inputClass()}
-              rows={2}
-              {...writingAssistProps}
-              value={line.customer_description}
-              onChange={event => onChange({ customer_description: event.target.value })}
-              placeholder="Optional customer-facing detail"
-            />
-          </Field>
-          <Field label="Model/spec">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
-              className={inputClass()}
-              value={line.model_spec}
-              onChange={event => onChange({ model_spec: event.target.value })}
-              placeholder="Optional"
-            />
-          </Field>
-          <Field label="Supply status">
+  }) => {
+    const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
+    const showSupplyStatus = Boolean(line.supply_status);
+    const sourceNote = line.editor_source_note?.trim();
+    const hasSecondaryRow = showModelSpec || showSupplyStatus || Boolean(sourceNote);
+
+    return (
+      <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
+          <Field label="Type">
             <select
               className={inputClass()}
-              value={line.supply_status}
-              onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
+              value={line.line_type}
+              onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
             >
-              <option value="">Not specified</option>
-              {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+              {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
+                <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
               ))}
             </select>
           </Field>
+          <Field label="Description">
+            <input
+              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+              className={inputClass()}
+              {...writingAssistProps}
+              value={line.line_title}
+              onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+              placeholder="Labor, material, trip fee..."
+            />
+          </Field>
+          <Field label="Qty">
+            <input
+              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
+              className={inputClass()}
+              type="number"
+              min="0"
+              step="0.01"
+              value={line.quantity}
+              onChange={event => onChange({ quantity: event.target.value })}
+            />
+          </Field>
+          <Field label="Unit">
+            <input
+              className={inputClass()}
+              value={line.unit}
+              onChange={event => onChange({ unit: event.target.value })}
+            />
+          </Field>
+          <Field label="Unit price">
+            <input
+              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
+              className={inputClass()}
+              value={line.unit_price}
+              onChange={event => onChange({ unit_price: event.target.value })}
+              placeholder="$0.00"
+            />
+          </Field>
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
+              {draftLineTotalLabel(line)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+            aria-label={`Remove ${itemLabel} line ${index + 1}`}
+          >
+            <Trash2 size={15} />
+          </button>
         </div>
-      </details>
-    </div>
-  );
+        {hasSecondaryRow ? (
+          <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
+            <div className="space-y-2">
+              {showModelSpec ? (
+                <Field label="Model/spec">
+                  <input
+                    aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
+                    className={inputClass()}
+                    value={line.model_spec}
+                    onChange={event => onChange({ model_spec: event.target.value })}
+                    placeholder="Optional model, size, brand, or spec"
+                  />
+                </Field>
+              ) : null}
+              {sourceNote ? (
+                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                  {sourceNote}
+                </p>
+              ) : null}
+            </div>
+            {showSupplyStatus ? (
+              <Field label="Supply status">
+                <select
+                  className={inputClass()}
+                  value={line.supply_status}
+                  onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
+                >
+                  <option value="">Not specified</option>
+                  {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   const renderSavedChargeQuickPick = () => (
     <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">

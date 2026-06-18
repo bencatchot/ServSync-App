@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/line-item-editor-simplify-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Simplified the structured estimate/invoice line item editor by relabeling the primary line text as Description, removing the collapsed Customer details pattern, showing material Model/spec input directly when relevant, and keeping generated/template/saved-charge source hints contractor-only in the editor.
+- Reason for change: Contractors should not have to open a hidden details section to understand or complete a line item, and helper/source logic should not become homeowner-facing estimate/PDF content.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated sandbox/local smoke should verify manual material/labor lines, Build Estimate Draft helper notes, starter template application, saved-charge quick-pick behavior, homeowner/PDF display, invoice editing, and mobile layout.
+  - Existing `customer_description` data remains preserved for compatibility, but new generated starter/draft/saved-charge paths no longer populate it as separate homeowner-facing copy.
+  - Supply status remains preserved but is intentionally not promoted as a required prominent field.
+
 - Branch: `feature/structured-line-item-conversion-rpcs-v1`
 - Files changed:
   - `servsync-structured-line-item-conversion-rpcs.sql`
