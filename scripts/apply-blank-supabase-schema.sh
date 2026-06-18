@@ -84,6 +84,7 @@ SQL_FILES=(
   "servsync-invoice-actions.sql"
   "servsync-estimate-invoice-home-id.sql"
   "servsync-estimate-equipment-line-type-cleanup.sql"
+  "servsync-structured-line-items-foundation.sql"
   "servsync-homeowner-file-estimates.sql"
   "servsync-reviews.sql"
   "servsync-public-reviews.sql"
