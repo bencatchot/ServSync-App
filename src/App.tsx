@@ -345,6 +345,21 @@ type EstimateLineDraft = {
   unit: string;
   unit_price: string;
 };
+type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry' | 'Other';
+type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
+type EstimateDraftBuilderLineSeed = {
+  line_type: EstimateLineType;
+  description: string;
+  quantity?: string;
+  unit?: string;
+  keywords?: string[];
+};
+type EstimateDraftBuilderRulePack = {
+  trade: EstimateDraftBuilderTrade;
+  scopeLead: (jobTypeLabel: string) => string;
+  notes: string;
+  lines: EstimateDraftBuilderLineSeed[];
+};
 type SavedEstimateChargeDraft = {
   name: string;
   description: string;
@@ -1184,140 +1199,187 @@ function inspectionJobBadgeClass(work: Pick<Inspection, 'status' | 'job_status'>
   return 'bg-emerald-50 text-emerald-700';
 }
 
-function inferSmartEstimateLineType(text: string): EstimateLineType {
-  const normalized = normalizeText(text);
-  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return 'labor';
-  if (/\b(trip|service call|diagnostic|permit|fee|disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return 'fee';
-  if (/\b(material|materials|parts|supplies|fixture|filter|valve|fitting|faucet|fan|outlet|cabinet|drywall|sheetrock|lumber|decking|fasteners|concrete)\b/.test(normalized)) return 'material';
-  if (/\b(equipment|machine|rental|lift|pump|tool)\b/.test(normalized)) return 'equipment';
-  if (/\b(labor|repair|replace|install|remove|demo|demolition|build|construct|tighten|seal|patch|paint|inspect|service|clean)\b/.test(normalized)) return 'labor';
-  return 'other';
+function compactText(value: string) {
+  return normalizeText(value).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function extractSmartEstimateQuantity(text: string) {
-  const laborHoursMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:billable\s*)?(?:hours?|hrs?)\b/i);
-  if (laborHoursMatch) return laborHoursMatch[1];
-  const quantityMatch =
-    text.match(/\b(?:qty|quantity)\s*[:x]?\s*(\d+(?:\.\d+)?)/i)
-    || text.match(/\b(\d+(?:\.\d+)?)\s+(?:hours?|hrs?|outlets?|fixtures?|filters?|valves?|faucets?|fans?|cabinets?|sheets?|sq\s*ft|sqft|sf)\b/i);
-  return quantityMatch?.[1] || '1';
+function estimateBuilderJobTypeLabel(jobType: EstimateDraftBuilderJobType) {
+  return ESTIMATE_DRAFT_BUILDER_JOB_LABELS[jobType];
 }
 
-function extractSmartEstimateUnit(text: string) {
-  const normalized = normalizeText(text);
-  if (/\b(hours?|hrs?)\b/.test(normalized)) return 'hour';
-  if (/\b(sq ft|sqft|sf)\b/.test(normalized)) return 'sq ft';
-  if (/\b(linear ft|lf)\b/.test(normalized)) return 'linear ft';
-  if (/\b(material|materials|supplies|parts|lumber|decking)\b/.test(normalized)) return 'lot';
-  if (/\b(demo|demolition|removal|disposal|debris|haul|haul-off)\b/.test(normalized)) return 'job';
-  return 'each';
-}
-
-function extractSmartEstimatePrice(text: string) {
-  const rateMatch = text.match(/\b(?:at|@)\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr)\b/i);
-  if (rateMatch) return rateMatch[1]?.replace(/,/g, '') || '';
-  const priceMatch =
-    text.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/)
-    || text.match(/\b(?:at|for|rate|price|cost)\s+\$?\s*([\d,]+(?:\.\d{1,2})?)/i)
-    || text.match(/\b([\d,]+(?:\.\d{1,2})?)\s*(?:dollars|each|ea|per)\b/i);
-  return priceMatch?.[1]?.replace(/,/g, '') || '';
-}
-
-function cleanSmartEstimateDescription(text: string) {
-  const cleaned = text
-    .replace(/\b\d+(?:\.\d+)?\s*(?:billable\s*)?(?:hours?|hrs?)\b/gi, '')
-    .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, '')
-    .replace(/\b(?:at|@|for|rate|price|cost)\s+\$?\s*[\d,]+(?:\.\d{1,2})?(?:\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr))?/gi, '')
-    .replace(/\b[\d,]+(?:\.\d{1,2})?\s*(?:dollars|each|ea|per)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned || text.trim();
-}
-
-function smartEstimateSentence(text: string) {
-  const cleaned = cleanSmartEstimateDescription(text)
-    .replace(/^build\b/i, 'Construct')
-    .replace(/^construct\b/i, 'Construct')
-    .replace(/^install\b/i, 'Install')
-    .replace(/^repair\b/i, 'Repair')
-    .replace(/^replace\b/i, 'Replace')
-    .replace(/^demo\b/i, 'Demolish')
-    .replace(/^material(?:s)?\s*(?:cost)?\s*$/i, 'Materials and supplies')
-    .trim();
-  if (!cleaned) return '';
-  const sentence = `${cleaned.charAt(0).toUpperCase()}${cleaned.slice(1)}`;
-  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
-}
-
-function smartEstimateSubject(parts: string[]) {
-  const primary = parts.find(part => !extractSmartEstimatePrice(part)) || parts[0] || '';
-  const cleaned = cleanSmartEstimateDescription(primary)
-    .replace(/\b(?:build|construct|install|repair|replace|demo|demolish|remove)\b/gi, '')
-    .replace(/\b\d+(?:\.\d+)?\s*(?:x|by)\s*\d+(?:\.\d+)?\s*(?:'|ft|feet)?\b/gi, '')
-    .replace(/\bwith\b.*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned || 'project';
-}
-
-function smartEstimateDescription(text: string, lineType: EstimateLineType, projectSubject = 'project') {
-  const normalized = normalizeText(text);
-  const subjectLabel = `${projectSubject.charAt(0).toUpperCase()}${projectSubject.slice(1)}`;
-  if (/\b(?:billable\s*)?(?:hours?|hrs?)\b/.test(normalized)) return `${subjectLabel} labor`;
-  if (/\b(demo|demolition|removal|remove)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Demolition / removal';
-  if (/\b(disposal|debris|haul|haul-off|dump)\b/.test(normalized)) return smartEstimateSentence(text).replace(/\.$/, '') || 'Debris disposal / haul-off';
-  if (lineType === 'material') return 'Materials and supplies';
-  return smartEstimateSentence(text).replace(/\.$/, '');
-}
-
-function splitSmartEstimateParts(text: string) {
-  return text
-    .split(/\n+|;|\.|,\s+|\b(?:plus|and also)\b/i)
-    .map(part => part.trim())
-    .filter(Boolean);
-}
-
-function buildSmartEstimateScope(parts: string[], lines: EstimateLineDraft[]) {
-  const pricedDescriptions = new Set(lines.filter(line => line.unit_price.trim()).map(line => normalizeText(line.description)));
-  const primaryScopeSentences = parts
-    .filter(part => !extractSmartEstimatePrice(part))
-    .map(smartEstimateSentence)
-    .filter(Boolean);
-  const lineScopeItems = lines
-    .map(line => line.description)
-    .filter(description => description && pricedDescriptions.has(normalizeText(description)));
-
-  const uniquePrimary = Array.from(new Set(primaryScopeSentences));
-  const uniqueLineItems = Array.from(new Set(lineScopeItems));
-  const included = uniqueLineItems.length > 0
-    ? `Includes ${uniqueLineItems.map(item => item.charAt(0).toLowerCase() + item.slice(1)).join(', ').replace(/, ([^,]*)$/, ', and $1')}.`
-    : '';
-
-  return [...uniquePrimary, included].filter(Boolean).join(' ');
-}
-
-function parseSmartEstimateText(text: string) {
-  const cleaned = text.trim();
-  const parts = splitSmartEstimateParts(cleaned);
-  const sourceParts = parts.length ? parts : [cleaned];
-  const projectSubject = smartEstimateSubject(sourceParts);
-  const parsedLines = sourceParts.map(part => {
-    const lineType = inferSmartEstimateLineType(part);
-    return createEstimateLineDraft({
-      line_type: lineType,
-      description: smartEstimateDescription(part, lineType, projectSubject),
-      quantity: extractSmartEstimateQuantity(part),
-      unit: extractSmartEstimateUnit(part),
-      unit_price: extractSmartEstimatePrice(part),
+function inferEstimateBuilderTrade(text: string): EstimateDraftBuilderTrade | null {
+  const normalized = compactText(text);
+  if (!normalized) return null;
+  const scores: Record<EstimateDraftBuilderTrade, number> = {
+    HVAC: 0,
+    Plumbing: 0,
+    Electrical: 0,
+    Carpentry: 0,
+    Other: 0,
+  };
+  const keywordGroups: Record<EstimateDraftBuilderTrade, string[]> = {
+    HVAC: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'thermostat', 'duct', 'vent', 'air handler', 'mini split'],
+    Plumbing: ['plumbing', 'plumber', 'pipe', 'leak', 'faucet', 'toilet', 'sink', 'drain', 'water heater', 'valve', 'shower'],
+    Electrical: ['electrical', 'electric', 'outlet', 'switch', 'breaker', 'panel', 'circuit', 'fixture', 'light', 'wire', 'gfci'],
+    Carpentry: ['carpentry', 'carpenter', 'deck', 'framing', 'trim', 'cabinet', 'door', 'window', 'lumber', 'stairs', 'railing'],
+    Other: [],
+  };
+  ESTIMATE_DRAFT_BUILDER_TRADES.forEach(trade => {
+    keywordGroups[trade].forEach(keyword => {
+      const compactKeyword = compactText(keyword);
+      if (normalized.includes(compactKeyword)) scores[trade] += compactKeyword.includes(' ') ? 3 : 2;
     });
   });
-  const pricedLines = parsedLines.filter(line => line.unit_price.trim());
-  const lines = pricedLines.length >= 2 ? pricedLines : parsedLines;
+  const sorted = ESTIMATE_DRAFT_BUILDER_TRADES
+    .filter(trade => trade !== 'Other')
+    .sort((a, b) => scores[b] - scores[a]);
+  const best = sorted[0];
+  if (!best || scores[best] < 2) return null;
+  const second = sorted[1];
+  if (second && scores[second] > 0 && scores[best] - scores[second] < 2) return null;
+  return best;
+}
+
+function inferEstimateBuilderJobType(text: string): EstimateDraftBuilderJobType | null {
+  const normalized = compactText(text);
+  if (!normalized) return null;
+  const rules: Array<{ type: EstimateDraftBuilderJobType; keywords: string[] }> = [
+    { type: 'service_diagnostic', keywords: ['diagnostic', 'diagnose', 'troubleshoot', 'inspect', 'assessment', 'service call'] },
+    { type: 'replacement', keywords: ['replace', 'replacement', 'swap out', 'remove and replace'] },
+    { type: 'install', keywords: ['install', 'installation', 'new', 'set up'] },
+    { type: 'maintenance', keywords: ['maintenance', 'tune up', 'tuneup', 'clean', 'service', 'preventive'] },
+    { type: 'repair', keywords: ['repair', 'fix', 'patch', 'correct', 'resolve'] },
+  ];
+  return rules.find(rule => rule.keywords.some(keyword => normalized.includes(compactText(keyword))))?.type ?? null;
+}
+
+function estimateBuilderDefaultLineDescription(seed: EstimateDraftBuilderLineSeed, jobType: EstimateDraftBuilderJobType) {
+  if (jobType === 'service_diagnostic' && seed.description.toLowerCase().includes('diagnostic')) return seed.description;
+  if (jobType === 'maintenance' && seed.description.toLowerCase().includes('maintenance')) return seed.description;
+  return seed.description;
+}
+
+function estimateBuilderKeywordScore(seed: EstimateDraftBuilderLineSeed, charge: ContractorSavedEstimateCharge) {
+  const seedDescription = compactText(seed.description);
+  const chargeName = compactText(charge.name);
+  const chargeDescription = compactText(charge.description || '');
+  const combinedChargeText = `${chargeName} ${chargeDescription}`.trim();
+  if (!seedDescription || !chargeName) return 0;
+
+  let score = 0;
+  if (charge.line_type === seed.line_type) score += 25;
+  if (chargeName === seedDescription) score += 100;
+  if (chargeName && seedDescription.includes(chargeName)) score += 85;
+  if (chargeName && chargeName.includes(seedDescription)) score += 85;
+
+  (seed.keywords || []).forEach(keyword => {
+    const compactKeyword = compactText(keyword);
+    if (!compactKeyword) return;
+    if (chargeName === compactKeyword) score += 60;
+    if (chargeName.includes(compactKeyword)) score += 35;
+    if (chargeDescription.includes(compactKeyword)) score += 20;
+  });
+
+  const seedTokens = new Set(seedDescription.split(' ').filter(token => token.length > 3));
+  const overlap = combinedChargeText.split(' ').filter(token => seedTokens.has(token)).length;
+  score += Math.min(overlap * 8, 32);
+
+  return score;
+}
+
+function findSavedChargeMatchForEstimateBuilder(seed: EstimateDraftBuilderLineSeed, charges: ContractorSavedEstimateCharge[]) {
+  const activeCharges = charges.filter(charge => charge.active);
+  const scored = activeCharges
+    .map(charge => ({
+      charge,
+      score: estimateBuilderKeywordScore(seed, charge),
+      compatibleType: charge.line_type === seed.line_type,
+    }))
+    .filter(candidate => candidate.score >= 85 && candidate.compatibleType)
+    .sort((a, b) => b.score - a.score);
+  if (scored.length === 0) return null;
+  const [best, second] = scored;
+  if (second && best.score - second.score < 20) return null;
+  return best.charge;
+}
+
+function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges: ContractorSavedEstimateCharge[], jobType: EstimateDraftBuilderJobType) {
+  const matchedCharge = findSavedChargeMatchForEstimateBuilder(seed, charges);
+  if (matchedCharge) {
+    return {
+      line: estimateLineDraftFromSavedCharge(matchedCharge),
+      matched: true,
+    };
+  }
+  return {
+    line: createEstimateLineDraft({
+      line_type: seed.line_type,
+      description: estimateBuilderDefaultLineDescription(seed, jobType),
+      quantity: seed.quantity || '1',
+      unit: seed.unit || 'each',
+      unit_price: '',
+    }),
+    matched: false,
+  };
+}
+
+function customerFacingRoughScope(value: string) {
+  return value
+    .replace(/\b(?:quote|estimate|bid)\s*(?:for|on)?\s*/gi, '')
+    .replace(/\b(?:at|@|for|rate|price|cost)\s+\$?\s*[\d,]+(?:\.\d{1,2})?(?:\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr|each|ea))?/gi, '')
+    .replace(/\b(?:price|pricing|cost|rate)\s*(?:is|at|for)?\s*\$?\s*[\d,]+(?:\.\d{1,2})?/gi, '')
+    .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, '')
+    .replace(/\b(?:internal|helper|draft|placeholder|price required)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim();
+}
+
+function buildRuleBasedEstimateDraft({
+  trade,
+  jobType,
+  roughScope,
+  subjectName,
+  savedCharges,
+}: {
+  trade: EstimateDraftBuilderTrade;
+  jobType: EstimateDraftBuilderJobType;
+  roughScope: string;
+  subjectName: string;
+  savedCharges: ContractorSavedEstimateCharge[];
+}) {
+  const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const cleanScope = customerFacingRoughScope(roughScope);
+  const builtLines = rulePack.lines.map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
+  const jobTypeLabel = estimateBuilderJobTypeLabel(jobType);
+  const requestedScope = cleanScope
+    ? `Requested scope: ${/[.!?]$/.test(cleanScope) ? cleanScope : `${cleanScope}.`}`
+    : '';
+  const scope = [
+    rulePack.scopeLead(jobTypeLabel.toLowerCase()),
+    requestedScope,
+  ].filter(Boolean).join(' ');
 
   return {
-    scope: buildSmartEstimateScope(sourceParts, lines) || cleaned,
-    lines,
+    title: `${trade === 'Other' ? 'Project' : trade} ${jobTypeLabel} Estimate - ${subjectName || 'Customer'} - ${dateLabel}`,
+    scope,
+    notes: rulePack.notes,
+    lines: builtLines.map(item => item.line),
+    matchedCount: builtLines.filter(item => item.matched).length,
   };
+}
+
+function estimateDraftLooksBlank(draft: EstimateDraft) {
+  return !draft.title.trim()
+    && !draft.scope.trim()
+    && !draft.notes.trim()
+    && draft.line_items.every(line => !line.description.trim());
+}
+
+function estimateDraftTitleLooksDefault(title: string) {
+  const normalized = title.trim().toLowerCase();
+  return !normalized || normalized.startsWith('estimate - ') || normalized.startsWith('estimate — ');
 }
 
 function tradeToolNumber(values: Record<string, string>, key: string, fallback = 0) {
@@ -1845,6 +1907,93 @@ const ESTIMATE_CHARGE_TYPE_OPTIONS: EstimateChargeType[] = ['flat', 'hourly'];
 const ESTIMATE_CHARGE_TYPE_LABELS: Record<EstimateChargeType, string> = {
   flat: 'Flat',
   hourly: 'Hourly',
+};
+const ESTIMATE_DRAFT_BUILDER_TRADES: EstimateDraftBuilderTrade[] = ['HVAC', 'Plumbing', 'Electrical', 'Carpentry', 'Other'];
+const ESTIMATE_DRAFT_BUILDER_JOB_TYPES: { value: EstimateDraftBuilderJobType; label: string }[] = [
+  { value: 'service_diagnostic', label: 'Service / diagnostic' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'replacement', label: 'Replacement' },
+  { value: 'install', label: 'Install' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'custom_other', label: 'Custom / other' },
+];
+const ESTIMATE_DRAFT_BUILDER_JOB_LABELS = Object.fromEntries(
+  ESTIMATE_DRAFT_BUILDER_JOB_TYPES.map(option => [option.value, option.label]),
+) as Record<EstimateDraftBuilderJobType, string>;
+const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, EstimateDraftBuilderRulePack> = {
+  HVAC: {
+    trade: 'HVAC',
+    scopeLead: jobTypeLabel => `Provide HVAC ${jobTypeLabel} services for the requested system or equipment. Work includes reviewing accessible components related to the reported scope, confirming required materials or equipment, and completing the approved HVAC work after contractor review.`,
+    notes: 'Excludes concealed conditions, code upgrades, manufacturer-specific requirements, permit costs not listed, and additional repairs or equipment changes unless approved separately.',
+    lines: [
+      { line_type: 'labor', description: 'HVAC diagnostic / site assessment labor', unit: 'hour', keywords: ['diagnostic', 'assessment', 'service call', 'troubleshoot'] },
+      { line_type: 'labor', description: 'HVAC repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replacement'] },
+      { line_type: 'material', description: 'HVAC parts, fittings, and consumables', unit: 'lot', keywords: ['parts', 'fittings', 'consumables', 'filter', 'thermostat'] },
+      { line_type: 'equipment', description: 'HVAC equipment allowance', unit: 'each', keywords: ['equipment', 'unit', 'furnace', 'condenser', 'air handler', 'heat pump'] },
+      { line_type: 'material', description: 'Ductwork, venting, or line-set materials', unit: 'lot', keywords: ['duct', 'vent', 'line set', 'lineset'] },
+      { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
+      { line_type: 'labor', description: 'System startup, testing, and commissioning', unit: 'job', keywords: ['startup', 'testing', 'commissioning'] },
+      { line_type: 'labor', description: 'Removal of existing HVAC components', unit: 'job', keywords: ['remove', 'removal', 'demo'] },
+      { line_type: 'fee', description: 'Disposal / haul-off of old equipment', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] },
+      { line_type: 'other', description: 'Contingency for site conditions to be confirmed', unit: 'allowance', keywords: ['contingency', 'site conditions'] },
+    ],
+  },
+  Plumbing: {
+    trade: 'Plumbing',
+    scopeLead: jobTypeLabel => `Provide plumbing ${jobTypeLabel} services for the requested fixture, piping, or water-system issue. Work includes reviewing accessible plumbing components related to the reported scope, confirming required materials, and completing the approved plumbing work after contractor review.`,
+    notes: 'Excludes concealed conditions, code upgrades, wall/floor/cabinet restoration, permit costs not listed, and additional plumbing repairs unless approved separately.',
+    lines: [
+      { line_type: 'labor', description: 'Plumbing diagnostic / service labor', unit: 'hour', keywords: ['diagnostic', 'service', 'leak', 'clog'] },
+      { line_type: 'labor', description: 'Plumbing repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
+      { line_type: 'material', description: 'Pipe, fittings, valves, and plumbing materials', unit: 'lot', keywords: ['pipe', 'fittings', 'valve', 'materials'] },
+      { line_type: 'material', description: 'Fixture or appliance connection materials', unit: 'lot', keywords: ['fixture', 'faucet', 'toilet', 'sink', 'water heater'] },
+      { line_type: 'equipment', description: 'Specialty equipment or drain machine allowance', unit: 'each', keywords: ['equipment', 'drain machine', 'camera', 'snake'] },
+      { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
+      { line_type: 'labor', description: 'Access, protection, and cleanup labor', unit: 'job', keywords: ['access', 'protection', 'cleanup'] },
+      { line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] },
+      { line_type: 'other', description: 'Contingency for concealed plumbing conditions', unit: 'allowance', keywords: ['contingency', 'concealed'] },
+    ],
+  },
+  Electrical: {
+    trade: 'Electrical',
+    scopeLead: jobTypeLabel => `Provide electrical ${jobTypeLabel} services for the requested circuit, device, fixture, or panel-related work. Work includes reviewing accessible electrical components related to the reported scope, confirming required materials, and completing the approved electrical work after contractor review.`,
+    notes: 'Excludes hidden wiring issues, service upgrades, drywall/paint repair, utility company work, permit costs not listed, and additional code-required repairs unless approved separately.',
+    lines: [
+      { line_type: 'labor', description: 'Electrical diagnostic / site assessment labor', unit: 'hour', keywords: ['diagnostic', 'assessment', 'troubleshoot'] },
+      { line_type: 'labor', description: 'Electrical repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
+      { line_type: 'material', description: 'Wire, boxes, breakers, and electrical materials', unit: 'lot', keywords: ['wire', 'box', 'breaker', 'materials'] },
+      { line_type: 'material', description: 'Device, fixture, or outlet materials', unit: 'each', keywords: ['device', 'fixture', 'outlet', 'switch', 'light'] },
+      { line_type: 'equipment', description: 'Specialty equipment or lift allowance', unit: 'each', keywords: ['equipment', 'lift', 'ladder'] },
+      { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
+      { line_type: 'labor', description: 'Testing, labeling, and cleanup', unit: 'job', keywords: ['testing', 'labeling', 'cleanup'] },
+      { line_type: 'other', description: 'Contingency for access or code-related conditions', unit: 'allowance', keywords: ['contingency', 'code', 'access'] },
+    ],
+  },
+  Carpentry: {
+    trade: 'Carpentry',
+    scopeLead: jobTypeLabel => `Provide carpentry ${jobTypeLabel} services for the requested repair, installation, or finish work. Work includes confirming measurements, reviewing accessible conditions, confirming required materials, and completing the approved carpentry scope.`,
+    notes: 'Excludes hidden structural conditions, engineering, utility relocation, paint/stain unless listed, and related trade work unless approved separately.',
+    lines: [
+      { line_type: 'labor', description: 'Carpentry layout and site assessment labor', unit: 'hour', keywords: ['layout', 'assessment', 'measure'] },
+      { line_type: 'labor', description: 'Carpentry build / repair / installation labor', unit: 'hour', keywords: ['labor', 'build', 'repair', 'install'] },
+      { line_type: 'material', description: 'Lumber, trim, fasteners, and carpentry materials', unit: 'lot', keywords: ['lumber', 'trim', 'fasteners', 'materials'] },
+      { line_type: 'material', description: 'Finish hardware or specialty material allowance', unit: 'lot', keywords: ['hardware', 'specialty', 'finish'] },
+      { line_type: 'labor', description: 'Demolition or removal of existing material', unit: 'job', keywords: ['demo', 'demolition', 'remove', 'removal'] },
+      { line_type: 'equipment', description: 'Tool, equipment, or rental allowance', unit: 'each', keywords: ['equipment', 'tool', 'rental'] },
+      { line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] },
+      { line_type: 'other', description: 'Contingency for field measurements or concealed conditions', unit: 'allowance', keywords: ['contingency', 'field measurement', 'concealed'] },
+    ],
+  },
+  Other: {
+    trade: 'Other',
+    scopeLead: () => 'Provide services for the requested project scope. Work includes reviewing accessible conditions, confirming required labor and materials, and completing the approved work after contractor review.',
+    notes: 'Excludes hidden conditions, permits or specialty work not listed, and additional labor or materials unless approved separately.',
+    lines: [
+      { line_type: 'labor', description: 'Labor for requested work', unit: 'hour', keywords: ['labor', 'work', 'repair', 'install'] },
+      { line_type: 'material', description: 'Materials and supplies allowance', unit: 'lot', keywords: ['materials', 'supplies', 'parts'] },
+      { line_type: 'other', description: 'Project scope item to be confirmed', unit: 'allowance', keywords: ['project', 'scope'] },
+    ],
+  },
 };
 const KUDOS_OPTIONS = [
   'Great communication',
@@ -14955,6 +15104,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const convertingEstimateIdsRef = useRef<Set<string>>(new Set());
   const [estimateTemplateSearch, setEstimateTemplateSearch] = useState('');
   const [estimateAssistantText, setEstimateAssistantText] = useState('');
+  const [estimateDraftBuilderTrade, setEstimateDraftBuilderTrade] = useState<EstimateDraftBuilderTrade>('Other');
+  const [estimateDraftBuilderJobType, setEstimateDraftBuilderJobType] = useState<EstimateDraftBuilderJobType>('repair');
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
@@ -16175,6 +16326,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: options.localHomeId ?? defaultLocalHomeId,
     }));
     setEstimateAssistantText('');
+    setEstimateDraftBuilderTrade('Other');
+    setEstimateDraftBuilderJobType('repair');
     setEstimateAssistantNotice('');
     setSavedChargeQuickPickNotice('');
     setEstimateComposerOpen(true);
@@ -16287,6 +16440,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
       setEstimateAssistantText('');
+      setEstimateDraftBuilderTrade('Other');
+      setEstimateDraftBuilderJobType('repair');
       setEstimateAssistantNotice('');
       await loadContractor();
     } catch (err) {
@@ -16531,6 +16686,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEditingEstimateId(estimate.id);
       setEstimateDraft(estimateDraftFromEstimate(estimate));
       setEstimateAssistantText('');
+      setEstimateDraftBuilderTrade('Other');
+      setEstimateDraftBuilderJobType('repair');
       setEstimateAssistantNotice('');
       setSavedChargeQuickPickNotice('');
       setEstimateComposerOpen(true);
@@ -16979,20 +17136,156 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     </div>
   );
 
-  const applySmartEstimateDraft = () => {
+  const applyEstimateDraftBuilder = (subjectName: string) => {
     setEstimateAssistantNotice('');
     if (!estimateAssistantText.trim()) {
-      setEstimateAssistantNotice('Add a short description first, then generate the estimate draft.');
+      setEstimateAssistantNotice('Add a rough scope first, then build the estimate draft.');
       return;
     }
-    const parsed = parseSmartEstimateText(estimateAssistantText);
-    const currentUsableLines = estimateDraft.line_items.filter(line => line.description.trim());
-    setEstimateDraft(draft => ({
-      ...draft,
-      scope: draft.scope.trim() ? `${draft.scope.trim()}\n\n${parsed.scope}` : parsed.scope,
-      line_items: currentUsableLines.length === 0 ? parsed.lines : [...draft.line_items, ...parsed.lines],
-    }));
-    setEstimateAssistantNotice(`Added ${parsed.lines.length} editable line item${parsed.lines.length === 1 ? '' : 's'} and drafted a cleaner scope. Review before sending.`);
+    const builtDraft = buildRuleBasedEstimateDraft({
+      trade: estimateDraftBuilderTrade,
+      jobType: estimateDraftBuilderJobType,
+      roughScope: estimateAssistantText,
+      subjectName: subjectName || 'Customer',
+      savedCharges: activeSavedEstimateCharges,
+    });
+    setEstimateDraft(draft => {
+      const currentUsableLines = draft.line_items.filter(line => line.description.trim());
+      const shouldReplaceDraft = estimateDraftLooksBlank(draft);
+      return {
+        ...draft,
+        title: shouldReplaceDraft || estimateDraftTitleLooksDefault(draft.title) ? builtDraft.title : draft.title,
+        scope: draft.scope.trim() ? `${draft.scope.trim()}\n\n${builtDraft.scope}` : builtDraft.scope,
+        notes: draft.notes.trim() ? `${draft.notes.trim()}\n\n${builtDraft.notes}` : builtDraft.notes,
+        line_items: currentUsableLines.length === 0 ? builtDraft.lines : [...draft.line_items, ...builtDraft.lines],
+      };
+    });
+    const unpricedCount = builtDraft.lines.filter(draftLineIsUnpriced).length;
+    const matchedCopy = builtDraft.matchedCount > 0
+      ? ` Matched saved-charge pricing for ${builtDraft.matchedCount} line${builtDraft.matchedCount === 1 ? '' : 's'}.`
+      : '';
+    setEstimateAssistantNotice(
+      `Built ${builtDraft.lines.length} editable line item${builtDraft.lines.length === 1 ? '' : 's'}; ${unpricedCount} need pricing before totals include them.${matchedCopy}`,
+    );
+  };
+
+  const renderBuildEstimateDraftPanel = (subjectName: string) => {
+    const inferredTrade = inferEstimateBuilderTrade(estimateAssistantText);
+    const inferredJobType = inferEstimateBuilderJobType(estimateAssistantText);
+    const showTradeMismatch = Boolean(inferredTrade && inferredTrade !== estimateDraftBuilderTrade);
+    const showJobTypeSuggestion = Boolean(inferredJobType && inferredJobType !== estimateDraftBuilderJobType);
+
+    return (
+      <div className="rounded-2xl border border-blue-200 bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-blue-700" />
+              <p className="text-sm font-bold text-slate-950">Build Estimate Draft</p>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Choose a trade and job type, add rough scope, then build editable line items. Prices stay blank unless an active saved charge clearly matches.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={startEstimateAssistantSpeech}
+            disabled={estimateAssistantListening}
+            className={buttonClass('secondary')}
+          >
+            <Mic size={14} />
+            {estimateAssistantListening ? 'Listening...' : 'Speak'}
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <Field label="Trade">
+            <select
+              className={inputClass()}
+              value={estimateDraftBuilderTrade}
+              onChange={event => setEstimateDraftBuilderTrade(event.target.value as EstimateDraftBuilderTrade)}
+            >
+              {ESTIMATE_DRAFT_BUILDER_TRADES.map(trade => (
+                <option key={trade} value={trade}>{trade}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Job type">
+            <select
+              className={inputClass()}
+              value={estimateDraftBuilderJobType}
+              onChange={event => setEstimateDraftBuilderJobType(event.target.value as EstimateDraftBuilderJobType)}
+            >
+              {ESTIMATE_DRAFT_BUILDER_JOB_TYPES.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        {(showTradeMismatch || showJobTypeSuggestion) && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+            {showTradeMismatch && inferredTrade && (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold text-amber-900">
+                  This sounds more like a {inferredTrade} estimate than {estimateDraftBuilderTrade}.
+                </p>
+                <button type="button" onClick={() => setEstimateDraftBuilderTrade(inferredTrade)} className="text-xs font-bold text-amber-900 underline">
+                  Use {inferredTrade}
+                </button>
+              </div>
+            )}
+            {showJobTypeSuggestion && inferredJobType && (
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold text-amber-900">
+                  Suggested job type: {estimateBuilderJobTypeLabel(inferredJobType)}.
+                </p>
+                <button type="button" onClick={() => setEstimateDraftBuilderJobType(inferredJobType)} className="text-xs font-bold text-amber-900 underline">
+                  Use {estimateBuilderJobTypeLabel(inferredJobType)}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3">
+          <Field label="Rough scope">
+            <textarea
+              className={`${inputClass()} min-h-[96px] resize-y`}
+              {...writingAssistProps}
+              value={estimateAssistantText}
+              onChange={event => setEstimateAssistantText(event.target.value)}
+              placeholder="Example: Replace failed condenser and confirm line-set condition. Leave pricing blank unless a saved charge matches."
+            />
+          </Field>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => applyEstimateDraftBuilder(subjectName)} className={buttonClass('primary')}>
+            <Sparkles size={14} />
+            Build Estimate Draft
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEstimateAssistantText('');
+              setEstimateAssistantNotice('');
+            }}
+            className={buttonClass('secondary')}
+          >
+            Clear
+          </button>
+          <p className="text-xs leading-5 text-slate-500">
+            Rough-scope prices are ignored. Review Price Required lines before sending.
+          </p>
+        </div>
+        {estimateAssistantNotice && (
+          <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+            {estimateAssistantNotice}
+          </p>
+        )}
+      </div>
+    );
   };
 
   const updateTradeToolInput = (toolId: string, inputId: string, value: string) => {
@@ -17015,6 +17308,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: current.local_home_id,
     }));
     setEstimateAssistantText('');
+    setEstimateDraftBuilderTrade('Other');
+    setEstimateDraftBuilderJobType('repair');
     setSavedChargeQuickPickNotice('');
     setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
     setEstimateComposerOpen(true);
@@ -23100,6 +23395,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             home_id: workspaceNewRecordHomeId,
                                           }));
                                           setEstimateAssistantText('');
+                                          setEstimateDraftBuilderTrade('Other');
+                                          setEstimateDraftBuilderJobType('repair');
                                           setEstimateAssistantNotice('');
                                           setSavedChargeQuickPickNotice('');
                                           setEstimateComposerOpen(true);
@@ -23189,60 +23486,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         />
                                       </div>
                                     )}
-                                    <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4">
-                                      <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                          <div className="flex items-center gap-2">
-                                            <Sparkles size={16} className="text-blue-700" />
-                                            <p className="text-sm font-bold text-slate-950">Smart estimate assistant</p>
-                                          </div>
-                                          <p className="mt-1 text-xs text-slate-500">
-                                            Type or speak the work performed or work needed. ServSync will draft scope and line items for you to review.
-                                          </p>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={startEstimateAssistantSpeech}
-                                          disabled={estimateAssistantListening}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          <Mic size={14} />
-                                          {estimateAssistantListening ? 'Listening...' : 'Speak'}
-                                        </button>
-                                      </div>
-                                      <div className="mt-3">
-                                        <Field label="Describe the estimate">
-                                          <textarea
-                                            className={`${inputClass()} min-h-[96px] resize-y`}
-                                            {...writingAssistProps}
-                                            value={estimateAssistantText}
-                                            onChange={event => setEstimateAssistantText(event.target.value)}
-                                            placeholder="Example: Built deck, labor $2400, materials $3100, demo old deck $650, debris disposal $225."
-                                          />
-                                        </Field>
-                                      </div>
-                                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <button type="button" onClick={applySmartEstimateDraft} className={buttonClass('primary')}>
-                                          <Sparkles size={14} />
-                                          Generate draft
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setEstimateAssistantText('');
-                                            setEstimateAssistantNotice('');
-                                          }}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          Clear
-                                        </button>
-                                        <p className="text-xs text-slate-500">Pricing is editable and should be reviewed before sending.</p>
-                                      </div>
-                                      {estimateAssistantNotice && (
-                                        <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                                          {estimateAssistantNotice}
-                                        </p>
-                                      )}
+                                    <div className="mt-4">
+                                      {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                     </div>
                                     <div className="mt-3">
                                       <Field label="Scope of work">
@@ -23459,6 +23704,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     home_id: workspaceNewRecordHomeId,
                                                   });
                                                   setEstimateAssistantText('');
+                                                  setEstimateDraftBuilderTrade('Other');
+                                                  setEstimateDraftBuilderJobType('repair');
                                                   setEstimateAssistantNotice('');
                                                   setSavedChargeQuickPickNotice('');
                                                   setEstimateComposerOpen(true);
@@ -23550,6 +23797,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                         home_id: workspaceNewRecordHomeId,
                                                       });
                                                       setEstimateAssistantText('');
+                                                      setEstimateDraftBuilderTrade('Other');
+                                                      setEstimateDraftBuilderJobType('repair');
                                                       setEstimateAssistantNotice('');
                                                       setSavedChargeQuickPickNotice('');
                                                       setEstimateComposerOpen(true);
@@ -23678,6 +23927,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEditingEstimateId(estimate.id);
                                                     setEstimateDraft(estimateDraftFromEstimate(estimate));
                                                     setEstimateAssistantText('');
+                                                    setEstimateDraftBuilderTrade('Other');
+                                                    setEstimateDraftBuilderJobType('repair');
                                                     setEstimateAssistantNotice('');
                                                     setSavedChargeQuickPickNotice('');
                                                     setEstimateComposerOpen(true);
@@ -24330,42 +24581,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                         )}
 
-                        <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <Sparkles size={16} className="text-blue-700" />
-                                <p className="text-sm font-bold text-slate-950">Smart estimate assistant</p>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">Describe rough work and pricing. ServSync will draft cleaner scope and editable line items.</p>
-                            </div>
-                            <button type="button" onClick={startEstimateAssistantSpeech} disabled={estimateAssistantListening} className={buttonClass('secondary')}>
-                              <Mic size={14} />
-                              {estimateAssistantListening ? 'Listening...' : 'Speak'}
-                            </button>
-                          </div>
-                          <div className="mt-3">
-                            <textarea
-                              className={`${inputClass()} min-h-[96px] resize-y`}
-                              {...writingAssistProps}
-                              value={estimateAssistantText}
-                              onChange={event => setEstimateAssistantText(event.target.value)}
-                              placeholder="Example: Build 20x40 deck with railing, 40 billable hours at $50/hr, demo and removal $500, materials $3,000."
-                            />
-                          </div>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <button type="button" onClick={applySmartEstimateDraft} className={buttonClass('primary')}>
-                              <Sparkles size={14} />
-                              Generate draft
-                            </button>
-                            <button type="button" onClick={() => { setEstimateAssistantText(''); setEstimateAssistantNotice(''); }} className={buttonClass('secondary')}>
-                              Clear
-                            </button>
-                            <p className="text-xs text-slate-500">Everything remains editable before saving or sending.</p>
-                          </div>
-                          {estimateAssistantNotice && (
-                            <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">{estimateAssistantNotice}</p>
-                          )}
+                        <div className="mt-4">
+                          {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
                         </div>
 
                         <div className="mt-4">
@@ -25011,6 +25228,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEditingEstimateId(estimate.id);
                                         setEstimateDraft(estimateDraftFromEstimate(estimate));
                                         setEstimateAssistantText('');
+                                        setEstimateDraftBuilderTrade('Other');
+                                        setEstimateDraftBuilderJobType('repair');
                                         setEstimateAssistantNotice('');
                                         setSavedChargeQuickPickNotice('');
                                         setEstimateComposerOpen(true);
