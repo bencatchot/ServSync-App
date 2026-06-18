@@ -19,7 +19,8 @@ export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_wait
 export type CalendarEventType = 'service_visit' | 'inspection_visit' | 'estimate_visit' | 'follow_up_visit' | 'custom';
 export type CalendarEventRecurrenceFrequency = 'none' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
-export type EstimateLineType = 'labor' | 'material' | 'equipment' | 'fee' | 'other';
+export type EstimateLineType = 'labor' | 'material' | 'fee' | 'other';
+export type LegacyEstimateLineType = EstimateLineType | 'equipment';
 export type EstimateChargeType = 'flat' | 'hourly';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
@@ -60,7 +61,7 @@ export interface ServiceRequestQuote {
 export interface EstimateLineItem {
   id: string;
   estimate_id: string;
-  line_type: EstimateLineType;
+  line_type: LegacyEstimateLineType;
   description: string;
   quantity: number;
   unit: string;
@@ -96,7 +97,7 @@ export interface Estimate {
 export interface InvoiceLineItem {
   id: string;
   invoice_id: string;
-  line_type: EstimateLineType;
+  line_type: LegacyEstimateLineType;
   description: string;
   quantity: number;
   unit: string;
@@ -169,7 +170,7 @@ export interface InvoiceDraft {
 }
 
 export interface EstimateTemplateLineItem {
-  line_type: EstimateLineType;
+  line_type: LegacyEstimateLineType;
   description: string;
   quantity: number;
   unit: string;
@@ -195,7 +196,7 @@ export interface ContractorSavedEstimateCharge {
   contractor_id: string;
   name: string;
   description: string;
-  line_type: EstimateLineType;
+  line_type: LegacyEstimateLineType;
   charge_type: EstimateChargeType;
   amount_cents: number;
   default_quantity: number;

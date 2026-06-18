@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/estimate-equipment-line-type-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Stopped future app-created estimate, invoice, saved-charge, Build Estimate Draft, and starter-template line items from using the `equipment` line type by treating equipment-style items as `material` while preserving defensive compatibility for legacy `equipment` records until SQL cleanup.
+- Reason for change: Equipment is no longer intended to be a separate estimate/invoice line item category; tools, fixtures, appliances, HVAC units, panels, and similar equipment-style items should be categorized as material in new app-created records.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Later PR 50B should perform approved SQL data migration and constraint tightening after the deployed app no longer creates `equipment` line items.
+  - Future slices may add structured line title/customer description/model/spec/supply status fields and PDF/homeowner subtotal refinements.
+
 - Branch: `feature/build-estimate-draft-v3-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
