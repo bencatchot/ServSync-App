@@ -1,0 +1,801 @@
+# ServSync Feature Backlog
+
+Last updated: 2026-06-18
+
+## Purpose
+
+This document is the living ServSync feature backlog and brainstorming inventory.
+
+Use it to keep product direction consistent across ChatGPT brainstorming chats, Codex implementation chats, and future planning work. It tracks discussed feature ideas, current status, priority, guardrails, implementation state, and recommended next action.
+
+This document does not replace:
+
+- `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- `docs/servsync-master-plan/CHANGELOG.md`
+- PR descriptions
+- Codex implementation reports
+
+## How this document should be used
+
+Use this document when:
+
+- A feature idea is discussed and should not be lost.
+- A feature moves from brainstorming into audit.
+- A Codex audit is completed.
+- A feature is approved for implementation.
+- A feature enters preview testing.
+- A feature is completed and confirmed functional.
+- A feature is paused, rejected, or deferred.
+
+The changelog records approved repo/app changes. This backlog records discussed product direction and implementation state.
+
+Do not treat a feature as live just because it appears in this backlog. Live status must be confirmed by code, deployed app behavior, or a completed implementation report.
+
+## Current ServSync beta context
+
+ServSync is in controlled private beta, not public go-live.
+
+Core beta loop:
+
+Homeowner request
+→ Contractor estimate
+→ Homeowner approval
+→ Job/report
+→ Invoice
+→ Home History
+→ Manual reminder
+
+Important guardrails:
+
+- Do not claim payments/Stripe checkout are live.
+- Do not claim QuickBooks/accounting sync is live.
+- Do not claim push notifications are live unless confirmed.
+- Do not claim email/text reminder automation is live.
+- Do not claim automatic/recurring reminders are live.
+- Do not claim native iOS/Android apps are live.
+- Do not claim full external calendar sync is live.
+- Do not claim broad public marketplace lead generation is live.
+- Do not claim advanced analytics/admin reporting is live.
+- Do not claim enterprise dispatch/routing is live.
+- Do not claim contractor verification/background checks are live.
+- Do not claim formal compliance certifications are live.
+- Do not claim guaranteed leads or rankings.
+
+## Status definitions
+
+| Status | Meaning |
+| --- | --- |
+| Brainstorming | Idea is being shaped and is not ready for audit. |
+| Backlog | Direction is worth preserving but not active. |
+| Needs Audit | Direction is clear enough for a Codex audit prompt. |
+| Audit In Progress | Codex or manual review is currently auditing the item. |
+| Ready for Implementation | Audit is complete and the user has approved or is preparing implementation scope. |
+| Implementation In Progress | Codex or another implementation workflow is actively working on the approved task. |
+| Preview Testing | Implementation exists in a preview/branch environment and needs testing. |
+| Completed / Functional | Implemented and believed functional, though future polish may remain. |
+| Paused | Deliberately stopped or waiting on a dependency. |
+| Rejected / Not Pursuing | Decided not to pursue unless reopened later. |
+| Later / Future | Useful future direction, but intentionally not near-term. |
+
+## Priority definitions
+
+| Priority | Meaning |
+| --- | --- |
+| High | Important for beta readiness, core workflow confidence, or contractor/homeowner adoption. |
+| Medium | Useful and valuable, but not blocking the immediate beta loop. |
+| Low | Nice-to-have, polish, or future convenience. |
+| Later / Future | Should be preserved, but not built until stronger prerequisites exist. |
+
+## Feature inventory
+
+| ID | Feature / Topic | Product Area | Status | Priority | Current Next Step |
+| --- | --- | --- | --- | --- | --- |
+| FB-001 | Invite a Contractor to ServSync | Homeowner Contractors tab, service request support, contractor acquisition | Completed / Functional | Medium | Future outreach/claim-flow improvements later. |
+| FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates | Completed / Functional; Needs Testing | High | Codex audit + manual test plan. |
+| FB-003 | Contextual Connection Request Flow with Multi-Property Permission Access | Connections, permissions, property sharing | Completed / Functional | High | Follow-up testing of permission enforcement and contractor visibility. |
+| FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
+| FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
+| FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
+| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Backlog | High | Wait until estimate templates are audited/tested and mobile estimate workflow is polished. |
+| FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
+| FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
+| FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
+| FB-011 | Mobile Workflow Polish | Mobile/responsive UX, field workflow | Backlog | High | Audit/test estimate, job, invoice, permissions, and request flows on mobile. |
+| FB-012 | Push Notifications | Notifications, mobile, workflow events | Later / Future | Medium | Do not claim live unless confirmed; revisit after stable core workflows. |
+| FB-013 | QuickBooks / Accounting Integration | Accounting, invoices, integrations | Later / Future | Medium | Research later after invoice/payment workflow stabilizes. |
+| FB-014 | Payments / Stripe | Payments, invoices | Later / Future | Medium | Revisit after invoice workflow is tested. |
+| FB-015 | Native Mobile Apps | iOS/Android, field workflow | Later / Future | Medium | Validate responsive web first; evaluate Capacitor vs React Native/Expo later. |
+| FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
+| FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
+
+## Detailed feature notes
+
+### FB-001 — Invite a Contractor to ServSync
+
+Status: Completed / Functional
+
+Product area:
+
+- Homeowner Contractors tab
+- Service Requests support link
+- Contractor acquisition / growth
+- Admin invite lead workflow
+
+Summary:
+Homeowners can invite or recommend a contractor to join ServSync. This is separate from service requests and connection requests.
+
+Key decisions:
+
+- Feature name: "Invite a contractor to ServSync."
+- Do not call it a request.
+- Contractors tab should show connected contractors and the invite button.
+- Service Requests tab can include: "Don’t see your contractor? Invite them to join ServSync."
+- Required invite fields: business name and location.
+- Optional fields: trade/category, contact name, phone, email, website, Facebook/social link, homeowner note.
+- Contractor outreach can mention that a local homeowner invited/requested the business to join ServSync.
+- Do not frame the 30-day trial as exclusive to invited contractors.
+
+Future possible improvements:
+
+- Automated outreach
+- Contractor claim flow
+- Homeowner follow-up automation
+- Invite analytics
+- Duplicate lead grouping
+- Outreach history
+
+### FB-002 — Contractor Estimate Defaults & Templates
+
+Status: Completed / Functional; Needs Testing
+
+Priority: High
+
+Product area:
+
+- Contractor tools
+- Estimate workflow
+- Estimate templates
+- Saved estimate charges
+
+Summary:
+Contractors can save recurring estimate charges and estimate templates so they do not have to rebuild common estimates from scratch.
+
+Current next step:
+Codex audit + manual test plan before additional implementation.
+
+Key decisions:
+
+- The current feature was recommended by Codex/ChatGPT but has not been personally/manual tested by the user yet.
+- Saved charges should not auto-load into every estimate.
+- Contractors should choose saved charges from a quick-pick list.
+- Labor should support flat labor charges and hourly rate × estimated hours.
+- Contractors should be able to create multiple estimate templates.
+- Templates can be organized by service type or common job type.
+- Copied line items must remain editable/removable per estimate.
+- Homeowners only see final estimate line items, not internal templates.
+- Contractors should be able to save an estimate they create as a reusable template.
+
+Initial trades to support/test:
+
+- HVAC
+- Plumbing
+- Electrical
+- Carpentry
+
+Product direction:
+
+- These are labor + materials estimating workflows.
+- Each trade needs realistic trade-specific material categories.
+- Do not hardcode a massive material catalog too early.
+- Better direction is starter material categories/templates that contractors can customize.
+
+Template structure should support:
+
+- Materials
+- Labor
+- Trip/service fees
+- Optional add-ons
+- Line-item notes
+- Terms
+- Optional scope inclusions/exclusions
+- Optional estimated schedule
+
+Saved charge examples:
+
+- Service call fee
+- Diagnostic fee
+- Trip charge
+- Standard labor rate
+- Emergency fee
+- Permit/admin fee
+- Disposal fee
+- Custom "other" charge that the contractor can name/create
+
+Saved charges and templates should remain distinct:
+
+- A saved charge can be used on a template.
+- A saved charge does not have to be part of a template.
+- Templates are reusable estimate structures.
+- Saved charges are reusable line items or fees.
+
+Homeowner view direction:
+
+- Keep the homeowner estimate view as simple as possible.
+- Make full context obvious.
+- Line items should not be long paragraphs.
+- Contractors may add optional notes under line items if desired.
+- Scope inclusions/exclusions, terms, and estimated schedule should be optional sections, likely controlled by checkbox/toggle options.
+
+Testing needed:
+
+- Contractor can create saved/default charges.
+- Contractor can create estimate templates.
+- Saved charges can be selected during estimate creation.
+- Templates can be used without breaking blank estimate creation.
+- Flat labor and hourly labor behave correctly.
+- Copied line items remain editable/removable.
+- Homeowners only see final estimate line items.
+- RLS/security prevents cross-contractor access.
+- Existing estimate flow still works.
+- Mobile estimate workflow is usable.
+
+Recommended sequence:
+
+1. Audit current estimate defaults/templates/saved charges implementation.
+2. Create and run a manual test plan.
+3. Decide whether the current feature is ready as-is, needs fixes, or needs redesign.
+4. Polish estimate/mobile workflow.
+5. Then move into trade-specific estimate/pre-visit checklist features.
+
+### FB-003 — Contextual Connection Request Flow with Multi-Property Permission Access
+
+Status: Completed / Functional
+
+Product area:
+
+- Connections
+- Permissions
+- Homeowner property sharing
+- Contractor customer/property view
+
+Summary:
+One homeowner-contractor connection can include access to one or more homeowner properties, with separate permissions per property.
+
+Key decisions:
+
+- There should be one homeowner-contractor connection.
+- Do not create separate connections per property.
+- Homeowner can choose which properties the contractor can see.
+- Permissions can be set separately per property.
+- Homeowner can copy permissions from one property to another.
+- Preferred copy UI: "Copy permissions from: [Primary Home ▼] [Apply to this property]"
+- Contractor sees one connected homeowner/customer relationship.
+- Contractor sees only shared properties and allowed permission categories.
+
+Contractor action guardrails:
+
+- Contractor cannot create a service request for the homeowner.
+- Contractor cannot send an estimate unless tied to an allowed workflow.
+- Contractor cannot create a job unless tied to an allowed workflow.
+- Contractor cannot initiate general messaging unless the homeowner starts communication.
+
+Contractor shortcuts:
+
+- View shared profile
+- View shared properties
+- View open Jobs/Estimates/Invoices
+- View Homeowner History
+
+Follow-up testing:
+
+- Multi-property homeowner connection request
+- Per-property permission enforcement
+- Copy-permissions UI behavior
+- Contractor visibility with one shared property vs multiple properties
+- Contractor cannot see unshared properties
+- Contractor cannot see unshared permission categories
+- Open Jobs/Estimates/Invoices routes to existing records
+- Homeowner History uses existing completed/closed records
+
+### FB-004 — Contractor Reports
+
+Status: Backlog
+
+Priority: Medium
+
+Purpose:
+Give contractors practical reports based on real ServSync activity so they can understand estimates, jobs, invoices, open items, and customer activity.
+
+Initial report ideas:
+
+- Estimate Report
+- Invoice Report
+- Jobs Report
+- Customer / Property Report
+- Revenue Snapshot
+- Open Items Report
+
+Recommended first report:
+Open Items Report.
+
+Open Items Report would show:
+
+- Draft estimates
+- Sent estimates waiting on homeowner
+- Accepted estimates needing job creation
+- Open jobs
+- Completed jobs needing invoice
+- Sent/unpaid invoices
+- Overdue invoices
+
+Guardrails:
+
+- Do not call this accounting.
+- Do not build tax reporting in MVP.
+- Do not build payroll reporting in MVP.
+- Do not build profit/loss reporting in MVP.
+- Do not build QuickBooks-style reporting in MVP.
+- Do not overclaim analytics.
+- Use only real ServSync data.
+- Make report numbers traceable back to actual records.
+
+Recommended timing:
+Hold until the estimate/job/invoice workflows are tested harder. Reporting is only useful if the underlying statuses are reliable.
+
+### FB-005 — Awards / Contractor Recognition Badges
+
+Status: Later / Future
+
+Purpose:
+Create recognition badges contractors can display on their profile, such as "Best Plumber of 2026."
+
+Examples:
+
+- Best Plumber of 2026
+- Best HVAC Contractor of 2026
+- Best Electrician of 2026
+- Most Recommended Contractor
+- Homeowner Favorite
+- Top Rated Local Contractor
+
+Guardrails:
+
+- Do not make this feel fake or premature.
+- Do not imply contractors are verified/licensed/insured unless that is actually implemented.
+- Do not create fake ratings.
+- Needs real platform activity before it feels credible.
+- Avoid pay-to-win perception.
+
+Recommended timing:
+Later, after ServSync has real contractor/homeowner activity.
+
+### FB-006 — Contractor Auto-Scheduling
+
+Status: Later / Future
+
+Purpose:
+Allow contractors to optionally let homeowners schedule visits or request appointment windows.
+
+Direction:
+
+- This must be contractor-controlled.
+- Some contractors will like it; others may not want customers booking directly.
+- MVP should likely start as appointment request windows, not full automatic scheduling.
+
+Possible controls:
+
+- Allowed days/times
+- Service types available for scheduling
+- Travel radius
+- Buffer times
+- Approval required vs auto-confirm
+- Max bookings per day
+
+Guardrails:
+
+- Do not create full dispatch/routing too early.
+- Do not overcomplicate calendar sync.
+- Do not promise external Google/Outlook sync unless built.
+- Do not allow homeowners to force bookings onto contractor calendars without contractor control.
+
+### FB-007 — Trade-Specific Estimate / Pre-Visit Checklists
+
+Status: Backlog
+
+Priority: High
+
+Purpose:
+Help contractors gather the right information before creating an estimate and potentially reduce unnecessary site visits.
+
+Direction:
+
+- Contractor creates the checklist.
+- Contractor fills in known variables.
+- Homeowner fills out what they can.
+- Existing homeowner/property data may prefill later if permissions allow.
+- Checklist answers can help inform the estimate.
+
+Examples:
+
+- Deck size
+- Roof size
+- HVAC equipment info
+- Electrical panel info
+- Plumbing fixture count
+- Water heater model/serial
+- Photos of issue
+- Measurements
+- Access notes
+- Urgency
+
+Homeowner pre-visit version:
+Contractor can send a checklist to the homeowner before a visit. Homeowner fills it out. If the information already exists in the homeowner profile and permissions allow, ServSync can prefill it.
+
+Fit:
+
+- Estimate workflow
+- Inspection/checklist workflow
+- Home profile
+- Permission-based sharing
+- Contractor templates
+
+Guardrails:
+
+- Do not overbuild every trade at once.
+- Start with one or two common templates.
+- Keep homeowner forms simple.
+- Respect permissions when pulling from home profile data.
+
+Recommended timing:
+After estimate defaults/templates are audited, tested, and mobile estimate workflow is polished.
+
+### FB-008 — Discover Engagement Filter / Recently Active Contractors
+
+Status: Later / Future
+
+Purpose:
+Help homeowners find contractors who are active on ServSync and encourage contractors to keep profiles/content current.
+
+Possible wording:
+
+- Recently Active
+- Active on ServSync
+- Recently Posted
+- Active Contractors
+
+Possible metrics:
+
+- Number of Discover posts
+- Recent posting activity
+- Completed profile
+- Response rate, if reliable
+- Recent platform activity
+- Homeowner engagement
+
+Guardrails:
+
+- Do not reward spammy posting.
+- Do not imply guaranteed response time.
+- Do not create public rankings before marketplace behavior is reliable.
+- Do not claim "top contractor" unless backed by clear criteria.
+
+### FB-009 — Discover Feed Strategy
+
+Status: Backlog
+
+Priority: Medium
+
+Purpose:
+Make Discover feel like a useful local contractor feed, not just a generic search page.
+
+Direction:
+
+- Discover should show contractor posts/feed-style content.
+- It should focus on useful contractor visibility.
+- Contractor search belongs primarily in Contractors tab/search context.
+- Discover should not be a generic property-selector-driven page.
+
+Possible content:
+
+- Contractor posts
+- Service examples
+- Maintenance tips
+- Before/after content later when real
+- Local service updates
+- Seasonal reminders
+
+Guardrails:
+
+- No fake activity.
+- No fake contractor posts.
+- No fake metrics.
+- No broad marketplace lead-generation claims until real.
+
+### FB-010 — General Homeowner-Contractor Messaging
+
+Status: Later / Future
+
+Purpose:
+Allow homeowner-contractor communication outside a specific service request, while preserving homeowner control.
+
+Current rule:
+Homeowner must initiate communication.
+
+Contractor should not cold-message a homeowner just because they are connected.
+
+Possible homeowner-initiated communication paths:
+
+- Connection request message
+- Service request message
+- Future homeowner-started general message
+
+Guardrails:
+
+- Do not allow unrestricted contractor-initiated messaging.
+- Make it clear whether a message is general, tied to a connection request, or tied to a service request/job.
+- Avoid creating a chaotic chat system.
+
+Recommended timing:
+After contextual connection flow is tested.
+
+### FB-011 — Mobile Workflow Polish
+
+Status: Backlog
+
+Priority: High
+
+Purpose:
+Improve mobile usability for field use and homeowner convenience.
+
+Areas to watch:
+
+- Dense contractor cards
+- Estimate creation on mobile
+- Job workflow on mobile
+- Invoice view/send on mobile
+- Connection/property permission flow on mobile
+- Homeowner request flow on mobile
+- Contractor customer/property views
+
+Guardrails:
+
+- Current app is responsive web, not native mobile.
+- Do not claim iOS/Android native app until built.
+- Do not overbuild mobile-only workflows before testing current responsive app.
+
+Recommended timing:
+High before broader beta.
+
+### FB-012 — Push Notifications
+
+Status: Later / Future
+
+Purpose:
+Notify users when key events happen.
+
+Potential events:
+
+- Contractor receives connection request
+- Homeowner receives estimate
+- Contractor receives accepted estimate
+- Homeowner receives invoice
+- Reminder due
+- Contractor invite status changes
+- Connection accepted/declined
+- Message received
+
+Guardrails:
+
+- Do not claim push notifications are live unless confirmed.
+- In-app attention badges may exist, but push/email/text automation should be treated separately.
+- Native app push will likely depend on mobile app strategy.
+
+### FB-013 — QuickBooks / Accounting Integration
+
+Status: Later / Future
+
+Purpose:
+Potentially allow contractors to connect invoices/customers/payments with QuickBooks later.
+
+Guardrails:
+
+- Do not build before invoice/payment workflow is stable.
+- Do not overclaim accounting support.
+- Requires Intuit/QuickBooks approval/research.
+- Should remain optional for contractors.
+- ServSync should not become full accounting software.
+
+### FB-014 — Payments / Stripe
+
+Status: Later / Future
+
+Purpose:
+Allow homeowners to pay invoices through ServSync later.
+
+Guardrails:
+
+- Payment collection currently happens outside ServSync.
+- Do not claim in-app payments are live.
+- Manual mark-paid may exist, but that is not payment processing.
+- Stripe should come after invoice workflow is tested.
+
+### FB-015 — Native Mobile Apps
+
+Status: Later / Future
+
+Purpose:
+Create iOS/Android apps for field use, homeowner requests, notifications, and mobile-first workflows.
+
+Possible paths:
+
+- Capacitor
+- React Native / Expo
+
+Guardrails:
+
+- Current app is responsive web.
+- Do not claim native apps are live.
+- Push notifications may depend on this direction.
+- Validate mobile web first before committing to native.
+
+### FB-016 — PDF / Storage Strategy Audit
+
+Status: Backlog
+
+Purpose:
+Make sure PDFs, media, reports, invoices, estimates, and job records are stored efficiently and safely.
+
+Guiding principle:
+Keep estimates, invoices, reports, and job records as structured database data. Generate PDFs on demand where possible. Store only business/legal final snapshots when needed.
+
+Audit should inspect:
+
+- Current PDF generation/storage
+- Duplicate PDFs
+- Draft PDF storage
+- Final/legal snapshots
+- Report photos
+- Media compression
+- Supabase storage usage
+- Egress risk
+- Archival strategy
+
+Guardrails:
+
+- Avoid storing duplicate/draft PDFs.
+- Compress/resize photos.
+- Monitor Supabase storage and egress.
+- Use signed/private media access where appropriate.
+
+### FB-017 — Pricing Levels / Feature Tier Direction
+
+Status: Brainstorming
+
+Priority: High
+
+Purpose:
+Define pricing levels and features offered at each level.
+
+Direction:
+ServSync’s pricing model should stay simple and contractor-friendly. Homeowners should remain free because homeowner adoption helps create value for contractors. Contractors are the paying customer.
+
+This is product direction only. Do not treat pricing tiers as live unless they are implemented and confirmed in the app.
+
+Possible early structure:
+
+- Homeowner Free
+- Contractor Starter
+- Contractor Pro
+- Contractor Team
+
+Homeowner Free possible features:
+
+- Homeowner profile
+- Home/property profiles
+- Service requests
+- Contractor connections
+- Permission-based sharing
+- Estimate review and approval
+- Job/report visibility
+- Invoice visibility
+- Home History
+- Manual reminders
+- Ability to invite a contractor to ServSync
+
+Contractor Starter possible features:
+
+- Contractor business profile
+- Connection requests
+- Service request management
+- Estimate creation
+- Basic estimate templates
+- Saved charges
+- Job creation from accepted estimates
+- Basic job/report workflow
+- Invoice creation
+- Manual mark-paid workflow
+- Customer/property view based on homeowner permissions
+- Basic Home History visibility where permitted
+- Basic Discover/profile visibility
+- One contractor/admin user
+
+Contractor Pro possible features:
+
+- Everything in Contractor Starter
+- Multiple estimate templates
+- Trade-specific starter template categories
+- Rich estimate sections
+- Save estimate as reusable template
+- More saved charges
+- More advanced customer/property organization
+- More robust job/report records
+- More complete invoice tools
+- Open items report when reporting is ready
+- Expanded Discover/profile content
+- Limited team/user access if implemented
+
+Contractor Team possible features:
+
+- Everything in Contractor Pro
+- Multiple team users
+- Role-based access
+- Team job visibility
+- Assignment/status visibility if implemented
+- More advanced reporting when ready
+- More template capacity
+- More customer/property organization
+- Stronger mobile workflow support
+- Future calendar/job coordination tools when implemented
+
+Possible future add-ons:
+
+- Payments / Stripe processing
+- QuickBooks/accounting integration
+- Advanced reporting
+- Automated reminders
+- Push notifications
+- Native mobile app features
+- External calendar sync
+- Premium Discover/profile visibility
+- Additional storage/media capacity
+- Advanced team/dispatch tools
+
+Guardrails:
+
+- Do not claim pricing tiers are live unless implemented and confirmed.
+- Do not claim payments are live until implemented.
+- Do not claim QuickBooks/accounting sync is live until implemented.
+- Do not claim push notifications are live unless confirmed.
+- Do not claim automated reminders are live unless confirmed.
+- Do not claim native iOS/Android apps are live until built.
+- Do not claim broad marketplace lead generation or guaranteed leads.
+- Do not make pricing feel enterprise-heavy.
+
+Pricing philosophy:
+
+- Starter helps contractors get organized.
+- Pro helps contractors estimate and operate more efficiently.
+- Team helps small companies coordinate work across multiple users.
+- Avoid building too many tiers too early.
+- Exact prices should be finalized later after competitor review, beta feedback, and confirmation of live features.
+
+## Current next recommended focus
+
+1. Contractor Estimate Defaults & Templates audit + manual test plan.
+2. Estimate/mobile workflow polish.
+3. Trade-Specific Estimate / Pre-Visit Checklists.
+4. Discover Feed Strategy later.
+5. Contractor Reports later after workflow statuses are reliable.
+
+## Update rules
+
+- Update this document when a feature direction, priority, workflow definition, or feature status changes.
+- When a feature moves into audit, update its status to `Audit In Progress`.
+- When Codex returns an audit and the user approves implementation, update its status to `Ready for Implementation` or `Implementation In Progress`.
+- When a PR is opened, add the PR number/link only after it exists. Do not invent PR numbers.
+- When implementation is completed and merged/confirmed, update status to `Completed / Functional`.
+- If a feature is deferred, mark it `Paused` or `Later / Future`.
+- If a feature is rejected, mark it `Rejected / Not Pursuing` and preserve the reason.
+- Keep roadmap ideas separate from implemented features.
+- Do not use this document as proof that a feature is live.
+- Keep this document concise enough to remain usable. Detailed research and implementation reports should live in separate docs or PRs when needed.
