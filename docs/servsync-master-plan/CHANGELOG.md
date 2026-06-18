@@ -4,6 +4,33 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-18
+
+- Branch: `feature/estimate-price-required-foundation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `servsync-estimate-price-required-foundation.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Slice 1 Price Required foundation for estimate line items so blank line pricing remains unpriced/price-to-be-confirmed instead of being converted to intentional `$0.00`, while preserving intentional zero-dollar line items and normal positive pricing.
+- Reason for change: Contractors need a safe way to include known-scope line items whose price still needs confirmation without confusing homeowners, PDFs, totals, or downstream invoice compatibility.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL has not been applied to sandbox or production in this branch; separate approval is required before applying and verifying the patch.
+  - Focused sandbox smoke should verify create/send warnings, homeowner display, PDF display, and estimate-to-invoice compatibility after the schema patch is applied.
+  - This branch does not implement Build Estimate Draft v2, trade-specific estimating logic, AI generation, pricing-library redesign, or saved-charge quick-pick changes.
+
 ## 2026-06-17
 
 - Branch: `docs/builder-mode-workflow-v1`

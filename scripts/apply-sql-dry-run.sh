@@ -81,6 +81,7 @@ SQL_FILES=(
   "servsync-contractor-saved-estimate-charges.sql"
   "servsync-job-lifecycle.sql"
   "servsync-invoices-schema.sql"
+  "servsync-estimate-price-required-foundation.sql"
   "servsync-invoice-discount-details.sql"
   "servsync-estimate-job-approved-scope.sql"
   "servsync-invoice-from-source.sql"

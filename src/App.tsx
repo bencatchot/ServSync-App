@@ -73,6 +73,7 @@ import type {
   DiscoverFeedItem,
   Estimate,
   EstimateChargeType,
+  EstimateLineItem,
   EstimateLineType,
   EstimateTemplate,
   EstimateTemplateLineItem,
@@ -84,6 +85,7 @@ import type {
   InspectionTemplate,
   InspectionTemplateRoom,
   Invoice,
+  InvoiceLineItem,
   JobLifecycleStatus,
   HomeReminder,
   HomeReminderStatus,
@@ -1594,7 +1596,7 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
-            unit_price: centsToDollars(line.unit_price_cents),
+            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
           }))
       : [createEstimateLineDraft()],
   };
@@ -1632,7 +1634,7 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
-            unit_price: centsToDollars(line.unit_price_cents),
+            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
           }))
       : [createEstimateLineDraft()],
   };
@@ -1654,7 +1656,7 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
-            unit_price: centsToDollars(line.unit_price_cents),
+            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
           }))
       : [createEstimateLineDraft()],
   };
@@ -1676,7 +1678,7 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
-            unit_price: line.unit_price_cents ? centsToDollars(line.unit_price_cents) : '',
+            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
           }))
       : [createEstimateLineDraft()],
   };
@@ -1999,7 +2001,7 @@ function starterEstimateLines(lines: TradeStarterTemplateBlueprint['estimateLine
     description: line.description,
     quantity: line.quantity ?? 1,
     unit: line.unit ?? 'each',
-    unit_price_cents: 0,
+    unit_price_cents: null,
     sort_order: index,
   }));
 }
@@ -4349,7 +4351,24 @@ function dollarsToCents(value: string) {
   return Math.round(numeric * 100);
 }
 
+function priceInputIsBlank(value: string) {
+  return value.replace(/[$,]/g, '').trim() === '';
+}
+
+function draftLineIsUnpriced(line: Pick<EstimateLineDraft, 'unit_price'>) {
+  return priceInputIsBlank(line.unit_price);
+}
+
+function persistedLineIsUnpriced(line: Pick<EstimateLineItem | InvoiceLineItem, 'unit_price_cents'>) {
+  return line.unit_price_cents === null || line.unit_price_cents === undefined;
+}
+
+function lineUnitPriceInputFromCents(value: number | null | undefined) {
+  return value === null || value === undefined ? '' : centsToDollars(value);
+}
+
 function estimateLineTotalCents(line: EstimateLineDraft) {
+  if (draftLineIsUnpriced(line)) return 0;
   const quantity = Number(line.quantity);
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
   return Math.round(safeQuantity * dollarsToCents(line.unit_price));
@@ -4357,6 +4376,24 @@ function estimateLineTotalCents(line: EstimateLineDraft) {
 
 function estimateTotalCents(lines: EstimateLineDraft[] = []) {
   return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
+}
+
+function persistedLineTotalCents(line: Pick<EstimateLineItem | InvoiceLineItem, 'quantity' | 'unit_price_cents'>) {
+  const unitPriceCents = line.unit_price_cents;
+  if (unitPriceCents === null || unitPriceCents === undefined) return 0;
+  return Math.round(Number(line.quantity || 0) * unitPriceCents);
+}
+
+function unpricedLineCount(lines: Array<Pick<EstimateLineItem | InvoiceLineItem, 'unit_price_cents'>> = []) {
+  return lines.filter(persistedLineIsUnpriced).length;
+}
+
+function priceRequiredWarningText(lineCount: number) {
+  return `${lineCount} line item${lineCount === 1 ? '' : 's'} ${lineCount === 1 ? 'has' : 'have'} no pricing. The estimate total will not include ${lineCount === 1 ? 'that item' : 'those items'}, and homeowners will see "Price to be confirmed."`;
+}
+
+function draftLineTotalLabel(line: EstimateLineDraft) {
+  return draftLineIsUnpriced(line) ? 'Price Required' : formatMoney(estimateLineTotalCents(line));
 }
 
 function parsePercentValue(value: string) {
@@ -4387,6 +4424,15 @@ function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 
 
 function formatMoney(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function persistedLinePriceLabel(line: Pick<EstimateLineItem | InvoiceLineItem, 'unit_price_cents'>) {
+  const unitPriceCents = line.unit_price_cents;
+  return unitPriceCents === null || unitPriceCents === undefined ? 'Price to be confirmed' : formatMoney(unitPriceCents);
+}
+
+function persistedLineTotalLabel(line: Pick<EstimateLineItem | InvoiceLineItem, 'quantity' | 'unit_price_cents'>) {
+  return persistedLineIsUnpriced(line) ? 'Price to be confirmed' : formatMoney(persistedLineTotalCents(line));
 }
 
 function formatPhoneNumber(value?: string | null) {
@@ -4621,11 +4667,11 @@ async function createEstimatePdf(
 
   sectionTitle('Line Items');
   const lines = [...(estimate.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const estimateUnpricedCount = unpricedLineCount(lines);
   if (lines.length === 0) {
     addWrappedText('No line items listed.', margin, contentW, 10, 5);
   } else {
     lines.forEach(line => {
-      const lineTotal = Math.round(Number(line.quantity || 0) * line.unit_price_cents);
       addPageIfNeeded(18);
       pdf.setFillColor(248, 250, 252);
       pdf.roundedRect(margin, y - 4, contentW, 15, 2, 2, 'F');
@@ -4633,13 +4679,21 @@ async function createEstimatePdf(
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
       pdf.text(line.description || 'Line item', margin + 3, y);
-      pdf.text(formatMoney(lineTotal), pageW - margin - 3, y, { align: 'right' });
+      pdf.text(persistedLineTotalLabel(line), pageW - margin - 3, y, { align: 'right' });
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text(`${line.line_type} · ${line.quantity} ${line.unit} @ ${formatMoney(line.unit_price_cents)}`, margin + 3, y + 5);
+      pdf.text(`${line.line_type} · ${line.quantity} ${line.unit} @ ${persistedLinePriceLabel(line)}`, margin + 3, y + 5);
       y += 18;
     });
+  }
+
+  if (estimateUnpricedCount > 0) {
+    addPageIfNeeded(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(146, 64, 14);
+    addWrappedText('Estimate total does not include items marked "Price to be confirmed."', margin, contentW, 9, 4);
   }
 
   addPageIfNeeded(16);
@@ -4823,6 +4877,7 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
 
   sectionTitle('Line Items');
   const lines = [...(invoice.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const invoiceUnpricedCount = unpricedLineCount(lines);
   addPageIfNeeded(10);
   pdf.setFillColor(241, 245, 249);
   pdf.roundedRect(margin, y - 4, contentW, 9, 1.5, 1.5, 'F');
@@ -4840,7 +4895,6 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
     addWrappedText('No line items were listed for this invoice.', margin, contentW, 10, 5);
   } else {
     lines.forEach(line => {
-      const lineTotal = Math.round(Number(line.quantity || 0) * line.unit_price_cents);
       const descriptionLines = pdf.splitTextToSize(line.description || 'Line item', contentW - 88);
       const rowH = Math.max(12, descriptionLines.length * 4 + 7);
       addPageIfNeeded(rowH);
@@ -4853,12 +4907,20 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
       pdf.setTextColor(71, 85, 105);
       pdf.text(String(line.quantity), pageW - margin - 72, y, { align: 'right' });
       pdf.text(line.unit || 'each', pageW - margin - 54, y, { align: 'right' });
-      pdf.text(formatMoney(line.unit_price_cents), pageW - margin - 25, y, { align: 'right' });
+      pdf.text(persistedLinePriceLabel(line), pageW - margin - 25, y, { align: 'right' });
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
-      pdf.text(formatMoney(lineTotal), pageW - margin - 3, y, { align: 'right' });
+      pdf.text(persistedLineTotalLabel(line), pageW - margin - 3, y, { align: 'right' });
       y += rowH;
     });
+  }
+
+  if (invoiceUnpricedCount > 0) {
+    addPageIfNeeded(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(146, 64, 14);
+    addWrappedText('Invoice total does not include items marked "Price to be confirmed."', margin, contentW, 9, 4);
   }
 
   addPageIfNeeded(42);
@@ -10554,10 +10616,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
                     <span className="text-slate-700">{line.description}</span>
                     <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                    <span className="font-semibold text-slate-950 sm:text-right">{formatMoney(Math.round(line.quantity * line.unit_price_cents))}</span>
+                    <span className="font-semibold text-slate-950 sm:text-right">{persistedLineTotalLabel(line)}</span>
                   </div>
                 ))}
               </div>
+            )}
+            {unpricedLineCount(invoice.line_items || []) > 0 && (
+              <p className="rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-sm text-amber-900">
+                Invoice total does not include items marked “Price to be confirmed.”
+              </p>
             )}
             <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-4">
               <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(invoice.subtotal_cents)}</strong></span>
@@ -10708,10 +10775,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
                     <span className="text-slate-700">{line.description}</span>
                     <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                    <span className="font-semibold text-slate-950 sm:text-right">${((line.quantity * line.unit_price_cents) / 100).toFixed(2)}</span>
+                    <span className="font-semibold text-slate-950 sm:text-right">{persistedLineTotalLabel(line)}</span>
                   </div>
                 ))}
               </div>
+            )}
+            {unpricedLineCount(estimate.line_items || []) > 0 && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                Estimate total does not include items marked “Price to be confirmed.”
+              </p>
             )}
             {(estimate.notes || estimate.terms) && (
               <div className="grid gap-3 md:grid-cols-2">
@@ -16082,7 +16154,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               description: line.description,
               quantity: String(line.quantity),
               unit: line.unit,
-              unit_price: centsToDollars(line.unit_price_cents),
+              unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
             }))
         : undefined,
     }));
@@ -16150,6 +16222,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(`Add at least one line item before saving the ${draftDocumentLabel.toLowerCase()}.`);
       return;
     }
+    const draftUnpricedCount = usableLines.filter(draftLineIsUnpriced).length;
+    if (draftUnpricedCount > 0) {
+      const confirmed = window.confirm(`${priceRequiredWarningText(draftUnpricedCount)}\n\nChoose OK to continue anyway, or Cancel to go back and edit pricing.`);
+      if (!confirmed) return;
+    }
     setSavingEstimate(true);
     try {
       const subtotalCents = estimateTotalCents(usableLines);
@@ -16200,7 +16277,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           description: line.description.trim(),
           quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
           unit: line.unit.trim() || 'each',
-          unit_price_cents: dollarsToCents(line.unit_price),
+          unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
           sort_order: index,
         })));
       if (linesError) throw linesError;
@@ -16316,7 +16393,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           description: line.description.trim(),
           quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
           unit: line.unit.trim() || 'each',
-          unit_price_cents: dollarsToCents(line.unit_price),
+          unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
           sort_order: index,
         })));
       if (linesError) throw linesError;
@@ -16577,6 +16654,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (!estimate.homeowner_user_id) {
       setError('This estimate is attached to a new customer. Connect the homeowner before sending it through the portal.');
       return;
+    }
+    const estimateUnpricedCount = unpricedLineCount(estimate.line_items || []);
+    if (estimateUnpricedCount > 0) {
+      const confirmed = window.confirm(`${priceRequiredWarningText(estimateUnpricedCount)}\n\nChoose OK to send anyway, or Cancel to go back and edit pricing.`);
+      if (!confirmed) return;
     }
     setSendingEstimateId(estimate.id);
     try {
@@ -23258,7 +23340,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div>
                                               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
                                               <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-                                                ${(estimateLineTotalCents(line) / 100).toFixed(2)}
+                                                {draftLineTotalLabel(line)}
                                               </p>
                                             </div>
                                             <button
@@ -23286,7 +23368,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </Field>
                                     </div>
                                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                                      <p className="text-sm font-semibold text-slate-600">Draft total</p>
+                                      <div>
+                                        <p className="text-sm font-semibold text-slate-600">Draft total</p>
+                                        {estimateDraft.line_items.some(draftLineIsUnpriced) && (
+                                          <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
+                                        )}
+                                      </div>
                                       <p className="text-2xl font-bold text-slate-950">${(estimateTotalCents(estimateDraft.line_items) / 100).toFixed(2)}</p>
                                     </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
@@ -23444,7 +23531,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                         <div key={`${template.id}-${index}`} className="grid gap-2 border-b border-slate-200 px-3 py-2 text-xs last:border-b-0 sm:grid-cols-[1fr_5rem_6rem]">
                                                           <span className="font-medium text-slate-800">{line.description || 'Line item'}</span>
                                                           <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                                                          <span className="font-semibold text-slate-900 sm:text-right">{formatMoney(Math.round(line.quantity * line.unit_price_cents))}</span>
+                                                          <span className="font-semibold text-slate-900 sm:text-right">{persistedLineTotalLabel(line)}</span>
                                                         </div>
                                                       ))}
                                                     {template.line_items.length > 4 && (
@@ -24362,7 +24449,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </Field>
                                 <div>
                                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">${(estimateLineTotalCents(line) / 100).toFixed(2)}</p>
+                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">{draftLineTotalLabel(line)}</p>
                                 </div>
                                 <button
                                   type="button"
@@ -24389,7 +24476,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                         </div>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                          <p className="text-sm font-semibold text-slate-600">Draft total</p>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-600">Draft total</p>
+                            {estimateDraft.line_items.some(draftLineIsUnpriced) && (
+                              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
+                            )}
+                          </div>
                           <p className="text-2xl font-bold text-slate-950">${(estimateTotalCents(estimateDraft.line_items) / 100).toFixed(2)}</p>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -24521,7 +24613,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </Field>
                                 <div>
                                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">${(estimateLineTotalCents(line) / 100).toFixed(2)}</p>
+                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">{draftLineTotalLabel(line)}</p>
                                 </div>
                                 <button
                                   type="button"
@@ -24574,6 +24666,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
                             <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
                             <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items ?? []))}</p>
+                            {(invoiceDraft.line_items ?? []).some(draftLineIsUnpriced) && (
+                              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
+                            )}
                             {invoiceDiscountCents(invoiceDraft) > 0 && (
                               <p className="mt-1 text-xs text-slate-500">Discount {formatMoney(invoiceDiscountCents(invoiceDraft))}</p>
                             )}

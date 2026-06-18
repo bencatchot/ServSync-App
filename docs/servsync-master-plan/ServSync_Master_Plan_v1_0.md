@@ -104,7 +104,7 @@ The product should be judged against the core loop: Homeowner Request -> Contrac
 | Step | Current understanding | Priority |
 | --- | --- | --- |
 | Homeowner Request | Homeowners can create requests tied to homes/properties. Direct connected-contractor flow exists. Recent UI copy clarifies what happens after a request is sent and after an estimate is accepted. | Harden end-to-end coverage and beta QA. |
-| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, and PDF download exist. Recent contractor cleanup makes Create/Open Estimate and accepted-estimate next steps clearer. | Keep estimate path clear from invoice path and expand test coverage. |
+| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, PDF download, and Price Required/unpriced line handling exist. Recent contractor cleanup makes Create/Open Estimate and accepted-estimate next steps clearer. | Keep estimate path clear from invoice path and expand test coverage. |
 | Homeowner Approval | Accept/decline status and RPCs exist. Homeowner accepted-estimate copy now explains that the contractor's next step is to create, schedule, or complete the job/work. | Validate the full approval-to-job handoff in beta. |
 | Job | Jobs are backed by inspections table; simple service jobs and checklist/report jobs exist. Contractor-facing terminology has been partially cleaned up, while internal schema names may still use inspection terminology. | Continue reducing user-facing inspection language where it confuses service work. |
 | Completion | Finalization/report filing exists. Recent contractor cleanup keeps invoice creation behind report finalization for checklist/report jobs. | Add broader regression coverage for closeout paths. |
