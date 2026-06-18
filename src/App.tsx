@@ -87,6 +87,7 @@ import type {
   Invoice,
   InvoiceLineItem,
   JobLifecycleStatus,
+  LegacyEstimateLineType,
   HomeReminder,
   HomeReminderStatus,
   MaintenanceLogEntry,
@@ -391,6 +392,12 @@ type EstimateDraft = {
   local_home_id?: string;
   line_items: EstimateLineDraft[];
 };
+
+function normalizeEstimateLineType(lineType: LegacyEstimateLineType | string | null | undefined): EstimateLineType {
+  if (lineType === 'labor' || lineType === 'material' || lineType === 'fee' || lineType === 'other') return lineType;
+  if (lineType === 'equipment') return 'material';
+  return 'other';
+}
 type InvoiceDraftForm = {
   invoice_number: string;
   title: string;
@@ -770,7 +777,7 @@ function savedEstimateChargeDraftFromRecord(charge: ContractorSavedEstimateCharg
   return createBlankSavedEstimateChargeDraft({
     name: charge.name,
     description: charge.description || '',
-    line_type: charge.line_type,
+    line_type: normalizeEstimateLineType(charge.line_type),
     charge_type: charge.charge_type,
     amount: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
     default_quantity: String(Number(charge.default_quantity || 1)),
@@ -787,7 +794,7 @@ function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharg
 
 function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge): EstimateLineDraft {
   return createEstimateLineDraft({
-    line_type: charge.line_type,
+    line_type: normalizeEstimateLineType(charge.line_type),
     description: savedEstimateChargeLineDescription(charge),
     quantity: String(Number(charge.default_quantity || 1)),
     unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each'),
@@ -1298,10 +1305,9 @@ function estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope: string)
 function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
   const lineTypeWeight: Record<EstimateLineType, number> = {
     material: 0,
-    equipment: 1,
-    labor: 2,
-    other: 3,
-    fee: 4,
+    labor: 1,
+    other: 2,
+    fee: 3,
   };
   return [...seeds].sort((a, b) => lineTypeWeight[a.line_type] - lineTypeWeight[b.line_type]);
 }
@@ -1350,7 +1356,7 @@ function contextualEstimateBuilderSeeds({
   const materialSeeds: EstimateDraftBuilderLineSeed[] = [
     hasSink && { line_type: 'material', description: 'Sink', unit: 'each', keywords: ['sink', 'kitchen sink'] },
     hasFaucet && { line_type: 'material', description: 'Faucet / hardware', unit: 'each', keywords: ['faucet', 'hardware'] },
-    hasGarbageDisposal && { line_type: 'equipment', description: 'Garbage disposal', unit: 'each', keywords: ['garbage disposal', 'disposal unit', 'disposer'] },
+    hasGarbageDisposal && { line_type: 'material', description: 'Garbage disposal', unit: 'each', keywords: ['garbage disposal', 'disposal unit', 'disposer'] },
     { line_type: 'material', description: 'Installation hardware', unit: 'lot', keywords: ['installation hardware', 'mounting hardware', 'hardware'] },
     { line_type: 'material', description: 'Fittings / connections', unit: 'lot', keywords: ['fittings', 'connections', 'drain', 'supply'] },
   ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
@@ -1412,7 +1418,7 @@ function estimateBuilderKeywordScore(seed: EstimateDraftBuilderLineSeed, charge:
   if (!seedDescription || !chargeName) return 0;
 
   let score = 0;
-  if (charge.line_type === seed.line_type) score += 25;
+  if (normalizeEstimateLineType(charge.line_type) === seed.line_type) score += 25;
   if (chargeName === seedDescription) score += 100;
   if (chargeName && seedDescription.includes(chargeName)) score += 85;
   if (chargeName && chargeName.includes(seedDescription)) score += 85;
@@ -1438,7 +1444,7 @@ function findSavedChargeMatchForEstimateBuilder(seed: EstimateDraftBuilderLineSe
     .map(charge => ({
       charge,
       score: estimateBuilderKeywordScore(seed, charge),
-      compatibleType: charge.line_type === seed.line_type,
+      compatibleType: normalizeEstimateLineType(charge.line_type) === seed.line_type,
     }))
     .filter(candidate => candidate.score >= 85 && candidate.compatibleType)
     .sort((a, b) => b.score - a.score);
@@ -1808,7 +1814,7 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
             id: line.id,
-            line_type: line.line_type,
+            line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
@@ -1846,7 +1852,7 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
             id: line.id,
-            line_type: line.line_type,
+            line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
@@ -1868,7 +1874,7 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
       ? [...template.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
-            line_type: line.line_type,
+            line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
@@ -1890,7 +1896,7 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
       ? [...template.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
-            line_type: line.line_type,
+            line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             quantity: String(line.quantity),
             unit: line.unit,
@@ -2049,14 +2055,16 @@ const UNIVERSAL_REFERRAL_STATUS_OPTIONS: UniversalReferralStatus[] = ['pending',
 const UNIVERSAL_REFERRAL_REWARD_STATUS_OPTIONS: UniversalReferralRewardStatus[] = ['pending', 'approved', 'denied', 'paid', 'not_eligible'];
 const SERVICE_REQUEST_URGENCY_OPTIONS: ServiceRequestUrgency[] = ['low', 'normal', 'urgent'];
 const SERVICE_REQUEST_CATEGORIES = [...TRADE_OPTIONS, 'Other'];
-const ESTIMATE_LINE_TYPE_OPTIONS: EstimateLineType[] = ['labor', 'material', 'equipment', 'fee', 'other'];
+const ESTIMATE_LINE_TYPE_OPTIONS: EstimateLineType[] = ['labor', 'material', 'fee', 'other'];
 const ESTIMATE_LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
   labor: 'Labor',
   material: 'Material',
-  equipment: 'Equipment',
   fee: 'Fee',
   other: 'Other',
 };
+function estimateLineTypeLabel(lineType: LegacyEstimateLineType | string | null | undefined) {
+  return ESTIMATE_LINE_TYPE_LABELS[normalizeEstimateLineType(lineType)];
+}
 const ESTIMATE_CHARGE_TYPE_OPTIONS: EstimateChargeType[] = ['flat', 'hourly'];
 const ESTIMATE_CHARGE_TYPE_LABELS: Record<EstimateChargeType, string> = {
   flat: 'Flat',
@@ -2095,7 +2103,7 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
       { line_type: 'labor', description: 'HVAC diagnostic / site assessment labor', unit: 'hour', keywords: ['diagnostic', 'assessment', 'service call', 'troubleshoot'] },
       { line_type: 'labor', description: 'HVAC repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replacement'] },
       { line_type: 'material', description: 'HVAC parts, fittings, and consumables', unit: 'lot', keywords: ['parts', 'fittings', 'consumables', 'filter', 'thermostat'] },
-      { line_type: 'equipment', description: 'HVAC equipment allowance', unit: 'each', keywords: ['equipment', 'unit', 'furnace', 'condenser', 'air handler', 'heat pump'] },
+      { line_type: 'material', description: 'HVAC equipment allowance', unit: 'each', keywords: ['equipment', 'unit', 'furnace', 'condenser', 'air handler', 'heat pump'] },
       { line_type: 'material', description: 'Ductwork, venting, or line-set materials', unit: 'lot', keywords: ['duct', 'vent', 'line set', 'lineset'] },
       { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
       { line_type: 'labor', description: 'System startup, testing, and commissioning', unit: 'job', keywords: ['startup', 'testing', 'commissioning'] },
@@ -2113,7 +2121,7 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
       { line_type: 'labor', description: 'Plumbing repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
       { line_type: 'material', description: 'Pipe, fittings, valves, and plumbing materials', unit: 'lot', keywords: ['pipe', 'fittings', 'valve', 'materials'] },
       { line_type: 'material', description: 'Fixture or appliance connection materials', unit: 'lot', keywords: ['fixture', 'faucet', 'toilet', 'sink', 'water heater'] },
-      { line_type: 'equipment', description: 'Specialty equipment or drain machine allowance', unit: 'each', keywords: ['equipment', 'drain machine', 'camera', 'snake'] },
+      { line_type: 'material', description: 'Specialty equipment or drain machine allowance', unit: 'each', keywords: ['equipment', 'drain machine', 'camera', 'snake'] },
       { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
       { line_type: 'labor', description: 'Access, protection, and cleanup labor', unit: 'job', keywords: ['access', 'protection', 'cleanup'] },
       { line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] },
@@ -2129,7 +2137,7 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
       { line_type: 'labor', description: 'Electrical repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
       { line_type: 'material', description: 'Wire, boxes, breakers, and electrical materials', unit: 'lot', keywords: ['wire', 'box', 'breaker', 'materials'] },
       { line_type: 'material', description: 'Device, fixture, or outlet materials', unit: 'each', keywords: ['device', 'fixture', 'outlet', 'switch', 'light'] },
-      { line_type: 'equipment', description: 'Specialty equipment or lift allowance', unit: 'each', keywords: ['equipment', 'lift', 'ladder'] },
+      { line_type: 'material', description: 'Specialty equipment or lift allowance', unit: 'each', keywords: ['equipment', 'lift', 'ladder'] },
       { line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] },
       { line_type: 'labor', description: 'Testing, labeling, and cleanup', unit: 'job', keywords: ['testing', 'labeling', 'cleanup'] },
       { line_type: 'other', description: 'Contingency for access or code-related conditions', unit: 'allowance', keywords: ['contingency', 'code', 'access'] },
@@ -2145,7 +2153,7 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
       { line_type: 'material', description: 'Lumber, trim, fasteners, and carpentry materials', unit: 'lot', keywords: ['lumber', 'trim', 'fasteners', 'materials'] },
       { line_type: 'material', description: 'Finish hardware or specialty material allowance', unit: 'lot', keywords: ['hardware', 'specialty', 'finish'] },
       { line_type: 'labor', description: 'Demolition or removal of existing material', unit: 'job', keywords: ['demo', 'demolition', 'remove', 'removal'] },
-      { line_type: 'equipment', description: 'Tool, equipment, or rental allowance', unit: 'each', keywords: ['equipment', 'tool', 'rental'] },
+      { line_type: 'material', description: 'Tool, equipment, or rental allowance', unit: 'each', keywords: ['equipment', 'tool', 'rental'] },
       { line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] },
       { line_type: 'other', description: 'Contingency for field measurements or concealed conditions', unit: 'allowance', keywords: ['contingency', 'field measurement', 'concealed'] },
     ],
@@ -2387,7 +2395,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Roofing labor' },
       { line_type: 'material', description: 'Shingles, panels, flashing, underlayment, sealant, or fasteners' },
-      { line_type: 'equipment', description: 'Access equipment or safety setup' },
+      { line_type: 'material', description: 'Access equipment or safety setup' },
       { line_type: 'fee', description: 'Disposal, dump, or permit fee' },
     ],
   },
@@ -2403,7 +2411,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Gutter labor' },
       { line_type: 'material', description: 'Gutter sections, hangers, elbows, downspouts, or guards' },
-      { line_type: 'equipment', description: 'Ladder or access setup' },
+      { line_type: 'material', description: 'Ladder or access setup' },
       { line_type: 'fee', description: 'Debris disposal or haul-off' },
     ],
   },
@@ -2419,7 +2427,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Concrete labor and prep' },
       { line_type: 'material', description: 'Concrete, reinforcement, forms, base, and finishing materials' },
-      { line_type: 'equipment', description: 'Equipment, saw cutting, pump, or rental allowance' },
+      { line_type: 'material', description: 'Equipment, saw cutting, pump, or rental allowance' },
       { line_type: 'fee', description: 'Demo, haul-off, or disposal fee' },
     ],
   },
@@ -2435,7 +2443,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Masonry labor' },
       { line_type: 'material', description: 'Brick, block, stone, mortar, flashing, or sealant' },
-      { line_type: 'equipment', description: 'Scaffold, lift, or access equipment' },
+      { line_type: 'material', description: 'Scaffold, lift, or access equipment' },
       { line_type: 'fee', description: 'Demo, disposal, or cleanup fee' },
     ],
   },
@@ -2452,7 +2460,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
       { line_type: 'fee', description: 'Assessment / diagnostic fee' },
       { line_type: 'labor', description: 'Foundation repair labor' },
       { line_type: 'material', description: 'Piers, jacks, beams, drainage, sealant, or repair materials' },
-      { line_type: 'equipment', description: 'Access, excavation, or equipment allowance' },
+      { line_type: 'material', description: 'Access, excavation, or equipment allowance' },
     ],
   },
   Framing: {
@@ -2467,7 +2475,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Framing labor' },
       { line_type: 'material', description: 'Lumber, sheathing, hangers, fasteners, and connectors' },
-      { line_type: 'equipment', description: 'Saw, lift, scaffold, or access allowance' },
+      { line_type: 'material', description: 'Saw, lift, scaffold, or access allowance' },
       { line_type: 'other', description: 'Layout, protection, and cleanup' },
     ],
   },
@@ -2483,7 +2491,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Carpentry labor' },
       { line_type: 'material', description: 'Wood, trim, hardware, fasteners, adhesive, or finish materials' },
-      { line_type: 'equipment', description: 'Tooling, setup, or access allowance' },
+      { line_type: 'material', description: 'Tooling, setup, or access allowance' },
       { line_type: 'other', description: 'Protection, cleanup, and touch-up coordination' },
     ],
   },
@@ -2579,7 +2587,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Painting labor and prep' },
       { line_type: 'material', description: 'Paint, primer, caulk, patch, tape, plastic, and supplies' },
-      { line_type: 'equipment', description: 'Ladder, sprayer, scaffold, or access allowance' },
+      { line_type: 'material', description: 'Ladder, sprayer, scaffold, or access allowance' },
       { line_type: 'other', description: 'Protection, cleanup, and touch-up' },
     ],
   },
@@ -2595,7 +2603,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Siding labor' },
       { line_type: 'material', description: 'Siding, trim, flashing, housewrap, caulk, or fasteners' },
-      { line_type: 'equipment', description: 'Ladder, scaffold, or access equipment' },
+      { line_type: 'material', description: 'Ladder, scaffold, or access equipment' },
       { line_type: 'fee', description: 'Disposal, cleanup, or paint/finish coordination' },
     ],
   },
@@ -2659,7 +2667,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Deck labor' },
       { line_type: 'material', description: 'Deck boards, framing lumber, fasteners, connectors, railing, or stain' },
-      { line_type: 'equipment', description: 'Access, saw, scaffold, or equipment allowance' },
+      { line_type: 'material', description: 'Access, saw, scaffold, or equipment allowance' },
       { line_type: 'fee', description: 'Demo, disposal, or cleanup fee' },
     ],
   },
@@ -2675,7 +2683,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Fence labor' },
       { line_type: 'material', description: 'Posts, panels, rails, pickets, concrete, hardware, or gate materials' },
-      { line_type: 'equipment', description: 'Post hole, auger, or equipment allowance' },
+      { line_type: 'material', description: 'Post hole, auger, or equipment allowance' },
       { line_type: 'fee', description: 'Demo, disposal, or haul-off fee' },
     ],
   },
@@ -2691,7 +2699,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Landscaping labor' },
       { line_type: 'material', description: 'Plants, soil, mulch, stone, edging, fabric, or amendments' },
-      { line_type: 'equipment', description: 'Equipment or delivery allowance' },
+      { line_type: 'material', description: 'Equipment or delivery allowance' },
       { line_type: 'fee', description: 'Debris removal or disposal fee' },
     ],
   },
@@ -2707,7 +2715,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Lawn care labor' },
       { line_type: 'material', description: 'Fertilizer, seed, weed treatment, or supplies' },
-      { line_type: 'equipment', description: 'Equipment/service route allowance' },
+      { line_type: 'material', description: 'Equipment/service route allowance' },
       { line_type: 'fee', description: 'Debris bagging, haul-off, or recurring service setup' },
     ],
   },
@@ -2722,7 +2730,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateScope: 'Tree trimming, removal, stump grinding, storm cleanup, or haul-off estimate.',
     estimateLines: [
       { line_type: 'labor', description: 'Tree service labor' },
-      { line_type: 'equipment', description: 'Bucket truck, lift, chipper, stump grinder, or rigging allowance' },
+      { line_type: 'material', description: 'Bucket truck, lift, chipper, stump grinder, or rigging allowance' },
       { line_type: 'fee', description: 'Debris hauling, disposal, or dump fee' },
       { line_type: 'other', description: 'Site protection and cleanup' },
     ],
@@ -2739,7 +2747,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Irrigation labor' },
       { line_type: 'material', description: 'Heads, nozzles, valves, pipe, fittings, wire, or controller parts' },
-      { line_type: 'equipment', description: 'Locating, trenching, or equipment allowance' },
+      { line_type: 'material', description: 'Locating, trenching, or equipment allowance' },
       { line_type: 'other', description: 'System testing and homeowner instructions' },
     ],
   },
@@ -2772,7 +2780,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
       { line_type: 'fee', description: 'Inspection / pump-out fee' },
       { line_type: 'labor', description: 'Septic labor' },
       { line_type: 'material', description: 'Risers, lids, pipe, fittings, or repair materials' },
-      { line_type: 'equipment', description: 'Truck, excavation, or equipment allowance' },
+      { line_type: 'material', description: 'Truck, excavation, or equipment allowance' },
     ],
   },
   'Well Service': {
@@ -2788,7 +2796,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
       { line_type: 'fee', description: 'Diagnostic / service call fee' },
       { line_type: 'labor', description: 'Well service labor' },
       { line_type: 'material', description: 'Pump, tank, switch, fittings, pipe, filter, or parts' },
-      { line_type: 'equipment', description: 'Pulling, testing, or equipment allowance' },
+      { line_type: 'material', description: 'Pulling, testing, or equipment allowance' },
     ],
   },
   Insulation: {
@@ -2803,7 +2811,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Insulation labor and prep' },
       { line_type: 'material', description: 'Insulation, baffles, foam, caulk, vapor barrier, or air sealing materials' },
-      { line_type: 'equipment', description: 'Blower, vacuum, protective setup, or access equipment' },
+      { line_type: 'material', description: 'Blower, vacuum, protective setup, or access equipment' },
       { line_type: 'fee', description: 'Removal, disposal, or cleanup fee' },
     ],
   },
@@ -2820,7 +2828,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
       { line_type: 'fee', description: 'Inspection / cleaning fee' },
       { line_type: 'labor', description: 'Chimney labor' },
       { line_type: 'material', description: 'Cap, crown, flashing, mortar, liner, sealant, or repair materials' },
-      { line_type: 'equipment', description: 'Roof access, ladder, scaffold, or safety setup' },
+      { line_type: 'material', description: 'Roof access, ladder, scaffold, or safety setup' },
     ],
   },
   'Appliance Repair': {
@@ -2867,7 +2875,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Cleaning labor' },
       { line_type: 'material', description: 'Cleaning supplies and consumables' },
-      { line_type: 'equipment', description: 'Vacuum, extractor, ladder, or specialty equipment allowance' },
+      { line_type: 'material', description: 'Vacuum, extractor, ladder, or specialty equipment allowance' },
       { line_type: 'fee', description: 'Deep clean, pet, move-out, or disposal fee' },
     ],
   },
@@ -2883,7 +2891,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Pressure washing labor' },
       { line_type: 'material', description: 'Detergent, treatment, or cleaning supplies' },
-      { line_type: 'equipment', description: 'Pressure washer, surface cleaner, hose, or access equipment' },
+      { line_type: 'material', description: 'Pressure washer, surface cleaner, hose, or access equipment' },
       { line_type: 'fee', description: 'Water access, protection, or disposal fee' },
     ],
   },
@@ -2899,7 +2907,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Pool service labor' },
       { line_type: 'material', description: 'Chemicals, filters, baskets, fittings, valves, or replacement parts' },
-      { line_type: 'equipment', description: 'Cleaning equipment or repair equipment allowance' },
+      { line_type: 'material', description: 'Cleaning equipment or repair equipment allowance' },
       { line_type: 'other', description: 'Water testing, homeowner notes, and follow-up' },
     ],
   },
@@ -2915,7 +2923,7 @@ const TRADE_STARTER_TEMPLATE_BLUEPRINTS: Record<string, TradeStarterTemplateBlue
     estimateLines: [
       { line_type: 'labor', description: 'Moving crew labor', unit: 'hour' },
       { line_type: 'material', description: 'Boxes, wrap, blankets, tape, or packing supplies' },
-      { line_type: 'equipment', description: 'Truck, dolly, liftgate, or equipment allowance' },
+      { line_type: 'material', description: 'Truck, dolly, liftgate, or equipment allowance' },
       { line_type: 'fee', description: 'Travel, fuel, stairs, specialty item, or disposal fee' },
     ],
   },
@@ -4997,7 +5005,7 @@ async function createEstimatePdf(
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text(`${line.line_type} · ${line.quantity} ${line.unit} @ ${persistedLinePriceLabel(line)}`, margin + 3, y + 5);
+      pdf.text(`${estimateLineTypeLabel(line.line_type)} · ${line.quantity} ${line.unit} @ ${persistedLinePriceLabel(line)}`, margin + 3, y + 5);
       y += 18;
     });
   }
@@ -16469,7 +16477,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? [...options.sourceEstimate.line_items]
             .sort((a, b) => a.sort_order - b.sort_order)
             .map(line => createEstimateLineDraft({
-              line_type: line.line_type,
+              line_type: normalizeEstimateLineType(line.line_type),
               description: line.description,
               quantity: String(line.quantity),
               unit: line.unit,
@@ -16596,7 +16604,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .from('estimate_line_items')
         .insert(usableLines.map((line, index) => ({
           estimate_id: estimateId,
-          line_type: line.line_type,
+          line_type: normalizeEstimateLineType(line.line_type),
           description: line.description.trim(),
           quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
           unit: line.unit.trim() || 'each',
@@ -16716,7 +16724,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .from('invoice_line_items')
         .insert(usableLines.map((line, index) => ({
           invoice_id: invoiceId,
-          line_type: line.line_type,
+          line_type: normalizeEstimateLineType(line.line_type),
           description: line.description.trim(),
           quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
           unit: line.unit.trim() || 'each',
@@ -17087,7 +17095,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         line_items: [...(estimate.line_items || [])]
           .sort((a, b) => a.sort_order - b.sort_order)
           .map((line, index) => ({
-            line_type: line.line_type,
+            line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             quantity: line.quantity,
             unit: line.unit,
@@ -17185,7 +17193,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       contractor_id: contractor.id,
       name,
       description: savedEstimateChargeDraft.description.trim(),
-      line_type: savedEstimateChargeDraft.line_type,
+      line_type: normalizeEstimateLineType(savedEstimateChargeDraft.line_type),
       charge_type: savedEstimateChargeDraft.charge_type,
       amount_cents: dollarsToCents(savedEstimateChargeDraft.amount),
       default_quantity: Number(defaultQuantity.toFixed(2)),
@@ -17286,7 +17294,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-950">{charge.name}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {ESTIMATE_LINE_TYPE_LABELS[charge.line_type]} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]} · {formatMoney(charge.amount_cents)}
+                    {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]} · {formatMoney(charge.amount_cents)}
                     {charge.charge_type === 'hourly' ? '/hr' : ''}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -20762,7 +20770,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {charge.active ? 'Active' : 'Inactive'}
                         </span>
                         <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#223D67]">
-                          {ESTIMATE_LINE_TYPE_LABELS[charge.line_type]} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]}
+                          {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]}
                         </span>
                       </div>
                       {charge.description && <p className="mt-1 text-sm leading-5 text-[#223D67]/75">{charge.description}</p>}
@@ -23781,8 +23789,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: e.target.value as EstimateLineType } : item),
                                                 }))}
                                               >
-                                                {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => (
-                                                  <option key={type} value={type}>{type}</option>
+                                                {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
+                                                  <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
                                                 ))}
                                               </select>
                                             </Field>
@@ -24866,7 +24874,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     ...d,
                                     line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
                                   }))}>
-                                    {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => <option key={type} value={type}>{type}</option>)}
+                                    {ESTIMATE_LINE_TYPE_OPTIONS.map(type => <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>)}
                                   </select>
                                 </Field>
                                 <Field label="Description">
@@ -25051,7 +25059,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     ...d,
                                     line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
                                   }))}>
-                                    {(['labor', 'material', 'equipment', 'fee', 'other'] as EstimateLineType[]).map(type => <option key={type} value={type}>{type}</option>)}
+                                    {ESTIMATE_LINE_TYPE_OPTIONS.map(type => <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>)}
                                   </select>
                                 </Field>
                                 <Field label="Description">
