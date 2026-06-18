@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/structured-line-items-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added app/UI support for structured estimate and invoice line items, including customer-facing line titles, optional customer descriptions, optional model/spec fields, optional supply status, structured Build Estimate Draft output, saved-charge mapping, template preservation, homeowner display, and PDF rendering.
+- Reason for change: Use the structured line item SQL foundation in the contractor estimate/invoice workflow while preserving Price Required behavior, legacy `description` fallback compatibility, saved charges, templates, and customer-facing simplicity.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated sandbox/preview smoke should verify manual line creation, Build Estimate Draft output, saved-charge quick-pick, template save/apply, homeowner estimate display, PDF output, invoice editing/display, and mobile layout.
+  - Estimate-to-invoice SQL/RPC structured copying and approved-estimate-to-job scope SQL remain deferred if any backend conversion path still uses only legacy `description`.
+  - Saved-charge structured metadata, estimate-template research, and homeowner/PDF subtotal refinements remain later estimate workflow slices.
+
 - Branch/task: direct documentation update from ChatGPT brainstorming chat
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

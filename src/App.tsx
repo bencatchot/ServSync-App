@@ -74,6 +74,7 @@ import type {
   Estimate,
   EstimateChargeType,
   EstimateLineItem,
+  EstimateLineSupplyStatus,
   EstimateLineType,
   EstimateTemplate,
   EstimateTemplateLineItem,
@@ -342,6 +343,10 @@ type EstimateLineDraft = {
   id: string;
   line_type: EstimateLineType;
   description: string;
+  line_title: string;
+  customer_description: string;
+  model_spec: string;
+  supply_status: EstimateLineSupplyStatus | '';
   quantity: string;
   unit: string;
   unit_price: string;
@@ -353,6 +358,7 @@ type EstimateDraftBuilderLaborMode = 'job_total' | 'line_specific';
 type EstimateDraftBuilderLineSeed = {
   line_type: EstimateLineType;
   description: string;
+  customer_description?: string;
   quantity?: string;
   unit?: string;
   keywords?: string[];
@@ -397,6 +403,80 @@ function normalizeEstimateLineType(lineType: LegacyEstimateLineType | string | n
   if (lineType === 'labor' || lineType === 'material' || lineType === 'fee' || lineType === 'other') return lineType;
   if (lineType === 'equipment') return 'material';
   return 'other';
+}
+
+const ESTIMATE_LINE_SUPPLY_STATUS_LABELS: Record<EstimateLineSupplyStatus, string> = {
+  contractor_supplied: 'Contractor supplied',
+  customer_supplied: 'Customer supplied',
+  to_be_confirmed: 'Supply status to be confirmed',
+};
+
+function normalizeEstimateLineSupplyStatus(value: string | null | undefined): EstimateLineSupplyStatus | '' {
+  if (value === 'contractor_supplied' || value === 'customer_supplied' || value === 'to_be_confirmed') return value;
+  return '';
+}
+
+type StructuredLineDisplay = {
+  description?: string | null;
+  line_title?: string | null;
+  customer_description?: string | null;
+  model_spec?: string | null;
+  supply_status?: EstimateLineSupplyStatus | string | null;
+};
+
+function lineDisplayTitle(line: StructuredLineDisplay) {
+  return line.line_title?.trim() || line.description?.trim() || 'Line item';
+}
+
+function lineCustomerDescription(line: { customer_description?: string | null }) {
+  return line.customer_description?.trim() || '';
+}
+
+function lineModelSpec(line: { model_spec?: string | null }) {
+  return line.model_spec?.trim() || '';
+}
+
+function lineSupplyStatusLabel(line: { supply_status?: EstimateLineSupplyStatus | string | null }) {
+  const status = normalizeEstimateLineSupplyStatus(line.supply_status || '');
+  return status ? ESTIMATE_LINE_SUPPLY_STATUS_LABELS[status] : '';
+}
+
+function lineDisplayDetailRows(line: StructuredLineDisplay) {
+  return [
+    lineCustomerDescription(line),
+    lineModelSpec(line) ? `Model/spec: ${lineModelSpec(line)}` : '',
+    lineSupplyStatusLabel(line),
+  ].filter(Boolean);
+}
+
+function draftLineTitle(line: EstimateLineDraft) {
+  return line.line_title.trim() || line.description.trim();
+}
+
+function draftLineLegacyDescription(line: EstimateLineDraft) {
+  return line.description.trim() || line.line_title.trim() || line.customer_description.trim();
+}
+
+function draftLineHasContent(line: EstimateLineDraft) {
+  return Boolean(draftLineTitle(line) || line.customer_description.trim());
+}
+
+function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate_id' | 'invoice_id', ownerId: string, index: number) {
+  const lineTitle = draftLineTitle(line);
+  const legacyDescription = draftLineLegacyDescription(line);
+  return {
+    [ownerIdField]: ownerId,
+    line_type: normalizeEstimateLineType(line.line_type),
+    description: legacyDescription,
+    line_title: lineTitle || legacyDescription || null,
+    customer_description: cleanHumanWrittenText(line.customer_description) || null,
+    model_spec: line.model_spec.trim() || null,
+    supply_status: line.supply_status || null,
+    quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
+    unit: line.unit.trim() || 'each',
+    unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
+    sort_order: index,
+  };
 }
 type InvoiceDraftForm = {
   invoice_number: string;
@@ -732,15 +812,23 @@ function storedInspectionViewForJobsView(jobsView: ContractorJobsView): Inspecti
 }
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
-  return {
+  const draft: EstimateLineDraft = {
     id: crypto.randomUUID(),
     line_type: 'labor',
     description: '',
+    line_title: '',
+    customer_description: '',
+    model_spec: '',
+    supply_status: '',
     quantity: '1',
     unit: 'each',
     unit_price: '',
     ...overrides,
   };
+  if (!draft.line_title.trim() && draft.description.trim()) draft.line_title = draft.description;
+  if (!draft.description.trim() && draft.line_title.trim()) draft.description = draft.line_title;
+  draft.supply_status = normalizeEstimateLineSupplyStatus(draft.supply_status);
+  return draft;
 }
 
 function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): EstimateDraft {
@@ -796,6 +884,8 @@ function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge)
   return createEstimateLineDraft({
     line_type: normalizeEstimateLineType(charge.line_type),
     description: savedEstimateChargeLineDescription(charge),
+    line_title: charge.name,
+    customer_description: charge.description || '',
     quantity: String(Number(charge.default_quantity || 1)),
     unit: charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each'),
     unit_price: charge.amount_cents === 0 ? '0.00' : centsToDollars(charge.amount_cents),
@@ -1354,20 +1444,50 @@ function contextualEstimateBuilderSeeds({
   if (!hasSink || (!hasFaucet && !hasGarbageDisposal)) return null;
 
   const materialSeeds: EstimateDraftBuilderLineSeed[] = [
-    hasSink && { line_type: 'material', description: 'Sink', unit: 'each', keywords: ['sink', 'kitchen sink'] },
-    hasFaucet && { line_type: 'material', description: 'Faucet / hardware', unit: 'each', keywords: ['faucet', 'hardware'] },
-    hasGarbageDisposal && { line_type: 'material', description: 'Garbage disposal', unit: 'each', keywords: ['garbage disposal', 'disposal unit', 'disposer'] },
-    { line_type: 'material', description: 'Installation hardware', unit: 'lot', keywords: ['installation hardware', 'mounting hardware', 'hardware'] },
-    { line_type: 'material', description: 'Fittings / connections', unit: 'lot', keywords: ['fittings', 'connections', 'drain', 'supply'] },
+    hasSink && {
+      line_type: 'material',
+      description: 'Sink',
+      customer_description: 'Replacement sink for the kitchen installation.',
+      unit: 'each',
+      keywords: ['sink', 'kitchen sink'],
+    },
+    hasFaucet && {
+      line_type: 'material',
+      description: 'Faucet / hardware',
+      customer_description: 'Sink faucet and related faucet hardware for installation.',
+      unit: 'each',
+      keywords: ['faucet', 'hardware'],
+    },
+    hasGarbageDisposal && {
+      line_type: 'material',
+      description: 'Garbage disposal',
+      customer_description: 'Garbage disposal unit for the kitchen sink replacement.',
+      unit: 'each',
+      keywords: ['garbage disposal', 'disposal unit', 'disposer'],
+    },
+    {
+      line_type: 'material',
+      description: 'Installation hardware',
+      customer_description: 'Mounting hardware and disposal installation hardware as needed.',
+      unit: 'lot',
+      keywords: ['installation hardware', 'mounting hardware', 'hardware'],
+    },
+    {
+      line_type: 'material',
+      description: 'Fittings / connections',
+      customer_description: 'Fittings, drain connections, and supply connection materials related to the sink, faucet, and disposal installation.',
+      unit: 'lot',
+      keywords: ['fittings', 'connections', 'drain', 'supply'],
+    },
   ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
   const laborSeeds: EstimateDraftBuilderLineSeed[] = laborMode === 'job_total'
-    ? [{ line_type: 'labor', description: 'Labor', unit: 'hour', keywords: ['labor', 'install', 'replace', 'remove'] }]
+    ? [{ line_type: 'labor', description: 'Labor', customer_description: 'Labor to remove existing components and complete the approved kitchen sink installation scope.', unit: 'hour', keywords: ['labor', 'install', 'replace', 'remove'] }]
     : [
-        hasSink && { line_type: 'labor', description: 'Sink installation labor', unit: 'hour', keywords: ['sink labor', 'sink installation', 'labor'] },
-        hasFaucet && { line_type: 'labor', description: 'Faucet installation labor', unit: 'hour', keywords: ['faucet labor', 'faucet installation', 'labor'] },
-        hasGarbageDisposal && { line_type: 'labor', description: 'Garbage disposal installation labor', unit: 'hour', keywords: ['garbage disposal labor', 'disposal installation', 'labor'] },
-        { line_type: 'labor', description: 'Fittings / connections labor', unit: 'hour', keywords: ['fittings labor', 'connections labor', 'labor'] },
+        hasSink && { line_type: 'labor', description: 'Sink installation labor', customer_description: 'Labor for sink removal, preparation, and installation.', unit: 'hour', keywords: ['sink labor', 'sink installation', 'labor'] },
+        hasFaucet && { line_type: 'labor', description: 'Faucet installation labor', customer_description: 'Labor to install and connect the sink faucet.', unit: 'hour', keywords: ['faucet labor', 'faucet installation', 'labor'] },
+        hasGarbageDisposal && { line_type: 'labor', description: 'Garbage disposal installation labor', customer_description: 'Labor to install and connect the garbage disposal.', unit: 'hour', keywords: ['garbage disposal labor', 'disposal installation', 'labor'] },
+        { line_type: 'labor', description: 'Fittings / connections labor', customer_description: 'Labor for drain, fitting, and supply connection work related to the installation.', unit: 'hour', keywords: ['fittings labor', 'connections labor', 'labor'] },
       ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
   const feeSeeds: EstimateDraftBuilderLineSeed[] = [];
@@ -1469,6 +1589,8 @@ function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges
     line: createEstimateLineDraft({
       line_type: seed.line_type,
       description: estimateBuilderDefaultLineDescription(seed, jobType),
+      line_title: estimateBuilderDefaultLineDescription(seed, jobType),
+      customer_description: seed.customer_description || '',
       quantity: seed.quantity || '1',
       unit: seed.unit || 'each',
       unit_price: '',
@@ -1534,7 +1656,7 @@ function estimateDraftLooksBlank(draft: EstimateDraft) {
   return !draft.title.trim()
     && !draft.scope.trim()
     && !draft.notes.trim()
-    && draft.line_items.every(line => !line.description.trim());
+    && draft.line_items.every(line => !draftLineHasContent(line));
 }
 
 function estimateDraftTitleLooksDefault(title: string) {
@@ -1816,6 +1938,10 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
             id: line.id,
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
@@ -1854,6 +1980,10 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
             id: line.id,
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
@@ -1876,6 +2006,10 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
           .map(line => createEstimateLineDraft({
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
@@ -1898,6 +2032,10 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
           .map(line => createEstimateLineDraft({
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
@@ -4994,19 +5132,24 @@ async function createEstimatePdf(
     addWrappedText('No line items listed.', margin, contentW, 10, 5);
   } else {
     lines.forEach(line => {
-      addPageIfNeeded(18);
+      const detailRows = lineDisplayDetailRows(line);
+      const rowH = 18 + detailRows.length * 4;
+      addPageIfNeeded(rowH);
       pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(margin, y - 4, contentW, 15, 2, 2, 'F');
+      pdf.roundedRect(margin, y - 4, contentW, rowH - 3, 2, 2, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
-      pdf.text(line.description || 'Line item', margin + 3, y);
+      pdf.text(pdf.splitTextToSize(lineDisplayTitle(line), contentW - 52)[0] || 'Line item', margin + 3, y);
       pdf.text(persistedLineTotalLabel(line), pageW - margin - 3, y, { align: 'right' });
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
       pdf.text(`${estimateLineTypeLabel(line.line_type)} · ${line.quantity} ${line.unit} @ ${persistedLinePriceLabel(line)}`, margin + 3, y + 5);
-      y += 18;
+      detailRows.forEach((detail, index) => {
+        pdf.text(pdf.splitTextToSize(detail, contentW - 9)[0] || detail, margin + 3, y + 10 + index * 4);
+      });
+      y += rowH;
     });
   }
 
@@ -5217,7 +5360,10 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
     addWrappedText('No line items were listed for this invoice.', margin, contentW, 10, 5);
   } else {
     lines.forEach(line => {
-      const descriptionLines = pdf.splitTextToSize(line.description || 'Line item', contentW - 88);
+      const descriptionLines = pdf.splitTextToSize(
+        [lineDisplayTitle(line), ...lineDisplayDetailRows(line)].join('\n'),
+        contentW - 88,
+      );
       const rowH = Math.max(12, descriptionLines.length * 4 + 7);
       addPageIfNeeded(rowH);
       pdf.setDrawColor(226, 232, 240);
@@ -10936,7 +11082,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="overflow-hidden rounded-xl border border-slate-200">
                 {[...invoice.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
-                    <span className="text-slate-700">{line.description}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
+                      {lineDisplayDetailRows(line).map(detail => (
+                        <p key={detail} className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
+                      ))}
+                    </div>
                     <span className="text-slate-500">{line.quantity} {line.unit}</span>
                     <span className="font-semibold text-slate-950 sm:text-right">{persistedLineTotalLabel(line)}</span>
                   </div>
@@ -11095,7 +11246,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <div className="overflow-hidden rounded-xl border border-slate-200">
                 {[...estimate.line_items].sort((a, b) => a.sort_order - b.sort_order).map(line => (
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
-                    <span className="text-slate-700">{line.description}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
+                      {lineDisplayDetailRows(line).map(detail => (
+                        <p key={detail} className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
+                      ))}
+                    </div>
                     <span className="text-slate-500">{line.quantity} {line.unit}</span>
                     <span className="font-semibold text-slate-950 sm:text-right">{persistedLineTotalLabel(line)}</span>
                   </div>
@@ -16479,6 +16635,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .map(line => createEstimateLineDraft({
               line_type: normalizeEstimateLineType(line.line_type),
               description: line.description,
+              line_title: line.line_title || line.description || '',
+              customer_description: line.customer_description || '',
+              model_spec: line.model_spec || '',
+              supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
               quantity: String(line.quantity),
               unit: line.unit,
               unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
@@ -16548,7 +16708,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(`Add a ${draftDocumentLabel.toLowerCase()} title before saving.`);
       return;
     }
-    const usableLines = estimateDraft.line_items.filter(line => line.description.trim());
+    const usableLines = estimateDraft.line_items.filter(draftLineHasContent);
     if (usableLines.length === 0) {
       setError(`Add at least one line item before saving the ${draftDocumentLabel.toLowerCase()}.`);
       return;
@@ -16602,15 +16762,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       }
       const { error: linesError } = await supabase
         .from('estimate_line_items')
-        .insert(usableLines.map((line, index) => ({
-          estimate_id: estimateId,
-          line_type: normalizeEstimateLineType(line.line_type),
-          description: line.description.trim(),
-          quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
-          unit: line.unit.trim() || 'each',
-          unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
-          sort_order: index,
-        })));
+        .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'estimate_id', estimateId, index)));
       if (linesError) throw linesError;
 
       setNotice(editingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved.`);
@@ -16649,7 +16801,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError('Add an invoice title before saving.');
       return null;
     }
-    const usableLines = (invoiceDraft.line_items ?? []).filter(line => line.description.trim());
+    const usableLines = (invoiceDraft.line_items ?? []).filter(draftLineHasContent);
     if (usableLines.length === 0) {
       setError('Add at least one line item before saving the invoice.');
       return null;
@@ -16722,15 +16874,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       }
       const { error: linesError } = await supabase
         .from('invoice_line_items')
-        .insert(usableLines.map((line, index) => ({
-          invoice_id: invoiceId,
-          line_type: normalizeEstimateLineType(line.line_type),
-          description: line.description.trim(),
-          quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
-          unit: line.unit.trim() || 'each',
-          unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
-          sort_order: index,
-        })));
+        .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'invoice_id', invoiceId, index)));
       if (linesError) throw linesError;
 
       const savedInvoice = await loadInvoiceById(invoiceId);
@@ -17097,6 +17241,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .map((line, index) => ({
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status) || null,
             quantity: line.quantity,
             unit: line.unit,
             unit_price_cents: line.unit_price_cents,
@@ -17255,7 +17403,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const addSavedChargeToEstimateDraft = (charge: ContractorSavedEstimateCharge) => {
     const nextLine = estimateLineDraftFromSavedCharge(charge);
     setEstimateDraft(draft => {
-      const usableLines = draft.line_items.filter(line => line.description.trim());
+      const usableLines = draft.line_items.filter(draftLineHasContent);
       return {
         ...draft,
         line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
@@ -17263,6 +17411,126 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     });
     setSavedChargeQuickPickNotice(`Added "${charge.name}" as an editable estimate line item.`);
   };
+
+  const renderStructuredLineDraftEditor = ({
+    line,
+    index,
+    itemLabel,
+    onChange,
+    onRemove,
+  }: {
+    line: EstimateLineDraft;
+    index: number;
+    itemLabel: 'estimate' | 'invoice';
+    onChange: (updates: Partial<EstimateLineDraft>) => void;
+    onRemove: () => void;
+  }) => (
+    <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
+        <Field label="Type">
+          <select
+            className={inputClass()}
+            value={line.line_type}
+            onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
+          >
+            {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
+              <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Title">
+          <input
+            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} title`}
+            className={inputClass()}
+            {...writingAssistProps}
+            value={line.line_title}
+            onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+            placeholder="Labor, material, trip fee..."
+          />
+        </Field>
+        <Field label="Qty">
+          <input
+            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
+            className={inputClass()}
+            type="number"
+            min="0"
+            step="0.01"
+            value={line.quantity}
+            onChange={event => onChange({ quantity: event.target.value })}
+          />
+        </Field>
+        <Field label="Unit">
+          <input
+            className={inputClass()}
+            value={line.unit}
+            onChange={event => onChange({ unit: event.target.value })}
+          />
+        </Field>
+        <Field label="Unit price">
+          <input
+            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
+            className={inputClass()}
+            value={line.unit_price}
+            onChange={event => onChange({ unit_price: event.target.value })}
+            placeholder="$0.00"
+          />
+        </Field>
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
+            {draftLineTotalLabel(line)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+          aria-label={`Remove ${itemLabel} line ${index + 1}`}
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+      <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">
+          Customer details
+        </summary>
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <Field label="Customer description">
+            <textarea
+              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} customer description`}
+              className={inputClass()}
+              rows={2}
+              {...writingAssistProps}
+              value={line.customer_description}
+              onChange={event => onChange({ customer_description: event.target.value })}
+              placeholder="Optional customer-facing detail"
+            />
+          </Field>
+          <Field label="Model/spec">
+            <input
+              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
+              className={inputClass()}
+              value={line.model_spec}
+              onChange={event => onChange({ model_spec: event.target.value })}
+              placeholder="Optional"
+            />
+          </Field>
+          <Field label="Supply status">
+            <select
+              className={inputClass()}
+              value={line.supply_status}
+              onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
+            >
+              <option value="">Not specified</option>
+              {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </details>
+    </div>
+  );
 
   const renderSavedChargeQuickPick = () => (
     <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
@@ -17320,7 +17588,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const chooseEstimateDraftBuilderMergeMode = (draft: EstimateDraft): 'replace' | 'append' | 'cancel' => {
     if (draft.line_items.some(line => line.builderGenerated)) return 'replace';
-    const hasExistingDraftContent = draft.scope.trim() || draft.notes.trim() || draft.line_items.some(line => line.description.trim());
+    const hasExistingDraftContent = draft.scope.trim() || draft.notes.trim() || draft.line_items.some(draftLineHasContent);
     if (estimateDraftLooksBlank(draft) || (!hasExistingDraftContent && estimateDraftTitleLooksDefault(draft.title))) return 'replace';
     const choice = window.prompt('This draft already has content. Type Replace to replace current draft lines, Append to add new lines, or Cancel to stop.', 'Replace');
     if (!choice) return 'cancel';
@@ -17365,8 +17633,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return;
     }
     setEstimateDraft(draft => {
-      const currentUsableLines = draft.line_items.filter(line => line.description.trim());
-      const manualLines = draft.line_items.filter(line => line.description.trim() && !line.builderGenerated);
+      const currentUsableLines = draft.line_items.filter(draftLineHasContent);
+      const manualLines = draft.line_items.filter(line => draftLineHasContent(line) && !line.builderGenerated);
       const replacingGeneratedLines = draft.line_items.some(line => line.builderGenerated);
       const shouldReplaceDraft = mergeMode === 'replace';
       const nextScope = mergeMode === 'append'
@@ -18146,7 +18414,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     ...inspectionHomeTemplatesForNewJob,
     ...inspectionContractorTemplatesForNewJob,
   ];
-  const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<{ description: string; line_type: string; unit: string }> }) => {
+  const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<StructuredLineDisplay & { line_type: string; unit: string }> }) => {
     if (!normalizedTemplateSearch) return true;
     const haystack = normalizeText([
       template.name,
@@ -18154,7 +18422,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       template.scope,
       template.notes,
       template.terms,
-      ...(template.line_items || []).map(line => `${line.description} ${line.line_type} ${line.unit}`),
+      ...(template.line_items || []).map(line => `${lineDisplayTitle(line)} ${lineCustomerDescription(line)} ${line.line_type} ${line.unit}`),
     ].filter(Boolean).join(' '));
     return normalizedTemplateSearch.split(' ').every(term => haystack.includes(term));
   };
@@ -22543,7 +22811,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         template.scope,
                         template.notes,
                         template.terms,
-                        ...(template.line_items || []).map(line => `${line.description} ${line.line_type} ${line.unit}`),
+                        ...(template.line_items || []).map(line => `${lineDisplayTitle(line)} ${lineCustomerDescription(line)} ${line.line_type} ${line.unit}`),
                       ].filter(Boolean).join(' '));
                       return estimateTemplateSearchTerms.every(term => haystack.includes(term));
                     });
@@ -22555,7 +22823,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         template.scope,
                         template.notes,
                         template.terms,
-                        ...(template.line_items || []).map(line => `${line.description} ${line.line_type} ${line.unit}`),
+                        ...(template.line_items || []).map(line => `${lineDisplayTitle(line)} ${lineCustomerDescription(line)} ${line.line_type} ${line.unit}`),
                       ].filter(Boolean).join(' '));
                       return estimateTemplateSearchTerms.every(term => haystack.includes(term));
                     });
@@ -23778,90 +24046,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </div>
                                       {renderSavedChargeQuickPick()}
                                       {estimateDraft.line_items.map((line, index) => (
-                                        <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                                          <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
-                                            <Field label="Type">
-                                              <select
-                                                className={inputClass()}
-                                                value={line.line_type}
-                                                onChange={e => setEstimateDraft(d => ({
-                                                  ...d,
-                                                  line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: e.target.value as EstimateLineType } : item),
-                                                }))}
-                                              >
-                                                {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
-                                                  <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
-                                                ))}
-                                              </select>
-                                            </Field>
-                                            <Field label="Description">
-                                              <input
-                                                aria-label={`Line item ${index + 1} description`}
-                                                className={inputClass()}
-                                                {...writingAssistProps}
-                                                value={line.description}
-                                                onChange={e => setEstimateDraft(d => ({
-                                                  ...d,
-                                                  line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: e.target.value } : item),
-                                                }))}
-                                                placeholder="Labor, material, trip fee..."
-                                              />
-                                            </Field>
-                                            <Field label="Qty">
-                                              <input
-                                                aria-label={`Line item ${index + 1} quantity`}
-                                                className={inputClass()}
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={line.quantity}
-                                                onChange={e => setEstimateDraft(d => ({
-                                                  ...d,
-                                                  line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: e.target.value } : item),
-                                                }))}
-                                              />
-                                            </Field>
-                                            <Field label="Unit">
-                                              <input
-                                                className={inputClass()}
-                                                value={line.unit}
-                                                onChange={e => setEstimateDraft(d => ({
-                                                  ...d,
-                                                  line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit: e.target.value } : item),
-                                                }))}
-                                              />
-                                            </Field>
-                                            <Field label="Unit price">
-                                              <input
-                                                aria-label={`Line item ${index + 1} unit price`}
-                                                className={inputClass()}
-                                                value={line.unit_price}
-                                                onChange={e => setEstimateDraft(d => ({
-                                                  ...d,
-                                                  line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: e.target.value } : item),
-                                                }))}
-                                                placeholder="$0.00"
-                                              />
-                                            </Field>
-                                            <div>
-                                              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                                              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-                                                {draftLineTotalLabel(line)}
-                                              </p>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => setEstimateDraft(d => ({
-                                                ...d,
-                                                line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                                              }))}
-                                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-                                              aria-label={`Remove estimate line ${index + 1}`}
-                                            >
-                                              <Trash2 size={15} />
-                                            </button>
-                                          </div>
-                                        </div>
+                                        renderStructuredLineDraftEditor({
+                                          line,
+                                          index,
+                                          itemLabel: 'estimate',
+                                          onChange: updates => setEstimateDraft(d => ({
+                                            ...d,
+                                            line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                                          })),
+                                          onRemove: () => setEstimateDraft(d => ({
+                                            ...d,
+                                            line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
+                                          })),
+                                        })
                                       ))}
                                     </div>
 
@@ -24039,7 +24236,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                       .slice(0, 4)
                                                       .map((line, index) => (
                                                         <div key={`${template.id}-${index}`} className="grid gap-2 border-b border-slate-200 px-3 py-2 text-xs last:border-b-0 sm:grid-cols-[1fr_5rem_6rem]">
-                                                          <span className="font-medium text-slate-800">{line.description || 'Line item'}</span>
+                                                          <div className="min-w-0">
+                                                            <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
+                                                            {lineDisplayDetailRows(line).map(detail => (
+                                                              <p key={detail} className="mt-0.5 text-[11px] leading-4 text-slate-500">{detail}</p>
+                                                            ))}
+                                                          </div>
                                                           <span className="text-slate-500">{line.quantity} {line.unit}</span>
                                                           <span className="font-semibold text-slate-900 sm:text-right">{persistedLineTotalLabel(line)}</span>
                                                         </div>
@@ -24867,78 +25069,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                           {renderSavedChargeQuickPick()}
                           {estimateDraft.line_items.map((line, index) => (
-                            <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                              <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
-                                <Field label="Type">
-                                  <select className={inputClass()} value={line.line_type} onChange={event => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
-                                  }))}>
-                                    {ESTIMATE_LINE_TYPE_OPTIONS.map(type => <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>)}
-                                  </select>
-                                </Field>
-                                <Field label="Description">
-                                  <input
-                                    aria-label={`Line item ${index + 1} description`}
-                                    className={inputClass()}
-                                    {...writingAssistProps}
-                                    value={line.description}
-                                    onChange={event => setEstimateDraft(d => ({
-                                      ...d,
-                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
-                                    }))}
-                                    placeholder="Labor, materials, disposal..."
-                                  />
-                                </Field>
-                                <Field label="Qty">
-                                  <input
-                                    aria-label={`Line item ${index + 1} quantity`}
-                                    className={inputClass()}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={line.quantity}
-                                    onChange={event => setEstimateDraft(d => ({
-                                      ...d,
-                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
-                                    }))}
-                                  />
-                                </Field>
-                                <Field label="Unit">
-                                  <input className={inputClass()} value={line.unit} onChange={event => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
-                                  }))} />
-                                </Field>
-                                <Field label="Unit price">
-                                  <input
-                                    aria-label={`Line item ${index + 1} unit price`}
-                                    className={inputClass()}
-                                    value={line.unit_price}
-                                    onChange={event => setEstimateDraft(d => ({
-                                      ...d,
-                                      line_items: d.line_items.map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
-                                    }))}
-                                    placeholder="$0.00"
-                                  />
-                                </Field>
-                                <div>
-                                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">{draftLineTotalLabel(line)}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                                  }))}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-                                  aria-label={`Remove estimate line ${index + 1}`}
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </div>
-                            </div>
+                            renderStructuredLineDraftEditor({
+                              line,
+                              index,
+                              itemLabel: 'estimate',
+                              onChange: updates => setEstimateDraft(d => ({
+                                ...d,
+                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                              })),
+                              onRemove: () => setEstimateDraft(d => ({
+                                ...d,
+                                line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
+                              })),
+                            })
                           ))}
                         </div>
 
@@ -25052,57 +25195,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </button>
                           </div>
                           {(invoiceDraft.line_items ?? []).map((line, index) => (
-                            <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                              <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
-                                <Field label="Type">
-                                  <select className={inputClass()} value={line.line_type} onChange={event => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, line_type: event.target.value as EstimateLineType } : item),
-                                  }))}>
-                                    {ESTIMATE_LINE_TYPE_OPTIONS.map(type => <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>)}
-                                  </select>
-                                </Field>
-                                <Field label="Description">
-                                  <input aria-label={`Invoice line item ${index + 1} description`} className={inputClass()} {...writingAssistProps} value={line.description} onChange={event => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, description: event.target.value } : item),
-                                  }))} placeholder="Labor, materials, disposal..." />
-                                </Field>
-                                <Field label="Qty">
-                                  <input aria-label={`Invoice line item ${index + 1} quantity`} className={inputClass()} type="number" min="0" step="0.01" value={line.quantity} onChange={event => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, quantity: event.target.value } : item),
-                                  }))} />
-                                </Field>
-                                <Field label="Unit">
-                                  <input className={inputClass()} value={line.unit} onChange={event => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, unit: event.target.value } : item),
-                                  }))} />
-                                </Field>
-                                <Field label="Unit price">
-                                  <input aria-label={`Invoice line item ${index + 1} unit price`} className={inputClass()} value={line.unit_price} onChange={event => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, unit_price: event.target.value } : item),
-                                  }))} placeholder="$0.00" />
-                                </Field>
-                                <div>
-                                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">{draftLineTotalLabel(line)}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setInvoiceDraft(d => ({
-                                    ...d,
-                                    line_items: (d.line_items ?? []).length <= 1 ? [createEstimateLineDraft()] : (d.line_items ?? []).filter(item => item.id !== line.id),
-                                  }))}
-                                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-                                  aria-label={`Remove invoice line ${index + 1}`}
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </div>
-                            </div>
+                            renderStructuredLineDraftEditor({
+                              line,
+                              index,
+                              itemLabel: 'invoice',
+                              onChange: updates => setInvoiceDraft(d => ({
+                                ...d,
+                                line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, ...updates } : item),
+                              })),
+                              onRemove: () => setInvoiceDraft(d => ({
+                                ...d,
+                                line_items: (d.line_items ?? []).length <= 1 ? [createEstimateLineDraft()] : (d.line_items ?? []).filter(item => item.id !== line.id),
+                              })),
+                            })
                           ))}
                         </div>
 
