@@ -13,6 +13,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Cleaned up the Build Estimate Draft workflow by moving Trade Tools behind a collapsed Advanced trade tools section, running trade/job inference only on Build, adding current-draft labor format selection, replacing prior generated builder content on rebuild, and improving scope-aware Plumbing sink/faucet/disposal draft lines.
 - Reason for change: Contractors need faster draft generation without live typing noise, duplicate generated lines, internal helper copy in homeowner-facing estimate fields, or vague placeholder/contingency line items.
+- Blocker follow-up: Tightened the scope-aware Plumbing fixture path so kitchen sink, faucet, and garbage-disposal replacement scopes consistently produce customer-facing material/equipment/labor lines in job-total and line-specific labor modes, and refined conditional fee triggers so permit/inspection/code fees and disposal/haul-off fees are added only when the rough scope calls for them.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`

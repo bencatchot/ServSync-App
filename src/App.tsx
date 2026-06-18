@@ -1228,7 +1228,7 @@ function inferEstimateBuilderTrade(text: string): EstimateDraftBuilderTrade | nu
   };
   const keywordGroups: Record<EstimateDraftBuilderTrade, string[]> = {
     HVAC: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'thermostat', 'duct', 'vent', 'air handler', 'mini split'],
-    Plumbing: ['plumbing', 'plumber', 'pipe', 'leak', 'faucet', 'toilet', 'sink', 'drain', 'water heater', 'valve', 'shower'],
+    Plumbing: ['plumbing', 'plumber', 'pipe', 'leak', 'faucet', 'toilet', 'sink', 'drain', 'water heater', 'valve', 'shower', 'garbage disposal'],
     Electrical: ['electrical', 'electric', 'outlet', 'switch', 'breaker', 'panel', 'circuit', 'fixture', 'light', 'wire', 'gfci'],
     Carpentry: ['carpentry', 'carpenter', 'deck', 'framing', 'trim', 'cabinet', 'door', 'window', 'lumber', 'stairs', 'railing'],
     Other: [],
@@ -1266,6 +1266,35 @@ function textIncludesAny(normalizedText: string, keywords: string[]) {
   return keywords.some(keyword => normalizedText.includes(compactText(keyword)));
 }
 
+function estimateBuilderScopeNeedsPermitFee(normalizedScope: string) {
+  return textIncludesAny(normalizedScope, ['permit', 'inspection', 'code']);
+}
+
+function estimateBuilderScopeNeedsDisposalFee(normalizedScope: string) {
+  const disposalPhrases = [
+    'haul off',
+    'haul-off',
+    'debris',
+    'dispose',
+    'discard',
+    'remove old',
+    'old sink',
+    'old faucet',
+    'old disposal',
+    'take away',
+  ];
+  if (textIncludesAny(normalizedScope, disposalPhrases)) return true;
+  return normalizedScope.includes('disposal') && !normalizedScope.includes('garbage disposal');
+}
+
+function estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope: string) {
+  const normalized = compactText(roughScope);
+  const hasSink = textIncludesAny(normalized, ['sink', 'kitchen sink']);
+  const hasFaucet = textIncludesAny(normalized, ['faucet', 'fixture']);
+  const hasGarbageDisposal = textIncludesAny(normalized, ['garbage disposal', 'disposal unit', 'disposer']);
+  return hasSink && (hasFaucet || hasGarbageDisposal);
+}
+
 function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
   const lineTypeWeight: Record<EstimateLineType, number> = {
     material: 0,
@@ -1295,6 +1324,9 @@ function estimateDraftBuilderSeedIsCustomerSafe(seed: EstimateDraftBuilderLineSe
 function estimateDraftBuilderFeeIsRelevant(seed: EstimateDraftBuilderLineSeed, roughScope: string) {
   if (seed.line_type !== 'fee') return true;
   const normalized = compactText(roughScope);
+  const description = compactText(seed.description);
+  if (description.includes('permit') || description.includes('inspection')) return estimateBuilderScopeNeedsPermitFee(normalized);
+  if (description.includes('disposal') || description.includes('haul')) return estimateBuilderScopeNeedsDisposalFee(normalized);
   return textIncludesAny(normalized, seed.keywords && seed.keywords.length > 0 ? seed.keywords : [seed.description]);
 }
 
@@ -1308,7 +1340,7 @@ function contextualEstimateBuilderSeeds({
   laborMode: EstimateDraftBuilderLaborMode;
 }): EstimateDraftBuilderLineSeed[] | null {
   const normalized = compactText(roughScope);
-  if (trade !== 'Plumbing' || !normalized) return null;
+  if (!normalized || (trade !== 'Plumbing' && !estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope))) return null;
 
   const hasSink = textIncludesAny(normalized, ['sink', 'kitchen sink']);
   const hasFaucet = textIncludesAny(normalized, ['faucet', 'fixture']);
@@ -1333,10 +1365,10 @@ function contextualEstimateBuilderSeeds({
       ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
   const feeSeeds: EstimateDraftBuilderLineSeed[] = [];
-  if (textIncludesAny(normalized, ['permit', 'inspection'])) {
-    feeSeeds.push({ line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection'] });
+  if (estimateBuilderScopeNeedsPermitFee(normalized)) {
+    feeSeeds.push({ line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection', 'code'] });
   }
-  if (textIncludesAny(normalized, ['haul off', 'haul-off', 'debris', 'dispose of', 'discard', 'remove old', 'old sink', 'old faucet', 'old disposal', 'take away'])) {
+  if (estimateBuilderScopeNeedsDisposalFee(normalized)) {
     feeSeeds.push({ line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] });
   }
 
@@ -17307,7 +17339,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     const inferredTrade = inferEstimateBuilderTrade(estimateAssistantText);
     const inferredJobType = inferEstimateBuilderJobType(estimateAssistantText);
-    const buildTrade = inferredTrade || estimateDraftBuilderTrade;
+    const buildTrade = estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(estimateAssistantText)
+      ? 'Plumbing'
+      : inferredTrade || estimateDraftBuilderTrade;
     const buildJobType = inferredJobType || estimateDraftBuilderJobType;
     const builtDraft = buildRuleBasedEstimateDraft({
       trade: buildTrade,
