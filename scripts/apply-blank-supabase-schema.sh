@@ -77,6 +77,7 @@ SQL_FILES=(
   "servsync-estimate-job-support.sql"
   "servsync-home-specific-inspection-templates.sql"
   "servsync-invoices-schema.sql"
+  "servsync-estimate-price-required-foundation.sql"
   "servsync-invoice-discount-details.sql"
   "servsync-estimate-job-approved-scope.sql"
   "servsync-invoice-from-source.sql"

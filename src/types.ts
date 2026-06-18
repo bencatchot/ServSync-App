@@ -64,7 +64,7 @@ export interface EstimateLineItem {
   description: string;
   quantity: number;
   unit: string;
-  unit_price_cents: number;
+  unit_price_cents: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -100,7 +100,7 @@ export interface InvoiceLineItem {
   description: string;
   quantity: number;
   unit: string;
-  unit_price_cents: number;
+  unit_price_cents: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -173,7 +173,7 @@ export interface EstimateTemplateLineItem {
   description: string;
   quantity: number;
   unit: string;
-  unit_price_cents: number;
+  unit_price_cents: number | null;
   sort_order: number;
 }
 

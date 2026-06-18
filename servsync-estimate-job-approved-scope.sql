@@ -124,8 +124,14 @@ begin
             'Approved estimate line item.',
             'Type: ' || coalesce(nullif(trim(eli.line_type), ''), 'work'),
             'Quantity: ' || trim(to_char(coalesce(eli.quantity, 1), 'FM999999990.##')) || ' ' || coalesce(nullif(trim(eli.unit), ''), 'unit'),
-            'Unit price: $' || trim(to_char(coalesce(eli.unit_price_cents, 0) / 100.0, 'FM999999990.00')),
-            'Line total: $' || trim(to_char((coalesce(eli.quantity, 1) * coalesce(eli.unit_price_cents, 0)) / 100.0, 'FM999999990.00'))
+            case
+              when eli.unit_price_cents is null then 'Unit price: Price to be confirmed'
+              else 'Unit price: $' || trim(to_char(eli.unit_price_cents / 100.0, 'FM999999990.00'))
+            end,
+            case
+              when eli.unit_price_cents is null then 'Line total: Price to be confirmed'
+              else 'Line total: $' || trim(to_char((coalesce(eli.quantity, 1) * eli.unit_price_cents) / 100.0, 'FM999999990.00'))
+            end
           ),
           'action', 'Complete approved work: ' || coalesce(nullif(trim(eli.description), ''), 'line item'),
           'due', '',
