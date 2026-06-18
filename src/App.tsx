@@ -356,7 +356,7 @@ type EstimateDraftBuilderLineSeed = {
 };
 type EstimateDraftBuilderRulePack = {
   trade: EstimateDraftBuilderTrade;
-  scopeNoun: string;
+  scopeLead: (jobTypeLabel: string) => string;
   notes: string;
   lines: EstimateDraftBuilderLineSeed[];
 };
@@ -1323,6 +1323,18 @@ function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges
   };
 }
 
+function customerFacingRoughScope(value: string) {
+  return value
+    .replace(/\b(?:quote|estimate|bid)\s*(?:for|on)?\s*/gi, '')
+    .replace(/\b(?:at|@|for|rate|price|cost)\s+\$?\s*[\d,]+(?:\.\d{1,2})?(?:\s*(?:\/|per\s*)\s*(?:h(?:ou)?r|hr|each|ea))?/gi, '')
+    .replace(/\b(?:price|pricing|cost|rate)\s*(?:is|at|for)?\s*\$?\s*[\d,]+(?:\.\d{1,2})?/gi, '')
+    .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, '')
+    .replace(/\b(?:internal|helper|draft|placeholder|price required)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim();
+}
+
 function buildRuleBasedEstimateDraft({
   trade,
   jobType,
@@ -1338,14 +1350,16 @@ function buildRuleBasedEstimateDraft({
 }) {
   const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
   const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const cleanScope = roughScope.trim().replace(/\s+/g, ' ');
+  const cleanScope = customerFacingRoughScope(roughScope);
   const builtLines = rulePack.lines.map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
   const jobTypeLabel = estimateBuilderJobTypeLabel(jobType);
+  const requestedScope = cleanScope
+    ? `Requested scope: ${/[.!?]$/.test(cleanScope) ? cleanScope : `${cleanScope}.`}`
+    : '';
   const scope = [
-    `Prepare a ${trade === 'Other' ? 'general' : trade} ${jobTypeLabel.toLowerCase()} estimate for ${subjectName || 'the customer'}.`,
-    cleanScope ? `Contractor rough scope: ${cleanScope}` : `Contractor should confirm final ${rulePack.scopeNoun} details before pricing.`,
-    'Review all quantities, Price Required lines, exclusions, and terms before sending.',
-  ].join(' ');
+    rulePack.scopeLead(jobTypeLabel.toLowerCase()),
+    requestedScope,
+  ].filter(Boolean).join(' ');
 
   return {
     title: `${trade === 'Other' ? 'Project' : trade} ${jobTypeLabel} Estimate - ${subjectName || 'Customer'} - ${dateLabel}`,
@@ -1909,8 +1923,8 @@ const ESTIMATE_DRAFT_BUILDER_JOB_LABELS = Object.fromEntries(
 const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, EstimateDraftBuilderRulePack> = {
   HVAC: {
     trade: 'HVAC',
-    scopeNoun: 'HVAC work',
-    notes: 'Contractor should confirm system type, access, model information, refrigerant requirements, electrical needs, permit requirements, and any manufacturer constraints before final pricing.',
+    scopeLead: jobTypeLabel => `Provide HVAC ${jobTypeLabel} services for the requested system or equipment. Work includes reviewing accessible components related to the reported scope, confirming required materials or equipment, and completing the approved HVAC work after contractor review.`,
+    notes: 'Excludes concealed conditions, code upgrades, manufacturer-specific requirements, permit costs not listed, and additional repairs or equipment changes unless approved separately.',
     lines: [
       { line_type: 'labor', description: 'HVAC diagnostic / site assessment labor', unit: 'hour', keywords: ['diagnostic', 'assessment', 'service call', 'troubleshoot'] },
       { line_type: 'labor', description: 'HVAC repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replacement'] },
@@ -1926,8 +1940,8 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
   },
   Plumbing: {
     trade: 'Plumbing',
-    scopeNoun: 'plumbing work',
-    notes: 'Contractor should confirm fixture selections, shutoff access, concealed conditions, code requirements, permit needs, and whether additional wall/floor repair is outside plumbing scope.',
+    scopeLead: jobTypeLabel => `Provide plumbing ${jobTypeLabel} services for the requested fixture, piping, or water-system issue. Work includes reviewing accessible plumbing components related to the reported scope, confirming required materials, and completing the approved plumbing work after contractor review.`,
+    notes: 'Excludes concealed conditions, code upgrades, wall/floor/cabinet restoration, permit costs not listed, and additional plumbing repairs unless approved separately.',
     lines: [
       { line_type: 'labor', description: 'Plumbing diagnostic / service labor', unit: 'hour', keywords: ['diagnostic', 'service', 'leak', 'clog'] },
       { line_type: 'labor', description: 'Plumbing repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
@@ -1942,8 +1956,8 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
   },
   Electrical: {
     trade: 'Electrical',
-    scopeNoun: 'electrical work',
-    notes: 'Contractor should confirm panel capacity, circuit availability, code requirements, permit needs, device selections, access, and whether patching/finish repair is excluded.',
+    scopeLead: jobTypeLabel => `Provide electrical ${jobTypeLabel} services for the requested circuit, device, fixture, or panel-related work. Work includes reviewing accessible electrical components related to the reported scope, confirming required materials, and completing the approved electrical work after contractor review.`,
+    notes: 'Excludes hidden wiring issues, service upgrades, drywall/paint repair, utility company work, permit costs not listed, and additional code-required repairs unless approved separately.',
     lines: [
       { line_type: 'labor', description: 'Electrical diagnostic / site assessment labor', unit: 'hour', keywords: ['diagnostic', 'assessment', 'troubleshoot'] },
       { line_type: 'labor', description: 'Electrical repair or installation labor', unit: 'hour', keywords: ['labor', 'repair', 'install', 'replace'] },
@@ -1957,8 +1971,8 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
   },
   Carpentry: {
     trade: 'Carpentry',
-    scopeNoun: 'carpentry work',
-    notes: 'Contractor should confirm dimensions, materials, finish level, access, disposal needs, site protection, and whether paint/stain or related trades are included.',
+    scopeLead: jobTypeLabel => `Provide carpentry ${jobTypeLabel} services for the requested repair, installation, or finish work. Work includes confirming measurements, reviewing accessible conditions, confirming required materials, and completing the approved carpentry scope.`,
+    notes: 'Excludes hidden structural conditions, engineering, utility relocation, paint/stain unless listed, and related trade work unless approved separately.',
     lines: [
       { line_type: 'labor', description: 'Carpentry layout and site assessment labor', unit: 'hour', keywords: ['layout', 'assessment', 'measure'] },
       { line_type: 'labor', description: 'Carpentry build / repair / installation labor', unit: 'hour', keywords: ['labor', 'build', 'repair', 'install'] },
@@ -1972,13 +1986,12 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
   },
   Other: {
     trade: 'Other',
-    scopeNoun: 'project work',
-    notes: 'Contractor should confirm scope boundaries, access, materials, schedule, exclusions, and any conditions that need field verification before final pricing.',
+    scopeLead: () => 'Provide services for the requested project scope. Work includes reviewing accessible conditions, confirming required labor and materials, and completing the approved work after contractor review.',
+    notes: 'Excludes hidden conditions, permits or specialty work not listed, and additional labor or materials unless approved separately.',
     lines: [
       { line_type: 'labor', description: 'Labor for requested work', unit: 'hour', keywords: ['labor', 'work', 'repair', 'install'] },
       { line_type: 'material', description: 'Materials and supplies allowance', unit: 'lot', keywords: ['materials', 'supplies', 'parts'] },
-      { line_type: 'fee', description: 'Trip, permit, disposal, or administrative fee', unit: 'each', keywords: ['trip', 'permit', 'disposal', 'fee'] },
-      { line_type: 'other', description: 'Contingency for scope to be confirmed', unit: 'allowance', keywords: ['contingency', 'scope'] },
+      { line_type: 'other', description: 'Project scope item to be confirmed', unit: 'allowance', keywords: ['project', 'scope'] },
     ],
   },
 };
