@@ -15490,7 +15490,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
   const [selectedHomeownerSubjectId, setSelectedHomeownerSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorSelectedHomeowner));
-  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'schedule'] as const, 'profile'));
+  const [homeownerDetailTab, setHomeownerDetailTab] = useState<HomeownerWorkspaceTab>(() => storedTab(STORAGE_KEYS.contractorHomeownerDetailTab, ['profile', 'requests', 'fieldwork', 'estimates', 'schedule'] as const, 'profile'));
   const [homeownerWorkspaceRequestView, setHomeownerWorkspaceRequestView] = useState<HomeownerWorkspaceRequestView>(() => storedTab(STORAGE_KEYS.contractorHomeownerRequestView, ['attention', 'active', 'closed'] as const, 'active'));
   const [homeownerWorkspaceEstimateView, setHomeownerWorkspaceEstimateView] = useState<HomeownerWorkspaceEstimateView>('draft');
   const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
@@ -18429,15 +18429,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const contractorFieldWorkStarterTemplates = contractorTradeSet.size
     ? SERVSYNC_FIELD_WORK_TEMPLATES.filter(template => starterTemplateAllowedForContractor(template.trade))
     : SERVSYNC_FIELD_WORK_TEMPLATES.filter(template => template.trade === 'General Maintenance');
-  const contractorEstimateStarterTemplates = contractorTradeSet.size
-    ? STARTER_ESTIMATE_TEMPLATES.filter(template => starterTemplateAllowedForContractor(template.trade))
-    : STARTER_ESTIMATE_TEMPLATES.filter(template => template.trade === 'General Maintenance');
   const starterFieldWorkTemplatePool = contractorFieldWorkStarterTemplates.length
     ? contractorFieldWorkStarterTemplates
     : SERVSYNC_FIELD_WORK_TEMPLATES.filter(template => template.trade === 'General Maintenance');
-  const starterEstimateTemplatePool = contractorEstimateStarterTemplates.length
-    ? contractorEstimateStarterTemplates
-    : STARTER_ESTIMATE_TEMPLATES.filter(template => template.trade === 'General Maintenance');
+  const starterEstimateTemplatePool = STARTER_ESTIMATE_TEMPLATES;
   const sortedServSyncFieldWorkTemplates = [...starterFieldWorkTemplatePool].sort((a, b) => {
     const aRecommended = starterTemplateRecommendedForContractor(a.trade) ? 0 : 1;
     const bRecommended = starterTemplateRecommendedForContractor(b.trade) ? 0 : 1;
@@ -18462,7 +18457,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     ? checklistStarterTemplates
     : inspectionStarterTemplateFallback;
   const sortedStarterEstimateTemplates = [...starterEstimateTemplatePool]
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const aRecommended = starterTemplateRecommendedForContractor(a.trade) ? 0 : 1;
+      const bRecommended = starterTemplateRecommendedForContractor(b.trade) ? 0 : 1;
+      if (aRecommended !== bRecommended) return aRecommended - bRecommended;
+      return a.name.localeCompare(b.name);
+    });
   const normalizedTemplateSearch = normalizeText(templateSearch);
   const templateMatchesSearch = (template: { name: string; rooms: InspectionTemplateRoom[]; trade?: string; description?: string; kind?: FieldWorkflowKind }) => {
     if (!normalizedTemplateSearch) return true;
@@ -22990,6 +22990,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         tone: jobsAttentionCount > 0 ? 'amber' : 'blue',
                       },
                       {
+                        id: 'estimates',
+                        label: 'Estimates',
+                        value: String(estimateRecords.length),
+                        helper: estimateRecords.length > 0 ? 'Drafts, sent work, and templates' : 'Use templates or create a draft',
+                        icon: <Receipt size={15} />,
+                        tone: estimateRecords.length > 0 ? 'blue' : 'slate',
+                      },
+                      {
                         id: 'schedule',
                         label: 'Calendar',
                         value: String(upcomingAppts.length),
@@ -24202,7 +24210,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div>
                                         <p className="text-sm font-bold text-slate-950">ServSync estimate starters</p>
                                         <p className="mt-1 text-xs text-slate-600">
-                                          These starter estimates are limited to the service categories checked in your Business Profile.
+                                          Recommended starters match the service categories checked in your Business Profile. Search all ServSync starters when the scope crosses trades.
                                         </p>
                                       </div>
                                       <Field label="Search estimate templates">
