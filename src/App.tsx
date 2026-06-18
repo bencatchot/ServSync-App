@@ -2448,7 +2448,16 @@ type TradeStarterTemplateBlueprint = {
   description: string;
   rooms: InspectionTemplateRoom[];
   estimateScope: string;
-  estimateLines: Array<{ line_type: EstimateLineType; description: string; quantity?: number; unit?: string }>;
+  estimateLines: Array<{
+    line_type: EstimateLineType;
+    description: string;
+    line_title?: string;
+    customer_description?: string;
+    model_spec?: string;
+    supply_status?: EstimateLineSupplyStatus | null;
+    quantity?: number;
+    unit?: string;
+  }>;
 };
 
 function starterSlug(value: string) {
@@ -2456,14 +2465,21 @@ function starterSlug(value: string) {
 }
 
 function starterEstimateLines(lines: TradeStarterTemplateBlueprint['estimateLines']) {
-  return lines.map((line, index) => ({
-    line_type: line.line_type,
-    description: line.description,
-    quantity: line.quantity ?? 1,
-    unit: line.unit ?? 'each',
-    unit_price_cents: null,
-    sort_order: index,
-  }));
+  return lines.map((line, index) => {
+    const lineTitle = line.line_title?.trim() || line.description.trim() || 'Line item';
+    return {
+      line_type: line.line_type,
+      description: line.description.trim() || lineTitle,
+      line_title: lineTitle,
+      customer_description: line.customer_description?.trim() || '',
+      model_spec: line.model_spec?.trim() || '',
+      supply_status: line.supply_status ?? null,
+      quantity: line.quantity ?? 1,
+      unit: line.unit ?? 'each',
+      unit_price_cents: null,
+      sort_order: index,
+    };
+  });
 }
 
 const STARTER_ESTIMATE_TERMS = 'Starter estimate only. Contractor must verify scope, site conditions, materials, labor, taxes, permits, and pricing before sending to homeowner.';
@@ -3214,7 +3230,87 @@ const STARTER_ESTIMATE_TEMPLATES: StarterEstimateTemplate[] = TRADE_OPTIONS.map(
     terms: STARTER_ESTIMATE_TERMS,
     line_items: starterEstimateLines(blueprint.estimateLines),
   };
-});
+}).concat([
+  {
+    id: 'starter-hvac-system-replacement-estimate',
+    name: 'HVAC System Replacement',
+    trade: 'HVAC',
+    scope: 'Provide HVAC system replacement services for the requested heating or cooling equipment. Work includes reviewing accessible equipment and connections, confirming required materials and equipment, and completing the approved HVAC replacement after contractor review.',
+    notes: 'Pricing, equipment selection, permit needs, electrical requirements, and site conditions must be verified before sending.',
+    terms: STARTER_ESTIMATE_TERMS,
+    line_items: starterEstimateLines([
+      { line_type: 'fee', description: 'System replacement assessment', line_title: 'System replacement assessment', customer_description: 'Review existing HVAC equipment, accessible connections, replacement requirements, and site conditions before finalizing the replacement scope.' },
+      { line_type: 'material', description: 'Indoor HVAC equipment', line_title: 'Indoor HVAC equipment', customer_description: 'Indoor heating or air-handling equipment required for the approved system replacement.' },
+      { line_type: 'material', description: 'Outdoor HVAC equipment', line_title: 'Outdoor HVAC equipment', customer_description: 'Outdoor condenser or heat pump equipment required for the approved system replacement.' },
+      { line_type: 'material', description: 'Line set, drain, and transition materials', line_title: 'Line set, drain, and transition materials', customer_description: 'Refrigerant line, condensate, duct transition, pad, disconnect, and installation materials as needed for the replacement.' },
+      { line_type: 'labor', description: 'Remove existing HVAC equipment', line_title: 'Remove existing HVAC equipment', customer_description: 'Labor to safely remove existing accessible HVAC equipment included in the approved replacement scope.', unit: 'hour' },
+      { line_type: 'labor', description: 'Install replacement HVAC system', line_title: 'Install replacement HVAC system', customer_description: 'Labor to set, connect, start up, and test the replacement HVAC system after contractor review.', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance', customer_description: 'Permit, inspection, refrigerant recovery, or disposal allowance when required by the approved scope.' },
+    ]),
+  },
+  {
+    id: 'starter-plumbing-water-heater-replacement-estimate',
+    name: 'Plumbing Water Heater Replacement',
+    trade: 'Plumbing',
+    scope: 'Provide plumbing water heater replacement services for the requested water heating equipment. Work includes reviewing accessible plumbing connections, confirming required materials, and completing the approved replacement after contractor review.',
+    notes: 'Confirm water heater type, capacity, access, venting, drain pan, shutoffs, code requirements, and permit needs before sending.',
+    terms: STARTER_ESTIMATE_TERMS,
+    line_items: starterEstimateLines([
+      { line_type: 'fee', description: 'Water heater replacement assessment', line_title: 'Water heater replacement assessment', customer_description: 'Review the existing water heater, accessible plumbing connections, code requirements, and replacement conditions.' },
+      { line_type: 'material', description: 'Replacement water heater', line_title: 'Replacement water heater', customer_description: 'Replacement water heater equipment selected for the approved scope.' },
+      { line_type: 'material', description: 'Water heater connection materials', line_title: 'Water heater connection materials', customer_description: 'Supply connectors, valves, fittings, drain pan, discharge piping, venting, or expansion tank materials as needed.' },
+      { line_type: 'labor', description: 'Remove existing water heater', line_title: 'Remove existing water heater', customer_description: 'Labor to disconnect and remove the existing water heater included in the approved replacement scope.', unit: 'hour' },
+      { line_type: 'labor', description: 'Install replacement water heater', line_title: 'Install replacement water heater', customer_description: 'Labor to set, connect, fill, start, and test the replacement water heater after contractor review.', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, inspection, or disposal allowance', line_title: 'Permit, inspection, or disposal allowance', customer_description: 'Permit, inspection, or disposal allowance when required by the approved scope.' },
+    ]),
+  },
+  {
+    id: 'starter-electrical-dedicated-circuit-ev-charger-estimate',
+    name: 'Electrical Dedicated Circuit / EV Charger',
+    trade: 'Electrical',
+    scope: 'Provide electrical dedicated-circuit or EV charger installation services for the requested circuit, device, or charger location. Work includes reviewing accessible electrical conditions, confirming required materials, and completing the approved electrical work after contractor review.',
+    notes: 'Confirm panel capacity, circuit route, charger/device specifications, permit needs, utility requirements, and inspection requirements before sending.',
+    terms: STARTER_ESTIMATE_TERMS,
+    line_items: starterEstimateLines([
+      { line_type: 'fee', description: 'Electrical circuit assessment', line_title: 'Electrical circuit assessment', customer_description: 'Review panel capacity, accessible routing, device requirements, and installation conditions before finalizing the circuit scope.' },
+      { line_type: 'material', description: 'Breaker, wire, conduit, and boxes', line_title: 'Breaker, wire, conduit, and boxes', customer_description: 'Breaker, wiring, conduit, boxes, fittings, and related materials for the approved circuit installation.' },
+      { line_type: 'material', description: 'Device or charger connection materials', line_title: 'Device or charger connection materials', customer_description: 'Receptacle, disconnect, mounting, charger connection, or device materials included in the approved scope.' },
+      { line_type: 'labor', description: 'Install dedicated circuit', line_title: 'Install dedicated circuit', customer_description: 'Labor to install the approved circuit, routing, connections, labeling, and testing.', unit: 'hour' },
+      { line_type: 'labor', description: 'Install device or EV charger', line_title: 'Install device or EV charger', customer_description: 'Labor to mount, connect, and test the approved device or EV charger where included in the scope.', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit or inspection allowance', line_title: 'Permit or inspection allowance', customer_description: 'Permit or inspection allowance when required by the approved electrical scope.' },
+    ]),
+  },
+  {
+    id: 'starter-carpentry-deck-repair-build-estimate',
+    name: 'Carpentry Deck Repair / Build',
+    trade: 'Carpentry',
+    scope: 'Provide carpentry deck repair or build services for the requested deck scope. Work includes confirming measurements, reviewing accessible framing and finish conditions, confirming required materials, and completing the approved carpentry work.',
+    notes: 'Confirm dimensions, framing condition, fastener/connectors, railing/stair requirements, finish expectations, permits, and site access before sending.',
+    terms: STARTER_ESTIMATE_TERMS,
+    line_items: starterEstimateLines([
+      { line_type: 'fee', description: 'Deck scope assessment and measurements', line_title: 'Deck scope assessment and measurements', customer_description: 'Review deck conditions, confirm measurements, and identify repair or build requirements before finalizing the scope.' },
+      { line_type: 'material', description: 'Deck framing materials', line_title: 'Deck framing materials', customer_description: 'Framing lumber, posts, beams, joists, hangers, connectors, and fasteners required for the approved deck scope.' },
+      { line_type: 'material', description: 'Decking, railing, and finish materials', line_title: 'Decking, railing, and finish materials', customer_description: 'Deck boards, railing components, stairs, trim, hardware, and finish materials included in the approved scope.' },
+      { line_type: 'labor', description: 'Deck demolition or preparation', line_title: 'Deck demolition or preparation', customer_description: 'Labor for demolition, preparation, layout, or existing-material removal included in the approved scope.', unit: 'hour' },
+      { line_type: 'labor', description: 'Deck repair or build labor', line_title: 'Deck repair or build labor', customer_description: 'Labor to complete the approved deck repair, framing, decking, railing, stair, or finish work.', unit: 'hour' },
+      { line_type: 'fee', description: 'Permit, disposal, or access allowance', line_title: 'Permit, disposal, or access allowance', customer_description: 'Permit, disposal, delivery, or access allowance when required by the approved deck scope.' },
+    ]),
+  },
+  {
+    id: 'starter-generic-service-call-diagnostic-estimate',
+    name: 'Generic Service Call / Diagnostic',
+    trade: 'General Maintenance',
+    scope: 'Provide service call and diagnostic services for the requested project scope. Work includes reviewing accessible conditions, confirming required labor and materials, and completing the approved work after contractor review.',
+    notes: 'Confirm the final repair scope, materials, pricing, access limits, and any follow-up work before sending.',
+    terms: STARTER_ESTIMATE_TERMS,
+    line_items: starterEstimateLines([
+      { line_type: 'fee', description: 'Service call / diagnostic fee', line_title: 'Service call / diagnostic fee', customer_description: 'Initial visit to review the reported concern, inspect accessible conditions, and recommend next steps.' },
+      { line_type: 'labor', description: 'Labor for requested work', line_title: 'Labor for requested work', customer_description: 'Labor to complete the approved service or repair scope after contractor review.', unit: 'hour' },
+      { line_type: 'material', description: 'Materials and supplies allowance', line_title: 'Materials and supplies allowance', customer_description: 'Materials, parts, supplies, or consumables needed for the approved service scope.' },
+      { line_type: 'other', description: 'Project scope item to be confirmed', line_title: 'Project scope item to be confirmed', customer_description: 'Additional scope item to confirm or remove before sending the estimate.' },
+    ]),
+  },
+]);
 
 const FIELD_WORK_KIND_LABEL: Record<FieldWorkflowKind, string> = {
   inspection: 'Inspection',
