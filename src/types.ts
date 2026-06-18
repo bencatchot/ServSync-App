@@ -22,6 +22,7 @@ export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expir
 export type EstimateLineType = 'labor' | 'material' | 'fee' | 'other';
 export type LegacyEstimateLineType = EstimateLineType | 'equipment';
 export type EstimateChargeType = 'flat' | 'hourly';
+export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
@@ -63,6 +64,10 @@ export interface EstimateLineItem {
   estimate_id: string;
   line_type: LegacyEstimateLineType;
   description: string;
+  line_title?: string | null;
+  customer_description?: string | null;
+  model_spec?: string | null;
+  supply_status?: EstimateLineSupplyStatus | null;
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
@@ -99,6 +104,10 @@ export interface InvoiceLineItem {
   invoice_id: string;
   line_type: LegacyEstimateLineType;
   description: string;
+  line_title?: string | null;
+  customer_description?: string | null;
+  model_spec?: string | null;
+  supply_status?: EstimateLineSupplyStatus | null;
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
@@ -163,6 +172,10 @@ export interface InvoiceDraft {
   line_items: Array<{
     line_type: EstimateLineType;
     description: string;
+    line_title?: string;
+    customer_description?: string;
+    model_spec?: string;
+    supply_status?: EstimateLineSupplyStatus | '';
     quantity: string;
     unit: string;
     unit_price: string;
@@ -172,6 +185,10 @@ export interface InvoiceDraft {
 export interface EstimateTemplateLineItem {
   line_type: LegacyEstimateLineType;
   description: string;
+  line_title?: string;
+  customer_description?: string;
+  model_spec?: string;
+  supply_status?: EstimateLineSupplyStatus | null;
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
