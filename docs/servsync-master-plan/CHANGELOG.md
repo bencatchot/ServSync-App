@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/estimate-starter-templates-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Improved starter estimate templates by adding structured trade-specific starters for HVAC system replacement, plumbing water heater replacement, electrical dedicated circuit / EV charger work, carpentry deck repair/build work, and generic service calls, with Price Required starter lines and customer-facing structured line titles/descriptions. Follow-up blocker fix exposed the existing connected/local customer workspace Estimates route and made all ServSync estimate starters searchable while still ranking Business Profile category matches as recommended.
+- Reason for change: Give contractors more useful structured estimate starting points now that structured line item app support is in place, while preserving existing broad starter templates, saved templates, saved-charge quick-pick behavior, Build Estimate Draft behavior, and Price Required defaults.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+  - Static starter-template data check for the five new starter names, structured line fields, Price Required null defaults, and no app-created `equipment` line type.
+  - Authenticated local/sandbox smoke with existing structured-line smoke coverage for manual line persistence, Build Estimate Draft, saved-charge quick-pick, estimate PDF generation, invoice editing/display, mobile layout, and saved-charge fixture cleanup.
+  - Follow-up authenticated local/sandbox smoke to confirm the customer workspace Estimates tab exposes starter estimate template cards, all five new starters are searchable, each new starter applies and saves a structured Price Required draft, and representative saved estimate line rows preserve structured fields with no `equipment` line type.
+- Known risks or follow-ups:
+  - Saved-charge quick-pick remained reachable in the follow-up smoke, but the sandbox account had no active saved charges to exercise an add action during this specific route check.
+  - Existing structured-line smoke reported template apply as partial: saving preserved structured fields in template JSON, but the script did not complete the apply UI path.
+  - Homeowner estimate view smoke with a safe homeowner-linked fixture and deeper PDF content inspection remain recommended.
+  - Estimate-template research, saved-charge structured metadata, approved-estimate-to-job scope SQL, and broader E2E coverage remain later estimate workflow slices.
+
 - Branch: `feature/structured-line-items-ui-v1`
 - Files changed:
   - `src/App.tsx`
