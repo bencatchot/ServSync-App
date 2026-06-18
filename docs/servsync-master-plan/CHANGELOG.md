@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/build-estimate-draft-material-aliases-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a small rule-based, trade-aware material alias detector to Build Estimate Draft so explicit material, fixture, part, and equipment-style mentions create specific editable material line items before broad fallback material categories.
+- Reason for change: Rough scopes like “Remove and replace kitchen sink” should produce a specific sink material line instead of relying only on generic material fallback, while preserving Price Required behavior, saved-charge matching, and contractor-only source notes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Alias matching is intentionally small and rule-based; future expansion should stay trade-aware and avoid becoming a SKU catalog.
+  - Authenticated preview smoke should confirm the representative plumbing, electrical, HVAC, carpentry, and generic rough-scope cases in the live composer UI.
+  - Saved-charge exact-match behavior should be watched as more contractors add saved material charges with similar names.
+
 - Branch: `feature/estimate-save-flow-polish-v1`
 - Files changed:
   - `src/App.tsx`

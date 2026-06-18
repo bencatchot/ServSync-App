@@ -365,6 +365,15 @@ type EstimateDraftBuilderLineSeed = {
   unit?: string;
   keywords?: string[];
 };
+type EstimateDraftBuilderMaterialAliasRule = {
+  key: string;
+  trade: EstimateDraftBuilderTrade | 'Generic';
+  title: string;
+  aliases: string[];
+  unit?: string;
+  suppressIfKeysDetected?: string[];
+  fallbackOnly?: boolean;
+};
 type EstimateDraftBuilderLastOutput = {
   title: string;
   scope: string;
@@ -1334,9 +1343,9 @@ function inferEstimateBuilderTrade(text: string): EstimateDraftBuilderTrade | nu
     Other: 0,
   };
   const keywordGroups: Record<EstimateDraftBuilderTrade, string[]> = {
-    HVAC: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'thermostat', 'duct', 'vent', 'air handler', 'mini split'],
+    HVAC: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'thermostat', 'duct', 'vent', 'air handler', 'mini split', 'condensate', 'line set', 'lineset', 'disconnect'],
     Plumbing: ['plumbing', 'plumber', 'pipe', 'leak', 'faucet', 'toilet', 'sink', 'drain', 'water heater', 'valve', 'shower', 'garbage disposal'],
-    Electrical: ['electrical', 'electric', 'outlet', 'switch', 'breaker', 'panel', 'circuit', 'fixture', 'light', 'wire', 'gfci'],
+    Electrical: ['electrical', 'electric', 'outlet', 'receptacle', 'switch', 'breaker', 'panel', 'circuit', 'dedicated circuit', 'fixture', 'light', 'wire', 'conduit', 'gfci', 'gfi', 'ev charger', 'charger', 'ceiling fan'],
     Carpentry: ['carpentry', 'carpenter', 'deck', 'framing', 'trim', 'cabinet', 'door', 'window', 'lumber', 'stairs', 'railing'],
     Other: [],
   };
@@ -1371,6 +1380,120 @@ function inferEstimateBuilderJobType(text: string): EstimateDraftBuilderJobType 
 
 function textIncludesAny(normalizedText: string, keywords: string[]) {
   return keywords.some(keyword => normalizedText.includes(compactText(keyword)));
+}
+
+const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES: EstimateDraftBuilderMaterialAliasRule[] = [
+  { key: 'plumbing_sink', trade: 'Plumbing', title: 'Sink', aliases: ['kitchen sink', 'sink replacement', 'new sink', 'replace kitchen sink'], unit: 'each' },
+  { key: 'plumbing_faucet', trade: 'Plumbing', title: 'Faucet / hardware', aliases: ['faucet', 'sink faucet', 'faucet hardware'], unit: 'each' },
+  { key: 'plumbing_garbage_disposal', trade: 'Plumbing', title: 'Garbage disposal', aliases: ['garbage disposal', 'disposal unit', 'disposer'], unit: 'each' },
+  { key: 'plumbing_water_heater', trade: 'Plumbing', title: 'Water heater', aliases: ['water heater', 'tankless heater', 'hot water heater'], unit: 'each' },
+  { key: 'plumbing_shutoff_valve', trade: 'Plumbing', title: 'Shutoff valve', aliases: ['shutoff valve', 'shut off valve', 'angle stop'], unit: 'each' },
+  { key: 'plumbing_supply_lines', trade: 'Plumbing', title: 'Supply lines', aliases: ['supply line', 'supply lines', 'water supply line'], unit: 'lot' },
+  { key: 'plumbing_drain_p_trap', trade: 'Plumbing', title: 'Drain / P-trap', aliases: ['p trap', 'p-trap', 'drain trap', 'drain assembly'], unit: 'lot' },
+  { key: 'plumbing_wax_ring_flange', trade: 'Plumbing', title: 'Wax ring / toilet flange', aliases: ['wax ring', 'toilet flange', 'closet flange'], unit: 'each' },
+  { key: 'plumbing_drain_pan', trade: 'Plumbing', title: 'Drain pan', aliases: ['drain pan', 'water heater pan'], unit: 'each' },
+  { key: 'plumbing_fittings_connections', trade: 'Plumbing', title: 'Fittings / connections', aliases: ['fittings', 'connections', 'plumbing fittings', 'drain connections'], unit: 'lot' },
+  { key: 'plumbing_installation_hardware', trade: 'Plumbing', title: 'Installation hardware', aliases: ['installation hardware', 'mounting hardware'], unit: 'lot' },
+
+  { key: 'electrical_ev_charger', trade: 'Electrical', title: 'EV charger', aliases: ['ev charger', 'electric vehicle charger', 'car charger'], unit: 'each' },
+  { key: 'electrical_breaker', trade: 'Electrical', title: 'Breaker', aliases: ['breaker', 'amp breaker', 'circuit breaker'], unit: 'each' },
+  { key: 'electrical_dedicated_circuit', trade: 'Electrical', title: 'Dedicated circuit materials', aliases: ['dedicated circuit', 'new circuit', 'circuit materials'], unit: 'lot' },
+  { key: 'electrical_gfci_outlet', trade: 'Electrical', title: 'GFCI outlet', aliases: ['gfci', 'gfci outlet', 'gfi outlet'], unit: 'each' },
+  { key: 'electrical_outlet', trade: 'Electrical', title: 'Outlet / receptacle', aliases: ['outlet', 'receptacle'], unit: 'each', suppressIfKeysDetected: ['electrical_gfci_outlet'] },
+  { key: 'electrical_switch', trade: 'Electrical', title: 'Switch', aliases: ['switch', 'light switch'], unit: 'each' },
+  { key: 'electrical_light_fixture', trade: 'Electrical', title: 'Light fixture', aliases: ['light fixture', 'fixture', 'light'], unit: 'each' },
+  { key: 'electrical_ceiling_fan_box', trade: 'Electrical', title: 'Ceiling fan box', aliases: ['fan-rated box', 'fan rated box', 'ceiling fan box'], unit: 'each' },
+  { key: 'electrical_wire_conduit', trade: 'Electrical', title: 'Wire / conduit', aliases: ['wire', 'wiring', 'conduit'], unit: 'lot' },
+  { key: 'electrical_panel_materials', trade: 'Electrical', title: 'Panel materials', aliases: ['panel materials', 'electrical panel', 'panel'], unit: 'lot' },
+
+  { key: 'hvac_thermostat', trade: 'HVAC', title: 'Thermostat', aliases: ['thermostat'], unit: 'each' },
+  { key: 'hvac_furnace', trade: 'HVAC', title: 'Furnace', aliases: ['furnace'], unit: 'each' },
+  { key: 'hvac_condenser_ac_unit', trade: 'HVAC', title: 'Condenser / AC unit', aliases: ['condenser', 'ac unit', 'air conditioner'], unit: 'each' },
+  { key: 'hvac_air_handler', trade: 'HVAC', title: 'Air handler', aliases: ['air handler'], unit: 'each' },
+  { key: 'hvac_heat_pump', trade: 'HVAC', title: 'Heat pump', aliases: ['heat pump'], unit: 'each' },
+  { key: 'hvac_disconnect', trade: 'HVAC', title: 'Disconnect', aliases: ['disconnect', 'hvac disconnect'], unit: 'each' },
+  { key: 'hvac_electrical_whip', trade: 'HVAC', title: 'Electrical whip', aliases: ['electrical whip', 'whip'], unit: 'each' },
+  { key: 'hvac_line_set', trade: 'HVAC', title: 'Line set', aliases: ['line set', 'lineset'], unit: 'lot' },
+  { key: 'hvac_condensate_drain', trade: 'HVAC', title: 'Condensate drain materials', aliases: ['condensate drain', 'condensate line', 'drain line'], unit: 'lot' },
+  { key: 'hvac_filter_rack', trade: 'HVAC', title: 'Filter rack', aliases: ['filter rack'], unit: 'each' },
+  { key: 'hvac_surge_protection', trade: 'HVAC', title: 'Surge protection', aliases: ['surge protection', 'surge protector'], unit: 'each' },
+
+  { key: 'carpentry_deck_boards', trade: 'Carpentry', title: 'Deck boards', aliases: ['deck boards', 'deck board', 'decking'], unit: 'lot' },
+  { key: 'carpentry_railing', trade: 'Carpentry', title: 'Railing', aliases: ['railing', 'handrail', 'guardrail'], unit: 'lot' },
+  { key: 'carpentry_stair_materials', trade: 'Carpentry', title: 'Stair materials', aliases: ['stairs', 'stair', 'stair treads', 'steps'], unit: 'lot' },
+  { key: 'carpentry_posts', trade: 'Carpentry', title: 'Posts', aliases: ['posts', 'post'], unit: 'lot' },
+  { key: 'carpentry_joists', trade: 'Carpentry', title: 'Joists', aliases: ['joists', 'joist'], unit: 'lot' },
+  { key: 'carpentry_trim', trade: 'Carpentry', title: 'Trim', aliases: ['trim', 'molding', 'moulding'], unit: 'lot' },
+  { key: 'carpentry_door_window_material', trade: 'Carpentry', title: 'Door/window material', aliases: ['door', 'window'], unit: 'each' },
+  { key: 'carpentry_fasteners_hardware', trade: 'Carpentry', title: 'Fasteners / hardware', aliases: ['fasteners', 'screws', 'nails', 'carpentry hardware'], unit: 'lot' },
+  { key: 'carpentry_structural_connectors', trade: 'Carpentry', title: 'Structural connectors', aliases: ['structural connectors', 'joist hangers', 'hangers'], unit: 'lot' },
+  { key: 'carpentry_caulk_sealant', trade: 'Carpentry', title: 'Caulk / sealant', aliases: ['caulk', 'sealant'], unit: 'lot' },
+
+  { key: 'generic_hardware', trade: 'Generic', title: 'Hardware', aliases: ['hardware'], unit: 'lot', fallbackOnly: true },
+  { key: 'generic_fasteners', trade: 'Generic', title: 'Fasteners', aliases: ['fasteners', 'screws', 'nails'], unit: 'lot', fallbackOnly: true },
+  { key: 'generic_sealant_caulk', trade: 'Generic', title: 'Sealant / caulk', aliases: ['sealant', 'caulk'], unit: 'lot', fallbackOnly: true },
+  { key: 'generic_fittings_connections', trade: 'Generic', title: 'Fittings / connections', aliases: ['fittings', 'connections'], unit: 'lot', fallbackOnly: true },
+  { key: 'generic_materials_allowance', trade: 'Generic', title: 'Materials and supplies allowance', aliases: ['materials', 'supplies', 'parts'], unit: 'lot', fallbackOnly: true },
+];
+
+function estimateBuilderAliasRuleMatch(normalizedScope: string, rule: EstimateDraftBuilderMaterialAliasRule) {
+  return rule.aliases.find(alias => normalizedScope.includes(compactText(alias))) || '';
+}
+
+function detectEstimateBuilderMaterialSeeds({
+  trade,
+  roughScope,
+}: {
+  trade: EstimateDraftBuilderTrade;
+  roughScope: string;
+}) {
+  const normalized = compactText(roughScope);
+  if (!normalized) return [];
+
+  const detectedKeys = new Set<string>();
+  const detectedTitles = new Set<string>();
+  const tradeSeeds: EstimateDraftBuilderLineSeed[] = [];
+
+  ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES
+    .filter(rule => rule.trade === trade)
+    .forEach(rule => {
+      const matchedAlias = estimateBuilderAliasRuleMatch(normalized, rule);
+      if (!matchedAlias) return;
+      if (rule.suppressIfKeysDetected?.some(key => detectedKeys.has(key))) return;
+      const normalizedTitle = compactText(rule.title);
+      if (detectedKeys.has(rule.key) || detectedTitles.has(normalizedTitle)) return;
+      detectedKeys.add(rule.key);
+      detectedTitles.add(normalizedTitle);
+      tradeSeeds.push({
+        line_type: 'material',
+        description: rule.title,
+        editor_source_note: `Suggested because the rough scope mentions ${matchedAlias}.`,
+        unit: rule.unit || 'each',
+        keywords: rule.aliases,
+      });
+    });
+
+  const genericSeeds: EstimateDraftBuilderLineSeed[] = [];
+  ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES
+    .filter(rule => rule.trade === 'Generic')
+    .forEach(rule => {
+      if (rule.fallbackOnly && tradeSeeds.length > 0) return;
+      const matchedAlias = estimateBuilderAliasRuleMatch(normalized, rule);
+      if (!matchedAlias) return;
+      const normalizedTitle = compactText(rule.title);
+      if (detectedKeys.has(rule.key) || detectedTitles.has(normalizedTitle)) return;
+      detectedKeys.add(rule.key);
+      detectedTitles.add(normalizedTitle);
+      genericSeeds.push({
+        line_type: 'material',
+        description: rule.title,
+        editor_source_note: `Suggested because the rough scope mentions ${matchedAlias}.`,
+        unit: rule.unit || 'lot',
+        keywords: rule.aliases,
+      });
+    });
+
+  return [...tradeSeeds, ...genericSeeds];
 }
 
 function estimateBuilderScopeNeedsPermitFee(normalizedScope: string) {
@@ -1425,6 +1548,26 @@ function estimateDraftBuilderJobTotalLaborSeed(trade: EstimateDraftBuilderTrade)
 function estimateDraftBuilderSeedIsCustomerSafe(seed: EstimateDraftBuilderLineSeed) {
   const description = compactText(seed.description);
   return !description.includes('contingency') && !description.includes('cleanup');
+}
+
+function estimateDraftBuilderSeedIsGenericMaterialFallback(seed: EstimateDraftBuilderLineSeed) {
+  if (seed.line_type !== 'material') return false;
+  const description = compactText(seed.description);
+  return [
+    'hvac parts fittings and consumables',
+    'hvac equipment allowance',
+    'ductwork venting or line set materials',
+    'pipe fittings valves and plumbing materials',
+    'fixture or appliance connection materials',
+    'specialty equipment or drain machine allowance',
+    'wire boxes breakers and electrical materials',
+    'device fixture or outlet materials',
+    'specialty equipment or lift allowance',
+    'lumber trim fasteners and carpentry materials',
+    'finish hardware or specialty material allowance',
+    'tool equipment or rental allowance',
+    'materials',
+  ].includes(description);
 }
 
 function estimateDraftBuilderFeeIsRelevant(seed: EstimateDraftBuilderLineSeed, roughScope: string) {
@@ -1527,11 +1670,16 @@ function estimateDraftBuilderSeeds({
   const safeSeeds = rulePack.lines
     .filter(estimateDraftBuilderSeedIsCustomerSafe)
     .filter(seed => estimateDraftBuilderFeeIsRelevant(seed, roughScope));
-  const nonLaborSeeds = safeSeeds.filter(seed => seed.line_type !== 'labor');
+  const materialAliasSeeds = detectEstimateBuilderMaterialSeeds({ trade, roughScope });
+  const nonLaborSeeds = safeSeeds.filter(seed => {
+    if (seed.line_type === 'labor') return false;
+    if (materialAliasSeeds.length > 0 && estimateDraftBuilderSeedIsGenericMaterialFallback(seed)) return false;
+    return true;
+  });
   const laborSeeds = laborMode === 'job_total'
     ? [estimateDraftBuilderJobTotalLaborSeed(trade)]
     : safeSeeds.filter(seed => seed.line_type === 'labor');
-  return orderEstimateDraftBuilderSeeds([...nonLaborSeeds, ...laborSeeds]);
+  return orderEstimateDraftBuilderSeeds([...materialAliasSeeds, ...nonLaborSeeds, ...laborSeeds]);
 }
 
 function estimateBuilderDefaultLineDescription(seed: EstimateDraftBuilderLineSeed, jobType: EstimateDraftBuilderJobType) {
