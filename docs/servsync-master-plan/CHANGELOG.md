@@ -11,12 +11,14 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/App.tsx`
   - `src/types.ts`
   - `servsync-estimate-price-required-foundation.sql`
+  - `servsync-estimate-job-approved-scope.sql`
   - `scripts/apply-blank-supabase-schema.sh`
   - `scripts/apply-sql-dry-run.sh`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Added the Slice 1 Price Required foundation for estimate line items so blank line pricing remains unpriced/price-to-be-confirmed instead of being converted to intentional `$0.00`, while preserving intentional zero-dollar line items and normal positive pricing.
 - Reason for change: Contractors need a safe way to include known-scope line items whose price still needs confirmation without confusing homeowners, PDFs, totals, or downstream invoice compatibility.
+- Sandbox blocker follow-up: Preserved intentional `$0.00` when persisted line items reload into estimate/invoice/template draft editors and updated accepted-estimate-to-job approved-scope text so unpriced lines say `Price to be confirmed` instead of `$0.00`.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`

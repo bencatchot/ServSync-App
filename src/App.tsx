@@ -4364,7 +4364,7 @@ function persistedLineIsUnpriced(line: Pick<EstimateLineItem | InvoiceLineItem, 
 }
 
 function lineUnitPriceInputFromCents(value: number | null | undefined) {
-  return value === null || value === undefined ? '' : centsToDollars(value);
+  return value === null || value === undefined ? '' : (value / 100).toFixed(2);
 }
 
 function estimateLineTotalCents(line: EstimateLineDraft) {
