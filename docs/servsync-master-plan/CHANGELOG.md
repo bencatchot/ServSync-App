@@ -10,8 +10,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Files changed:
   - `src/App.tsx`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Polished the contractor estimate draft workflow by moving generated/saved-charge helper source notes directly under each line item's Description field, keeping kitchen-sink replacement draft lines specific, and routing newly saved estimate drafts to a focused single-estimate action card instead of returning contractors to the create/edit composer or full open financial list.
-- Reason for change: Contractor-only helper notes should sit next to the field they explain, “remove and replace kitchen sink” draft output should preserve the specific scope item instead of falling back to generic Materials, and saving a new estimate draft should put the contractor on the newly created estimate where they can immediately send the estimate, download the PDF, edit the draft, or use the existing estimate actions.
+- Summary of change: Polished the contractor estimate draft workflow by moving generated/saved-charge helper source notes directly under each line item's Description field and routing newly saved estimate drafts to a focused single-estimate action card instead of returning contractors to the create/edit composer or full open financial list.
+- Reason for change: Contractor-only helper notes should sit next to the field they explain, and saving a new estimate draft should put the contractor on the newly created estimate where they can immediately send the estimate, download the PDF, edit the draft, or use the existing estimate actions.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`

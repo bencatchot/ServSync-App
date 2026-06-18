@@ -1399,8 +1399,7 @@ function estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope: string)
   const hasSink = textIncludesAny(normalized, ['sink', 'kitchen sink']);
   const hasFaucet = textIncludesAny(normalized, ['faucet', 'fixture']);
   const hasGarbageDisposal = textIncludesAny(normalized, ['garbage disposal', 'disposal unit', 'disposer']);
-  const hasReplacementAction = textIncludesAny(normalized, ['replace', 'replacement', 'remove and replace', 'remove', 'install', 'installation']);
-  return hasSink && (hasFaucet || hasGarbageDisposal || hasReplacementAction);
+  return hasSink && (hasFaucet || hasGarbageDisposal);
 }
 
 function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
@@ -1457,7 +1456,7 @@ function contextualEstimateBuilderSeeds({
   const materialSeeds: EstimateDraftBuilderLineSeed[] = [
     hasSink && {
       line_type: 'material',
-      description: 'Kitchen sink',
+      description: 'Sink',
       editor_source_note: 'Suggested because the rough scope mentions replacing the kitchen sink.',
       unit: 'each',
       keywords: ['sink', 'kitchen sink'],
