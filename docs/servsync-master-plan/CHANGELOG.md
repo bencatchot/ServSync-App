@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/structured-line-items-sql-foundation-v1`
+- Files changed:
+  - `servsync-structured-line-items-foundation.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the SQL foundation patch for structured estimate and invoice line items by introducing nullable `line_title`, `customer_description`, `model_spec`, and `supply_status` columns on estimate and invoice line items, plus installer sequencing after the equipment line-type cleanup.
+- Reason for change: Prepare the next estimate workflow slice so future app support can display a customer-facing line title, optional customer description, optional model/spec, and optional supply status while preserving legacy `description` as a fallback and keeping Price Required behavior unchanged.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application and verification require separate approval.
+  - Production SQL application requires separate approval after sandbox verification passes.
+  - App/UI support is still needed for structured estimate and invoice editing/display, including homeowner/PDF display, Build Estimate Draft structured output, template JSON support, saved-charge structured metadata decisions, and focused E2E coverage.
+
 - Branch: `feature/estimate-equipment-sql-cleanup-v1`
 - Files changed:
   - `servsync-estimate-equipment-line-type-cleanup.sql`
