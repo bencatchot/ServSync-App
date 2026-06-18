@@ -16841,6 +16841,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (!confirmed) return;
     }
     setSavingEstimate(true);
+    const currentEditingEstimateId = editingEstimateId;
+    const focusSavedEstimateActions = (estimate: Estimate) => {
+      const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
+      const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+      setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+      setContractorTab('inspections');
+      setInspectionView('list');
+      setHomeownerWorkspaceEstimateView(
+        estimate.status === 'accepted'
+          ? 'accepted'
+          : estimate.status === 'sent'
+            ? 'sent'
+            : ['declined', 'expired', 'revised'].includes(estimate.status)
+              ? 'closed'
+              : 'draft',
+      );
+      setInvoiceComposerOpen(false);
+      setEstimateComposerOpen(false);
+      setEditingEstimateId(null);
+      setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+    };
     try {
       const subtotalCents = estimateTotalCents(usableLines);
       const property = estimateSourceProperty(estimateDraft);
@@ -16860,11 +16881,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         subtotal_cents: subtotalCents,
         total_cents: subtotalCents,
       };
-      const { data: estimateData, error: estimateError } = editingEstimateId
+      const { data: estimateData, error: estimateError } = currentEditingEstimateId
         ? await supabase
             .from('estimates')
             .update(estimatePayload)
-            .eq('id', editingEstimateId)
+            .eq('id', currentEditingEstimateId)
             .select('*')
             .single()
         : await supabase
@@ -16875,7 +16896,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (estimateError) throw estimateError;
 
       const estimateId = (estimateData as Estimate).id;
-      if (editingEstimateId) {
+      if (currentEditingEstimateId) {
         const { error: deleteLinesError } = await supabase
           .from('estimate_line_items')
           .delete()
@@ -16887,7 +16908,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'estimate_id', estimateId, index)));
       if (linesError) throw linesError;
 
-      setNotice(editingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved.`);
+      const { data: savedEstimateData, error: savedEstimateError } = await supabase
+        .from('estimates')
+        .select(ESTIMATE_WITH_LINES_SELECT)
+        .eq('id', estimateId)
+        .single();
+      if (savedEstimateError) throw savedEstimateError;
+      const savedEstimate = savedEstimateData as Estimate;
+      setEstimates(prev => [savedEstimate, ...prev.filter(item => item.id !== savedEstimate.id)]);
+      setNotice(currentEditingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved. Opened the saved estimate actions.`);
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
@@ -16897,7 +16926,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
       setEstimateAssistantNotice('');
+      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
       await loadContractor();
+      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
     } catch (err) {
       setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
     } finally {
@@ -17550,7 +17581,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
     const showSupplyStatus = Boolean(line.supply_status);
     const sourceNote = line.editor_source_note?.trim();
-    const hasSecondaryRow = showModelSpec || showSupplyStatus || Boolean(sourceNote);
+    const hasSecondaryRow = showModelSpec || showSupplyStatus;
 
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -17567,14 +17598,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </select>
           </Field>
           <Field label="Description">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
-              className={inputClass()}
-              {...writingAssistProps}
-              value={line.line_title}
-              onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-              placeholder="Labor, material, trip fee..."
-            />
+            <div className="space-y-2">
+              <input
+                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+                className={inputClass()}
+                {...writingAssistProps}
+                value={line.line_title}
+                onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+                placeholder="Labor, material, trip fee..."
+              />
+              {sourceNote ? (
+                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                  {sourceNote}
+                </p>
+              ) : null}
+            </div>
           </Field>
           <Field label="Qty">
             <input
@@ -17631,11 +17669,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     placeholder="Optional model, size, brand, or spec"
                   />
                 </Field>
-              ) : null}
-              {sourceNote ? (
-                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                  {sourceNote}
-                </p>
               ) : null}
             </div>
             {showSupplyStatus ? (
