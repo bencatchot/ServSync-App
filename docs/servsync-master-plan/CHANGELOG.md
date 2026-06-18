@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/build-estimate-draft-v3-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Cleaned up the Build Estimate Draft workflow by moving Trade Tools behind a collapsed Advanced trade tools section, running trade/job inference only on Build, adding current-draft labor format selection, replacing prior generated builder content on rebuild, and improving scope-aware Plumbing sink/faucet/disposal draft lines.
+- Reason for change: Contractors need faster draft generation without live typing noise, duplicate generated lines, internal helper copy in homeowner-facing estimate fields, or vague placeholder/contingency line items.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - Relevant Playwright check/listing
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated preview smoke should verify both estimate composer surfaces, mobile layout, job-total and line-specific labor modes, saved-charge exact-match behavior, and kitchen sink/faucet/disposal output.
+  - Future slices may add SQL-backed line name/customer description/model/spec/supply status fields, PDF/subtotal display refinements, and saved contractor language/settings, but this branch does not add those.
+
 - Branch: `feature/build-estimate-draft-v2-rule-based-ui-v1`
 - Files changed:
   - `src/App.tsx`
