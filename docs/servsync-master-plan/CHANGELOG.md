@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/structured-line-item-conversion-rpcs-v1`
+- Files changed:
+  - `servsync-structured-line-item-conversion-rpcs.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a SQL-only conversion RPC patch so structured estimate line item fields are preserved when accepted estimates create jobs, accepted estimates create invoices, and linked jobs create invoices from their source estimates.
+- Reason for change: App/UI support now captures customer-facing line titles, descriptions, model/specs, and supply statuses, but backend conversion RPCs still copied or flattened only legacy `description` fields in several flows.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static SQL/RPC inspection for final installer ordering, structured field copying, Price Required null preservation, $0 preservation, and unchanged RLS/table grants
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application and verification require separate approval.
+  - Production SQL application requires separate approval after sandbox verification passes.
+  - Job-to-invoice generation without a linked estimate remains simple/generated from job finding text.
+  - Homeowner/job scope UI, deeper PDF/content inspection, and broader conversion E2E coverage remain recommended follow-ups.
+
 - Branch: `feature/estimate-starter-templates-v1`
 - Files changed:
   - `src/App.tsx`
