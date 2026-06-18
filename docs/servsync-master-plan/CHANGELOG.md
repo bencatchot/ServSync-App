@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/estimate-save-flow-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Polished the contractor estimate draft workflow by moving generated/saved-charge helper source notes directly under each line item's Description field and routing newly saved estimate drafts to a focused single-estimate action card instead of returning contractors to the create/edit composer or full open financial list.
+- Reason for change: Contractor-only helper notes should sit next to the field they explain, and saving a new estimate draft should put the contractor on the newly created estimate where they can immediately send the estimate, download the PDF, edit the draft, or use the existing estimate actions.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated sandbox/preview smoke should confirm the saved draft lands on the existing estimate action card and that helper/source notes remain editor-only.
+  - The focused saved-estimate view intentionally reuses existing actions and does not add a new destructive delete action.
+  - Existing estimate draft update behavior is intentionally preserved.
+
 - Branch: `feature/line-item-editor-simplify-v1`
 - Files changed:
   - `src/App.tsx`

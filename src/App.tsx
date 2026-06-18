@@ -15530,6 +15530,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
   const [estimateComposerOpen, setEstimateComposerOpen] = useState(false);
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
+  const [focusedEstimateRecordId, setFocusedEstimateRecordId] = useState<string | null>(null);
   const [estimateDraft, setEstimateDraft] = useState<EstimateDraft>(() => createBlankEstimateDraft());
   const [savingEstimate, setSavingEstimate] = useState(false);
   const [invoiceComposerOpen, setInvoiceComposerOpen] = useState(false);
@@ -16743,6 +16744,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     subjectName: string,
     options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate; homeId?: string | null; localHomeId?: string | null } = {},
   ) => {
+    setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
       service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id ?? '',
@@ -16775,6 +16777,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string; homeId?: string | null; localHomeId?: string | null } = {}) => {
+    setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
       title: `Estimate — ${subjectName || 'Customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
@@ -16841,6 +16844,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (!confirmed) return;
     }
     setSavingEstimate(true);
+    const currentEditingEstimateId = editingEstimateId;
+    const focusSavedEstimateActions = (estimate: Estimate) => {
+      const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
+      const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
+      setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+      setContractorTab('inspections');
+      setInspectionView('list');
+      setHomeownerWorkspaceEstimateView(
+        estimate.status === 'accepted'
+          ? 'accepted'
+          : estimate.status === 'sent'
+            ? 'sent'
+            : ['declined', 'expired', 'revised'].includes(estimate.status)
+              ? 'closed'
+              : 'draft',
+      );
+      setInvoiceComposerOpen(false);
+      setEstimateComposerOpen(false);
+      setEditingEstimateId(null);
+      setFocusedEstimateRecordId(estimate.id);
+      setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
+    };
     try {
       const subtotalCents = estimateTotalCents(usableLines);
       const property = estimateSourceProperty(estimateDraft);
@@ -16860,11 +16885,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         subtotal_cents: subtotalCents,
         total_cents: subtotalCents,
       };
-      const { data: estimateData, error: estimateError } = editingEstimateId
+      const { data: estimateData, error: estimateError } = currentEditingEstimateId
         ? await supabase
             .from('estimates')
             .update(estimatePayload)
-            .eq('id', editingEstimateId)
+            .eq('id', currentEditingEstimateId)
             .select('*')
             .single()
         : await supabase
@@ -16875,7 +16900,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (estimateError) throw estimateError;
 
       const estimateId = (estimateData as Estimate).id;
-      if (editingEstimateId) {
+      if (currentEditingEstimateId) {
         const { error: deleteLinesError } = await supabase
           .from('estimate_line_items')
           .delete()
@@ -16887,7 +16912,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'estimate_id', estimateId, index)));
       if (linesError) throw linesError;
 
-      setNotice(editingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved.`);
+      const { data: savedEstimateData, error: savedEstimateError } = await supabase
+        .from('estimates')
+        .select(ESTIMATE_WITH_LINES_SELECT)
+        .eq('id', estimateId)
+        .single();
+      if (savedEstimateError) throw savedEstimateError;
+      const savedEstimate = savedEstimateData as Estimate;
+      setEstimates(prev => [savedEstimate, ...prev.filter(item => item.id !== savedEstimate.id)]);
+      setNotice(currentEditingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved. Opened the saved estimate actions.`);
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
@@ -16897,7 +16930,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
       setEstimateAssistantNotice('');
+      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
       await loadContractor();
+      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
     } catch (err) {
       setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
     } finally {
@@ -17092,6 +17127,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const openInvoiceRecord = (invoice: Invoice) => {
+    setFocusedEstimateRecordId(null);
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -17113,6 +17149,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const openEstimateRecord = (estimate: Estimate) => {
+    setFocusedEstimateRecordId(null);
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -17550,7 +17587,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
     const showSupplyStatus = Boolean(line.supply_status);
     const sourceNote = line.editor_source_note?.trim();
-    const hasSecondaryRow = showModelSpec || showSupplyStatus || Boolean(sourceNote);
+    const hasSecondaryRow = showModelSpec || showSupplyStatus;
 
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -17567,14 +17604,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </select>
           </Field>
           <Field label="Description">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
-              className={inputClass()}
-              {...writingAssistProps}
-              value={line.line_title}
-              onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-              placeholder="Labor, material, trip fee..."
-            />
+            <div className="space-y-2">
+              <input
+                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+                className={inputClass()}
+                {...writingAssistProps}
+                value={line.line_title}
+                onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+                placeholder="Labor, material, trip fee..."
+              />
+              {sourceNote ? (
+                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                  {sourceNote}
+                </p>
+              ) : null}
+            </div>
           </Field>
           <Field label="Qty">
             <input
@@ -17631,11 +17675,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     placeholder="Optional model, size, brand, or spec"
                   />
                 </Field>
-              ) : null}
-              {sourceNote ? (
-                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                  {sourceNote}
-                </p>
               ) : null}
             </div>
             {showSupplyStatus ? (
@@ -25484,8 +25523,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const invoiceRecordsForView = contractorJobsView === 'open_financial'
                       ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)) : openInvoiceRecords)
                       : (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)) : closedInvoiceRecords);
-                    const listTitle = contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed / Billed Records';
-                    const listDescription = contractorJobsView === 'open_financial'
+                    const focusedEstimateRecord = contractorJobsView === 'open_financial' && focusedEstimateRecordId
+                      ? records.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
+                      : null;
+                    const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : records;
+                    const visibleInvoiceRecords = focusedEstimateRecord ? [] : invoiceRecordsForView;
+                    const listTitle = focusedEstimateRecord
+                      ? 'Saved estimate draft'
+                      : contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed / Billed Records';
+                    const listDescription = focusedEstimateRecord
+                      ? 'This is the estimate you just saved. Send it, download the PDF, save it as a template, or continue editing.'
+                      : contractorJobsView === 'open_financial'
                       ? 'Estimate drafts, sent estimates, draft invoices, and unpaid invoices.'
                       : 'Closed estimates and billed invoice records.';
                     return (
@@ -25497,16 +25545,34 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <h3 className="mt-1 text-lg font-bold text-slate-950">{listTitle}</h3>
                               <p className="mt-1 text-sm leading-6 text-slate-500">{listDescription}</p>
                             </div>
-                            <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
-                              Back to Jobs Overview
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              {focusedEstimateRecord && (
+                                <button type="button" onClick={() => setFocusedEstimateRecordId(null)} className={buttonClass('secondary')}>
+                                  View all open estimates
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFocusedEstimateRecordId(null);
+                                  setContractorJobsView('overview');
+                                }}
+                                className={buttonClass('secondary')}
+                              >
+                                Back to Jobs Overview
+                              </button>
+                            </div>
                           </div>
+                          {!focusedEstimateRecord && (
                           <div className="mt-4 max-w-sm">
                             <Field label="Customer">
                               <select
                                 className={inputClass()}
                                 value={jobsCustomerFilterSubjectId ?? ''}
-                                onChange={event => setJobsCustomerFilterSubjectId(event.target.value || null)}
+                                onChange={event => {
+                                  setFocusedEstimateRecordId(null);
+                                  setJobsCustomerFilterSubjectId(event.target.value || null);
+                                }}
                               >
                                 <option value="">All customers</option>
                                 {connections.filter(c => c.status === 'active').map(c => (
@@ -25518,26 +25584,35 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </select>
                             </Field>
                           </div>
+                          )}
                         </div>
 
-                        {records.length === 0 && invoiceRecordsForView.length === 0 ? (
+                        {visibleEstimateRecords.length === 0 && visibleInvoiceRecords.length === 0 ? (
                           <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />
                         ) : (
                         <div className="space-y-2">
-                        {invoiceRecordsForView.length > 0 && (
+                        {visibleInvoiceRecords.length > 0 && (
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">First-class invoices</p>
-                                <p className="mt-1 text-xs text-slate-500">{invoiceRecordsForView.length} invoice{invoiceRecordsForView.length === 1 ? '' : 's'} in this view</p>
+                                <p className="mt-1 text-xs text-slate-500">{visibleInvoiceRecords.length} invoice{visibleInvoiceRecords.length === 1 ? '' : 's'} in this view</p>
                               </div>
-                              <button type="button" onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')} disabled={!selectedJobsCustomerName} className={buttonClass('secondary')}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFocusedEstimateRecordId(null);
+                                  beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer');
+                                }}
+                                disabled={!selectedJobsCustomerName}
+                                className={buttonClass('secondary')}
+                              >
                                 <Plus size={14} />
                                 New Invoice
                               </button>
                             </div>
                             <div className="space-y-2">
-                              {invoiceRecordsForView.map(invoice => {
+                              {visibleInvoiceRecords.map(invoice => {
                                 const connection = invoice.homeowner_user_id ? connections.find(c => c.homeowner_user_id === invoice.homeowner_user_id) : null;
                                 const local = invoice.local_contact_id ? localContacts.find(c => c.id === invoice.local_contact_id) : null;
                                 const customerName = connection?.display_name || local?.display_name || 'Customer';
@@ -25660,10 +25735,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           </div>
                         )}
-                        {records.length > 0 && (
+                        {visibleEstimateRecords.length > 0 && (
                           <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estimate records</p>
                         )}
-                        {records.map(estimate => {
+                        {visibleEstimateRecords.map(estimate => {
                           const isInvoice = estimateDocumentLabel(estimate) === 'Invoice';
                           const connection = estimate.homeowner_user_id ? connections.find(c => c.homeowner_user_id === estimate.homeowner_user_id) : null;
                           const local = estimate.local_contact_id ? localContacts.find(c => c.id === estimate.local_contact_id) : null;
