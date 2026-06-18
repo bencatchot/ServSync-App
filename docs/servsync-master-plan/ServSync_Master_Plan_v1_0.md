@@ -104,7 +104,7 @@ The product should be judged against the core loop: Homeowner Request -> Contrac
 | Step | Current understanding | Priority |
 | --- | --- | --- |
 | Homeowner Request | Homeowners can create requests tied to homes/properties. Direct connected-contractor flow exists. Recent UI copy clarifies what happens after a request is sent and after an estimate is accepted. | Harden end-to-end coverage and beta QA. |
-| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, PDF download, and Price Required/unpriced line handling exist. Recent contractor cleanup makes Create/Open Estimate and accepted-estimate next steps clearer. | Keep estimate path clear from invoice path and expand test coverage. |
+| Contractor Estimate | Estimate creation, line items, templates, notes, terms, sending, PDF download, Price Required/unpriced line handling, saved charges, and a rule-based Build Estimate Draft workflow exist. Recent contractor cleanup makes Create/Open Estimate and accepted-estimate next steps clearer. | Keep estimate path clear from invoice path, keep rule-based drafting distinct from future AI automation, and expand test coverage. |
 | Homeowner Approval | Accept/decline status and RPCs exist. Homeowner accepted-estimate copy now explains that the contractor's next step is to create, schedule, or complete the job/work. | Validate the full approval-to-job handoff in beta. |
 | Job | Jobs are backed by inspections table; simple service jobs and checklist/report jobs exist. Contractor-facing terminology has been partially cleaned up, while internal schema names may still use inspection terminology. | Continue reducing user-facing inspection language where it confuses service work. |
 | Completion | Finalization/report filing exists. Recent contractor cleanup keeps invoice creation behind report finalization for checklist/report jobs. | Add broader regression coverage for closeout paths. |
@@ -119,7 +119,7 @@ The repository audit shows ServSync has progressed far beyond a simple prototype
 | Area | Status | Beta concern |
 | --- | --- | --- |
 | Requests | Working and clearer after homeowner/contractor core-loop copy updates | Needs full request-to-invoice E2E coverage. |
-| Estimates | Working with clearer accepted-estimate handoff | Continue avoiding overlap with invoice actions. |
+| Estimates | Working with clearer accepted-estimate handoff and rule-based draft builder | Continue avoiding overlap with invoice actions and avoid implying AI/pricing automation until implemented. |
 | Invoices | Working, including invoice-to-Home-History filing v1 | Payment processing and contractor-side filing remain deferred. |
 | Jobs | Working but inspection-backed internally | Continue user-facing terminology cleanup without renaming schema casually. |
 | Home History | Homeowner-facing v1 is shipped on top of existing maintenance-log structures | Do not build a separate timeline table until beta feedback justifies it. |

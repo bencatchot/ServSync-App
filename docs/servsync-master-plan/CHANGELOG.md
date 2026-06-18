@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/build-estimate-draft-v2-rule-based-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Replaced the old Smart estimate assistant with a compact rule-based Build Estimate Draft workflow in the contractor estimate composer, including trade/job-type selection, rough-scope input, conservative trade/job suggestions, and starter draft lines for HVAC, Plumbing, Electrical, Carpentry, and Other.
+- Reason for change: Contractors need faster estimate draft creation while preserving the Price Required foundation, keeping generated lines editable/removable, and avoiding invented rough-scope pricing or AI-style automation claims.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - Relevant Playwright check/listing
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - Authenticated preview smoke should verify the draft builder on both estimate composer surfaces with HVAC, Plumbing, Electrical, Carpentry, Other, trade mismatch suggestions, saved-charge match/no-match behavior, manual Add line, saved-charge quick-pick, and mobile layout.
+  - This branch does not add SQL/schema/RLS/RPC/storage changes, AI generation, subscription gating, saved-charge metadata persistence, estimate-line source metadata, production data changes, or deployment behavior.
+
 - Branch: `feature/estimate-price-required-foundation-v1`
 - Files changed:
   - `src/App.tsx`
