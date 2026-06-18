@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/estimate-equipment-sql-cleanup-v1`
+- Files changed:
+  - `servsync-estimate-equipment-line-type-cleanup.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the PR 50B SQL cleanup patch that maps persisted `equipment` line-item values to `material`, normalizes estimate template JSON line items, and tightens estimate, invoice, and saved-charge `line_type` constraints to `labor`, `material`, `fee`, and `other`.
+- Reason for change: PR #50 stopped future app-created `equipment` line items; this follow-up prepares the database cleanup and constraint tightening needed so legacy `equipment` values are removed and future direct database writes reject that line type.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application and verification require separate approval.
+  - Production SQL application requires separate approval after sandbox verification passes.
+  - Follow-up smoke should verify the direct saved-charge form, homeowner/PDF display, mobile layout, future structured line item fields, and PDF/homeowner subtotal refinements.
+
 - Branch: `feature/estimate-equipment-line-type-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
