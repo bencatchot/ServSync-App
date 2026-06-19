@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/build-estimate-draft-labor-cleanup`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the PR 4 Build Estimate Draft labor cleanup slice for FB-019. Build Estimate Draft now applies the selected labor mode to the estimate draft without generating standalone labor-only rows. Job-total mode leaves labor hours in the PR 3 estimate-level labor controls, and line-specific mode uses Labor hrs inputs on material/scope lines instead of generated labor rows.
+- Reason for change: Complete the schema-backed labor model rollout by aligning the rule-based draft builder with PR 62 app/UI labor behavior, while keeping material prices separate from labor, preserving Price Required behavior, and avoiding SQL, RPC, RLS, auth, storage, deployment, or production-data changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RPC/RLS/policy/grant/storage/auth/env/Vercel/settings changes were added.
+  - Static search confirming Build Estimate Draft line-specific mode does not create generated standalone labor-only rows.
+  - Static search confirming labor values are not stored in `customer_description`, `model_spec`, or `editor_source_note`.
+  - Static search confirming contractor-only helper/source notes do not appear in homeowner/PDF paths.
+- Known risks or follow-ups:
+  - Authenticated preview smoke should verify job-total and line-specific Build Estimate Draft behavior before merge approval.
+  - Advanced trade tools still intentionally preserve their existing calculator-specific labor line behavior; this slice only updates the Build Estimate Draft panel.
+
 - Branch: `codex/estimate-labor-ui-v1`
 - Files changed:
   - `src/App.tsx`
