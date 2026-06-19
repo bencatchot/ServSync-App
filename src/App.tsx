@@ -1575,15 +1575,6 @@ function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
   return [...seeds].sort((a, b) => lineTypeWeight[a.line_type] - lineTypeWeight[b.line_type]);
 }
 
-function estimateDraftBuilderJobTotalLaborSeed(trade: EstimateDraftBuilderTrade): EstimateDraftBuilderLineSeed {
-  return {
-    line_type: 'labor',
-    description: 'Labor',
-    unit: 'hour',
-    keywords: [trade, 'labor', 'work', 'install', 'repair', 'replacement'],
-  };
-}
-
 function estimateDraftBuilderSeedIsCustomerSafe(seed: EstimateDraftBuilderLineSeed) {
   const description = compactText(seed.description);
   return !description.includes('contingency') && !description.includes('cleanup');
@@ -1621,11 +1612,9 @@ function estimateDraftBuilderFeeIsRelevant(seed: EstimateDraftBuilderLineSeed, r
 function contextualEstimateBuilderSeeds({
   trade,
   roughScope,
-  laborMode,
 }: {
   trade: EstimateDraftBuilderTrade;
   roughScope: string;
-  laborMode: EstimateDraftBuilderLaborMode;
 }): EstimateDraftBuilderLineSeed[] | null {
   const normalized = compactText(roughScope);
   if (!normalized || (trade !== 'Plumbing' && !estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope))) return null;
@@ -1673,15 +1662,6 @@ function contextualEstimateBuilderSeeds({
     },
   ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
 
-  const laborSeeds: EstimateDraftBuilderLineSeed[] = laborMode === 'job_total'
-    ? [{ line_type: 'labor', description: 'Labor', editor_source_note: 'Suggested because the scope includes removal and installation work.', unit: 'hour', keywords: ['labor', 'install', 'replace', 'remove'] }]
-    : [
-        hasSink && { line_type: 'labor', description: 'Sink installation labor', editor_source_note: 'Suggested because the rough scope mentions replacing the kitchen sink.', unit: 'hour', keywords: ['sink labor', 'sink installation', 'labor'] },
-        hasFaucet && { line_type: 'labor', description: 'Faucet installation labor', editor_source_note: 'Suggested because the rough scope mentions a new sink faucet.', unit: 'hour', keywords: ['faucet labor', 'faucet installation', 'labor'] },
-        hasGarbageDisposal && { line_type: 'labor', description: 'Garbage disposal installation labor', editor_source_note: 'Suggested because the rough scope mentions garbage disposal.', unit: 'hour', keywords: ['garbage disposal labor', 'disposal installation', 'labor'] },
-        { line_type: 'labor', description: 'Fittings / connections labor', editor_source_note: 'Suggested as common labor for drain, fitting, and supply connection work.', unit: 'hour', keywords: ['fittings labor', 'connections labor', 'labor'] },
-      ].filter(Boolean) as EstimateDraftBuilderLineSeed[];
-
   const feeSeeds: EstimateDraftBuilderLineSeed[] = [];
   if (estimateBuilderScopeNeedsPermitFee(normalized)) {
     feeSeeds.push({ line_type: 'fee', description: 'Permit or inspection coordination', unit: 'each', keywords: ['permit', 'inspection', 'code'] });
@@ -1690,19 +1670,17 @@ function contextualEstimateBuilderSeeds({
     feeSeeds.push({ line_type: 'fee', description: 'Disposal / haul-off', unit: 'job', keywords: ['disposal', 'haul', 'haul-off'] });
   }
 
-  return [...materialSeeds, ...laborSeeds, ...feeSeeds];
+  return [...materialSeeds, ...feeSeeds];
 }
 
 function estimateDraftBuilderSeeds({
   trade,
   roughScope,
-  laborMode,
 }: {
   trade: EstimateDraftBuilderTrade;
   roughScope: string;
-  laborMode: EstimateDraftBuilderLaborMode;
 }) {
-  const contextualSeeds = contextualEstimateBuilderSeeds({ trade, roughScope, laborMode });
+  const contextualSeeds = contextualEstimateBuilderSeeds({ trade, roughScope });
   if (contextualSeeds) return contextualSeeds;
 
   const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
@@ -1715,10 +1693,7 @@ function estimateDraftBuilderSeeds({
     if (materialAliasSeeds.length > 0 && estimateDraftBuilderSeedIsGenericMaterialFallback(seed)) return false;
     return true;
   });
-  const laborSeeds = laborMode === 'job_total'
-    ? [estimateDraftBuilderJobTotalLaborSeed(trade)]
-    : safeSeeds.filter(seed => seed.line_type === 'labor');
-  return orderEstimateDraftBuilderSeeds([...materialAliasSeeds, ...nonLaborSeeds, ...laborSeeds]);
+  return orderEstimateDraftBuilderSeeds([...materialAliasSeeds, ...nonLaborSeeds]);
 }
 
 function estimateBuilderDefaultLineDescription(seed: EstimateDraftBuilderLineSeed, jobType: EstimateDraftBuilderJobType) {
@@ -1841,7 +1816,7 @@ function buildRuleBasedEstimateDraft({
   const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
   const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const cleanScope = customerFacingRoughScope(roughScope);
-  const builtLines = estimateDraftBuilderSeeds({ trade, roughScope, laborMode })
+  const builtLines = estimateDraftBuilderSeeds({ trade, roughScope })
     .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
   const jobTypeLabel = estimateBuilderJobTypeLabel(jobType);
   const requestedScope = cleanScope
@@ -1860,6 +1835,7 @@ function buildRuleBasedEstimateDraft({
     matchedCount: builtLines.filter(item => item.matched).length,
     builtTrade: trade,
     builtJobType: jobType,
+    builtLaborMode: laborMode,
   };
 }
 
@@ -2450,12 +2426,12 @@ const ESTIMATE_DRAFT_BUILDER_LABOR_MODES: { value: EstimateDraftBuilderLaborMode
   {
     value: 'job_total',
     label: 'Job-total labor',
-    description: 'Use one editable labor line for the draft.',
+    description: 'Use the estimate-level labor hours field after building the draft.',
   },
   {
     value: 'line_specific',
     label: 'Line-specific labor',
-    description: 'Use editable labor lines for the main tasks.',
+    description: 'Use Labor hrs on material/scope lines after building the draft.',
   },
 ];
 const ESTIMATE_DRAFT_BUILDER_JOB_LABELS = Object.fromEntries(
@@ -18725,6 +18701,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return {
         ...draft,
         title: shouldReplaceDraft || estimateDraftTitleLooksDefault(draft.title) ? builtDraft.title : draft.title,
+        labor_mode: builtDraft.builtLaborMode,
         scope: nextScope,
         notes: nextNotes,
         line_items: nextLines,
@@ -18741,6 +18718,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const matchedCopy = builtDraft.matchedCount > 0
       ? ` Matched saved-charge pricing for ${builtDraft.matchedCount} line${builtDraft.matchedCount === 1 ? '' : 's'}.`
       : '';
+    const laborModeCopy = builtDraft.builtLaborMode === 'line_specific'
+      ? ' Line-specific labor is ready for Labor hrs on material/scope lines; no generated labor-only rows were added.'
+      : ' Job-total labor is ready in the Labor section; enter total labor hours when known.';
     const inferenceCopy = [
       `Draft built using: ${builtDraft.builtTrade} / ${estimateBuilderJobTypeLabel(builtDraft.builtJobType)}.`,
       inferredTrade && inferredTrade !== estimateDraftBuilderTrade
@@ -18751,7 +18731,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         : '',
     ].filter(Boolean).join(' ');
     setEstimateAssistantNotice(
-      `${inferenceCopy} Built ${builtDraft.lines.length} editable line item${builtDraft.lines.length === 1 ? '' : 's'}; ${unpricedCount} need pricing before totals include them.${matchedCopy} Review all quantities, Price Required lines, exclusions, and terms before sending.`,
+      `${inferenceCopy} Built ${builtDraft.lines.length} editable line item${builtDraft.lines.length === 1 ? '' : 's'}; ${unpricedCount} need pricing before totals include them.${matchedCopy}${laborModeCopy} Review all quantities, Price Required lines, exclusions, and terms before sending.`,
     );
   };
 
