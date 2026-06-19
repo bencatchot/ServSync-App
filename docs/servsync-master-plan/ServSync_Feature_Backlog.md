@@ -108,7 +108,7 @@ Important guardrails:
 | FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
-| FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Implementation In Progress | High | PR 1 SQL/schema foundation and PR 2 SQL/RPC conversion preservation are merged and applied to sandbox/production; PR 3 app/UI labor support is merged; PR 4 Build Estimate Draft labor cleanup is the active slice. |
+| FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Completed / Functional | High | v1 is complete: schema foundation and RPC/conversion preservation are merged and applied to sandbox/production; app/UI labor support and Build Estimate Draft labor cleanup are merged and passing preview. |
 
 ## Detailed feature notes
 
@@ -831,7 +831,7 @@ Validation completed:
 
 ### FB-019 — Estimate Labor Model / Line-Specific Labor Inputs
 
-Status: Implementation In Progress
+Status: Completed / Functional
 
 Priority: High
 
@@ -844,7 +844,7 @@ Product area:
 - Estimate-to-job and estimate-to-invoice conversion
 
 Summary:
-Implement a schema-backed labor model so contractors can use one estimate-level labor rate with either job-total labor hours or line-specific labor hours attached to material/scope lines. Line-specific labor should not create standalone generated labor rows and should not bury labor inside material pricing.
+Completed v1 of the schema-backed labor model so contractors can use one estimate-level labor rate with either job-total labor hours or line-specific labor hours attached to material/scope lines. Line-specific labor no longer creates standalone generated labor rows in Build Estimate Draft and does not bury labor inside material pricing.
 
 Key decisions:
 
@@ -864,11 +864,21 @@ Implementation sequence:
 1. PR 1: SQL/schema foundation file only. Completed and applied to sandbox/production with separate approvals.
 2. PR 2: SQL-only RPC/conversion preservation so accepted estimate-to-invoice, accepted estimate-to-job approved scope, and linked job-to-invoice paths preserve labor context before app/UI rollout. Completed and applied to sandbox/production with separate approvals.
 3. PR 3: App/UI support for contractor labor rate, labor mode, job-total labor hours, line-specific labor hours, totals, save/reopen, homeowner/PDF display, and warnings. Completed and merged.
-4. PR 4: Build Estimate Draft behavior update so line-specific labor no longer creates generated standalone labor rows. In progress.
-5. PR 5: Conversion/PDF/homeowner regression hardening if not completed in earlier slices.
+4. PR 4: Build Estimate Draft behavior update so line-specific labor no longer creates generated standalone labor rows. Completed and merged.
+
+Completed v1 behavior:
+
+- Schema foundation is complete and applied to sandbox/production.
+- RPC/conversion preservation is complete and applied to sandbox/production.
+- App/UI labor model support is complete for contractor estimate editing, save/reopen, totals, homeowner display, PDF display, and minimal invoice preservation.
+- Build Estimate Draft now aligns with the new labor model.
+- Job-total labor uses estimate-level labor controls.
+- Line-specific labor uses per-line labor-hour inputs.
+- Line-specific Build Estimate Draft no longer generates standalone labor-only rows.
+- Homeowner and PDF display shows filled labor hours and hides blank labor hours.
 
 Current next step:
-Review and preview PR 4 Build Estimate Draft cleanup. Confirm job-total mode uses estimate-level labor controls, line-specific mode creates no generated standalone labor rows, and PR 62 homeowner/PDF labor display remains clean.
+Estimate Labor Model v1 is complete. Future work should be optional regression hardening or a deliberate review of advanced trade-tool labor behavior.
 
 ## Current next recommended focus
 
