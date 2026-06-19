@@ -387,6 +387,17 @@ type EstimateDraftBuilderRulePack = {
   notes: string;
   lines: EstimateDraftBuilderLineSeed[];
 };
+type EstimateHelperSuggestion = {
+  id: string;
+  category: string;
+  title: string;
+  detail: string;
+  line_type: EstimateLineType;
+  unit: string;
+  quantity?: string;
+  editor_source_note: string;
+  duplicateKeywords: string[];
+};
 type SavedEstimateChargeDraft = {
   name: string;
   description: string;
@@ -2479,6 +2490,173 @@ const ESTIMATE_DRAFT_BUILDER_RULE_PACKS: Record<EstimateDraftBuilderTrade, Estim
     ],
   },
 };
+
+function estimateHelperTradeFromContext({
+  draft,
+  selectedTrade,
+  contractorCategories,
+}: {
+  draft: EstimateDraft;
+  selectedTrade: EstimateDraftBuilderTrade;
+  contractorCategories: string[];
+}): EstimateDraftBuilderTrade {
+  if (selectedTrade !== 'Other') return selectedTrade;
+  const draftText = [
+    draft.title,
+    draft.scope,
+    draft.notes,
+    ...draft.line_items.flatMap(line => [line.line_title, line.description, line.customer_description, line.model_spec]),
+  ].join(' ');
+  const inferred = inferEstimateBuilderTrade(draftText);
+  if (inferred) return inferred;
+  const categoryText = compactText(contractorCategories.join(' '));
+  if (textIncludesAny(categoryText, ['hvac', 'heating', 'cooling', 'air conditioning'])) return 'HVAC';
+  if (textIncludesAny(categoryText, ['plumbing', 'plumber', 'water heater', 'drain'])) return 'Plumbing';
+  if (textIncludesAny(categoryText, ['electrical', 'electrician', 'ev charger', 'panel'])) return 'Electrical';
+  if (textIncludesAny(categoryText, ['carpentry', 'carpenter', 'deck', 'framing', 'trim'])) return 'Carpentry';
+  return 'Other';
+}
+
+function estimateHelperLineAlreadyExists(draft: EstimateDraft, suggestion: EstimateHelperSuggestion) {
+  const existingLines = draft.line_items.map(line => compactText([
+    line.line_title,
+    line.description,
+    line.customer_description,
+    line.model_spec,
+  ].filter(Boolean).join(' ')));
+  return existingLines.some(existing => {
+    if (!existing) return false;
+    return suggestion.duplicateKeywords.some(keyword => existing.includes(compactText(keyword)));
+  });
+}
+
+function buildEstimateHelperSuggestions({
+  draft,
+  selectedTrade,
+  selectedJobType,
+  contractorCategories,
+}: {
+  draft: EstimateDraft;
+  selectedTrade: EstimateDraftBuilderTrade;
+  selectedJobType: EstimateDraftBuilderJobType;
+  contractorCategories: string[];
+}) {
+  const contextText = compactText([
+    draft.title,
+    draft.scope,
+    draft.notes,
+    contractorCategories.join(' '),
+    ...draft.line_items.flatMap(line => [line.line_title, line.description, line.customer_description, line.model_spec]),
+  ].filter(Boolean).join(' '));
+  const trade = estimateHelperTradeFromContext({ draft, selectedTrade, contractorCategories });
+  const inferredJobType = inferEstimateBuilderJobType(contextText) || selectedJobType;
+  const looksLikeInstallOrReplacement = ['install', 'replacement'].includes(inferredJobType)
+    || textIncludesAny(contextText, ['install', 'installation', 'replace', 'replacement', 'remove and replace']);
+  const looksLikeRemoval = textIncludesAny(contextText, ['remove', 'removal', 'demo', 'demolition', 'old', 'replace', 'replacement']);
+  const looksLikeServiceVisit = inferredJobType === 'service_diagnostic'
+    || textIncludesAny(contextText, ['diagnostic', 'service call', 'troubleshoot', 'site visit']);
+  const looksLikePermitScope = looksLikeInstallOrReplacement
+    || textIncludesAny(contextText, ['permit', 'inspection', 'code', 'water heater', 'ev charger', 'panel', 'deck', 'hvac system']);
+  const looksLikeMaterialHeavy = looksLikeInstallOrReplacement
+    || textIncludesAny(contextText, ['equipment', 'water heater', 'condenser', 'furnace', 'deck', 'lumber', 'charger', 'panel']);
+  const looksLikeAccessIssue = textIncludesAny(contextText, ['attic', 'crawlspace', 'crawl space', 'roof', 'basement', 'tight access', 'limited access', 'ladder', 'lift', 'high ceiling']);
+  const suggestions: EstimateHelperSuggestion[] = [];
+  const addSuggestion = (suggestion: EstimateHelperSuggestion, include: boolean) => {
+    if (!include) return;
+    if (estimateHelperLineAlreadyExists(draft, suggestion)) return;
+    suggestions.push(suggestion);
+  };
+
+  addSuggestion({
+    id: 'permit-inspection',
+    category: 'Fee',
+    title: 'Permit or inspection coordination',
+    detail: 'Common on code-sensitive installs, replacements, and larger scoped work.',
+    line_type: 'fee',
+    unit: 'each',
+    editor_source_note: 'Estimate Helper suggested this because the draft context may involve permit, inspection, or code coordination. Confirm before sending.',
+    duplicateKeywords: ['permit', 'inspection coordination', 'inspection allowance', 'code coordination'],
+  }, looksLikePermitScope);
+
+  addSuggestion({
+    id: 'disposal-haul-off',
+    category: 'Fee',
+    title: 'Disposal / haul-off',
+    detail: 'Useful when old materials, fixtures, equipment, or debris may need removal.',
+    line_type: 'fee',
+    unit: 'job',
+    editor_source_note: 'Estimate Helper suggested this because the draft context may include removal, replacement, demolition, or debris handling. Confirm before sending.',
+    duplicateKeywords: ['disposal', 'haul off', 'haul-off', 'debris', 'remove old'],
+  }, looksLikeRemoval);
+
+  addSuggestion({
+    id: 'trip-service-call',
+    category: 'Fee',
+    title: 'Trip / service call fee',
+    detail: 'A common charge for diagnostic, troubleshooting, or site-visit based work.',
+    line_type: 'fee',
+    unit: 'each',
+    editor_source_note: 'Estimate Helper suggested this because the draft context looks like a service call, diagnostic, or site visit. Confirm before sending.',
+    duplicateKeywords: ['trip', 'service call', 'diagnostic fee', 'site visit'],
+  }, looksLikeServiceVisit || trade === 'Other');
+
+  addSuggestion({
+    id: 'testing-startup',
+    category: 'Labor',
+    title: trade === 'Electrical' ? 'Testing and verification' : 'Testing and startup',
+    detail: 'Often needed after system, fixture, circuit, or equipment work.',
+    line_type: 'labor',
+    unit: 'job',
+    editor_source_note: 'Estimate Helper suggested this because the draft context may need startup, testing, commissioning, or verification after work is complete. Confirm before sending.',
+    duplicateKeywords: ['testing', 'startup', 'start up', 'commissioning', 'verification'],
+  }, looksLikeInstallOrReplacement && ['HVAC', 'Plumbing', 'Electrical'].includes(trade));
+
+  addSuggestion({
+    id: 'delivery-material-handling',
+    category: 'Other',
+    title: 'Delivery / material handling',
+    detail: 'May apply when bulky equipment, fixtures, lumber, or specialty materials are involved.',
+    line_type: 'other',
+    unit: 'job',
+    editor_source_note: 'Estimate Helper suggested this because the draft context may involve material delivery, staging, or handling. Confirm before sending.',
+    duplicateKeywords: ['delivery', 'material handling', 'staging', 'freight'],
+  }, looksLikeMaterialHeavy);
+
+  addSuggestion({
+    id: 'access-difficulty',
+    category: 'Other',
+    title: 'Access difficulty allowance',
+    detail: 'Consider when access, height, crawlspace, attic, roof, or lift conditions may add time.',
+    line_type: 'other',
+    unit: 'allowance',
+    editor_source_note: 'Estimate Helper suggested this because the draft context mentions access conditions that may affect labor or setup. Confirm before sending.',
+    duplicateKeywords: ['access difficulty', 'access allowance', 'limited access', 'lift', 'ladder'],
+  }, looksLikeAccessIssue);
+
+  addSuggestion({
+    id: 'hidden-condition',
+    category: 'Scope',
+    title: 'Hidden condition allowance',
+    detail: 'Helps separate visible approved work from concealed or unknown conditions.',
+    line_type: 'other',
+    unit: 'allowance',
+    editor_source_note: 'Estimate Helper suggested this because the draft context may involve repair, replacement, or concealed-condition risk. Confirm before sending.',
+    duplicateKeywords: ['hidden condition', 'concealed condition', 'unknown condition', 'condition allowance'],
+  }, looksLikeInstallOrReplacement || inferredJobType === 'repair');
+
+  addSuggestion({
+    id: 'maintenance-plan',
+    category: 'Add-on',
+    title: 'Maintenance plan add-on',
+    detail: 'Optional follow-up value for systems or recurring maintenance work.',
+    line_type: 'other',
+    unit: 'each',
+    editor_source_note: 'Estimate Helper suggested this as an optional maintenance or follow-up add-on. Confirm it fits this customer before sending.',
+    duplicateKeywords: ['maintenance plan', 'maintenance add-on', 'follow-up plan', 'service plan'],
+  }, ['HVAC', 'Plumbing', 'Electrical'].includes(trade) || inferredJobType === 'maintenance');
+
+  return suggestions.slice(0, 5);
+}
 const KUDOS_OPTIONS = [
   'Great communication',
   'On time',
@@ -15709,6 +15887,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
+  const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
+  const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
   const [tradeToolsExpanded, setTradeToolsExpanded] = useState(false);
   const [tradeToolSearch, setTradeToolSearch] = useState('');
@@ -16939,6 +17119,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderLaborMode('job_total');
     setEstimateDraftBuilderLastOutput(null);
     setEstimateAssistantNotice('');
+    setEstimateHelperNotice('');
+    setEstimateHelperExpanded(false);
     setSavedChargeQuickPickNotice('');
     setEstimateComposerOpen(true);
     setInvoiceComposerOpen(false);
@@ -17077,6 +17259,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
       setEstimateAssistantNotice('');
+      setEstimateHelperNotice('');
+      setEstimateHelperExpanded(false);
       if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
       await loadContractor();
       if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
@@ -17321,6 +17505,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
       setEstimateAssistantNotice('');
+      setEstimateHelperNotice('');
+      setEstimateHelperExpanded(false);
       setSavedChargeQuickPickNotice('');
       setEstimateComposerOpen(true);
       setContractorJobsView('new_financial');
@@ -17898,6 +18084,112 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     </div>
   );
 
+  const addEstimateHelperSuggestionToDraft = (suggestion: EstimateHelperSuggestion) => {
+    const nextLine = createEstimateLineDraft({
+      line_type: suggestion.line_type,
+      description: suggestion.title,
+      line_title: suggestion.title,
+      customer_description: '',
+      quantity: suggestion.quantity || '1',
+      unit: suggestion.unit,
+      unit_price: '',
+      editor_source_note: suggestion.editor_source_note,
+    });
+    setEstimateDraft(draft => {
+      const usableLines = draft.line_items.filter(draftLineHasContent);
+      return {
+        ...draft,
+        line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
+      };
+    });
+    setEstimateHelperNotice(`Added "${suggestion.title}" as an editable Price Required estimate line.`);
+  };
+
+  const renderEstimateHelperPanel = () => {
+    const suggestions = buildEstimateHelperSuggestions({
+      draft: estimateDraft,
+      selectedTrade: estimateDraftBuilderTrade,
+      selectedJobType: estimateDraftBuilderJobType,
+      contractorCategories: contractorDraft.service_categories,
+    });
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setEstimateHelperExpanded(current => !current)}
+          aria-expanded={estimateHelperExpanded}
+          className="flex w-full flex-col gap-2 text-left sm:flex-row sm:items-start sm:justify-between"
+        >
+          <span className="flex min-w-0 items-start gap-2">
+            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              {estimateHelperExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-2">
+                <Sparkles size={15} className="text-slate-500" />
+                <span className="text-sm font-bold text-slate-950">Estimate Helper</span>
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                Optional contractor-only prompts for commonly missed scope items. Expand to review before sending.
+              </span>
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {suggestions.length} suggestion{suggestions.length === 1 ? '' : 's'}
+            </span>
+            <span className="text-xs font-semibold text-blue-700">
+              {estimateHelperExpanded ? 'Hide' : 'Review'}
+            </span>
+          </span>
+        </button>
+
+        {estimateHelperExpanded && (
+          <>
+            {suggestions.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
+                No new helper suggestions right now. You can keep building the estimate normally.
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {suggestions.map(suggestion => (
+                  <div key={suggestion.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{suggestion.category}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-950">{suggestion.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{suggestion.detail}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addEstimateHelperSuggestionToDraft(suggestion)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                      >
+                        <Plus size={13} />
+                        Add item
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {estimateHelperNotice && (
+              <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+                {estimateHelperNotice}
+              </p>
+            )}
+          </>
+        )}
+        {!estimateHelperExpanded && estimateHelperNotice && (
+          <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+            {estimateHelperNotice}
+          </p>
+        )}
+      </div>
+    );
+  };
+
   const chooseEstimateDraftBuilderMergeMode = (draft: EstimateDraft): 'replace' | 'append' | 'cancel' => {
     if (draft.line_items.some(line => line.builderGenerated)) return 'replace';
     const hasExistingDraftContent = draft.scope.trim() || draft.notes.trim() || draft.line_items.some(draftLineHasContent);
@@ -18158,6 +18450,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderJobType('repair');
     setEstimateDraftBuilderLaborMode('job_total');
     setEstimateDraftBuilderLastOutput(null);
+    setEstimateHelperNotice('');
+    setEstimateHelperExpanded(false);
     setSavedChargeQuickPickNotice('');
     setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
     setEstimateComposerOpen(true);
@@ -24256,6 +24550,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           setEstimateDraftBuilderLaborMode('job_total');
                                           setEstimateDraftBuilderLastOutput(null);
                                           setEstimateAssistantNotice('');
+                                          setEstimateHelperNotice('');
+                                          setEstimateHelperExpanded(false);
                                           setSavedChargeQuickPickNotice('');
                                           setEstimateComposerOpen(true);
                                         }}
@@ -24365,6 +24661,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </button>
                                       </div>
                                       {renderSavedChargeQuickPick()}
+                                      {!isInvoiceWorkspaceTab && renderEstimateHelperPanel()}
                                       {estimateDraft.line_items.map((line, index) => (
                                         renderStructuredLineDraftEditor({
                                           line,
@@ -24487,6 +24784,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraftBuilderLaborMode('job_total');
                                                   setEstimateDraftBuilderLastOutput(null);
                                                   setEstimateAssistantNotice('');
+                                                  setEstimateHelperNotice('');
+                                                  setEstimateHelperExpanded(false);
                                                   setSavedChargeQuickPickNotice('');
                                                   setEstimateComposerOpen(true);
                                                 }}
@@ -24587,6 +24886,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                       setEstimateDraftBuilderLaborMode('job_total');
                                                       setEstimateDraftBuilderLastOutput(null);
                                                       setEstimateAssistantNotice('');
+                                                      setEstimateHelperNotice('');
+                                                      setEstimateHelperExpanded(false);
                                                       setSavedChargeQuickPickNotice('');
                                                       setEstimateComposerOpen(true);
                                                     }}
@@ -24719,6 +25020,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEstimateDraftBuilderLaborMode('job_total');
                                                     setEstimateDraftBuilderLastOutput(null);
                                                     setEstimateAssistantNotice('');
+                                                    setEstimateHelperNotice('');
+                                                    setEstimateHelperExpanded(false);
                                                     setSavedChargeQuickPickNotice('');
                                                     setEstimateComposerOpen(true);
                                                   }}
@@ -25388,6 +25691,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </button>
                           </div>
                           {renderSavedChargeQuickPick()}
+                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
                           {estimateDraft.line_items.map((line, index) => (
                             renderStructuredLineDraftEditor({
                               line,
@@ -25952,6 +26256,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateDraftBuilderLaborMode('job_total');
                                         setEstimateDraftBuilderLastOutput(null);
                                         setEstimateAssistantNotice('');
+                                        setEstimateHelperNotice('');
+                                        setEstimateHelperExpanded(false);
                                         setSavedChargeQuickPickNotice('');
                                         setEstimateComposerOpen(true);
                                         setContractorJobsView('new_financial');
