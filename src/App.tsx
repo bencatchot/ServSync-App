@@ -1345,8 +1345,8 @@ function inferEstimateBuilderTrade(text: string): EstimateDraftBuilderTrade | nu
   const keywordGroups: Record<EstimateDraftBuilderTrade, string[]> = {
     HVAC: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'thermostat', 'duct', 'vent', 'air handler', 'mini split', 'condensate', 'line set', 'lineset', 'disconnect'],
     Plumbing: ['plumbing', 'plumber', 'pipe', 'leak', 'faucet', 'toilet', 'sink', 'drain', 'water heater', 'valve', 'shower', 'garbage disposal'],
-    Electrical: ['electrical', 'electric', 'outlet', 'receptacle', 'switch', 'breaker', 'panel', 'circuit', 'dedicated circuit', 'fixture', 'light', 'wire', 'conduit', 'gfci', 'gfi', 'ev charger', 'charger', 'ceiling fan'],
-    Carpentry: ['carpentry', 'carpenter', 'deck', 'framing', 'trim', 'cabinet', 'door', 'window', 'lumber', 'stairs', 'railing'],
+    Electrical: ['electrical', 'electric', 'outlet', 'receptacle', 'switch', 'breaker', 'panel', 'circuit', 'dedicated circuit', 'light fixture', 'wire', 'conduit', 'gfci', 'gfi', 'ev charger', 'charger', 'ceiling fan'],
+    Carpentry: ['carpentry', 'carpenter', 'deck', 'deck board', 'deck boards', 'decking', 'framing', 'trim', 'cabinet', 'door', 'window', 'lumber', 'stairs', 'railing'],
     Other: [],
   };
   ESTIMATE_DRAFT_BUILDER_TRADES.forEach(trade => {
@@ -1401,7 +1401,7 @@ const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES: EstimateDraftBuilderMaterialA
   { key: 'electrical_gfci_outlet', trade: 'Electrical', title: 'GFCI outlet', aliases: ['gfci', 'gfci outlet', 'gfi outlet'], unit: 'each' },
   { key: 'electrical_outlet', trade: 'Electrical', title: 'Outlet / receptacle', aliases: ['outlet', 'receptacle'], unit: 'each', suppressIfKeysDetected: ['electrical_gfci_outlet'] },
   { key: 'electrical_switch', trade: 'Electrical', title: 'Switch', aliases: ['switch', 'light switch'], unit: 'each' },
-  { key: 'electrical_light_fixture', trade: 'Electrical', title: 'Light fixture', aliases: ['light fixture', 'fixture', 'light'], unit: 'each' },
+  { key: 'electrical_light_fixture', trade: 'Electrical', title: 'Light fixture', aliases: ['light fixture', 'replace light fixture', 'install light fixture', 'replace fixture', 'install fixture'], unit: 'each' },
   { key: 'electrical_ceiling_fan_box', trade: 'Electrical', title: 'Ceiling fan box', aliases: ['fan-rated box', 'fan rated box', 'ceiling fan box'], unit: 'each' },
   { key: 'electrical_wire_conduit', trade: 'Electrical', title: 'Wire / conduit', aliases: ['wire', 'wiring', 'conduit'], unit: 'lot' },
   { key: 'electrical_panel_materials', trade: 'Electrical', title: 'Panel materials', aliases: ['panel materials', 'electrical panel', 'panel'], unit: 'lot' },
@@ -1421,7 +1421,7 @@ const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES: EstimateDraftBuilderMaterialA
   { key: 'carpentry_deck_boards', trade: 'Carpentry', title: 'Deck boards', aliases: ['deck boards', 'deck board', 'decking'], unit: 'lot' },
   { key: 'carpentry_railing', trade: 'Carpentry', title: 'Railing', aliases: ['railing', 'handrail', 'guardrail'], unit: 'lot' },
   { key: 'carpentry_stair_materials', trade: 'Carpentry', title: 'Stair materials', aliases: ['stairs', 'stair', 'stair treads', 'steps'], unit: 'lot' },
-  { key: 'carpentry_posts', trade: 'Carpentry', title: 'Posts', aliases: ['posts', 'post'], unit: 'lot' },
+  { key: 'carpentry_posts', trade: 'Carpentry', title: 'Posts', aliases: ['replace post', 'install post', 'deck post', 'deck posts', 'railing post', 'railing posts', 'structural post', 'structural posts'], unit: 'lot' },
   { key: 'carpentry_joists', trade: 'Carpentry', title: 'Joists', aliases: ['joists', 'joist'], unit: 'lot' },
   { key: 'carpentry_trim', trade: 'Carpentry', title: 'Trim', aliases: ['trim', 'molding', 'moulding'], unit: 'lot' },
   { key: 'carpentry_door_window_material', trade: 'Carpentry', title: 'Door/window material', aliases: ['replace door', 'install door', 'new door', 'door replacement', 'door slab', 'door frame', 'replace window', 'install window', 'new window', 'window replacement', 'window sash', 'window frame'], unit: 'each' },
@@ -1497,7 +1497,10 @@ function detectEstimateBuilderMaterialSeeds({
 }
 
 function estimateBuilderScopeNeedsPermitFee(normalizedScope: string) {
-  return textIncludesAny(normalizedScope, ['permit', 'inspection', 'code']);
+  if (textIncludesAny(normalizedScope, ['permit', 'code required', 'code compliance', 'code inspection'])) return true;
+  if (!normalizedScope.includes('inspection')) return false;
+  if (textIncludesAny(normalizedScope, ['inspection fee', 'inspection cost', 'inspection coordination', 'permit inspection'])) return true;
+  return false;
 }
 
 function estimateBuilderScopeNeedsDisposalFee(normalizedScope: string) {
