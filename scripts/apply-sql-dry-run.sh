@@ -91,6 +91,7 @@ SQL_FILES=(
   "servsync-structured-line-items-foundation.sql"
   "servsync-structured-line-item-conversion-rpcs.sql"
   "servsync-estimate-labor-model-foundation.sql"
+  "servsync-estimate-labor-model-conversion-rpcs.sql"
   "servsync-homeowner-file-estimates.sql"
   "servsync-reviews.sql"
   "servsync-public-reviews.sql"

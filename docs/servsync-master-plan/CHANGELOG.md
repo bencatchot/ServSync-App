@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/estimate-labor-conversion-rpcs-v1`
+- Files changed:
+  - `servsync-estimate-labor-model-conversion-rpcs.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the PR 2 SQL-only RPC/conversion preservation patch for the schema-backed estimate labor model. The patch replaces the existing estimate/job/invoice conversion RPCs so accepted estimate-to-invoice and linked job-to-invoice paths copy estimate-level labor mode, labor rate, job labor hours, labor subtotal breakdown fields, and line-specific labor hours to invoices. Accepted estimate-to-job conversion now carries safe rendered labor context in the job approved-scope summary/JSON without adding job labor schema.
+- Reason for change: Preserve newly available labor fields through existing backend conversion paths before app/UI labor editing starts saving them, while keeping Price Required/null behavior, $0.00 semantics, structured line fields, and legacy estimates/invoices compatible.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static scope scan for restricted database/security/deployment changes.
+  - Static search confirming no app/UI behavior changes.
+  - Static review confirming labor values are not stored in `customer_description`, `model_spec`, or `editor_source_note`.
+  - Changed-file secret-value scan.
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application requires separate approval.
+  - Production SQL application requires separate approval after sandbox verification and merge.
+  - App/UI labor editing, Build Estimate Draft labor behavior, homeowner/PDF labor display, and broader end-to-end validation remain deferred to later FB-019 slices.
+
 - Branch: `codex/estimate-labor-model-sql-v1`
 - Files changed:
   - `servsync-estimate-labor-model-foundation.sql`
