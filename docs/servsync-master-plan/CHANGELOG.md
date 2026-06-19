@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/fb-019-docs-complete`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Closed out FB-019 documentation after PR 63 merged and passed Vercel. The backlog now marks Estimate Labor Model / Line-Specific Labor Inputs as Completed / Functional and summarizes the completed v1 sequence across schema foundation, RPC/conversion preservation, app/UI labor support, and Build Estimate Draft labor cleanup.
+- Reason for change: Keep ServSync planning docs aligned with the completed v1 rollout while making future labor work optional regression hardening or advanced trade-tool labor behavior review.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Changed-file secret-value scan.
+  - Documentation-only scope check confirming no app, SQL, schema, RPC, RLS, auth, storage, env, Vercel/settings, production-data, or user-record files changed.
+- Known risks or follow-ups:
+  - Advanced trade-tool labor behavior remains intentionally outside FB-019 v1 and can be reviewed later if desired.
+
 - Branch: `codex/build-estimate-draft-labor-cleanup`
 - Files changed:
   - `src/App.tsx`
