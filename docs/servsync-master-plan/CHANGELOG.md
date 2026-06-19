@@ -19,9 +19,10 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `npm run build`
   - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
   - Changed-file secret-value scan
+  - Follow-up authenticated preview smoke on the live contractor estimate composer confirmed generated material line titles render in editable Description input values; the earlier broad matrix missed them because it checked page text instead of input values.
 - Known risks or follow-ups:
   - Alias matching is intentionally small and rule-based; future expansion should stay trade-aware and avoid becoming a SKU catalog.
-  - Authenticated preview smoke should confirm the representative plumbing, electrical, HVAC, carpentry, and generic rough-scope cases in the live composer UI.
+  - Full authenticated preview matrix automation remained flaky around contractor dashboard/tour navigation, so future smoke should read Description input values directly and avoid text-only assertions for editable fields.
   - Saved-charge exact-match behavior should be watched as more contractors add saved material charges with similar names.
 
 - Branch: `feature/estimate-save-flow-polish-v1`
