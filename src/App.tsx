@@ -1519,10 +1519,7 @@ function estimateBuilderScopeNeedsDisposalFee(normalizedScope: string) {
 
 function estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope: string) {
   const normalized = compactText(roughScope);
-  const hasSink = textIncludesAny(normalized, ['sink', 'kitchen sink']);
-  const hasFaucet = textIncludesAny(normalized, ['faucet', 'fixture']);
-  const hasGarbageDisposal = textIncludesAny(normalized, ['garbage disposal', 'disposal unit', 'disposer']);
-  return hasSink && (hasFaucet || hasGarbageDisposal);
+  return textIncludesAny(normalized, ['sink', 'kitchen sink']);
 }
 
 function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
@@ -1536,12 +1533,11 @@ function orderEstimateDraftBuilderSeeds(seeds: EstimateDraftBuilderLineSeed[]) {
 }
 
 function estimateDraftBuilderJobTotalLaborSeed(trade: EstimateDraftBuilderTrade): EstimateDraftBuilderLineSeed {
-  const label = trade === 'Other' ? 'Labor for requested work' : `${trade} labor`;
   return {
     line_type: 'labor',
-    description: label,
+    description: 'Labor',
     unit: 'hour',
-    keywords: ['labor', 'work', 'install', 'repair', 'replacement'],
+    keywords: [trade, 'labor', 'work', 'install', 'repair', 'replacement'],
   };
 }
 
@@ -1594,7 +1590,7 @@ function contextualEstimateBuilderSeeds({
   const hasSink = textIncludesAny(normalized, ['sink', 'kitchen sink']);
   const hasFaucet = textIncludesAny(normalized, ['faucet', 'fixture']);
   const hasGarbageDisposal = textIncludesAny(normalized, ['garbage disposal', 'disposal unit', 'disposer']);
-  if (!hasSink || (!hasFaucet && !hasGarbageDisposal)) return null;
+  if (!hasSink) return null;
 
   const materialSeeds: EstimateDraftBuilderLineSeed[] = [
     hasSink && {
