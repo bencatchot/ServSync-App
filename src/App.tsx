@@ -73,6 +73,7 @@ import type {
   DiscoverFeedItem,
   Estimate,
   EstimateChargeType,
+  EstimateLaborMode,
   EstimateLineItem,
   EstimateLineSupplyStatus,
   EstimateLineType,
@@ -350,6 +351,7 @@ type EstimateLineDraft = {
   quantity: string;
   unit: string;
   unit_price: string;
+  labor_hours: string;
   builderGenerated?: boolean;
   editor_source_note?: string;
 };
@@ -418,6 +420,9 @@ type EstimateDraft = {
   inspection_id: string;
   home_id?: string;
   local_home_id?: string;
+  labor_mode: EstimateLaborMode;
+  labor_rate: string;
+  job_labor_hours: string;
   line_items: EstimateLineDraft[];
 };
 
@@ -471,6 +476,18 @@ function lineDisplayDetailRows(line: StructuredLineDisplay) {
   ].filter(Boolean);
 }
 
+function customerLineDisplayDetailRows(
+  line: StructuredLineDisplay & Pick<EstimateLineItem | InvoiceLineItem, 'line_type' | 'labor_hours'>,
+  record?: Pick<Estimate | Invoice, 'labor_mode'>,
+) {
+  const rows = lineDisplayDetailRows(line);
+  const laborHours = typeof line.labor_hours === 'number' && line.labor_hours > 0 ? line.labor_hours : 0;
+  if (record && normalizeEstimateLaborMode(record.labor_mode) === 'line_specific' && laborHours > 0 && persistedLineCanShowLaborHours(line)) {
+    rows.push(`Labor hours: ${formatLaborHours(laborHours)}`);
+  }
+  return rows;
+}
+
 function draftLineTitle(line: EstimateLineDraft) {
   return line.line_title.trim() || line.description.trim();
 }
@@ -486,6 +503,7 @@ function draftLineHasContent(line: EstimateLineDraft) {
 function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate_id' | 'invoice_id', ownerId: string, index: number) {
   const lineTitle = draftLineTitle(line);
   const legacyDescription = draftLineLegacyDescription(line);
+  const laborHours = draftLineCanTrackLaborHours(line) ? parseLaborHoursValue(line.labor_hours) : null;
   return {
     [ownerIdField]: ownerId,
     line_type: normalizeEstimateLineType(line.line_type),
@@ -497,6 +515,7 @@ function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate
     quantity: Number.isFinite(Number(line.quantity)) && Number(line.quantity) > 0 ? Number(line.quantity) : 1,
     unit: line.unit.trim() || 'each',
     unit_price_cents: draftLineIsUnpriced(line) ? null : dollarsToCents(line.unit_price),
+    labor_hours: laborHours,
     sort_order: index,
   };
 }
@@ -516,6 +535,9 @@ type InvoiceDraftForm = {
   discount_type: 'amount' | 'percentage';
   discount: string;
   discount_reason: string;
+  labor_mode: EstimateLaborMode;
+  labor_rate: string;
+  job_labor_hours: string;
   line_items: EstimateLineDraft[];
 };
 type TradeToolInputType = 'number' | 'text' | 'select';
@@ -579,8 +601,8 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
   viewer: 'Read-only style access for oversight. Deeper restrictions can be added later.',
 };
 
-const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, created_at, updated_at, line_items:estimate_line_items(*)';
-const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
+const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, labor_mode, labor_rate_cents, job_labor_hours, material_total_cents, labor_total_cents, fee_total_cents, other_total_cents, tax_rate_percent, tax_cents, created_at, updated_at, line_items:estimate_line_items(*)';
+const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, labor_mode, labor_rate_cents, job_labor_hours, material_total_cents, labor_total_cents, fee_total_cents, other_total_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
 const HOMEOWNER_CONTRACTOR_INVITE_LEAD_SELECT = 'id, business_name, location, trade_category, contact_name, homeowner_status, created_at, updated_at';
 const ADMIN_INVITE_LEAD_SELECT = [
   'id',
@@ -845,6 +867,7 @@ function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): Es
     quantity: '1',
     unit: 'each',
     unit_price: '',
+    labor_hours: '',
     ...overrides,
   };
   if (!draft.line_title.trim() && draft.description.trim()) draft.line_title = draft.description;
@@ -863,6 +886,9 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     inspection_id: '',
     home_id: '',
     local_home_id: '',
+    labor_mode: 'job_total',
+    labor_rate: '',
+    job_labor_hours: '',
     line_items: [createEstimateLineDraft()],
     ...overrides,
   };
@@ -946,6 +972,9 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
     discount_type: 'amount' as const,
     discount: '',
     discount_reason: '',
+    labor_mode: 'job_total' as EstimateLaborMode,
+    labor_rate: '',
+    job_labor_hours: '',
     line_items: defaultLineItems,
     ...overrides,
   };
@@ -2113,6 +2142,9 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
     inspection_id: estimate.inspection_id || '',
     home_id: estimate.home_id || '',
     local_home_id: estimate.local_home_id || '',
+    labor_mode: normalizeEstimateLaborMode(estimate.labor_mode),
+    labor_rate: laborRateInputFromCents(estimate.labor_rate_cents),
+    job_labor_hours: laborHoursInputFromValue(estimate.job_labor_hours),
     line_items: estimate.line_items?.length
       ? [...estimate.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -2127,6 +2159,7 @@ function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            labor_hours: laborHoursInputFromValue(line.labor_hours),
           }))
       : [createEstimateLineDraft()],
   };
@@ -2155,6 +2188,9 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
       ? String(Number(invoice.discount_value ?? 0) || '')
       : centsToDollars(invoice.discount_cents),
     discount_reason: invoice.discount_reason ?? '',
+    labor_mode: normalizeEstimateLaborMode(invoice.labor_mode),
+    labor_rate: laborRateInputFromCents(invoice.labor_rate_cents),
+    job_labor_hours: laborHoursInputFromValue(invoice.job_labor_hours),
     line_items: invoice.line_items?.length
       ? [...invoice.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -2169,6 +2205,7 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            labor_hours: laborHoursInputFromValue(line.labor_hours),
           }))
       : [createEstimateLineDraft()],
   };
@@ -2182,6 +2219,9 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
     terms: template.terms || createBlankEstimateDraft().terms,
     service_request_id: '',
     inspection_id: '',
+    labor_mode: 'job_total',
+    labor_rate: '',
+    job_labor_hours: '',
     line_items: template.line_items?.length
       ? [...template.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -2195,6 +2235,7 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            labor_hours: laborHoursInputFromValue(line.labor_hours),
             editor_source_note: `Suggested by saved estimate template: ${template.name}.`,
           }))
       : [createEstimateLineDraft()],
@@ -2209,6 +2250,9 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
     terms: template.terms || createBlankEstimateDraft().terms,
     service_request_id: '',
     inspection_id: '',
+    labor_mode: 'job_total',
+    labor_rate: '',
+    job_labor_hours: '',
     line_items: template.line_items?.length
       ? [...template.line_items]
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -2222,6 +2266,7 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
             quantity: String(line.quantity),
             unit: line.unit,
             unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            labor_hours: laborHoursInputFromValue(line.labor_hours),
             editor_source_note: `Suggested by ${template.name} template.`,
           }))
       : [createEstimateLineDraft()],
@@ -5274,6 +5319,41 @@ function lineUnitPriceInputFromCents(value: number | null | undefined) {
   return value === null || value === undefined ? '' : (value / 100).toFixed(2);
 }
 
+function laborRateInputFromCents(value: number | null | undefined) {
+  return value === null || value === undefined ? '' : (value / 100).toFixed(2);
+}
+
+function normalizeEstimateLaborMode(value: string | null | undefined): EstimateLaborMode {
+  return value === 'line_specific' ? 'line_specific' : 'job_total';
+}
+
+function parseLaborHoursValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const cleaned = typeof value === 'number' ? value : String(value).replace(/,/g, '').trim();
+  if (cleaned === '') return null;
+  const numeric = typeof cleaned === 'number' ? cleaned : Number(cleaned);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  return numeric;
+}
+
+function laborHoursInputFromValue(value: number | null | undefined) {
+  return value === null || value === undefined ? '' : String(Number(value));
+}
+
+function formatLaborHours(value: number) {
+  return Number(value.toFixed(2)).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function draftLineCanTrackLaborHours(line: Pick<EstimateLineDraft, 'line_type'>) {
+  const type = normalizeEstimateLineType(line.line_type);
+  return type === 'material' || type === 'other';
+}
+
+function persistedLineCanShowLaborHours(line: Pick<EstimateLineItem | InvoiceLineItem, 'line_type'>) {
+  const type = normalizeEstimateLineType(line.line_type);
+  return type === 'material' || type === 'other';
+}
+
 function estimateLineTotalCents(line: EstimateLineDraft) {
   if (draftLineIsUnpriced(line)) return 0;
   const quantity = Number(line.quantity);
@@ -5285,10 +5365,117 @@ function estimateTotalCents(lines: EstimateLineDraft[] = []) {
   return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
 }
 
+function estimateLineBucket(lineType: LegacyEstimateLineType | EstimateLineType | string | null | undefined) {
+  const type = normalizeEstimateLineType(lineType);
+  if (type === 'fee') return 'fee';
+  if (type === 'labor') return 'labor';
+  if (type === 'material' || type === 'other') return 'material';
+  return 'other';
+}
+
+function draftLineBucketTotal(lines: EstimateLineDraft[], bucket: 'material' | 'labor' | 'fee') {
+  return lines.reduce((sum, line) => estimateLineBucket(line.line_type) === bucket ? sum + estimateLineTotalCents(line) : sum, 0);
+}
+
+function draftOtherLineTotal(lines: EstimateLineDraft[]) {
+  const lineSubtotal = estimateTotalCents(lines);
+  return Math.max(0, lineSubtotal - draftLineBucketTotal(lines, 'material') - draftLineBucketTotal(lines, 'labor') - draftLineBucketTotal(lines, 'fee'));
+}
+
+function draftSchemaLaborHours(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'job_labor_hours' | 'line_items'>) {
+  if (draft.labor_mode === 'line_specific') {
+    return (draft.line_items ?? []).reduce((sum, line) => {
+      if (!draftLineCanTrackLaborHours(line)) return sum;
+      return sum + (parseLaborHoursValue(line.labor_hours) ?? 0);
+    }, 0);
+  }
+  return parseLaborHoursValue(draft.job_labor_hours) ?? 0;
+}
+
+function draftHasLaborHoursWithoutRate(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
+  return priceInputIsBlank(draft.labor_rate) && draftSchemaLaborHours(draft) > 0;
+}
+
+function draftSchemaLaborTotalCents(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
+  if (draftHasLaborHoursWithoutRate(draft)) return 0;
+  return Math.round(draftSchemaLaborHours(draft) * dollarsToCents(draft.labor_rate));
+}
+
+function draftFinancialBreakdown(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
+  const lines = draft.line_items ?? [];
+  const materialTotalCents = draftLineBucketTotal(lines, 'material');
+  const laborLineTotalCents = draftLineBucketTotal(lines, 'labor');
+  const schemaLaborTotalCents = draftSchemaLaborTotalCents(draft);
+  const laborTotalCents = laborLineTotalCents + schemaLaborTotalCents;
+  const feeTotalCents = draftLineBucketTotal(lines, 'fee');
+  const otherTotalCents = draftOtherLineTotal(lines);
+  const subtotalCents = materialTotalCents + laborTotalCents + feeTotalCents + otherTotalCents;
+  return {
+    materialTotalCents,
+    laborLineTotalCents,
+    schemaLaborTotalCents,
+    laborTotalCents,
+    feeTotalCents,
+    otherTotalCents,
+    subtotalCents,
+    laborHours: draftSchemaLaborHours(draft),
+    missingLaborRate: draftHasLaborHoursWithoutRate(draft),
+  };
+}
+
 function persistedLineTotalCents(line: Pick<EstimateLineItem | InvoiceLineItem, 'quantity' | 'unit_price_cents'>) {
   const unitPriceCents = line.unit_price_cents;
   if (unitPriceCents === null || unitPriceCents === undefined) return 0;
   return Math.round(Number(line.quantity || 0) * unitPriceCents);
+}
+
+function persistedLineBucketTotal(lines: Array<EstimateLineItem | InvoiceLineItem> = [], bucket: 'material' | 'labor' | 'fee') {
+  return lines.reduce((sum, line) => estimateLineBucket(line.line_type) === bucket ? sum + persistedLineTotalCents(line) : sum, 0);
+}
+
+function persistedOtherLineTotal(lines: Array<EstimateLineItem | InvoiceLineItem> = []) {
+  const lineSubtotal = lines.reduce((sum, line) => sum + persistedLineTotalCents(line), 0);
+  return Math.max(0, lineSubtotal - persistedLineBucketTotal(lines, 'material') - persistedLineBucketTotal(lines, 'labor') - persistedLineBucketTotal(lines, 'fee'));
+}
+
+function persistedSchemaLaborHours(record: Pick<Estimate | Invoice, 'labor_mode' | 'job_labor_hours' | 'line_items'>) {
+  const mode = normalizeEstimateLaborMode(record.labor_mode);
+  if (mode === 'line_specific') {
+    return (record.line_items ?? []).reduce((sum, line) => {
+      if (!persistedLineCanShowLaborHours(line)) return sum;
+      return sum + (typeof line.labor_hours === 'number' && line.labor_hours > 0 ? line.labor_hours : 0);
+    }, 0);
+  }
+  return typeof record.job_labor_hours === 'number' && record.job_labor_hours > 0 ? record.job_labor_hours : 0;
+}
+
+function persistedSchemaLaborTotalCents(record: Pick<Estimate | Invoice, 'labor_mode' | 'labor_rate_cents' | 'job_labor_hours' | 'line_items' | 'labor_total_cents'>) {
+  if (typeof record.labor_total_cents === 'number') {
+    return Math.max(0, record.labor_total_cents - persistedLineBucketTotal(record.line_items ?? [], 'labor'));
+  }
+  const rate = record.labor_rate_cents;
+  if (rate === null || rate === undefined) return 0;
+  return Math.round(persistedSchemaLaborHours(record) * rate);
+}
+
+function persistedFinancialBreakdown(record: Pick<Estimate | Invoice, 'subtotal_cents' | 'total_cents' | 'labor_mode' | 'labor_rate_cents' | 'job_labor_hours' | 'material_total_cents' | 'labor_total_cents' | 'fee_total_cents' | 'other_total_cents' | 'tax_cents' | 'line_items'>) {
+  const lines = record.line_items ?? [];
+  const materialTotalCents = record.material_total_cents ?? persistedLineBucketTotal(lines, 'material');
+  const laborTotalCents = record.labor_total_cents ?? (persistedLineBucketTotal(lines, 'labor') + persistedSchemaLaborTotalCents(record));
+  const feeTotalCents = record.fee_total_cents ?? persistedLineBucketTotal(lines, 'fee');
+  const otherTotalCents = record.other_total_cents ?? persistedOtherLineTotal(lines);
+  const taxCents = record.tax_cents ?? 0;
+  const subtotalCents = record.subtotal_cents ?? materialTotalCents + laborTotalCents + feeTotalCents + otherTotalCents;
+  return {
+    materialTotalCents,
+    laborTotalCents,
+    feeTotalCents,
+    otherTotalCents,
+    taxCents,
+    subtotalCents,
+    totalCents: record.total_cents,
+    laborHours: persistedSchemaLaborHours(record),
+  };
 }
 
 function unpricedLineCount(lines: Array<Pick<EstimateLineItem | InvoiceLineItem, 'unit_price_cents'>> = []) {
@@ -5309,23 +5496,23 @@ function parsePercentValue(value: string) {
   return Math.min(numeric, 100);
 }
 
-function invoiceDiscountCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type'>) {
-  const subtotalCents = estimateTotalCents(draft.line_items ?? []);
+function invoiceDiscountCentsFromDraft(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type' | 'labor_mode' | 'labor_rate' | 'job_labor_hours'>) {
+  const subtotalCents = draftFinancialBreakdown(draft).subtotalCents;
   if (draft.discount_type === 'percentage') {
     return Math.min(subtotalCents, Math.round(subtotalCents * parsePercentValue(draft.discount) / 100));
   }
   return Math.min(subtotalCents, dollarsToCents(draft.discount));
 }
 
-function invoiceTaxableCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type'>) {
-  return Math.max(0, estimateTotalCents(draft.line_items ?? []) - invoiceDiscountCents(draft));
+function invoiceTaxableCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'discount' | 'discount_type' | 'labor_mode' | 'labor_rate' | 'job_labor_hours'>) {
+  return Math.max(0, draftFinancialBreakdown(draft).subtotalCents - invoiceDiscountCentsFromDraft(draft));
 }
 
-function invoiceTaxCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type'>) {
+function invoiceTaxCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type' | 'labor_mode' | 'labor_rate' | 'job_labor_hours'>) {
   return Math.round(invoiceTaxableCents(draft) * parsePercentValue(draft.tax) / 100);
 }
 
-function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type'>) {
+function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 'discount' | 'discount_type' | 'labor_mode' | 'labor_rate' | 'job_labor_hours'>) {
   return invoiceTaxableCents(draft) + invoiceTaxCents(draft);
 }
 
@@ -5518,6 +5705,15 @@ async function createEstimatePdf(
     y += 7;
     pdf.setFont('helvetica', 'normal');
   };
+  const moneyRow = (label: string, amount: number, bold = false, helper?: string) => {
+    addPageIfNeeded(7);
+    pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+    pdf.setFontSize(bold ? 12 : 10);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text(helper ? `${label} (${helper})` : label, pageW - margin - 70, y);
+    pdf.text(formatMoney(amount), pageW - margin, y, { align: 'right' });
+    y += bold ? 7 : 6;
+  };
 
   pdf.setFillColor(0, 120, 255);
   pdf.rect(0, 0, pageW, 42, 'F');
@@ -5574,12 +5770,13 @@ async function createEstimatePdf(
 
   sectionTitle('Line Items');
   const lines = [...(estimate.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const totals = persistedFinancialBreakdown(estimate);
   const estimateUnpricedCount = unpricedLineCount(lines);
   if (lines.length === 0) {
     addWrappedText('No line items listed.', margin, contentW, 10, 5);
   } else {
     lines.forEach(line => {
-      const detailRows = lineDisplayDetailRows(line);
+      const detailRows = customerLineDisplayDetailRows(line, estimate);
       const rowH = 18 + detailRows.length * 4;
       addPageIfNeeded(rowH);
       pdf.setFillColor(248, 250, 252);
@@ -5608,16 +5805,16 @@ async function createEstimatePdf(
     addWrappedText('Estimate total does not include items marked "Price to be confirmed."', margin, contentW, 9, 4);
   }
 
-  addPageIfNeeded(16);
+  addPageIfNeeded(44);
   pdf.setDrawColor(226, 232, 240);
-  pdf.line(margin, y, pageW - margin, y);
-  y += 8;
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(14);
-  pdf.setTextColor(15, 23, 42);
-  pdf.text('Total', margin, y);
-  pdf.text(formatMoney(estimate.total_cents), pageW - margin, y, { align: 'right' });
-  y += 8;
+  pdf.line(pageW - margin - 72, y, pageW - margin, y);
+  y += 7;
+  moneyRow('Material total', totals.materialTotalCents);
+  moneyRow('Labor total', totals.laborTotalCents, false, totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined);
+  moneyRow('Subtotal', totals.subtotalCents);
+  moneyRow('Fees', totals.feeTotalCents);
+  moneyRow('Tax', totals.taxCents);
+  moneyRow('Total', totals.totalCents, true);
 
   if (estimate.notes) {
     sectionTitle('Notes / Exclusions');
@@ -5789,6 +5986,7 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
 
   sectionTitle('Line Items');
   const lines = [...(invoice.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  const totals = persistedFinancialBreakdown(invoice);
   const invoiceUnpricedCount = unpricedLineCount(lines);
   addPageIfNeeded(10);
   pdf.setFillColor(241, 245, 249);
@@ -5808,7 +6006,7 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
   } else {
     lines.forEach(line => {
       const descriptionLines = pdf.splitTextToSize(
-        [lineDisplayTitle(line), ...lineDisplayDetailRows(line)].join('\n'),
+        [lineDisplayTitle(line), ...customerLineDisplayDetailRows(line, invoice)].join('\n'),
         contentW - 88,
       );
       const rowH = Math.max(12, descriptionLines.length * 4 + 7);
@@ -5842,8 +6040,17 @@ async function createInvoicePdf(invoice: Invoice, context: InvoicePdfContext) {
   pdf.setDrawColor(226, 232, 240);
   pdf.line(pageW - margin - 62, y, pageW - margin, y);
   y += 7;
-  moneyRow('Subtotal', invoice.subtotal_cents);
-  moneyRow('Tax', invoice.tax_cents);
+  moneyRow('Material total', totals.materialTotalCents);
+  moneyRow('Labor total', totals.laborTotalCents, false);
+  if (totals.laborHours > 0) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(`${formatLaborHours(totals.laborHours)} labor hrs`, pageW - margin - 58, y - 2);
+  }
+  moneyRow('Subtotal', totals.subtotalCents);
+  moneyRow('Fees', totals.feeTotalCents);
+  moneyRow('Tax', totals.taxCents);
   moneyRow('Discount', -invoice.discount_cents);
   moneyRow('Total', invoice.total_cents, true);
   moneyRow('Amount paid', invoice.amount_paid_cents);
@@ -11424,6 +11631,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const invoiceFiled = maintenanceLog.some(entry => entry.invoice_id === invoice.id);
     const invoiceFileable = invoice.status !== 'draft' && invoice.status !== 'void';
     const invoiceRecordLabel = invoice.status === 'paid' ? 'receipt/invoice record' : 'invoice record';
+    const totals = persistedFinancialBreakdown(invoice);
 
     return (
       <div
@@ -11531,7 +11739,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
-                      {lineDisplayDetailRows(line).map(detail => (
+                      {customerLineDisplayDetailRows(line, invoice).map(detail => (
                         <p key={detail} className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
                       ))}
                     </div>
@@ -11546,11 +11754,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Invoice total does not include items marked “Price to be confirmed.”
               </p>
             )}
-            <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-4">
-              <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(invoice.subtotal_cents)}</strong></span>
-              <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(invoice.tax_cents)}</strong></span>
-              <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
-              <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <span className="text-slate-500">Material total <strong className="text-slate-950">{formatMoney(totals.materialTotalCents)}</strong></span>
+                <span className="text-slate-500">Labor total <strong className="text-slate-950">{formatMoney(totals.laborTotalCents)}</strong>{totals.laborHours > 0 ? <span className="ml-1 text-xs">({formatLaborHours(totals.laborHours)} hrs)</span> : null}</span>
+                <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(totals.subtotalCents)}</strong></span>
+                <span className="text-slate-500">Fees <strong className="text-slate-950">{formatMoney(totals.feeTotalCents)}</strong></span>
+                <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(totals.taxCents)}</strong></span>
+                <span className="text-slate-500">Total <strong className="text-slate-950">{formatMoney(invoice.total_cents)}</strong></span>
+                <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
+                <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
+              </div>
             </div>
             {(invoice.notes || invoice.terms) && (
               <div className="grid gap-3 md:grid-cols-2">
@@ -11586,6 +11800,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const isOpen = viewingEstimateId === estimate.id;
     const cardTone = options.needsReview ? 'attention' : options.accepted ? 'accepted' : 'closed';
     const propertyLabel = propertyRecordLabel(estimate, { homes });
+    const totals = persistedFinancialBreakdown(estimate);
 
     return (
       <div
@@ -11695,7 +11910,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div key={line.id} className="grid gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_6rem]">
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
-                      {lineDisplayDetailRows(line).map(detail => (
+                      {customerLineDisplayDetailRows(line, estimate).map(detail => (
                         <p key={detail} className="mt-0.5 text-xs leading-5 text-slate-500">{detail}</p>
                       ))}
                     </div>
@@ -11710,6 +11925,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 Estimate total does not include items marked “Price to be confirmed.”
               </p>
             )}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <span className="text-slate-500">Material total <strong className="text-slate-950">{formatMoney(totals.materialTotalCents)}</strong></span>
+                <span className="text-slate-500">Labor total <strong className="text-slate-950">{formatMoney(totals.laborTotalCents)}</strong>{totals.laborHours > 0 ? <span className="ml-1 text-xs">({formatLaborHours(totals.laborHours)} hrs)</span> : null}</span>
+                <span className="text-slate-500">Subtotal <strong className="text-slate-950">{formatMoney(totals.subtotalCents)}</strong></span>
+                <span className="text-slate-500">Fees <strong className="text-slate-950">{formatMoney(totals.feeTotalCents)}</strong></span>
+                <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(totals.taxCents)}</strong></span>
+                <span className="text-slate-500">Total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong></span>
+              </div>
+            </div>
             {(estimate.notes || estimate.terms) && (
               <div className="grid gap-3 md:grid-cols-2">
                 {estimate.notes && (
@@ -17080,6 +17305,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       home_id: options.homeId ?? options.sourceEstimate?.home_id ?? defaultConnectedHomeId,
       local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id ?? defaultLocalHomeId,
       scope: options.sourceEstimate?.scope || 'Completed work performed for the customer.',
+      labor_mode: normalizeEstimateLaborMode(options.sourceEstimate?.labor_mode),
+      labor_rate: laborRateInputFromCents(options.sourceEstimate?.labor_rate_cents ?? contractor?.default_labor_rate_cents),
+      job_labor_hours: laborHoursInputFromValue(options.sourceEstimate?.job_labor_hours),
       line_items: options.sourceEstimate?.line_items?.length
         ? [...options.sourceEstimate.line_items]
             .sort((a, b) => a.sort_order - b.sort_order)
@@ -17093,6 +17321,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               quantity: String(line.quantity),
               unit: line.unit,
               unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+              labor_hours: laborHoursInputFromValue(line.labor_hours),
             }))
         : undefined,
     }));
@@ -17112,6 +17341,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       inspection_id: options.inspectionId ?? '',
       home_id: options.homeId ?? defaultConnectedHomeId,
       local_home_id: options.localHomeId ?? defaultLocalHomeId,
+      labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
     }));
     setEstimateAssistantText('');
     setEstimateDraftBuilderTrade('Other');
@@ -17172,6 +17402,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const confirmed = window.confirm(`${priceRequiredWarningText(draftUnpricedCount)}\n\nChoose OK to continue anyway, or Cancel to go back and edit pricing.`);
       if (!confirmed) return;
     }
+    const draftForTotals = { ...estimateDraft, line_items: usableLines };
+    if (draftHasLaborHoursWithoutRate(draftForTotals)) {
+      const confirmed = window.confirm('This estimate has labor hours but no labor rate. Labor hours will be saved, but labor price will be excluded from totals until a labor rate is added.\n\nChoose OK to continue anyway, or Cancel to add a labor rate.');
+      if (!confirmed) return;
+    }
     setSavingEstimate(true);
     const currentEditingEstimateId = editingEstimateId;
     const focusSavedEstimateActions = (estimate: Estimate) => {
@@ -17196,7 +17431,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
     };
     try {
-      const subtotalCents = estimateTotalCents(usableLines);
+      const totals = draftFinancialBreakdown(draftForTotals);
+      const taxCents = 0;
       const property = estimateSourceProperty(estimateDraft);
       const estimatePayload = {
         contractor_id: contractor.id,
@@ -17211,8 +17447,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         notes: cleanHumanWrittenText(estimateDraft.notes),
         terms: cleanHumanWrittenText(estimateDraft.terms),
         status: 'draft',
-        subtotal_cents: subtotalCents,
-        total_cents: subtotalCents,
+        subtotal_cents: totals.subtotalCents,
+        total_cents: totals.subtotalCents + taxCents,
+        labor_mode: estimateDraft.labor_mode,
+        labor_rate_cents: priceInputIsBlank(estimateDraft.labor_rate) ? null : dollarsToCents(estimateDraft.labor_rate),
+        job_labor_hours: parseLaborHoursValue(estimateDraft.job_labor_hours),
+        material_total_cents: totals.materialTotalCents,
+        labor_total_cents: totals.laborTotalCents,
+        fee_total_cents: totals.feeTotalCents,
+        other_total_cents: totals.otherTotalCents,
+        tax_rate_percent: null,
+        tax_cents: taxCents,
       };
       const { data: estimateData, error: estimateError } = currentEditingEstimateId
         ? await supabase
@@ -17299,10 +17544,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError('Only draft invoices can be edited in this version.');
       return null;
     }
+    const draftForTotals = { ...invoiceDraft, line_items: usableLines };
+    if (draftHasLaborHoursWithoutRate(draftForTotals)) {
+      const confirmed = window.confirm('This invoice has labor hours but no labor rate. Labor hours will be saved, but labor price will be excluded from totals until a labor rate is added.\n\nChoose OK to continue anyway, or Cancel to add a labor rate.');
+      if (!confirmed) return null;
+    }
     setSavingInvoice(true);
     try {
-      const subtotalCents = estimateTotalCents(usableLines);
-      const discountCents = invoiceDiscountCents({ ...invoiceDraft, line_items: usableLines });
+      const totals = draftFinancialBreakdown(draftForTotals);
+      const subtotalCents = totals.subtotalCents;
+      const discountCents = invoiceDiscountCentsFromDraft(draftForTotals);
       const taxableCents = Math.max(0, subtotalCents - discountCents);
       const taxRatePercent = parsePercentValue(invoiceDraft.tax);
       const taxCents = Math.round(taxableCents * taxRatePercent / 100);
@@ -17327,6 +17578,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         terms: cleanHumanWrittenText(invoiceDraft.terms),
         status: 'draft',
         subtotal_cents: subtotalCents,
+        labor_mode: invoiceDraft.labor_mode,
+        labor_rate_cents: priceInputIsBlank(invoiceDraft.labor_rate) ? null : dollarsToCents(invoiceDraft.labor_rate),
+        job_labor_hours: parseLaborHoursValue(invoiceDraft.job_labor_hours),
+        material_total_cents: totals.materialTotalCents,
+        labor_total_cents: totals.laborTotalCents,
+        fee_total_cents: totals.feeTotalCents,
+        other_total_cents: totals.otherTotalCents,
         tax_cents: taxCents,
         tax_rate_percent: taxRatePercent,
         discount_cents: discountCents,
@@ -17635,6 +17893,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const confirmed = window.confirm(`${priceRequiredWarningText(estimateUnpricedCount)}\n\nChoose OK to send anyway, or Cancel to go back and edit pricing.`);
       if (!confirmed) return;
     }
+    if (persistedSchemaLaborHours(estimate) > 0 && (estimate.labor_rate_cents === null || estimate.labor_rate_cents === undefined)) {
+      const confirmed = window.confirm('This estimate has labor hours but no labor rate. Labor price is excluded from totals until a labor rate is added.\n\nChoose OK to send anyway, or Cancel to go back and edit pricing.');
+      if (!confirmed) return;
+    }
     setSendingEstimateId(estimate.id);
     try {
       const { error: sendError } = await supabase
@@ -17740,6 +18002,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             quantity: line.quantity,
             unit: line.unit,
             unit_price_cents: line.unit_price_cents,
+            labor_hours: line.labor_hours ?? null,
             sort_order: index,
           })),
       });
@@ -17908,12 +18171,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     line,
     index,
     itemLabel,
+    laborMode,
     onChange,
     onRemove,
   }: {
     line: EstimateLineDraft;
     index: number;
     itemLabel: 'estimate' | 'invoice';
+    laborMode?: EstimateLaborMode;
     onChange: (updates: Partial<EstimateLineDraft>) => void;
     onRemove: () => void;
   }) => {
@@ -17921,10 +18186,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const showSupplyStatus = Boolean(line.supply_status);
     const sourceNote = line.editor_source_note?.trim();
     const hasSecondaryRow = showModelSpec || showSupplyStatus;
+    const showLaborHours = laborMode === 'line_specific' && draftLineCanTrackLaborHours(line);
+    const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
 
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="grid gap-3 lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto] lg:items-end">
+        <div className={`grid gap-3 ${priceColumnClass} lg:items-end`}>
           <Field label="Type">
             <select
               className={inputClass()}
@@ -17986,6 +18253,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {draftLineTotalLabel(line)}
             </p>
           </div>
+          {showLaborHours ? (
+            <Field label="Labor hrs">
+              <input
+                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
+                className={inputClass()}
+                type="number"
+                min="0"
+                step="0.25"
+                value={line.labor_hours}
+                onChange={event => onChange({ labor_hours: event.target.value })}
+                placeholder="0"
+              />
+            </Field>
+          ) : null}
           <button
             type="button"
             onClick={onRemove}
@@ -18026,6 +18307,197 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             ) : null}
           </div>
         ) : null}
+      </div>
+    );
+  };
+
+  const renderLaborModeButton = (active: boolean, label: string, onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+        active
+          ? 'bg-blue-600 text-white shadow-sm'
+          : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const renderEstimateLaborControls = () => {
+    const totals = draftFinancialBreakdown(estimateDraft);
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Labor</p>
+            <p className="mt-1 text-xs text-slate-500">Track labor as one job total or as hours on material/scope lines.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {renderLaborModeButton(estimateDraft.labor_mode === 'job_total', 'Job-total labor', () => setEstimateDraft(d => ({ ...d, labor_mode: 'job_total' })))}
+            {renderLaborModeButton(estimateDraft.labor_mode === 'line_specific', 'Line-specific labor', () => setEstimateDraft(d => ({ ...d, labor_mode: 'line_specific' })))}
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <Field label="Labor rate">
+            <input
+              aria-label="Estimate labor rate"
+              className={inputClass()}
+              value={estimateDraft.labor_rate}
+              onChange={event => setEstimateDraft(d => ({ ...d, labor_rate: event.target.value }))}
+              placeholder="$0.00"
+            />
+          </Field>
+          {estimateDraft.labor_mode === 'job_total' ? (
+            <Field label="Total labor hours">
+              <input
+                aria-label="Estimate total labor hours"
+                className={inputClass()}
+                type="number"
+                min="0"
+                step="0.25"
+                value={estimateDraft.job_labor_hours}
+                onChange={event => setEstimateDraft(d => ({ ...d, job_labor_hours: event.target.value }))}
+                placeholder="0"
+              />
+            </Field>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line labor hours</p>
+              <p className="mt-1 text-sm font-bold text-slate-950">{formatLaborHours(totals.laborHours)} hrs entered</p>
+              <p className="mt-1 text-xs text-slate-500">Use the Labor hrs field on material and scope lines below.</p>
+            </div>
+          )}
+        </div>
+        {totals.missingLaborRate && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            Labor hours are entered without a labor rate. Labor price is excluded until a rate is added.
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderInvoiceLaborControls = () => {
+    const totals = draftFinancialBreakdown(invoiceDraft);
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Labor</p>
+            <p className="mt-1 text-xs text-slate-500">Preserve converted labor details or edit them for this draft invoice.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {renderLaborModeButton(invoiceDraft.labor_mode === 'job_total', 'Job-total labor', () => setInvoiceDraft(d => ({ ...d, labor_mode: 'job_total' })))}
+            {renderLaborModeButton(invoiceDraft.labor_mode === 'line_specific', 'Line-specific labor', () => setInvoiceDraft(d => ({ ...d, labor_mode: 'line_specific' })))}
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <Field label="Labor rate">
+            <input
+              aria-label="Invoice labor rate"
+              className={inputClass()}
+              value={invoiceDraft.labor_rate}
+              onChange={event => setInvoiceDraft(d => ({ ...d, labor_rate: event.target.value }))}
+              placeholder="$0.00"
+            />
+          </Field>
+          {invoiceDraft.labor_mode === 'job_total' ? (
+            <Field label="Total labor hours">
+              <input
+                aria-label="Invoice total labor hours"
+                className={inputClass()}
+                type="number"
+                min="0"
+                step="0.25"
+                value={invoiceDraft.job_labor_hours}
+                onChange={event => setInvoiceDraft(d => ({ ...d, job_labor_hours: event.target.value }))}
+                placeholder="0"
+              />
+            </Field>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line labor hours</p>
+              <p className="mt-1 text-sm font-bold text-slate-950">{formatLaborHours(totals.laborHours)} hrs entered</p>
+              <p className="mt-1 text-xs text-slate-500">Use the Labor hrs field on material and scope lines below.</p>
+            </div>
+          )}
+        </div>
+        {totals.missingLaborRate && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            Labor hours are entered without a labor rate. Labor price is excluded until a rate is added.
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderDraftTotalsRows = (rows: Array<{ label: string; amount: number; bold?: boolean; helper?: string }>) => (
+    <div className="space-y-1 text-sm">
+      {rows.map(row => (
+        <div key={row.label} className={`flex items-start justify-between gap-3 ${row.bold ? 'border-t border-slate-200 pt-2 text-base font-bold text-slate-950' : 'text-slate-600'}`}>
+          <span>
+            {row.label}
+            {row.helper ? <span className="ml-1 text-xs font-medium text-slate-500">{row.helper}</span> : null}
+          </span>
+          <span className={row.bold ? 'text-slate-950' : 'font-semibold text-slate-900'}>{formatMoney(row.amount)}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderEstimateDraftTotals = () => {
+    const totals = draftFinancialBreakdown(estimateDraft);
+    const taxCents = 0;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-600">Draft total</p>
+            {estimateDraft.line_items.some(draftLineIsUnpriced) && (
+              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
+            )}
+            {totals.laborHours > 0 && (
+              <p className="mt-1 text-xs text-slate-500">Labor hours: {formatLaborHours(totals.laborHours)}</p>
+            )}
+          </div>
+          <p className="text-2xl font-bold text-slate-950">{formatMoney(totals.subtotalCents + taxCents)}</p>
+        </div>
+        {renderDraftTotalsRows([
+          { label: 'Material total', amount: totals.materialTotalCents },
+          { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
+          { label: 'Subtotal', amount: totals.subtotalCents },
+          { label: 'Fees', amount: totals.feeTotalCents },
+          { label: 'Tax', amount: taxCents },
+          { label: 'Total', amount: totals.subtotalCents + taxCents, bold: true },
+        ])}
+      </div>
+    );
+  };
+
+  const renderInvoiceDraftTotals = () => {
+    const totals = draftFinancialBreakdown(invoiceDraft);
+    const discountCents = invoiceDiscountCentsFromDraft(invoiceDraft);
+    const taxCents = invoiceTaxCents(invoiceDraft);
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
+        <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
+        {(invoiceDraft.line_items ?? []).some(draftLineIsUnpriced) && (
+          <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
+        )}
+        <div className="mt-3">
+          {renderDraftTotalsRows([
+            { label: 'Material total', amount: totals.materialTotalCents },
+            { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
+            { label: 'Subtotal', amount: totals.subtotalCents },
+            { label: 'Fees', amount: totals.feeTotalCents },
+            ...(discountCents > 0 ? [{ label: 'Discount', amount: -discountCents }] : []),
+            { label: 'Tax', amount: taxCents },
+            { label: 'Total', amount: invoiceTotalCents(invoiceDraft), bold: true },
+          ])}
+        </div>
       </div>
     );
   };
@@ -18444,6 +18916,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       inspection_id: current.inspection_id,
       home_id: current.home_id,
       local_home_id: current.local_home_id,
+      labor_rate: builtDraft.labor_rate || current.labor_rate || laborRateInputFromCents(contractor?.default_labor_rate_cents),
     }));
     setEstimateAssistantText('');
     setEstimateDraftBuilderTrade('Other');
@@ -24543,6 +25016,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           setEstimateDraft(createBlankEstimateDraft({
                                             title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
                                             home_id: workspaceNewRecordHomeId,
+                                            labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                           }));
                                           setEstimateAssistantText('');
                                           setEstimateDraftBuilderTrade('Other');
@@ -24648,6 +25122,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </Field>
                                     </div>
 
+                                    <div className="mt-4">
+                                      {renderEstimateLaborControls()}
+                                    </div>
+
                                     <div className="mt-4 space-y-3">
                                       <div className="flex items-center justify-between gap-3">
                                         <p className="text-sm font-bold text-slate-950">Line items</p>
@@ -24667,6 +25145,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           line,
                                           index,
                                           itemLabel: 'estimate',
+                                          laborMode: estimateDraft.labor_mode,
                                           onChange: updates => setEstimateDraft(d => ({
                                             ...d,
                                             line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
@@ -24687,14 +25166,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.terms} onChange={e => setEstimateDraft(d => ({ ...d, terms: e.target.value }))} />
                                       </Field>
                                     </div>
-                                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                                      <div>
-                                        <p className="text-sm font-semibold text-slate-600">Draft total</p>
-                                        {estimateDraft.line_items.some(draftLineIsUnpriced) && (
-                                          <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
-                                        )}
-                                      </div>
-                                      <p className="text-2xl font-bold text-slate-950">${(estimateTotalCents(estimateDraft.line_items) / 100).toFixed(2)}</p>
+                                    <div className="mt-4">
+                                      {renderEstimateDraftTotals()}
                                     </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                       <button
@@ -24777,6 +25250,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraft({
                                                     ...estimateDraftFromStarterTemplate(template, subjectName),
                                                     home_id: workspaceNewRecordHomeId,
+                                                    labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                                   });
                                                   setEstimateAssistantText('');
                                                   setEstimateDraftBuilderTrade('Other');
@@ -24879,6 +25353,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                       setEstimateDraft({
                                                         ...estimateDraftFromTemplate(template, subjectName),
                                                         home_id: workspaceNewRecordHomeId,
+                                                        labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                                       });
                                                       setEstimateAssistantText('');
                                                       setEstimateDraftBuilderTrade('Other');
@@ -25682,6 +26157,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                         </div>
 
+                        <div className="mt-4">
+                          {renderEstimateLaborControls()}
+                        </div>
+
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Line items</p>
@@ -25697,6 +26176,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               line,
                               index,
                               itemLabel: 'estimate',
+                              laborMode: estimateDraft.labor_mode,
                               onChange: updates => setEstimateDraft(d => ({
                                 ...d,
                                 line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
@@ -25717,14 +26197,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <textarea className={inputClass()} rows={3} {...writingAssistProps} value={estimateDraft.terms} onChange={event => setEstimateDraft(d => ({ ...d, terms: event.target.value }))} />
                           </Field>
                         </div>
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-600">Draft total</p>
-                            {estimateDraft.line_items.some(draftLineIsUnpriced) && (
-                              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
-                            )}
-                          </div>
-                          <p className="text-2xl font-bold text-slate-950">${(estimateTotalCents(estimateDraft.line_items) / 100).toFixed(2)}</p>
+                        <div className="mt-4">
+                          {renderEstimateDraftTotals()}
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => void saveEstimateDraft(selectedJobsSubject)} disabled={savingEstimate} className={buttonClass('primary')}>
@@ -25810,6 +26284,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                         </div>
 
+                        <div className="mt-4">
+                          {renderInvoiceLaborControls()}
+                        </div>
+
                         <div className="mt-4 space-y-3">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Invoice line items</p>
@@ -25823,6 +26301,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               line,
                               index,
                               itemLabel: 'invoice',
+                              laborMode: invoiceDraft.labor_mode,
                               onChange: updates => setInvoiceDraft(d => ({
                                 ...d,
                                 line_items: (d.line_items ?? []).map(item => item.id === line.id ? { ...item, ...updates } : item),
@@ -25866,19 +26345,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <Field label="Tax rate">
                             <input className={inputClass()} value={invoiceDraft.tax} onChange={event => setInvoiceDraft(d => ({ ...d, tax: event.target.value }))} placeholder="8.25%" />
                           </Field>
-                          <div className="rounded-xl border border-slate-200 bg-white p-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
-                            <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
-                            <p className="mt-1 text-xs text-slate-500">Subtotal {formatMoney(estimateTotalCents(invoiceDraft.line_items ?? []))}</p>
-                            {(invoiceDraft.line_items ?? []).some(draftLineIsUnpriced) && (
-                              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
-                            )}
-                            {invoiceDiscountCents(invoiceDraft) > 0 && (
-                              <p className="mt-1 text-xs text-slate-500">Discount {formatMoney(invoiceDiscountCents(invoiceDraft))}</p>
-                            )}
-                            <p className="mt-1 text-xs text-slate-500">Taxable amount {formatMoney(invoiceTaxableCents(invoiceDraft))}</p>
-                            <p className="mt-1 text-xs text-slate-500">Tax {formatMoney(invoiceTaxCents(invoiceDraft))}</p>
-                          </div>
+                          {renderInvoiceDraftTotals()}
                         </div>
 
                         <div className="mt-3">

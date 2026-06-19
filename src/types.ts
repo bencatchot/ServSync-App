@@ -21,6 +21,7 @@ export type CalendarEventRecurrenceFrequency = 'none' | 'weekly' | 'monthly' | '
 export type EstimateStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'revised';
 export type EstimateLineType = 'labor' | 'material' | 'fee' | 'other';
 export type LegacyEstimateLineType = EstimateLineType | 'equipment';
+export type EstimateLaborMode = 'job_total' | 'line_specific';
 export type EstimateChargeType = 'flat' | 'hourly';
 export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
@@ -71,6 +72,7 @@ export interface EstimateLineItem {
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
+  labor_hours?: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -94,6 +96,15 @@ export interface Estimate {
   status: EstimateStatus;
   subtotal_cents: number;
   total_cents: number;
+  labor_mode?: EstimateLaborMode | null;
+  labor_rate_cents?: number | null;
+  job_labor_hours?: number | null;
+  material_total_cents?: number | null;
+  labor_total_cents?: number | null;
+  fee_total_cents?: number | null;
+  other_total_cents?: number | null;
+  tax_rate_percent?: number | null;
+  tax_cents?: number | null;
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItem[];
@@ -111,6 +122,7 @@ export interface InvoiceLineItem {
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
+  labor_hours?: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -135,6 +147,13 @@ export interface Invoice {
   terms: string;
   status: InvoiceStatus;
   subtotal_cents: number;
+  labor_mode?: EstimateLaborMode | null;
+  labor_rate_cents?: number | null;
+  job_labor_hours?: number | null;
+  material_total_cents?: number | null;
+  labor_total_cents?: number | null;
+  fee_total_cents?: number | null;
+  other_total_cents?: number | null;
   tax_cents: number;
   tax_rate_percent?: number;
   discount_cents: number;
@@ -179,6 +198,7 @@ export interface InvoiceDraft {
     quantity: string;
     unit: string;
     unit_price: string;
+    labor_hours?: string;
   }>;
 }
 
@@ -192,6 +212,7 @@ export interface EstimateTemplateLineItem {
   quantity: number;
   unit: string;
   unit_price_cents: number | null;
+  labor_hours?: number | null;
   sort_order: number;
 }
 
@@ -288,6 +309,7 @@ export interface ContractorProfile {
   account_status: ContractorAccountStatus;
   subscription_status: ContractorSubscriptionStatus;
   monthly_price_cents: number;
+  default_labor_rate_cents?: number | null;
   subscription_notes: string;
   admin_notes: string;
   permanent_invite_code: string | null;

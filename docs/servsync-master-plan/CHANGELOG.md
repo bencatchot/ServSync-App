@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/estimate-labor-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the PR 3 app/UI labor model slice for FB-019. Contractor estimate and invoice drafts now read, edit, save, and reopen schema-backed labor mode, estimate-level labor rate, job-total labor hours, and line-specific labor hours on material/scope lines. Estimate totals now separate material total, labor total, subtotal, fees, tax, and total; homeowner estimate views and estimate/invoice PDFs show customer-safe labor hours/totals when present; converted invoice labor fields are preserved in invoice draft/display paths.
+- Reason for change: Expose the already-applied schema/RPC labor foundation in the app without changing SQL, RPCs, Build Estimate Draft generation, RLS, auth, storage, deployment settings, or production data.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RPC/RLS/policy/grant/storage/auth/env/Vercel/settings changes were added.
+  - Static search confirming labor values are not stored in `customer_description`, `model_spec`, or `editor_source_note`.
+  - Static search confirming no helper/source-note paths were added to homeowner/PDF rendering.
+  - Local public app smoke at `http://127.0.0.1:5173/` confirmed the app loads without browser console errors.
+- Known risks or follow-ups:
+  - Authenticated preview smoke still needs to run before merge approval.
+  - Build Estimate Draft still generates its existing labor rows; PR 4 should update it so line-specific mode uses labor-hour controls instead of generated standalone labor rows.
+  - Labor-hour UX is intentionally compact and should be preview-tested with legacy estimates, blank labor rate warnings, $0.00 labor rate, Price Required material lines, homeowner estimate display, PDFs, invoice drafts, Estimate Helper accordion, starter templates, saved templates, and saved-charge quick-pick.
+
 - Branch: `codex/estimate-labor-conversion-rpcs-v1`
 - Files changed:
   - `servsync-estimate-labor-model-conversion-rpcs.sql`
