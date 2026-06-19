@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/estimate-labor-model-sql-v1`
+- Files changed:
+  - `servsync-estimate-labor-model-foundation.sql`
+  - `scripts/apply-blank-supabase-schema.sh`
+  - `scripts/apply-sql-dry-run.sh`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the PR 1 SQL/schema foundation patch for the schema-backed estimate labor model. The patch adds nullable contractor default labor rate, estimate-level labor mode/rate/job-total hours, estimate and invoice labor breakdown fields, estimate tax fields, and line-specific labor hour fields on estimate and invoice line items. It also adds FB-019 to the backlog and records the approved schema-backed direction in the master plan.
+- Reason for change: Prepare the database shape for true line-specific labor without burying labor inside material pricing or generating standalone line-specific labor rows, while preserving existing estimates, invoices, Price Required/null behavior, and $0.00 semantics.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `git diff --check --no-index /dev/null servsync-estimate-labor-model-foundation.sql`
+  - `bash -n scripts/apply-blank-supabase-schema.sh`
+  - `bash -n scripts/apply-sql-dry-run.sh`
+  - Static scope scan confirming the new SQL patch does not change RLS, policies, grants, storage, auth, env, or Vercel settings.
+  - Static search confirming labor schema values are not stored in `customer_description`, `model_spec`, or `editor_source_note`.
+  - Changed-file secret-value scan.
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application requires separate approval.
+  - Production SQL application requires separate approval after sandbox verification passes.
+  - App/UI support, Build Estimate Draft behavior changes, homeowner/PDF display, and RPC conversion preservation remain future approved slices.
+
 - Branch: `codex/estimate-helper-v1`
 - Files changed:
   - `src/App.tsx`
