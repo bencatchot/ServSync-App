@@ -9,6 +9,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Branch: `codex/estimate-helper-v1`
 - Files changed:
   - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Refined Estimate Helper v1 presentation so the contractor-only suggestions live inside a collapsed Estimate Helper accordion by default, with the suggestion count and availability still visible in the estimate composer.
+- Reason for change: Keep the estimate composer less cluttered while preserving optional helper suggestions, Add item behavior, Price Required defaults, and editor-only helper/source notes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+  - Authenticated local smoke confirming Estimate Helper is collapsed by default, expands to show suggestions, collapses to hide suggestions, still adds an editable Price Required line, and still drops helper rationale on save/reopen.
+  - Authenticated homeowner/PDF smoke confirming helper/source-note phrases do not appear in the homeowner estimate view or downloaded estimate PDF.
+- Known risks or follow-ups:
+  - Preview should refresh after this branch is pushed; no schema, auth, storage, homeowner view, or PDF rendering behavior changed.
+
+- Branch: `codex/estimate-helper-v1`
+- Files changed:
+  - `src/App.tsx`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
