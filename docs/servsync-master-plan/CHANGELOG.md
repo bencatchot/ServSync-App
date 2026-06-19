@@ -4,6 +4,29 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-19
+
+- Branch: `codex/estimate-helper-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Estimate Helper v1 as a contractor-only, code-only suggestion panel in the estimate composer. The panel suggests optional commonly missed items such as permit/inspection coordination, disposal/haul-off, trip/service call fees, testing/startup, delivery/material handling, access difficulty, hidden condition allowances, and maintenance-plan add-ons based on draft, trade, and job context where safely possible.
+- Reason for change: Contractors need a lightweight reminder surface for commonly missed estimate scope/revenue items without automatic line insertion, new database settings, persistent dismissals, homeowner-facing helper text, or changes to Price Required behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+  - Static search confirming Estimate Helper rationale/source-note copy is restricted to contractor editor code and not homeowner/PDF rendering paths.
+- Known risks or follow-ups:
+  - Helper suggestions are intentionally small and rule-based; future expansion should remain trade-aware and avoid becoming an automated pricing/catalog system.
+  - Authenticated preview/manual smoke should confirm added helper lines persist only as normal estimate line fields and that helper rationale remains absent from homeowner estimate views and PDFs.
+  - Duplicate suppression is practical keyword matching, not a full semantic duplicate detector.
+
 ## 2026-06-18
 
 - Branch: `feature/build-estimate-draft-material-aliases-v1`

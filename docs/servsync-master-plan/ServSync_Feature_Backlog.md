@@ -107,6 +107,7 @@ Important guardrails:
 | FB-015 | Native Mobile Apps | iOS/Android, field workflow | Later / Future | Medium | Validate responsive web first; evaluate Capacitor vs React Native/Expo later. |
 | FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
+| FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Implementation In Progress | High | Validate code-only helper branch and confirm no helper/source rationale leaks to homeowner estimate/PDF views. |
 
 ## Detailed feature notes
 
@@ -779,9 +780,56 @@ Pricing philosophy:
 - Avoid building too many tiers too early.
 - Exact prices should be finalized later after competitor review, beta feedback, and confirmation of live features.
 
+### FB-018 — Estimate Helper v1
+
+Status: Implementation In Progress
+
+Priority: High
+
+Product area:
+
+- Contractor tools
+- Estimate composer
+- Scope/revenue suggestion support
+
+Purpose:
+Give contractors an internal, contractor-only estimate-builder suggestion panel for commonly missed scope or revenue items without adding automation, persistent settings, or homeowner-facing helper text.
+
+Initial suggestion categories:
+
+- Permit / inspection fee
+- Disposal / haul-off
+- Trip / service call fee
+- Testing/startup
+- Delivery / material handling
+- Access difficulty
+- Optional maintenance plan add-ons
+- Hidden condition or scope allowance
+
+Key decisions:
+
+- Estimate Helper v1 is code-only.
+- No SQL, schema, RLS, RPC, storage, auth, environment, or production setting changes.
+- Suggestions are not automatically added.
+- Contractor can click Add item to add a normal editable estimate line.
+- Added helper lines should default to blank price / Price Required.
+- Suggestion rationale must use contractor editor-only helper/source-note behavior.
+- No persistent dismissals, global settings, per-template settings, source metadata schema, or customer-visible visibility flags in v1.
+- Homeowner estimate views and PDFs must not show helper rationale unless the contractor intentionally turns a suggestion into normal customer-facing estimate content.
+
+Testing needed:
+
+- Estimate Helper appears only in contractor estimate creation/editing.
+- Suggestions can be ignored.
+- Add item creates editable Price Required lines.
+- Saved draft persists only normal line fields, not helper rationale.
+- Homeowner estimate view does not show helper/source notes.
+- Estimate PDF does not show helper/source notes.
+- Starter templates, Build Estimate Draft, saved templates, and saved-charge quick-pick still work.
+
 ## Current next recommended focus
 
-1. Contractor Estimate Defaults & Templates audit + manual test plan.
+1. Contractor Estimate Defaults & Templates audit + manual test plan, including Estimate Helper v1 validation.
 2. Estimate/mobile workflow polish.
 3. Trade-Specific Estimate / Pre-Visit Checklists.
 4. Discover Feed Strategy later.
