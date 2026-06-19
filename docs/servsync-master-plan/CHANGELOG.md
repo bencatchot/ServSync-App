@@ -10,7 +10,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Files changed:
   - `src/App.tsx`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added a small rule-based, trade-aware material alias detector to Build Estimate Draft so explicit material, fixture, part, and equipment-style mentions create specific editable material line items before broad fallback material categories.
+- Summary of change: Added a small rule-based, trade-aware material alias detector to Build Estimate Draft so explicit material, fixture, part, and equipment-style mentions create specific editable material line items before broad fallback material categories. Follow-up correction narrowed the carpentry door/window material alias so trim-around-window scopes do not generate a separate window material line unless the rough scope implies actual door/window replacement or installation.
 - Reason for change: Rough scopes like “Remove and replace kitchen sink” should produce a specific sink material line instead of relying only on generic material fallback, while preserving Price Required behavior, saved-charge matching, and contractor-only source notes.
 - Tests/checks run:
   - `git status --short --branch`

@@ -1424,7 +1424,7 @@ const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES: EstimateDraftBuilderMaterialA
   { key: 'carpentry_posts', trade: 'Carpentry', title: 'Posts', aliases: ['posts', 'post'], unit: 'lot' },
   { key: 'carpentry_joists', trade: 'Carpentry', title: 'Joists', aliases: ['joists', 'joist'], unit: 'lot' },
   { key: 'carpentry_trim', trade: 'Carpentry', title: 'Trim', aliases: ['trim', 'molding', 'moulding'], unit: 'lot' },
-  { key: 'carpentry_door_window_material', trade: 'Carpentry', title: 'Door/window material', aliases: ['door', 'window'], unit: 'each' },
+  { key: 'carpentry_door_window_material', trade: 'Carpentry', title: 'Door/window material', aliases: ['replace door', 'install door', 'new door', 'door replacement', 'door slab', 'door frame', 'replace window', 'install window', 'new window', 'window replacement', 'window sash', 'window frame'], unit: 'each' },
   { key: 'carpentry_fasteners_hardware', trade: 'Carpentry', title: 'Fasteners / hardware', aliases: ['fasteners', 'screws', 'nails', 'carpentry hardware'], unit: 'lot' },
   { key: 'carpentry_structural_connectors', trade: 'Carpentry', title: 'Structural connectors', aliases: ['structural connectors', 'joist hangers', 'hangers'], unit: 'lot' },
   { key: 'carpentry_caulk_sealant', trade: 'Carpentry', title: 'Caulk / sealant', aliases: ['caulk', 'sealant'], unit: 'lot' },
