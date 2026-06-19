@@ -21,6 +21,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Changed-file secret-value scan
   - Authenticated local smoke confirming Estimate Helper is collapsed by default, expands to show suggestions, collapses to hide suggestions, still adds an editable Price Required line, and still drops helper rationale on save/reopen.
   - Authenticated homeowner/PDF smoke confirming helper/source-note phrases do not appear in the homeowner estimate view or downloaded estimate PDF.
+  - Authenticated Vercel preview smoke confirming the updated Estimate Helper accordion starts collapsed, expands/collapses correctly, and still adds an editable Price Required line.
 - Known risks or follow-ups:
   - Preview should refresh after this branch is pushed; no schema, auth, storage, homeowner view, or PDF rendering behavior changed.
 
