@@ -107,7 +107,7 @@ Important guardrails:
 | FB-015 | Native Mobile Apps | iOS/Android, field workflow | Later / Future | Medium | Validate responsive web first; evaluate Capacitor vs React Native/Expo later. |
 | FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
-| FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Implementation In Progress | High | Validate code-only helper branch and confirm no helper/source rationale leaks to homeowner estimate/PDF views. |
+| FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
 
 ## Detailed feature notes
 
@@ -782,7 +782,7 @@ Pricing philosophy:
 
 ### FB-018 — Estimate Helper v1
 
-Status: Implementation In Progress
+Status: Completed / Functional
 
 Priority: High
 
@@ -817,7 +817,7 @@ Key decisions:
 - No persistent dismissals, global settings, per-template settings, source metadata schema, or customer-visible visibility flags in v1.
 - Homeowner estimate views and PDFs must not show helper rationale unless the contractor intentionally turns a suggestion into normal customer-facing estimate content.
 
-Testing needed:
+Validation completed:
 
 - Estimate Helper appears only in contractor estimate creation/editing.
 - Suggestions can be ignored.
@@ -825,14 +825,14 @@ Testing needed:
 - Saved draft persists only normal line fields, not helper rationale.
 - Homeowner estimate view does not show helper/source notes.
 - Estimate PDF does not show helper/source notes.
-- Starter templates, Build Estimate Draft, saved templates, and saved-charge quick-pick still work.
+- Build Estimate Draft, saved-charge quick-pick, and starter/saved template surfaces remain reachable.
+- Estimate Helper accordion/dropdown starts collapsed, expands to show suggestions, and collapses to hide suggestions.
 
 ## Current next recommended focus
 
-1. Contractor Estimate Defaults & Templates audit + manual test plan, including Estimate Helper v1 validation.
-2. Estimate/mobile workflow polish.
-3. Trade-Specific Estimate / Pre-Visit Checklists.
-4. Discover Feed Strategy later.
+1. Estimate/mobile workflow polish.
+2. Trade-Specific Estimate / Pre-Visit Checklists.
+3. Discover Feed Strategy later.
 5. Contractor Reports later after workflow statuses are reliable.
 
 ## Update rules
