@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## Purpose
 
@@ -108,6 +108,7 @@ Important guardrails:
 | FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
+| FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Implementation In Progress | High | Review PR 1 SQL/schema foundation; sandbox SQL application requires separate approval. |
 
 ## Detailed feature notes
 
@@ -827,6 +828,46 @@ Validation completed:
 - Estimate PDF does not show helper/source notes.
 - Build Estimate Draft, saved-charge quick-pick, and starter/saved template surfaces remain reachable.
 - Estimate Helper accordion/dropdown starts collapsed, expands to show suggestions, and collapses to hide suggestions.
+
+### FB-019 — Estimate Labor Model / Line-Specific Labor Inputs
+
+Status: Implementation In Progress
+
+Priority: High
+
+Product area:
+
+- Contractor estimates
+- Build Estimate Draft
+- Estimate/invoice line items
+- Homeowner estimate/PDF display
+- Estimate-to-job and estimate-to-invoice conversion
+
+Summary:
+Implement a schema-backed labor model so contractors can use one estimate-level labor rate with either job-total labor hours or line-specific labor hours attached to material/scope lines. Line-specific labor should not create standalone generated labor rows and should not bury labor inside material pricing.
+
+Key decisions:
+
+- One labor rate belongs to the estimate, defaulting from contractor profile when available.
+- Job-total labor uses estimate-level labor hours.
+- Line-specific labor stores labor hours on estimate line items.
+- Labor totals are calculated from hours x estimate labor rate.
+- Blank labor hours do not show to homeowners/PDFs.
+- Labor hours with blank labor rate should warn and behave like a Price Required-style issue.
+- $0.00 remains intentional no charge.
+- Estimate-to-invoice and linked job-to-invoice conversion must preserve labor fields before app rollout is considered complete.
+- Accepted estimate-to-job approved scope may preserve labor as rendered approved-scope text/JSON for v1.
+- Existing estimates remain compatible.
+
+Implementation sequence:
+
+1. PR 1: SQL/schema foundation file only; do not apply SQL without separate sandbox and production approvals.
+2. PR 2: App/UI support for contractor labor rate, labor mode, job-total labor hours, line-specific labor hours, totals, save/reopen, and warnings.
+3. PR 3: Build Estimate Draft behavior update so line-specific labor no longer creates generated standalone labor rows.
+4. PR 4: Conversion/PDF/homeowner regression hardening if not completed in the app/UI PR.
+
+Current next step:
+Review PR 1 SQL/schema foundation and decide whether to approve sandbox SQL application.
 
 ## Current next recommended focus
 
