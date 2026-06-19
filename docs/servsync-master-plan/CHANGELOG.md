@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-18
 
+- Branch: `feature/build-estimate-draft-material-aliases-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a small rule-based, trade-aware material alias detector to Build Estimate Draft so explicit material, fixture, part, and equipment-style mentions create specific editable material line items before broad fallback material categories. Follow-up corrections route sink-only rough scopes through the specific sink material path, keep generated job-total labor labels customer-facing as "Labor," strengthen deck-board trade inference, and narrow ambiguous light/post/inspection/window matching so note-taking or trim-around-window scopes do not generate unrelated material or fee lines.
+- Reason for change: Rough scopes like “Remove and replace kitchen sink” should produce a specific sink material line instead of relying only on generic material fallback, while preserving Price Required behavior, saved-charge matching, and contractor-only source notes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+  - Follow-up authenticated preview smoke on the live contractor estimate composer confirmed generated material line titles render in editable Description input values; the earlier broad matrix missed them because it checked page text instead of input values.
+- Known risks or follow-ups:
+  - Alias matching is intentionally small and rule-based; future expansion should stay trade-aware and avoid becoming a SKU catalog.
+  - Full authenticated preview matrix automation remained flaky around contractor dashboard/tour navigation, so future smoke should read Description input values directly and avoid text-only assertions for editable fields.
+  - Saved-charge exact-match behavior should be watched as more contractors add saved material charges with similar names.
+
 - Branch: `feature/estimate-save-flow-polish-v1`
 - Files changed:
   - `src/App.tsx`
