@@ -5329,7 +5329,9 @@ function normalizeEstimateLaborMode(value: string | null | undefined): EstimateL
 
 function parseLaborHoursValue(value: string | number | null | undefined) {
   if (value === null || value === undefined) return null;
-  const numeric = typeof value === 'number' ? value : Number(String(value).replace(/,/g, '').trim());
+  const cleaned = typeof value === 'number' ? value : String(value).replace(/,/g, '').trim();
+  if (cleaned === '') return null;
+  const numeric = typeof cleaned === 'number' ? cleaned : Number(cleaned);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   return numeric;
 }
