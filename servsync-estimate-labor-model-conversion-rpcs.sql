@@ -115,7 +115,7 @@ begin
    where line_label is not null;
 
   select string_agg(
-           '- ' || line_label || ': ' || trim(to_char(labor_hours, 'FM999999990.##')) || ' hours',
+           '- ' || line_label || ': ' || regexp_replace(regexp_replace(labor_hours::text, '0+$', ''), '\.$', '') || ' hours',
            E'\n'
            order by sort_order asc, created_at asc
          )
@@ -145,7 +145,7 @@ begin
     case
       when v_estimate.labor_mode = 'job_total'
        and v_estimate.job_labor_hours is not null
-        then 'Job labor hours: ' || trim(to_char(v_estimate.job_labor_hours, 'FM999999990.##'))
+        then 'Job labor hours: ' || regexp_replace(regexp_replace(v_estimate.job_labor_hours::text, '0+$', ''), '\.$', '')
       else null
     end,
     case
@@ -247,7 +247,7 @@ begin
               else 'Line total: $' || trim(to_char((coalesce(eli.quantity, 1) * eli.unit_price_cents) / 100.0, 'FM999999990.00'))
             end,
             case
-              when eli.labor_hours is not null then 'Labor hours: ' || trim(to_char(eli.labor_hours, 'FM999999990.##'))
+              when eli.labor_hours is not null then 'Labor hours: ' || regexp_replace(regexp_replace(eli.labor_hours::text, '0+$', ''), '\.$', '')
               else null
             end,
             case
