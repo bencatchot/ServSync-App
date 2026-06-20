@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-20
 
+- Branch: `codex/email-notification-safety-hardening-v1`
+- Files changed:
+  - `supabase/functions/send-notification-email/index.ts`
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added pre-activation safety hardening for the `send-notification-email` Edge Function and clarified the profile email notification preference copy. The function now validates webhook JSON shape, requires `INSERT` events for the `notifications` table, validates required notification fields before use, keeps the existing Email v1 allowlist unchanged, and reports provider failures as `sent: false` instead of successful sends.
+- Reason for change: Prepare the email notification path for a future separately approved sandbox activation without enabling email delivery, deploying functions, adding secrets, changing webhooks, applying SQL, or claiming email/text/push notifications are live.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL, env, settings, webhook, deploy, production-data, or user-record files changed.
+  - Static check confirming the Email v1 event allowlist was not expanded.
+  - Static check confirming SMS/text/push implementation was not added.
+  - Edge Function Deno check was skipped because `deno` is not installed locally.
+- Known risks or follow-ups:
+  - Sandbox email activation is still not approved.
+  - `EMAIL_ENABLED`, provider keys, `NOTIFICATION_WEBHOOK_SECRET`, and the database webhook still require separate setup/verification before email can send.
+  - Delivery logging/retry policy remains future work.
+  - SMS/text and push notifications remain future-facing and are not implemented.
+
 - Branch: `codex/fb-020-lazy-pdf-loading-v1`
 - Files changed:
   - `src/App.tsx`

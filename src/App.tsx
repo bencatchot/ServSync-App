@@ -6609,7 +6609,7 @@ function EmailNotificationsToggle({ initialEnabled }: { initialEnabled: boolean 
     <div className="flex items-center justify-between gap-4">
       <div>
         <p className="text-sm font-medium text-slate-200">Email notifications</p>
-        <p className="text-xs text-slate-500 mt-0.5">Receive email alerts for new activity on your account.</p>
+        <p className="text-xs text-slate-500 mt-0.5">Allow email notifications when delivery is enabled. In-app notifications are available now.</p>
       </div>
       <button
         type="button"
