@@ -48,6 +48,87 @@ const EMAIL_V1_EVENTS: Record<string, { subject: string; intro: string }> = {
   },
 };
 
+function jsonResponse(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function invalidPayload(reason: string): Response {
+  console.warn(`[send-notification-email] Invalid webhook payload: ${reason}.`);
+  return jsonResponse({ sent: false, reason: 'invalid_payload' }, 400);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readRequiredString(record: Record<string, unknown>, field: string, allowEmpty = false): string | null {
+  const value = record[field];
+  if (typeof value !== 'string') return null;
+  if (!allowEmpty && value.trim() === '') return null;
+  return value;
+}
+
+async function parseWebhookPayload(req: Request): Promise<WebhookPayload | Response> {
+  let payload: unknown;
+  try {
+    payload = await req.json();
+  } catch {
+    return invalidPayload('request body is not valid JSON');
+  }
+
+  if (!isObject(payload)) return invalidPayload('payload is not an object');
+  if (payload.type !== 'INSERT') return invalidPayload('event is not INSERT');
+  if (payload.table !== 'notifications') return invalidPayload('table is not notifications');
+  if (!isObject(payload.record)) return invalidPayload('record is not an object');
+
+  const userId = readRequiredString(payload.record, 'user_id');
+  const type = readRequiredString(payload.record, 'type');
+  const title = readRequiredString(payload.record, 'title');
+  const body = readRequiredString(payload.record, 'body', true);
+
+  if (!userId) return invalidPayload('missing user_id');
+  if (!type) return invalidPayload('missing type');
+  if (!title) return invalidPayload('missing title');
+  if (body === null) return invalidPayload('missing body');
+
+  return {
+    type: 'INSERT',
+    table: 'notifications',
+    record: {
+      id: typeof payload.record.id === 'string' ? payload.record.id : '',
+      user_id: userId,
+      type,
+      title,
+      body,
+      request_id: typeof payload.record.request_id === 'string' ? payload.record.request_id : null,
+      created_at: typeof payload.record.created_at === 'string' ? payload.record.created_at : '',
+    },
+  };
+}
+
+async function safeProviderJson(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const value = await res.json();
+    return isObject(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function providerFailure(provider: string, status: number): Response {
+  console.error(`[send-notification-email] ${provider} send failed with status ${status}.`);
+  return jsonResponse({ sent: false, provider, reason: 'provider_error', status }, 502);
+}
+
+function providerSuccess(provider: string, status: number, result?: Record<string, unknown> | null): Response {
+  console.log(`[send-notification-email] ${provider} send accepted with status ${status}.`);
+  const providerId = typeof result?.id === 'string' ? result.id : undefined;
+  return jsonResponse({ sent: true, provider, status, ...(providerId ? { provider_id: providerId } : {}) });
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
@@ -58,9 +139,7 @@ Deno.serve(async (req) => {
 
   if (!EMAIL_ENABLED) {
     console.log('[send-notification-email] Disabled — set EMAIL_ENABLED=true to activate.');
-    return new Response(JSON.stringify({ sent: false, reason: 'disabled' }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ sent: false, reason: 'disabled' });
   }
 
   if (!WEBHOOK_SECRET) {
@@ -73,7 +152,10 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const payload: WebhookPayload = await req.json();
+  const parsedPayload = await parseWebhookPayload(req);
+  if (parsedPayload instanceof Response) return parsedPayload;
+
+  const payload = parsedPayload;
   const { user_id, type, title, body } = payload.record;
 
   // Email Notifications v1: only send for the in-scope event types. All other
@@ -81,9 +163,7 @@ Deno.serve(async (req) => {
   const eventCopy = EMAIL_V1_EVENTS[type];
   if (!eventCopy) {
     console.log(`[send-notification-email] Skipping type "${type}" — not in Email v1 scope.`);
-    return new Response(JSON.stringify({ sent: false, reason: 'event_not_in_v1_scope' }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ sent: false, reason: 'event_not_in_v1_scope' });
   }
 
   // Look up recipient email and preference using service role
@@ -92,17 +172,25 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  const { data: userProfile } = await supabase
+  const { data: userProfile, error: profileError } = await supabase
     .from('profiles')
     .select('email, full_name, email_notifications_enabled')
     .eq('id', user_id)
     .single();
 
+  if (profileError) {
+    console.error('[send-notification-email] Unable to load recipient profile.');
+    return jsonResponse({ sent: false, reason: 'profile_lookup_failed' }, 500);
+  }
+
   if (!userProfile?.email_notifications_enabled) {
-    console.log(`[send-notification-email] User ${user_id} has email notifications disabled.`);
-    return new Response(JSON.stringify({ sent: false, reason: 'user_opted_out' }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.log('[send-notification-email] Recipient has email notifications disabled.');
+    return jsonResponse({ sent: false, reason: 'user_opted_out' });
+  }
+
+  if (typeof userProfile.email !== 'string' || userProfile.email.trim() === '') {
+    console.error('[send-notification-email] Recipient profile has no email address.');
+    return jsonResponse({ sent: false, reason: 'missing_recipient_email' }, 500);
   }
 
   const recipientEmail = userProfile.email;
@@ -125,11 +213,9 @@ Deno.serve(async (req) => {
         html: buildEmailHtml(recipientName, title, eventCopy.intro, body),
       }),
     });
-    const result = await res.json();
-    console.log('[send-notification-email] Resend result:', result);
-    return new Response(JSON.stringify({ sent: true, provider: 'resend', result }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const result = await safeProviderJson(res);
+    if (!res.ok) return providerFailure('resend', res.status);
+    return providerSuccess('resend', res.status, result);
   }
 
   // ── SendGrid fallback ─────────────────────────────────────────────────────
@@ -148,16 +234,12 @@ Deno.serve(async (req) => {
         content: [{ type: 'text/html', value: buildEmailHtml(recipientName, title, eventCopy.intro, body) }],
       }),
     });
-    console.log('[send-notification-email] SendGrid status:', res.status);
-    return new Response(JSON.stringify({ sent: true, provider: 'sendgrid', status: res.status }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!res.ok) return providerFailure('sendgrid', res.status);
+    return providerSuccess('sendgrid', res.status);
   }
 
   console.log('[send-notification-email] EMAIL_ENABLED=true but no provider key found.');
-  return new Response(JSON.stringify({ sent: false, reason: 'no_provider_key' }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ sent: false, reason: 'no_provider_key' });
 });
 
 function escapeHtml(value: string): string {
