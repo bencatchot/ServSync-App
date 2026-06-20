@@ -1118,4 +1118,3 @@ export async function downloadInvoicePdf(invoice: Invoice, context: InvoicePdfCo
   anchor.remove();
   URL.revokeObjectURL(url);
 }
-
