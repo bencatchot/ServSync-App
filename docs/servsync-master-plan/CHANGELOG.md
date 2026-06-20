@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-20
 
+- Branch: `codex/fb-020-lazy-pdf-loading-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/pdfDocuments.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-020 lazy PDF loading v1 frontend code-splitting slice. Estimate, invoice, and job report PDF generation/download logic now lives in a dedicated PDF module that is dynamically imported from the existing PDF/download actions instead of being included in the first-loaded app path.
+- Reason for change: Reduce initial app load and improve scale/mobile readiness while preserving existing PDF content, filenames, formatting, and download behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL, schema, RPC, RLS, auth, storage policy, env, Vercel/settings, production-data, or user-record files changed.
+- Known risks or follow-ups:
+  - Authenticated preview smoke should confirm estimate, invoice, and report PDF downloads still work from the dynamically imported PDF module before merge approval.
+  - The main app chunk is still large because dashboard/route-level splitting is intentionally deferred to a later approved slice.
+
 - Branch: `codex/dependency-security-triage-v1`
 - Files changed:
   - `package.json`
