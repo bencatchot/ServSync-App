@@ -45,6 +45,7 @@ Related controlled beta docs:
 - [ ] No unrelated files are included in commits.
 - [ ] No credentials, `.env` files, SQL secrets, screenshots, videos, traces, or reports are committed.
 - [ ] Production public URL loads after merge/deploy.
+- [ ] FB-020 readiness items have been reviewed for the intended beta stage, especially RLS/storage verification, backup/restore expectations, dependency security triage, and records reliability risks.
 
 ## 4. Sandbox QA Account Plan
 

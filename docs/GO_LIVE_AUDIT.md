@@ -28,6 +28,31 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
+- FB-020 now tracks the broader Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness workstream. It is a backlog/readiness program, not proof that security, backup/restore, production RLS/storage verification, or public go-live readiness is complete.
+
+## FB-020 Readiness Workstream
+
+FB-020 is the umbrella follow-up for the completed security/readiness audit. It should be handled through small, separately approved tasks before broader beta, public go-live, or paid contractor subscriptions.
+
+FB-020 covers:
+
+- Deployed RLS and storage policy verification.
+- SECURITY DEFINER/RPC authorization review.
+- Home documents, private media, signed URL, public bucket, and orphaned storage-object safety.
+- Backup/restore runbooks, storage-object backup expectations, and restore drills.
+- Data retention, deletion, export, and account-cancellation expectations.
+- Records durability, misfiling prevention, duplicate prevention, and immutable/auditable record snapshot strategy.
+- Dependency security triage and upgrade planning.
+- Pagination, query limits, and 1,000-user performance readiness.
+
+Recommended sequencing:
+
+1. Documentation and policy decisions.
+2. Test-only security hardening.
+3. Dependency security triage/upgrade.
+4. SQL/RLS/storage hardening after explicit approval.
+5. App pagination and storage-integrity cleanup.
+6. Operational backup/restore and deployed-state verification.
 
 ## Historical Changes From Original Audit
 

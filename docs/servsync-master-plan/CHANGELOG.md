@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-19
 
+- Branch: `codex/fb-security-readiness-backlog`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+- Summary of change: Added FB-020 as the umbrella backlog/readiness workstream for Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness. The backlog keeps FB-016 as the narrower PDF/storage strategy item while FB-020 now covers deployed RLS/storage verification, private media safety, backup/restore expectations, storage-object backup, retention/export/cancellation policy, records durability, immutable/auditable snapshots, dependency security triage, pagination/query hardening, and 1,000-user performance readiness.
+- Reason for change: Preserve the completed security/readiness audit findings in the planning docs without claiming security, backup/restore, production deployed-state verification, public go-live readiness, or paid subscription readiness is complete.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Changed-file secret-value scan.
+  - Documentation-only scope check confirming no app, SQL, schema, RPC, RLS, auth, storage, env, Vercel/settings, production-data, or user-record files changed.
+- Known risks or follow-ups:
+  - FB-020 is not implementation approval. Future work should proceed through small, separately approved documentation, test-only, dependency, SQL/RLS/storage, app pagination/storage-integrity, and operational verification slices.
+
 - Branch: `codex/fb-019-docs-complete`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

@@ -321,6 +321,7 @@ Current beta-readiness notes:
 - Full end-to-end coverage for the core loop remains future work.
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
 - Local Vercel CLI account/project mismatch is a non-blocking tooling cleanup item.
+- FB-020 now tracks security, records reliability, backup/restore, storage, dependency security, and scale readiness as a cross-cutting workstream before broader beta/public go-live. This does not mean those readiness items are complete; they require separate audited implementation and verification.
 
 # 16. Roadmap Priorities
 
@@ -328,16 +329,17 @@ The roadmap should stay disciplined. The app already has many features. Recent c
 
 | Priority | Workstream | Why it matters |
 | --- | --- | --- |
-| 1 | Beta readiness and release checklist | Confirms the cleaned-up core loop is dependable enough for friendly beta users. |
-| 2 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
-| 3 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
-| 4 | Production smoke account plan | Enables safe authenticated production smoke without using personal or fragile accounts. |
-| 5 | Contextual connection request with message, selected properties, and per-property permissions | This strengthens the main differentiator. Photos/media should follow later after storage/RLS design. |
-| 6 | General connection-level messaging | Allows questions without forcing service requests. |
-| 7 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
-| 8 | Dashboard and notification accuracy | Builds trust and reduces confusion. Notification automation remains future-facing. |
-| 9 | Beta onboarding and feedback capture | Turns early users into product direction. |
-| 10 | Payments/Stripe, QuickBooks, push/email/text automation, native mobile apps, and full calendar sync later | Important, but after the core loop and beta operations are reliable. |
+| 1 | FB-020 security, records reliability, backup/restore, storage, and scale readiness | Keeps privacy, data durability, recoverability, dependency security, and 1,000-user readiness ahead of broader beta/public go-live claims. |
+| 2 | Beta readiness and release checklist | Confirms the cleaned-up core loop is dependable enough for friendly beta users. |
+| 3 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
+| 4 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
+| 5 | Production smoke account plan | Enables safe authenticated production smoke without using personal or fragile accounts. |
+| 6 | Contextual connection request with message, selected properties, and per-property permissions | This strengthens the main differentiator. Photos/media should follow later after storage/RLS design. |
+| 7 | General connection-level messaging | Allows questions without forcing service requests. |
+| 8 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
+| 9 | Dashboard and notification accuracy | Builds trust and reduces confusion. Notification automation remains future-facing. |
+| 10 | Beta onboarding and feedback capture | Turns early users into product direction. |
+| 11 | Payments/Stripe, QuickBooks, push/email/text automation, native mobile apps, and full calendar sync later | Important, but after the core loop and beta operations are reliable. |
 
 SQL provenance note: tracked replacements for estimate-to-job support and home-specific inspection templates are now in main. If old loose SQL files such as `servsync-estimate-to-job.sql` or `servsync-home-specific-templates.sql` are encountered outside the repo, do not apply them directly; use the reviewed tracked SQL patches instead.
 
@@ -384,12 +386,13 @@ These items need more founder input or beta learning before they can be finalize
 # 20. Immediate Next Steps
 
 1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
-2. Run a focused beta-readiness/release-checklist audit before starting another major feature.
-3. Decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
-4. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
-5. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
-6. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.
-7. Keep QuickBooks, payments/Stripe, push/email/text automation, native mobile apps, full calendar sync, and contractor call tracking future-facing until the beta loop is stable.
+2. Use FB-020 as the umbrella readiness workstream for security, records reliability, backup/restore, storage, dependency security, and scale hardening before broader beta/public go-live.
+3. Run a focused beta-readiness/release-checklist audit before starting another major feature.
+4. Decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
+5. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
+6. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
+7. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.
+8. Keep QuickBooks, payments/Stripe, push/email/text automation, native mobile apps, full calendar sync, and contractor call tracking future-facing until the beta loop is stable.
 
 # Appendix A: Contextual Connection Implementation Breakdown
 
