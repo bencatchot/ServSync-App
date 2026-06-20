@@ -4,6 +4,27 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-20
+
+- Branch: `codex/dependency-security-triage-v1`
+- Files changed:
+  - `package.json`
+  - `package-lock.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Performed the first FB-020 dependency security triage implementation slice. Updated the Vite toolchain to the patched Vite 8 path with the matching React plugin peer version, and refreshed vulnerable transitive dependency paths for `dompurify`, `ws`, and `js-yaml` without upgrading Supabase JS, jsPDF, ESLint, Playwright, React, TypeScript, app features, SQL, RLS, storage policies, auth, env/settings, production data, or user records.
+- Reason for change: Clear the moderate-and-above dependency advisories identified during the FB-020 readiness audit while keeping the change limited to dependency security maintenance.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `npm audit --audit-level=moderate`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan.
+  - Scope scan confirming no SQL, schema, RPC, RLS, auth, storage, env, Vercel/settings, production-data, or user-record files changed.
+- Known risks or follow-ups:
+  - Vite 8 is a major tooling update required because Vite 7 still resolved to a vulnerable `esbuild` range; preview smoke should confirm dev/build behavior on the PR.
+  - Authenticated PDF generation smoke remains pending; compile/build validation confirms PDF-related imports still build.
+
 ## 2026-06-19
 
 - Branch: `codex/fb-security-readiness-backlog`
