@@ -109,6 +109,7 @@ Important guardrails:
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
 | FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Completed / Functional | High | v1 is complete: schema foundation and RPC/conversion preservation are merged and applied to sandbox/production; app/UI labor support and Build Estimate Draft labor cleanup are merged and passing preview. |
+| FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Backlog | High | Cross-cutting readiness program before broader beta/public go-live; includes deployed RLS/storage verification, backup/restore runbooks, retention/export/cancellation policy, immutable record strategy, pagination/scale hardening, dependency security triage, and security test expansion. |
 
 ## Detailed feature notes
 
@@ -880,11 +881,57 @@ Completed v1 behavior:
 Current next step:
 Estimate Labor Model v1 is complete. Future work should be optional regression hardening or a deliberate review of advanced trade-tool labor behavior.
 
+### FB-020 — Security, Records Reliability, Backup/Restore, and Scale Readiness
+
+Status: Backlog
+
+Priority: High
+
+Product area:
+
+- Security / RLS / cross-user privacy
+- Storage and private media
+- Records durability and data integrity
+- Backup, restore, retention, export, and cancellation policy
+- Dependency security and operational readiness
+- Pagination, query limits, and scale readiness
+
+Purpose:
+Make sure ServSync can safely protect private homeowner/contractor information, preserve business-critical service records, recover from data/file loss events, and scale toward real beta/public usage without avoidable privacy, storage, records, or performance failures.
+
+Relationship to FB-016:
+FB-016 remains focused on PDF/storage strategy. FB-020 is broader and owns security, records reliability, backup/restore, retention/export, dependency security, and scale readiness.
+
+Audit findings to preserve:
+
+- Current confidence is medium for many app security foundations, low for backup/restore readiness, low for deletion/retention/export readiness, medium-low for 1,000-user performance readiness, and low for public go-live readiness.
+- Existing foundations include browser-safe Supabase client usage, RLS foundation, private home document bucket design, private media storage policies, signed URL display paths, RLS/storage tests, sign-out local storage cleanup, and duplicate prevention for invoice-to-Home-History filing.
+- Gaps include deployed-state verification, SECURITY DEFINER/RPC authorization audit, backup/restore runbooks, storage-object backup strategy, dependency audit vulnerabilities, public-media guardrails, orphan/broken storage-object handling, unpaginated growing lists, and immutable/auditable record snapshots.
+
+Recommended future implementation sequence:
+
+1. Documentation/policy decisions.
+2. Test-only security hardening.
+3. Dependency security triage/upgrade.
+4. SQL/RLS/storage hardening after explicit approval.
+5. App pagination and storage-integrity cleanup.
+6. Operational backup/restore and deployed-state verification.
+
+Guardrails:
+
+- Do not treat this backlog item as implementation approval.
+- Do not claim security, backup/restore, compliance, public go-live, or production RLS/storage verification is complete until proven by code, SQL/config, deployed-state checks, tests, and completed implementation reports.
+- Keep controlled private beta, broader beta, public go-live, and paid subscription readiness as separate gates.
+
+Current next step:
+Use FB-020 as the umbrella readiness workstream before broader beta/public go-live. Start with no-code policy/runbook decisions and test-only hardening before any SQL/RLS/storage/settings changes.
+
 ## Current next recommended focus
 
-1. Estimate/mobile workflow polish.
-2. Trade-Specific Estimate / Pre-Visit Checklists.
-3. Discover Feed Strategy later.
+1. FB-020 security, records reliability, backup/restore, storage, and scale readiness.
+2. Estimate/mobile workflow polish.
+3. Trade-Specific Estimate / Pre-Visit Checklists.
+4. Discover Feed Strategy later.
 5. Contractor Reports later after workflow statuses are reliable.
 
 ## Update rules
