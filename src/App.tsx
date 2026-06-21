@@ -1847,7 +1847,7 @@ function estimateDraftLibraryItemEditorNote(bundle: EstimateDraftLibraryBundle, 
   return [
     `Suggested by Estimate Draft Library: ${bundle.display_name}.`,
     item.editor_note || '',
-    item.contractor_review_required ? 'Contractor review required before sending.' : '',
+    item.contractor_review_required ? 'Contractor review required before finalizing this estimate.' : '',
     reviewFlags ? `Review flags: ${reviewFlags}.` : '',
   ].filter(Boolean).join(' ');
 }
@@ -1867,7 +1867,12 @@ function estimateDraftLibrarySeedFromItem(bundle: EstimateDraftLibraryBundle, it
 }
 
 function estimateDraftLibraryBundleItems(bundle: EstimateDraftLibraryBundle) {
-  return bundle.sections.flatMap(section => section.items);
+  return bundle.sections
+    .flatMap(section => section.items)
+    .filter(item => {
+      const behavior = item.suggestion_behavior || 'default_candidate';
+      return behavior === 'default_candidate' || behavior === 'optional_candidate';
+    });
 }
 
 function estimateDraftLibraryNotes(bundle: EstimateDraftLibraryBundle) {

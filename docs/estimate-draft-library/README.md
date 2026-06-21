@@ -50,6 +50,8 @@ Maintenance belongs under `service`. Diagnostic/service calls belong under `serv
 - Contractors must review and edit all generated content before sending.
 - Code, permit, safety, licensing, electrical, gas, refrigerant, structural, manufacturer, and regional-sensitive items must be marked for contractor review.
 - Contractor review reminders must stay editor-only unless a contractor intentionally converts them into customer-facing wording.
+- Use `suggestion_behavior` to separate editable line candidates from review-only guidance. Only `default_candidate` and intentionally included `optional_candidate` items should become draft lines.
+- Customer-facing note and terms candidates must read like estimate language, not internal contractor instructions.
 - If no matching bundle exists, the app must fall back to the existing rule-based Build Estimate Draft behavior.
 
 ## Data Format

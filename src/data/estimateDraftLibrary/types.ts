@@ -16,6 +16,12 @@ export type EstimateDraftLibraryReviewFlag =
   | 'manufacturer'
   | 'regional';
 
+export type EstimateDraftLibrarySuggestionBehavior =
+  | 'default_candidate'
+  | 'optional_candidate'
+  | 'review_only'
+  | 'not_auto_added';
+
 export interface ScopeWordingHelper {
   id: string;
   label: string;
@@ -42,6 +48,7 @@ export interface EstimateDraftLibraryItem {
   id: string;
   title: string;
   line_type: EstimateLineType;
+  suggestion_behavior?: EstimateDraftLibrarySuggestionBehavior;
   unit: string;
   quantity?: string;
   customer_description?: string;
