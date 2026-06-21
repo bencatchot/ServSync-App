@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-06-19
+Last updated: 2026-06-21
 
 ## Purpose
 
@@ -96,7 +96,7 @@ Important guardrails:
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
 | FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
-| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Backlog | High | Wait until estimate templates are audited/tested and mobile estimate workflow is polished. |
+| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Backlog | High | Review the Estimate Draft Library path-flow foundation v1 after PR validation; broader trade libraries and homeowner pre-visit checklist work remain future. |
 | FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
 | FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
 | FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
@@ -451,6 +451,14 @@ Guardrails:
 
 Recommended timing:
 After estimate defaults/templates are audited, tested, and mobile estimate workflow is polished.
+
+Foundation slice:
+
+- Estimate Draft Library path-flow v1 introduces a code-only app data structure for trade -> work category -> job bundle -> estimate sections -> recommended items -> scope wording helpers -> notes/terms candidates -> contractor review reminders.
+- v1 starts with one HVAC replacement proof bundle only.
+- The library is price-free and does not replace contractor review.
+- Existing Build Estimate Draft fallback behavior must remain in place whenever no matching bundle exists.
+- This does not complete full trade-specific estimate/pre-visit checklist coverage.
 
 ### FB-008 — Discover Engagement Filter / Recently Active Contractors
 

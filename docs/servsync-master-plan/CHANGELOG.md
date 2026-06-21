@@ -4,6 +4,36 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-21
+
+- Branch: `codex/estimate-draft-library-path-flow-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/data/estimateDraftLibrary/types.ts`
+  - `src/data/estimateDraftLibrary/index.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/hvac-system-replacement.ts`
+  - `docs/estimate-draft-library/README.md`
+  - `docs/estimate-draft-library/schema.example.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Estimate Draft Library path-flow v1 foundation and wired Build Estimate Draft to use a matching price-free library bundle before falling back to the existing rule-based builder. The first proof bundle is HVAC system replacement under `hvac/replace/hvac_system_replacement`; it provides sections, editable recommended items, scope wording helpers, notes/terms candidates, and editor-only contractor review reminders.
+- Reason for change: Start FB-007's structured estimate recommendation-library direction without adding pricing, JSON imports, schema changes, AI automation, or full trade library coverage, while preserving existing Build Estimate Draft fallback behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Static validation confirming no price/cost/rate fields or currency literals were added to estimate draft library data.
+  - Static validation confirming contractor review reminders remain editor-only through `editor_source_note` or the contractor builder notice.
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Authenticated preview smoke should confirm HVAC replacement rough scope uses the new bundle and unrelated scopes fall back to the existing builder.
+  - Broader HVAC, plumbing, electrical, carpentry, and homeowner pre-visit checklist libraries remain future work.
+  - Library bundles must remain price-free and contractor-reviewed before sending.
+
 ## 2026-06-20
 
 - Branch: `codex/email-notification-safety-hardening-v1`
