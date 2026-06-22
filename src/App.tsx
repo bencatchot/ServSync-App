@@ -705,6 +705,7 @@ const STORAGE_KEYS = {
   contractorJobsView: 'servsync.contractor.jobsView',
   contractorProfileSetupSkipped: 'servsync.contractor.profileSetupSkipped',
   contractorWalkthroughSkipped: 'servsync.contractor.walkthroughSkipped',
+  contractorViewedCalendarVisits: 'servsync.contractor.viewedCalendarVisits',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 };
 
@@ -15547,6 +15548,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorWalkthroughSkipped, setContractorWalkthroughSkipped] = useState(
     () => window.localStorage.getItem(contractorWalkthroughStorageKey) === 'true',
   );
+  const contractorViewedCalendarVisitsStorageKey = `${STORAGE_KEYS.contractorViewedCalendarVisits}:${profile.id}`;
+  const [viewedContractorVisitKeys, setViewedContractorVisitKeys] = useState<Set<string>>(
+    () => storedStringSet(contractorViewedCalendarVisitsStorageKey),
+  );
   const [contractorWalkthroughStep, setContractorWalkthroughStep] = useState(0);
 
   useEffect(() => {
@@ -15569,6 +15574,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorWalkthroughSkipped(window.localStorage.getItem(contractorWalkthroughStorageKey) === 'true');
     setContractorWalkthroughStep(0);
   }, [contractorWalkthroughStorageKey]);
+
+  useEffect(() => {
+    setViewedContractorVisitKeys(storedStringSet(contractorViewedCalendarVisitsStorageKey));
+  }, [contractorViewedCalendarVisitsStorageKey]);
 
   const [loading, setLoading] = useState(true);
   const restoredFieldWorkRef = useRef(false);
@@ -18317,7 +18326,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const confirmedAppointments = serviceRequests
     .filter(request => request.appointment?.status === 'confirmed')
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
-  const activeVisitEventCount = contractorVisitEvents.filter(event => event.status === 'scheduled').length;
+  const contractorVisitViewedKey = (event: Pick<ContractorVisitEvent, 'id'>) => `visit:${event.id}`;
+  const activeVisitEvents = contractorVisitEvents.filter(event => event.status === 'scheduled');
+  const activeVisitEventCount = activeVisitEvents.length;
+  const unviewedActiveVisitEventCount = activeVisitEvents.filter(
+    event => !viewedContractorVisitKeys.has(contractorVisitViewedKey(event)),
+  ).length;
+  const contractorCalendarBadgeCount = homeownerAppointmentRequests.length + unviewedActiveVisitEventCount;
+  const markContractorVisitViewed = (event: ContractorVisitEvent) => {
+    const viewedKey = contractorVisitViewedKey(event);
+    setViewedContractorVisitKeys(previousKeys => {
+      if (previousKeys.has(viewedKey)) return previousKeys;
+      const nextKeys = new Set(previousKeys);
+      nextKeys.add(viewedKey);
+      try {
+        window.localStorage.setItem(contractorViewedCalendarVisitsStorageKey, JSON.stringify(Array.from(nextKeys)));
+      } catch {
+        // Calendar badge clearing should not fail if local storage is unavailable.
+      }
+      return nextKeys;
+    });
+  };
 
   // ── Standalone calendar events (not tied to a job) ──────────────────────────
   const openNewCalendarEvent = () => {
@@ -18338,6 +18367,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setCalendarEventComposerOpen(true);
   };
   const openVisitCalendarEventDetail = (event: ContractorVisitEvent) => {
+    markContractorVisitViewed(event);
     setSelectedVisitCalendarEvent(event);
   };
   const closeVisitCalendarEventDetail = () => {
@@ -20541,7 +20571,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
         { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: connectionRequests.length, group: 'Homeowner Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorFollowUpCount || openServiceRequestCount, group: 'Homeowner Work' },
-        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: homeownerAppointmentRequests.length || activeVisitEventCount, group: 'Homeowner Work' },
+        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: contractorCalendarBadgeCount, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
         { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
