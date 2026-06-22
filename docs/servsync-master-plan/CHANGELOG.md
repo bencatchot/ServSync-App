@@ -15,6 +15,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/plumbing/replace/toilet-replacement.ts`
   - `src/data/estimateDraftLibrary/plumbing/replace/faucet-replacement.ts`
   - `src/data/estimateDraftLibrary/plumbing/replace/garbage-disposal-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/service/tankless-water-heater-service.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/water-heater-repair-or-component-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/shower-valve-or-tub-shower-trim-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/sink-drain-or-p-trap-repair.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/angle-stop-or-supply-line-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/main-water-shutoff-valve-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/pressure-reducing-valve-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/hose-bibb-or-outdoor-faucet-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/sump-pump-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/install/dishwasher-water-and-drain-connection.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/water-line-repair-or-section-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/inspect/sewer-camera-inspection.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/sewer-line-spot-repair.ts`
+  - `src/data/estimateDraftLibrary/plumbing/inspect/slab-leak-detection-or-repair.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/gas-line-repair-or-appliance-connection.ts`
+  - `src/data/estimateDraftLibrary/plumbing/install/water-filtration-or-softener-installation.ts`
+  - `src/data/estimateDraftLibrary/plumbing/inspect/plumbing-safety-or-home-inspection-followup.ts`
+  - `src/data/estimateDraftLibrary/plumbing/install/bathroom-vanity-or-sink-installation.ts`
   - `src/data/estimateDraftLibrary/electrical/service/electrical-diagnostic-service-call.ts`
   - `src/data/estimateDraftLibrary/electrical/replace/outlet-or-switch-replacement.ts`
   - `src/data/estimateDraftLibrary/electrical/install/ceiling-fan-installation.ts`
@@ -73,7 +91,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/hvac/install/whole-home-dehumidifier-install.ts`
   - `src/data/estimateDraftLibrary/hvac/install/zoning-system-install.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles, and the expanded electrical payload brings electrical coverage to 23 total bundles across service, install, repair, replace, and inspection work.
+- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles, the expanded electrical payload brings electrical coverage to 23 total bundles, and the expanded plumbing payload brings plumbing coverage to 24 total bundles across service, install, repair, replace, and inspection work.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`

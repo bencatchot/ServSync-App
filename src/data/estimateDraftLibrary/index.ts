@@ -55,12 +55,30 @@ import { outletOrSwitchReplacementBundle } from './electrical/replace/outlet-or-
 import { panelUpgradeOrReplacementBundle } from './electrical/replace/panel-upgrade-or-replacement';
 import { electricalDiagnosticServiceCallBundle } from './electrical/service/electrical-diagnostic-service-call';
 import { panelLabelingAndCircuitMappingBundle } from './electrical/service/panel-labeling-and-circuit-mapping';
+import { plumbingSafetyOrHomeInspectionFollowupBundle } from './plumbing/inspect/plumbing-safety-or-home-inspection-followup';
+import { sewerCameraInspectionBundle } from './plumbing/inspect/sewer-camera-inspection';
+import { slabLeakDetectionOrRepairBundle } from './plumbing/inspect/slab-leak-detection-or-repair';
+import { bathroomVanityOrSinkInstallationBundle } from './plumbing/install/bathroom-vanity-or-sink-installation';
+import { dishwasherWaterAndDrainConnectionBundle } from './plumbing/install/dishwasher-water-and-drain-connection';
+import { waterFiltrationOrSoftenerInstallationBundle } from './plumbing/install/water-filtration-or-softener-installation';
 import { accessibleFixtureOrSupplyLeakRepairBundle } from './plumbing/repair/accessible-fixture-or-supply-leak-repair';
+import { gasLineRepairOrApplianceConnectionBundle } from './plumbing/repair/gas-line-repair-or-appliance-connection';
+import { sewerLineSpotRepairBundle } from './plumbing/repair/sewer-line-spot-repair';
+import { sinkDrainOrPTrapRepairBundle } from './plumbing/repair/sink-drain-or-p-trap-repair';
+import { waterHeaterRepairOrComponentReplacementBundle } from './plumbing/repair/water-heater-repair-or-component-replacement';
+import { waterLineRepairOrSectionReplacementBundle } from './plumbing/repair/water-line-repair-or-section-replacement';
+import { angleStopOrSupplyLineReplacementBundle } from './plumbing/replace/angle-stop-or-supply-line-replacement';
 import { faucetReplacementBundle } from './plumbing/replace/faucet-replacement';
 import { garbageDisposalReplacementBundle } from './plumbing/replace/garbage-disposal-replacement';
+import { hoseBibbOrOutdoorFaucetReplacementBundle } from './plumbing/replace/hose-bibb-or-outdoor-faucet-replacement';
+import { mainWaterShutoffValveReplacementBundle } from './plumbing/replace/main-water-shutoff-valve-replacement';
+import { pressureReducingValveReplacementBundle } from './plumbing/replace/pressure-reducing-valve-replacement';
+import { showerValveOrTubShowerTrimReplacementBundle } from './plumbing/replace/shower-valve-or-tub-shower-trim-replacement';
+import { sumpPumpReplacementBundle } from './plumbing/replace/sump-pump-replacement';
 import { tankStyleWaterHeaterReplacementBundle } from './plumbing/replace/tank-style-water-heater-replacement';
 import { toiletReplacementBundle } from './plumbing/replace/toilet-replacement';
 import { drainCleaningServiceBundle } from './plumbing/service/drain-cleaning-service';
+import { tanklessWaterHeaterServiceBundle } from './plumbing/service/tankless-water-heater-service';
 import type {
   EstimateDraftLibraryBundle,
   EstimateDraftLibraryTrade,
@@ -108,6 +126,24 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   toiletReplacementBundle,
   faucetReplacementBundle,
   garbageDisposalReplacementBundle,
+  tanklessWaterHeaterServiceBundle,
+  waterHeaterRepairOrComponentReplacementBundle,
+  showerValveOrTubShowerTrimReplacementBundle,
+  sinkDrainOrPTrapRepairBundle,
+  angleStopOrSupplyLineReplacementBundle,
+  mainWaterShutoffValveReplacementBundle,
+  pressureReducingValveReplacementBundle,
+  hoseBibbOrOutdoorFaucetReplacementBundle,
+  sumpPumpReplacementBundle,
+  dishwasherWaterAndDrainConnectionBundle,
+  waterLineRepairOrSectionReplacementBundle,
+  sewerCameraInspectionBundle,
+  sewerLineSpotRepairBundle,
+  slabLeakDetectionOrRepairBundle,
+  gasLineRepairOrApplianceConnectionBundle,
+  waterFiltrationOrSoftenerInstallationBundle,
+  plumbingSafetyOrHomeInspectionFollowupBundle,
+  bathroomVanityOrSinkInstallationBundle,
   electricalDiagnosticServiceCallBundle,
   outletOrSwitchReplacementBundle,
   ceilingFanInstallationBundle,
