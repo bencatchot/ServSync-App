@@ -4,6 +4,35 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-22
+
+- Branch: `codex/hvac-curated-recipes-v1`
+- Files changed:
+  - `src/data/estimateDraftLibrary/index.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/tank-style-water-heater-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/service/drain-cleaning-service.ts`
+  - `src/data/estimateDraftLibrary/plumbing/repair/accessible-fixture-or-supply-leak-repair.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/toilet-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/faucet-replacement.ts`
+  - `src/data/estimateDraftLibrary/plumbing/replace/garbage-disposal-replacement.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the approved Curator plumbing recipe set to the Estimate Draft Library and registered the bundles for app use. The new curated bundles cover tank-style water heater replacement, drain cleaning service, accessible fixture or supply leak repair, toilet replacement, faucet replacement, and garbage disposal replacement.
+- Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Static no-pricing scan of added/updated recipe data.
+  - Static customer-facing wording scan for internal phrases like "before sending."
+  - Static duplicate-strategy check confirming curated recipe and old rule-pack outputs are not combined for the same matched recipe.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Authenticated preview smoke should verify the plumbing recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
+  - The requested branch name says HVAC, but the approved attachment contained plumbing recipes; the implemented app paths are plumbing-specific.
+
 ## 2026-06-21
 
 - Branch: `codex/estimate-draft-library-path-flow-v1`

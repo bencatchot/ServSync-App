@@ -1,4 +1,10 @@
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
+import { accessibleFixtureOrSupplyLeakRepairBundle } from './plumbing/repair/accessible-fixture-or-supply-leak-repair';
+import { faucetReplacementBundle } from './plumbing/replace/faucet-replacement';
+import { garbageDisposalReplacementBundle } from './plumbing/replace/garbage-disposal-replacement';
+import { tankStyleWaterHeaterReplacementBundle } from './plumbing/replace/tank-style-water-heater-replacement';
+import { toiletReplacementBundle } from './plumbing/replace/toilet-replacement';
+import { drainCleaningServiceBundle } from './plumbing/service/drain-cleaning-service';
 import type {
   EstimateDraftLibraryBundle,
   EstimateDraftLibraryTrade,
@@ -18,6 +24,12 @@ export type {
 
 const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   hvacSystemReplacementBundle,
+  tankStyleWaterHeaterReplacementBundle,
+  drainCleaningServiceBundle,
+  accessibleFixtureOrSupplyLeakRepairBundle,
+  toiletReplacementBundle,
+  faucetReplacementBundle,
+  garbageDisposalReplacementBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {
