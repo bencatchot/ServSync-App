@@ -4,6 +4,27 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-22
+
+- Branch: `codex/contractor-calendar-badge-viewed-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the contractor Calendar tab badge so scheduled visit events are counted only until the contractor opens the related visit detail. The viewed state is stored locally per contractor user, and homeowner-proposed appointment requests remain action-needed badge items.
+- Reason for change: Fix a contractor Calendar badge issue where scheduled visits continued to badge the tab after the contractor had already viewed the calendar item.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+  - Static diff check confirming notification bell read/unread code paths were not changed.
+- Known risks or follow-ups:
+  - Viewed scheduled visits are browser-local in this slice; team-wide or cross-device durable viewed state would require a separately approved database-backed enhancement.
+  - Notification bell read/unread behavior is intentionally unchanged.
+
 ## 2026-06-21
 
 - Branch: `codex/estimate-draft-library-path-flow-v1`
