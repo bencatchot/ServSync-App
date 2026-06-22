@@ -15448,6 +15448,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<ContractorCalendarEvent | null>(null);
   const [editingCalendarEventOccurrenceAt, setEditingCalendarEventOccurrenceAt] = useState<string | null>(null);
   const [contractorCalendarSelectedDate, setContractorCalendarSelectedDate] = useState<string | null>(null);
+  const [contractorDashboardWeekStart, setContractorDashboardWeekStart] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    today.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return today.toISOString();
+  });
   const [selectedVisitCalendarEvent, setSelectedVisitCalendarEvent] = useState<ContractorVisitEvent | null>(null);
   const [calendarEventBusy, setCalendarEventBusy] = useState(false);
   const [creatingJobFromCalendarEventKey, setCreatingJobFromCalendarEventKey] = useState<string | null>(null);
@@ -19065,10 +19071,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     tone: 'amber' | 'emerald' | 'sky' | 'violet';
     onOpen: () => void;
   };
-  const scheduleSnapshotStart = new Date();
-  scheduleSnapshotStart.setHours(0, 0, 0, 0);
-  const scheduleSnapshotEnd = new Date(scheduleSnapshotStart);
-  scheduleSnapshotEnd.setDate(scheduleSnapshotEnd.getDate() + 7);
   const scheduleDayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const scheduleDateFromValue = (value?: string | null) => {
     if (!value) return null;
@@ -19076,15 +19078,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (Number.isNaN(date.getTime())) return null;
     return date;
   };
+  const contractorDashboardCurrentWeekStart = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    today.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    return today;
+  };
+  const scheduleSnapshotStart = scheduleDateFromValue(contractorDashboardWeekStart) ?? contractorDashboardCurrentWeekStart();
+  scheduleSnapshotStart.setHours(0, 0, 0, 0);
+  const scheduleSnapshotEnd = new Date(scheduleSnapshotStart);
+  scheduleSnapshotEnd.setDate(scheduleSnapshotEnd.getDate() + 7);
+  const dashboardCurrentWeekStart = contractorDashboardCurrentWeekStart();
+  const setDashboardWeekOffset = (offset: number) => {
+    setContractorDashboardWeekStart(current => {
+      const currentDate = scheduleDateFromValue(current) ?? contractorDashboardCurrentWeekStart();
+      currentDate.setHours(0, 0, 0, 0);
+      currentDate.setDate(currentDate.getDate() + (offset * 7));
+      return currentDate.toISOString();
+    });
+  };
+  const resetDashboardScheduleWeek = () => setContractorDashboardWeekStart(contractorDashboardCurrentWeekStart().toISOString());
   const scheduleTimeLabel = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const scheduleItemInSnapshot = (date: Date) => date.getTime() >= scheduleSnapshotStart.getTime() && date.getTime() < scheduleSnapshotEnd.getTime();
+  const todayScheduleKey = scheduleDayKey(new Date());
+  const isCurrentDashboardWeek = scheduleDayKey(scheduleSnapshotStart) === scheduleDayKey(dashboardCurrentWeekStart);
+  const scheduleWeekLabel = `${scheduleSnapshotStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(scheduleSnapshotEnd.getTime() - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   const scheduleSnapshotDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(scheduleSnapshotStart);
     date.setDate(scheduleSnapshotStart.getDate() + index);
     return {
       date,
       key: scheduleDayKey(date),
-      label: index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'long' }),
+      isToday: scheduleDayKey(date) === todayScheduleKey,
+      label: date.toLocaleDateString('en-US', { weekday: 'long' }),
       dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     };
   });
@@ -21079,25 +21105,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
           <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
             <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-950">Today through the next 6 days</p>
+                  <p className="text-sm font-bold text-slate-950">Week of {scheduleWeekLabel}</p>
                   <p className="mt-1 text-sm leading-5 text-slate-500">
-                    Appointment requests, confirmed appointments, scheduled visits, and standalone calendar events grouped by day.
+                    Monday through Sunday, including appointment requests, confirmed appointments, scheduled visits, and standalone calendar events.
                   </p>
                 </div>
-                <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                  {scheduleSnapshotCount} this week
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+                    onClick={() => setDashboardWeekOffset(-1)}
+                    aria-label="Previous week"
+                  >
+                    <ChevronRight size={16} className="rotate-180" />
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-700"
+                    onClick={() => setDashboardWeekOffset(1)}
+                    aria-label="Next week"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`${buttonClass('secondary')} bg-white`}
+                    onClick={resetDashboardScheduleWeek}
+                    disabled={isCurrentDashboardWeek}
+                  >
+                    <RotateCcw size={15} />
+                    This week
+                  </button>
+                  <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                    {scheduleSnapshotCount} scheduled
+                  </span>
+                </div>
               </div>
 
               <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
                 {scheduleSnapshotDays.map(day => {
                   const items = scheduleItemsByDay[day.key] ?? [];
                   return (
-                    <div key={day.key} className="grid gap-3 p-3 md:grid-cols-[150px_1fr]">
+                    <div key={day.key} className={`grid gap-3 p-3 md:grid-cols-[150px_1fr] ${day.isToday ? 'bg-blue-50/50' : ''}`}>
                       <div>
-                        <p className="text-sm font-bold text-slate-950">{day.label}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-slate-950">{day.label}</p>
+                          {day.isToday && (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700">
+                              Today
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-0.5 text-xs font-medium text-slate-500">{day.dateLabel}</p>
                       </div>
                       <div className="space-y-2">
@@ -21121,7 +21181,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         ))}
                         {items.length === 0 && (
                           <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                            {day.label === 'Today' ? 'No appointments or scheduled work today.' : 'No scheduled items.'}
+                            {day.isToday ? 'No appointments or scheduled work today.' : 'No scheduled items.'}
                           </p>
                         )}
                       </div>
