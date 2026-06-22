@@ -1,13 +1,38 @@
+import { atticAccessLadderOrPanelInstallationBundle } from './carpentry/install/attic-access-ladder-or-panel-installation';
+import { baseboardAndShoeMoldingInstallationBundle } from './carpentry/install/baseboard-and-shoe-molding-installation';
+import { builtInBookcaseOrCabinetryInstallationBundle } from './carpentry/install/built-in-bookcase-or-cabinetry-installation';
 import { closetShelvingOrStorageInstallationBundle } from './carpentry/install/closet-shelving-or-storage-installation';
+import { crownMoldingInstallationBundle } from './carpentry/install/crown-molding-installation';
+import { customShelvingOrClosetShelvingInstallationBundle } from './carpentry/install/custom-shelving-or-closet-shelving-installation';
+import { drywallBackingOrMinorWallFramingBundle } from './carpentry/install/drywall-backing-or-minor-wall-framing';
 import { interiorAccentWallOrWainscotingInstallationBundle } from './carpentry/install/interior-accent-wall-or-wainscoting-installation';
+import { mantelOrFireplaceSurroundInstallationBundle } from './carpentry/install/mantel-or-fireplace-surround-installation';
+import { nonLoadBearingWallFramingBundle } from './carpentry/install/non-load-bearing-wall-framing';
+import { screenDoorOrStormDoorInstallationBundle } from './carpentry/install/screen-door-or-storm-door-installation';
 import { smallWallFramingOrPartitionInstallationBundle } from './carpentry/install/small-wall-framing-or-partition-installation';
+import { wainscotingOrAccentWallInstallationBundle } from './carpentry/install/wainscoting-or-accent-wall-installation';
+import { woodFloorTransitionOrThresholdInstallationBundle } from './carpentry/install/wood-floor-transition-or-threshold-installation';
+import { cabinetRepairOrHardwareAdjustmentBundle } from './carpentry/repair/cabinet-repair-or-hardware-adjustment';
+import { deckBoardReplacementOrDeckRepairBundle } from './carpentry/repair/deck-board-replacement-or-deck-repair';
+import { deckRailingRepairOrReplacementBundle } from './carpentry/repair/deck-railing-repair-or-replacement';
 import { deckRepairBundle } from './carpentry/repair/deck-repair';
+import { deckStairRepairBundle } from './carpentry/repair/deck-stair-repair';
 import { exteriorTrimOrWoodRotRepairBundle } from './carpentry/repair/exterior-trim-or-wood-rot-repair';
 import { fenceOrGateRepairBundle } from './carpentry/repair/fence-or-gate-repair';
+import { fencePanelOrPostRepairBundle } from './carpentry/repair/fence-panel-or-post-repair';
+import { gateRepairOrReplacementBundle } from './carpentry/repair/gate-repair-or-replacement';
 import { interiorTrimRepairOrReplacementBundle } from './carpentry/repair/interior-trim-repair-or-replacement';
+import { minorCustomWoodRepairBundle } from './carpentry/repair/minor-custom-wood-repair';
 import { porchColumnOrPostRepairBundle } from './carpentry/repair/porch-column-or-post-repair';
+import { porchColumnRepairOrReplacementBundle } from './carpentry/repair/porch-column-repair-or-replacement';
+import { sidingOrFasciaBoardRepairBundle } from './carpentry/repair/siding-or-fascia-board-repair';
 import { stairOrHandrailRepairBundle } from './carpentry/repair/stair-or-handrail-repair';
+import { stairTreadRiserOrHandrailRepairBundle } from './carpentry/repair/stair-tread-riser-or-handrail-repair';
+import { windowTrimOrCasingRepairBundle } from './carpentry/repair/window-trim-or-casing-repair';
+import { woodRotRepairExteriorTrimSidingBundle } from './carpentry/repair/wood-rot-repair-exterior-trim-siding';
+import { exteriorDoorReplacementOrRepairBundle } from './carpentry/replace/exterior-door-replacement-or-repair';
 import { exteriorDoorReplacementBundle } from './carpentry/replace/exterior-door-replacement';
+import { interiorDoorReplacementOrRepairBundle } from './carpentry/replace/interior-door-replacement-or-repair';
 import { interiorDoorReplacementBundle } from './carpentry/replace/interior-door-replacement';
 import { ductlessMiniSplitInstallBundle } from './hvac/install/ductless-mini-split-install';
 import { indoorAirQualityFilterOrAirPurifierInstallBundle } from './hvac/install/indoor-air-quality-filter-or-air-purifier-install';
@@ -167,17 +192,42 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   atticOrCrawlspaceWiringRepairBundle,
   minorRoomWiringAdditionBundle,
   poolOrSpaElectricalCorrectionBundle,
-  deckRepairBundle,
-  interiorDoorReplacementBundle,
-  exteriorDoorReplacementBundle,
-  interiorTrimRepairOrReplacementBundle,
-  fenceOrGateRepairBundle,
-  stairOrHandrailRepairBundle,
-  exteriorTrimOrWoodRotRepairBundle,
+  atticAccessLadderOrPanelInstallationBundle,
+  baseboardAndShoeMoldingInstallationBundle,
+  builtInBookcaseOrCabinetryInstallationBundle,
   closetShelvingOrStorageInstallationBundle,
-  porchColumnOrPostRepairBundle,
-  smallWallFramingOrPartitionInstallationBundle,
+  crownMoldingInstallationBundle,
+  customShelvingOrClosetShelvingInstallationBundle,
+  drywallBackingOrMinorWallFramingBundle,
   interiorAccentWallOrWainscotingInstallationBundle,
+  mantelOrFireplaceSurroundInstallationBundle,
+  nonLoadBearingWallFramingBundle,
+  screenDoorOrStormDoorInstallationBundle,
+  smallWallFramingOrPartitionInstallationBundle,
+  wainscotingOrAccentWallInstallationBundle,
+  woodFloorTransitionOrThresholdInstallationBundle,
+  cabinetRepairOrHardwareAdjustmentBundle,
+  deckBoardReplacementOrDeckRepairBundle,
+  deckRailingRepairOrReplacementBundle,
+  deckRepairBundle,
+  deckStairRepairBundle,
+  exteriorTrimOrWoodRotRepairBundle,
+  fenceOrGateRepairBundle,
+  fencePanelOrPostRepairBundle,
+  gateRepairOrReplacementBundle,
+  interiorTrimRepairOrReplacementBundle,
+  minorCustomWoodRepairBundle,
+  porchColumnOrPostRepairBundle,
+  porchColumnRepairOrReplacementBundle,
+  sidingOrFasciaBoardRepairBundle,
+  stairOrHandrailRepairBundle,
+  stairTreadRiserOrHandrailRepairBundle,
+  windowTrimOrCasingRepairBundle,
+  woodRotRepairExteriorTrimSidingBundle,
+  exteriorDoorReplacementOrRepairBundle,
+  exteriorDoorReplacementBundle,
+  interiorDoorReplacementOrRepairBundle,
+  interiorDoorReplacementBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {

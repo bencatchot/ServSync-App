@@ -67,6 +67,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/carpentry/repair/porch-column-or-post-repair.ts`
   - `src/data/estimateDraftLibrary/carpentry/install/small-wall-framing-or-partition-installation.ts`
   - `src/data/estimateDraftLibrary/carpentry/install/interior-accent-wall-or-wainscoting-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/attic-access-ladder-or-panel-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/baseboard-and-shoe-molding-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/built-in-bookcase-or-cabinetry-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/crown-molding-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/custom-shelving-or-closet-shelving-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/drywall-backing-or-minor-wall-framing.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/mantel-or-fireplace-surround-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/non-load-bearing-wall-framing.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/screen-door-or-storm-door-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/wainscoting-or-accent-wall-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/wood-floor-transition-or-threshold-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/cabinet-repair-or-hardware-adjustment.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/deck-board-replacement-or-deck-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/deck-railing-repair-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/deck-stair-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/fence-panel-or-post-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/gate-repair-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/minor-custom-wood-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/porch-column-repair-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/siding-or-fascia-board-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/stair-tread-riser-or-handrail-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/window-trim-or-casing-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/wood-rot-repair-exterior-trim-siding.ts`
+  - `src/data/estimateDraftLibrary/carpentry/replace/exterior-door-replacement-or-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/replace/interior-door-replacement-or-repair.ts`
   - `src/data/estimateDraftLibrary/hvac/service/hvac-diagnostic-service-call.ts`
   - `src/data/estimateDraftLibrary/hvac/service/seasonal-hvac-maintenance-visit.ts`
   - `src/data/estimateDraftLibrary/hvac/replace/hvac-system-replacement.ts`
@@ -91,7 +116,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/hvac/install/whole-home-dehumidifier-install.ts`
   - `src/data/estimateDraftLibrary/hvac/install/zoning-system-install.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles, the expanded electrical payload brings electrical coverage to 23 total bundles, and the expanded plumbing payload brings plumbing coverage to 24 total bundles across service, install, repair, replace, and inspection work.
+- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles, the expanded electrical payload brings electrical coverage to 23 total bundles, the expanded plumbing payload brings plumbing coverage to 24 total bundles, and the expanded carpentry payload brings carpentry coverage to 36 total bundles across install, repair, and replace work.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`
