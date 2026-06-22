@@ -18721,6 +18721,66 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     contractorDraft.business_summary,
   ];
   const contractorProfileScore = Math.round((contractorProfileFields.filter(Boolean).length / contractorProfileFields.length) * 100);
+  const contractorProfileServiceAreaConfigured = contractorServiceAreas.some(contractorServiceAreaHasLocation) || contractorDraft.service_zip_codes.length > 0;
+  const contractorProfileTrustConfigured = Boolean(
+    contractorDraft.license_number.trim()
+    || contractorDraft.insurance_status.trim()
+    || contractorDraft.bonded_status.trim()
+    || normalizeExternalReviewLinks(contractorDraft.external_review_links).length
+  );
+  const scrollToContractorProfileSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const contractorProfileNavTiles: Array<{
+    title: string;
+    copy: string;
+    targetId: string;
+    icon: ReactNode;
+    status: string;
+  }> = [
+    {
+      title: 'Business Info',
+      copy: 'Edit your business name, contact info, and website.',
+      targetId: 'contractor-profile-business-info',
+      icon: <Building2 size={18} />,
+      status: contractorDraft.business_name.trim() ? 'Started' : 'Needs name',
+    },
+    {
+      title: 'Logo & Branding',
+      copy: 'Upload or update your business logo.',
+      targetId: 'contractor-profile-logo-branding',
+      icon: <Upload size={18} />,
+      status: contractorDraft.logo_url ? 'Logo uploaded' : 'Optional',
+    },
+    {
+      title: 'Services Offered',
+      copy: 'Show homeowners what types of work you handle.',
+      targetId: 'contractor-profile-services-offered',
+      icon: <ClipboardList size={18} />,
+      status: contractorDraft.service_categories.length ? `${contractorDraft.service_categories.length} selected` : 'Add services',
+    },
+    {
+      title: 'Service Area',
+      copy: 'Set the cities, ZIP codes, or areas you serve.',
+      targetId: 'contractor-profile-service-area',
+      icon: <MapPin size={18} />,
+      status: contractorProfileServiceAreaConfigured ? 'Configured' : 'Add area',
+    },
+    {
+      title: 'Public Profile',
+      copy: 'Review what homeowners can see.',
+      targetId: 'contractor-profile-public-preview',
+      icon: <Compass size={18} />,
+      status: contractorDraft.public_profile_enabled ? 'Visible when saved' : 'Hidden',
+    },
+    {
+      title: 'Trust & Links',
+      copy: 'Add review links, license info, or business credibility details.',
+      targetId: 'contractor-profile-trust-links',
+      icon: <ShieldCheck size={18} />,
+      status: contractorProfileTrustConfigured ? 'Started' : 'Optional',
+    },
+  ];
   const contractorProfileOnboardingComplete = Boolean(contractorDraft.business_name.trim()) && contractorProfileScore >= 70;
   const showInitialContractorProfileSetupPrompt = !loading
     && contractorTab !== 'profile'
@@ -21410,6 +21470,58 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {contractorTab === 'profile' && (
       <Card title="Business profile" icon={<Building2 size={18} />}>
         <div className="mb-5 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#02132D]">Manage your contractor profile</p>
+              <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
+                Keep the business details, service area, profile links, and customer-facing basics up to date from one page.
+              </p>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm lg:min-w-[190px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#223D67]/70">Completion</span>
+                <span className="text-sm font-bold text-[#02132D]">{contractorProfileScore}%</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-[#0078FF]"
+                  style={{ width: `${contractorProfileScore}%` }}
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {contractorProfileNavTiles.map(tile => (
+            <button
+              key={tile.title}
+              type="button"
+              onClick={() => scrollToContractorProfileSection(tile.targetId)}
+              className="group flex h-full flex-col justify-between rounded-2xl border border-[#E1E3E7] bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#0078FF]/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#0078FF]/30"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#0078FF]">
+                    {tile.icon}
+                  </span>
+                  <span className="rounded-full bg-[#F7F9FC] px-2 py-0.5 text-xs font-semibold text-[#223D67]">
+                    {tile.status}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm font-bold text-[#02132D]">{tile.title}</p>
+                <p className="mt-1 text-sm leading-5 text-[#223D67]/75">{tile.copy}</p>
+              </div>
+              <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-[#0078FF]">
+                Go to section
+                <ArrowRight size={14} className="transition group-hover:translate-x-0.5" />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div id="contractor-profile-logo-branding" className="mb-5 scroll-mt-6 rounded-2xl border border-[#E1E3E7] bg-[#F7F9FC] p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E1E3E7] bg-white">
@@ -21806,7 +21918,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div id="contractor-profile-business-info" className="grid scroll-mt-6 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Business name">
             <input className={inputClass()} value={contractorDraft.business_name} onChange={event => setContractor({ ...contractorDraft, business_name: event.target.value })} />
           </Field>
@@ -21840,14 +21952,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <Field label="ZIP code">
             <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={contractorDraft.zip_code} onChange={event => setContractor({ ...contractorDraft, zip_code: event.target.value })} />
           </Field>
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div id="contractor-profile-services-offered" className="scroll-mt-6 sm:col-span-2 lg:col-span-3">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Service categories</span>
             <ServiceCategorySelector
               selected={contractorDraft.service_categories}
               onChange={service_categories => setContractor({ ...contractorDraft, service_categories })}
             />
           </div>
-          <div className="sm:col-span-2 lg:col-span-3">
+          <div id="contractor-profile-service-area" className="scroll-mt-6 sm:col-span-2 lg:col-span-3">
             <div className="rounded-2xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -21963,15 +22075,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </div>
           </div>
-          <Field label="License number">
-            <input className={inputClass()} spellCheck={false} value={contractorDraft.license_number} onChange={event => setContractor({ ...contractorDraft, license_number: event.target.value })} />
-          </Field>
-          <Field label="Insurance status">
-            <input className={inputClass()} value={contractorDraft.insurance_status} onChange={event => setContractor({ ...contractorDraft, insurance_status: event.target.value })} />
-          </Field>
-          <Field label="Bonded status">
-            <input className={inputClass()} value={contractorDraft.bonded_status} onChange={event => setContractor({ ...contractorDraft, bonded_status: event.target.value })} />
-          </Field>
+          <div id="contractor-profile-trust-links" className="grid scroll-mt-6 gap-4 sm:col-span-2 sm:grid-cols-2 lg:col-span-3 lg:grid-cols-3">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <p className="text-sm font-bold text-[#02132D]">Trust & links</p>
+              <p className="mt-1 text-sm leading-5 text-[#223D67]/75">
+                Add the license, insurance, bonding, and third-party review links you want available with your business profile.
+              </p>
+            </div>
+            <Field label="License number">
+              <input className={inputClass()} spellCheck={false} value={contractorDraft.license_number} onChange={event => setContractor({ ...contractorDraft, license_number: event.target.value })} />
+            </Field>
+            <Field label="Insurance status">
+              <input className={inputClass()} value={contractorDraft.insurance_status} onChange={event => setContractor({ ...contractorDraft, insurance_status: event.target.value })} />
+            </Field>
+            <Field label="Bonded status">
+              <input className={inputClass()} value={contractorDraft.bonded_status} onChange={event => setContractor({ ...contractorDraft, bonded_status: event.target.value })} />
+            </Field>
+          </div>
           <Field label="Business summary">
             <textarea className={inputClass()} rows={3} {...writingAssistProps} value={contractorDraft.business_summary} onChange={event => setContractor({ ...contractorDraft, business_summary: event.target.value })} />
           </Field>
@@ -22019,7 +22139,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div id="contractor-profile-public-preview" className="mt-4 flex scroll-mt-6 flex-wrap items-center gap-3">
           <button type="button" onClick={() => void saveContractor()} className={buttonClass('primary')}>
             <ClipboardCheck size={16} />
             Save business profile
