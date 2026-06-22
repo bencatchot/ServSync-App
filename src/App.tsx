@@ -59,6 +59,13 @@ import {
   localSuggestedActionFromNote,
 } from './inspectionAssistant';
 import { cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
+import {
+  estimateDraftLibraryTradeFromText,
+  findEstimateDraftLibraryBundleForScope,
+  type EstimateDraftLibraryBundle,
+  type EstimateDraftLibraryItem,
+  type EstimateDraftLibraryWorkCategory,
+} from './data/estimateDraftLibrary';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -361,6 +368,8 @@ type EstimateDraftBuilderLineSeed = {
   line_type: EstimateLineType;
   description: string;
   customer_description?: string;
+  model_spec?: string;
+  supply_status?: EstimateLineSupplyStatus;
   editor_source_note?: string;
   quantity?: string;
   unit?: string;
@@ -379,6 +388,7 @@ type EstimateDraftBuilderLastOutput = {
   title: string;
   scope: string;
   notes: string;
+  terms?: string;
   builtTrade: EstimateDraftBuilderTrade;
   builtJobType: EstimateDraftBuilderJobType;
 };
@@ -1774,7 +1784,9 @@ function estimateBuilderLineFromSeed(seed: EstimateDraftBuilderLineSeed, charges
       line_type: seed.line_type,
       description: estimateBuilderDefaultLineDescription(seed, jobType),
       line_title: estimateBuilderDefaultLineDescription(seed, jobType),
-      customer_description: '',
+      customer_description: seed.customer_description || '',
+      model_spec: seed.model_spec || '',
+      supply_status: seed.supply_status || '',
       quantity: seed.quantity || '1',
       unit: seed.unit || 'each',
       unit_price: '',
@@ -1795,6 +1807,139 @@ function customerFacingRoughScope(value: string) {
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.!?])/g, '$1')
     .trim();
+}
+
+function estimateDraftLibraryWorkCategoryFromJobType(jobType: EstimateDraftBuilderJobType): EstimateDraftLibraryWorkCategory | null {
+  if (jobType === 'replacement') return 'replace';
+  if (jobType === 'repair') return 'repair';
+  if (jobType === 'install') return 'install';
+  if (jobType === 'maintenance' || jobType === 'service_diagnostic') return 'service';
+  return null;
+}
+
+function resolveEstimateDraftLibraryBundle({
+  trade,
+  jobType,
+  roughScope,
+}: {
+  trade: EstimateDraftBuilderTrade;
+  jobType: EstimateDraftBuilderJobType;
+  roughScope: string;
+}) {
+  const libraryTrade = estimateDraftLibraryTradeFromText(trade);
+  const workCategory = estimateDraftLibraryWorkCategoryFromJobType(jobType);
+  if (!libraryTrade || !workCategory) return null;
+  return findEstimateDraftLibraryBundleForScope({
+    trade: libraryTrade,
+    work_category: workCategory,
+    rough_scope: roughScope,
+  });
+}
+
+function estimateDraftLibraryReviewFlags(flags: string[] | undefined) {
+  return (flags || [])
+    .map(flag => flag.replace(/_/g, ' '))
+    .join(', ');
+}
+
+function estimateDraftLibraryItemEditorNote(bundle: EstimateDraftLibraryBundle, item: EstimateDraftLibraryItem) {
+  const reviewFlags = estimateDraftLibraryReviewFlags(item.review_flags);
+  return [
+    `Suggested by Estimate Draft Library: ${bundle.display_name}.`,
+    item.editor_note || '',
+    item.contractor_review_required ? 'Contractor review required before finalizing this estimate.' : '',
+    reviewFlags ? `Review flags: ${reviewFlags}.` : '',
+  ].filter(Boolean).join(' ');
+}
+
+function estimateDraftLibrarySeedFromItem(bundle: EstimateDraftLibraryBundle, item: EstimateDraftLibraryItem): EstimateDraftBuilderLineSeed {
+  return {
+    line_type: item.line_type,
+    description: item.title,
+    customer_description: item.customer_description || '',
+    model_spec: item.model_spec || '',
+    supply_status: item.supply_status,
+    editor_source_note: estimateDraftLibraryItemEditorNote(bundle, item),
+    quantity: item.quantity || '1',
+    unit: item.unit,
+    keywords: [item.title, ...(item.match_terms || [])],
+  };
+}
+
+function estimateDraftLibraryBundleItems(bundle: EstimateDraftLibraryBundle) {
+  return bundle.sections
+    .flatMap(section => section.items)
+    .filter(item => {
+      const behavior = item.suggestion_behavior || 'default_candidate';
+      return behavior === 'default_candidate' || behavior === 'optional_candidate';
+    });
+}
+
+function estimateDraftLibraryNotes(bundle: EstimateDraftLibraryBundle) {
+  return bundle.customer_note_candidates
+    .map(candidate => candidate.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function estimateDraftLibraryTerms(bundle: EstimateDraftLibraryBundle) {
+  return bundle.terms_candidates
+    .map(candidate => candidate.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function estimateDraftLibraryScope(bundle: EstimateDraftLibraryBundle, roughScope: string) {
+  const cleanScope = customerFacingRoughScope(roughScope);
+  const requestedScope = cleanScope
+    ? `Requested scope: ${/[.!?]$/.test(cleanScope) ? cleanScope : `${cleanScope}.`}`
+    : '';
+  const helperText = bundle.scope_wording_helpers
+    .map(helper => helper.text.trim())
+    .filter(Boolean)
+    .join(' ');
+  return [
+    bundle.scope_summary,
+    requestedScope,
+    helperText,
+  ].filter(Boolean).join(' ');
+}
+
+function buildEstimateDraftFromLibraryBundle({
+  bundle,
+  trade,
+  jobType,
+  laborMode,
+  roughScope,
+  subjectName,
+  savedCharges,
+}: {
+  bundle: EstimateDraftLibraryBundle;
+  trade: EstimateDraftBuilderTrade;
+  jobType: EstimateDraftBuilderJobType;
+  laborMode: EstimateDraftBuilderLaborMode;
+  roughScope: string;
+  subjectName: string;
+  savedCharges: ContractorSavedEstimateCharge[];
+}) {
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const builtLines = estimateDraftLibraryBundleItems(bundle)
+    .map(item => estimateDraftLibrarySeedFromItem(bundle, item))
+    .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
+  return {
+    title: `${bundle.display_name} Estimate - ${subjectName || 'Customer'} - ${dateLabel}`,
+    scope: estimateDraftLibraryScope(bundle, roughScope),
+    notes: estimateDraftLibraryNotes(bundle),
+    terms: estimateDraftLibraryTerms(bundle),
+    lines: builtLines.map(item => item.line),
+    matchedCount: builtLines.filter(item => item.matched).length,
+    builtTrade: trade,
+    builtJobType: jobType,
+    builtLaborMode: laborMode,
+    libraryBundleName: bundle.display_name,
+    libraryPath: `${bundle.trade}/${bundle.work_category}/${bundle.job_bundle}`,
+    reviewReminderLabels: bundle.contractor_review_reminders.map(reminder => reminder.label),
+  };
 }
 
 function buildRuleBasedEstimateDraft({
@@ -1830,11 +1975,15 @@ function buildRuleBasedEstimateDraft({
     title: `${trade === 'Other' ? 'Project' : trade} ${jobTypeLabel} Estimate - ${subjectName || 'Customer'} - ${dateLabel}`,
     scope,
     notes: rulePack.notes,
+    terms: '',
     lines: builtLines.map(item => item.line),
     matchedCount: builtLines.filter(item => item.matched).length,
     builtTrade: trade,
     builtJobType: jobType,
     builtLaborMode: laborMode,
+    libraryBundleName: '',
+    libraryPath: '',
+    reviewReminderLabels: [] as string[],
   };
 }
 
@@ -17826,14 +17975,29 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       ? 'Plumbing'
       : inferredTrade || estimateDraftBuilderTrade;
     const buildJobType = inferredJobType || estimateDraftBuilderJobType;
-    const builtDraft = buildRuleBasedEstimateDraft({
+    const libraryBundle = resolveEstimateDraftLibraryBundle({
       trade: buildTrade,
       jobType: buildJobType,
-      laborMode: estimateDraftBuilderLaborMode,
       roughScope: estimateAssistantText,
-      subjectName: subjectName || 'Customer',
-      savedCharges: activeSavedEstimateCharges,
     });
+    const builtDraft = libraryBundle
+      ? buildEstimateDraftFromLibraryBundle({
+          bundle: libraryBundle,
+          trade: buildTrade,
+          jobType: buildJobType,
+          laborMode: estimateDraftBuilderLaborMode,
+          roughScope: estimateAssistantText,
+          subjectName: subjectName || 'Customer',
+          savedCharges: activeSavedEstimateCharges,
+        })
+      : buildRuleBasedEstimateDraft({
+          trade: buildTrade,
+          jobType: buildJobType,
+          laborMode: estimateDraftBuilderLaborMode,
+          roughScope: estimateAssistantText,
+          subjectName: subjectName || 'Customer',
+          savedCharges: activeSavedEstimateCharges,
+        });
     const mergeMode = chooseEstimateDraftBuilderMergeMode(estimateDraft);
     if (mergeMode === 'cancel') {
       setEstimateAssistantNotice('Build canceled. Existing estimate draft was not changed.');
@@ -17850,6 +18014,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const nextNotes = mergeMode === 'append'
         ? draft.notes.trim() ? `${draft.notes.trim()}\n\n${builtDraft.notes}` : builtDraft.notes
         : replaceEstimateBuilderText(draft.notes, estimateDraftBuilderLastOutput?.notes, builtDraft.notes);
+      const nextTerms = builtDraft.terms
+        ? mergeMode === 'append'
+          ? draft.terms.trim() ? `${draft.terms.trim()}\n\n${builtDraft.terms}` : builtDraft.terms
+          : replaceEstimateBuilderText(draft.terms, estimateDraftBuilderLastOutput?.terms, builtDraft.terms)
+        : draft.terms;
       const nextLines = mergeMode === 'append'
         ? (currentUsableLines.length === 0 ? builtDraft.lines : [...draft.line_items, ...builtDraft.lines])
         : (replacingGeneratedLines ? [...builtDraft.lines, ...manualLines] : builtDraft.lines);
@@ -17859,6 +18028,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         labor_mode: builtDraft.builtLaborMode,
         scope: nextScope,
         notes: nextNotes,
+        terms: nextTerms,
         line_items: nextLines,
       };
     });
@@ -17866,6 +18036,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       title: builtDraft.title,
       scope: builtDraft.scope,
       notes: builtDraft.notes,
+      terms: builtDraft.terms,
       builtTrade: builtDraft.builtTrade,
       builtJobType: builtDraft.builtJobType,
     });
@@ -17876,6 +18047,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const laborModeCopy = builtDraft.builtLaborMode === 'line_specific'
       ? ' Line-specific labor is ready for Labor hrs on material/scope lines; no generated labor-only rows were added.'
       : ' Job-total labor is ready in the Labor section; enter total labor hours when known.';
+    const libraryCopy = builtDraft.libraryBundleName
+      ? ` Used Estimate Draft Library path ${builtDraft.libraryPath}. Contractor review reminders: ${builtDraft.reviewReminderLabels.join(', ')}.`
+      : ' No matching Estimate Draft Library bundle was found, so the existing rule-based builder was used.';
     const inferenceCopy = [
       `Draft built using: ${builtDraft.builtTrade} / ${estimateBuilderJobTypeLabel(builtDraft.builtJobType)}.`,
       inferredTrade && inferredTrade !== estimateDraftBuilderTrade
@@ -17886,7 +18060,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         : '',
     ].filter(Boolean).join(' ');
     setEstimateAssistantNotice(
-      `${inferenceCopy} Built ${builtDraft.lines.length} editable line item${builtDraft.lines.length === 1 ? '' : 's'}; ${unpricedCount} need pricing before totals include them.${matchedCopy}${laborModeCopy} Review all quantities, Price Required lines, exclusions, and terms before sending.`,
+      `${inferenceCopy}${libraryCopy} Built ${builtDraft.lines.length} editable line item${builtDraft.lines.length === 1 ? '' : 's'}; ${unpricedCount} need pricing before totals include them.${matchedCopy}${laborModeCopy} Review all quantities, Price Required lines, exclusions, and terms before sending.`,
     );
   };
 
