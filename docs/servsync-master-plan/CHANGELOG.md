@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-22
 
+- Branch: `codex/business-profile-nav-tiles-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a tile-based navigation area at the top of the contractor Business Profile tab, including quick jumps for Business Info, Logo & Branding, Services Offered, Service Area, Public Profile, and Trust & Links. Reused the existing profile completion score and existing contractor profile fields without adding new claims or backend data.
+- Reason for change: Reduce scrolling and help contractors understand the profile page sections quickly while preserving existing save behavior, onboarding/profile prompts, Discover/public profile behavior, and profile data fields.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-smoke.spec.ts tests/e2e/mobile-smoke.spec.ts`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Preview smoke should confirm each tile scrolls to the expected section on desktop and mobile.
+
 - Branch: `feature/contractor-command-center-v1`
 - Files changed:
   - `src/App.tsx`
