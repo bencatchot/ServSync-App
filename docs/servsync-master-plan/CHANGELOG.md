@@ -29,8 +29,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/carpentry/repair/porch-column-or-post-repair.ts`
   - `src/data/estimateDraftLibrary/carpentry/install/small-wall-framing-or-partition-installation.ts`
   - `src/data/estimateDraftLibrary/carpentry/install/interior-accent-wall-or-wainscoting-installation.ts`
+  - `src/data/estimateDraftLibrary/hvac/service/hvac-diagnostic-service-call.ts`
+  - `src/data/estimateDraftLibrary/hvac/service/seasonal-hvac-maintenance-visit.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/hvac-system-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/central-ac-system-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/heat-pump-system-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/gas-furnace-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/install/ductless-mini-split-install.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/thermostat-replacement-or-smart-thermostat-install.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/capacitor-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/condenser-fan-motor-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/blower-motor-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/service/condensate-drain-cleaning-or-repair.ts`
+  - `src/data/estimateDraftLibrary/hvac/repair/refrigerant-leak-diagnosis-and-repair.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/evaporator-coil-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/compressor-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/repair/furnace-ignition-or-flame-sensor-repair.ts`
+  - `src/data/estimateDraftLibrary/hvac/repair/furnace-gas-valve-or-control-board-repair.ts`
+  - `src/data/estimateDraftLibrary/hvac/repair/duct-repair-or-duct-sealing.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/ductwork-replacement-or-modification.ts`
+  - `src/data/estimateDraftLibrary/hvac/replace/air-handler-replacement.ts`
+  - `src/data/estimateDraftLibrary/hvac/install/indoor-air-quality-filter-or-air-purifier-install.ts`
+  - `src/data/estimateDraftLibrary/hvac/install/whole-home-dehumidifier-install.ts`
+  - `src/data/estimateDraftLibrary/hvac/install/zoning-system-install.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The new curated carpentry bundles cover deck repair, interior/exterior door replacement, interior/exterior trim repair, fence or gate repair, stair or handrail repair, closet shelving or storage installation, porch column or post repair, small wall framing or partition installation, and interior accent wall or wainscoting installation.
+- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles spanning diagnostic/service, maintenance, replacement, repair, ductwork, indoor air quality, dehumidifier, and zoning jobs.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`
@@ -44,7 +67,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Changed-file secret-value scan.
   - Static protected-scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
 - Known risks or follow-ups:
-  - Authenticated preview smoke should verify the plumbing, electrical, and carpentry recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
+  - Authenticated preview smoke should verify HVAC, plumbing, electrical, and carpentry recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
 
 ## 2026-06-21
 

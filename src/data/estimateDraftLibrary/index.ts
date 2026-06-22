@@ -9,7 +9,29 @@ import { porchColumnOrPostRepairBundle } from './carpentry/repair/porch-column-o
 import { stairOrHandrailRepairBundle } from './carpentry/repair/stair-or-handrail-repair';
 import { exteriorDoorReplacementBundle } from './carpentry/replace/exterior-door-replacement';
 import { interiorDoorReplacementBundle } from './carpentry/replace/interior-door-replacement';
+import { ductlessMiniSplitInstallBundle } from './hvac/install/ductless-mini-split-install';
+import { indoorAirQualityFilterOrAirPurifierInstallBundle } from './hvac/install/indoor-air-quality-filter-or-air-purifier-install';
+import { wholeHomeDehumidifierInstallBundle } from './hvac/install/whole-home-dehumidifier-install';
+import { zoningSystemInstallBundle } from './hvac/install/zoning-system-install';
+import { ductRepairOrDuctSealingBundle } from './hvac/repair/duct-repair-or-duct-sealing';
+import { furnaceGasValveOrControlBoardRepairBundle } from './hvac/repair/furnace-gas-valve-or-control-board-repair';
+import { furnaceIgnitionOrFlameSensorRepairBundle } from './hvac/repair/furnace-ignition-or-flame-sensor-repair';
+import { refrigerantLeakDiagnosisAndRepairBundle } from './hvac/repair/refrigerant-leak-diagnosis-and-repair';
+import { airHandlerReplacementBundle } from './hvac/replace/air-handler-replacement';
+import { blowerMotorReplacementBundle } from './hvac/replace/blower-motor-replacement';
+import { capacitorReplacementBundle } from './hvac/replace/capacitor-replacement';
+import { centralAcSystemReplacementBundle } from './hvac/replace/central-ac-system-replacement';
+import { compressorReplacementBundle } from './hvac/replace/compressor-replacement';
+import { condenserFanMotorReplacementBundle } from './hvac/replace/condenser-fan-motor-replacement';
+import { ductworkReplacementOrModificationBundle } from './hvac/replace/ductwork-replacement-or-modification';
+import { evaporatorCoilReplacementBundle } from './hvac/replace/evaporator-coil-replacement';
+import { gasFurnaceReplacementBundle } from './hvac/replace/gas-furnace-replacement';
+import { heatPumpSystemReplacementBundle } from './hvac/replace/heat-pump-system-replacement';
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
+import { thermostatReplacementOrSmartThermostatInstallBundle } from './hvac/replace/thermostat-replacement-or-smart-thermostat-install';
+import { condensateDrainCleaningOrRepairBundle } from './hvac/service/condensate-drain-cleaning-or-repair';
+import { hvacDiagnosticServiceCallBundle } from './hvac/service/hvac-diagnostic-service-call';
+import { seasonalHvacMaintenanceVisitBundle } from './hvac/service/seasonal-hvac-maintenance-visit';
 import { ceilingFanInstallationBundle } from './electrical/install/ceiling-fan-installation';
 import { outletOrSwitchReplacementBundle } from './electrical/replace/outlet-or-switch-replacement';
 import { electricalDiagnosticServiceCallBundle } from './electrical/service/electrical-diagnostic-service-call';
@@ -38,6 +60,28 @@ export type {
 
 const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   hvacSystemReplacementBundle,
+  hvacDiagnosticServiceCallBundle,
+  seasonalHvacMaintenanceVisitBundle,
+  centralAcSystemReplacementBundle,
+  heatPumpSystemReplacementBundle,
+  gasFurnaceReplacementBundle,
+  ductlessMiniSplitInstallBundle,
+  thermostatReplacementOrSmartThermostatInstallBundle,
+  capacitorReplacementBundle,
+  condenserFanMotorReplacementBundle,
+  blowerMotorReplacementBundle,
+  condensateDrainCleaningOrRepairBundle,
+  refrigerantLeakDiagnosisAndRepairBundle,
+  evaporatorCoilReplacementBundle,
+  compressorReplacementBundle,
+  furnaceIgnitionOrFlameSensorRepairBundle,
+  furnaceGasValveOrControlBoardRepairBundle,
+  ductRepairOrDuctSealingBundle,
+  ductworkReplacementOrModificationBundle,
+  airHandlerReplacementBundle,
+  indoorAirQualityFilterOrAirPurifierInstallBundle,
+  wholeHomeDehumidifierInstallBundle,
+  zoningSystemInstallBundle,
   tankStyleWaterHeaterReplacementBundle,
   drainCleaningServiceBundle,
   accessibleFixtureOrSupplyLeakRepairBundle,

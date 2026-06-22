@@ -37,7 +37,7 @@ export const hvacSystemReplacementBundle = {
     {
       id: 'equipment_materials',
       title: 'Equipment and materials',
-      description: 'Capture the core material/equipment buckets without pricing or final equipment selection.',
+      description: 'Capture the core material/equipment buckets without monetary assumptions or final equipment selection.',
       items: [
         {
           id: 'indoor_hvac_equipment',
@@ -251,7 +251,7 @@ export const hvacSystemReplacementBundle = {
     },
   ],
   excluded_items: [
-    'pricing',
+    'monetary assumptions',
     'guaranteed permit requirements',
     'guaranteed manufacturer warranty terms',
     'final sizing/load calculation conclusions',
