@@ -11,8 +11,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/App.tsx`
   - `tests/e2e/contractor-smoke.spec.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Reorganized the contractor dashboard overview into a cleaner command center with top priorities, upcoming schedule visibility, workflow-stage shortcuts, workspace tiles, and a lower-priority tools/setup panel.
-- Reason for change: Reduce contractor dashboard clutter and make the next action, schedule, core ServSync workflow, and major workspaces easier for solo/small contractors to scan without changing backend data, lifecycle rules, or Calendar badge behavior.
+- Summary of change: Reorganized the contractor dashboard overview into a cleaner command center with Today’s schedule first, workflow-stage shortcuts, workspace tiles, and a lower-priority tools/setup panel. Action-required items are surfaced with neutral “Needs review” wording instead of subjective priority language.
+- Reason for change: Reduce contractor dashboard clutter and make the schedule, core ServSync workflow, and major workspaces easier for solo/small contractors to scan without telling contractors what their priorities are or changing backend data, lifecycle rules, or Calendar badge behavior.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`
