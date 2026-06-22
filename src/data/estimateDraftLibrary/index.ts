@@ -1,3 +1,14 @@
+import { closetShelvingOrStorageInstallationBundle } from './carpentry/install/closet-shelving-or-storage-installation';
+import { interiorAccentWallOrWainscotingInstallationBundle } from './carpentry/install/interior-accent-wall-or-wainscoting-installation';
+import { smallWallFramingOrPartitionInstallationBundle } from './carpentry/install/small-wall-framing-or-partition-installation';
+import { deckRepairBundle } from './carpentry/repair/deck-repair';
+import { exteriorTrimOrWoodRotRepairBundle } from './carpentry/repair/exterior-trim-or-wood-rot-repair';
+import { fenceOrGateRepairBundle } from './carpentry/repair/fence-or-gate-repair';
+import { interiorTrimRepairOrReplacementBundle } from './carpentry/repair/interior-trim-repair-or-replacement';
+import { porchColumnOrPostRepairBundle } from './carpentry/repair/porch-column-or-post-repair';
+import { stairOrHandrailRepairBundle } from './carpentry/repair/stair-or-handrail-repair';
+import { exteriorDoorReplacementBundle } from './carpentry/replace/exterior-door-replacement';
+import { interiorDoorReplacementBundle } from './carpentry/replace/interior-door-replacement';
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
 import { ceilingFanInstallationBundle } from './electrical/install/ceiling-fan-installation';
 import { outletOrSwitchReplacementBundle } from './electrical/replace/outlet-or-switch-replacement';
@@ -36,6 +47,17 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   electricalDiagnosticServiceCallBundle,
   outletOrSwitchReplacementBundle,
   ceilingFanInstallationBundle,
+  deckRepairBundle,
+  interiorDoorReplacementBundle,
+  exteriorDoorReplacementBundle,
+  interiorTrimRepairOrReplacementBundle,
+  fenceOrGateRepairBundle,
+  stairOrHandrailRepairBundle,
+  exteriorTrimOrWoodRotRepairBundle,
+  closetShelvingOrStorageInstallationBundle,
+  porchColumnOrPostRepairBundle,
+  smallWallFramingOrPartitionInstallationBundle,
+  interiorAccentWallOrWainscotingInstallationBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {

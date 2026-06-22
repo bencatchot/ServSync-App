@@ -6,7 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-22
 
-- Branch: `codex/hvac-curated-recipes-v1`
+- Branch: `codex/estimate-draft-library-curated-recipes-v1`
 - Files changed:
   - `src/data/estimateDraftLibrary/index.ts`
   - `src/data/estimateDraftLibrary/plumbing/replace/tank-style-water-heater-replacement.ts`
@@ -18,8 +18,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/electrical/service/electrical-diagnostic-service-call.ts`
   - `src/data/estimateDraftLibrary/electrical/replace/outlet-or-switch-replacement.ts`
   - `src/data/estimateDraftLibrary/electrical/install/ceiling-fan-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/deck-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/replace/interior-door-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/replace/exterior-door-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/interior-trim-repair-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/fence-or-gate-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/stair-or-handrail-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/exterior-trim-or-wood-rot-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/closet-shelving-or-storage-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/repair/porch-column-or-post-repair.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/small-wall-framing-or-partition-installation.ts`
+  - `src/data/estimateDraftLibrary/carpentry/install/interior-accent-wall-or-wainscoting-installation.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator plumbing and electrical recipe sets to the Estimate Draft Library and registered the bundles for app use. The new curated electrical bundles cover electrical diagnostic service call, outlet or switch replacement, and ceiling fan installation.
+- Summary of change: Added the approved Curator plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The new curated carpentry bundles cover deck repair, interior/exterior door replacement, interior/exterior trim repair, fence or gate repair, stair or handrail repair, closet shelving or storage installation, porch column or post repair, small wall framing or partition installation, and interior accent wall or wainscoting installation.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`
@@ -33,8 +44,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Changed-file secret-value scan.
   - Static protected-scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
 - Known risks or follow-ups:
-  - Authenticated preview smoke should verify the plumbing and electrical recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
-  - The requested branch name says HVAC, but the approved attachments contained plumbing and electrical recipes; the implemented app paths are trade-specific to those attachments.
+  - Authenticated preview smoke should verify the plumbing, electrical, and carpentry recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
 
 ## 2026-06-21
 
