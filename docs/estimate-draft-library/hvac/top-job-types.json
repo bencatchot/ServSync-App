@@ -1,0 +1,326 @@
+{
+  "trade": "hvac",
+  "research_purpose": "prioritize_common_hvac_job_types_for_estimate_recommendation_bundles",
+  "review_status": "research_draft_needs_human_review",
+  "planning_note": "Planning/reference file only. This is not wired into app behavior and must be reviewed before any app-consumable bundle files are created.",
+  "ranking_note": "This is a practical ServSync library priority list, not a guaranteed national job-volume ranking. Public sources generally list common HVAC services and repairs, not verified job-count rankings.",
+  "work_category_normalization_note": {
+    "approved_v1_work_categories": [
+      "install",
+      "repair",
+      "replace",
+      "inspect",
+      "service"
+    ],
+    "implementation_requirement": "Before creating app-consumable bundle files, each curator job type must be mapped into one approved ServSync work category.",
+    "suggested_mappings": {
+      "diagnostic": "service",
+      "maintenance": "service",
+      "replacement": "replace",
+      "installation": "install",
+      "control": "install_or_repair_depending_on_job",
+      "repair": "repair",
+      "repair_or_replacement": "repair_or_replace_depending_on_bundle",
+      "major_repair": "repair",
+      "ductwork": "repair_replace_or_install_depending_on_bundle",
+      "indoor_air_quality": "install",
+      "comfort_upgrade": "install"
+    }
+  },
+  "candidate_job_types": [
+    {
+      "rank": 1,
+      "job_type": "hvac_diagnostic_service_call",
+      "bundle_name": "HVAC Diagnostic Service Call",
+      "job_family": "diagnostic",
+      "priority_tier": "must_build",
+      "why_include": "Most repair work starts with a diagnostic visit before a contractor can recommend repair, replacement, or follow-up work.",
+      "estimate_bundle_fit": "Strong fit for service call fee, inspection labor, system findings note, repair options, and exclusions.",
+      "likely_bundle_size": "simple_8_to_12_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 2,
+      "job_type": "seasonal_hvac_maintenance_visit",
+      "bundle_name": "Seasonal HVAC Maintenance Visit",
+      "job_family": "maintenance",
+      "priority_tier": "must_build",
+      "why_include": "Tune-ups and maintenance plans are core recurring HVAC work and useful for homeowner retention.",
+      "estimate_bundle_fit": "Strong fit for filter check, coil cleaning, condensate check, thermostat check, electrical inspection note, and customer maintenance notes.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 3,
+      "job_type": "central_ac_system_replacement",
+      "bundle_name": "Central AC System Replacement",
+      "job_family": "replacement",
+      "priority_tier": "must_build",
+      "why_include": "High-value residential job type and a major estimate workflow for HVAC contractors.",
+      "estimate_bundle_fit": "Strong fit for equipment removal, condenser install, coil/air handler coordination, line set review, thermostat, startup, disposal, permit/admin, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 4,
+      "job_type": "heat_pump_system_replacement",
+      "bundle_name": "Heat Pump System Replacement",
+      "job_family": "replacement",
+      "priority_tier": "must_build",
+      "why_include": "Heat pumps are common residential replacement options, especially where one system handles heating and cooling.",
+      "estimate_bundle_fit": "Strong fit for outdoor unit, air handler, thermostat, auxiliary heat review, duct compatibility, startup, permit/admin, and code-sensitive items.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 5,
+      "job_type": "gas_furnace_replacement",
+      "bundle_name": "Gas Furnace Replacement",
+      "job_family": "replacement",
+      "priority_tier": "must_build",
+      "why_include": "Common heating replacement job and important for contractors in cooler regions.",
+      "estimate_bundle_fit": "Strong fit for remove existing furnace, set new furnace, gas connection review, venting review, condensate where applicable, thermostat, startup, permit/admin, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 6,
+      "job_type": "ductless_mini_split_install",
+      "bundle_name": "Ductless Mini-Split Installation",
+      "job_family": "installation",
+      "priority_tier": "must_build",
+      "why_include": "Useful for additions, garages, bonus rooms, older homes without ductwork, and room-specific comfort problems.",
+      "estimate_bundle_fit": "Strong fit for indoor head, outdoor unit, line set, wall penetration, condensate routing, electrical coordination, startup, permit/admin, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 7,
+      "job_type": "thermostat_replacement_or_smart_thermostat_install",
+      "bundle_name": "Thermostat Replacement or Smart Thermostat Installation",
+      "job_family": "control",
+      "priority_tier": "must_build",
+      "why_include": "Common small-ticket job that can be recommended after comfort complaints, system upgrades, or homeowner requests.",
+      "estimate_bundle_fit": "Strong fit for remove existing thermostat, install customer-selected thermostat, setup, compatibility review, wiring/common-wire note, and customer instruction.",
+      "likely_bundle_size": "simple_8_to_12_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 8,
+      "job_type": "capacitor_replacement",
+      "bundle_name": "AC Capacitor Replacement",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Capacitor failure is one of the most common AC repair recommendations and is easy to structure into estimate items.",
+      "estimate_bundle_fit": "Good fit for diagnostic confirmation, capacitor replacement, electrical inspection note, startup test, and customer warning about related failures.",
+      "likely_bundle_size": "simple_8_to_12_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 9,
+      "job_type": "condenser_fan_motor_replacement",
+      "bundle_name": "Condenser Fan Motor Replacement",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Common outdoor-unit repair tied to no-cool calls, overheating, noise, or outdoor fan failure.",
+      "estimate_bundle_fit": "Good fit for fan motor, capacitor if needed, blade inspection, electrical connections, startup test, and related-condition notes.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 10,
+      "job_type": "blower_motor_replacement",
+      "bundle_name": "Blower Motor Replacement",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Common airflow-related HVAC repair that applies to furnaces, air handlers, and some heat pump systems.",
+      "estimate_bundle_fit": "Good fit for blower motor, wheel inspection, capacitor/module review, access labor, startup test, and airflow notes.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 11,
+      "job_type": "condensate_drain_cleaning_or_repair",
+      "bundle_name": "Condensate Drain Cleaning or Repair",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Very common AC service issue and important because drain problems can cause leaks, shutoffs, and homeowner callbacks.",
+      "estimate_bundle_fit": "Strong fit for drain clearing, pan inspection, float switch review, PVC repair, access notes, water damage exclusion, and maintenance recommendation.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 12,
+      "job_type": "refrigerant_leak_diagnosis_and_repair",
+      "bundle_name": "Refrigerant Leak Diagnosis and Repair",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Common enough to need structure, but must be handled carefully because refrigerant work is regulated and diagnosis-dependent.",
+      "estimate_bundle_fit": "Strong fit for leak search, repair allowance, recovery/handling note, pressure test, evacuation, recharge, and replacement recommendation when repair is not practical.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 13,
+      "job_type": "evaporator_coil_replacement",
+      "bundle_name": "Evaporator Coil Replacement",
+      "job_family": "repair_or_replacement",
+      "priority_tier": "must_build",
+      "why_include": "Frequent follow-up recommendation after refrigerant leak, frozen coil, or poor cooling diagnosis.",
+      "estimate_bundle_fit": "Strong fit for recover refrigerant, remove coil, install coil, line connection, drain/pan review, evacuation, recharge, startup, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 14,
+      "job_type": "compressor_replacement",
+      "bundle_name": "Compressor Replacement",
+      "job_family": "major_repair",
+      "priority_tier": "must_build",
+      "why_include": "Major repair that often competes with full system replacement, making estimate clarity important.",
+      "estimate_bundle_fit": "Strong fit for compressor replacement, refrigerant recovery, filter drier, evacuation, recharge, electrical testing, startup, and replacement-option note.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 15,
+      "job_type": "furnace_ignition_or_flame_sensor_repair",
+      "bundle_name": "Furnace Ignition or Flame Sensor Repair",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Common no-heat repair category with clear line-item recommendations.",
+      "estimate_bundle_fit": "Good fit for diagnostic confirmation, flame sensor cleaning/replacement, igniter replacement, burner inspection note, startup test, and safety review reminder.",
+      "likely_bundle_size": "simple_8_to_12_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 16,
+      "job_type": "furnace_gas_valve_or_control_board_repair",
+      "bundle_name": "Furnace Gas Valve or Control Board Repair",
+      "job_family": "repair",
+      "priority_tier": "must_build",
+      "why_include": "Common heating repair path for no-heat calls, but needs review because gas and control work can be safety/code sensitive.",
+      "estimate_bundle_fit": "Good fit for diagnostic confirmation, gas valve/control board replacement, wiring check, startup test, combustion/safety check note, and exclusions.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 17,
+      "job_type": "duct_repair_or_duct_sealing",
+      "bundle_name": "Duct Repair or Duct Sealing",
+      "job_family": "ductwork",
+      "priority_tier": "must_build",
+      "why_include": "Common comfort and efficiency-related work, especially for leaky, disconnected, damaged, or poorly sealed duct runs.",
+      "estimate_bundle_fit": "Strong fit for accessible duct repair, mastic/foil tape sealing, insulation repair, register boot sealing, attic/crawlspace access notes, and exclusions.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 18,
+      "job_type": "ductwork_replacement_or_modification",
+      "bundle_name": "Ductwork Replacement or Modification",
+      "job_family": "ductwork",
+      "priority_tier": "must_build",
+      "why_include": "Common add-on or correction item during system replacement, comfort complaints, additions, and airflow issues.",
+      "estimate_bundle_fit": "Strong fit for duct removal, new duct run, transition, return/supply modification, insulation, access notes, balancing note, and concealed-condition exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 19,
+      "job_type": "air_handler_replacement",
+      "bundle_name": "Air Handler Replacement",
+      "job_family": "replacement",
+      "priority_tier": "should_build",
+      "why_include": "Important replacement category for heat pump and split-system homes where the indoor unit is replaced separately or with the outdoor unit.",
+      "estimate_bundle_fit": "Strong fit for remove existing air handler, set new unit, drain/pan, electrical connection review, duct transition, startup, permit/admin, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 20,
+      "job_type": "indoor_air_quality_filter_or_air_purifier_install",
+      "bundle_name": "Indoor Air Quality Filter or Air Purifier Installation",
+      "job_family": "indoor_air_quality",
+      "priority_tier": "should_build",
+      "why_include": "Common HVAC upsell and useful recommendation when customers mention dust, allergies, odors, pets, or filter upgrades.",
+      "estimate_bundle_fit": "Good fit for media cabinet, filter upgrade, air purifier, electrical coordination where applicable, customer maintenance note, and exclusions.",
+      "likely_bundle_size": "normal_15_to_25_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": false
+    },
+    {
+      "rank": 21,
+      "job_type": "whole_home_dehumidifier_install",
+      "bundle_name": "Whole-Home Dehumidifier Installation",
+      "job_family": "indoor_air_quality",
+      "priority_tier": "should_build",
+      "why_include": "Especially useful in humid markets and homes with comfort, moisture, or indoor air quality complaints.",
+      "estimate_bundle_fit": "Good fit for equipment install, duct connection, condensate routing, control wiring, electrical review, startup, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    },
+    {
+      "rank": 22,
+      "job_type": "zoning_system_install",
+      "bundle_name": "HVAC Zoning System Installation",
+      "job_family": "comfort_upgrade",
+      "priority_tier": "should_build",
+      "why_include": "Useful for homes with hot/cold spots, multi-level comfort issues, additions, or customers wanting room/zone control.",
+      "estimate_bundle_fit": "Strong fit for dampers, zone control board, thermostats/sensors, duct review, bypass/static pressure review, startup, and exclusions.",
+      "likely_bundle_size": "complex_up_to_30_items",
+      "review_required_default": true,
+      "local_code_sensitive_default": true
+    }
+  ],
+  "recommended_first_10_bundle_build_order": [
+    "hvac_diagnostic_service_call",
+    "seasonal_hvac_maintenance_visit",
+    "central_ac_system_replacement",
+    "heat_pump_system_replacement",
+    "gas_furnace_replacement",
+    "ductless_mini_split_install",
+    "thermostat_replacement_or_smart_thermostat_install",
+    "capacitor_replacement",
+    "condensate_drain_cleaning_or_repair",
+    "refrigerant_leak_diagnosis_and_repair"
+  ],
+  "recommended_defer_until_after_core_library": [
+    {
+      "job_type": "commercial_rooftop_unit_replacement",
+      "reason": "Important HVAC work, but outside the first residential/small-contractor library focus."
+    },
+    {
+      "job_type": "boiler_replacement",
+      "reason": "Important in some regions, but less universal across the first HVAC bundle set."
+    },
+    {
+      "job_type": "geothermal_heat_pump_install",
+      "reason": "Useful but more specialized and complex than first-pass residential HVAC service bundles."
+    },
+    {
+      "job_type": "duct_cleaning_only",
+      "reason": "Common service, but can be controversial and varies by contractor offering; better after duct repair/sealing and indoor air quality bundles."
+    }
+  ]
+}

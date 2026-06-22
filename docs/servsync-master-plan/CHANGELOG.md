@@ -4,6 +4,25 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-22
+
+- Branch: `codex/hvac-library-top-job-types-v1`
+- Files changed:
+  - `docs/estimate-draft-library/hvac/top-job-types.json`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the HVAC Library Curator top-job-types research draft as a reviewable planning/reference JSON file under the Estimate Draft Library docs. The file preserves the curator's priority list, marks the content as a research draft needing human review, and documents the required normalization from curator `job_family` labels into ServSync's approved v1 work categories before future app-consumable bundles are created.
+- Reason for change: Preserve HVAC bundle-prioritization research for future Estimate Draft Library planning without wiring it into app behavior, creating bundle files, adding pricing, or changing Build Estimate Draft.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - JSON validation for `docs/estimate-draft-library/hvac/top-job-types.json`.
+  - Static no-pricing scan of the added file.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Future implementation must map each research `job_family` into one approved ServSync work category before creating app-consumable bundle files.
+  - No HVAC bundles beyond the existing proof bundle were created in this slice.
+
 ## 2026-06-21
 
 - Branch: `codex/estimate-draft-library-path-flow-v1`
