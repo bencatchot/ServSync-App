@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-22
 
+- Branch: `feature/contractor-command-center-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reorganized the contractor dashboard overview into a cleaner command center with top priorities, upcoming schedule visibility, workflow-stage shortcuts, workspace tiles, and a lower-priority tools/setup panel.
+- Reason for change: Reduce contractor dashboard clutter and make the next action, schedule, core ServSync workflow, and major workspaces easier for solo/small contractors to scan without changing backend data, lifecycle rules, or Calendar badge behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-smoke.spec.ts tests/e2e/mobile-smoke.spec.ts`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Manual preview smoke should confirm contractor dashboard tile routing, mobile layout, and schedule display with realistic sandbox data.
+  - The Calendar badge viewed/unviewed state remains browser-local as implemented in the prior badge fix; any durable team-wide viewed state would need a separate approved enhancement.
+
 - Branch: `codex/contractor-calendar-badge-viewed-v1`
 - Files changed:
   - `src/App.tsx`
