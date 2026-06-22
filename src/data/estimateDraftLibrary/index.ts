@@ -1,4 +1,7 @@
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
+import { ceilingFanInstallationBundle } from './electrical/install/ceiling-fan-installation';
+import { outletOrSwitchReplacementBundle } from './electrical/replace/outlet-or-switch-replacement';
+import { electricalDiagnosticServiceCallBundle } from './electrical/service/electrical-diagnostic-service-call';
 import { accessibleFixtureOrSupplyLeakRepairBundle } from './plumbing/repair/accessible-fixture-or-supply-leak-repair';
 import { faucetReplacementBundle } from './plumbing/replace/faucet-replacement';
 import { garbageDisposalReplacementBundle } from './plumbing/replace/garbage-disposal-replacement';
@@ -30,6 +33,9 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   toiletReplacementBundle,
   faucetReplacementBundle,
   garbageDisposalReplacementBundle,
+  electricalDiagnosticServiceCallBundle,
+  outletOrSwitchReplacementBundle,
+  ceilingFanInstallationBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {

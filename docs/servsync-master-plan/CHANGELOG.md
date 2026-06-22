@@ -15,8 +15,11 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/plumbing/replace/toilet-replacement.ts`
   - `src/data/estimateDraftLibrary/plumbing/replace/faucet-replacement.ts`
   - `src/data/estimateDraftLibrary/plumbing/replace/garbage-disposal-replacement.ts`
+  - `src/data/estimateDraftLibrary/electrical/service/electrical-diagnostic-service-call.ts`
+  - `src/data/estimateDraftLibrary/electrical/replace/outlet-or-switch-replacement.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/ceiling-fan-installation.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator plumbing recipe set to the Estimate Draft Library and registered the bundles for app use. The new curated bundles cover tank-style water heater replacement, drain cleaning service, accessible fixture or supply leak repair, toilet replacement, faucet replacement, and garbage disposal replacement.
+- Summary of change: Added the approved Curator plumbing and electrical recipe sets to the Estimate Draft Library and registered the bundles for app use. The new curated electrical bundles cover electrical diagnostic service call, outlet or switch replacement, and ceiling fan installation.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`
@@ -30,8 +33,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Changed-file secret-value scan.
   - Static protected-scope scan confirming no SQL/schema/RLS/RPC/storage/auth/Supabase/Vercel/env/settings/production-data/user-record files changed.
 - Known risks or follow-ups:
-  - Authenticated preview smoke should verify the plumbing recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
-  - The requested branch name says HVAC, but the approved attachment contained plumbing recipes; the implemented app paths are plumbing-specific.
+  - Authenticated preview smoke should verify the plumbing and electrical recipe aliases select the curated bundles and unrelated scopes still fall back to the old rule-based builder.
+  - The requested branch name says HVAC, but the approved attachments contained plumbing and electrical recipes; the implemented app paths are trade-specific to those attachments.
 
 ## 2026-06-21
 
