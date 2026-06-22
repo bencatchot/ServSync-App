@@ -18328,7 +18328,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
   const contractorVisitViewedKey = (event: Pick<ContractorVisitEvent, 'id'>) => `visit:${event.id}`;
   const activeVisitEvents = contractorVisitEvents.filter(event => event.status === 'scheduled');
-  const activeVisitEventCount = activeVisitEvents.length;
   const unviewedActiveVisitEventCount = activeVisitEvents.filter(
     event => !viewedContractorVisitKeys.has(contractorVisitViewedKey(event)),
   ).length;
@@ -19055,49 +19054,203 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   ];
   const completedContractorOnboardingCount = contractorOnboardingItems.filter(item => item.complete).length;
   const showContractorOnboardingChecklist = completedContractorOnboardingCount < contractorOnboardingItems.length;
-  type ContractorCommandItem = {
+  type ContractorScheduleSnapshotItem = {
     id: string;
-    icon: ReactNode;
+    dayKey: string;
+    timeLabel: string;
+    sortTime: number;
     title: string;
-    helper: string;
-    meta?: string;
-    actionLabel: string;
-    tone?: 'blue' | 'amber' | 'emerald' | 'slate' | 'rose';
-    onAction: () => void;
+    meta: string;
+    statusLabel: string;
+    tone: 'amber' | 'emerald' | 'sky' | 'violet';
+    onOpen: () => void;
   };
-  const calendarDateIsToday = (value?: string | null) => {
-    if (!value) return false;
+  const scheduleSnapshotStart = new Date();
+  scheduleSnapshotStart.setHours(0, 0, 0, 0);
+  const scheduleSnapshotEnd = new Date(scheduleSnapshotStart);
+  scheduleSnapshotEnd.setDate(scheduleSnapshotEnd.getDate() + 7);
+  const scheduleDayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const scheduleDateFromValue = (value?: string | null) => {
+    if (!value) return null;
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return false;
-    const today = new Date();
-    return date.getFullYear() === today.getFullYear()
-      && date.getMonth() === today.getMonth()
-      && date.getDate() === today.getDate();
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
   };
-  const upcomingVisitItems = activeVisitEvents
-    .slice()
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
-    .slice(0, 3);
-  const upcomingCalendarItems = contractorCalendarEvents
-    .filter(event => new Date(event.starts_at).getTime() >= Date.now())
-    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
-    .slice(0, 2);
-  const todayAppointmentRequests = homeownerAppointmentRequests.filter(request => calendarDateIsToday(request.appointment?.proposed_at));
-  const todayVisitItems = upcomingVisitItems.filter(event => calendarDateIsToday(event.scheduled_at));
-  const todayConfirmedAppointments = confirmedAppointments.filter(request => calendarDateIsToday(request.appointment?.proposed_at));
-  const todayCalendarItems = upcomingCalendarItems.filter(event => calendarDateIsToday(event.starts_at));
-  const todayScheduleCount = todayAppointmentRequests.length + todayVisitItems.length + todayConfirmedAppointments.length + todayCalendarItems.length;
-  const futureAppointmentRequests = homeownerAppointmentRequests.filter(request => !calendarDateIsToday(request.appointment?.proposed_at));
-  const futureVisitItems = upcomingVisitItems.filter(event => !calendarDateIsToday(event.scheduled_at));
-  const futureConfirmedAppointments = confirmedAppointments.filter(request => !calendarDateIsToday(request.appointment?.proposed_at));
-  const futureCalendarItems = upcomingCalendarItems.filter(event => !calendarDateIsToday(event.starts_at));
-  const upcomingScheduleCount = futureAppointmentRequests.length + futureVisitItems.length + futureConfirmedAppointments.length + futureCalendarItems.length;
+  const scheduleTimeLabel = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const scheduleItemInSnapshot = (date: Date) => date.getTime() >= scheduleSnapshotStart.getTime() && date.getTime() < scheduleSnapshotEnd.getTime();
+  const scheduleSnapshotDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(scheduleSnapshotStart);
+    date.setDate(scheduleSnapshotStart.getDate() + index);
+    return {
+      date,
+      key: scheduleDayKey(date),
+      label: index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'long' }),
+      dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    };
+  });
+  const scheduleItemToneClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
+    amber: 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100',
+    emerald: 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100',
+    sky: 'border-sky-200 bg-sky-50 hover:border-sky-300 hover:bg-sky-100',
+    violet: 'border-violet-200 bg-violet-50 hover:border-violet-300 hover:bg-violet-100',
+  }[tone]);
+  const scheduleItemStatusClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
+    amber: 'text-amber-800',
+    emerald: 'text-emerald-800',
+    sky: 'text-sky-800',
+    violet: 'text-violet-800',
+  }[tone]);
+  const linkedStandaloneOccurrenceKeys = new Set(calendarEventJobLinks.map(link => {
+    const date = new Date(link.occurrence_starts_at);
+    return `${link.calendar_event_id}:${Number.isNaN(date.getTime()) ? link.occurrence_starts_at : date.toISOString()}`;
+  }));
+  const excludedStandaloneOccurrenceKeys = new Set(calendarEventOccurrenceExclusions.map(exclusion => {
+    const date = new Date(exclusion.occurrence_starts_at);
+    return `${exclusion.calendar_event_id}:${Number.isNaN(date.getTime()) ? exclusion.occurrence_starts_at : date.toISOString()}`;
+  }));
+  const scheduleSnapshotItems: ContractorScheduleSnapshotItem[] = [
+    ...homeownerAppointmentRequests.flatMap(request => {
+      const date = scheduleDateFromValue(request.appointment?.proposed_at);
+      if (!date || !scheduleItemInSnapshot(date)) return [];
+      return [{
+        id: `appointment-request-${request.id}`,
+        dayKey: scheduleDayKey(date),
+        timeLabel: scheduleTimeLabel(date),
+        sortTime: date.getTime(),
+        title: request.title || 'Appointment request',
+        meta: request.homeowner_name || 'Homeowner',
+        statusLabel: 'Needs response',
+        tone: 'amber' as const,
+        onOpen: () => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' }),
+      }];
+    }),
+    ...confirmedAppointments.flatMap(request => {
+      const date = scheduleDateFromValue(request.appointment?.proposed_at);
+      if (!date || !scheduleItemInSnapshot(date)) return [];
+      return [{
+        id: `confirmed-appointment-${request.id}`,
+        dayKey: scheduleDayKey(date),
+        timeLabel: scheduleTimeLabel(date),
+        sortTime: date.getTime(),
+        title: request.title || 'Confirmed appointment',
+        meta: request.homeowner_name || 'Homeowner',
+        statusLabel: 'Confirmed',
+        tone: 'emerald' as const,
+        onOpen: () => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' }),
+      }];
+    }),
+    ...activeVisitEvents.flatMap(event => {
+      const date = scheduleDateFromValue(event.scheduled_at);
+      if (!date || !scheduleItemInSnapshot(date)) return [];
+      const request = event.service_request_id ? serviceRequests.find(item => item.id === event.service_request_id) ?? null : null;
+      return [{
+        id: `scheduled-visit-${event.id}`,
+        dayKey: scheduleDayKey(date),
+        timeLabel: scheduleTimeLabel(date),
+        sortTime: date.getTime(),
+        title: event.inspection?.name || request?.title || 'Scheduled visit',
+        meta: request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer'),
+        statusLabel: viewedContractorVisitKeys.has(contractorVisitViewedKey(event)) ? 'Viewed' : 'Scheduled',
+        tone: 'sky' as const,
+        onOpen: () => openVisitCalendarEventDetail(event),
+      }];
+    }),
+    ...contractorCalendarEvents.flatMap(event =>
+      recurringCalendarEventOccurrences(event, scheduleSnapshotStart, scheduleSnapshotEnd)
+        .flatMap(occurrence => {
+          const date = scheduleDateFromValue(occurrence.startsAt);
+          if (!date || !scheduleItemInSnapshot(date)) return [];
+          const occurrenceKey = `${event.id}:${date.toISOString()}`;
+          if (linkedStandaloneOccurrenceKeys.has(occurrenceKey) || excludedStandaloneOccurrenceKeys.has(occurrenceKey)) return [];
+          return [{
+            id: `standalone-event-${event.id}-${date.toISOString()}`,
+            dayKey: scheduleDayKey(date),
+            timeLabel: scheduleTimeLabel(date),
+            sortTime: date.getTime(),
+            title: event.title || 'Calendar event',
+            meta: calendarEventTypeLabel(event.event_type),
+            statusLabel: 'Calendar event',
+            tone: 'violet' as const,
+            onOpen: () => openCalendarEventDetail(event, occurrence.startsAt),
+          }];
+        })
+    ),
+  ].sort((a, b) => a.sortTime - b.sortTime);
+  const scheduleItemsByDay = scheduleSnapshotDays.reduce<Record<string, ContractorScheduleSnapshotItem[]>>((acc, day) => {
+    acc[day.key] = scheduleSnapshotItems.filter(item => item.dayKey === day.key);
+    return acc;
+  }, {});
+  const scheduleSnapshotCount = scheduleSnapshotItems.length;
   const actionReviewCount = connectionRequests.length
     + homeownerAppointmentRequests.length
     + contractorFollowUpCount
     + acceptedEstimatesNeedingJobs.length
     + invoiceAttentionRecords.length
     + (contractorProfileOnboardingComplete ? 0 : 1);
+  const workflowReviewItems: Array<{
+    label: string;
+    count: number;
+    onClick: () => void;
+  }> = [
+    {
+      label: 'Connections',
+      count: connectionRequests.length,
+      onClick: () => setContractorTab('connections'),
+    },
+    {
+      label: 'Calendar requests',
+      count: homeownerAppointmentRequests.length,
+      onClick: () => setContractorTab('calendar'),
+    },
+    {
+      label: 'Requests',
+      count: contractorFollowUpCount,
+      onClick: () => setContractorTab('requests'),
+    },
+    {
+      label: 'Estimates / invoices',
+      count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length,
+      onClick: () => {
+        setContractorTab('inspections');
+        setContractorJobsView('open_financial');
+        setInspectionView('list');
+      },
+    },
+    {
+      label: 'Profile setup',
+      count: contractorProfileOnboardingComplete ? 0 : 1,
+      onClick: () => setContractorTab('profile'),
+    },
+  ].filter(item => item.count > 0);
+  const toolShortcutItems: Array<{
+    id: string;
+    icon: ReactNode;
+    title: string;
+    helper: string;
+    meta?: string;
+    onAction: () => void;
+  }> = [
+    {
+      id: 'tool-templates',
+      icon: <Sparkles size={16} />,
+      title: 'Templates / Saved Charges',
+      helper: 'Reusable estimate structures, starter templates, and saved charges.',
+      meta: `${estimateTemplates.length + activeSavedEstimateCharges.length} saved`,
+      onAction: () => {
+        setContractorTab('inspections');
+        setContractorJobsView('templates');
+        setInspectionView('list');
+      },
+    },
+    {
+      id: 'tool-profile',
+      icon: <Compass size={16} />,
+      title: 'Profile / Discover',
+      helper: 'Public profile, service area, and marketplace visibility setup.',
+      meta: contractorDraft.public_profile_enabled ? 'Visible' : 'Hidden',
+      onAction: () => setContractorTab('profile'),
+    },
+  ];
   const workflowStages: Array<{
     label: string;
     value: string;
@@ -19155,96 +19308,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setContractorJobsView('closed_jobs');
         setInspectionView('list');
       },
-    },
-  ];
-  const workspaceTiles: ContractorCommandItem[] = [
-    {
-      id: 'workspace-requests',
-      icon: <MessageSquare size={16} />,
-      title: 'Requests',
-      helper: 'Review homeowner service requests and reply with next steps.',
-      meta: `${openServiceRequestCount} open`,
-      actionLabel: 'Open',
-      onAction: () => setContractorTab('requests'),
-    },
-    {
-      id: 'workspace-estimates',
-      icon: <FileText size={16} />,
-      title: 'Estimates',
-      helper: 'Draft, send, and manage homeowner pricing.',
-      meta: `${openFinancialRecords.length} active`,
-      actionLabel: 'Open',
-      onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('open_financial');
-        setInspectionView('list');
-      },
-    },
-    {
-      id: 'workspace-jobs',
-      icon: <ClipboardCheck size={16} />,
-      title: 'Jobs',
-      helper: 'Create, schedule, complete, and finalize work.',
-      meta: `${openJobs.length} open`,
-      actionLabel: 'Open',
-      onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('open_jobs');
-        setInspectionView('list');
-      },
-    },
-    {
-      id: 'workspace-calendar',
-      icon: <Calendar size={16} />,
-      title: 'Calendar',
-      helper: 'View visits, appointment requests, and standalone events.',
-      meta: contractorCalendarBadgeCount > 0 ? `${contractorCalendarBadgeCount} need review` : `${activeVisitEventCount + confirmedAppointments.length} upcoming`,
-      actionLabel: 'Open',
-      onAction: () => setContractorTab('calendar'),
-    },
-    {
-      id: 'workspace-invoices',
-      icon: <Receipt size={16} />,
-      title: 'Invoices',
-      helper: 'Draft, send, and track billing records.',
-      meta: `${openInvoiceRecords.length} open`,
-      actionLabel: 'Open',
-      onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('open_financial');
-        setInspectionView('list');
-      },
-    },
-    {
-      id: 'workspace-customers',
-      icon: <Users size={16} />,
-      title: 'Customers',
-      helper: 'Connected homeowners and local customer records.',
-      meta: `${onboardingCustomerCount} total`,
-      actionLabel: 'Open',
-      onAction: () => setContractorTab('connections'),
-    },
-    {
-      id: 'workspace-templates',
-      icon: <Sparkles size={16} />,
-      title: 'Templates / Saved Charges',
-      helper: 'Reusable estimate structures, starter templates, and saved charges.',
-      meta: `${estimateTemplates.length + activeSavedEstimateCharges.length} saved`,
-      actionLabel: 'Open',
-      onAction: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('templates');
-        setInspectionView('list');
-      },
-    },
-    {
-      id: 'workspace-profile',
-      icon: <Compass size={16} />,
-      title: 'Profile / Discover',
-      helper: 'Manage your public profile, service area, and marketplace visibility.',
-      meta: contractorDraft.public_profile_enabled ? 'Visible' : 'Hidden',
-      actionLabel: 'Open',
-      onAction: () => setContractorTab('profile'),
     },
   ];
   const contractorFeedbackPageLabel = {
@@ -21003,252 +21066,69 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {contractorTab === 'overview' && (
         <div className="space-y-4">
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="grid gap-0 xl:grid-cols-[1.45fr_0.55fr]">
-              <div className="p-4 sm:p-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Contractor command center</p>
-                <h2 className="mt-1.5 text-xl font-bold text-slate-950 sm:text-2xl">
-                  {contractorDraft.business_name || 'Set up your ServSync workspace'}
-                </h2>
-                <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-600">
-                  See today’s schedule, understand where work stands, and jump into the workspace you need.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={buttonClass('primary')}
-                    onClick={() => setContractorTab('calendar')}
-                  >
-                    <Calendar size={16} />
-                    View calendar
-                  </button>
-                  <button type="button" className={buttonClass('secondary')} onClick={() => setContractorTab('requests')}>
-                    <MessageSquare size={16} />
-                    Review requests
-                  </button>
-                  <button
-                    type="button"
-                    className={buttonClass('secondary')}
-                    onClick={() => {
-                      setContractorTab('inspections');
-                      setContractorJobsView('overview');
-                      setInspectionView('list');
-                    }}
-                  >
-                    <ClipboardCheck size={16} />
-                    Open workflow
-                  </button>
-                </div>
-              </div>
-              <div className="border-t border-slate-200 bg-slate-50 p-4 xl:border-l xl:border-t-0">
-                <p className="text-sm font-semibold text-slate-950">Workspace status</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-                  <MetricButton label="Profile" value={`${contractorProfileScore}% complete`} onClick={() => setContractorTab('profile')} />
-                  <MetricButton label="Calendar badge" value={contractorCalendarBadgeCount > 0 ? String(contractorCalendarBadgeCount) : 'Clear'} onClick={() => setContractorTab('calendar')} />
-                  <MetricButton label="Needs review" value={actionReviewCount > 0 ? String(actionReviewCount) : 'Clear'} onClick={() => setContractorTab(actionReviewCount > 0 ? 'requests' : 'connections')} />
-                  <MetricButton label="Public listing" value={contractorDraft.public_profile_enabled ? 'Visible' : 'Hidden'} onClick={() => setContractorTab('profile')} />
-                </div>
-              </div>
+            <div className="p-4 sm:p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-700">Contractor command center</p>
+              <h2 className="mt-1.5 text-xl font-bold text-slate-950 sm:text-2xl">
+                {contractorDraft.business_name || 'Set up your ServSync workspace'}
+              </h2>
+              <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-600">
+                Scan the week, see where work stands, and use setup tools when you need them.
+              </p>
             </div>
           </section>
 
-          <Card title="Today’s schedule" icon={<Calendar size={18} />}>
+          <Card title="Schedule snapshot" icon={<Calendar size={18} />}>
             <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-950">Today</p>
+                  <p className="text-sm font-bold text-slate-950">Today through the next 6 days</p>
                   <p className="mt-1 text-sm leading-5 text-slate-500">
-                    Appointment requests, confirmed appointments, scheduled visits, and calendar events for today.
+                    Appointment requests, confirmed appointments, scheduled visits, and standalone calendar events grouped by day.
                   </p>
                 </div>
                 <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                  {todayScheduleCount} today
+                  {scheduleSnapshotCount} this week
                 </span>
               </div>
 
-              <div className="space-y-3">
-                {todayAppointmentRequests.map(request => (
-                  <button
-                    key={`today-appointment-request-${request.id}`}
-                    type="button"
-                    onClick={() => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
-                    className="w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left transition hover:border-amber-300 hover:bg-amber-100"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">{request.title}</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          {request.homeowner_name || 'Homeowner'} proposed {formatDateTime(request.appointment?.proposed_at)}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-amber-800">Needs response</span>
-                    </div>
-                  </button>
-                ))}
-                {todayVisitItems.map(event => {
-                  const request = event.service_request_id ? serviceRequests.find(item => item.id === event.service_request_id) ?? null : null;
+              <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+                {scheduleSnapshotDays.map(day => {
+                  const items = scheduleItemsByDay[day.key] ?? [];
                   return (
-                    <button
-                      key={`today-visit-${event.id}`}
-                      type="button"
-                      onClick={() => openVisitCalendarEventDetail(event)}
-                      className="w-full rounded-xl border border-sky-200 bg-sky-50 p-3 text-left transition hover:border-sky-300 hover:bg-sky-100"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-950">{event.inspection?.name || request?.title || 'Scheduled visit'}</p>
-                          <p className="mt-1 text-xs text-slate-600">
-                            {request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer')} · {formatDateTime(event.scheduled_at)}
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-sky-800">
-                          {viewedContractorVisitKeys.has(contractorVisitViewedKey(event)) ? 'Viewed' : 'Scheduled'}
-                        </span>
+                    <div key={day.key} className="grid gap-3 p-3 md:grid-cols-[150px_1fr]">
+                      <div>
+                        <p className="text-sm font-bold text-slate-950">{day.label}</p>
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">{day.dateLabel}</p>
                       </div>
-                    </button>
+                      <div className="space-y-2">
+                        {items.map(item => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={item.onOpen}
+                            className={`w-full rounded-lg border p-2.5 text-left transition ${scheduleItemToneClass(item.tone)}`}
+                          >
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
+                                <p className="mt-0.5 text-xs text-slate-600">{item.meta} · {item.timeLabel}</p>
+                              </div>
+                              <span className={`w-fit shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold ${scheduleItemStatusClass(item.tone)}`}>
+                                {item.statusLabel}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                        {items.length === 0 && (
+                          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                            {day.label === 'Today' ? 'No appointments or scheduled work today.' : 'No scheduled items.'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
-                {todayConfirmedAppointments.map(request => (
-                  <button
-                    key={`today-confirmed-${request.id}`}
-                    type="button"
-                    onClick={() => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
-                    className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
-                  >
-                    <p className="text-sm font-semibold text-slate-950">{request.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">{request.homeowner_name || 'Homeowner'} · {formatDateTime(request.appointment?.proposed_at)}</p>
-                    <p className="mt-1 text-xs font-bold text-emerald-800">Confirmed appointment</p>
-                  </button>
-                ))}
-                {todayCalendarItems.map(event => (
-                  <button
-                    key={`today-standalone-${event.id}`}
-                    type="button"
-                    onClick={() => openCalendarEventDetail(event)}
-                    className="w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left transition hover:border-violet-300 hover:bg-violet-100"
-                  >
-                    <p className="text-sm font-semibold text-slate-950">{event.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">{calendarEventTypeLabel(event.event_type)} · {formatDateTime(event.starts_at)}</p>
-                    <p className="mt-1 text-xs font-bold text-violet-800">Calendar event</p>
-                  </button>
-                ))}
-                {todayScheduleCount === 0 && (
-                  <EmptyState text="No appointments or scheduled work for today. Upcoming items will show below when available." />
-                )}
               </div>
-
-              {upcomingScheduleCount > 0 && (
-                <div className="space-y-3 border-t border-slate-200 pt-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-950">Upcoming</p>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{upcomingScheduleCount} upcoming</span>
-                  </div>
-                  {futureAppointmentRequests.slice(0, 2).map(request => (
-                    <button
-                      key={`upcoming-appointment-request-${request.id}`}
-                      type="button"
-                      onClick={() => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
-                      className="w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-left transition hover:border-amber-300 hover:bg-amber-100"
-                    >
-                      <p className="text-sm font-semibold text-slate-950">{request.title}</p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        {request.homeowner_name || 'Homeowner'} proposed {formatDateTime(request.appointment?.proposed_at)}
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-amber-800">Needs response</p>
-                    </button>
-                  ))}
-                  {futureVisitItems.slice(0, 2).map(event => {
-                    const request = event.service_request_id ? serviceRequests.find(item => item.id === event.service_request_id) ?? null : null;
-                    return (
-                      <button
-                        key={`upcoming-visit-${event.id}`}
-                        type="button"
-                        onClick={() => openVisitCalendarEventDetail(event)}
-                        className="w-full rounded-xl border border-sky-200 bg-sky-50 p-3 text-left transition hover:border-sky-300 hover:bg-sky-100"
-                      >
-                        <p className="text-sm font-semibold text-slate-950">{event.inspection?.name || request?.title || 'Scheduled visit'}</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          {request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer')} · {formatDateTime(event.scheduled_at)}
-                        </p>
-                        <p className="mt-1 text-xs font-bold text-sky-800">
-                          {viewedContractorVisitKeys.has(contractorVisitViewedKey(event)) ? 'Viewed' : 'Scheduled visit'}
-                        </p>
-                      </button>
-                    );
-                  })}
-                  {futureConfirmedAppointments.slice(0, 2).map(request => (
-                    <button
-                      key={`upcoming-confirmed-${request.id}`}
-                      type="button"
-                      onClick={() => openHomeownerWorkspaceForRequest(request, { tab: 'schedule' })}
-                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-100"
-                    >
-                      <p className="text-sm font-semibold text-slate-950">{request.title}</p>
-                      <p className="mt-1 text-xs text-slate-600">{request.homeowner_name || 'Homeowner'} · {formatDateTime(request.appointment?.proposed_at)}</p>
-                      <p className="mt-1 text-xs font-bold text-emerald-800">Confirmed appointment</p>
-                    </button>
-                  ))}
-                  {futureCalendarItems.slice(0, 2).map(event => (
-                    <button
-                      key={`upcoming-standalone-${event.id}`}
-                      type="button"
-                      onClick={() => openCalendarEventDetail(event)}
-                      className="w-full rounded-xl border border-violet-200 bg-violet-50 p-3 text-left transition hover:border-violet-300 hover:bg-violet-100"
-                    >
-                      <p className="text-sm font-semibold text-slate-950">{event.title}</p>
-                      <p className="mt-1 text-xs text-slate-600">{calendarEventTypeLabel(event.event_type)} · {formatDateTime(event.starts_at)}</p>
-                      <p className="mt-1 text-xs font-bold text-violet-800">Calendar event</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {actionReviewCount > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-slate-950">Needs review</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Items with existing action-required statuses are still available in their workspaces.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {connectionRequests.length > 0 && (
-                        <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('connections')}>
-                          Connections ({connectionRequests.length})
-                        </button>
-                      )}
-                      {homeownerAppointmentRequests.length > 0 && (
-                        <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('calendar')}>
-                          Calendar ({homeownerAppointmentRequests.length})
-                        </button>
-                      )}
-                      {contractorFollowUpCount > 0 && (
-                        <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('requests')}>
-                          Requests ({contractorFollowUpCount})
-                        </button>
-                      )}
-                      {(acceptedEstimatesNeedingJobs.length > 0 || invoiceAttentionRecords.length > 0) && (
-                        <button
-                          type="button"
-                          className={`${buttonClass('secondary')} bg-white`}
-                          onClick={() => {
-                            setContractorTab('inspections');
-                            setContractorJobsView('open_financial');
-                            setInspectionView('list');
-                          }}
-                        >
-                          Estimates / Invoices ({acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length})
-                        </button>
-                      )}
-                      {!contractorProfileOnboardingComplete && (
-                        <button type="button" className={`${buttonClass('secondary')} bg-white`} onClick={() => setContractorTab('profile')}>
-                          Profile
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="pt-1">
                 <button
@@ -21264,51 +21144,51 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           </Card>
 
           <Card title="Workflow overview" icon={<LayoutDashboard size={18} />}>
-            <div className="grid gap-3 md:grid-cols-5">
-              {workflowStages.map((stage, index) => (
-                <button
-                  key={stage.label}
-                  type="button"
-                  onClick={stage.onClick}
-                  className="relative rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
-                      {stage.icon}
+            <div className="space-y-4">
+              {actionReviewCount > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">Needs review</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Items already marked by existing workflow statuses.
+                      </p>
                     </div>
-                    {index < workflowStages.length - 1 && <ArrowRight size={14} className="hidden text-slate-400 md:block" />}
+                    <div className="flex flex-wrap gap-2">
+                      {workflowReviewItems.map(item => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
+                          onClick={item.onClick}
+                        >
+                          {item.label} ({item.count})
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="mt-3 text-2xl font-bold text-slate-950">{stage.value}</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-800">{stage.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">{stage.helper}</p>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          <Card title="Workspaces" icon={<Compass size={18} />}>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {workspaceTiles.map(tile => (
-                <button
-                  key={tile.id}
-                  type="button"
-                  onClick={tile.onAction}
-                  className="rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                      {tile.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-slate-950">{tile.title}</p>
-                        {tile.meta && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">{tile.meta}</span>}
+                </div>
+              )}
+              <div className="grid gap-3 md:grid-cols-5">
+                {workflowStages.map((stage, index) => (
+                  <button
+                    key={stage.label}
+                    type="button"
+                    onClick={stage.onClick}
+                    className="relative rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                        {stage.icon}
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                      {index < workflowStages.length - 1 && <ArrowRight size={14} className="hidden text-slate-400 md:block" />}
                     </div>
-                  </div>
-                </button>
-              ))}
+                    <p className="mt-3 text-2xl font-bold text-slate-950">{stage.value}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-slate-800">{stage.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{stage.helper}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </Card>
 
@@ -21366,6 +21246,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </div>
                 </section>
               )}
+
+              <section className="grid gap-3 md:grid-cols-2">
+                {toolShortcutItems.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onAction}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                        {item.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-950">{item.title}</p>
+                          {item.meta && <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{item.meta}</span>}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.helper}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </section>
 
               <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
                 <ContractorBillingCard contractor={contractor} />
