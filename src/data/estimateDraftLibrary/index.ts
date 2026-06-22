@@ -32,9 +32,29 @@ import { thermostatReplacementOrSmartThermostatInstallBundle } from './hvac/repl
 import { condensateDrainCleaningOrRepairBundle } from './hvac/service/condensate-drain-cleaning-or-repair';
 import { hvacDiagnosticServiceCallBundle } from './hvac/service/hvac-diagnostic-service-call';
 import { seasonalHvacMaintenanceVisitBundle } from './hvac/service/seasonal-hvac-maintenance-visit';
+import { electricalSafetyInspectionBundle } from './electrical/inspect/electrical-safety-inspection';
+import { afciBreakerOrProtectionUpgradeBundle } from './electrical/install/afci-breaker-or-protection-upgrade';
+import { applianceDisconnectOrWhipInstallationBundle } from './electrical/install/appliance-disconnect-or-whip-installation';
 import { ceilingFanInstallationBundle } from './electrical/install/ceiling-fan-installation';
+import { dimmerOrSmartSwitchInstallationBundle } from './electrical/install/dimmer-or-smart-switch-installation';
+import { doorbellOrVideoDoorbellInstallationBundle } from './electrical/install/doorbell-or-video-doorbell-installation';
+import { generatorInletOrTransferSwitchInstallationBundle } from './electrical/install/generator-inlet-or-transfer-switch-installation';
+import { gfciOutletInstallationOrReplacementBundle } from './electrical/install/gfci-outlet-installation-or-replacement';
+import { minorRoomWiringAdditionBundle } from './electrical/install/minor-room-wiring-addition';
+import { outdoorReceptacleInstallationBundle } from './electrical/install/outdoor-receptacle-installation';
+import { outdoorSecurityOrFloodLightInstallationBundle } from './electrical/install/outdoor-security-or-flood-light-installation';
+import { recessedLightingInstallationBundle } from './electrical/install/recessed-lighting-installation';
+import { smokeAndCoDetectorInstallationBundle } from './electrical/install/smoke-and-co-detector-installation';
+import { subpanelInstallationBundle } from './electrical/install/subpanel-installation';
+import { wholeHomeSurgeProtectorInstallationBundle } from './electrical/install/whole-home-surge-protector-installation';
+import { atticOrCrawlspaceWiringRepairBundle } from './electrical/repair/attic-or-crawlspace-wiring-repair';
+import { breakerReplacementOrPanelRepairBundle } from './electrical/repair/breaker-replacement-or-panel-repair';
+import { poolOrSpaElectricalCorrectionBundle } from './electrical/repair/pool-or-spa-electrical-correction';
+import { bathroomExhaustFanReplacementBundle } from './electrical/replace/bathroom-exhaust-fan-replacement';
 import { outletOrSwitchReplacementBundle } from './electrical/replace/outlet-or-switch-replacement';
+import { panelUpgradeOrReplacementBundle } from './electrical/replace/panel-upgrade-or-replacement';
 import { electricalDiagnosticServiceCallBundle } from './electrical/service/electrical-diagnostic-service-call';
+import { panelLabelingAndCircuitMappingBundle } from './electrical/service/panel-labeling-and-circuit-mapping';
 import { accessibleFixtureOrSupplyLeakRepairBundle } from './plumbing/repair/accessible-fixture-or-supply-leak-repair';
 import { faucetReplacementBundle } from './plumbing/replace/faucet-replacement';
 import { garbageDisposalReplacementBundle } from './plumbing/replace/garbage-disposal-replacement';
@@ -91,6 +111,26 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   electricalDiagnosticServiceCallBundle,
   outletOrSwitchReplacementBundle,
   ceilingFanInstallationBundle,
+  gfciOutletInstallationOrReplacementBundle,
+  breakerReplacementOrPanelRepairBundle,
+  afciBreakerOrProtectionUpgradeBundle,
+  electricalSafetyInspectionBundle,
+  smokeAndCoDetectorInstallationBundle,
+  recessedLightingInstallationBundle,
+  dimmerOrSmartSwitchInstallationBundle,
+  outdoorReceptacleInstallationBundle,
+  outdoorSecurityOrFloodLightInstallationBundle,
+  wholeHomeSurgeProtectorInstallationBundle,
+  panelUpgradeOrReplacementBundle,
+  subpanelInstallationBundle,
+  generatorInletOrTransferSwitchInstallationBundle,
+  bathroomExhaustFanReplacementBundle,
+  doorbellOrVideoDoorbellInstallationBundle,
+  panelLabelingAndCircuitMappingBundle,
+  applianceDisconnectOrWhipInstallationBundle,
+  atticOrCrawlspaceWiringRepairBundle,
+  minorRoomWiringAdditionBundle,
+  poolOrSpaElectricalCorrectionBundle,
   deckRepairBundle,
   interiorDoorReplacementBundle,
   exteriorDoorReplacementBundle,

@@ -18,6 +18,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/electrical/service/electrical-diagnostic-service-call.ts`
   - `src/data/estimateDraftLibrary/electrical/replace/outlet-or-switch-replacement.ts`
   - `src/data/estimateDraftLibrary/electrical/install/ceiling-fan-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/gfci-outlet-installation-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/electrical/repair/breaker-replacement-or-panel-repair.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/afci-breaker-or-protection-upgrade.ts`
+  - `src/data/estimateDraftLibrary/electrical/inspect/electrical-safety-inspection.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/smoke-and-co-detector-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/recessed-lighting-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/dimmer-or-smart-switch-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/outdoor-receptacle-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/outdoor-security-or-flood-light-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/whole-home-surge-protector-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/replace/panel-upgrade-or-replacement.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/subpanel-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/generator-inlet-or-transfer-switch-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/replace/bathroom-exhaust-fan-replacement.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/doorbell-or-video-doorbell-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/service/panel-labeling-and-circuit-mapping.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/appliance-disconnect-or-whip-installation.ts`
+  - `src/data/estimateDraftLibrary/electrical/repair/attic-or-crawlspace-wiring-repair.ts`
+  - `src/data/estimateDraftLibrary/electrical/install/minor-room-wiring-addition.ts`
+  - `src/data/estimateDraftLibrary/electrical/repair/pool-or-spa-electrical-correction.ts`
   - `src/data/estimateDraftLibrary/carpentry/repair/deck-repair.ts`
   - `src/data/estimateDraftLibrary/carpentry/replace/interior-door-replacement.ts`
   - `src/data/estimateDraftLibrary/carpentry/replace/exterior-door-replacement.ts`
@@ -53,7 +73,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/data/estimateDraftLibrary/hvac/install/whole-home-dehumidifier-install.ts`
   - `src/data/estimateDraftLibrary/hvac/install/zoning-system-install.ts`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles spanning diagnostic/service, maintenance, replacement, repair, ductwork, indoor air quality, dehumidifier, and zoning jobs.
+- Summary of change: Added the approved Curator HVAC, plumbing, electrical, and carpentry recipe sets to the Estimate Draft Library and registered the bundles for app use. The corrected HVAC payload adds 22 app-ready bundles, and the expanded electrical payload brings electrical coverage to 23 total bundles across service, install, repair, replace, and inspection work.
 - Reason for change: Expand the curated Estimate Draft Library while preserving the existing strategy that matching curated recipes are preferred and the older hardcoded Build Estimate Draft rules remain fallback when no curated recipe matches.
 - Tests/checks run:
   - `git status --short --branch`
