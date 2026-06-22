@@ -9,9 +9,17 @@ test.describe('contractor read-only smoke', () => {
 
     await loginAs(page, 'contractor');
     await expect(main.getByText(/Contractor command center/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Report bug/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /Schedule snapshot/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /Workflow overview/i })).toBeVisible();
+    await expect(main.getByText(/Tools & setup/i)).toBeVisible();
 
-    await page.getByRole('button', { name: /Report bug/i }).click();
+    const reportBugButton = page.getByRole('button', { name: /Report bug/i });
+    if (!(await reportBugButton.isVisible().catch(() => false))) {
+      await main.getByText(/Tools & setup/i).click();
+    }
+    await expect(reportBugButton).toBeVisible();
+
+    await reportBugButton.click();
     await expectActiveTabHeading(page, /^Support$/i);
     await expect(main.getByRole('heading', { level: 2, name: /^ServSync support$/i })).toBeVisible();
     await expect(main.getByText(/Help us improve ServSync/i)).toBeVisible();

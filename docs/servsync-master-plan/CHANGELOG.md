@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-22
 
+- Branch: `feature/contractor-command-center-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reworked the contractor dashboard overview into a work snapshot with a Monday-Sunday Schedule snapshot first, previous/next week controls, Workflow overview underneath, and Tools & setup lower on the page. Removed the top hero action buttons, Workspace status panel, Workspaces tile grid, separate Upcoming section, and dashboard Calendar badge/large Needs review status cards.
+- Reason for change: Reduce contractor dashboard duplication of the sidebar and help solo/small contractors scan the selected calendar week and workflow state without the app declaring priorities or changing backend data, lifecycle rules, or Calendar badge behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-smoke.spec.ts tests/e2e/mobile-smoke.spec.ts`
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Manual preview smoke should confirm Monday-Sunday week navigation, today highlighting, mobile layout, Tools & setup reachability, and schedule display with realistic sandbox data.
+  - The Calendar badge viewed/unviewed state remains browser-local as implemented in the prior badge fix; any durable team-wide viewed state would need a separate approved enhancement.
+
 - Branch: `codex/contractor-calendar-badge-viewed-v1`
 - Files changed:
   - `src/App.tsx`
