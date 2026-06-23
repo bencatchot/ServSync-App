@@ -10265,18 +10265,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setHomeownerRequestSearch('');
     scrollToHomeownerSection(homeownerRequestListSectionRef);
   };
-  const openHomeownerRequestComposer = () => {
-    setHomeownerRequestPropertyScope('selected');
-    setRequestComposerOpen(true);
-    setRequestingConnectionId(null);
-    resetRequestContractorFilters();
-    setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
-    setServiceRequestDraft(current => ({
-      ...current,
-      home_id: homes.length === 1 ? homes[0].id : selectedHome?.id || selectedHomeId || current.home_id,
-    }));
-    setHomeownerTab('requests');
-  };
   const connectedContractorsForRequest = activeConnections.filter(connection => {
     if (!serviceRequestDraft.category) return true;
     const contractor = contractorProfileById.get(connection.contractor_id);
@@ -11542,14 +11530,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const homeownerContractorHubTiles = [
     {
       title: 'Find a contractor',
-      helper: 'Browse local contractors and view profiles before starting a request.',
+      helper: 'Browse local contractor profiles and request a connection when you find the right fit.',
       meta: 'Discover',
       icon: <Search size={18} />,
       onClick: () => setHomeownerTab('discover'),
     },
     {
-      title: 'Connected contractors',
-      helper: 'Manage contractors you are connected with and review what you share.',
+      title: 'My Contractors',
+      helper: 'View connected contractors and manage what information you share with them.',
       meta: `${activeConnections.length} active`,
       icon: <Users size={18} />,
       onClick: () => scrollToHomeownerSection(homeownerConnectedContractorsSectionRef),
@@ -11563,13 +11551,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         setContractorInviteModalOpen(true);
         scrollToHomeownerSection(homeownerContractorInvitesSectionRef);
       },
-    },
-    {
-      title: 'Start a service request',
-      helper: 'Know what you need? Start a request and choose who to send it to.',
-      meta: `${openServiceRequestCount} open`,
-      icon: <MessageSquare size={18} />,
-      onClick: openHomeownerRequestComposer,
     },
   ];
   const homeownerRequestWorkflowStages = ['Request', 'Contractor Review', 'Estimate', 'Approval', 'Job', 'Invoice', 'Home History'];
@@ -12731,44 +12712,48 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div className="space-y-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-950">Find, connect, invite, or request service from one place.</p>
+                  <p className="text-sm font-bold text-slate-950">Find contractors, manage the contractors you are connected with, and invite contractors you already know to join ServSync.</p>
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                    Browse contractors when you are still looking, manage permission-based connections when you are working with someone, and start a service request only when you are ready to send details.
+                    Use this page for contractor relationships and discovery. Service requests stay in the Service Requests tab or inside an existing contractor relationship.
                   </p>
                 </div>
                 <span className="inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                   Connections control what gets shared
                 </span>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <ol className="grid gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs leading-5 text-blue-900 md:grid-cols-4">
+                {['Find contractors', 'Request a connection', 'Choose what to share', 'Work with your contractors'].map((step, index) => (
+                  <li key={step} className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-500">{index + 1}</span>
+                    <span className="font-semibold">{step}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="grid gap-3 lg:grid-cols-3">
                 {homeownerContractorHubTiles.map(tile => (
                   <button
                     key={tile.title}
                     type="button"
                     onClick={tile.onClick}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm ring-1 ring-transparent transition hover:border-blue-300 hover:bg-blue-50/60 hover:shadow-md"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
-                        {tile.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-950">{tile.title}</p>
-                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{tile.meta}</span>
+                    <div className="flex h-full flex-col gap-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                          {tile.icon}
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 group-hover:bg-white">{tile.meta}</span>
                       </div>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-bold text-slate-950">{tile.title}</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">{tile.helper}</p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-sm font-bold text-blue-700">
+                        Open
+                        <ArrowRight size={14} className="transition group-hover:translate-x-0.5" />
+                      </span>
+                      </div>
                   </button>
-                ))}
-              </div>
-              <div className="grid gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900 md:grid-cols-4">
-                {['Find contractors', 'Request a connection', 'Choose what to share', 'Send service requests when ready'].map((step, index) => (
-                  <div key={step} className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-blue-700">{index + 1}</span>
-                    <span className="font-semibold">{step}</span>
-                  </div>
                 ))}
               </div>
             </div>
@@ -12908,7 +12893,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
 
         <div ref={homeownerConnectedContractorsSectionRef}>
-        <Card title="My contractors" icon={<Users size={18} />}>
+        <Card title="My Contractors" icon={<Users size={18} />}>
           {(() => {
             const visibleConnections = connections.filter(connection => connection.status !== 'dismissed');
             return (
