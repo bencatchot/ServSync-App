@@ -135,6 +135,7 @@ The homeowner experience should feel lightweight. Most homeowners will likely ha
 - Homeowner can create an account and add basic home/property info.
 - Homeowner can browse Discover and contractor profiles.
 - Homeowner can request a connection with a contractor and include a message, selected property context, and permission choices. Photos/media should come later after storage and RLS handling are designed safely.
+- The homeowner Contractors area should act as the relationship/discovery hub: find contractors, manage permission-based connections, invite known contractors, and then start service requests when ready. The Service Requests area should stay focused on work intake and request tracking.
 - Homeowner can grant permission to share implemented categories: contact info, home overview, address, preferred vendors, photos.
 - Homeowner can submit service requests, review estimates, approve/decline, view invoices, file eligible invoices to Home History, create manual reminders, and access home service history.
 - Homeowner should be able to communicate with a contractor without starting a service request.

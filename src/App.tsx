@@ -8547,6 +8547,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [contextualConnectionError, setContextualConnectionError] = useState('');
   const [contractorInviteLeads, setContractorInviteLeads] = useState<HomeownerContractorInviteLead[]>([]);
   const [contractorInviteModalOpen, setContractorInviteModalOpen] = useState(false);
+  const homeownerConnectedContractorsSectionRef = useRef<HTMLDivElement | null>(null);
+  const homeownerContractorInvitesSectionRef = useRef<HTMLDivElement | null>(null);
   const [submittingContractorInvite, setSubmittingContractorInvite] = useState(false);
   const [contractorInviteDraft, setContractorInviteDraft] = useState<HomeownerContractorInviteDraft>({
     business_name: '',
@@ -10254,6 +10256,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const toggleRequestContractorAttributeFilter = (filter: RequestContractorAttributeFilter) => {
     setRequestContractorAttributeFilters(current => ({ ...current, [filter]: !current[filter] }));
   };
+  const scrollToHomeownerSection = (sectionRef: { current: HTMLDivElement | null }) => {
+    window.setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+  const openHomeownerRequestComposer = () => {
+    setHomeownerRequestPropertyScope('selected');
+    setRequestComposerOpen(true);
+    setRequestingConnectionId(null);
+    resetRequestContractorFilters();
+    setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
+    setServiceRequestDraft(current => ({
+      ...current,
+      home_id: homes.length === 1 ? homes[0].id : selectedHome?.id || selectedHomeId || current.home_id,
+    }));
+    setHomeownerTab('requests');
+  };
   const connectedContractorsForRequest = activeConnections.filter(connection => {
     if (!serviceRequestDraft.category) return true;
     const contractor = contractorProfileById.get(connection.contractor_id);
@@ -11516,6 +11533,76 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       requests: propertyScopedServiceRequests.filter(requestHasInvoiceActivity),
     },
   ];
+  const homeownerContractorHubTiles = [
+    {
+      title: 'Find a contractor',
+      helper: 'Browse local contractors and view profiles before starting a request.',
+      meta: 'Discover',
+      icon: <Search size={18} />,
+      onClick: () => setHomeownerTab('discover'),
+    },
+    {
+      title: 'Connected contractors',
+      helper: 'Manage contractors you are connected with and review what you share.',
+      meta: `${activeConnections.length} active`,
+      icon: <Users size={18} />,
+      onClick: () => scrollToHomeownerSection(homeownerConnectedContractorsSectionRef),
+    },
+    {
+      title: 'Invite a contractor',
+      helper: 'Recommend a contractor you already know and invite them to ServSync.',
+      meta: `${contractorInviteLeads.length} sent`,
+      icon: <Mail size={18} />,
+      onClick: () => {
+        setContractorInviteModalOpen(true);
+        scrollToHomeownerSection(homeownerContractorInvitesSectionRef);
+      },
+    },
+    {
+      title: 'Start a service request',
+      helper: 'Know what you need? Start a request and choose who to send it to.',
+      meta: `${openServiceRequestCount} open`,
+      icon: <MessageSquare size={18} />,
+      onClick: openHomeownerRequestComposer,
+    },
+  ];
+  const homeownerRequestWorkflowStages = [
+    {
+      label: 'Request',
+      helper: 'Describe what you need and choose the property.',
+      icon: <MessageSquare size={16} />,
+    },
+    {
+      label: 'Contractor Review',
+      helper: 'The contractor reviews details and replies or schedules time.',
+      icon: <Users size={16} />,
+    },
+    {
+      label: 'Estimate',
+      helper: 'If pricing is needed, they send an estimate.',
+      icon: <FileText size={16} />,
+    },
+    {
+      label: 'Approval',
+      helper: 'You approve or decline the estimate.',
+      icon: <CheckCircle2 size={16} />,
+    },
+    {
+      label: 'Job',
+      helper: 'The contractor completes or documents the work.',
+      icon: <ClipboardCheck size={16} />,
+    },
+    {
+      label: 'Invoice',
+      helper: 'You receive the invoice when the work is ready to bill.',
+      icon: <Receipt size={16} />,
+    },
+    {
+      label: 'Home History',
+      helper: 'Completed records can be saved with your home.',
+      icon: <Home size={16} />,
+    },
+  ];
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
     const requestInvoices = requestInvoicesFor(request);
@@ -12670,6 +12757,53 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'contractors' && (
         <div className="space-y-5">
+          <Card title="Contractor hub" icon={<Users size={18} />}>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Find, connect, invite, or request service from one place.</p>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                    Browse contractors when you are still looking, manage permission-based connections when you are working with someone, and start a service request only when you are ready to send details.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                  Connections control what gets shared
+                </span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {homeownerContractorHubTiles.map(tile => (
+                  <button
+                    key={tile.title}
+                    type="button"
+                    onClick={tile.onClick}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                        {tile.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-950">{tile.title}</p>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{tile.meta}</span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900 md:grid-cols-4">
+                {['Find contractors', 'Request a connection', 'Choose what to share', 'Send service requests when ready'].map((step, index) => (
+                  <div key={step} className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-blue-700">{index + 1}</span>
+                    <span className="font-semibold">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
           {requestingConnectionId && selectedRequestConnection && (
             <Card title={`Request service from ${selectedRequestConnection.business_name}`} icon={<MessageSquare size={18} />}>
               <div className="space-y-4">
@@ -12803,6 +12937,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Card>
           )}
 
+        <div ref={homeownerConnectedContractorsSectionRef}>
         <Card title="My contractors" icon={<Users size={18} />}>
           {(() => {
             const visibleConnections = connections.filter(connection => connection.status !== 'dismissed');
@@ -13084,7 +13219,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             );
           })()}
         </Card>
+        </div>
 
+        <div ref={homeownerContractorInvitesSectionRef}>
         <Card title="My contractor invites" icon={<Mail size={18} />}>
           {contractorInviteLeads.length === 0 ? (
             <EmptyState text="No contractor invites yet." />
@@ -13113,6 +13250,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           )}
         </Card>
+        </div>
 
       </div>
       )}
@@ -13163,6 +13301,37 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </button>
                   </div>
                 )}
+                <Card title="How requests move through ServSync" icon={<LayoutDashboard size={18} />}>
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <p className="max-w-3xl text-sm leading-6 text-slate-500">
+                        Start with a clear request. If the contractor accepts the work, estimates, jobs, invoices, and Home History records stay organized here.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setHomeownerTab('contractors')}
+                        className={`${buttonClass('secondary')} w-full justify-center bg-white lg:w-auto`}
+                      >
+                        <Search size={16} />
+                        Need a contractor first?
+                      </button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+                      {homeownerRequestWorkflowStages.map((stage, index) => (
+                        <div key={stage.label} className="relative rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                              {stage.icon}
+                            </div>
+                            {index < homeownerRequestWorkflowStages.length - 1 && <ArrowRight size={14} className="hidden text-slate-400 md:block" />}
+                          </div>
+                          <p className="mt-3 text-sm font-bold text-slate-950">{stage.label}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">{stage.helper}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {homeownerRequestSections.map(section => {
                     const active = section.id === activeHomeownerRequestView;
@@ -13192,15 +13361,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div>
                   <p className="text-sm font-bold text-slate-950">Need help with something new?</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    Describe the issue, let ServSync suggest a contractor type, then send it to a connected contractor or search for one.
+                    Describe the issue, choose the property, then send it to a connected contractor or request a connection with a contractor you find.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setContractorInviteModalOpen(true)}
-                    className="mt-2 text-left text-sm font-semibold text-blue-700 underline-offset-2 hover:underline"
-                  >
-                    Don’t see your contractor? Invite them to join ServSync.
-                  </button>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setHomeownerTab('contractors')}
+                      className="text-left text-sm font-semibold text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      Need a contractor first? Open Contractors.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContractorInviteModalOpen(true)}
+                      className="text-left text-sm font-semibold text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      Don’t see your contractor? Invite them to join ServSync.
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"

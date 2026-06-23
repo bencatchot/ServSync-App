@@ -4,6 +4,26 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-23
+
+- Branch: `feature/homeowner-contractor-request-flow-redesign-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reframed the homeowner Contractors tab as a contractor relationship/discovery hub with top tiles for finding contractors, managing connected contractors, inviting known contractors, and starting a service request. Added a homeowner-facing Service Requests workflow map showing Request -> Contractor Review -> Estimate -> Approval -> Job -> Invoice -> Home History, plus clearer copy and a cross-link back to Contractors when the homeowner needs to find someone first.
+- Reason for change: Make contractor discovery available without forcing the homeowner to start a service request, while keeping finding, connecting, inviting, and requesting service as separate concepts and preserving existing connection permissions, invite flow, service request wizard, and request lists.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Attempted focused homeowner/mobile smoke against local dev server; blocked before UI load because local test account environment variables were not present.
+- Known risks or follow-ups:
+  - Preview smoke should confirm the new Contractors tiles work on desktop/mobile, the Find tile opens Discover, the Invite tile opens the existing invite flow, the Start request tile opens the existing request composer, and existing connection permission controls and request lists still behave normally.
+  - Copy intentionally avoids claims about contractor verification, guaranteed leads, automated matching, payment processing, marketplace scale, or notification automation.
+
 ## 2026-06-22
 
 - Branch: `codex/business-profile-nav-tiles-v1`
