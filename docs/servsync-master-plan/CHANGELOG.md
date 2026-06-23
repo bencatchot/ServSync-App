@@ -37,6 +37,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Screenshot capture requires a running non-production app and demo credentials; authenticated screenshot smoke was not run without those credentials.
   - If stable screenshot selectors are needed later, add them in a separate approved UI-only slice.
 
+- Branch: `feature/marketing-demo-data-screenshots-v1`
+- Files changed:
+  - `tests/marketing-screenshots/helpers/marketingAuth.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Tightened the marketing screenshot login helper so authenticated screenshot capture finds the active auth form by email/password/sign-in controls, clears stale browser session state before login, and reports a clear error when a preview URL points to a missing Vercel deployment.
+- Reason for change: Authenticated marketing screenshot smoke exposed a brittle sign-in-heading assumption and an unclear failure mode when the preview deployment URL was unavailable.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npm run screenshots:marketing -- --project=desktop`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npm run screenshots:marketing`
+  - Production URL block check for marketing screenshots.
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no app UI, SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Full authenticated screenshot capture still requires a reachable non-production deployment and demo credentials.
+
 - Branch: `codex/business-profile-nav-tiles-v1`
 - Files changed:
   - `src/App.tsx`
