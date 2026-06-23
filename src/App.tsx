@@ -12729,7 +12729,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </li>
                 ))}
               </ol>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-2">
                 {homeownerContractorHubTiles.map(tile => (
                   <button
                     key={tile.title}
@@ -12739,11 +12739,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm ring-1 ring-blue-100">
-                          {tile.icon}
-                        </div>
+                        {tile.icon}
+                      </div>
                       <div className="min-w-0 flex-1 leading-tight">
-                        <p className="truncate text-sm font-bold text-slate-950">{tile.title}</p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-blue-700">{tile.helper}</p>
+                        <p className="whitespace-normal break-words text-sm font-bold text-slate-950">{tile.title}</p>
+                        <p className="mt-0.5 whitespace-normal break-words text-xs font-semibold text-blue-700">{tile.helper}</p>
                       </div>
                       <span className="hidden shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-blue-100 md:inline-flex">
                         {tile.meta}
