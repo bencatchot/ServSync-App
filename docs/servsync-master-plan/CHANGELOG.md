@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-23
 
+- Branch: `feature/homeowner-contractors-find-search-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a simple in-tab Find a contractor search section to the homeowner Contractors tab. The top Find a contractor quick-action tile now scrolls to the in-tab search instead of leaving the Contractors tab immediately. Homeowners can search matching public contractor profiles by ZIP/profile location data and listed trade, then view a profile, request a connection, request service from an existing connection, open Discover for richer browsing, or invite a contractor when no matches are found. The trade dropdown combines app-wide service categories with all unique categories listed on public contractor profiles.
+- Reason for change: Make contractor discovery available directly inside the Contractors relationship hub while preserving Discover as the richer feed/profile browsing area and avoiding scoring, endorsement, or automated match claims.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Focused authenticated local smoke for the homeowner Contractors tab search on desktop and mobile.
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+  - Static product-claim scan confirming no top/best/ranked/recommended/verified/guaranteed claims were added to the UI copy.
+- Known risks or follow-ups:
+  - v1 search uses already-loaded public contractor profile fields only, so ZIP matching depends on contractor-listed profile ZIPs and service ZIPs. Richer service-area radius matching, public review aggregates, or scored/rated display should remain separate approved slices.
+  - Copy intentionally uses matching/listed language only and avoids marketplace overclaims.
+
 - Branch: `feature/homeowner-contractors-tab-cleanup-v1`
 - Files changed:
   - `src/App.tsx`
