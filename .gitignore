@@ -12,6 +12,8 @@ dist-ssr
 test-results/
 playwright-report/
 .playwright/
+/marketing-screenshots/
+tests/marketing-screenshots/.auth/
 *.local
 
 .vscode/*
