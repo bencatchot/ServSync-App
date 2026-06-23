@@ -6,6 +6,23 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-23
 
+- Branch: `feature/homeowner-contractors-tab-cleanup-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Cleaned up the homeowner Contractors tab hub so the top action area focuses on Find a contractor, My Contractors, and Invite a contractor. Moved the contractor relationship flow above the tiles, removed the top Start a service request tile, refined the remaining tiles into a compact horizontal quick-action strip, and kept connected-contractor request actions available inside existing contractor relationship cards.
+- Reason for change: Reduce visual clutter and keep the Contractors tab focused on contractor discovery and relationship management while leaving service request creation primarily in the Service Requests tab or inside existing connected-contractor workflows.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Focused authenticated local smoke for desktop/mobile homeowner Contractors tab.
+- Known risks or follow-ups:
+  - Preview smoke should confirm the compact three-tile quick-action strip feels visually distinct without overpowering the connected-contractor list.
+  - Copy intentionally avoids claims about contractor verification, guaranteed leads, automated matching, payment processing, marketplace scale, or notification automation.
+
 - Branch: `feature/homeowner-contractor-request-flow-redesign-v1`
 - Files changed:
   - `src/App.tsx`
