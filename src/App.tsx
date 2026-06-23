@@ -11566,43 +11566,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       onClick: openHomeownerRequestComposer,
     },
   ];
-  const homeownerRequestWorkflowStages = [
-    {
-      label: 'Request',
-      helper: 'Describe what you need and choose the property.',
-      icon: <MessageSquare size={16} />,
-    },
-    {
-      label: 'Contractor Review',
-      helper: 'The contractor reviews details and replies or schedules time.',
-      icon: <Users size={16} />,
-    },
-    {
-      label: 'Estimate',
-      helper: 'If pricing is needed, they send an estimate.',
-      icon: <FileText size={16} />,
-    },
-    {
-      label: 'Approval',
-      helper: 'You approve or decline the estimate.',
-      icon: <CheckCircle2 size={16} />,
-    },
-    {
-      label: 'Job',
-      helper: 'The contractor completes or documents the work.',
-      icon: <ClipboardCheck size={16} />,
-    },
-    {
-      label: 'Invoice',
-      helper: 'You receive the invoice when the work is ready to bill.',
-      icon: <Receipt size={16} />,
-    },
-    {
-      label: 'Home History',
-      helper: 'Completed records can be saved with your home.',
-      icon: <Home size={16} />,
-    },
-  ];
+  const homeownerRequestWorkflowStages = ['Request', 'Contractor Review', 'Estimate', 'Approval', 'Job', 'Invoice', 'Home History'];
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
     const requestInvoices = requestInvoicesFor(request);
@@ -13302,33 +13266,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </div>
                 )}
                 <Card title="How requests move through ServSync" icon={<LayoutDashboard size={18} />}>
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <p className="max-w-3xl text-sm leading-6 text-slate-500">
-                        Start with a clear request. If the contractor accepts the work, estimates, jobs, invoices, and Home History records stay organized here.
-                      </p>
+                  <div className="space-y-3">
+                    <p className="max-w-3xl text-sm leading-6 text-slate-500">
+                      Start with a clear request. If the contractor accepts the work, estimates, jobs, invoices, and Home History records stay organized here.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
+                      {homeownerRequestWorkflowStages.map((stage, index) => (
+                        <div key={stage} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700 shadow-sm">
+                              {index + 1}
+                            </span>
+                            <p className="text-xs font-bold leading-4 text-slate-950">{stage}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-1">
                       <button
                         type="button"
                         onClick={() => setHomeownerTab('contractors')}
-                        className={`${buttonClass('secondary')} w-full justify-center bg-white lg:w-auto`}
+                        className={`${buttonClass('secondary')} w-full justify-center bg-white sm:w-auto`}
                       >
                         <Search size={16} />
                         Need a contractor first?
                       </button>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
-                      {homeownerRequestWorkflowStages.map((stage, index) => (
-                        <div key={stage.label} className="relative rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
-                              {stage.icon}
-                            </div>
-                            {index < homeownerRequestWorkflowStages.length - 1 && <ArrowRight size={14} className="hidden text-slate-400 md:block" />}
-                          </div>
-                          <p className="mt-3 text-sm font-bold text-slate-950">{stage.label}</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">{stage.helper}</p>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </Card>
