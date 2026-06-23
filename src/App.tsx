@@ -13274,16 +13274,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <p className="max-w-3xl text-sm leading-6 text-slate-500">
                       Start with a clear request. If the contractor accepts the work, estimates, jobs, invoices, and Home History records stay organized here.
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <ol className="flex flex-wrap items-center gap-y-2 rounded-xl bg-slate-50/80 px-3 py-2 text-sm font-semibold text-slate-700">
                       {homeownerRequestWorkflowStages.map((stage, index) => (
-                        <div key={stage} className="flex max-w-full items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-800">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700 shadow-sm">
-                            {index + 1}
+                        <li key={stage} className="flex min-w-0 items-center">
+                          <span className={index === 0 ? 'whitespace-nowrap text-blue-700' : 'whitespace-nowrap'}>
+                            {stage}
                           </span>
-                          <span className="leading-4">{stage}</span>
-                        </div>
+                          {index < homeownerRequestWorkflowStages.length - 1 && (
+                            <ArrowRight size={13} className="mx-2 shrink-0 text-slate-300" aria-hidden="true" />
+                          )}
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                   </div>
                 </Card>
               </div>
