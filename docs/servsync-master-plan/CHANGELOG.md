@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-23
 
+- Branch: `fix/beta-gate-smoke-core-loop-tests-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/homeowner-smoke.spec.ts`
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/mobile-smoke.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed a homeowner mobile dashboard horizontal overflow beta blocker by allowing shared dashboard cards to shrink inside grid layouts, and refreshed beta gate smoke/core-loop tests for the current homeowner request and estimate UI.
+- Reason for change: Restore controlled beta gate confidence after the mobile smoke test found repeatable horizontal overflow and stale E2E assertions/selectors from recent homeowner flow updates.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Focused homeowner, contractor, homeowner mobile, and contractor mobile smoke tests.
+  - Full sandbox core-loop Playwright test.
+  - RLS/privacy/storage Playwright suites.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+  - Static product-claim scan confirming no unsupported trust or automation claims were added.
+- Known risks or follow-ups:
+  - Rerun the final beta gate against the intended beta deployment/URL after merge/deploy.
+
 - Branch: `feature/homeowner-contractors-find-search-v1`
 - Files changed:
   - `src/App.tsx`

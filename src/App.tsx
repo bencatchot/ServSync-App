@@ -34803,10 +34803,10 @@ function OverviewCard({
 
 function Card({ title, icon, children, action }: { title: string; icon: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
+    <section className="min-w-0 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+      <div className="mb-3 flex min-w-0 items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0078FF]/10 text-[#0078FF]">{icon}</div>
-        <h2 className="text-sm font-bold text-[#02132D]">{title}</h2>
+        <h2 className="min-w-0 text-sm font-bold text-[#02132D]">{title}</h2>
         {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}

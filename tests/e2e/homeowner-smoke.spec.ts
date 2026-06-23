@@ -31,11 +31,14 @@ test.describe('homeowner read-only smoke', () => {
 
     await openSidebarTab(page, /Service Requests/i);
     await expectActiveTabHeading(page, /^Service Requests$/i);
+    await expect(main.getByRole('heading', { level: 2, name: /^How requests move through ServSync$/i })).toBeVisible();
     await expect(main.getByRole('heading', { level: 2, name: /^Start a new service request$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Don’t see your contractor\? Invite them to join ServSync\.$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^New request$/i })).toBeVisible();
 
     await openSidebarTab(page, /^Contractors\b/i);
     await expectActiveTabHeading(page, /^Contractors$/i);
+    await expect(main.getByRole('heading', { level: 2, name: /^Find a contractor$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { level: 2, name: /^My Contractors$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Invite a contractor to ServSync$/i })).toBeVisible();
     await expect(main.getByRole('heading', { level: 2, name: /^My contractor invites$/i })).toBeVisible();
     await expect(main.getByRole('heading', { level: 2, name: /^Find or request service$/i })).toHaveCount(0);

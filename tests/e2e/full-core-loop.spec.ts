@@ -17,9 +17,17 @@ function appContextOptions() {
 
 async function dismissTourIfVisible(page: Page) {
   const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
-  if (await skipTour.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await skipTour.click();
-    await expect(skipTour).toBeHidden({ timeout: 5_000 });
+  for (let attempts = 0; attempts < 3; attempts += 1) {
+    let visibleSkip: Locator | null = null;
+    for (let index = 0; index < await skipTour.count(); index += 1) {
+      const candidate = skipTour.nth(index);
+      if (await candidate.isVisible({ timeout: 500 }).catch(() => false)) {
+        visibleSkip = candidate;
+        break;
+      }
+    }
+    if (!visibleSkip) return;
+    await visibleSkip.click({ force: true });
   }
 }
 
@@ -86,8 +94,19 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
   await dismissTourIfVisible(page);
 
   const issueTextbox = main.getByRole('textbox', { name: /^What do you need help with\?$/i });
-  if (!(await issueTextbox.isVisible({ timeout: 5_000 }).catch(() => false)) && await main.getByText(/^Choose property$/i).isVisible({ timeout: 10_000 }).catch(() => false)) {
-    await main.getByRole('button', { name: /^Continue$/i }).click();
+  for (let attempts = 0; attempts < 5; attempts += 1) {
+    await dismissTourIfVisible(page);
+    if (await issueTextbox.isVisible({ timeout: 2_000 }).catch(() => false)) break;
+    const propertySelector = main.getByRole('combobox', { name: /^Request for$/i });
+    if (await propertySelector.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      const selectedValue = await propertySelector.inputValue().catch(() => '');
+      if (!selectedValue) {
+        await propertySelector.selectOption({ index: 1 }).catch(() => undefined);
+      }
+      await main.getByRole('button', { name: /^Continue$/i }).click({ force: true });
+      continue;
+    }
+    break;
   }
 
   await expect(issueTextbox).toBeVisible({ timeout: 10_000 });
@@ -126,9 +145,9 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
   await expect(main.getByText(/^Estimate draft$/i)).toBeVisible({ timeout: 30_000 });
   await main.getByRole('textbox', { name: /^Estimate title$/i }).fill(estimateTitle);
   await main.getByRole('textbox', { name: /^Scope of work$/i }).fill(`${recordPrefix}: approved service scope for the full sandbox E2E core loop.`);
-  await main.getByRole('textbox', { name: /^Line item 1 description$/i }).fill(`${recordPrefix} approved work item`);
-  await main.getByRole('spinbutton', { name: /^Line item 1 quantity$/i }).fill('1');
-  await main.getByRole('textbox', { name: /^Line item 1 unit price$/i }).fill('125');
+  await main.getByRole('textbox', { name: /^Estimate line item 1 description$/i }).fill(`${recordPrefix} approved work item`);
+  await main.getByRole('spinbutton', { name: /^Estimate line item 1 quantity$/i }).fill('1');
+  await main.getByRole('textbox', { name: /^Estimate line item 1 unit price$/i }).fill('125');
 
   const saveEstimateButton = main.getByRole('button', { name: /^Save estimate draft$/i });
   await expect(saveEstimateButton).toBeEnabled();
