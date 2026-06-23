@@ -12729,26 +12729,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   </li>
                 ))}
               </ol>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {homeownerContractorHubTiles.map(tile => (
                   <button
                     key={tile.title}
                     type="button"
                     onClick={tile.onClick}
-                    className="group rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2.5 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-100/70"
+                    className="group min-w-0 rounded-xl border border-blue-100 bg-blue-50/80 px-2 py-2 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-100/70 sm:px-3 sm:py-2.5"
                   >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm ring-1 ring-blue-100">
+                    <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm ring-1 ring-blue-100 sm:h-9 sm:w-9">
                         {tile.icon}
                       </div>
                       <div className="min-w-0 flex-1 leading-tight">
-                        <p className="whitespace-normal break-words text-sm font-bold text-slate-950">{tile.title}</p>
-                        <p className="mt-0.5 whitespace-normal break-words text-xs font-semibold text-blue-700">{tile.helper}</p>
+                        <p className="whitespace-normal break-words text-[11px] font-bold leading-4 text-slate-950 sm:text-sm sm:leading-5">{tile.title}</p>
+                        <p className="mt-0.5 hidden whitespace-normal break-words text-xs font-semibold text-blue-700 sm:block">{tile.helper}</p>
                       </div>
-                      <span className="hidden shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-blue-100 md:inline-flex">
+                      <span className="hidden shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-blue-100 xl:inline-flex">
                         {tile.meta}
                       </span>
-                      <ArrowRight size={14} className="shrink-0 text-blue-500 transition group-hover:translate-x-0.5" />
+                      <ArrowRight size={14} className="hidden shrink-0 text-blue-500 transition group-hover:translate-x-0.5 md:block" />
                     </div>
                   </button>
                 ))}
