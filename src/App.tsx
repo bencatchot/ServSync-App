@@ -8547,6 +8547,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [contextualConnectionError, setContextualConnectionError] = useState('');
   const [contractorInviteLeads, setContractorInviteLeads] = useState<HomeownerContractorInviteLead[]>([]);
   const [contractorInviteModalOpen, setContractorInviteModalOpen] = useState(false);
+  const homeownerConnectedContractorsSectionRef = useRef<HTMLDivElement | null>(null);
+  const homeownerContractorInvitesSectionRef = useRef<HTMLDivElement | null>(null);
+  const homeownerRequestListSectionRef = useRef<HTMLDivElement | null>(null);
   const [submittingContractorInvite, setSubmittingContractorInvite] = useState(false);
   const [contractorInviteDraft, setContractorInviteDraft] = useState<HomeownerContractorInviteDraft>({
     business_name: '',
@@ -10254,6 +10257,26 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const toggleRequestContractorAttributeFilter = (filter: RequestContractorAttributeFilter) => {
     setRequestContractorAttributeFilters(current => ({ ...current, [filter]: !current[filter] }));
   };
+  const scrollToHomeownerSection = (sectionRef: { current: HTMLDivElement | null }) => {
+    window.setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+  const openHomeownerRequestSection = (sectionId: HomeownerRequestView) => {
+    setHomeownerRequestView(sectionId);
+    setHomeownerRequestSearch('');
+    scrollToHomeownerSection(homeownerRequestListSectionRef);
+  };
+  const openHomeownerRequestComposer = () => {
+    setHomeownerRequestPropertyScope('selected');
+    setRequestComposerOpen(true);
+    setRequestingConnectionId(null);
+    resetRequestContractorFilters();
+    setRequestComposerStep(homes.length === 1 ? 'issue' : 'property');
+    setServiceRequestDraft(current => ({
+      ...current,
+      home_id: homes.length === 1 ? homes[0].id : selectedHome?.id || selectedHomeId || current.home_id,
+    }));
+    setHomeownerTab('requests');
+  };
   const connectedContractorsForRequest = activeConnections.filter(connection => {
     if (!serviceRequestDraft.category) return true;
     const contractor = contractorProfileById.get(connection.contractor_id);
@@ -11516,6 +11539,40 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       requests: propertyScopedServiceRequests.filter(requestHasInvoiceActivity),
     },
   ];
+  const homeownerContractorHubTiles = [
+    {
+      title: 'Find a contractor',
+      helper: 'Browse local contractors and view profiles before starting a request.',
+      meta: 'Discover',
+      icon: <Search size={18} />,
+      onClick: () => setHomeownerTab('discover'),
+    },
+    {
+      title: 'Connected contractors',
+      helper: 'Manage contractors you are connected with and review what you share.',
+      meta: `${activeConnections.length} active`,
+      icon: <Users size={18} />,
+      onClick: () => scrollToHomeownerSection(homeownerConnectedContractorsSectionRef),
+    },
+    {
+      title: 'Invite a contractor',
+      helper: 'Recommend a contractor you already know and invite them to ServSync.',
+      meta: `${contractorInviteLeads.length} sent`,
+      icon: <Mail size={18} />,
+      onClick: () => {
+        setContractorInviteModalOpen(true);
+        scrollToHomeownerSection(homeownerContractorInvitesSectionRef);
+      },
+    },
+    {
+      title: 'Start a service request',
+      helper: 'Know what you need? Start a request and choose who to send it to.',
+      meta: `${openServiceRequestCount} open`,
+      icon: <MessageSquare size={18} />,
+      onClick: openHomeownerRequestComposer,
+    },
+  ];
+  const homeownerRequestWorkflowStages = ['Request', 'Contractor Review', 'Estimate', 'Approval', 'Job', 'Invoice', 'Home History'];
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
     const requestInvoices = requestInvoicesFor(request);
@@ -12670,6 +12727,53 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'contractors' && (
         <div className="space-y-5">
+          <Card title="Contractor hub" icon={<Users size={18} />}>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Find, connect, invite, or request service from one place.</p>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                    Browse contractors when you are still looking, manage permission-based connections when you are working with someone, and start a service request only when you are ready to send details.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                  Connections control what gets shared
+                </span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {homeownerContractorHubTiles.map(tile => (
+                  <button
+                    key={tile.title}
+                    type="button"
+                    onClick={tile.onClick}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                        {tile.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-950">{tile.title}</p>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{tile.meta}</span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900 md:grid-cols-4">
+                {['Find contractors', 'Request a connection', 'Choose what to share', 'Send service requests when ready'].map((step, index) => (
+                  <div key={step} className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-blue-700">{index + 1}</span>
+                    <span className="font-semibold">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
           {requestingConnectionId && selectedRequestConnection && (
             <Card title={`Request service from ${selectedRequestConnection.business_name}`} icon={<MessageSquare size={18} />}>
               <div className="space-y-4">
@@ -12803,6 +12907,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Card>
           )}
 
+        <div ref={homeownerConnectedContractorsSectionRef}>
         <Card title="My contractors" icon={<Users size={18} />}>
           {(() => {
             const visibleConnections = connections.filter(connection => connection.status !== 'dismissed');
@@ -13084,7 +13189,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             );
           })()}
         </Card>
+        </div>
 
+        <div ref={homeownerContractorInvitesSectionRef}>
         <Card title="My contractor invites" icon={<Mail size={18} />}>
           {contractorInviteLeads.length === 0 ? (
             <EmptyState text="No contractor invites yet." />
@@ -13113,6 +13220,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           )}
         </Card>
+        </div>
 
       </div>
       )}
@@ -13120,8 +13228,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'requests' && (
         <div className="space-y-5">
           {(() => {
-            const activeHomeownerRequestView = homeownerRequestSections.find(section => section.id === homeownerRequestView)?.id
-              ?? homeownerRequestSections[0].id;
             return (
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -13163,26 +13269,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </button>
                   </div>
                 )}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {homeownerRequestSections.map(section => {
-                    const active = section.id === activeHomeownerRequestView;
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        onClick={() => setHomeownerRequestView(section.id)}
-                        className={`rounded-xl border px-3 py-2 text-left shadow-sm transition ${
-                          active
-                            ? 'border-blue-600 bg-blue-600 text-white'
-                            : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
-                        }`}
-                      >
-                        <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
-                        <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
-                      </button>
-                    );
-                  })}
-                </div>
+                <Card title="How requests move through ServSync" icon={<LayoutDashboard size={18} />}>
+                  <div className="space-y-3">
+                    <p className="max-w-3xl text-sm leading-6 text-slate-500">
+                      Start with a clear request. If the contractor accepts the work, estimates, jobs, invoices, and Home History records stay organized here.
+                    </p>
+                    <ol className="flex flex-wrap items-center gap-y-2 rounded-xl bg-slate-50/80 px-3 py-2 text-sm font-semibold text-slate-700">
+                      {homeownerRequestWorkflowStages.map((stage, index) => (
+                        <li key={stage} className="flex min-w-0 items-center">
+                          <span className={index === 0 ? 'whitespace-nowrap text-blue-700' : 'whitespace-nowrap'}>
+                            {stage}
+                          </span>
+                          {index < homeownerRequestWorkflowStages.length - 1 && (
+                            <ArrowRight size={13} className="mx-2 shrink-0 text-slate-300" aria-hidden="true" />
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </Card>
               </div>
             );
           })()}
@@ -13190,17 +13295,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {!requestComposerOpen ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-bold text-slate-950">Need help with something new?</p>
+                  <p className="text-sm font-bold text-slate-950">Ready to request work?</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    Describe the issue, let ServSync suggest a contractor type, then send it to a connected contractor or search for one.
+                    Start a request with the property, category, details, and contractor you want to send it to.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setContractorInviteModalOpen(true)}
-                    className="mt-2 text-left text-sm font-semibold text-blue-700 underline-offset-2 hover:underline"
-                  >
-                    Don’t see your contractor? Invite them to join ServSync.
-                  </button>
                 </div>
                 <button
                   type="button"
@@ -13986,6 +14084,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
           </Card>
 
+          <div className="grid gap-3 sm:grid-cols-3">
+            {homeownerRequestSections.map(section => {
+              const active = section.id === homeownerRequestView;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => openHomeownerRequestSection(section.id)}
+                  className={`rounded-xl border px-3 py-2 text-left shadow-sm transition ${
+                    active
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  <p className={`break-words text-xs font-semibold uppercase leading-5 tracking-[0.08em] ${active ? 'text-blue-50' : 'text-slate-500'}`}>{section.title}</p>
+                  <p className="mt-1 text-lg font-bold sm:text-xl">{section.requests.length}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <div ref={homeownerRequestListSectionRef}>
           <Card title="My requests" icon={<ClipboardCheck size={18} />}>
           {(() => {
             const renderRequestCard = (request: ServiceRequestSummary) => {
@@ -14444,6 +14564,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             );
           })()}
         </Card>
+        </div>
         </div>
       )}
 

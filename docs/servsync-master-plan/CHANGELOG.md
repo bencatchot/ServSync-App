@@ -4,6 +4,26 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-23
+
+- Branch: `feature/homeowner-contractor-request-flow-redesign-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reframed the homeowner Contractors tab as a contractor relationship/discovery hub with top tiles for finding contractors, managing connected contractors, inviting known contractors, and starting a service request. Added a homeowner-facing Service Requests process overview showing Request -> Contractor Review -> Estimate -> Approval -> Job -> Invoice -> Home History as a passive timeline/list with subtle connectors, moved the New Request action into its own clear card, and placed request status shortcuts below it so Open / Pending, Closed, and Invoiced request sections are easier to reach.
+- Reason for change: Make contractor discovery available without forcing the homeowner to start a service request, while keeping finding, connecting, inviting, and requesting service as separate concepts and preserving existing connection permissions, invite flow, service request wizard, and request lists.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Focused authenticated local smoke for desktop/mobile homeowner Contractors and Service Requests flow.
+- Known risks or follow-ups:
+  - Preview smoke should confirm the passive Service Requests timeline/list feels appropriately light in Vercel's desktop/mobile rendering and that existing connection permission controls, request status shortcuts, and request lists still behave normally.
+  - Copy intentionally avoids claims about contractor verification, guaranteed leads, automated matching, payment processing, marketplace scale, or notification automation.
+
 ## 2026-06-22
 
 - Branch: `codex/business-profile-nav-tiles-v1`
