@@ -10,7 +10,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Files changed:
   - `src/App.tsx`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added a simple in-tab Find a contractor search section to the homeowner Contractors tab. The top Find a contractor quick-action tile now scrolls to the in-tab search instead of leaving the Contractors tab immediately. Homeowners can search matching public contractor profiles by ZIP/profile location data and listed trade, then view a profile, request a connection, request service from an existing connection, open Discover for richer browsing, or invite a contractor when no matches are found.
+- Summary of change: Added a simple in-tab Find a contractor search section to the homeowner Contractors tab. The top Find a contractor quick-action tile now scrolls to the in-tab search instead of leaving the Contractors tab immediately. Homeowners can search matching public contractor profiles by ZIP/profile location data and listed trade, then view a profile, request a connection, request service from an existing connection, open Discover for richer browsing, or invite a contractor when no matches are found. The trade dropdown combines app-wide service categories with all unique categories listed on public contractor profiles.
 - Reason for change: Make contractor discovery available directly inside the Contractors relationship hub while preserving Discover as the richer feed/profile browsing area and avoiding scoring, endorsement, or automated match claims.
 - Tests/checks run:
   - `git status --short --branch`

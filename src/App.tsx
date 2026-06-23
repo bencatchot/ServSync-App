@@ -10241,9 +10241,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const contractorProfileById = new Map(directoryContractors.map(c => [c.id, c]));
   const connectionByContractorId = new Map(connections.map(connection => [connection.contractor_id, connection]));
   const activeConnections = connections.filter(connection => connection.status === 'active');
-  const homeownerFindTradeOptions = SERVICE_REQUEST_CATEGORIES
-    .filter(category => category !== 'Other')
-    .filter(category => directoryContractors.some(contractor => contractor.service_categories.some(item => item.toLowerCase() === category.toLowerCase())));
+  const homeownerFindTradeOptions = Array.from(new Map([
+    ...SERVICE_REQUEST_CATEGORIES.filter(category => category !== 'Other'),
+    ...directoryContractors.flatMap(contractor => contractor.service_categories),
+  ].map(category => {
+    const display = category.trim().replace(/\s+/g, ' ');
+    return [display.toLowerCase(), display] as const;
+  }).filter(([, display]) => Boolean(display))).values())
+    .sort((a, b) => a.localeCompare(b));
   const homeownerFindZipQuery = homeownerFindContractorZip.trim();
   const homeownerFindZipDigits = homeownerFindZipQuery.replace(/\D/g, '');
   const homeownerFindTradeQuery = homeownerFindContractorTrade.trim().toLowerCase();
@@ -12832,8 +12837,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       value={homeownerFindContractorTrade}
                       onChange={event => setHomeownerFindContractorTrade(event.target.value)}
                     >
-                      <option value="">Any listed trade</option>
-                      {(homeownerFindTradeOptions.length > 0 ? homeownerFindTradeOptions : SERVICE_REQUEST_CATEGORIES.filter(category => category !== 'Other')).map(category => (
+                      <option value="">All trades</option>
+                      {homeownerFindTradeOptions.map(category => (
                         <option key={category} value={category}>{category}</option>
                       ))}
                     </select>
