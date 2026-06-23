@@ -8547,6 +8547,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [contextualConnectionError, setContextualConnectionError] = useState('');
   const [contractorInviteLeads, setContractorInviteLeads] = useState<HomeownerContractorInviteLead[]>([]);
   const [contractorInviteModalOpen, setContractorInviteModalOpen] = useState(false);
+  const [homeownerFindContractorZip, setHomeownerFindContractorZip] = useState('');
+  const [homeownerFindContractorTrade, setHomeownerFindContractorTrade] = useState('');
+  const [homeownerFindContractorSubmitted, setHomeownerFindContractorSubmitted] = useState(false);
+  const homeownerFindContractorsSectionRef = useRef<HTMLDivElement | null>(null);
   const homeownerConnectedContractorsSectionRef = useRef<HTMLDivElement | null>(null);
   const homeownerContractorInvitesSectionRef = useRef<HTMLDivElement | null>(null);
   const homeownerRequestListSectionRef = useRef<HTMLDivElement | null>(null);
@@ -10237,6 +10241,38 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const contractorProfileById = new Map(directoryContractors.map(c => [c.id, c]));
   const connectionByContractorId = new Map(connections.map(connection => [connection.contractor_id, connection]));
   const activeConnections = connections.filter(connection => connection.status === 'active');
+  const homeownerFindTradeOptions = SERVICE_REQUEST_CATEGORIES
+    .filter(category => category !== 'Other')
+    .filter(category => directoryContractors.some(contractor => contractor.service_categories.some(item => item.toLowerCase() === category.toLowerCase())));
+  const homeownerFindZipQuery = homeownerFindContractorZip.trim();
+  const homeownerFindZipDigits = homeownerFindZipQuery.replace(/\D/g, '');
+  const homeownerFindTradeQuery = homeownerFindContractorTrade.trim().toLowerCase();
+  const homeownerFindContractorMatchesLocation = (contractor: ContractorProfile) => {
+    if (!homeownerFindZipQuery) return true;
+    if (homeownerFindZipDigits) {
+      const zipMatches = [
+        contractor.zip_code,
+        ...(contractor.service_zip_codes ?? []),
+      ].some(zip => zip && zip.startsWith(homeownerFindZipDigits));
+      if (zipMatches) return true;
+    }
+    const locationSearch = normalizeText(homeownerFindZipQuery);
+    if (!locationSearch) return true;
+    return normalizeText([
+      contractor.city,
+      contractor.state,
+      contractor.zip_code,
+      ...(contractor.service_zip_codes ?? []),
+    ].filter(Boolean).join(' ')).includes(locationSearch);
+  };
+  const homeownerFindContractorMatchesTrade = (contractor: ContractorProfile) => {
+    if (!homeownerFindTradeQuery) return true;
+    return contractor.service_categories.some(category => category.toLowerCase() === homeownerFindTradeQuery);
+  };
+  const homeownerFindContractorResults = directoryContractors
+    .filter(contractor => homeownerFindContractorMatchesLocation(contractor) && homeownerFindContractorMatchesTrade(contractor))
+    .sort((a, b) => a.business_name.localeCompare(b.business_name))
+    .slice(0, 8);
   const requestDiscoverPostsByContractor = requestDiscoverPosts.reduce<Map<string, DiscoverFeedItem[]>>((map, post) => {
     const existing = map.get(post.contractor_id) ?? [];
     existing.push(post);
@@ -11530,10 +11566,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const homeownerContractorHubTiles = [
     {
       title: 'Find a contractor',
-      helper: 'Discover',
-      meta: 'Browse',
+      helper: 'Search profiles',
+      meta: 'Search',
       icon: <Search size={16} />,
-      onClick: () => setHomeownerTab('discover'),
+      onClick: () => scrollToHomeownerSection(homeownerFindContractorsSectionRef),
     },
     {
       title: 'My Contractors',
@@ -12755,6 +12791,199 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </div>
           </Card>
+
+          <div ref={homeownerFindContractorsSectionRef}>
+            <Card title="Find a contractor" icon={<Search size={18} />}>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Search matching contractor profiles</p>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                      Search public contractor profiles by listed ZIP/service area and trade. For more detailed contractor profiles, posts, and browsing, visit Discover.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHomeownerTab('discover')}
+                    className={`${buttonClass('secondary')} w-full justify-center sm:w-auto`}
+                  >
+                    <Compass size={16} />
+                    Visit Discover
+                  </button>
+                </div>
+
+                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[1fr_1fr_auto]">
+                  <Field label="ZIP code">
+                    <input
+                      className={inputClass()}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      value={homeownerFindContractorZip}
+                      onChange={event => setHomeownerFindContractorZip(event.target.value)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') setHomeownerFindContractorSubmitted(true);
+                      }}
+                      placeholder="Example: 36532"
+                    />
+                  </Field>
+                  <Field label="Trade desired">
+                    <select
+                      className={inputClass()}
+                      value={homeownerFindContractorTrade}
+                      onChange={event => setHomeownerFindContractorTrade(event.target.value)}
+                    >
+                      <option value="">Any listed trade</option>
+                      {(homeownerFindTradeOptions.length > 0 ? homeownerFindTradeOptions : SERVICE_REQUEST_CATEGORIES.filter(category => category !== 'Other')).map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => setHomeownerFindContractorSubmitted(true)}
+                      className={`${buttonClass('primary')} w-full justify-center`}
+                    >
+                      <Search size={16} />
+                      Search
+                    </button>
+                  </div>
+                </div>
+
+                <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+                  ZIP matching uses contractor-listed profile ZIPs and service ZIPs when available. Results are based on listed profile details and are not endorsements.
+                </p>
+
+                {!homeownerFindContractorSubmitted ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                    Enter a ZIP code, choose a trade, or use both to search public contractor profiles from this page.
+                  </div>
+                ) : homeownerFindContractorResults.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <EmptyState text="No matching contractors found here yet. Try Discover for broader browsing or invite a contractor you already know to join ServSync." />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setHomeownerTab('discover')} className={buttonClass('secondary')}>
+                        <Compass size={16} />
+                        Open Discover
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractorInviteModalOpen(true);
+                          scrollToHomeownerSection(homeownerContractorInvitesSectionRef);
+                        }}
+                        className={buttonClass('secondary')}
+                      >
+                        <Mail size={16} />
+                        Invite a contractor
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-950">
+                        Matching contractor profiles
+                      </p>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {homeownerFindContractorResults.length} shown
+                      </span>
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {homeownerFindContractorResults.map(contractor => {
+                        const existingStatus = connectionByContractorId.get(contractor.id)?.status;
+                        const trustSignals = [
+                          contractor.license_number ? 'License listed' : '',
+                          contractor.insurance_status ? 'Insurance listed' : '',
+                          contractor.bonded_status ? 'Bonded listed' : '',
+                        ].filter(Boolean);
+                        return (
+                          <div key={contractor.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-950">{contractor.business_name}</p>
+                                <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                                  <MapPin size={12} className="shrink-0" />
+                                  {[contractor.city, contractor.state].filter(Boolean).join(', ') || 'Location not listed'}
+                                  {contractor.zip_code && <span className="text-slate-400">· {contractor.zip_code}</span>}
+                                </p>
+                              </div>
+                              {existingStatus && (
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                  existingStatus === 'active' ? 'bg-emerald-50 text-emerald-700'
+                                    : existingStatus === 'pending' ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {existingStatus === 'active' ? 'Connected' : existingStatus}
+                                </span>
+                              )}
+                            </div>
+
+                            {contractor.service_categories.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {contractor.service_categories.slice(0, 5).map(category => (
+                                  <span key={`${contractor.id}-${category}`} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    {category}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {contractor.business_summary && (
+                              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{contractor.business_summary}</p>
+                            )}
+                            {trustSignals.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {trustSignals.map(signal => (
+                                  <span key={`${contractor.id}-${signal}`} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                    {signal}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {contractor.slug && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateRoute('profile', `slug=${encodeURIComponent(contractor.slug)}`)}
+                                  className={buttonClass('secondary')}
+                                >
+                                  View profile
+                                </button>
+                              )}
+                              {(!existingStatus || ['declined', 'revoked', 'dismissed'].includes(existingStatus)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => openContextualConnectionRequest(contractorTargetFromProfile(contractor))}
+                                  className={buttonClass('primary')}
+                                >
+                                  <Link2 size={16} />
+                                  {existingStatus ? 'Request again' : 'Request connection'}
+                                </button>
+                              )}
+                              {existingStatus === 'active' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const connection = activeConnections.find(item => item.contractor_id === contractor.id);
+                                    if (!connection) return;
+                                    startServiceRequestForConnection(connection, contractor.service_categories[0] || 'General Maintenance');
+                                  }}
+                                  className={buttonClass('primary')}
+                                >
+                                  Request service
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
 
           {requestingConnectionId && selectedRequestConnection && (
             <Card title={`Request service from ${selectedRequestConnection.business_name}`} icon={<MessageSquare size={18} />}>
