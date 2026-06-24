@@ -49,12 +49,26 @@ function requiredEnv(name) {
 }
 
 function parseBaseUrl() {
-  const value = (__ENV.LOAD_TEST_BASE_URL || 'https://servsync.app').trim().replace(/\/+$/, '');
-  try {
-    return new URL(value);
-  } catch {
-    throw new Error(`Invalid LOAD_TEST_BASE_URL "${value}".`);
+  const rawValue = (__ENV.LOAD_TEST_BASE_URL || 'https://servsync.app').trim();
+  const markdownLink = rawValue.match(/^\[[^\]]+\]\((https?:\/\/[^)\s]+)\)$/i);
+  const value = (markdownLink ? markdownLink[1] : rawValue).replace(/\/+$/, '');
+
+  if (!/^https?:\/\//i.test(value)) {
+    throw new Error(`Invalid LOAD_TEST_BASE_URL "${rawValue}". Use a raw http:// or https:// URL.`);
   }
+
+  const withoutProtocol = value.replace(/^https?:\/\//i, '');
+  const hostWithOptionalPort = withoutProtocol.split(/[/?#]/)[0];
+  if (!hostWithOptionalPort || /\s/.test(hostWithOptionalPort) || hostWithOptionalPort.includes('@')) {
+    throw new Error(`Invalid LOAD_TEST_BASE_URL "${rawValue}". Could not extract a safe hostname.`);
+  }
+
+  const hostname = hostWithOptionalPort.split(':')[0].toLowerCase();
+  if (!hostname) {
+    throw new Error(`Invalid LOAD_TEST_BASE_URL "${rawValue}". Could not extract a safe hostname.`);
+  }
+
+  return { url: value, hostname };
 }
 
 export function requireLoadTestAllowed(expectedTargetEnv) {
@@ -70,17 +84,16 @@ export function requireLoadTestAllowed(expectedTargetEnv) {
 
 export function publicBaseUrl() {
   requireLoadTestAllowed('production-public');
-  return parseBaseUrl().toString().replace(/\/+$/, '');
+  return parseBaseUrl().url;
 }
 
 export function sandboxBaseUrl() {
   requireLoadTestAllowed('sandbox-auth');
   const parsed = parseBaseUrl();
-  const hostname = parsed.hostname.toLowerCase();
-  if (PRODUCTION_HOSTS.has(hostname)) {
+  if (PRODUCTION_HOSTS.has(parsed.hostname)) {
     throw new Error('Refusing to run authenticated load-test structure against servsync.app production.');
   }
-  return parsed.toString().replace(/\/+$/, '');
+  return parsed.url;
 }
 
 export function requireSandboxSupabaseRef() {

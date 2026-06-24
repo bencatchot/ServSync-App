@@ -16,6 +16,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/load-testing/README.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Added a guarded k6 load-testing foundation with a public anonymous route script, shared safety guards, a sandbox-authenticated placeholder that refuses to run real authenticated load, npm scripts, and load-testing documentation for staged protocol-level VU runs.
+- Follow-up fix: Replaced the k6 guard helper's `new URL()` parsing with a k6-safe string parser so tiny public runs can parse normalized `LOAD_TEST_BASE_URL` values without weakening production/authenticated safety guards.
 - Reason for change: Start FB-020 scale-readiness tooling without creating users, seeding data, adding authenticated production load, mutating records, applying SQL, changing Supabase/Vercel settings, or running high-volume production load by default.
 - Tests/checks run:
   - `git status --short --branch`
