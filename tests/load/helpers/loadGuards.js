@@ -6,35 +6,20 @@ const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const LOCAL_CREDENTIALS_PREFIX = 'tests/load/.local/';
 
 const READ_ONLY_TABLES = new Set([
-  'contractor_calendar_event_job_links',
-  'contractor_calendar_event_occurrence_exclusions',
-  'contractor_calendar_events',
-  'contractor_invites',
-  'contractor_local_contacts',
   'contractor_profiles',
   'contractor_saved_estimate_charges',
-  'contractor_service_areas',
-  'contractor_visit_events',
   'estimate_templates',
   'estimates',
-  'home_documents',
-  'home_maintenance_log',
   'home_reminders',
-  'homeowner_contractor_invite_leads',
   'homeowner_profiles',
   'homes',
-  'inspection_templates',
   'inspections',
   'invoices',
-  'notifications',
-  'support_inquiries',
 ]);
 
 const READ_ONLY_RPCS = new Set([
   'servsync_contractor_connected_homeowners',
-  'servsync_contractor_pending_connection_requests',
   'servsync_contractor_service_requests',
-  'servsync_contractor_team',
   'servsync_current_contractor_profile',
   'servsync_get_homeowner_connections',
   'servsync_homeowner_service_requests',
@@ -210,6 +195,14 @@ export function requireSandboxAuthReadOnly() {
   if ((__ENV.LOAD_TEST_AUTH_READ_ONLY || '').trim() !== 'true') {
     throw new Error('Refusing to run sandbox authenticated load without LOAD_TEST_AUTH_READ_ONLY=true.');
   }
+}
+
+export function authProfileMode() {
+  const profile = (__ENV.LOAD_TEST_AUTH_PROFILE || 'mixed').trim();
+  if (!['homeowner', 'contractor', 'mixed'].includes(profile)) {
+    throw new Error('LOAD_TEST_AUTH_PROFILE must be one of: homeowner, contractor, mixed.');
+  }
+  return profile;
 }
 
 export function loadSandboxCredentials() {

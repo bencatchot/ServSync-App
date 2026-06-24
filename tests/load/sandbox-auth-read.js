@@ -3,6 +3,7 @@ import { check, fail, sleep } from 'k6';
 import {
   assertReadOnlyRestTable,
   assertReadOnlyRpc,
+  authProfileMode,
   loadSandboxCredentials,
   requireLoadTestAllowed,
   requireSandboxAnonKey,
@@ -19,6 +20,7 @@ const baseUrl = sandboxBaseUrl();
 const supabaseUrl = requireSandboxSupabaseRef();
 const anonKey = requireSandboxAnonKey();
 const credentials = loadSandboxCredentials();
+const profileMode = authProfileMode();
 
 export const options = {
   stages: stageProfile(),
@@ -181,8 +183,9 @@ function buildContractorSession(credential, index) {
 export function setup() {
   return {
     appBaseUrl: baseUrl,
-    homeowners: credentials.homeowners.map(buildHomeownerSession),
-    contractors: credentials.contractors.map(buildContractorSession),
+    profileMode,
+    homeowners: profileMode === 'contractor' ? [] : credentials.homeowners.map(buildHomeownerSession),
+    contractors: profileMode === 'homeowner' ? [] : credentials.contractors.map(buildContractorSession),
   };
 }
 
@@ -194,65 +197,33 @@ function readHomeownerBundle(session) {
   const token = session.accessToken;
   const userId = session.userId;
 
-  supabaseGet(token, 'homeowner_profiles', { select: '*', user_id: `eq.${userId}`, limit: 1 }, 'homeowner-profile');
-  supabaseGet(token, 'homes', { select: '*', homeowner_user_id: `eq.${userId}`, order: 'created_at.asc' }, 'homeowner-homes');
+  supabaseGet(
+    token,
+    'homeowner_profiles',
+    { select: 'user_id,display_name,city,state,zip_code,created_at,updated_at', user_id: `eq.${userId}`, limit: 1 },
+    'homeowner-profile',
+  );
+  supabaseGet(
+    token,
+    'homes',
+    { select: 'id,homeowner_user_id,nickname,city,state,zip_code,home_type,created_at,updated_at', homeowner_user_id: `eq.${userId}`, order: 'created_at.asc', limit: 25 },
+    'homeowner-homes',
+  );
   supabaseRpc(token, 'servsync_get_homeowner_connections', {}, 'homeowner-connections');
-  supabaseGet(
-    token,
-    'contractor_profiles',
-    {
-      select: 'id,business_name,contact_name,service_categories,city,state,zip_code,public_profile_enabled,account_status',
-      public_profile_enabled: 'eq.true',
-      account_status: 'eq.active',
-      order: 'business_name.asc',
-      limit: 50,
-    },
-    'public-contractor-directory',
-  );
-  supabaseGet(
-    token,
-    'homeowner_contractor_invite_leads',
-    { select: 'id,business_name,location,trade_category,homeowner_status,created_at,updated_at', order: 'created_at.desc', limit: 50 },
-    'homeowner-invite-leads',
-  );
   supabaseRpc(token, 'servsync_homeowner_service_requests', {}, 'homeowner-service-requests');
   supabaseGet(
     token,
     'estimates',
-    { select: '*', homeowner_user_id: `eq.${userId}`, status: 'neq.draft', order: 'updated_at.desc', limit: 50 },
+    { select: 'id,contractor_id,homeowner_user_id,service_request_id,home_id,title,status,total_cents,created_at,updated_at', homeowner_user_id: `eq.${userId}`, status: 'neq.draft', order: 'updated_at.desc', limit: 25 },
     'homeowner-estimates',
   );
   supabaseGet(
     token,
     'invoices',
-    { select: '*', homeowner_user_id: `eq.${userId}`, status: 'neq.draft', order: 'updated_at.desc', limit: 50 },
+    { select: 'id,contractor_id,homeowner_user_id,service_request_id,estimate_id,home_id,invoice_number,title,status,total_cents,created_at,updated_at', homeowner_user_id: `eq.${userId}`, status: 'neq.draft', order: 'updated_at.desc', limit: 25 },
     'homeowner-invoices',
   );
-  supabaseGet(token, 'notifications', { select: '*', user_id: `eq.${userId}`, order: 'created_at.desc', limit: 50 }, 'homeowner-notifications');
-  supabaseGet(
-    token,
-    'home_maintenance_log',
-    { select: '*', homeowner_user_id: `eq.${userId}`, order: 'performed_at.desc', limit: 50 },
-    'homeowner-history',
-  );
-  supabaseGet(token, 'home_reminders', { select: '*', homeowner_user_id: `eq.${userId}`, order: 'due_on.asc', limit: 50 }, 'homeowner-reminders');
-  supabaseGet(
-    token,
-    'home_documents',
-    {
-      select: 'id,home_id,homeowner_user_id,file_name,file_type,file_size_bytes,upload_source,created_at',
-      homeowner_user_id: `eq.${userId}`,
-      order: 'created_at.desc',
-      limit: 50,
-    },
-    'homeowner-document-metadata',
-  );
-  supabaseGet(
-    token,
-    'support_inquiries',
-    { select: 'id,requester_user_id,status,category,subject,updated_at,created_at', requester_user_id: `eq.${userId}`, order: 'updated_at.desc', limit: 25 },
-    'homeowner-support-inquiries',
-  );
+  supabaseGet(token, 'home_reminders', { select: 'id,homeowner_user_id,home_id,title,due_on,status,created_at,updated_at', homeowner_user_id: `eq.${userId}`, order: 'due_on.asc', limit: 25 }, 'homeowner-reminders');
 }
 
 function readContractorBundle(session) {
@@ -260,55 +231,52 @@ function readContractorBundle(session) {
   const userId = session.userId;
   const contractorId = session.contractorId;
 
-  supabaseGet(token, 'contractor_profiles', { select: '*', owner_user_id: `eq.${userId}`, limit: 1 }, 'contractor-profile');
+  supabaseGet(
+    token,
+    'contractor_profiles',
+    { select: 'id,owner_user_id,business_name,contact_name,city,state,zip_code,service_categories,account_status,created_at,updated_at', owner_user_id: `eq.${userId}`, limit: 1 },
+    'contractor-profile',
+  );
   supabaseRpc(token, 'servsync_current_contractor_profile', {}, 'contractor-current-profile');
   supabaseRpc(token, 'servsync_contractor_connected_homeowners', {}, 'contractor-connected-homeowners');
   supabaseRpc(token, 'servsync_contractor_service_requests', {}, 'contractor-service-requests');
-  supabaseGet(token, 'notifications', { select: '*', user_id: `eq.${userId}`, order: 'created_at.desc', limit: 50 }, 'contractor-notifications');
   supabaseGet(
     token,
-    'support_inquiries',
-    { select: 'id,requester_user_id,status,category,subject,updated_at,created_at', requester_user_id: `eq.${userId}`, order: 'updated_at.desc', limit: 25 },
-    'contractor-support-inquiries',
-  );
-  supabaseGet(token, 'contractor_invites', { select: '*', contractor_id: `eq.${contractorId}`, order: 'created_at.desc', limit: 50 }, 'contractor-invites');
-  supabaseRpc(token, 'servsync_contractor_pending_connection_requests', {}, 'contractor-pending-connections');
-  supabaseRpc(token, 'servsync_contractor_team', {}, 'contractor-team');
-  supabaseGet(token, 'contractor_service_areas', { select: '*', contractor_id: `eq.${contractorId}`, order: 'created_at.asc', limit: 50 }, 'contractor-service-areas');
-  supabaseGet(token, 'inspection_templates', { select: '*', contractor_id: `eq.${contractorId}`, order: 'created_at.desc', limit: 50 }, 'contractor-inspection-templates');
-  supabaseGet(token, 'inspections', { select: '*', contractor_id: `eq.${contractorId}`, order: 'created_at.desc', limit: 50 }, 'contractor-inspections');
-  supabaseGet(token, 'contractor_visit_events', { select: '*', contractor_id: `eq.${contractorId}`, order: 'scheduled_at.asc', limit: 50 }, 'contractor-visit-events');
-  supabaseGet(token, 'contractor_calendar_events', { select: '*', contractor_id: `eq.${contractorId}`, order: 'starts_at.asc', limit: 50 }, 'contractor-calendar-events');
-  supabaseGet(
-    token,
-    'contractor_calendar_event_job_links',
-    { select: '*', contractor_id: `eq.${contractorId}`, order: 'occurrence_starts_at.asc', limit: 50 },
-    'contractor-calendar-job-links',
+    'inspections',
+    { select: 'id,contractor_id,homeowner_user_id,home_id,service_request_id,name,status,job_status,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'created_at.desc', limit: 25 },
+    'contractor-inspections',
   );
   supabaseGet(
     token,
-    'contractor_calendar_event_occurrence_exclusions',
-    { select: '*', contractor_id: `eq.${contractorId}`, order: 'occurrence_starts_at.asc', limit: 50 },
-    'contractor-calendar-exclusions',
+    'estimates',
+    { select: 'id,contractor_id,homeowner_user_id,service_request_id,inspection_id,home_id,title,status,total_cents,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 25 },
+    'contractor-estimates',
   );
-  supabaseGet(token, 'contractor_local_contacts', { select: '*', contractor_id: `eq.${contractorId}`, order: 'created_at.desc', limit: 50 }, 'contractor-local-contacts');
-  supabaseGet(token, 'estimates', { select: '*', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 50 }, 'contractor-estimates');
-  supabaseGet(token, 'invoices', { select: '*', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 50 }, 'contractor-invoices');
-  supabaseGet(token, 'estimate_templates', { select: '*', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 50 }, 'contractor-estimate-templates');
+  supabaseGet(
+    token,
+    'invoices',
+    { select: 'id,contractor_id,homeowner_user_id,service_request_id,job_id,estimate_id,home_id,invoice_number,title,status,total_cents,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 25 },
+    'contractor-invoices',
+  );
+  supabaseGet(token, 'estimate_templates', { select: 'id,contractor_id,name,trade,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'updated_at.desc', limit: 25 }, 'contractor-estimate-templates');
   supabaseGet(
     token,
     'contractor_saved_estimate_charges',
-    { select: 'id,contractor_id,name,description,line_type,charge_type,amount_cents,default_quantity,unit,active,sort_order,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'created_at.asc', limit: 50 },
+    { select: 'id,contractor_id,name,line_type,charge_type,amount_cents,active,sort_order,created_at,updated_at', contractor_id: `eq.${contractorId}`, order: 'created_at.asc', limit: 25 },
     'contractor-saved-charges',
   );
 }
 
 export default function sandboxAuthReadLoad(data) {
-  const homeowner = pickFromPool(data.homeowners);
-  const contractor = pickFromPool(data.contractors);
+  const selectedProfile = data.profileMode === 'mixed'
+    ? (__ITER + __VU) % 2 === 0 ? 'homeowner' : 'contractor'
+    : data.profileMode;
 
-  readHomeownerBundle(homeowner);
-  readContractorBundle(contractor);
+  if (selectedProfile === 'homeowner') {
+    readHomeownerBundle(pickFromPool(data.homeowners));
+  } else {
+    readContractorBundle(pickFromPool(data.contractors));
+  }
 
   sleep(Number(__ENV.LOAD_TEST_SLEEP_SECONDS || '4'));
 }

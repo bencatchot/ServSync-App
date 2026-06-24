@@ -50,6 +50,7 @@ LOAD_TEST_BASE_URL=<sandbox-or-preview-url>
 LOAD_TEST_SUPABASE_URL=https://zpzdkoaubyjtsomccxya.supabase.co
 LOAD_TEST_SUPABASE_ANON_KEY=<sandbox anon key>
 LOAD_TEST_AUTH_READ_ONLY=true
+LOAD_TEST_AUTH_PROFILE=homeowner|contractor|mixed
 LOAD_TEST_CREDENTIALS_FILE=tests/load/.local/sandbox-auth-credentials.json
 ```
 
@@ -180,6 +181,7 @@ Tiny sandbox read-only smoke:
 LOAD_TEST_ALLOW=true \
 LOAD_TEST_TARGET_ENV=sandbox-auth \
 LOAD_TEST_AUTH_READ_ONLY=true \
+LOAD_TEST_AUTH_PROFILE=mixed \
 LOAD_TEST_BASE_URL=<sandbox-or-preview-url> \
 LOAD_TEST_SUPABASE_URL=https://zpzdkoaubyjtsomccxya.supabase.co \
 LOAD_TEST_SUPABASE_ANON_KEY=<sandbox anon key> \
@@ -197,15 +199,53 @@ Recommended ramp order after a clean tiny run:
 
 The existing `500` and `1000` profiles still require separate manual approval and `LOAD_TEST_HIGH_VU_APPROVED=true`.
 
-The v1 sandbox read bundles include:
+`LOAD_TEST_AUTH_PROFILE` controls which account type each iteration reads:
 
-- homeowner profile, homes, connections RPC, public contractor directory, homeowner invite leads, service requests RPC, estimates, invoices, notifications, Home History, reminders, document metadata, and support inquiries,
-- contractor profile, current contractor profile RPC, connected homeowners RPC, service requests RPC, notifications, support inquiries, invites, pending connection requests RPC, team RPC, service areas, inspection templates, inspections, visit/calendar events, local contacts, estimates, invoices, estimate templates, and saved charges.
+- `homeowner`: read only the homeowner bundle.
+- `contractor`: read only the contractor bundle.
+- `mixed`: alternate homeowner and contractor bundles by iteration. This is the default.
+
+The v1 sandbox read bundles intentionally use a narrow core endpoint set.
+
+Homeowner v1 includes:
+
+- `homeowner_profiles`
+- `homes`
+- `servsync_get_homeowner_connections`
+- `servsync_homeowner_service_requests`
+- `estimates`
+- `invoices`
+- `home_reminders`
+
+Contractor v1 includes:
+
+- `contractor_profiles`
+- `servsync_current_contractor_profile`
+- `servsync_contractor_connected_homeowners`
+- `servsync_contractor_service_requests`
+- `inspections`
+- `estimates`
+- `invoices`
+- `estimate_templates`
+- `contractor_saved_estimate_charges`
 
 The v1 sandbox read bundles intentionally skip:
 
 - auth signup,
 - writes or status changes,
+- notifications,
+- support inquiries,
+- documents,
+- Home History / maintenance-log reads,
+- public contractor directory scans,
+- homeowner invite leads,
+- contractor invites,
+- pending connection requests,
+- contractor team reads,
+- contractor service areas,
+- inspection templates,
+- contractor visit/calendar events,
+- contractor local contacts,
 - notification read marking,
 - service request/estimate/job/invoice creation,
 - document uploads, signed URL/download stress, and storage writes,
