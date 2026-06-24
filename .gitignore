@@ -26,3 +26,6 @@ playwright-report/
 .env
 .env.test.local
 supabase/.temp/
+tests/load/.local/*
+!tests/load/.local/
+!tests/load/.local/sandbox-auth-credentials.example.json

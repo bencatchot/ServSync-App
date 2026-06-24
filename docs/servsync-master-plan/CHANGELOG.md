@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-24
 
+- Branch: `feature/sandbox-auth-read-load-foundation-v1`
+- Files changed:
+  - `.gitignore`
+  - `tests/load/.local/sandbox-auth-credentials.example.json`
+  - `tests/load/helpers/loadGuards.js`
+  - `tests/load/helpers/check-load-env.mjs`
+  - `tests/load/sandbox-auth-read.js`
+  - `docs/load-testing/README.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Replaced the sandbox-authenticated k6 placeholder with a guarded sandbox-only read-load foundation. The script requires an ignored local credential file, sandbox anon key, sandbox Supabase ref, read-only opt-in flag, and setup-time login before running narrow direct Supabase REST/RPC read bundles for homeowner or contractor core dashboard/workflow data. `LOAD_TEST_AUTH_PROFILE` can run homeowner-only, contractor-only, or mixed mode without running both bundles every iteration.
+- Reason for change: Continue FB-020 scale-readiness tooling with a narrow read-only authenticated sandbox path while keeping production authenticated load, user creation, seed data, writes, uploads, service-role keys, SQL, Supabase/Vercel settings, and production data out of scope.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run load:check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `node --check` on changed load-test JavaScript files.
+  - k6 sandbox-auth guard-only run confirming the script fails safely when the ignored local credential file is missing.
+  - Tiny public k6 smoke run against `https://servsync.app` with 1 VU, 48 HTTP requests, 0 failed requests, and passing thresholds.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Real sandbox-auth load still requires an approved local credential file with sandbox-only homeowner and contractor accounts.
+  - v1 reads only a narrow core endpoint set; notifications, support, documents, Home History/maintenance-log reads, directory scans, invite/team/service-area/calendar/local-contact reads, storage downloads, nested line-item stress, mutating workflows, credential seeding, email/Stripe/notification side effects, and production authenticated load remain excluded.
+  - 500 and 1,000 VU runs continue to require separate manual approval plus `LOAD_TEST_HIGH_VU_APPROVED=true`.
+
 - Branch: `feature/k6-load-testing-foundation-v1`
 - Files changed:
   - `package.json`
