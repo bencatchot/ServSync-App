@@ -758,6 +758,15 @@ export interface DiscoverFeedItem {
 }
 
 export type HomeDocumentType = 'warranty' | 'manual' | 'inspection' | 'insurance' | 'permit' | 'receipt' | 'other';
+export type HomeDocumentUploadSource =
+  | 'legacy'
+  | 'manual_documents_tab'
+  | 'home_history_receipt'
+  | 'estimate_filing'
+  | 'contractor_report'
+  | 'profile_photo'
+  | 'home_photo'
+  | 'app_generated';
 
 export type FindingStatus = 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
 
@@ -969,6 +978,7 @@ export interface HomeDocument {
   content_type: string;
   file_size_bytes: number | null;
   document_type: HomeDocumentType;
+  upload_source?: HomeDocumentUploadSource | string;
   notes: string;
   created_at: string;
 }

@@ -4,6 +4,41 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-24
+
+- Branch: `codex/homeowner-documents-beta-upload-limits-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `servsync-home-document-beta-upload-limits.sql`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added beta-only limits for manual homeowner Documents-tab uploads, including frontend file validation, beta-safe upload copy, manual-upload usage readouts, an `upload_source` metadata path, reservation/register RPCs, reserved manual upload storage paths, and a durable monthly upload ledger for quota enforcement.
+- Hardening revision: Added explicit `PUBLIC`/`anon` execute revokes for the new document-limit functions, a production rollout precheck for contractor report storage dependencies, and a low-risk reservation locking / unique ledger guard to reduce duplicate-register risk.
+- Reason for change: Prevent free beta homeowner accounts from using ServSync as unlimited document storage while preserving normal app usage for service requests, estimates, jobs, invoices, Home History, and reminders.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Applied `servsync-home-document-beta-upload-limits.sql` to the approved sandbox Supabase project `zpzdkoaubyjtsomccxya` only.
+  - Sandbox schema verification confirming `upload_source`, reservation table, ledger table, prepare RPC, and register RPC are present.
+  - Sandbox API smoke confirming valid PDF/JPG/PNG/WebP uploads, over-10 MB block, ZIP/MP4/EXE/DOCX/TXT blocks, owner read access, cross-homeowner denial, reservation ownership denial, reservation reuse denial, active usage deletion behavior, and durable monthly ledger behavior.
+  - Sandbox quota smoke confirming 50 active documents, 250 MB account storage, 100 MB per-property storage, and 100 MB monthly ledger caps block manual Documents-tab uploads while another property can reserve when account quota remains.
+  - Local preview UI smoke confirming beta-safe upload copy, usage readouts, valid file uploads, invalid file blocks, friendly quota error copy, and Service Requests, Estimates/Invoices, and Home History/reminder surfaces still load when manual document upload is blocked.
+  - Sandbox non-manual source smoke confirming app-generated records and contractor-filed reports do not count toward manual quota, field-work report rows auto-classify as `contractor_report`, and browser clients cannot spoof `contractor_report` or `legacy` upload sources.
+  - Hardening revision sandbox validation confirming the updated SQL reapplies cleanly, `PUBLIC`/`anon` cannot execute the new document-limit functions, `authenticated` can execute the intended functions, contractor report storage dependencies are present, the manual upload RPC flow still works, duplicate reservation registration is blocked, and temporary smoke rows were cleaned up.
+  - Sandbox cleanup verification confirming no `codex-` smoke document rows, reservation rows, or ledger rows remained after testing.
+  - Changed-file secret-value scan.
+  - Static pricing/premium-claim scan for added lines and new SQL.
+  - Static protected-scope scan confirming no Supabase/Vercel/env/settings/production-data/user-record files changed and confirming the SQL patch was applied only to sandbox, not production.
+- Known risks or follow-ups:
+  - SQL patch is committed for review only and must be applied through the approved Supabase change process before the new RPC-backed upload flow can run in an environment.
+  - The shared private `home-documents` bucket setting remains at the existing 50 MB limit for other flows; manual Documents-tab uploads use reserved `manual-documents/` paths and a 10 MB app/RPC limit.
+  - Existing legacy document rows are not backfilled into the new `manual_documents_tab` source by this slice.
+
 ## 2026-06-23
 
 - Branch: `fix/beta-gate-smoke-core-loop-tests-v1`

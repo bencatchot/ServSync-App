@@ -150,6 +150,7 @@ import type {
   AppointmentStatus,
   HomeDocument,
   HomeDocumentType,
+  HomeDocumentUploadSource,
   QuoteStatus,
   ServiceRequestAppointment,
   ServiceRequestMedia,
@@ -6073,6 +6074,21 @@ const SUPPORT_STATUS_OPTIONS: { value: SupportInquiryStatus; label: string }[] =
 
 const SUPPORT_ATTACHMENT_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
 const SUPPORT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+const MANUAL_HOME_DOCUMENT_ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp';
+const MANUAL_HOME_DOCUMENT_ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+const MANUAL_HOME_DOCUMENT_ALLOWED_EXTENSIONS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp']);
+const MANUAL_HOME_DOCUMENT_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MANUAL_HOME_DOCUMENT_ACCOUNT_MAX_BYTES = 250 * 1024 * 1024;
+const MANUAL_HOME_DOCUMENT_HOME_MAX_BYTES = 100 * 1024 * 1024;
+const MANUAL_HOME_DOCUMENT_MONTHLY_MAX_BYTES = 100 * 1024 * 1024;
+const MANUAL_HOME_DOCUMENT_MAX_COUNT = 50;
+const MANUAL_HOME_DOCUMENT_UPLOAD_SOURCE = 'manual_documents_tab';
+
+type ManualHomeDocumentPrepareResponse = {
+  reservation_id?: string;
+  storage_path?: string;
+  expires_at?: string;
+};
 
 function safeSupportFileName(name: string) {
   return name
@@ -6086,6 +6102,53 @@ function supportAttachmentSizeLabel(bytes: number | null | undefined) {
   if (!bytes) return '';
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function storageSizeLabel(bytes: number | null | undefined) {
+  if (!bytes) return '0 MB';
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function fileExtensionFromName(name: string) {
+  return name.split('.').pop()?.trim().toLowerCase() || '';
+}
+
+function isManualHomeDocumentUpload(doc: HomeDocument) {
+  return doc.upload_source === MANUAL_HOME_DOCUMENT_UPLOAD_SOURCE;
+}
+
+function manualHomeDocumentUploadError(file: File) {
+  const extension = fileExtensionFromName(file.name);
+  if (file.size > MANUAL_HOME_DOCUMENT_MAX_FILE_BYTES) {
+    return 'This file is over the 10 MB beta document limit. Try a smaller PDF or compressed image.';
+  }
+  if (!MANUAL_HOME_DOCUMENT_ALLOWED_TYPES.has(file.type) || !MANUAL_HOME_DOCUMENT_ALLOWED_EXTENSIONS.has(extension)) {
+    return 'For beta, Documents supports PDF, JPG, PNG, and WebP files.';
+  }
+  return '';
+}
+
+function manualHomeDocumentRpcErrorMessage(err: unknown) {
+  let message = 'Unable to upload document.';
+  if (err instanceof Error) {
+    message = err.message;
+  } else if (err && typeof err === 'object') {
+    const possible = err as { message?: string };
+    message = possible.message || message;
+  }
+  if (message.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(message) as { message?: string };
+      message = parsed.message || message;
+    } catch {
+      // Leave the original message in place if it is not valid JSON.
+    }
+  }
+  if (/servsync_prepare_manual_home_document_upload|servsync_register_manual_home_document_upload|schema cache|function/i.test(message)) {
+    return 'Beta document upload limits are not configured yet. Please try again after this update is applied.';
+  }
+  return message;
 }
 
 function supportCategoryLabel(category: SupportInquiryCategory | string) {
@@ -9075,7 +9138,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     fileName: string,
     documentType: HomeDocumentType,
     notes: string,
-    options: { homeId?: string | null } = {},
+    options: { homeId?: string | null; uploadSource?: HomeDocumentUploadSource } = {},
   ) => {
     if (!supabase) throw new Error('Supabase is not connected.');
     const ext = fileName.split('.').pop() ?? 'bin';
@@ -9083,7 +9146,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const contentType = blob.type || 'application/octet-stream';
     const { error: storageError } = await supabase.storage.from('home-documents').upload(path, blob, { contentType });
     if (storageError) throw storageError;
-    const { data, error: insertError } = await supabase.from('home_documents').insert({
+    const documentPayload = {
       homeowner_user_id: profile.id,
       storage_path: path,
       file_name: fileName,
@@ -9092,7 +9155,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       document_type: documentType,
       notes,
       home_id: options.homeId ?? null,
-    }).select('*').single();
+      upload_source: options.uploadSource ?? 'app_generated',
+    };
+    let { data, error: insertError } = await supabase.from('home_documents').insert(documentPayload).select('*').single();
+    if (insertError && /(upload_source|schema cache|column)/i.test(insertError.message || '')) {
+      const fallbackPayload = { ...documentPayload };
+      delete (fallbackPayload as Record<string, unknown>).upload_source;
+      const fallback = await supabase.from('home_documents').insert(fallbackPayload).select('*').single();
+      data = fallback.data;
+      insertError = fallback.error;
+    }
     if (insertError) {
       await supabase.storage.from('home-documents').remove([path]);
       throw insertError;
@@ -9104,7 +9176,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     file: File,
     documentType: HomeDocumentType,
     notes: string,
-    options: { homeId?: string | null } = {},
+    options: { homeId?: string | null; uploadSource?: HomeDocumentUploadSource } = {},
   ) => {
     return createHomeDocumentFromBlob(file, file.name, documentType, notes, options);
   };
@@ -9122,6 +9194,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             logInvoiceFile,
             'receipt',
             `Invoice/receipt for Home History${logDraft.title.trim() ? `: ${logDraft.title.trim()}` : ''}`,
+            { homeId: selectedHome?.id || selectedHomeId || null, uploadSource: 'home_history_receipt' },
           )
         : null;
       const linkedLogRequest = logDraft.service_request_id
@@ -9253,15 +9326,59 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const uploadDocument = async (file: File) => {
     if (!supabase) return;
-    setDocUploading(true);
+    const fileError = manualHomeDocumentUploadError(file);
+    if (fileError) {
+      setError(fileError);
+      setNotice('');
+      return;
+    }
     setError('');
+    setNotice('');
+    setDocUploading(true);
+    let preparedStoragePath = '';
     try {
-      await createHomeDocumentFromFile(file, docUploadType, cleanHumanWrittenText(docUploadNotes), { homeId: selectedHome?.id || selectedHomeId || null });
+      const { data: preparedUpload, error: prepareError } = await supabase.rpc('servsync_prepare_manual_home_document_upload', {
+        p_home_id: selectedHome?.id || selectedHomeId || null,
+        p_file_name: file.name,
+        p_content_type: file.type,
+        p_file_size_bytes: file.size,
+        p_document_type: docUploadType,
+        p_notes: cleanHumanWrittenText(docUploadNotes),
+      });
+      if (prepareError) throw prepareError;
+
+      const prepared = preparedUpload as ManualHomeDocumentPrepareResponse | null;
+      preparedStoragePath = prepared?.storage_path || '';
+      if (!preparedStoragePath) {
+        throw new Error('Unable to prepare document upload. Please try again.');
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from('home-documents')
+        .upload(preparedStoragePath, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: registeredDocument, error: registerError } = await supabase.rpc(
+        'servsync_register_manual_home_document_upload',
+        { p_storage_path: preparedStoragePath },
+      );
+      if (registerError) {
+        await supabase.storage.from('home-documents').remove([preparedStoragePath]);
+        throw registerError;
+      }
+
+      if (registeredDocument) {
+        setHomeDocuments(prev => [registeredDocument as HomeDocument, ...prev]);
+      }
       setDocUploadNotes('');
       setDocUploadType('other');
+      setNotice('Document uploaded. Beta document limits apply only to manual Documents-tab uploads.');
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to upload document.'));
+      if (preparedStoragePath) {
+        await supabase.storage.from('home-documents').remove([preparedStoragePath]);
+      }
+      setError(manualHomeDocumentRpcErrorMessage(err));
     } finally {
       setDocUploading(false);
     }
@@ -10035,6 +10152,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         fileName,
         'receipt',
         `Filed by homeowner from accepted contractor estimate: ${estimate.title}`,
+        { homeId: estimate.home_id || selectedHome?.id || selectedHomeId || null, uploadSource: 'estimate_filing' },
       );
       const relatedRequest = estimate.service_request_id
         ? serviceRequests.find(request => request.id === estimate.service_request_id)
@@ -10550,6 +10668,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       : selectedHomeId
         ? selectedDocumentPropertyLabel
         : 'unassigned documents';
+  const manualHomeDocuments = homeDocuments.filter(isManualHomeDocumentUpload);
+  const selectedHomeManualDocuments = selectedHomeId
+    ? manualHomeDocuments.filter(doc => doc.home_id === selectedHomeId)
+    : [];
+  const manualHomeDocumentAccountBytes = manualHomeDocuments.reduce((total, doc) => total + (doc.file_size_bytes || 0), 0);
+  const manualHomeDocumentHomeBytes = selectedHomeManualDocuments.reduce((total, doc) => total + (doc.file_size_bytes || 0), 0);
+  const manualHomeDocumentAccountCount = manualHomeDocuments.length;
+  const manualHomeDocumentAccountFull = manualHomeDocumentAccountBytes >= MANUAL_HOME_DOCUMENT_ACCOUNT_MAX_BYTES;
+  const manualHomeDocumentHomeFull = Boolean(selectedHomeId && manualHomeDocumentHomeBytes >= MANUAL_HOME_DOCUMENT_HOME_MAX_BYTES);
+  const manualHomeDocumentCountFull = manualHomeDocumentAccountCount >= MANUAL_HOME_DOCUMENT_MAX_COUNT;
+  const manualHomeDocumentLocalQuotaFull = manualHomeDocumentAccountFull || manualHomeDocumentHomeFull || manualHomeDocumentCountFull;
+  const manualHomeDocumentUploadDisabledReason = manualHomeDocumentCountFull
+    ? 'Your beta document library has reached the 50 document limit. Delete an old manual document before uploading another.'
+    : manualHomeDocumentAccountFull
+      ? 'Your beta document storage is full. You can still use requests, estimates, invoices, Home History, and reminders.'
+      : manualHomeDocumentHomeFull
+        ? 'This property has reached the 100 MB beta document limit. You can upload to another property or delete older files for this home.'
+        : '';
   const homeProfileFields = [
     homeDraft.nickname,
     homeDraft.address_line1,
@@ -15423,6 +15559,50 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
 
             {/* Upload area */}
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">Beta document storage limits</p>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                    These limits apply only to files you upload from this Documents tab. Requests, estimates, invoices, Home History, and reminders keep working even if document storage is full.
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Monthly manual upload cap: {storageSizeLabel(MANUAL_HOME_DOCUMENT_MONTHLY_MAX_BYTES)} per homeowner account.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Manual uploads only
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Account storage</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {storageSizeLabel(manualHomeDocumentAccountBytes)} / {storageSizeLabel(MANUAL_HOME_DOCUMENT_ACCOUNT_MAX_BYTES)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">This property</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {selectedHomeId
+                      ? `${storageSizeLabel(manualHomeDocumentHomeBytes)} / ${storageSizeLabel(MANUAL_HOME_DOCUMENT_HOME_MAX_BYTES)}`
+                      : 'Choose a property'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Document count</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {manualHomeDocumentAccountCount} / {MANUAL_HOME_DOCUMENT_MAX_COUNT}
+                  </p>
+                </div>
+              </div>
+              {manualHomeDocumentUploadDisabledReason && (
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  {manualHomeDocumentUploadDisabledReason}
+                </p>
+              )}
+            </div>
+
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Document type">
@@ -15449,13 +15629,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   />
                 </Field>
               </div>
-              <label className={`${buttonClass('primary')} mt-3 cursor-pointer inline-flex ${docUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+              <label className={`${buttonClass('primary')} mt-3 cursor-pointer inline-flex ${docUploading || manualHomeDocumentLocalQuotaFull ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={16} />
                 {docUploading ? 'Uploading...' : 'Choose file to upload'}
                 <input
                   type="file"
                   className="hidden"
-                  disabled={docUploading}
+                  accept={MANUAL_HOME_DOCUMENT_ACCEPT}
+                  disabled={docUploading || manualHomeDocumentLocalQuotaFull}
                   onChange={e => {
                     const file = e.target.files?.[0];
                     if (file) void uploadDocument(file);
@@ -15463,7 +15644,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   }}
                 />
               </label>
-              <p className="mt-2 text-xs text-slate-500">PDF, images, Word docs, and more — up to 50 MB per file.</p>
+              <p className="mt-2 text-xs text-slate-500">PDF, JPG, PNG, and WebP files up to 10 MB during beta.</p>
+              <p className="mt-1 text-xs text-slate-500">ZIP files, videos, executables, archives, Word documents, and unsupported file types are blocked for manual uploads.</p>
               <p className="mt-1 text-xs leading-5 text-amber-700">
                 Private document storage. Files saved here are visible only to you and cannot be shared from this tab. You can upload, download, or delete your own home records here.
               </p>
