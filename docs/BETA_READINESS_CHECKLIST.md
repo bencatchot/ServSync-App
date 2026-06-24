@@ -144,6 +144,7 @@ Test data rules:
 - [ ] Selected property persists after refresh.
 - [ ] Dashboard filters by selected property.
 - [ ] Documents can be uploaded.
+- [ ] Manual Documents-tab beta limits are enforced without blocking normal app usage: 10 MB per file, 250 MB per homeowner account, 100 MB per property, 50 active documents, and 100 MB monthly upload ledger.
 - [ ] Documents can be viewed/downloaded.
 - [ ] Documents can be deleted with confirmation.
 - [ ] Estimates/invoices can be viewed.
