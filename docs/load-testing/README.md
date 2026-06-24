@@ -13,10 +13,10 @@ Protocol-level virtual users are not the same as real browser users. The public 
 Approved now:
 
 - Anonymous public route checks only.
-- No login.
+- Sandbox-only authenticated read-load checks with approved local credentials.
 - No writes.
 - No uploads.
-- No service requests, estimates, invoices, jobs, documents, notifications, Stripe, email, or other external side effects.
+- No service request, estimate, invoice, job, document, notification, Stripe, email, or other external side-effect creation or mutation.
 
 Not approved yet:
 
@@ -42,12 +42,15 @@ LOAD_TEST_TARGET_ENV=production-public
 LOAD_TEST_BASE_URL=https://servsync.app
 ```
 
-Future sandbox authenticated tests require:
+Sandbox authenticated read-only tests require:
 
 ```bash
 LOAD_TEST_TARGET_ENV=sandbox-auth
 LOAD_TEST_BASE_URL=<sandbox-or-preview-url>
 LOAD_TEST_SUPABASE_URL=https://zpzdkoaubyjtsomccxya.supabase.co
+LOAD_TEST_SUPABASE_ANON_KEY=<sandbox anon key>
+LOAD_TEST_AUTH_READ_ONLY=true
+LOAD_TEST_CREDENTIALS_FILE=tests/load/.local/sandbox-auth-credentials.json
 ```
 
 Authenticated scenarios block:
@@ -57,6 +60,39 @@ Authenticated scenarios block:
 - production Supabase ref `uqgtheclhxqlnjpfmheq`
 
 Authenticated scenarios currently allow only sandbox Supabase ref `zpzdkoaubyjtsomccxya`.
+
+The sandbox credentials file must be local-only and must never be committed. A placeholder example lives at:
+
+```text
+tests/load/.local/sandbox-auth-credentials.example.json
+```
+
+Real credentials must use:
+
+```text
+tests/load/.local/sandbox-auth-credentials.json
+```
+
+Format:
+
+```json
+{
+  "homeowners": [
+    {
+      "email": "homeowner-load-001@example.test",
+      "password": "replace-me"
+    }
+  ],
+  "contractors": [
+    {
+      "email": "contractor-load-001@example.test",
+      "password": "replace-me"
+    }
+  ]
+}
+```
+
+Use approved sandbox accounts only. Do not use production users, real beta users, service-role keys, or credentials from committed files.
 
 ## Public Anonymous Commands
 
@@ -134,19 +170,47 @@ Hash routes are client-side routes, so protocol-level k6 requests still exercise
 
 Public contractor profile routes are intentionally deferred until a specific profile slug is approved as safe, public, and stable.
 
-## Future Sandbox Authenticated Testing
+## Sandbox Authenticated Read-Only Testing
 
-The placeholder script `npm run load:sandbox:auth-read` exists only to preserve the guard shape. It does not log in or run authenticated load yet.
+The script `npm run load:sandbox:auth-read` runs direct Supabase REST/RPC read-only checks against the sandbox project only. It signs in each approved sandbox credential once during k6 `setup()`, keeps access tokens in memory for that run, and reuses those tokens inside the virtual-user loop. It does not write token files, seed records, create users, upload files, or mutate app state.
 
-Future authenticated read-heavy testing should use:
+Tiny sandbox read-only smoke:
 
-- a sandbox-only credential pool,
-- deterministic sandbox fixtures,
-- no service-role credentials in committed files,
-- no production hosts,
-- no production Supabase ref,
-- read-heavy scenarios before any write scenarios,
-- explicit cleanup/reset strategy before any mutating load tests.
+```bash
+LOAD_TEST_ALLOW=true \
+LOAD_TEST_TARGET_ENV=sandbox-auth \
+LOAD_TEST_AUTH_READ_ONLY=true \
+LOAD_TEST_BASE_URL=<sandbox-or-preview-url> \
+LOAD_TEST_SUPABASE_URL=https://zpzdkoaubyjtsomccxya.supabase.co \
+LOAD_TEST_SUPABASE_ANON_KEY=<sandbox anon key> \
+LOAD_TEST_CREDENTIALS_FILE=tests/load/.local/sandbox-auth-credentials.json \
+npm run load:sandbox:auth-read
+```
+
+Recommended ramp order after a clean tiny run:
+
+1. `tiny`
+2. `5`
+3. `10`
+4. `25`
+5. Pause and review Supabase metrics before any higher stage.
+
+The existing `500` and `1000` profiles still require separate manual approval and `LOAD_TEST_HIGH_VU_APPROVED=true`.
+
+The v1 sandbox read bundles include:
+
+- homeowner profile, homes, connections RPC, public contractor directory, homeowner invite leads, service requests RPC, estimates, invoices, notifications, Home History, reminders, document metadata, and support inquiries,
+- contractor profile, current contractor profile RPC, connected homeowners RPC, service requests RPC, notifications, support inquiries, invites, pending connection requests RPC, team RPC, service areas, inspection templates, inspections, visit/calendar events, local contacts, estimates, invoices, estimate templates, and saved charges.
+
+The v1 sandbox read bundles intentionally skip:
+
+- auth signup,
+- writes or status changes,
+- notification read marking,
+- service request/estimate/job/invoice creation,
+- document uploads, signed URL/download stress, and storage writes,
+- email, Stripe, geocoding, AI, notification webhooks, and Edge Function side effects,
+- line-item nested payload stress beyond top-level estimate/invoice reads.
 
 Seed scripts are not implemented in this slice. If added later, they must require a separate approval and hard guards such as `SERVSYNC_ALLOW_LOAD_SEED=true`, sandbox project verification, and deterministic cleanup.
 
