@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-24
 
+- Branch: `feature/k6-load-testing-foundation-v1`
+- Files changed:
+  - `package.json`
+  - `tests/load/helpers/loadGuards.js`
+  - `tests/load/helpers/check-load-env.mjs`
+  - `tests/load/public-anonymous.js`
+  - `tests/load/sandbox-auth-read.js`
+  - `docs/load-testing/README.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a guarded k6 load-testing foundation with a public anonymous route script, shared safety guards, a sandbox-authenticated placeholder that refuses to run real authenticated load, npm scripts, and load-testing documentation for staged protocol-level VU runs.
+- Reason for change: Start FB-020 scale-readiness tooling without creating users, seeding data, adding authenticated production load, mutating records, applying SQL, changing Supabase/Vercel settings, or running high-volume production load by default.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `npm run load:check`
+  - k6 availability check.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - k6 must be installed separately on machines that run the load scripts.
+  - The public script is protocol-level and does not execute React/client-side route rendering; use Playwright separately for browser-rendered route checks.
+  - Authenticated sandbox load, credential pooling, sandbox seeding, and mutating workflow load remain future separately approved work.
+  - 500 and 1,000 VU public runs require separate manual approval plus `LOAD_TEST_HIGH_VU_APPROVED=true`.
+
 - Branch: `codex/homeowner-documents-beta-upload-limits-v1`
 - Files changed:
   - `src/App.tsx`
