@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-24
 
+- Branch: `fix/sandbox-auth-credential-file-open-v1`
+- Files changed:
+  - `tests/load/helpers/loadGuards.js`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed sandbox-authenticated k6 credential-file reading so ignored local credential files under `tests/load/.local/` can be opened reliably without using `import.meta.resolve()` file URLs.
+- Reason for change: Allow the guarded sandbox-auth read-load script to get past local credential-file validation while preserving production host/ref blockers, service-role rejection, local-only credential path guards, and no committed real credentials.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run load:check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `node --check` on changed load-test JavaScript files.
+  - k6 missing-credential guard check confirming absent local files still fail safely.
+  - k6 fake ignored credential-file check confirming local file reading succeeds and then fails safely at sandbox sign-in with fake credentials.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Real sandbox-auth load still requires separate approval and approved sandbox credentials; this fix only repairs local credential-file reading.
+
 - Branch: `feature/sandbox-auth-read-load-foundation-v1`
 - Files changed:
   - `.gitignore`
