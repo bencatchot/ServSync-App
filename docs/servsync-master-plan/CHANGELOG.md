@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-24
 
+- Branch: `feature/custom-pricing-foundation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `servsync-contractor-price-book-items.sql`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Phase 1 Custom Pricing / Pricing Library foundation with a private contractor-owned price-book table/RLS SQL patch, TypeScript data shape, contractor loading, and a Jobs-tab Custom Pricing workspace for manually creating, viewing, editing, archiving, and restoring pricing items.
+- Reason for change: Give contractors a private place to build reusable pricing library records during beta without integrating those records into estimates, invoices, imports, AI suggestions, homeowner views, or billing tiers yet.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Changed-file secret-value scan
+  - Static protected-scope scan confirming no production data, user-record, Supabase/Vercel/env/settings, storage, auth, or unrelated app files changed.
+- Known risks or follow-ups:
+  - SQL patch has been created but not applied; sandbox SQL application and verification require separate approval.
+  - Production SQL application requires separate approval after sandbox verification passes.
+  - Future slices may add CSV/XLSX import, estimate/invoice quick-pick integration, duplicate detection, richer price-book metadata, and RLS tests.
+
 - Branch: `fix/sandbox-auth-credential-file-open-v1`
 - Files changed:
   - `tests/load/helpers/loadGuards.js`

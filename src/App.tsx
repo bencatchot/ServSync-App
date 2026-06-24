@@ -104,6 +104,7 @@ import type {
   ContractorConnectedHomeowner,
   ContractorConnectedHomeownerHome,
   ContractorAccountStatus,
+  ContractorPriceBookItem,
   ContractorSavedEstimateCharge,
   ConnectionAlertLevel,
   ConnectionAlertStatus,
@@ -344,7 +345,7 @@ type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'cale
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
-type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates';
+type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type EstimateLineDraft = {
@@ -420,6 +421,20 @@ type SavedEstimateChargeDraft = {
   unit: string;
   active: boolean;
   sort_order: string;
+};
+type ContractorPriceBookItemDraft = {
+  title: string;
+  customer_description: string;
+  internal_notes: string;
+  trade: string;
+  category: string;
+  line_type: EstimateLineType;
+  unit: string;
+  default_unit_price: string;
+  taxable: boolean;
+  labor_hours: string;
+  sku: string;
+  active: boolean;
 };
 type EstimateDraft = {
   title: string;
@@ -932,6 +947,50 @@ function savedEstimateChargeDraftFromRecord(charge: ContractorSavedEstimateCharg
     active: charge.active,
     sort_order: String(charge.sort_order || 0),
   });
+}
+
+function createBlankContractorPriceBookItemDraft(overrides: Partial<ContractorPriceBookItemDraft> = {}): ContractorPriceBookItemDraft {
+  return {
+    title: '',
+    customer_description: '',
+    internal_notes: '',
+    trade: '',
+    category: '',
+    line_type: 'material',
+    unit: 'each',
+    default_unit_price: '',
+    taxable: true,
+    labor_hours: '',
+    sku: '',
+    active: true,
+    ...overrides,
+  };
+}
+
+function contractorPriceBookItemDraftFromRecord(item: ContractorPriceBookItem): ContractorPriceBookItemDraft {
+  return createBlankContractorPriceBookItemDraft({
+    title: item.title,
+    customer_description: item.customer_description || '',
+    internal_notes: item.internal_notes || '',
+    trade: item.trade || '',
+    category: item.category || '',
+    line_type: normalizeEstimateLineType(item.line_type),
+    unit: item.unit || '',
+    default_unit_price: item.default_unit_price_cents === null || item.default_unit_price_cents === undefined
+      ? ''
+      : item.default_unit_price_cents === 0
+        ? '0.00'
+      : centsToDollars(item.default_unit_price_cents),
+    taxable: item.taxable,
+    labor_hours: item.labor_hours === null || item.labor_hours === undefined ? '' : String(Number(item.labor_hours)),
+    sku: item.sku || '',
+    active: item.active && !item.archived_at,
+  });
+}
+
+function contractorPriceBookPriceLabel(item: Pick<ContractorPriceBookItem, 'default_unit_price_cents'>) {
+  if (item.default_unit_price_cents === null || item.default_unit_price_cents === undefined) return 'Price Required';
+  return formatMoney(item.default_unit_price_cents);
 }
 
 function savedEstimateChargeLineDescription(charge: ContractorSavedEstimateCharge) {
@@ -15860,6 +15919,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
   const [savedEstimateCharges, setSavedEstimateCharges] = useState<ContractorSavedEstimateCharge[]>([]);
+  const [contractorPriceBookItems, setContractorPriceBookItems] = useState<ContractorPriceBookItem[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
   const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
@@ -15872,7 +15932,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
   const [selectedHomeownerWorkspaceHomeId, setSelectedHomeownerWorkspaceHomeId] = useState('');
   const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
-  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates'] as const, 'overview');
+  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates', 'custom_pricing'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
   const [jobsListDateFilter, setJobsListDateFilter] = useState('');
   const [jobsListStatusFilter, setJobsListStatusFilter] = useState<JobLifecycleStatus | 'all'>('all');
@@ -15888,6 +15948,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [contractorPriceBookDraft, setContractorPriceBookDraft] = useState<ContractorPriceBookItemDraft>(() => createBlankContractorPriceBookItemDraft());
+  const [editingContractorPriceBookItemId, setEditingContractorPriceBookItemId] = useState<string | null>(null);
+  const [savingContractorPriceBookItem, setSavingContractorPriceBookItem] = useState(false);
+  const [togglingContractorPriceBookItemId, setTogglingContractorPriceBookItemId] = useState<string | null>(null);
+  const [showArchivedContractorPriceBookItems, setShowArchivedContractorPriceBookItems] = useState(false);
+  const [contractorPriceBookSearch, setContractorPriceBookSearch] = useState('');
   const [creatingInvoiceSourceId, setCreatingInvoiceSourceId] = useState<string | null>(null);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
@@ -16275,7 +16341,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes] = await Promise.all([
+        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase
@@ -16329,6 +16395,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             .eq('contractor_id', loadedContractor.id)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: true }),
+          supabase
+            .from('contractor_price_book_items')
+            .select('id, contractor_id, title, customer_description, internal_notes, trade, category, line_type, unit, default_unit_price_cents, taxable, labor_hours, sku, source, active, archived_at, created_at, updated_at')
+            .eq('contractor_id', loadedContractor.id)
+            .order('active', { ascending: false })
+            .order('title', { ascending: true }),
         ]);
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
@@ -16346,6 +16418,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
         if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
+        if (!priceBookItemsRes.error) setContractorPriceBookItems((priceBookItemsRes.data || []) as ContractorPriceBookItem[]);
       } else {
         setContractorVisitEvents([]);
         setContractorCalendarEvents([]);
@@ -16354,6 +16427,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setLocalContacts([]);
         setLocalClaimInvites([]);
         setSavedEstimateCharges([]);
+        setContractorPriceBookItems([]);
       }
     } catch (err) {
       setError(readableError(err, 'Unable to load contractor workspace.'));
@@ -17969,6 +18043,118 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const resetContractorPriceBookDraft = () => {
+    setEditingContractorPriceBookItemId(null);
+    setContractorPriceBookDraft(createBlankContractorPriceBookItemDraft());
+  };
+
+  const editContractorPriceBookItem = (item: ContractorPriceBookItem) => {
+    setEditingContractorPriceBookItemId(item.id);
+    setContractorPriceBookDraft(contractorPriceBookItemDraftFromRecord(item));
+    setContractorJobsView('custom_pricing');
+    setInspectionView('list');
+  };
+
+  const saveContractorPriceBookItem = async () => {
+    if (!supabase || !contractor?.id) return;
+    const title = contractorPriceBookDraft.title.trim();
+    const priceInput = contractorPriceBookDraft.default_unit_price.replace(/[$,]/g, '').trim();
+    const priceValue = priceInput === '' ? null : Number(priceInput);
+    const laborHoursInput = contractorPriceBookDraft.labor_hours.trim();
+    const laborHoursValue = laborHoursInput === '' ? null : Number(laborHoursInput);
+    if (!title) {
+      setError('Add a Custom Pricing title before saving.');
+      return;
+    }
+    if (priceValue !== null && (!Number.isFinite(priceValue) || priceValue < 0)) {
+      setError('Enter a default price of zero or more, or leave it blank for Price Required.');
+      return;
+    }
+    if (laborHoursValue !== null && (!Number.isFinite(laborHoursValue) || laborHoursValue < 0)) {
+      setError('Labor hours must be zero or more, or left blank.');
+      return;
+    }
+    setNotice('');
+    setError('');
+    setSavingContractorPriceBookItem(true);
+    const active = contractorPriceBookDraft.active;
+    const payload = {
+      contractor_id: contractor.id,
+      title,
+      customer_description: contractorPriceBookDraft.customer_description.trim(),
+      internal_notes: contractorPriceBookDraft.internal_notes.trim(),
+      trade: contractorPriceBookDraft.trade.trim(),
+      category: contractorPriceBookDraft.category.trim(),
+      line_type: normalizeEstimateLineType(contractorPriceBookDraft.line_type),
+      unit: contractorPriceBookDraft.unit.trim() || null,
+      default_unit_price_cents: priceValue === null ? null : dollarsToCents(contractorPriceBookDraft.default_unit_price),
+      taxable: contractorPriceBookDraft.taxable,
+      labor_hours: laborHoursValue === null ? null : Number(laborHoursValue.toFixed(2)),
+      sku: contractorPriceBookDraft.sku.trim() || null,
+      source: 'manual',
+      active,
+      archived_at: active ? null : new Date().toISOString(),
+    };
+    try {
+      const mutation = editingContractorPriceBookItemId
+        ? supabase
+            .from('contractor_price_book_items')
+            .update({
+              title: payload.title,
+              customer_description: payload.customer_description,
+              internal_notes: payload.internal_notes,
+              trade: payload.trade,
+              category: payload.category,
+              line_type: payload.line_type,
+              unit: payload.unit,
+              default_unit_price_cents: payload.default_unit_price_cents,
+              taxable: payload.taxable,
+              labor_hours: payload.labor_hours,
+              sku: payload.sku,
+              source: payload.source,
+              active: payload.active,
+              archived_at: payload.archived_at,
+            })
+            .eq('id', editingContractorPriceBookItemId)
+        : supabase
+            .from('contractor_price_book_items')
+            .insert(payload);
+      const { error: saveError } = await mutation;
+      if (saveError) throw saveError;
+      setNotice(editingContractorPriceBookItemId ? 'Custom Pricing item updated.' : 'Custom Pricing item created.');
+      resetContractorPriceBookDraft();
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this Custom Pricing item. Make sure you have estimate settings access.'));
+    } finally {
+      setSavingContractorPriceBookItem(false);
+    }
+  };
+
+  const toggleContractorPriceBookItemActive = async (item: ContractorPriceBookItem) => {
+    if (!supabase) return;
+    const nextActive = !(item.active && !item.archived_at);
+    setNotice('');
+    setError('');
+    setTogglingContractorPriceBookItemId(item.id);
+    try {
+      const { error: updateError } = await supabase
+        .from('contractor_price_book_items')
+        .update({
+          active: nextActive,
+          archived_at: nextActive ? null : new Date().toISOString(),
+        })
+        .eq('id', item.id);
+      if (updateError) throw updateError;
+      setNotice(nextActive ? 'Custom Pricing item restored.' : 'Custom Pricing item archived.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update this Custom Pricing item.'));
+    } finally {
+      setTogglingContractorPriceBookItemId(null);
+    }
+  };
+
   const addSavedChargeToEstimateDraft = (charge: ContractorSavedEstimateCharge) => {
     const nextLine = estimateLineDraftFromSavedCharge(charge);
     setEstimateDraft(draft => {
@@ -19491,6 +19677,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const activeSavedEstimateCharges = savedEstimateCharges
     .filter(charge => charge.active)
     .sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const activeContractorPriceBookItems = contractorPriceBookItems
+    .filter(item => item.active && !item.archived_at)
+    .sort((a, b) => a.title.localeCompare(b.title) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const archivedContractorPriceBookItems = contractorPriceBookItems
+    .filter(item => !item.active || Boolean(item.archived_at))
+    .sort((a, b) => a.title.localeCompare(b.title) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const contractorPriceBookSearchText = normalizeText(contractorPriceBookSearch);
+  const visibleContractorPriceBookItems = (showArchivedContractorPriceBookItems ? archivedContractorPriceBookItems : activeContractorPriceBookItems)
+    .filter(item => {
+      if (!contractorPriceBookSearchText) return true;
+      return normalizeText(`${item.title} ${item.customer_description} ${item.internal_notes} ${item.trade} ${item.category} ${item.sku || ''}`).includes(contractorPriceBookSearchText);
+    });
   const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => inspections.find(insp =>
     insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)
   ) ?? null;
@@ -19844,6 +20042,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       onAction: () => {
         setContractorTab('inspections');
         setContractorJobsView('templates');
+        setInspectionView('list');
+      },
+    },
+    {
+      id: 'tool-custom-pricing',
+      icon: <Receipt size={16} />,
+      title: 'Custom Pricing',
+      helper: 'Private price book items for your contractor account.',
+      meta: `${activeContractorPriceBookItems.length} active`,
+      onAction: () => {
+        setContractorTab('inspections');
+        setContractorJobsView('custom_pricing');
         setInspectionView('list');
       },
     },
@@ -26292,24 +26502,41 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <div className="mb-2 flex items-center gap-2">
                       <ClipboardList size={16} className="text-blue-700" />
-                      <h3 className="text-sm font-bold text-slate-950">Templates</h3>
+                      <h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setContractorJobsView('templates');
-                        setInspectionView('list');
-                        setShowTemplateLibrary(true);
-                      }}
-                      className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
-	                        <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
-	                      </div>
-	                      <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Templates</p>
-	                      <p className="mt-1 break-words text-xs leading-5 text-slate-500">Workflow and estimate starters</p>
-                    </button>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractorJobsView('templates');
+                          setInspectionView('list');
+                          setShowTemplateLibrary(true);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
+                          <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
+                        </div>
+                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Templates</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Workflow and estimate starters</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractorJobsView('custom_pricing');
+                          setInspectionView('list');
+                        }}
+                        className="w-full rounded-xl border border-blue-100 bg-blue-50 p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-100"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-lg bg-white p-1.5 text-blue-700"><Receipt size={15} /></span>
+                          <span className="shrink-0 text-base font-bold sm:text-lg">{activeContractorPriceBookItems.length}</span>
+                        </div>
+                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-blue-700">Custom Pricing</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-blue-900">Private pricing library</p>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -27377,6 +27604,258 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         {savingInspection ? 'Saving...' : 'Save new customer'}
                       </button>
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {contractorJobsView === 'custom_pricing' && (
+                <Card title="Custom Pricing" icon={<Receipt size={18} />}>
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Private pricing library</p>
+                        <h3 className="mt-1 text-lg font-bold text-slate-950">Build a reusable price book for your contractor account.</h3>
+                        <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
+                          Phase 1 stores manually managed Custom Pricing items only. These records stay private to your contractor account and do not automatically load into estimates, invoices, imports, or homeowner-facing screens.
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
+                        Back to Jobs
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <InfoBox label="Active" value={String(activeContractorPriceBookItems.length)} />
+                      <InfoBox label="Archived" value={String(archivedContractorPriceBookItems.length)} />
+                      <InfoBox
+                        label="Price Required"
+                        value={String(activeContractorPriceBookItems.filter(item => item.default_unit_price_cents === null || item.default_unit_price_cents === undefined).length)}
+                      />
+                    </div>
+
+                    {!contractor?.id ? (
+                      <Notice tone="info" text="Save the business profile once before adding Custom Pricing items." />
+                    ) : canManageEstimateSettings ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-slate-950">{editingContractorPriceBookItemId ? 'Edit Custom Pricing item' : 'Add Custom Pricing item'}</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Leave default price blank when the contractor must price the item manually before use.</p>
+                          </div>
+                          {editingContractorPriceBookItemId && (
+                            <button type="button" onClick={resetContractorPriceBookDraft} className={buttonClass('secondary')}>
+                              Cancel edit
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+                          <Field label="Item title">
+                            <input
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.title}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, title: event.target.value }))}
+                              placeholder="Service call"
+                            />
+                          </Field>
+                          <Field label="Line type">
+                            <select
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.line_type}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, line_type: event.target.value as EstimateLineType }))}
+                            >
+                              {ESTIMATE_LINE_TYPE_OPTIONS.map(lineType => (
+                                <option key={lineType} value={lineType}>{ESTIMATE_LINE_TYPE_LABELS[lineType]}</option>
+                              ))}
+                            </select>
+                          </Field>
+                          <Field label="Default price">
+                            <input
+                              className={inputClass()}
+                              inputMode="decimal"
+                              value={contractorPriceBookDraft.default_unit_price}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, default_unit_price: event.target.value }))}
+                              placeholder="Blank = Price Required"
+                            />
+                          </Field>
+                          <Field label="Unit">
+                            <input
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.unit}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, unit: event.target.value }))}
+                              placeholder="each"
+                            />
+                          </Field>
+                          <Field label="Trade">
+                            <input
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.trade}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, trade: event.target.value }))}
+                              placeholder="HVAC, plumbing..."
+                            />
+                          </Field>
+                          <Field label="Category">
+                            <input
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.category}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, category: event.target.value }))}
+                              placeholder="Service, repair..."
+                            />
+                          </Field>
+                          <Field label="Labor hours">
+                            <input
+                              className={inputClass()}
+                              inputMode="decimal"
+                              value={contractorPriceBookDraft.labor_hours}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, labor_hours: event.target.value }))}
+                              placeholder="Optional"
+                            />
+                          </Field>
+                          <Field label="SKU / code">
+                            <input
+                              className={inputClass()}
+                              value={contractorPriceBookDraft.sku}
+                              onChange={event => setContractorPriceBookDraft(current => ({ ...current, sku: event.target.value }))}
+                              placeholder="Optional"
+                            />
+                          </Field>
+                          <div className="flex items-end">
+                            <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
+                              <input
+                                type="checkbox"
+                                checked={contractorPriceBookDraft.taxable}
+                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, taxable: event.target.checked }))}
+                                className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
+                              />
+                              Taxable
+                            </label>
+                          </div>
+                          <div className="flex items-end">
+                            <label className="flex min-h-[42px] w-full items-center gap-2 rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm font-semibold text-[#223D67]">
+                              <input
+                                type="checkbox"
+                                checked={contractorPriceBookDraft.active}
+                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, active: event.target.checked }))}
+                                className="h-4 w-4 rounded border-slate-300 text-[#0078FF]"
+                              />
+                              Active
+                            </label>
+                          </div>
+                          <div className="lg:col-span-2">
+                            <Field label="Customer description">
+                              <textarea
+                                className={inputClass()}
+                                rows={3}
+                                value={contractorPriceBookDraft.customer_description}
+                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, customer_description: event.target.value }))}
+                                placeholder="Optional customer-safe description for future estimate use"
+                              />
+                            </Field>
+                          </div>
+                          <div className="lg:col-span-2">
+                            <Field label="Internal notes">
+                              <textarea
+                                className={inputClass()}
+                                rows={3}
+                                value={contractorPriceBookDraft.internal_notes}
+                                onChange={event => setContractorPriceBookDraft(current => ({ ...current, internal_notes: event.target.value }))}
+                                placeholder="Private contractor note"
+                              />
+                            </Field>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={savingContractorPriceBookItem}
+                            onClick={() => void saveContractorPriceBookItem()}
+                            className={buttonClass('primary')}
+                          >
+                            <Plus size={16} />
+                            {savingContractorPriceBookItem ? 'Saving...' : editingContractorPriceBookItemId ? 'Save item' : 'Add item'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Notice tone="info" text="You can view Custom Pricing items, but only the contractor owner, admin, or office role can change pricing library settings." />
+                    )}
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search Custom Pricing</label>
+                          <input
+                            className={inputClass()}
+                            value={contractorPriceBookSearch}
+                            onChange={event => setContractorPriceBookSearch(event.target.value)}
+                            placeholder="Search title, trade, category, SKU, or notes..."
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowArchivedContractorPriceBookItems(value => !value)}
+                          className={buttonClass('secondary')}
+                        >
+                          {showArchivedContractorPriceBookItems ? 'Show active' : 'Show archived'}
+                        </button>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {visibleContractorPriceBookItems.length === 0 ? (
+                          <EmptyState text={showArchivedContractorPriceBookItems ? 'No archived Custom Pricing items match this view.' : 'No active Custom Pricing items match this view.'} />
+                        ) : visibleContractorPriceBookItems.map(item => {
+                          const archived = !item.active || Boolean(item.archived_at);
+                          return (
+                            <div key={item.id} className={`rounded-xl border p-3 ${archived ? 'border-slate-200 bg-slate-50' : 'border-blue-100 bg-blue-50/40'}`}>
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-bold text-slate-950">{item.title}</p>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                      {archived ? 'Archived' : 'Active'}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#223D67]">
+                                      {estimateLineTypeLabel(item.line_type)}
+                                    </span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.default_unit_price_cents === null || item.default_unit_price_cents === undefined ? 'bg-amber-50 text-amber-700' : 'bg-white text-[#223D67]'}`}>
+                                      {contractorPriceBookPriceLabel(item)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                                    {[item.trade, item.category, item.unit ? `Unit: ${item.unit}` : '', item.sku ? `SKU: ${item.sku}` : ''].filter(Boolean).join(' · ') || 'No trade/category metadata yet.'}
+                                  </p>
+                                  {item.customer_description && <p className="mt-2 text-sm leading-5 text-slate-700">{item.customer_description}</p>}
+                                  {item.internal_notes && (
+                                    <p className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
+                                      Internal note: {item.internal_notes}
+                                    </p>
+                                  )}
+                                  <p className="mt-2 text-xs text-slate-400">
+                                    Updated {new Date(item.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </p>
+                                </div>
+                                {canManageEstimateSettings && (
+                                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                                    <button type="button" onClick={() => editContractorPriceBookItem(item)} className={buttonClass('secondary')}>
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={togglingContractorPriceBookItemId === item.id}
+                                      onClick={() => void toggleContractorPriceBookItemActive(item)}
+                                      className={buttonClass('secondary')}
+                                    >
+                                      {togglingContractorPriceBookItemId === item.id ? 'Updating...' : archived ? 'Restore' : 'Archive'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </Card>
