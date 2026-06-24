@@ -11,6 +11,28 @@
 
 begin;
 
+-- Production rollout precheck:
+-- Contractor-filed reports use a separate storage policy and helper function.
+-- Verify both are present before tightening the general homeowner upload policy
+-- so report filing remains excluded from manual Documents-tab beta quotas.
+do $$
+begin
+  if to_regprocedure('public.servsync_can_upload_field_work_report_path(text)') is null then
+    raise exception 'Missing required contractor report helper: public.servsync_can_upload_field_work_report_path(text). Apply the field-work report delivery SQL before this patch.';
+  end if;
+
+  if not exists (
+    select 1
+      from pg_policies
+     where schemaname = 'storage'
+       and tablename = 'objects'
+       and policyname = 'home_docs_upload_contractor_field_work_reports'
+  ) then
+    raise exception 'Missing required storage policy: home_docs_upload_contractor_field_work_reports. Apply the field-work report delivery storage policy before this patch.';
+  end if;
+end;
+$$;
+
 alter table public.home_documents
   add column if not exists upload_source text not null default 'legacy';
 
@@ -79,6 +101,10 @@ create trigger home_documents_upload_source_classifier
   for each row
   execute function public.servsync_classify_home_document_upload_source();
 
+revoke execute on function public.servsync_classify_home_document_upload_source() from public;
+revoke execute on function public.servsync_classify_home_document_upload_source() from anon;
+grant execute on function public.servsync_classify_home_document_upload_source() to authenticated;
+
 create table if not exists public.home_document_upload_reservations (
   id uuid primary key default gen_random_uuid(),
   homeowner_user_id uuid not null references auth.users(id) on delete cascade,
@@ -123,6 +149,10 @@ create index if not exists home_doc_upload_events_owner_month_idx
   on public.home_document_upload_events(homeowner_user_id, created_at)
   where upload_source = 'manual_documents_tab';
 
+create unique index if not exists home_doc_upload_events_storage_path_unique_idx
+  on public.home_document_upload_events(storage_path)
+  where upload_source = 'manual_documents_tab';
+
 alter table public.home_document_upload_reservations enable row level security;
 alter table public.home_document_upload_events enable row level security;
 
@@ -159,6 +189,8 @@ as $$
   select lower(coalesce(storage.extension(p_name), '')) = any(p_allowed_extensions);
 $$;
 
+revoke execute on function public.servsync_storage_extension_is_allowed(text, text[]) from public;
+revoke execute on function public.servsync_storage_extension_is_allowed(text, text[]) from anon;
 grant execute on function public.servsync_storage_extension_is_allowed(text, text[]) to authenticated;
 
 drop policy if exists "home_docs_upload" on storage.objects;
@@ -216,6 +248,8 @@ as $$
   );
 $$;
 
+revoke execute on function public.servsync_manual_home_document_upload_limits() from public;
+revoke execute on function public.servsync_manual_home_document_upload_limits() from anon;
 grant execute on function public.servsync_manual_home_document_upload_limits() to authenticated;
 
 create or replace function public.servsync_normalized_manual_home_document_extension(p_file_name text)
@@ -225,6 +259,10 @@ immutable
 as $$
   select lower(coalesce(storage.extension(coalesce(p_file_name, '')), ''));
 $$;
+
+revoke execute on function public.servsync_normalized_manual_home_document_extension(text) from public;
+revoke execute on function public.servsync_normalized_manual_home_document_extension(text) from anon;
+grant execute on function public.servsync_normalized_manual_home_document_extension(text) to authenticated;
 
 create or replace function public.servsync_validate_manual_home_document_upload(
   p_homeowner_user_id uuid,
@@ -313,6 +351,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.servsync_validate_manual_home_document_upload(uuid, uuid, text, text, bigint) from public;
+revoke execute on function public.servsync_validate_manual_home_document_upload(uuid, uuid, text, text, bigint) from anon;
 grant execute on function public.servsync_validate_manual_home_document_upload(uuid, uuid, text, text, bigint) to authenticated;
 
 create or replace function public.servsync_prepare_manual_home_document_upload(
@@ -382,6 +422,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.servsync_prepare_manual_home_document_upload(uuid, text, text, bigint, text, text) from public;
+revoke execute on function public.servsync_prepare_manual_home_document_upload(uuid, text, text, bigint, text, text) from anon;
 grant execute on function public.servsync_prepare_manual_home_document_upload(uuid, text, text, bigint, text, text) to authenticated;
 
 create or replace function public.servsync_register_manual_home_document_upload(
@@ -408,7 +450,8 @@ begin
      and homeowner_user_id = v_user_id
      and status = 'pending'
      and expires_at > now()
-   limit 1;
+   limit 1
+   for update;
 
   if v_reservation.id is null then
     raise exception 'This document upload was not prepared or has expired. Please choose the file again.';
@@ -472,6 +515,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.servsync_register_manual_home_document_upload(text) from public;
+revoke execute on function public.servsync_register_manual_home_document_upload(text) from anon;
 grant execute on function public.servsync_register_manual_home_document_upload(text) to authenticated;
 
 notify pgrst, 'reload schema';

@@ -14,6 +14,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/BETA_READINESS_CHECKLIST.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Added beta-only limits for manual homeowner Documents-tab uploads, including frontend file validation, beta-safe upload copy, manual-upload usage readouts, an `upload_source` metadata path, reservation/register RPCs, reserved manual upload storage paths, and a durable monthly upload ledger for quota enforcement.
+- Hardening revision: Added explicit `PUBLIC`/`anon` execute revokes for the new document-limit functions, a production rollout precheck for contractor report storage dependencies, and a low-risk reservation locking / unique ledger guard to reduce duplicate-register risk.
 - Reason for change: Prevent free beta homeowner accounts from using ServSync as unlimited document storage while preserving normal app usage for service requests, estimates, jobs, invoices, Home History, and reminders.
 - Tests/checks run:
   - `git status --short --branch`
@@ -28,6 +29,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Sandbox quota smoke confirming 50 active documents, 250 MB account storage, 100 MB per-property storage, and 100 MB monthly ledger caps block manual Documents-tab uploads while another property can reserve when account quota remains.
   - Local preview UI smoke confirming beta-safe upload copy, usage readouts, valid file uploads, invalid file blocks, friendly quota error copy, and Service Requests, Estimates/Invoices, and Home History/reminder surfaces still load when manual document upload is blocked.
   - Sandbox non-manual source smoke confirming app-generated records and contractor-filed reports do not count toward manual quota, field-work report rows auto-classify as `contractor_report`, and browser clients cannot spoof `contractor_report` or `legacy` upload sources.
+  - Hardening revision sandbox validation confirming the updated SQL reapplies cleanly, `PUBLIC`/`anon` cannot execute the new document-limit functions, `authenticated` can execute the intended functions, contractor report storage dependencies are present, the manual upload RPC flow still works, duplicate reservation registration is blocked, and temporary smoke rows were cleaned up.
   - Sandbox cleanup verification confirming no `codex-` smoke document rows, reservation rows, or ledger rows remained after testing.
   - Changed-file secret-value scan.
   - Static pricing/premium-claim scan for added lines and new SQL.
