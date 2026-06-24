@@ -105,11 +105,21 @@ function looksLikeServiceRoleKey(value) {
 
 function readCredentialsFile(path) {
   const localName = path.slice(LOCAL_CREDENTIALS_PREFIX.length);
-  try {
-    return open(import.meta.resolve(`../.local/${localName}`));
-  } catch (_error) {
-    throw new Error(`Could not read LOAD_TEST_CREDENTIALS_FILE at "${path}". Keep the real file local and ignored under ${LOCAL_CREDENTIALS_PREFIX}.`);
+  const candidates = [
+    `.local/${localName}`,
+    `../.local/${localName}`,
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return open(candidate);
+    } catch (_error) {
+      // Try the next k6-relative candidate. k6 resolves open() relative to the
+      // entry script today and may resolve relative to imported modules later.
+    }
   }
+
+  throw new Error(`Could not read LOAD_TEST_CREDENTIALS_FILE at "${path}". Keep the real file local and ignored under ${LOCAL_CREDENTIALS_PREFIX}.`);
 }
 
 function assertCredentialEntry(entry, role, index) {
