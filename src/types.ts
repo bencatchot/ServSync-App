@@ -245,6 +245,27 @@ export interface ContractorSavedEstimateCharge {
   updated_at: string;
 }
 
+export interface ContractorPriceBookItem {
+  id: string;
+  contractor_id: string;
+  title: string;
+  customer_description: string;
+  internal_notes: string;
+  trade: string;
+  category: string;
+  line_type: EstimateLineType;
+  unit: string | null;
+  default_unit_price_cents: number | null;
+  taxable: boolean;
+  labor_hours: number | null;
+  sku: string | null;
+  source: string | null;
+  active: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;
