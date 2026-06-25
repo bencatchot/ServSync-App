@@ -1174,13 +1174,16 @@ function parseContractorPriceBookBoolean(value: string, fallback: boolean, label
 }
 
 function parseContractorPriceBookLineType(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z]/g, '');
-  if (!normalized) return { lineType: 'material' as EstimateLineType, warning: 'Line type was blank; defaulted to Material.' };
-  if (['labor', 'labour', 'lab'].includes(normalized)) return { lineType: 'labor' as EstimateLineType };
-  if (['material', 'materials', 'mat', 'part', 'parts', 'supply', 'supplies'].includes(normalized)) return { lineType: 'material' as EstimateLineType };
-  if (['fee', 'fees', 'charge', 'charges'].includes(normalized)) return { lineType: 'fee' as EstimateLineType };
-  if (['other', 'misc', 'miscellaneous'].includes(normalized)) return { lineType: 'other' as EstimateLineType };
-  return { lineType: 'other' as EstimateLineType, error: 'Line type must be labor, material, fee, or other.' };
+  const trimmed = value.trim();
+  const normalized = trimmed.toLowerCase();
+  if (!normalized) return { lineType: 'other' as EstimateLineType, warning: 'Line type was missing and will import as Other.' };
+  if (normalized === 'labor' || normalized === 'material' || normalized === 'fee' || normalized === 'other') {
+    return { lineType: normalized as EstimateLineType };
+  }
+  return {
+    lineType: 'other' as EstimateLineType,
+    warning: `Line type "${trimmed}" was not recognized and will import as Other.`,
+  };
 }
 
 function buildContractorPriceBookCsvPreviewRows(
@@ -1197,7 +1200,6 @@ function buildContractorPriceBookCsvPreviewRows(
     if (!title.trim()) errors.push('Title is required.');
 
     const lineTypeParsed = parseContractorPriceBookLineType(contractorPriceBookCsvValue(row, mapping, 'line_type'));
-    if (lineTypeParsed.error) errors.push(lineTypeParsed.error);
     if (lineTypeParsed.warning) warnings.push(lineTypeParsed.warning);
 
     const priceCentsValue = contractorPriceBookCsvValue(row, mapping, 'default_unit_price_cents');

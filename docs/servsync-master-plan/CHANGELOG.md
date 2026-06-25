@@ -13,6 +13,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
 - Summary of change: Added CSV-only import to the contractor Custom Pricing workspace, including sample CSV download, file parsing, column mapping, preview with row-level errors/warnings, and import of valid rows as normal editable private price-book items.
+- Follow-up revision: Missing or unrecognized CSV `line_type` values now warn and default to `Other` instead of blocking the row; only valid `labor`, `material`, `fee`, and `other` values import as their matching line types.
 - Reason for change: Let contractors seed their private pricing library from exported spreadsheet data during beta without adding dependencies, SQL changes, XLSX/PDF parsing, AI cleanup, estimate/invoice integration, homeowner visibility, or tier enforcement.
 - Tests/checks run:
   - `git status --short --branch`
