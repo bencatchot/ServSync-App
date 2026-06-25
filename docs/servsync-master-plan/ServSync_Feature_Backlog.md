@@ -91,7 +91,7 @@ Important guardrails:
 | ID | Feature / Topic | Product Area | Status | Priority | Current Next Step |
 | --- | --- | --- | --- | --- | --- |
 | FB-001 | Invite a Contractor to ServSync | Homeowner Contractors tab, service request support, contractor acquisition | Completed / Functional | Medium | Future outreach/claim-flow improvements later. |
-| FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates, Custom Pricing | Completed / Functional; Needs Testing | High | Validate Custom Pricing foundation after sandbox SQL/preview; estimate/invoice quick-pick integration remains future. |
+| FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates, Custom Pricing | Completed / Functional; Needs Testing | High | Validate Custom Pricing CSV import preview/sandbox behavior; estimate/invoice quick-pick integration remains future. |
 | FB-003 | Contextual Connection Request Flow with Multi-Property Permission Access | Connections, permissions, property sharing | Completed / Functional | High | Follow-up testing of permission enforcement and contractor visibility. |
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
@@ -164,7 +164,7 @@ Summary:
 Contractors can save recurring estimate charges and estimate templates so they do not have to rebuild common estimates from scratch.
 
 Current next step:
-Validate the Custom Pricing / Pricing Library foundation after sandbox SQL/preview. Estimate/invoice quick-pick integration remains a separate future slice.
+Validate the Custom Pricing / Pricing Library CSV import path after preview/sandbox review. Estimate/invoice quick-pick integration remains a separate future slice.
 
 Key decisions:
 
@@ -177,7 +177,7 @@ Key decisions:
 - Copied line items must remain editable/removable per estimate.
 - Homeowners only see final estimate line items, not internal templates.
 - Contractors should be able to save an estimate they create as a reusable template.
-- Custom Pricing / Pricing Library v1 should remain a private contractor-owned price-book foundation until separate approval wires it into estimates, invoices, imports, or automation.
+- Custom Pricing / Pricing Library v1 should remain a private contractor-owned price-book foundation; CSV import may add new private items, but separate approval is still required before wiring those items into estimates, invoices, XLSX/PDF imports, AI cleanup, or automation.
 
 Initial trades to support/test:
 
