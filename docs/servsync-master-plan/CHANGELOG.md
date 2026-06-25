@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-24
 
+- Branch: `feature/custom-pricing-csv-upload-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added CSV-only import to the contractor Custom Pricing workspace, including sample CSV download, file parsing, column mapping, preview with row-level errors/warnings, and import of valid rows as normal editable private price-book items.
+- Follow-up revision: Missing or unrecognized CSV `line_type` values now warn and default to `Other` instead of blocking the row; only valid `labor`, `material`, `fee`, and `other` values import as their matching line types.
+- Reason for change: Let contractors seed their private pricing library from exported spreadsheet data during beta without adding dependencies, SQL changes, XLSX/PDF parsing, AI cleanup, estimate/invoice integration, homeowner visibility, or tier enforcement.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Manual local/sandbox contractor CSV import smoke.
+  - Manual local/sandbox homeowner access smoke.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - CSV import creates new private Custom Pricing rows only; duplicate detection, overwrite/update behavior, XLSX import, PDF parsing, AI cleanup, estimate/invoice quick-pick integration, and tier enforcement remain future slices.
+  - Existing Custom Pricing RLS/table policies from the foundation continue to protect access; this slice does not add new database policy or schema behavior.
+
 - Branch: `feature/custom-pricing-foundation-v1`
 - Files changed:
   - `src/App.tsx`
