@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/partial-invoicing-manual-work-items-v1`
+- Files changed:
+  - `servsync-partial-invoicing-manual-work-items.sql`
+  - `src/App.tsx`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Phase 2C-1 foundation for contractor-created manual job work items. The SQL patch introduces guarded create/update/remove RPCs for `source_type='manual'` work items, preserving nullable Price Required values, explicit $0 no-charge values, contractor-only internal notes, and unbilled-only edit/remove safety. The contractor job detail durable work-items panel now exposes an Add/Edit modal and safe Remove action while leaving the existing partial invoice modal, invoice/PDF backlog display, and whole-job invoice flow unchanged.
+- Reason for change: Let contractors manually add durable work items to jobs so partial invoicing can be used when accepted-estimate or simple-task seeding is not enough, without legacy backfill, inspection finding conversion, invoice/PDF redesign, or unsafe billing-history mutation.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Applied `servsync-partial-invoicing-manual-work-items.sql` to the approved sandbox Supabase project `zpzdkoaubyjtsomccxya` only
+  - Verified the manual work-item RPC catalog, grants, source metadata behavior, billing safety, cross-contractor denial, partial invoice compatibility, and sandbox smoke cleanup
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium` (4/4 passed after sandbox SQL application)
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - SQL patch has been applied and verified in sandbox only; production SQL rollout remains pending separate approval.
+  - Broad legacy backfill, general inspection finding conversion, Custom Pricing integration, and advanced closeout UI remain deferred.
+
 - Branch: `codex/partial-invoicing-phase-2b-simple-work-items-v1`
 - Files changed:
   - `servsync-partial-invoicing-simple-work-items.sql`
