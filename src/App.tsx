@@ -59,6 +59,15 @@ import {
   localDraftFromNote,
   localSuggestedActionFromNote,
 } from './inspectionAssistant';
+import {
+  checklistMatchConfidence,
+  detectItemFromNote,
+  detectRoomFromNote,
+  findBestChecklistItem,
+  splitWalkthroughNotes,
+  suggestedChecklistItemFromNote,
+  uniqueWalkthroughChecklistItemLabel,
+} from './walkthroughNotesParser';
 import { cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
 import {
   estimateDraftLibraryTradeFromText,
@@ -4804,293 +4813,6 @@ function hasPhrase(haystack: string, phrase: string) {
     });
   }
   return false;
-}
-
-function splitWalkthroughNotes(text: string): string[] {
-  return text
-    .replace(/\b(and then|then|next)\b/gi, '.')
-    .split(/[.\n;•]+|-\s+|\d+\.\s+/)
-    .map(s => s.replace(/^\s*[-•]\s*/, '').trim())
-    .filter(s => s.length > 4);
-}
-
-function roomKeywords(room: string) {
-  const lower = normalizeText(room);
-  const words = lower.split(' ').filter(word => word.length > 2);
-  const keywords = new Set<string>([lower, ...words]);
-  if (lower.includes('kitchen')) ['kitchen', 'sink', 'dishwasher', 'refrigerator', 'range', 'stove', 'disposal'].forEach(k => keywords.add(k));
-  if (lower.includes('bath') || lower.includes('powder')) ['bathroom', 'bath', 'half bath', 'powder room', 'toilet', 'shower', 'tub', 'vanity', 'sink', 'faucet'].forEach(k => keywords.add(k));
-  if ((lower.includes('master') || lower.includes('primary')) && lower.includes('bath')) ['master bath', 'master bathroom', 'primary bath', 'primary bathroom'].forEach(k => keywords.add(k));
-  if (lower.includes('garage') || lower.includes('shop') || lower.includes('shed') || lower.includes('carport')) ['garage', 'garage door', 'shop', 'shed', 'carport'].forEach(k => keywords.add(k));
-  if (lower.includes('laundry') || lower.includes('utility')) ['laundry', 'utility', 'utility room', 'washer', 'dryer', 'dryer vent'].forEach(k => keywords.add(k));
-  if (lower.includes('attic')) ['attic', 'insulation', 'roof leak'].forEach(k => keywords.add(k));
-  if (lower.includes('basement') || lower.includes('crawl')) ['basement', 'crawl', 'foundation', 'sump'].forEach(k => keywords.add(k));
-  if (lower.includes('exterior') || lower.includes('yard') || lower.includes('porch') || lower.includes('deck') || lower.includes('patio')) ['exterior', 'outside', 'yard', 'porch', 'deck', 'patio', 'gutter', 'downspout', 'siding', 'hose bib', 'driveway'].forEach(k => keywords.add(k));
-  if (lower.includes('bedroom')) ['bedroom', 'closet'].forEach(k => keywords.add(k));
-  if (lower.includes('living') || lower.includes('family') || lower.includes('den') || lower.includes('great')) ['living room', 'family room', 'den', 'great room', 'fireplace'].forEach(k => keywords.add(k));
-  if (lower.includes('hall') || lower.includes('entry') || lower.includes('foyer')) ['hallway', 'entry', 'foyer', 'door', 'floor', 'light', 'switch'].forEach(k => keywords.add(k));
-  if (lower.includes('whole') || lower.includes('system') || lower.includes('mechanical')) ['hvac', 'thermostat', 'water heater', 'electrical panel', 'smoke detector', 'carbon monoxide'].forEach(k => keywords.add(k));
-  return Array.from(keywords).filter(Boolean);
-}
-
-function detectRoomFromNote(note: string, rooms: string[], fallbackRoom: string | null = null): string | null {
-  const lower = normalizeText(note);
-  const scored = rooms.map(room => {
-    let score = 0;
-    for (const keyword of roomKeywords(room)) {
-      if (keyword.length > 2 && hasPhrase(lower, keyword)) score += keyword.includes(' ') ? 8 : 4;
-    }
-    return { room, score };
-  }).sort((a, b) => b.score - a.score);
-  return scored[0]?.score > 0 ? scored[0].room : fallbackRoom;
-}
-
-const ITEM_MATCH_SYNONYMS: Record<string, string[]> = {
-  sink: ['sink', 'sinks', 'faucet', 'faucets', 'under-sink', 'under sink', 'cabinet under sink', 'basin', 'vanity'],
-  faucet: ['faucet', 'water pressure', 'spray', 'fixture'],
-  toilet: ['toilet', 'toilets', 'tank', 'bowl', 'flange', 'seat', 'flush', 'flushing'],
-  shower: ['shower', 'tub', 'bathtub', 'pan', 'shower door', 'enclosure'],
-  drain: ['drain', 'drains', 'draining', 'drainage', 'waste', 'p-trap', 'p trap', 'trap', 'slow drain', 'slow draining', 'clog'],
-  leak: ['leak', 'leaks', 'leaking', 'drip', 'drips', 'dripping', 'water leak', 'moisture', 'wet', 'damp'],
-  moisture: ['moisture', 'water stain', 'stain', 'staining', 'soft spot', 'damp', 'wet', 'mold', 'mildew'],
-  caulk: ['caulk', 'caulking', 'sealant', 'grout'],
-  dishwasher: ['dishwasher'],
-  disposal: ['disposal', 'garbage disposal', 'garburator'],
-  refrigerator: ['refrigerator', 'fridge'],
-  range: ['oven', 'range', 'stove', 'stovetop', 'burner'],
-  vent: ['vent', 'exhaust', 'fan', 'range hood'],
-  gfci: ['gfci', 'outlet', 'receptacle', 'plug'],
-  switch: ['switch', 'light switch', 'dimmer'],
-  electrical: ['electrical', 'breaker', 'panel', 'wire', 'wiring', 'spark', 'sparking', 'flicker', 'flickering'],
-  window: ['window', 'windows', 'sill', 'glass', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'],
-  door: ['door', 'doors', 'threshold', 'lock', 'hardware', 'hinge', 'sticks', 'sticking', 'stuck door', 'won t latch', 'wont latch'],
-  gutter: ['gutter', 'gutters', 'downspout', 'downspouts', 'clogged gutter', 'gutter clogged', 'blocked downspout', 'overflowing'],
-  roof: ['roof', 'shingle', 'flashing'],
-  hvac: ['hvac', 'filter', 'dirty filter', 'thermostat', 'furnace', 'condenser', 'ac', 'a c', 'air conditioner', 'not cooling', 'weak air', 'airflow', 'air flow', 'register'],
-  wall: ['wall', 'walls', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'],
-  cabinet: ['cabinet', 'cabinets', 'drawer', 'drawers', 'hinge', 'cabinet maker'],
-  fan: ['fan', 'ceiling fan', 'fan blade', 'blade', 'squeak', 'squeaking', 'noise', 'balance', 'out of balance'],
-  pest: ['pest', 'pests', 'wasp', 'wasps', 'nest', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent', 'mice'],
-};
-
-function checklistMatchConfidence(note: string, item: string) {
-  const lower = normalizeText(note);
-  const itemLower = normalizeText(item);
-  if (!itemLower) return 0;
-  let score = 0;
-  for (const [concept, phrases] of Object.entries(ITEM_MATCH_SYNONYMS)) {
-    const noteHasConcept = phrases.some(phrase => hasPhrase(lower, phrase));
-    const itemHasConcept = phrases.some(phrase => hasPhrase(itemLower, phrase)) || hasPhrase(itemLower, concept);
-    if (noteHasConcept && itemHasConcept) score += 2;
-  }
-  const itemWords = itemLower.split(' ').filter(word => word.length > 4);
-  for (const word of itemWords) if (hasPhrase(lower, word)) score += 1;
-  return score;
-}
-
-function suggestedChecklistItemFromNote(note: string, room: string) {
-  const lower = normalizeText(note);
-  if (['leak', 'leaking', 'drip', 'moisture', 'wet', 'water', 'supply line', 'p trap', 'p-trap'].some(word => hasPhrase(lower, word))) {
-    if (['sink', 'faucet', 'vanity', 'basin', 'cabinet'].some(word => hasPhrase(lower, word))) {
-      return hasPhrase(normalizeText(room), 'bath') ? 'Bathroom sink leak' : 'Kitchen sink leak';
-    }
-    if (['ceiling', 'stain', 'water stain'].some(word => hasPhrase(lower, word))) return 'Moisture stain';
-    return 'Plumbing leak';
-  }
-  if (['slow drain', 'clog', 'backup', 'not draining', 'drain'].some(word => hasPhrase(lower, word))) return 'Slow drain or clog';
-  if (['gutter', 'gutters', 'downspout', 'downspouts'].some(word => hasPhrase(lower, word))) return 'Gutter blockage';
-  if (['ac', 'a c', 'air conditioner', 'hvac', 'not cooling', 'weak air', 'airflow', 'air flow', 'dirty filter', 'filter'].some(word => hasPhrase(lower, word))) return 'HVAC airflow or filter concern';
-  if (['outlet', 'receptacle', 'plug', 'switch', 'light switch'].some(word => hasPhrase(lower, word))) return 'Loose outlet or switch';
-  if (['wall', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'].some(word => hasPhrase(lower, word))) return 'Wall or ceiling damage';
-  if (['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'out of balance', 'wobble', 'wobbling'].some(word => hasPhrase(lower, word))) return 'Ceiling fan noise';
-  if (['floor', 'flooring', 'tile', 'carpet', 'laminate', 'hardwood', 'soft spot'].some(word => hasPhrase(lower, word))) return 'Flooring concern';
-  if (['cabinet', 'drawer', 'countertop'].some(word => hasPhrase(lower, word))) return 'Cabinet or counter issue';
-  if (['door', 'hinge', 'lock', 'handle', 'sticks', 'sticking'].some(word => hasPhrase(lower, word))) return 'Door operation issue';
-  if (['window', 'screen', 'sash', 'won t open', 'wont open'].some(word => hasPhrase(lower, word))) return 'Window operation issue';
-  if (['wasp', 'wasps', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent', 'pest'].some(word => hasPhrase(lower, word))) return 'Pest concern';
-  const roomLabel = room && room !== 'General' ? room.replace(/\s*\/\s*/g, ' ') : 'General';
-  return `${roomLabel} observation`;
-}
-
-function findBestChecklistItem(note: string, items: string[]) {
-  if (items.length === 0) return 'General observation';
-  const lower = normalizeText(note);
-  const noteHasSink = ['sink', 'sinks', 'vanity', 'faucet', 'faucets'].some(word => hasPhrase(lower, word));
-  const noteHasDrain = ['drain', 'drains', 'draining', 'drainage', 'slow drain', 'slow draining', 'p trap', 'p-trap'].some(word => hasPhrase(lower, word));
-  const noteHasToilet = ['toilet', 'toilets'].some(word => hasPhrase(lower, word));
-  const noteHasDisposal = ['disposal', 'garbage disposal', 'garburator'].some(word => hasPhrase(lower, word));
-  const noteHasLeak = ['leak', 'leaks', 'leaking', 'drip', 'drips', 'dripping', 'water leak', 'water leaks', 'moisture', 'wet'].some(word => hasPhrase(lower, word));
-  const noteHasCabinet = ['cabinet', 'cabinets', 'drawer', 'drawers', 'cabinet maker'].some(word => hasPhrase(lower, word));
-  const noteHasWallSurface = ['sheetrock', 'drywall', 'wall', 'walls', 'ceiling', 'paint'].some(word => hasPhrase(lower, word));
-  const noteHasFan = ['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'balance', 'out of balance'].some(word => hasPhrase(lower, word));
-  const noteHasGutter = ['gutter', 'gutters', 'downspout', 'downspouts', 'gutter clogged', 'clogged gutter', 'blocked downspout', 'overflowing'].some(word => hasPhrase(lower, word));
-  const noteHasHvac = ['hvac', 'ac', 'a c', 'air conditioner', 'not cooling', 'weak air', 'airflow', 'air flow', 'filter', 'dirty filter', 'thermostat'].some(word => hasPhrase(lower, word));
-  const noteHasElectrical = ['outlet', 'receptacle', 'plug', 'switch', 'light switch', 'gfci', 'breaker', 'electrical', 'panel'].some(word => hasPhrase(lower, word));
-  const noteHasDoor = ['door', 'doors', 'hinge', 'lock', 'handle', 'sticks', 'sticking', 'won t latch', 'wont latch'].some(word => hasPhrase(lower, word));
-  const noteHasWindow = ['window', 'windows', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'].some(word => hasPhrase(lower, word));
-  const noteHasMoisture = ['moisture', 'water stain', 'stain', 'staining', 'soft spot', 'mold', 'mildew'].some(word => hasPhrase(lower, word));
-  const noteHasPest = ['pest', 'wasp', 'wasps', 'ants', 'ant', 'termite', 'termite tubes', 'droppings', 'rodent'].some(word => hasPhrase(lower, word));
-
-  if (noteHasGutter) {
-    const gutterItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['gutter', 'gutters', 'downspout', 'downspouts'].some(word => hasPhrase(itemLower, word));
-    });
-    if (gutterItem) return gutterItem;
-  }
-
-  if (noteHasHvac) {
-    const hvacItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      if (hasPhrase(lower, 'filter') || hasPhrase(lower, 'dirty filter')) return hasPhrase(itemLower, 'filter');
-      if (hasPhrase(lower, 'thermostat')) return hasPhrase(itemLower, 'thermostat');
-      return ['hvac', 'airflow', 'air flow', 'register', 'outdoor unit', 'condenser', 'visible airflow'].some(word => hasPhrase(itemLower, word));
-    });
-    if (hvacItem) return hvacItem;
-  }
-
-  if (noteHasElectrical) {
-    const electricalItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      if (hasPhrase(lower, 'outlet') || hasPhrase(lower, 'receptacle') || hasPhrase(lower, 'plug')) {
-        return ['outlet', 'outlets', 'receptacle', 'receptacles', 'gfci'].some(word => hasPhrase(itemLower, word));
-      }
-      if (hasPhrase(lower, 'switch')) return ['switch', 'switches', 'light fixture'].some(word => hasPhrase(itemLower, word));
-      return ['electrical', 'panel', 'breaker', 'gfci'].some(word => hasPhrase(itemLower, word));
-    });
-    if (electricalItem) return electricalItem;
-  }
-
-  if (noteHasDoor || noteHasWindow) {
-    const doorWindowItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return noteHasDoor
-        ? ['door', 'doors', 'lock', 'hardware', 'hinge'].some(word => hasPhrase(itemLower, word))
-        : ['window', 'windows', 'screen', 'screens', 'lock'].some(word => hasPhrase(itemLower, word));
-    });
-    if (doorWindowItem) return doorWindowItem;
-  }
-
-  if (noteHasPest) {
-    const pestItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['pest', 'pests', 'termite', 'ants', 'wasp', 'droppings'].some(word => hasPhrase(itemLower, word));
-    });
-    if (pestItem) return pestItem;
-  }
-
-  if (noteHasMoisture && !noteHasSink && !noteHasDrain) {
-    const moistureItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['moisture', 'staining', 'stain', 'leak', 'water', 'soft spot', 'visible damage'].some(word => hasPhrase(itemLower, word));
-    });
-    if (moistureItem) return moistureItem;
-  }
-
-  if (noteHasFan) {
-    const fanItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['ceiling fan', 'fan', 'light fixture', 'fixtures'].some(word => hasPhrase(itemLower, word));
-    });
-    if (fanItem) return fanItem;
-  }
-
-  if (noteHasCabinet) {
-    const cabinetItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['cabinet', 'cabinets', 'drawer', 'drawers'].some(word => hasPhrase(itemLower, word));
-    });
-    if (cabinetItem) return cabinetItem;
-  }
-
-  if (noteHasWallSurface) {
-    const wallItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['wall', 'walls', 'ceiling', 'sheetrock', 'drywall', 'paint'].some(word => hasPhrase(itemLower, word));
-    });
-    if (wallItem) return wallItem;
-  }
-
-  if (noteHasDisposal) {
-    const disposalItem = items.find(item => ['disposal', 'garbage disposal', 'garburator'].some(word => hasPhrase(normalizeText(item), word)));
-    if (disposalItem) return disposalItem;
-  }
-
-  if (noteHasSink && noteHasDrain) {
-    const sinkDrainItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['sink', 'sinks', 'faucet', 'vanity', 'under sink'].some(word => hasPhrase(itemLower, word)) &&
-        ['drain', 'drains', 'drainage', 'waste', 'p trap', 'p-trap'].some(word => hasPhrase(itemLower, word));
-    });
-    if (sinkDrainItem) return sinkDrainItem;
-    const sinkItem = items.find(item => ['sink', 'sinks', 'faucet', 'vanity', 'under sink'].some(word => hasPhrase(normalizeText(item), word)));
-    if (sinkItem) return sinkItem;
-  }
-
-  if ((noteHasSink || noteHasLeak) && noteHasLeak && !noteHasToilet) {
-    const sinkLeakItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      const sinkRelated = ['sink', 'sinks', 'under sink', 'vanity', 'shut off', 'shutoff', 'supply line', 'plumbing'].some(word => hasPhrase(itemLower, word));
-      const leakRelated = ['leak', 'leaks', 'water leak', 'water leaks', 'moisture'].some(word => hasPhrase(itemLower, word));
-      return sinkRelated && leakRelated;
-    });
-    if (sinkLeakItem) return sinkLeakItem;
-  }
-
-  if (noteHasSink && !noteHasToilet) {
-    const underSinkItem = items.find(item => {
-      const itemLower = normalizeText(item);
-      return ['under sink', 'under-sink', 'shut off', 'shutoff', 'supply line'].some(word => hasPhrase(itemLower, word));
-    });
-    if (underSinkItem) return underSinkItem;
-    const sinkItem = items.find(item => ['sink', 'sinks', 'faucet', 'vanity'].some(word => hasPhrase(normalizeText(item), word)));
-    if (sinkItem) return sinkItem;
-  }
-
-  const scored = items.map(item => {
-    const itemLower = normalizeText(item);
-    let score = 0;
-
-    for (const [concept, phrases] of Object.entries(ITEM_MATCH_SYNONYMS)) {
-      const noteHasConcept = phrases.some(phrase => hasPhrase(lower, phrase));
-      const itemHasConcept = phrases.some(phrase => hasPhrase(itemLower, phrase)) || hasPhrase(itemLower, concept);
-      if (noteHasConcept && itemHasConcept) score += 12;
-      if (noteHasConcept && !itemHasConcept) score -= 2;
-    }
-
-    const itemWords = itemLower.split(' ').filter(w => w.length > 3);
-    for (const word of itemWords) {
-      if (hasPhrase(lower, word)) score += 2;
-    }
-
-    if (noteHasDisposal && (hasPhrase(itemLower, 'disposal') || hasPhrase(itemLower, 'garbage disposal'))) score += 30;
-    if (noteHasDisposal && (hasPhrase(itemLower, 'drain') || hasPhrase(itemLower, 'drains')) && !hasPhrase(itemLower, 'disposal')) score -= 10;
-    if (noteHasSink && noteHasLeak && (hasPhrase(itemLower, 'leak') || hasPhrase(itemLower, 'leaks')) && (hasPhrase(itemLower, 'sink') || hasPhrase(itemLower, 'under sink') || hasPhrase(itemLower, 'shut off'))) score += 25;
-    if (noteHasSink && noteHasLeak && (hasPhrase(itemLower, 'operation') || hasPhrase(itemLower, 'water pressure'))) score -= 8;
-    if (noteHasSink && hasPhrase(itemLower, 'toilet')) score -= 20;
-    if (noteHasToilet && (hasPhrase(itemLower, 'sink') || hasPhrase(itemLower, 'faucet'))) score -= 20;
-    if ((hasPhrase(lower, 'shower') || hasPhrase(lower, 'tub')) && hasPhrase(itemLower, 'toilet')) score -= 8;
-    if (noteHasFan && hasPhrase(itemLower, 'outlet')) score -= 25;
-    if (noteHasCabinet && (hasPhrase(itemLower, 'under sink') || hasPhrase(itemLower, 'plumbing'))) score -= 16;
-    if (noteHasWallSurface && hasPhrase(itemLower, 'flooring')) score -= 18;
-    if (noteHasGutter && (hasPhrase(itemLower, 'gutter') || hasPhrase(itemLower, 'downspout'))) score += 28;
-    if (noteHasHvac && (hasPhrase(itemLower, 'hvac') || hasPhrase(itemLower, 'filter') || hasPhrase(itemLower, 'airflow') || hasPhrase(itemLower, 'thermostat'))) score += 22;
-    if (noteHasElectrical && (hasPhrase(itemLower, 'outlet') || hasPhrase(itemLower, 'switch') || hasPhrase(itemLower, 'gfci') || hasPhrase(itemLower, 'panel'))) score += 22;
-    if (noteHasDoor && hasPhrase(itemLower, 'door')) score += 20;
-    if (noteHasWindow && hasPhrase(itemLower, 'window')) score += 20;
-    if (noteHasPest && hasPhrase(itemLower, 'pest')) score += 20;
-    if (noteHasMoisture && (hasPhrase(itemLower, 'moisture') || hasPhrase(itemLower, 'staining') || hasPhrase(itemLower, 'water'))) score += 16;
-
-    return { item, score };
-  }).sort((a, b) => b.score - a.score);
-
-  return scored[0]?.score > 0 ? scored[0].item : items[0];
-}
-
-function detectItemFromNote(note: string, items: string[]): string | null {
-  if (items.length === 0) return null;
-  const item = findBestChecklistItem(note, items);
-  return checklistMatchConfidence(note, item) > 0 ? item : null;
 }
 
 function inspectionCostSavingsDetails(findings: InspectionRoomFinding[]): string[] {
@@ -22260,15 +21982,38 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return newChecklistItem ? { room: roomIdentityKey(room), item: newChecklistItem } : null;
   };
 
-  const applySuggestionToFinding = (suggestion: WalkthroughSuggestion): { room: string; item: string } | null => {
+  const findingHasReviewContent = (finding?: LocalFindingState) => Boolean(
+    finding
+    && (
+      finding.status !== 'Pass'
+      || finding.notes.trim()
+      || finding.action.trim()
+      || finding.due.trim()
+      || (finding.photos ?? []).length > 0
+    ),
+  );
+
+  const applySuggestionToFinding = (
+    suggestion: WalkthroughSuggestion,
+    reservation?: { usedKeys: Set<string>; itemsByRoom: Map<string, string[]> },
+  ): { room: string; item: string } | null => {
     const target = resolveSuggestionTarget(suggestion);
     if (!target) return null;
     const targetRoom = findRoomByIdentity(activeRooms, target.room);
     if (!targetRoom) return null;
-    const key = findingStateKey(targetRoom, target.item);
+    const roomKey = roomIdentityKey(targetRoom);
+    const baseKey = findingStateKey(targetRoom, target.item);
+    const shouldPreserveExisting = findingHasReviewContent(localFindings[baseKey]) || Boolean(reservation?.usedKeys.has(baseKey));
+    const reservedItems = reservation?.itemsByRoom.get(roomKey) ?? targetRoom.items;
+    const item = shouldPreserveExisting ? uniqueWalkthroughChecklistItemLabel(target.item, reservedItems) : target.item;
+    const key = findingStateKey(targetRoom, item);
+    if (reservation) {
+      reservation.usedKeys.add(key);
+      reservation.itemsByRoom.set(roomKey, reservedItems.includes(item) ? reservedItems : [...reservedItems, item]);
+    }
     setActiveRooms(prev => prev.map(room => (
-      roomIdentityKey(room) === roomIdentityKey(targetRoom) && !room.items.includes(target.item)
-        ? { ...room, items: [...room.items, target.item] }
+      roomIdentityKey(room) === roomKey && !room.items.includes(item)
+        ? { ...room, items: [...room.items, item] }
         : room
     )));
     setLocalFindings(prev => {
@@ -22285,8 +22030,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         },
       };
     });
-    setSelectedChecklistRoom(roomIdentityKey(targetRoom));
-    return target;
+    setSelectedChecklistRoom(roomKey);
+    return { room: roomKey, item };
   };
 
   useEffect(() => {
@@ -31379,8 +31124,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             onClick={() => {
                                               let firstRoom: string | null = null;
                                               let appliedCount = 0;
+                                              const reservation = {
+                                                usedKeys: new Set<string>(),
+                                                itemsByRoom: new Map<string, string[]>(activeRooms.map(room => [roomIdentityKey(room), [...room.items]])),
+                                              };
                                               walkthroughSuggestions.filter(s => s.accepted !== false).forEach(s => {
-                                                const target = applySuggestionToFinding(s);
+                                                const target = applySuggestionToFinding(s, reservation);
                                                 if (target) {
                                                   appliedCount += 1;
                                                   if (!firstRoom) firstRoom = target.room;

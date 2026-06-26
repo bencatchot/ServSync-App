@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/walkthrough-notes-parser-hardening-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/walkthroughNotesParser.ts`
+  - `scripts/test-walkthrough-notes-parser.mjs`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened the contractor Job Assistant local Walk mode parser so continuous walkthrough narration is split into separate reviewable suggestions for separate issues, rooms, components, and status changes. The parser now handles common narration separators such as `and`, `also`, `plus`, `but`, room transitions, component transitions, and comma-separated issue lists while preserving same-defect recommendation phrases as one suggestion. Walk suggestion application now avoids silently overwriting an existing finding when separate suggestions resolve to the same room/checklist item.
+- Reason for change: Contractors should be able to narrate a full inspection walkthrough naturally and trust that distinct physical issues become distinct reviewable checklist/finding suggestions instead of merged notes.
+- Tests/checks run:
+  - `git diff --check`
+  - `node scripts/test-walkthrough-notes-parser.mjs`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Local browser smoke on contractor Job Assistant Walk mode with the combined kitchen/primary-bath narration matrix string; verified five review cards, merged toilet recommendation, duplicate-target `(2)` preservation, and no saved/persisted smoke edits.
+- Known risks or follow-ups:
+  - This branch hardens local Walk mode only; the `inspection-ai` Edge Function prompt/schema remains unchanged and should receive separate parity work later if AI mode needs the same deterministic split guarantees.
+  - The duplicate-apply safeguard creates distinguishable checklist labels such as `(2)` when needed to preserve separate findings without changing the persisted report data shape.
+
 - Branch: `codex/job-work-summary-badges-v1`
 - Files changed:
   - `src/App.tsx`
