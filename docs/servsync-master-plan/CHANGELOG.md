@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/partial-invoicing-phase-2b-estimate-work-items-v1`
+- Files changed:
+  - `servsync-partial-invoicing-estimate-work-items.sql`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Phase 2B-1 SQL patch and focused sandbox E2E coverage for seeding durable `job_work_items` from accepted estimate line items when `servsync_create_job_from_estimate` creates or returns a linked job. The patch preserves accepted-estimate job creation behavior, approved-scope `rooms_with_findings`, line item source IDs, quantity/unit/price/labor/sort data, `NULL` Price Required values, and duplicate job prevention while adding duplicate work-item protection. It also hardens linked work-item invoice validation so Price Required work items cannot be billed through API/table bypasses.
+- Reason for change: Make the Phase 2A partial-invoicing UI available for real accepted-estimate jobs without broad legacy backfill, simple task sync, inspection finding conversion, manual work-item editing, job status redesign, invoice/PDF redesign, or removal of the existing whole-job invoice flow.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium` (existing foundation test passed; new Phase 2B estimate-work-item test skipped because the new SQL patch has not been applied to sandbox yet)
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - SQL patch has not been applied to sandbox or production in this implementation step; sandbox SQL rollout and verification require separate approval.
+  - Existing jobs are not globally backfilled.
+  - Simple service task sync, manual work item creation, and inspection finding conversion remain deferred.
+
 - Branch: `codex/partial-invoicing-phase-2a-v1`
 - Files changed:
   - `src/App.tsx`
