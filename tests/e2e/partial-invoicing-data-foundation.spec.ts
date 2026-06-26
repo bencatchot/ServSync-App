@@ -131,6 +131,7 @@ test.describe('partial invoicing data foundation', () => {
   let estimateWorkItemSeedingAvailable = false;
   let simpleWorkItemSyncAvailable = false;
   let manualWorkItemRpcAvailable = false;
+  let wholeJobInvoiceGuardAvailable = false;
 
   test.beforeAll(async () => {
     requireApprovedSandboxForMutation();
@@ -158,6 +159,61 @@ test.describe('partial invoicing data foundation', () => {
     });
     manualWorkItemRpcAvailable = Boolean(manualWorkItemProbe.error)
       && !/could not find the function|function .* does not exist/i.test(manualWorkItemProbe.error.message);
+
+    if (foundationAvailable) {
+      const suffix = Date.now().toString(36);
+      let probeJobId = '';
+      const probeInvoiceIds: string[] = [];
+      try {
+        const probeJob = await contractorA.client
+          .from('inspections')
+          .insert({
+            contractor_id: contractorAId,
+            homeowner_user_id: homeownerA.userId,
+            name: `Codex Whole Job Guard Probe ${suffix}`,
+            summary: 'Whole-job invoice guard probe.',
+            status: 'draft',
+            job_status: 'completed',
+            rooms_with_findings: [],
+          })
+          .select('id')
+          .single();
+        if (probeJob.error) throw probeJob.error;
+        probeJobId = probeJob.data!.id as string;
+
+        const probeWorkItem = await contractorA.client
+          .from('job_work_items')
+          .insert({
+            inspection_id: probeJobId,
+            contractor_id: contractorAId,
+            title: 'Whole-job guard probe work item',
+            line_type: 'labor',
+            quantity: 1,
+            unit: 'each',
+            unit_price_cents: 1000,
+            completion_status: 'completed',
+            billing_status: 'unbilled',
+            billable: true,
+            sort_order: 1,
+          });
+        if (probeWorkItem.error) throw probeWorkItem.error;
+
+        const guardedCreate = await contractorA.client.rpc('servsync_create_invoice_from_job', {
+          p_inspection_id: probeJobId,
+        });
+        wholeJobInvoiceGuardAvailable = Boolean(guardedCreate.error)
+          && /item-based invoicing for jobs with work items/i.test(guardedCreate.error.message);
+        if (!guardedCreate.error && guardedCreate.data?.invoice_id) {
+          probeInvoiceIds.push(guardedCreate.data.invoice_id as string);
+        }
+      } finally {
+        await cleanupCreatedInvoices(contractorA.client, probeInvoiceIds);
+        if (probeJobId) {
+          await contractorA.client.from('job_work_items').delete().eq('inspection_id', probeJobId);
+          await contractorA.client.from('inspections').delete().eq('id', probeJobId);
+        }
+      }
+    }
   });
 
   test.afterAll(async () => {
@@ -454,6 +510,154 @@ test.describe('partial invoicing data foundation', () => {
       await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
       await contractorA.client.from('inspections').delete().eq('id', jobId);
+    }
+  });
+
+  test('whole-job invoice guard preserves legacy fallback and blocks work-item-backed jobs', async ({ page }) => {
+    test.skip(!foundationAvailable, 'Partial-invoicing SQL foundation is not applied in this sandbox yet.');
+    test.skip(!wholeJobInvoiceGuardAvailable, 'Whole-job invoice guard SQL is not applied in this sandbox yet.');
+
+    const main = page.getByRole('main');
+    const suffix = Date.now().toString(36);
+    const legacyJobName = `Codex Legacy Whole Job Invoice ${suffix}`;
+    const guardedJobName = `Codex Guarded Work Item Job ${suffix}`;
+    const createdInvoiceIds: string[] = [];
+    let legacyJobId = '';
+    let guardedJobId = '';
+    let guardedWorkItemId = '';
+
+    try {
+      const legacyJob = await contractorA.client
+        .from('inspections')
+        .insert({
+          contractor_id: contractorAId,
+          homeowner_user_id: homeownerA.userId,
+          name: legacyJobName,
+          summary: 'Legacy whole-job invoice fallback smoke.',
+          status: 'draft',
+          job_status: 'completed',
+          rooms_with_findings: [],
+        })
+        .select('id')
+        .single();
+      expect(legacyJob.error, 'Legacy no-work-item job insert should succeed').toBeNull();
+      legacyJobId = legacyJob.data!.id as string;
+
+      const legacyInvoice = await contractorA.client.rpc('servsync_create_invoice_from_job', {
+        p_inspection_id: legacyJobId,
+      });
+      expect(legacyInvoice.error, 'Whole-job invoice should still work for legacy/no-work-item jobs').toBeNull();
+      expect(legacyInvoice.data?.invoice_id, 'Legacy whole-job invoice should return an invoice id').toBeTruthy();
+      expect(legacyInvoice.data?.created).toBe(true);
+      createdInvoiceIds.push(legacyInvoice.data.invoice_id as string);
+
+      const legacyLines = await contractorA.client
+        .from('invoice_line_items')
+        .select('id,job_work_item_id')
+        .eq('invoice_id', legacyInvoice.data.invoice_id);
+      expect(legacyLines.error, 'Legacy whole-job invoice lines should query').toBeNull();
+      expect(legacyLines.data!.length).toBeGreaterThan(0);
+      expect(legacyLines.data!.every(line => line.job_work_item_id === null)).toBe(true);
+
+      const guardedJob = await contractorA.client
+        .from('inspections')
+        .insert({
+          contractor_id: contractorAId,
+          homeowner_user_id: homeownerA.userId,
+          name: guardedJobName,
+          summary: 'Whole-job guard work-item-backed smoke.',
+          status: 'draft',
+          job_status: 'completed',
+          rooms_with_findings: [],
+        })
+        .select('id')
+        .single();
+      expect(guardedJob.error, 'Guarded work-item-backed job insert should succeed').toBeNull();
+      guardedJobId = guardedJob.data!.id as string;
+
+      const guardedWorkItem = await contractorA.client
+        .from('job_work_items')
+        .insert({
+          inspection_id: guardedJobId,
+          contractor_id: contractorAId,
+          title: 'Completed guarded item',
+          description: 'Completed work that should use item-based invoicing.',
+          line_type: 'labor',
+          quantity: 1,
+          unit: 'each',
+          unit_price_cents: 15500,
+          completion_status: 'completed',
+          billing_status: 'unbilled',
+          billable: true,
+          completed_at: new Date().toISOString(),
+          completed_by: contractorA.userId,
+          sort_order: 1,
+        })
+        .select('id')
+        .single();
+      expect(guardedWorkItem.error, 'Guarded job work item insert should succeed').toBeNull();
+      guardedWorkItemId = guardedWorkItem.data!.id as string;
+
+      const blockedWholeJobInvoice = await contractorA.client.rpc('servsync_create_invoice_from_job', {
+        p_inspection_id: guardedJobId,
+      });
+      expect(blockedWholeJobInvoice.error, 'Whole-job invoice should reject jobs with durable work items').toBeTruthy();
+      expect(blockedWholeJobInvoice.error!.message).toMatch(/item-based invoicing for jobs with work items/i);
+
+      await loginAs(page, 'contractor');
+      await openSidebarTab(page, /^Jobs\b/i);
+      await expectActiveTabHeading(page, /^Jobs$/i);
+      const completedJobsButton = main.getByRole('button', { name: /Completed \/ Closed Jobs/i });
+      if (await completedJobsButton.count() === 0) {
+        const backToJobs = main.getByRole('button', { name: /Back to Jobs/i }).first();
+        if (await backToJobs.count() > 0) await backToJobs.click();
+      }
+      await completedJobsButton.click();
+      const guardedRow = main.getByTestId('contractor-job-row').filter({ hasText: guardedJobName }).first();
+      await expect(guardedRow).toBeVisible({ timeout: 30_000 });
+      await expect(guardedRow.getByText(/use item-based invoicing/i)).toBeVisible();
+      await expect(guardedRow.getByRole('button', { name: /^Create Invoice$/i })).toHaveCount(0);
+      const itemBasedButton = guardedRow.getByRole('button', { name: /^Create invoice from completed items$/i });
+      await expect(itemBasedButton).toBeVisible();
+      await itemBasedButton.click();
+
+      const partialPanel = main.getByTestId('partial-invoicing-work-items-panel');
+      await expect(partialPanel).toBeVisible({ timeout: 30_000 });
+      await expect(partialPanel.getByText(/^Completed, ready to invoice$/i)).toBeVisible();
+      await expect(partialPanel.getByTestId('create-partial-invoice-from-completed-items')).toBeEnabled();
+
+      const partialInvoice = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: guardedJobId,
+        p_work_item_ids: [guardedWorkItemId],
+      });
+      expect(partialInvoice.error, 'Item-based partial invoice should remain available for completed priced work items').toBeNull();
+      const partialInvoiceId = partialInvoice.data.invoice_id as string;
+      expect(partialInvoiceId).toBeTruthy();
+      createdInvoiceIds.push(partialInvoiceId);
+
+      const wholeJobAfterPartial = await contractorA.client.rpc('servsync_create_invoice_from_job', {
+        p_inspection_id: guardedJobId,
+      });
+      expect(wholeJobAfterPartial.error, 'Whole-job invoice after a partial invoice should not create a duplicate').toBeNull();
+      expect(wholeJobAfterPartial.data?.invoice_id).toBe(partialInvoiceId);
+      expect(wholeJobAfterPartial.data?.created).toBe(false);
+
+      const guardedInvoices = await contractorA.client
+        .from('invoices')
+        .select('id')
+        .eq('job_id', guardedJobId)
+        .neq('status', 'void');
+      expect(guardedInvoices.error, 'Guarded job invoice count should query').toBeNull();
+      expect(guardedInvoices.data).toHaveLength(1);
+    } finally {
+      await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
+      if (guardedJobId) {
+        await contractorA.client.from('job_work_items').delete().eq('inspection_id', guardedJobId);
+        await contractorA.client.from('inspections').delete().eq('id', guardedJobId);
+      }
+      if (legacyJobId) {
+        await contractorA.client.from('inspections').delete().eq('id', legacyJobId);
+      }
     }
   });
 

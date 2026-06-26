@@ -18217,6 +18217,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       }
       return;
     }
+    if (workItemsForJob(job.id).length > 0) {
+      setError('Use item-based invoicing for jobs with work items.');
+      return;
+    }
     setCreatingInvoiceSourceId(`job:${job.id}`);
     try {
       const requestWillClose = Boolean(job.service_request_id && inspectionIsClosedJob(job));
@@ -18490,6 +18494,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const groups = groupedWorkItemsForJob(job.id);
     const invoiceableItems = groups.ready.filter(jobWorkItemCanInvoice);
     const missingPriceCount = groups.ready.filter(item => item.unit_price_cents === null || item.unit_price_cents === undefined).length;
+    const unavailableReason = partialInvoiceUnavailableReason(job.id);
     return (
       <div data-testid="partial-invoicing-work-items-panel" className="rounded-2xl border border-blue-200 bg-blue-50/45 p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -18528,6 +18533,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         {missingPriceCount > 0 && (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
             {missingPriceCount} completed item{missingPriceCount === 1 ? '' : 's'} need pricing before partial invoicing.
+          </p>
+        )}
+        {groups.backlog.length > 0 && (
+          <p className="mt-3 rounded-xl border border-blue-100 bg-white/75 px-3 py-2 text-xs font-semibold text-blue-900">
+            Open backlog remains on this job and is not included in item-based invoices.
+          </p>
+        )}
+        {allItems.length > 0 && invoiceableItems.length === 0 && unavailableReason && (
+          <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600">
+            {unavailableReason}
           </p>
         )}
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
@@ -21046,6 +21061,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       notBillable: items.filter(item => !item.billable || item.billing_status === 'not_billable' || item.completion_status === 'declined' || item.completion_status === 'removed'),
     };
   };
+  const partialInvoiceUnavailableReason = (jobId: string) => {
+    const groups = groupedWorkItemsForJob(jobId);
+    const readyItems = groups.ready;
+    if (readyItems.some(jobWorkItemCanInvoice)) return '';
+    const missingPriceCount = readyItems.filter(item => item.unit_price_cents === null || item.unit_price_cents === undefined).length;
+    if (missingPriceCount > 0) {
+      return `${missingPriceCount} completed item${missingPriceCount === 1 ? '' : 's'} need pricing before item-based invoicing.`;
+    }
+    if (readyItems.length === 0 && groups.backlog.length > 0 && groups.billed.length === 0) {
+      return 'No completed work items are ready yet; open backlog cannot be billed.';
+    }
+    if (groups.billed.length > 0) {
+      return 'Completed work items are already drafted or invoiced.';
+    }
+    return 'Complete and price at least one billable work item before creating an item-based invoice.';
+  };
   const partialInvoiceModalItems = partialInvoiceJob ? groupedWorkItemsForJob(partialInvoiceJob.id) : null;
   const partialInvoiceSelectedItems = partialInvoiceJob
     ? workItemsForJob(partialInvoiceJob.id).filter(item => partialInvoiceSelectedIds.has(item.id))
@@ -21192,7 +21223,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const refreshJobWorkItemsForJob = async (jobId: string) => {
-    if (!supabase) return;
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('job_work_items')
       .select('*')
@@ -21200,20 +21231,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) throw error;
+    const items = (data || []) as JobWorkItem[];
     setJobWorkItemsByJobId(prev => ({
       ...prev,
-      [jobId]: (data || []) as JobWorkItem[],
+      [jobId]: items,
     }));
+    return items;
   };
 
   const syncSimpleJobWorkItems = async (insp: Inspection) => {
-    if (!supabase || !isSimpleServiceJob(insp)) return;
+    if (!supabase || !isSimpleServiceJob(insp)) return workItemsForJob(insp.id);
     const { error } = await supabase.rpc('servsync_sync_simple_job_work_items', {
       p_inspection_id: insp.id,
     });
-    if (error && isMissingSimpleJobWorkItemSyncRpcError(error)) return;
+    if (error && isMissingSimpleJobWorkItemSyncRpcError(error)) return workItemsForJob(insp.id);
     if (error) throw error;
-    await refreshJobWorkItemsForJob(insp.id);
+    return await refreshJobWorkItemsForJob(insp.id);
   };
 
   const buildInspectionRoomsSnapshot = (
@@ -21908,7 +21941,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? { ...event, status: 'completed', updated_at: completedAt }
         : event
       ));
-      await syncSimpleJobWorkItems(completedJob);
+      const syncedWorkItems = await syncSimpleJobWorkItems(completedJob);
+      if (syncedWorkItems.length > 0) {
+        const readyCount = syncedWorkItems.filter(jobWorkItemCanInvoice).length;
+        setNotice(readyCount > 0
+          ? 'Job completed. Create an invoice from completed, priced work items when ready.'
+          : 'Job completed. Use item-based invoicing once completed work items are priced.'
+        );
+        return;
+      }
       await createInvoiceFromJob(completedJob);
     } catch (err) {
       setError(readableError(err, 'Unable to complete this job.'));
@@ -28433,6 +28474,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             invoice.status !== 'void'
                             && (invoice.job_id === insp.id || (insp.estimate_id ? invoice.estimate_id === insp.estimate_id : false))
                           ) ?? null;
+                          const jobWorkItems = workItemsForJob(insp.id);
+                          const hasDurableWorkItems = jobWorkItems.length > 0;
+                          const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
                           const showJobInvoiceAction = inspectionIsClosedJob(insp);
                           return (
                             <div
@@ -28461,9 +28505,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {!checklistStyle && insp.summary && (
                                     <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>
                                   )}
-                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && (
+                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && !hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
                                       Next step: create the invoice for this completed job.
+                                    </p>
+                                  )}
+                                  {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && hasDurableWorkItems && (
+                                    <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
+                                      Next step: use item-based invoicing for completed work items.
                                     </p>
                                   )}
                                   {!checklistStyle && linkedInvoice && (
@@ -28489,15 +28538,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 {showJobInvoiceAction && (
                                   <button
                                     type="button"
-                                    onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromJob(insp)}
-                                    disabled={creatingInvoiceSourceId === `job:${insp.id}`}
+                                    onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)}
+                                    disabled={!linkedInvoice && !hasDurableWorkItems && creatingInvoiceSourceId === `job:${insp.id}`}
                                     className={buttonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
                                   >
                                     <Receipt size={15} />
-                                    {creatingInvoiceSourceId === `job:${insp.id}`
+                                    {creatingInvoiceSourceId === `job:${insp.id}` && !hasDurableWorkItems
                                       ? 'Creating...'
                                       : linkedInvoice
                                         ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                        : hasDurableWorkItems
+                                          ? hasInvoiceableWorkItems ? 'Create invoice from completed items' : 'Open item invoicing'
                                         : 'Create Invoice'}
                                   </button>
                                 )}
@@ -29950,6 +30001,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               invoice.status !== 'void'
               && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
             ) ?? null;
+            const activeJobWorkItems = workItemsForJob(activeInspection.id);
+            const activeJobHasDurableWorkItems = activeJobWorkItems.length > 0;
+            const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);
             const linkedVisitEventForJob = contractorVisitEvents.find(event =>
               event.inspection_id === activeInspection.id && event.status !== 'cancelled'
             ) ?? null;
@@ -29991,9 +30045,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                 <div className="p-4 sm:p-5">
                   <p className="text-xs leading-5 text-slate-500">{jobTypeHelperCopy(activeInspection)}</p>
-                  {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && (
+                  {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && !activeJobHasDurableWorkItems && (
                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
                       Next step: create an invoice so the completed job has a billing record.
+                    </p>
+                  )}
+                  {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && activeJobHasDurableWorkItems && (
+                    <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
+                      Next step: create an item-based invoice from completed, priced work items.
                     </p>
                   )}
                   {linkedInvoiceForJob && (
@@ -31883,12 +31942,38 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
                         <button
                           type="button"
-                          disabled={activeInspection.status !== 'finalized' || creatingInvoiceSourceId === `job:${activeInspection.id}`}
-                          title={activeInspection.status !== 'finalized' ? 'Finalize the report before creating an invoice.' : 'Create or open the invoice for this completed work.'}
-                          onClick={() => void createInvoiceFromJob(activeInspection)}
+                          disabled={
+                            activeInspection.status !== 'finalized'
+                            || (!linkedInvoiceForJob && activeJobHasDurableWorkItems && !activeJobHasInvoiceableWorkItems)
+                            || (!activeJobHasDurableWorkItems && creatingInvoiceSourceId === `job:${activeInspection.id}`)
+                          }
+                          title={
+                            activeInspection.status !== 'finalized'
+                              ? 'Finalize the report before creating an invoice.'
+                              : linkedInvoiceForJob
+                                ? 'Open the invoice linked to this job.'
+                                : activeJobHasDurableWorkItems
+                                  ? activeJobHasInvoiceableWorkItems
+                                    ? 'Create an item-based invoice from completed, priced work items.'
+                                    : partialInvoiceUnavailableReason(activeInspection.id)
+                                  : 'Create or open the invoice for this completed work.'
+                          }
+                          onClick={() => {
+                            if (linkedInvoiceForJob) openInvoiceRecord(linkedInvoiceForJob);
+                            else if (activeJobHasDurableWorkItems) openPartialInvoiceReview(activeInspection);
+                            else void createInvoiceFromJob(activeInspection);
+                          }}
                           className="w-full flex items-center justify-center gap-2 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors bg-green-600 hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <FileText size={14} /> {creatingInvoiceSourceId === `job:${activeInspection.id}` ? 'Creating...' : activeInspection.status === 'finalized' ? 'Create Invoice' : 'Finalize Report First'}
+                          <FileText size={14} /> {creatingInvoiceSourceId === `job:${activeInspection.id}` && !activeJobHasDurableWorkItems
+                            ? 'Creating...'
+                            : activeInspection.status !== 'finalized'
+                              ? 'Finalize Report First'
+                              : linkedInvoiceForJob
+                                ? linkedInvoiceForJob.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                : activeJobHasDurableWorkItems
+                                  ? 'Create invoice from completed items'
+                                  : 'Create Invoice'}
                         </button>
 
                         <button

@@ -1,8 +1,13 @@
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import { escapeRegExp, timestampForRecord } from './helpers/customers';
+import { credentialsFor, requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+
+const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
+const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
 
 function appContextOptions() {
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
@@ -38,6 +43,47 @@ async function freshRolePage(browser: Browser, role: 'contractor' | 'homeowner')
   await loginAs(page, role);
   await dismissTourIfVisible(page);
   return { context, page, consoleErrors };
+}
+
+async function markSeededPricedWorkItemsCompleted(jobId: string) {
+  const url = requiredEnv('VITE_SUPABASE_URL');
+  if (url.includes(PRODUCTION_SUPABASE_REF) || !url.includes(SANDBOX_SUPABASE_REF)) {
+    throw new Error(`Refusing to update seeded work items outside sandbox Supabase ref ${SANDBOX_SUPABASE_REF}.`);
+  }
+  const client = createClient(url, requiredEnv('VITE_SUPABASE_ANON_KEY'), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  try {
+    const signIn = await client.auth.signInWithPassword(credentialsFor('contractor'));
+    expect(signIn.error, 'Contractor sandbox login for work-item completion should succeed').toBeNull();
+
+    const workItems = await client
+      .from('job_work_items')
+      .select('id')
+      .eq('inspection_id', jobId)
+      .eq('billable', true)
+      .eq('billing_status', 'unbilled')
+      .not('unit_price_cents', 'is', null);
+    expect(workItems.error, 'Seeded priced work items should be readable').toBeNull();
+    expect(workItems.data?.length ?? 0, 'Accepted-estimate job should have at least one priced work item').toBeGreaterThan(0);
+
+    const completedAt = new Date().toISOString();
+    const complete = await client
+      .from('job_work_items')
+      .update({
+        completion_status: 'completed',
+        completed_at: completedAt,
+        completed_by: signIn.data.user!.id,
+      })
+      .in('id', workItems.data!.map(item => item.id));
+    expect(complete.error, 'Seeded priced work items should be markable complete by the contractor').toBeNull();
+  } finally {
+    await client.auth.signOut().catch(() => undefined);
+  }
 }
 
 async function setPropertyScopeAllIfAvailable(main: Locator, label: RegExp) {
@@ -222,7 +268,11 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
     { timeout: 30_000 },
   );
   await acceptedEstimateCard.getByTestId('contractor-create-job-from-accepted-estimate').click();
-  expect((await createJobResponse).ok()).toBeTruthy();
+  const createJob = await createJobResponse;
+  expect(createJob.ok()).toBeTruthy();
+  const createJobResult = await createJob.json() as { job_id?: string };
+  expect(createJobResult.job_id, 'Accepted estimate job creation should return a job id').toBeTruthy();
+  const jobId = createJobResult.job_id!;
 
   const workCheckbox = main.locator('[data-testid="contractor-approved-work-checkbox"], [data-testid="contractor-work-item-checkbox"]').first();
   await expect(workCheckbox).toBeVisible({ timeout: 30_000 });
@@ -238,13 +288,12 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await main.getByTestId('contractor-save-job-progress').click();
   expect((await saveProgressResponse).ok()).toBeTruthy();
   await expect(main.getByText(/Progress saved/i)).toBeVisible({ timeout: 30_000 });
+  await markSeededPricedWorkItemsCompleted(jobId);
+  await page.reload();
+  await dismissTourIfVisible(page);
 
   const completeJobResponse = page.waitForResponse(
     response => response.url().includes('/rest/v1/inspections') && response.request().method() === 'PATCH',
-    { timeout: 30_000 },
-  );
-  const createInvoiceResponse = page.waitForResponse(
-    response => response.url().includes('/rpc/servsync_create_invoice_from_job'),
     { timeout: 30_000 },
   );
   const completeJob = main.getByTestId('contractor-complete-job');
@@ -252,6 +301,17 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   page.once('dialog', dialog => dialog.accept());
   await completeJob.click();
   expect((await completeJobResponse).ok()).toBeTruthy();
+
+  const partialPanel = main.getByTestId('partial-invoicing-work-items-panel');
+  await expect(partialPanel).toBeVisible({ timeout: 30_000 });
+  await expect(partialPanel.getByTestId('create-partial-invoice-from-completed-items')).toBeEnabled({ timeout: 30_000 });
+  await partialPanel.getByTestId('create-partial-invoice-from-completed-items').click();
+  await expect(main.getByRole('heading', { name: /^Create invoice from completed items$/i })).toBeVisible({ timeout: 30_000 });
+  const createInvoiceResponse = page.waitForResponse(
+    response => response.url().includes('/rpc/servsync_create_partial_invoice_from_job'),
+    { timeout: 30_000 },
+  );
+  await main.getByTestId('confirm-create-partial-invoice').click();
   expect((await createInvoiceResponse).ok()).toBeTruthy();
 
   const saveAndSendInvoice = main.getByTestId('contractor-save-and-send-invoice');
