@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/whole-job-invoice-work-item-guard-v1`
+- Files changed:
+  - `servsync-whole-job-invoice-work-item-guard.sql`
+  - `src/App.tsx`
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow whole-job invoice guardrail for work-item-backed jobs. The SQL patch updates `servsync_create_invoice_from_job(uuid)` so new whole-job invoice creation is rejected when durable `job_work_items` exist, while preserving legacy/no-work-item behavior and existing invoice return behavior. Contractor job actions now route work-item-backed jobs to item-based invoicing, show backlog helper copy, and explain why item-based invoicing is unavailable when no completed, priced, unbilled items exist. The full-core-loop E2E now follows the item-based invoice path for accepted-estimate jobs with seeded work items.
+- Reason for change: Prevent the old whole-job invoice flow from bypassing durable work-item billing safety, backlog snapshots, and Price Required safeguards now that partial/item-based invoicing is available.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Focused partial-invoicing/whole-job guard E2E coverage added; the new guard test is sandbox-gated until `servsync-whole-job-invoice-work-item-guard.sql` is applied.
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium` (4/5 passed; new guard test skipped because the new SQL patch has not been applied to sandbox yet)
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - SQL patch has not been applied to sandbox or production in this implementation step; sandbox SQL rollout and verification require separate approval.
+  - Whole-job invoicing intentionally remains available for legacy/no-work-item jobs.
+  - Legacy backfill, inspection finding conversion, invoice/PDF redesign, and remaining-balance automation remain deferred.
+
 - Branch: `codex/partial-invoicing-manual-work-items-v1`
 - Files changed:
   - `servsync-partial-invoicing-manual-work-items.sql`
