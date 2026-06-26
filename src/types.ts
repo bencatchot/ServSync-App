@@ -26,6 +26,8 @@ export type EstimateChargeType = 'flat' | 'hourly';
 export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
+export type JobWorkItemCompletionStatus = 'open' | 'completed' | 'declined' | 'removed';
+export type JobWorkItemBillingStatus = 'unbilled' | 'drafted' | 'invoiced' | 'not_billable';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
 export type SupportInquiryCategory = 'feature_request' | 'tweak' | 'bug' | 'question' | 'billing' | 'other';
 
@@ -113,6 +115,7 @@ export interface Estimate {
 export interface InvoiceLineItem {
   id: string;
   invoice_id: string;
+  job_work_item_id?: string | null;
   line_type: LegacyEstimateLineType;
   description: string;
   line_title?: string | null;
@@ -123,6 +126,46 @@ export interface InvoiceLineItem {
   unit: string;
   unit_price_cents: number | null;
   labor_hours?: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobWorkItem {
+  id: string;
+  inspection_id: string;
+  contractor_id: string;
+  source_estimate_line_item_id?: string | null;
+  reserved_invoice_id?: string | null;
+  invoiced_invoice_id?: string | null;
+  title: string;
+  description: string;
+  customer_description: string;
+  internal_notes: string;
+  line_type: EstimateLineType;
+  quantity: number;
+  unit: string;
+  unit_price_cents: number | null;
+  labor_hours?: number | null;
+  billable: boolean;
+  completion_status: JobWorkItemCompletionStatus;
+  billing_status: JobWorkItemBillingStatus;
+  completed_at?: string | null;
+  completed_by?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceBacklogItem {
+  id: string;
+  invoice_id: string;
+  job_work_item_id?: string | null;
+  title: string;
+  description: string;
+  completion_status: JobWorkItemCompletionStatus;
+  billing_status: JobWorkItemBillingStatus;
+  not_included_reason: string;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -169,6 +212,7 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
   line_items?: InvoiceLineItem[];
+  backlog_items?: InvoiceBacklogItem[];
 }
 
 export interface InvoiceDraft {
