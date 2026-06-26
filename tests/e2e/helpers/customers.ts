@@ -54,7 +54,6 @@ export async function openE2ECustomerDetail(page: Page, customerName: string) {
   const customerResult = main
     .getByRole('button')
     .filter({ hasText: customerName })
-    .filter({ hasText: 'Not invited' })
     .first();
 
   await expect(search).toBeVisible();
@@ -69,7 +68,7 @@ export async function openE2ECustomerActionPanel(page: Page, customerName: strin
   const main = page.getByRole('main');
 
   await openE2ECustomerDetail(page, customerName);
-  await main.getByRole('button', { name: /Jobs.*Create work for this customer/i }).click();
+  await main.getByRole('button', { name: /\bJobs\b.*(?:Create work for this customer|Items in progress)/i }).click();
 
   await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
   await expect(main.getByRole('button', { name: /^Create job\b/i })).toBeVisible();

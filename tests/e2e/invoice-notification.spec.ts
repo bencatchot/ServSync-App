@@ -4,6 +4,7 @@ import { captureMajorConsoleErrors } from './helpers/console';
 import {
   createLocalE2ECustomer,
   escapeRegExp,
+  openE2ECustomerActionPanel,
   timestampForRecord,
   waitForContractorWorkspaceReady,
 } from './helpers/customers';
@@ -97,12 +98,10 @@ test.describe('invoice_sent in-app notification', () => {
     await openSidebarTab(page, /Homeowners/i);
     await waitForContractorWorkspaceReady(page);
     await openCustomerByName(page, customerName);
-
-    await main.getByRole('button', { name: /Jobs.*Create work for this customer/i }).click();
-    await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
+    await openE2ECustomerActionPanel(page, customerName);
     await main.getByRole('button', { name: /^Create invoice\b/i }).click();
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByText(/^Invoice draft$/i)).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Invoice draft$/i })).toBeVisible();
 
     await main.getByRole('textbox', { name: /^Invoice title$/i }).fill(invoiceTitle);
     await main.getByRole('textbox', { name: /^(Invoice scope|Scope)$/i }).fill('E2E invoice for invoice_sent notification test.');
@@ -110,16 +109,17 @@ test.describe('invoice_sent in-app notification', () => {
     await main.getByRole('spinbutton', { name: /^(Invoice line item 1 quantity|Qty)$/i }).fill('1');
     await main.getByRole('textbox', { name: /^(Invoice line item 1 unit price|Unit price)$/i }).fill('150');
 
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save invoice draft$/i });
+    const saveInvoiceButton = main.getByRole('button', { name: /^Save Invoice$/i });
     await expect(saveInvoiceButton).toBeEnabled();
     await saveInvoiceButton.click();
     await waitForInvoiceDraftSave(main, saveInvoiceButton);
 
-    await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
     await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
     await expect(main.getByText(invoiceTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
 
-    const sendButton = main.getByRole('button', { name: /^Send Invoice$|^Send to homeowner$/i }).first();
+    const sendButton = main
+      .getByRole('button', { name: new RegExp(`Send invoice ${escapeRegExp(invoiceTitle)} to homeowner`, 'i') })
+      .first();
     await expect(sendButton).toBeVisible({ timeout: 30_000 });
     const sendPromise = page.waitForResponse(r => r.url().includes('/rpc/servsync_send_invoice'));
     await sendButton.click();

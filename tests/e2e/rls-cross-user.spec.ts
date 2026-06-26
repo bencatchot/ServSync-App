@@ -85,7 +85,23 @@ async function assertVisibleCount(
   expect(count, label).toBe(expected);
 }
 
+function firstRpcRow<T extends Record<string, unknown>>(value: unknown): T | null {
+  if (Array.isArray(value)) return (value[0] as T | undefined) ?? null;
+  if (value && typeof value === 'object') return value as T;
+  return null;
+}
+
+async function currentContractorProfileId(client: SupabaseClient, label: string): Promise<string | null> {
+  const { data, error } = await client.rpc('servsync_current_contractor_profile');
+  expect(error, `${label} current contractor profile RPC should not error`).toBeNull();
+  const profile = firstRpcRow<{ id?: string }>(data);
+  return profile?.id ?? null;
+}
+
 async function contractorProfileId(client: SupabaseClient, businessName: RegExp | string, label: string): Promise<string> {
+  const currentProfileId = await currentContractorProfileId(client, label);
+  if (currentProfileId) return currentProfileId;
+
   const query = client.from('contractor_profiles').select('id,business_name').limit(20);
   const { data, error } = await query;
   expect(error, `${label} contractor profile query should not error`).toBeNull();

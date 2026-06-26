@@ -42,7 +42,7 @@ test.describe('contractor mutating invoice creation', () => {
 
     await main.getByRole('button', { name: /^Create invoice\b/i }).click();
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByText(/^Invoice draft$/i)).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Invoice draft$/i })).toBeVisible();
     await expect(
       main.locator('p').filter({
         hasText: new RegExp(`^(?:Creating invoice for:\\s*)?${escapeRegExp(customerName)}(?:\\s*·.*)?$`, 'i'),
@@ -64,12 +64,11 @@ test.describe('contractor mutating invoice creation', () => {
     await expect(invoiceTitleField).toHaveValue(invoiceTitle);
     await expect(lineDescriptionField).toHaveValue(invoiceTitle);
 
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save invoice draft$/i });
+    const saveInvoiceButton = main.getByRole('button', { name: /^Save Invoice$/i });
     await expect(saveInvoiceButton).toBeEnabled();
     await saveInvoiceButton.click();
     await waitForInvoiceDraftSave(main, saveInvoiceButton);
 
-    await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
     await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
     await expect(main.getByText(invoiceTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(new RegExp(`${escapeRegExp(customerName)}.*Updated`, 'i'))).toBeVisible();

@@ -31,8 +31,8 @@ test.describe('contractor mutating report finalization', () => {
 
     await main.getByRole('button', { name: /^Create job\b/i }).click();
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^New job$/i })).toBeVisible();
-    await expect(main.getByText(new RegExp(`Creating job for:\\s*${escapeRegExp(customerName)}`, 'i'))).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
+    await expect(main.getByRole('combobox', { name: /Customer/i })).toContainText(customerName);
 
     await main.getByRole('button', { name: /Checklist \/ Report Job/i }).click();
     const starterTemplateSelect = main.locator('select:has(option[value="starter:starter-general-maintenance-field-work"])');
@@ -70,12 +70,16 @@ test.describe('contractor mutating report finalization', () => {
     await expect(findingCard.getByTestId('inspection-finding-notes')).toHaveValue(findingNote);
     await expect(findingCard.getByTestId('inspection-finding-action')).toHaveValue(recommendedAction);
 
-    await main.getByRole('button', { name: /^Review report$/i }).click();
-    await expect(main.getByText(/Report review is ready/i)).toBeVisible();
-    await expect(main.getByText(/Finalize saves the PDF and files the report/i)).toBeVisible();
-    await expect(main.getByText(/Finalize the report before sending it/i)).toBeVisible();
+    await main.getByRole('button', { name: /^Report$/i }).click();
+    await expect(main.getByText(/Close the job for review/i).first()).toBeVisible();
+
+    const closeForReviewButton = main.getByRole('button', { name: /^Close for Review$/i });
+    await expect(closeForReviewButton).toBeEnabled();
+    await closeForReviewButton.click();
+
+    await expect(main.getByText(/Finalize saves the PDF/i).first()).toBeVisible();
     const finalizeButton = main.getByRole('button', { name: /^Finalize Report$/i });
-    await expect(finalizeButton).toBeEnabled();
+    await expect(finalizeButton).toBeEnabled({ timeout: 30_000 });
 
     page.once('dialog', async dialog => {
       expect(dialog.message()).toMatch(/Finalize this new customer job report/i);
