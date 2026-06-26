@@ -4,6 +4,39 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-26
+
+- Branch: `codex/partial-invoicing-data-foundation-v1`
+- Files changed:
+  - `servsync-partial-invoicing-data-foundation.sql`
+  - `src/types.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Phase 1 backlog-aware partial invoicing data foundation. The SQL patch introduces durable `job_work_items`, `invoice_line_items.job_work_item_id`, `invoice_backlog_items`, invoice-line guards, reservation/release triggers, a guarded `servsync_create_partial_invoice_from_job` RPC, and send/void invoice lifecycle updates that promote drafted work items to invoiced or release them back to unbilled.
+- Reason for change: Prepare the backend safety layer needed for future contractor UI that can invoice only completed billable job work items while leaving open items attached to the job as backlog and excluding backlog from invoice totals.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Applied `servsync-partial-invoicing-data-foundation.sql` to the approved sandbox Supabase project `zpzdkoaubyjtsomccxya` only.
+  - Sandbox catalog verification confirming `job_work_items`, `invoice_line_items.job_work_item_id`, `invoice_backlog_items`, RLS policies, security-definer functions with `search_path=public`, reservation/release triggers, and restricted `authenticated` table grants.
+  - Focused sandbox Playwright/Supabase test for partial-invoicing data foundation.
+  - Contractor smoke test.
+  - Homeowner smoke test.
+  - Expanded RLS/privacy Playwright suite.
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no production SQL, Supabase/Vercel/env/settings, production-data, or user-record changes were made.
+- Known risks or follow-ups:
+  - SQL patch has been applied and validated in sandbox only; production SQL application requires separate approval after PR review.
+  - The existing contractor job UI, homeowner invoice display, and invoice PDF backlog section are intentionally deferred.
+  - Existing jobs are not backfilled into `job_work_items` by this slice; future UI/migration work must decide how to seed durable work items from existing checklist JSON and estimate lines.
+  - The full core-loop Playwright test currently has unrelated Service Requests wizard test drift around the property-to-issue step; contractor smoke, homeowner smoke, expanded RLS/privacy coverage, and the focused partial-invoicing foundation test passed.
+
 ## 2026-06-24
 
 - Branch: `feature/custom-pricing-csv-upload-v1`
