@@ -75,6 +75,7 @@ test.describe('partial invoicing data foundation', () => {
   let contractorAId: string;
   let foundationAvailable = false;
   let estimateWorkItemSeedingAvailable = false;
+  let simpleWorkItemSyncAvailable = false;
 
   test.beforeAll(async () => {
     requireApprovedSandboxForMutation();
@@ -91,6 +92,11 @@ test.describe('partial invoicing data foundation', () => {
     });
     estimateWorkItemSeedingAvailable = Boolean(seedProbe.error)
       && !/could not find the function|function .* does not exist/i.test(seedProbe.error.message);
+    const simpleSyncProbe = await contractorA.client.rpc('servsync_sync_simple_job_work_items', {
+      p_inspection_id: crypto.randomUUID(),
+    });
+    simpleWorkItemSyncAvailable = Boolean(simpleSyncProbe.error)
+      && !/could not find the function|function .* does not exist/i.test(simpleSyncProbe.error.message);
   });
 
   test.afterAll(async () => {
@@ -593,6 +599,259 @@ test.describe('partial invoicing data foundation', () => {
       if (estimateId) {
         await contractorA.client.from('estimate_line_items').delete().eq('estimate_id', estimateId);
         await contractorA.client.from('estimates').delete().eq('id', estimateId);
+      }
+    }
+  });
+
+  test('simple service work item sync creates durable source-backed items safely', async () => {
+    test.skip(!foundationAvailable, 'Partial-invoicing SQL foundation is not applied in this sandbox yet.');
+    test.skip(!simpleWorkItemSyncAvailable, 'Partial-invoicing simple work-item sync SQL is not applied in this sandbox yet.');
+
+    const suffix = Date.now().toString(36);
+    const jobName = `Codex Simple Work Items ${suffix}`;
+    const createdInvoiceIds: string[] = [];
+    let jobId = '';
+
+    const workItemsRoom = {
+      room: 'Work Items',
+      room_id: `codex-simple-room-${suffix}`,
+      display_name: 'Work Items',
+      findings: [
+        {
+          source_key: `codex-simple-task-a-${suffix}`,
+          source_type: 'simple_task',
+          source_room_id: `codex-simple-room-${suffix}`,
+          source_finding_id: `codex-simple-task-a-${suffix}`,
+          title: 'Replace faucet cartridge',
+          status: 'Fixed On Site',
+          notes: 'Internal parts note should stay contractor-side.',
+          action: 'Replaced the failed faucet cartridge.',
+          due: '',
+          photos: [],
+        },
+        {
+          source_key: `codex-simple-task-b-${suffix}`,
+          source_type: 'simple_task',
+          source_room_id: `codex-simple-room-${suffix}`,
+          source_finding_id: `codex-simple-task-b-${suffix}`,
+          title: 'Check slow drain',
+          status: 'Monitor',
+          notes: 'Needs a follow-up if it slows again.',
+          action: '',
+          due: '',
+          photos: [],
+        },
+        {
+          title: 'Legacy ambiguous task without source key',
+          status: 'Fixed On Site',
+          notes: '',
+          action: '',
+          due: '',
+          photos: [],
+        },
+      ],
+    };
+
+    try {
+      const jobInsert = await contractorA.client
+        .from('inspections')
+        .insert({
+          contractor_id: contractorAId,
+          homeowner_user_id: homeownerA.userId,
+          name: jobName,
+          summary: 'Simple job with JSON-backed work items.',
+          status: 'draft',
+          job_status: 'draft',
+          job_type: 'service_visit',
+          rooms_with_findings: [
+            workItemsRoom,
+            {
+              room: 'Kitchen',
+              room_id: `codex-general-room-${suffix}`,
+              display_name: 'Kitchen',
+              findings: [
+                {
+                  source_key: `codex-general-finding-${suffix}`,
+                  title: 'General inspection finding should not sync',
+                  status: 'Fixed On Site',
+                  notes: '',
+                  action: '',
+                  due: '',
+                  photos: [],
+                },
+              ],
+            },
+          ],
+        })
+        .select('id')
+        .single();
+
+      expect(jobInsert.error, 'Simple service smoke job insert should succeed').toBeNull();
+      jobId = jobInsert.data!.id as string;
+
+      const firstSync = await contractorA.client.rpc('servsync_sync_simple_job_work_items', {
+        p_inspection_id: jobId,
+      });
+      expect(firstSync.error, 'Simple work item sync should succeed').toBeNull();
+      expect(firstSync.data?.synced_count).toBe(2);
+      expect(firstSync.data?.skipped_missing_source_key_count).toBe(1);
+
+      const syncedItems = await contractorA.client
+        .from('job_work_items')
+        .select('id,source_type,source_key,source_room_id,source_finding_id,title,description,customer_description,internal_notes,line_type,quantity,unit,unit_price_cents,billable,completion_status,billing_status,sort_order')
+        .eq('inspection_id', jobId)
+        .order('sort_order', { ascending: true });
+      expect(syncedItems.error, 'Synced simple work item query should succeed').toBeNull();
+      expect(syncedItems.data).toHaveLength(2);
+      expect(syncedItems.data![0].source_type).toBe('simple_task');
+      expect(syncedItems.data![0].source_key).toBe(`codex-simple-task-a-${suffix}`);
+      expect(syncedItems.data![0].source_room_id).toBe(`codex-simple-room-${suffix}`);
+      expect(syncedItems.data![0].source_finding_id).toBe(`codex-simple-task-a-${suffix}`);
+      expect(syncedItems.data![0].title).toBe('Replace faucet cartridge');
+      expect(syncedItems.data![0].customer_description).toBe('Replaced the failed faucet cartridge.');
+      expect(syncedItems.data![0].internal_notes).toBe('Internal parts note should stay contractor-side.');
+      expect(syncedItems.data![0].line_type).toBe('other');
+      expect(Number(syncedItems.data![0].quantity)).toBe(1);
+      expect(syncedItems.data![0].unit).toBe('each');
+      expect(syncedItems.data![0].unit_price_cents).toBeNull();
+      expect(syncedItems.data![0].billable).toBe(true);
+      expect(syncedItems.data![0].completion_status).toBe('completed');
+      expect(syncedItems.data![0].billing_status).toBe('unbilled');
+      expect(syncedItems.data![1].completion_status).toBe('open');
+
+      const secondSync = await contractorA.client.rpc('servsync_sync_simple_job_work_items', {
+        p_inspection_id: jobId,
+      });
+      expect(secondSync.error, 'Repeating simple work item sync should succeed').toBeNull();
+      const duplicateCheck = await contractorA.client
+        .from('job_work_items')
+        .select('id')
+        .eq('inspection_id', jobId);
+      expect(duplicateCheck.error, 'Duplicate check query should succeed').toBeNull();
+      expect(duplicateCheck.data).toHaveLength(2);
+
+      const renamedRooms = [
+        {
+          ...workItemsRoom,
+          findings: [
+            {
+              ...workItemsRoom.findings[0],
+              title: 'Replace faucet cartridge and handle',
+              status: 'Monitor',
+              action: 'Faucet still needs final trim confirmation.',
+            },
+          ],
+        },
+      ];
+      const renameUpdate = await contractorA.client
+        .from('inspections')
+        .update({ rooms_with_findings: renamedRooms })
+        .eq('id', jobId);
+      expect(renameUpdate.error, 'Renamed simple task JSON update should succeed').toBeNull();
+
+      const renameSync = await contractorA.client.rpc('servsync_sync_simple_job_work_items', {
+        p_inspection_id: jobId,
+      });
+      expect(renameSync.error, 'Renaming with same source key should sync').toBeNull();
+      expect(renameSync.data?.removed_count).toBe(1);
+
+      const afterRename = await contractorA.client
+        .from('job_work_items')
+        .select('id,title,completion_status,billing_status,billable,source_key')
+        .eq('inspection_id', jobId)
+        .order('sort_order', { ascending: true });
+      expect(afterRename.error, 'Post-rename work item query should succeed').toBeNull();
+      expect(afterRename.data).toHaveLength(2);
+      const renamedItem = afterRename.data!.find(item => item.source_key === `codex-simple-task-a-${suffix}`)!;
+      const removedItem = afterRename.data!.find(item => item.source_key === `codex-simple-task-b-${suffix}`)!;
+      expect(renamedItem.id).toBe(syncedItems.data![0].id);
+      expect(renamedItem.title).toBe('Replace faucet cartridge and handle');
+      expect(renamedItem.completion_status).toBe('open');
+      expect(renamedItem.billing_status).toBe('unbilled');
+      expect(removedItem.completion_status).toBe('removed');
+      expect(removedItem.billing_status).toBe('not_billable');
+      expect(removedItem.billable).toBe(false);
+
+      const completeAndPrice = await contractorA.client
+        .from('job_work_items')
+        .update({
+          completion_status: 'completed',
+          unit_price_cents: 14500,
+          completed_at: new Date().toISOString(),
+          completed_by: contractorA.userId,
+        })
+        .eq('id', renamedItem.id);
+      expect(completeAndPrice.error, 'Completing and pricing synced simple work item should succeed').toBeNull();
+
+      const partialInvoice = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [renamedItem.id],
+      });
+      expect(partialInvoice.error, 'Completed priced synced simple work item should be invoiceable').toBeNull();
+      const invoiceId = partialInvoice.data.invoice_id as string;
+      expect(invoiceId).toBeTruthy();
+      createdInvoiceIds.push(invoiceId);
+
+      const draftedState = await contractorA.client
+        .from('job_work_items')
+        .select('billing_status,reserved_invoice_id,title,completion_status')
+        .eq('id', renamedItem.id)
+        .single();
+      expect(draftedState.error, 'Drafted synced simple work item state should query').toBeNull();
+      expect(draftedState.data!.billing_status).toBe('drafted');
+      expect(draftedState.data!.reserved_invoice_id).toBe(invoiceId);
+
+      const resetJsonUpdate = await contractorA.client
+        .from('inspections')
+        .update({
+          rooms_with_findings: [
+            {
+              ...workItemsRoom,
+              findings: [
+                {
+                  ...workItemsRoom.findings[0],
+                  title: 'Should not overwrite drafted work item title',
+                  status: 'Monitor',
+                },
+              ],
+            },
+          ],
+        })
+        .eq('id', jobId);
+      expect(resetJsonUpdate.error, 'Drafted reset JSON update should succeed').toBeNull();
+
+      const draftedSync = await contractorA.client.rpc('servsync_sync_simple_job_work_items', {
+        p_inspection_id: jobId,
+      });
+      expect(draftedSync.error, 'Sync should not reset drafted work items').toBeNull();
+
+      const preservedDrafted = await contractorA.client
+        .from('job_work_items')
+        .select('billing_status,title,completion_status,reserved_invoice_id')
+        .eq('id', renamedItem.id)
+        .single();
+      expect(preservedDrafted.error, 'Preserved drafted work item query should succeed').toBeNull();
+      expect(preservedDrafted.data!.billing_status).toBe('drafted');
+      expect(preservedDrafted.data!.title).toBe('Replace faucet cartridge and handle');
+      expect(preservedDrafted.data!.completion_status).toBe('completed');
+      expect(preservedDrafted.data!.reserved_invoice_id).toBe(invoiceId);
+
+      const generalFindingRows = await contractorA.client
+        .from('job_work_items')
+        .select('id')
+        .eq('inspection_id', jobId)
+        .eq('source_key', `codex-general-finding-${suffix}`);
+      expect(generalFindingRows.error, 'General finding work item query should succeed').toBeNull();
+      expect(generalFindingRows.data).toHaveLength(0);
+    } finally {
+      if (createdInvoiceIds.length > 0) {
+        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
+      }
+      if (jobId) {
+        await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
+        await contractorA.client.from('inspections').delete().eq('id', jobId);
       }
     }
   });

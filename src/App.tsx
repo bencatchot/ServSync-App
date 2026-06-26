@@ -1414,7 +1414,17 @@ const SIMPLE_WORK_ITEMS_ROOM = 'Work Items';
 const FINDING_KEY_SEPARATOR = '||';
 
 type RoomIdentitySource = Pick<InspectionRoomData, 'room' | 'room_id' | 'display_name' | 'room_type' | 'location_note' | 'reference_photo_storage_path' | 'sort_order' | 'last_edited_by' | 'last_edited_at'>;
-type LocalFindingState = { status: FindingStatus; notes: string; action: string; due: string; photos: string[] };
+type LocalFindingState = {
+  source_key?: string;
+  source_type?: string;
+  source_room_id?: string;
+  source_finding_id?: string;
+  status: FindingStatus;
+  notes: string;
+  action: string;
+  due: string;
+  photos: string[];
+};
 type InspectionLayoutSnapshotRoom = {
   room_key: string;
   room_id: string;
@@ -1440,6 +1450,30 @@ function createClientRoomId(label?: string) {
   } catch {
     return `local-${seed}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
+}
+
+function createClientFindingSourceKey(label?: string) {
+  const seed = (label || 'task')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32) || 'task';
+  try {
+    return `simple-task-${seed}-${crypto.randomUUID()}`;
+  } catch {
+    return `simple-task-${seed}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
+function findingSourceKey(finding?: Pick<InspectionRoomFinding, 'source_key' | 'source_finding_id' | 'title'> | null) {
+  return (finding?.source_key || finding?.source_finding_id || '').trim();
+}
+
+function isMissingSimpleJobWorkItemSyncRpcError(error: unknown) {
+  const err = error as { code?: string; message?: string; details?: string; hint?: string } | null | undefined;
+  const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`;
+  return err?.code === 'PGRST202'
+    || /servsync_sync_simple_job_work_items/i.test(text) && /function|schema cache|could not find|does not exist/i.test(text);
 }
 
 function roomDisplayLabel(room?: Partial<RoomIdentitySource> | null) {
@@ -16426,7 +16460,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     schedule_notes: '',
     share_with_homeowner: false,
   });
-  const [localFindings, setLocalFindings] = useState<Record<string, { status: FindingStatus; notes: string; action: string; due: string; photos: string[] }>>({});
+  const [localFindings, setLocalFindings] = useState<Record<string, LocalFindingState>>({});
   const [inspectionClosedForReview, setInspectionClosedForReview] = useState(false);
   const [simpleTaskTitleDraft, setSimpleTaskTitleDraft] = useState('');
   const [repairEstimateDrafts, setRepairEstimateDrafts] = useState<Record<string, RepairEstimateLineDraft[]>>({});
@@ -20957,6 +20991,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return home ? [home.nickname, location].filter(Boolean).join(' — ') : '';
   };
 
+  const refreshJobWorkItemsForJob = async (jobId: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('job_work_items')
+      .select('*')
+      .eq('inspection_id', jobId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    setJobWorkItemsByJobId(prev => ({
+      ...prev,
+      [jobId]: (data || []) as JobWorkItem[],
+    }));
+  };
+
+  const syncSimpleJobWorkItems = async (insp: Inspection) => {
+    if (!supabase || !isSimpleServiceJob(insp)) return;
+    const { error } = await supabase.rpc('servsync_sync_simple_job_work_items', {
+      p_inspection_id: insp.id,
+    });
+    if (error && isMissingSimpleJobWorkItemSyncRpcError(error)) return;
+    if (error) throw error;
+    await refreshJobWorkItemsForJob(insp.id);
+  };
+
   const buildInspectionRoomsSnapshot = (
     findingsByKey: Record<string, LocalFindingState> = localFindings,
   ): InspectionRoomData[] => activeRooms.map((r, index) => ({
@@ -20965,6 +21024,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const key = findingStateKey(r, item);
       const local = findingsByKey[key];
       return {
+        ...(local?.source_key ? { source_key: local.source_key } : {}),
+        ...(local?.source_type ? { source_type: local.source_type } : {}),
+        ...(local?.source_room_id ? { source_room_id: local.source_room_id } : {}),
+        ...(local?.source_finding_id ? { source_finding_id: local.source_finding_id } : {}),
         title: item,
         status: (local?.status ?? 'Pass') as FindingStatus,
         notes: cleanHumanWrittenText(local?.notes ?? ''),
@@ -21161,6 +21224,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (updateError) throw updateError;
     setActiveInspection(prev => prev ? { ...prev, rooms_with_findings: rooms, summary: cleanedSummary } : prev);
     setInspections(prev => prev.map(i => i.id === insp.id ? { ...i, rooms_with_findings: rooms, summary: cleanedSummary } : i));
+    if (isSimpleServiceJob({ ...insp, rooms_with_findings: rooms, summary: cleanedSummary })) {
+      await syncSimpleJobWorkItems({ ...insp, rooms_with_findings: rooms, summary: cleanedSummary });
+    }
     if (!options?.silent) setNotice('Progress saved.');
   };
 
@@ -21275,6 +21341,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           ? [{
               ...roomIdentityFields({ room: SIMPLE_WORK_ITEMS_ROOM, display_name: SIMPLE_WORK_ITEMS_ROOM }, 0),
               findings: serviceTaskTitles.map(title => ({
+                source_key: createClientFindingSourceKey(title),
+                source_type: 'simple_task',
                 title,
                 status: 'Monitor' as FindingStatus,
                 notes: '',
@@ -21373,7 +21441,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setActiveRooms(activeRoomSeed);
       setAvailableChecklistRooms(activeRoomSeed);
       const init: Record<string, LocalFindingState> = {};
-      seedFindings.forEach(rd => rd.findings.forEach(f => { init[findingStateKey(rd, f.title)] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: [] }; }));
+      seedFindings.forEach(rd => rd.findings.forEach(f => {
+        const sourceKey = findingSourceKey(f);
+        init[findingStateKey(rd, f.title)] = {
+          ...(sourceKey ? { source_key: sourceKey, source_type: f.source_type || 'simple_task', source_room_id: rd.room_id || roomIdentityKey(rd), source_finding_id: f.source_finding_id || sourceKey } : {}),
+          status: f.status,
+          notes: f.notes,
+          action: f.action ?? '',
+          due: f.due ?? '',
+          photos: [],
+        };
+      }));
       setLocalFindings(init);
       setInspectionSummary(isSimpleJobDraft ? trimmedScope : '');
       setIncludeReportSummary(true);
@@ -21382,6 +21460,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInspectionClosedForReview(false);
       setSelectedChecklistRoom(activeRoomSeed[0]?.room ?? null);
       setInspections(prev => [newInspection, ...prev]);
+      if (isSimpleJobDraft) {
+        await syncSimpleJobWorkItems(newInspection);
+      }
       if (scheduledDate && scheduledVisitResult?.visit_event_id) {
         setContractorVisitEvents(prev => [{
           id: String(scheduledVisitResult?.visit_event_id),
@@ -21627,6 +21708,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ? { ...event, status: 'completed', updated_at: completedAt }
         : event
       ));
+      await syncSimpleJobWorkItems(completedJob);
       await createInvoiceFromJob(completedJob);
     } catch (err) {
       setError(readableError(err, 'Unable to complete this job.'));
@@ -21689,7 +21771,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setIncludeReportValueAdd(storedDraft?.include_value_add ?? true);
     setReportValueAddText(storedDraft?.value_add_text ?? buildValueAddText(normalizedRoomsWithFindings));
     const init: Record<string, LocalFindingState> = {};
-    normalizedRoomsWithFindings.forEach(rd => rd.findings.forEach(f => { init[findingStateKey(rd, f.title)] = { status: f.status, notes: f.notes, action: f.action ?? '', due: f.due ?? '', photos: f.photos ?? [] }; }));
+    normalizedRoomsWithFindings.forEach(rd => rd.findings.forEach(f => {
+      const sourceKey = findingSourceKey(f)
+        || (isSimpleServiceJob(insp) && roomIsSimpleWorkItems(rd.room) ? createClientFindingSourceKey(f.title) : '');
+      init[findingStateKey(rd, f.title)] = {
+        ...(sourceKey ? { source_key: sourceKey } : {}),
+        ...(sourceKey ? { source_type: f.source_type || 'simple_task' } : {}),
+        ...(sourceKey ? { source_room_id: f.source_room_id || rd.room_id || roomIdentityKey(rd) } : {}),
+        ...(sourceKey ? { source_finding_id: f.source_finding_id || sourceKey } : {}),
+        status: f.status,
+        notes: f.notes,
+        action: f.action ?? '',
+        due: f.due ?? '',
+        photos: f.photos ?? [],
+      };
+    }));
     setLocalFindings(init);
     setInspectionClosedForReview(false);
     const selectedRoom = findRoomByIdentity(rooms, options?.selectedRoom);
@@ -29623,7 +29719,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               findings: rm.items.map(item => {
                 const key = findingStateKey(rm, item);
                 const local = localFindings[key];
-                return { title: item, status: (local?.status ?? 'Pass') as FindingStatus, notes: local?.notes ?? '', action: local?.action ?? '', due: local?.due ?? '', photos: local?.photos ?? [] };
+                return {
+                  ...(local?.source_key ? { source_key: local.source_key } : {}),
+                  ...(local?.source_type ? { source_type: local.source_type } : {}),
+                  ...(local?.source_room_id ? { source_room_id: local.source_room_id } : {}),
+                  ...(local?.source_finding_id ? { source_finding_id: local.source_finding_id } : {}),
+                  title: item,
+                  status: (local?.status ?? 'Pass') as FindingStatus,
+                  notes: local?.notes ?? '',
+                  action: local?.action ?? '',
+                  due: local?.due ?? '',
+                  photos: local?.photos ?? [],
+                };
               }),
             }));
             const workingFindings = workingRooms.flatMap(r => r.findings);
@@ -29729,7 +29836,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               ) => {
                 const key = findingStateKey(room, title);
                 setLocalFindings(prev => {
-                  const current = prev[key] ?? { status: 'Monitor' as FindingStatus, notes: '', action: '', due: '', photos: [] };
+                  const sourceKey = createClientFindingSourceKey(title);
+                  const current = prev[key] ?? {
+                    source_key: sourceKey,
+                    source_type: 'simple_task',
+                    source_room_id: room.room_id || roomIdentityKey(room),
+                    source_finding_id: sourceKey,
+                    status: 'Monitor' as FindingStatus,
+                    notes: '',
+                    action: '',
+                    due: '',
+                    photos: [],
+                  };
                   return { ...prev, [key]: { ...current, ...updates } };
                 });
               };
@@ -29744,6 +29862,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 const workItemsRoom = activeRooms.find(room => roomIsSimpleWorkItems(room.room))
                   ?? roomIdentityFields({ room: SIMPLE_WORK_ITEMS_ROOM, display_name: SIMPLE_WORK_ITEMS_ROOM });
                 const key = findingStateKey(workItemsRoom, title);
+                const sourceKey = createClientFindingSourceKey(title);
                 setActiveRooms(prev => {
                   const hasRoom = prev.some(room => roomIsSimpleWorkItems(room.room));
                   if (!hasRoom) return [...prev, { ...workItemsRoom, items: [title] }];
@@ -29756,7 +29875,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 });
                 setLocalFindings(prev => ({
                   ...prev,
-                  [key]: { status: 'Monitor', notes: '', action: '', due: '', photos: [] },
+                  [key]: {
+                    source_key: sourceKey,
+                    source_type: 'simple_task',
+                    source_room_id: workItemsRoom.room_id || roomIdentityKey(workItemsRoom),
+                    source_finding_id: sourceKey,
+                    status: 'Monitor',
+                    notes: '',
+                    action: '',
+                    due: '',
+                    photos: [],
+                  },
                 }));
                 setSimpleTaskTitleDraft('');
               };

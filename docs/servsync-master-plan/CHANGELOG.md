@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/partial-invoicing-phase-2b-simple-work-items-v1`
+- Files changed:
+  - `servsync-partial-invoicing-simple-work-items.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the Phase 2B-2 foundation for syncing simple service job `Work Items` tasks into durable source-backed `job_work_items`. The SQL patch adds source metadata, duplicate prevention, and a guarded `servsync_sync_simple_job_work_items(uuid)` RPC that syncs only the synthetic simple-job `Work Items` room, preserves drafted/invoiced work-item history, marks removed unbilled simple tasks safely, and avoids converting general inspection findings. The app now generates/preserves stable source keys for simple service tasks and calls the sync RPC after simple job creation, save, and completion.
+- Reason for change: Make durable work items available for simple service jobs without broad legacy backfill, general inspection finding conversion, manual work-item editing, job status redesign, invoice/PDF redesign, or removal of the existing whole-job invoice flow.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Applied `servsync-partial-invoicing-simple-work-items.sql` to the approved sandbox Supabase project `zpzdkoaubyjtsomccxya` only.
+  - Sandbox catalog verification confirming `job_work_items` source metadata columns, source-backed unique index, `servsync_sync_simple_job_work_items(uuid)`, `SECURITY DEFINER`, `search_path=public`, and no `PUBLIC`/`anon` execute grants.
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - Sandbox smoke-row cleanup check: 0 matching Codex partial-invoicing smoke rows remain.
+  - Changed added-line secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - SQL patch has been applied and validated in sandbox only; production SQL application requires separate approval after PR review.
+  - Existing legacy simple jobs without stable source keys are not globally backfilled; opened/saved simple tasks can receive stable source keys going forward.
+  - Manual work item creation and explicit inspection-finding-to-work-item conversion remain deferred.
+
 - Branch: `codex/partial-invoicing-phase-2b-estimate-work-items-v1`
 - Files changed:
   - `servsync-partial-invoicing-estimate-work-items.sql`
