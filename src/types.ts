@@ -135,6 +135,10 @@ export interface JobWorkItem {
   id: string;
   inspection_id: string;
   contractor_id: string;
+  source_type?: string | null;
+  source_key?: string | null;
+  source_room_id?: string | null;
+  source_finding_id?: string | null;
   source_estimate_line_item_id?: string | null;
   reserved_invoice_id?: string | null;
   invoiced_invoice_id?: string | null;
@@ -836,6 +840,10 @@ export type HomeDocumentUploadSource =
 export type FindingStatus = 'Pass' | 'Monitor' | 'Fixed On Site' | 'Needs Repair' | 'Urgent';
 
 export interface InspectionRoomFinding {
+  source_key?: string;
+  source_type?: string;
+  source_room_id?: string;
+  source_finding_id?: string;
   title: string;
   status: FindingStatus;
   notes: string;
