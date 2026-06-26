@@ -364,6 +364,57 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-22
 
+- Branch: `feature/marketing-demo-data-screenshots-v1`
+- Files changed:
+  - `.gitignore`
+  - `package.json`
+  - `scripts/demo-data/demoRecords.ts`
+  - `scripts/demo-data/servsync-demo-dataset.ts`
+  - `tests/marketing-screenshots/playwright.marketing.config.ts`
+  - `tests/marketing-screenshots/capture-marketing-screenshots.spec.ts`
+  - `tests/marketing-screenshots/helpers/marketingAuth.ts`
+  - `tests/marketing-screenshots/helpers/marketingEnv.ts`
+  - `tests/marketing-screenshots/helpers/screenshotOutput.ts`
+  - `docs/marketing-screenshots/README.md`
+  - `docs/marketing-screenshots/demo-data-policy.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added non-production-only marketing demo data setup scaffolding and a dedicated Playwright marketing screenshot capture suite. The setup script uses manually created demo auth accounts, requires explicit confirmation, defaults to dry-run, blocks production app/Supabase targets, and prepares fake demo records only through browser-safe Supabase/RPC paths when applied. Screenshot output and auth/session artifacts are ignored.
+- Reason for change: Support realistic, fake, repeatable marketing screenshots without using real homeowner/contractor/customer data, creating auth users, applying SQL, changing Supabase/Vercel settings, or touching production.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Demo data setup dry run with non-production localhost/sandbox env placeholders.
+  - Demo data production app/Supabase guard self-check.
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Actual demo data application requires manually created sandbox/preview demo auth accounts and explicit approval to run against a non-production target.
+  - Screenshot capture requires a running non-production app and demo credentials; authenticated screenshot smoke was not run without those credentials.
+  - If stable screenshot selectors are needed later, add them in a separate approved UI-only slice.
+
+- Branch: `feature/marketing-demo-data-screenshots-v1`
+- Files changed:
+  - `tests/marketing-screenshots/helpers/marketingAuth.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Tightened the marketing screenshot login helper so authenticated screenshot capture finds the active auth form by email/password/sign-in controls, clears stale browser session state before login, and reports a clear error when a preview URL points to a missing Vercel deployment.
+- Reason for change: Authenticated marketing screenshot smoke exposed a brittle sign-in-heading assumption and an unclear failure mode when the preview deployment URL was unavailable.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npm run screenshots:marketing -- --project=desktop`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npm run screenshots:marketing`
+  - Production URL block check for marketing screenshots.
+  - Changed-file secret-value scan.
+  - Static scope scan confirming no app UI, SQL/schema/RLS/RPC/auth/storage/Supabase/Vercel/env/settings/production-data/user-record files changed.
+- Known risks or follow-ups:
+  - Full authenticated screenshot capture still requires a reachable non-production deployment and demo credentials.
+
 - Branch: `codex/business-profile-nav-tiles-v1`
 - Files changed:
   - `src/App.tsx`
