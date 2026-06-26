@@ -74,6 +74,7 @@ test.describe('partial invoicing data foundation', () => {
   let homeownerA: AuthenticatedClient;
   let contractorAId: string;
   let foundationAvailable = false;
+  let estimateWorkItemSeedingAvailable = false;
 
   test.beforeAll(async () => {
     requireApprovedSandboxForMutation();
@@ -84,6 +85,12 @@ test.describe('partial invoicing data foundation', () => {
     homeownerA = await signInAs('homeowner');
     contractorAId = await contractorProfileId(contractorA);
     foundationAvailable = await foundationTableExists(contractorA.client);
+    const seedProbe = await contractorA.client.rpc('servsync_seed_job_work_items_from_estimate', {
+      p_estimate_id: crypto.randomUUID(),
+      p_inspection_id: crypto.randomUUID(),
+    });
+    estimateWorkItemSeedingAvailable = Boolean(seedProbe.error)
+      && !/could not find the function|function .* does not exist/i.test(seedProbe.error.message);
   });
 
   test.afterAll(async () => {
@@ -384,6 +391,209 @@ test.describe('partial invoicing data foundation', () => {
       }
       await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
       await contractorA.client.from('inspections').delete().eq('id', jobId);
+    }
+  });
+
+  test('accepted estimate job creation seeds durable work items without duplicates', async () => {
+    test.skip(!foundationAvailable, 'Partial-invoicing SQL foundation is not applied in this sandbox yet.');
+    test.skip(!estimateWorkItemSeedingAvailable, 'Partial-invoicing estimate work-item seeding SQL is not applied in this sandbox yet.');
+
+    const suffix = Date.now().toString(36);
+    const estimateTitle = `Codex Estimate Work Items ${suffix}`;
+    const createdInvoiceIds: string[] = [];
+    let estimateId = '';
+    let jobId = '';
+
+    try {
+      const estimateInsert = await contractorA.client
+        .from('estimates')
+        .insert({
+          contractor_id: contractorAId,
+          homeowner_user_id: homeownerA.userId,
+          title: estimateTitle,
+          scope: 'Accepted estimate scope for durable work-item seeding.',
+          notes: 'Contractor notes should stay with the estimate/job context.',
+          terms: 'Standard sandbox terms.',
+          status: 'accepted',
+          subtotal_cents: 12500,
+          total_cents: 12500,
+          labor_mode: 'line_specific',
+          labor_rate_cents: 9500,
+        })
+        .select('id')
+        .single();
+      expect(estimateInsert.error, 'Accepted estimate insert should succeed').toBeNull();
+      estimateId = estimateInsert.data!.id as string;
+
+      const lineInsert = await contractorA.client
+        .from('estimate_line_items')
+        .insert([
+          {
+            estimate_id: estimateId,
+            line_type: 'material',
+            description: 'Cabinet hinge set legacy description',
+            line_title: 'Cabinet hinge set',
+            customer_description: 'Replacement hinges for cabinet door.',
+            quantity: 2,
+            unit: 'set',
+            unit_price_cents: null,
+            sort_order: 1,
+          },
+          {
+            estimate_id: estimateId,
+            line_type: 'labor',
+            description: 'Install shelf and repair cabinet door',
+            line_title: 'Install shelf and repair cabinet door',
+            customer_description: 'Install one shelf and repair loose cabinet door.',
+            quantity: 1,
+            unit: 'job',
+            unit_price_cents: 12500,
+            labor_hours: 1.5,
+            sort_order: 2,
+          },
+          {
+            estimate_id: estimateId,
+            line_type: 'fee',
+            description: 'No-charge follow-up check',
+            line_title: 'No-charge follow-up check',
+            customer_description: 'Included follow-up check.',
+            quantity: 1,
+            unit: 'each',
+            unit_price_cents: 0,
+            sort_order: 3,
+          },
+        ])
+        .select('id,line_type,line_title,customer_description,quantity,unit,unit_price_cents,labor_hours,sort_order')
+        .order('sort_order', { ascending: true });
+      expect(lineInsert.error, 'Estimate line inserts should succeed').toBeNull();
+      expect(lineInsert.data).toHaveLength(3);
+
+      const createJob = await contractorA.client.rpc('servsync_create_job_from_estimate', {
+        p_estimate_id: estimateId,
+      });
+      expect(createJob.error, 'Accepted estimate should convert to job').toBeNull();
+      expect(createJob.data?.job_id, 'Job id should be returned').toBeTruthy();
+      expect(createJob.data?.created, 'First conversion should create a job').toBe(true);
+      expect(createJob.data?.work_items_created, 'First conversion should seed one work item per estimate line').toBe(3);
+      jobId = createJob.data.job_id as string;
+
+      const jobRows = await contractorA.client
+        .from('inspections')
+        .select('id, estimate_id, rooms_with_findings')
+        .eq('id', jobId)
+        .single();
+      expect(jobRows.error, 'Linked job query should succeed').toBeNull();
+      expect(jobRows.data!.estimate_id).toBe(estimateId);
+      expect(JSON.stringify(jobRows.data!.rooms_with_findings)).toContain('Approved Scope');
+
+      const workItems = await contractorA.client
+        .from('job_work_items')
+        .select('id,source_estimate_line_item_id,title,description,customer_description,line_type,quantity,unit,unit_price_cents,labor_hours,billable,completion_status,billing_status,sort_order')
+        .eq('inspection_id', jobId)
+        .order('sort_order', { ascending: true });
+      expect(workItems.error, 'Seeded work item query should succeed').toBeNull();
+      expect(workItems.data).toHaveLength(3);
+
+      for (const [index, line] of lineInsert.data!.entries()) {
+        const item = workItems.data![index];
+        expect(item.source_estimate_line_item_id).toBe(line.id);
+        expect(item.title).toBe(line.line_title);
+        expect(item.customer_description).toBe(line.customer_description);
+        expect(Number(item.quantity)).toBe(Number(line.quantity));
+        expect(item.unit).toBe(line.unit);
+        expect(item.unit_price_cents).toBe(line.unit_price_cents);
+        expect(Number(item.sort_order)).toBe(Number(line.sort_order));
+        expect(item.billable).toBe(true);
+        expect(item.completion_status).toBe('open');
+        expect(item.billing_status).toBe('unbilled');
+      }
+      expect(workItems.data![1].line_type).toBe('labor');
+      expect(Number(workItems.data![1].labor_hours)).toBe(1.5);
+      expect(workItems.data![0].unit_price_cents).toBeNull();
+      expect(workItems.data![2].unit_price_cents).toBe(0);
+
+      const retryCreateJob = await contractorA.client.rpc('servsync_create_job_from_estimate', {
+        p_estimate_id: estimateId,
+      });
+      expect(retryCreateJob.error, 'Retrying accepted estimate job creation should succeed').toBeNull();
+      expect(retryCreateJob.data?.job_id).toBe(jobId);
+      expect(retryCreateJob.data?.created).toBe(false);
+      expect(retryCreateJob.data?.work_items_created).toBe(0);
+
+      const retryWorkItems = await contractorA.client
+        .from('job_work_items')
+        .select('id')
+        .eq('inspection_id', jobId);
+      expect(retryWorkItems.error, 'Retry seeded work item query should succeed').toBeNull();
+      expect(retryWorkItems.data).toHaveLength(3);
+
+      const pricedWorkItem = workItems.data![1];
+      const unpricedWorkItem = workItems.data![0];
+
+      const openAttempt = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [pricedWorkItem.id],
+      });
+      expect(openAttempt.error, 'Open seeded work item should not be invoiceable').toBeTruthy();
+
+      const completePriced = await contractorA.client
+        .from('job_work_items')
+        .update({
+          completion_status: 'completed',
+          completed_at: new Date().toISOString(),
+          completed_by: contractorA.userId,
+        })
+        .eq('id', pricedWorkItem.id);
+      expect(completePriced.error, 'Completing priced seeded work item should succeed').toBeNull();
+
+      const completedUnpriced = await contractorA.client
+        .from('job_work_items')
+        .update({
+          completion_status: 'completed',
+          completed_at: new Date().toISOString(),
+          completed_by: contractorA.userId,
+        })
+        .eq('id', unpricedWorkItem.id);
+      expect(completedUnpriced.error, 'Completing unpriced seeded work item should succeed').toBeNull();
+
+      const unpricedAttempt = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [unpricedWorkItem.id],
+      });
+      expect(unpricedAttempt.error, 'Completed unpriced work item should remain blocked by Price Required behavior').toBeTruthy();
+
+      const partialInvoice = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [pricedWorkItem.id],
+      });
+      expect(partialInvoice.error, 'Completed priced seeded work item should create a partial invoice').toBeNull();
+      const invoiceId = partialInvoice.data.invoice_id as string;
+      expect(invoiceId).toBeTruthy();
+      createdInvoiceIds.push(invoiceId);
+
+      const partialInvoiceLine = await contractorA.client
+        .from('invoice_line_items')
+        .select('job_work_item_id,line_title,unit_price_cents')
+        .eq('invoice_id', invoiceId)
+        .single();
+      expect(partialInvoiceLine.error, 'Partial invoice line query should succeed').toBeNull();
+      expect(partialInvoiceLine.data!.job_work_item_id).toBe(pricedWorkItem.id);
+      expect(partialInvoiceLine.data!.line_title).toBe(pricedWorkItem.title);
+      expect(partialInvoiceLine.data!.unit_price_cents).toBe(12500);
+    } finally {
+      if (createdInvoiceIds.length > 0) {
+        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
+      }
+      if (jobId) {
+        await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
+        await contractorA.client.from('inspections').delete().eq('id', jobId);
+      }
+      if (estimateId) {
+        await contractorA.client.from('estimate_line_items').delete().eq('estimate_id', estimateId);
+        await contractorA.client.from('estimates').delete().eq('id', estimateId);
+      }
     }
   });
 });
