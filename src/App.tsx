@@ -39,6 +39,7 @@ import {
   Sparkles,
   Star,
   Search,
+  Pencil,
   Trash2,
   Upload,
   UserRound,
@@ -438,6 +439,18 @@ type ContractorPriceBookItemDraft = {
   labor_hours: string;
   sku: string;
   active: boolean;
+};
+type ManualJobWorkItemDraft = {
+  title: string;
+  customer_description: string;
+  internal_notes: string;
+  line_type: EstimateLineType;
+  quantity: string;
+  unit: string;
+  unit_price: string;
+  labor_hours: string;
+  billable: boolean;
+  completion_status: 'open' | 'completed' | 'removed';
 };
 type ContractorPriceBookCsvField =
   | 'title'
@@ -1110,6 +1123,37 @@ function contractorPriceBookItemDraftFromRecord(item: ContractorPriceBookItem): 
   });
 }
 
+function createBlankManualJobWorkItemDraft(overrides: Partial<ManualJobWorkItemDraft> = {}): ManualJobWorkItemDraft {
+  return {
+    title: '',
+    customer_description: '',
+    internal_notes: '',
+    line_type: 'other',
+    quantity: '1',
+    unit: 'each',
+    unit_price: '',
+    labor_hours: '',
+    billable: true,
+    completion_status: 'open',
+    ...overrides,
+  };
+}
+
+function manualJobWorkItemDraftFromRecord(item: JobWorkItem): ManualJobWorkItemDraft {
+  return createBlankManualJobWorkItemDraft({
+    title: item.title || '',
+    customer_description: item.customer_description || item.description || '',
+    internal_notes: item.internal_notes || '',
+    line_type: normalizeEstimateLineType(item.line_type),
+    quantity: String(Number(item.quantity || 0)),
+    unit: item.unit || 'each',
+    unit_price: lineUnitPriceInputFromCents(item.unit_price_cents),
+    labor_hours: item.labor_hours === null || item.labor_hours === undefined ? '' : String(Number(item.labor_hours)),
+    billable: item.billable && item.billing_status !== 'not_billable',
+    completion_status: item.completion_status === 'completed' ? 'completed' : item.completion_status === 'removed' ? 'removed' : 'open',
+  });
+}
+
 function contractorPriceBookPriceLabel(item: Pick<ContractorPriceBookItem, 'default_unit_price_cents'>) {
   if (item.default_unit_price_cents === null || item.default_unit_price_cents === undefined) return 'Price Required';
   return formatMoney(item.default_unit_price_cents);
@@ -1239,6 +1283,26 @@ function parseContractorPriceBookOptionalNumber(value: string, label: string) {
   if (!trimmed) return { value: null as number | null };
   const cleaned = trimmed.replace(/,/g, '');
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { value: null, error: `${label} must be blank, 0, or a positive number.` };
+  const parsed = Number(cleaned);
+  if (!Number.isFinite(parsed)) return { value: null, error: `${label} is not a valid number.` };
+  if (parsed < 0) return { value: null, error: `${label} cannot be negative.` };
+  return { value: Number(parsed.toFixed(2)) };
+}
+
+function parseManualJobWorkItemDollarPrice(value: string) {
+  const parsed = parseContractorPriceBookDollarPrice(value);
+  return parsed.error ? { ...parsed, error: parsed.error.replace('Default price', 'Unit price') } : parsed;
+}
+
+function parseManualJobWorkItemNumber(value: string, label: string, options: { required?: boolean } = {}) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return options.required
+      ? { value: null as number | null, error: `${label} is required.` }
+      : { value: null as number | null };
+  }
+  const cleaned = trimmed.replace(/,/g, '');
+  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { value: null, error: `${label} must be a positive number or 0.` };
   const parsed = Number(cleaned);
   if (!Number.isFinite(parsed)) return { value: null, error: `${label} is not a valid number.` };
   if (parsed < 0) return { value: null, error: `${label} cannot be negative.` };
@@ -16331,6 +16395,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [partialInvoiceJob, setPartialInvoiceJob] = useState<Inspection | null>(null);
   const [partialInvoiceSelectedIds, setPartialInvoiceSelectedIds] = useState<Set<string>>(new Set());
   const [creatingPartialInvoice, setCreatingPartialInvoice] = useState(false);
+  const [manualWorkItemJob, setManualWorkItemJob] = useState<Inspection | null>(null);
+  const [editingManualWorkItemId, setEditingManualWorkItemId] = useState<string | null>(null);
+  const [manualWorkItemDraft, setManualWorkItemDraft] = useState<ManualJobWorkItemDraft>(() => createBlankManualJobWorkItemDraft());
+  const [savingManualWorkItem, setSavingManualWorkItem] = useState(false);
+  const [removingManualWorkItemId, setRemovingManualWorkItemId] = useState<string | null>(null);
   const [contractorPriceBookDraft, setContractorPriceBookDraft] = useState<ContractorPriceBookItemDraft>(() => createBlankContractorPriceBookItemDraft());
   const [editingContractorPriceBookItemId, setEditingContractorPriceBookItemId] = useState<string | null>(null);
   const [savingContractorPriceBookItem, setSavingContractorPriceBookItem] = useState(false);
@@ -18230,6 +18299,103 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const manualWorkItemCanEdit = (item: JobWorkItem) =>
+    item.source_type === 'manual'
+    && item.billing_status === 'unbilled'
+    && !item.reserved_invoice_id
+    && !item.invoiced_invoice_id;
+
+  const openManualWorkItemEditor = (job: Inspection, item?: JobWorkItem) => {
+    setError('');
+    setNotice('');
+    setManualWorkItemJob(job);
+    setEditingManualWorkItemId(item?.id ?? null);
+    setManualWorkItemDraft(item ? manualJobWorkItemDraftFromRecord(item) : createBlankManualJobWorkItemDraft());
+  };
+
+  const closeManualWorkItemEditor = () => {
+    if (savingManualWorkItem) return;
+    setManualWorkItemJob(null);
+    setEditingManualWorkItemId(null);
+    setManualWorkItemDraft(createBlankManualJobWorkItemDraft());
+  };
+
+  const manualWorkItemRpcPayload = () => {
+    const title = cleanHumanWrittenText(manualWorkItemDraft.title);
+    if (!title) return { error: 'Enter a work item title.' };
+    const quantity = parseManualJobWorkItemNumber(manualWorkItemDraft.quantity, 'Quantity', { required: true });
+    if (quantity.error || quantity.value === null) return { error: quantity.error || 'Quantity is required.' };
+    const unitPrice = parseManualJobWorkItemDollarPrice(manualWorkItemDraft.unit_price);
+    if (unitPrice.error) return { error: unitPrice.error };
+    const laborHours = parseManualJobWorkItemNumber(manualWorkItemDraft.labor_hours, 'Labor hours');
+    if (laborHours.error) return { error: laborHours.error };
+
+    return {
+      payload: {
+        p_title: title,
+        p_customer_description: cleanHumanWrittenText(manualWorkItemDraft.customer_description),
+        p_internal_notes: cleanHumanWrittenText(manualWorkItemDraft.internal_notes),
+        p_line_type: normalizeEstimateLineType(manualWorkItemDraft.line_type),
+        p_quantity: quantity.value,
+        p_unit: manualWorkItemDraft.unit.trim() || 'each',
+        p_unit_price_cents: unitPrice.cents,
+        p_labor_hours: laborHours.value,
+        p_billable: manualWorkItemDraft.billable,
+        p_completion_status: manualWorkItemDraft.completion_status === 'completed' ? 'completed' : 'open',
+      },
+    };
+  };
+
+  const saveManualWorkItem = async () => {
+    if (!supabase || !manualWorkItemJob) return;
+    const parsed = manualWorkItemRpcPayload();
+    if ('error' in parsed) {
+      setError(parsed.error || 'Check the manual work item fields and try again.');
+      return;
+    }
+    setSavingManualWorkItem(true);
+    setNotice('');
+    setError('');
+    try {
+      const rpcName = editingManualWorkItemId ? 'servsync_update_job_work_item' : 'servsync_create_job_work_item';
+      const rpcPayload = editingManualWorkItemId
+        ? { p_work_item_id: editingManualWorkItemId, ...parsed.payload }
+        : { p_inspection_id: manualWorkItemJob.id, ...parsed.payload };
+      const { error: rpcError } = await supabase.rpc(rpcName, rpcPayload);
+      if (rpcError) throw rpcError;
+      await refreshJobWorkItemsForJob(manualWorkItemJob.id);
+      setNotice(editingManualWorkItemId ? 'Manual work item updated.' : 'Manual work item added.');
+      setManualWorkItemJob(null);
+      setEditingManualWorkItemId(null);
+      setManualWorkItemDraft(createBlankManualJobWorkItemDraft());
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this manual work item.'));
+    } finally {
+      setSavingManualWorkItem(false);
+    }
+  };
+
+  const removeManualWorkItem = async (job: Inspection, item: JobWorkItem) => {
+    if (!supabase || !manualWorkItemCanEdit(item)) return;
+    const confirmed = window.confirm(`Remove "${item.title}" from billable work items? It will stay on the job as removed/not billable and will not affect invoice history.`);
+    if (!confirmed) return;
+    setRemovingManualWorkItemId(item.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: rpcError } = await supabase.rpc('servsync_remove_job_work_item', {
+        p_work_item_id: item.id,
+      });
+      if (rpcError) throw rpcError;
+      await refreshJobWorkItemsForJob(job.id);
+      setNotice('Manual work item marked removed and not billable.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to remove this manual work item.'));
+    } finally {
+      setRemovingManualWorkItemId(null);
+    }
+  };
+
   const renderDurableWorkItemRow = (item: JobWorkItem, options: { selectable?: boolean; selected?: boolean; onSelect?: (checked: boolean) => void } = {}) => {
     const canInvoice = jobWorkItemCanInvoice(item);
     const disabledReason = item.completion_status !== 'completed'
@@ -18278,6 +18444,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <p>{item.quantity} {item.unit || 'each'}</p>
             <p>{jobWorkItemPriceLabel(item)}</p>
             <p className="font-bold text-slate-950">{jobWorkItemTotalLabel(item)}</p>
+            {!options.selectable && partialInvoiceJob === null && manualWorkItemJob === null && activeInspection && manualWorkItemCanEdit(item) && (
+              <div className="mt-2 flex flex-wrap gap-1 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => openManualWorkItemEditor(activeInspection, item)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  <Pencil size={12} />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={removingManualWorkItemId === item.id}
+                  onClick={() => void removeManualWorkItem(activeInspection, item)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Trash2 size={12} />
+                  {removingManualWorkItemId === item.id ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -18300,7 +18487,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const renderPartialInvoicingPanel = (job: Inspection) => {
     const allItems = workItemsForJob(job.id);
-    if (allItems.length === 0) return null;
     const groups = groupedWorkItemsForJob(job.id);
     const invoiceableItems = groups.ready.filter(jobWorkItemCanInvoice);
     const missingPriceCount = groups.ready.filter(item => item.unit_price_cents === null || item.unit_price_cents === undefined).length;
@@ -18324,7 +18510,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <Receipt size={15} />
             {creatingInvoiceSourceId === `partial-job:${job.id}` ? 'Creating...' : 'Create invoice from completed items'}
           </button>
+          <button
+            type="button"
+            onClick={() => openManualWorkItemEditor(job)}
+            data-testid="add-manual-job-work-item"
+            className={buttonClass('secondary')}
+          >
+            <Plus size={15} />
+            Add work item
+          </button>
         </div>
+        {allItems.length === 0 && (
+          <p className="mt-3 rounded-xl border border-blue-100 bg-white/75 px-3 py-2 text-xs leading-5 text-slate-600">
+            No durable work items yet. Add a manual work item or save simple service tasks to make partial invoicing available.
+          </p>
+        )}
         {missingPriceCount > 0 && (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
             {missingPriceCount} completed item{missingPriceCount === 1 ? '' : 's'} need pricing before partial invoicing.
@@ -31807,6 +32007,171 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   {renderDurableWorkItemGroup('Not billable / declined / removed', partialInvoiceModalItems.notBillable, 'No not-billable items.')}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualWorkItemJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="manual-work-item-title">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Manual work item</p>
+                <h3 id="manual-work-item-title" className="mt-1 text-lg font-bold text-slate-950">
+                  {editingManualWorkItemId ? 'Edit work item' : 'Add work item'}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Manual work items stay on this job and can be partially invoiced only after they are complete, billable, and priced.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={savingManualWorkItem}
+                onClick={closeManualWorkItemEditor}
+                className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                aria-label="Close manual work item editor"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block md:col-span-2">
+                <span className="text-xs font-semibold text-slate-500">Title</span>
+                <input
+                  className={`${inputClass()} mt-1`}
+                  {...writingAssistProps}
+                  data-testid="manual-work-item-title"
+                  value={manualWorkItemDraft.title}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, title: event.target.value }))}
+                  placeholder="e.g. Replace shutoff valve"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-xs font-semibold text-slate-500">Customer-facing description</span>
+                <textarea
+                  className={`${inputClass()} mt-1 min-h-[88px] resize-y`}
+                  {...writingAssistProps}
+                  data-testid="manual-work-item-customer-description"
+                  value={manualWorkItemDraft.customer_description}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, customer_description: event.target.value }))}
+                  placeholder="Visible on invoice lines when this work is billed."
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-xs font-semibold text-slate-500">Internal note</span>
+                <textarea
+                  className={`${inputClass()} mt-1 min-h-[76px] resize-y`}
+                  {...writingAssistProps}
+                  data-testid="manual-work-item-internal-note"
+                  value={manualWorkItemDraft.internal_notes}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, internal_notes: event.target.value }))}
+                  placeholder="Contractor-only note. This is not shown on homeowner invoice views or PDFs."
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Line type</span>
+                <select
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-line-type"
+                  value={manualWorkItemDraft.line_type}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, line_type: normalizeEstimateLineType(event.target.value) }))}
+                >
+                  {ESTIMATE_LINE_TYPE_OPTIONS.map(lineType => (
+                    <option key={lineType} value={lineType}>{ESTIMATE_LINE_TYPE_LABELS[lineType]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Completion status</span>
+                <select
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-completion-status"
+                  value={manualWorkItemDraft.completion_status}
+                  onChange={event => setManualWorkItemDraft(draft => ({
+                    ...draft,
+                    completion_status: event.target.value === 'completed' ? 'completed' : 'open',
+                  }))}
+                >
+                  <option value="open">Open backlog</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Quantity</span>
+                <input
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-quantity"
+                  value={manualWorkItemDraft.quantity}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, quantity: event.target.value }))}
+                  inputMode="decimal"
+                  placeholder="1"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Unit</span>
+                <input
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-unit"
+                  value={manualWorkItemDraft.unit}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, unit: event.target.value }))}
+                  placeholder="each"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Unit price</span>
+                <input
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-unit-price"
+                  value={manualWorkItemDraft.unit_price}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, unit_price: event.target.value }))}
+                  inputMode="decimal"
+                  placeholder="Blank = Price Required"
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Blank shows Price Required. Enter 0 for intentional no-charge.
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Labor hours</span>
+                <input
+                  className={`${inputClass()} mt-1`}
+                  data-testid="manual-work-item-labor-hours"
+                  value={manualWorkItemDraft.labor_hours}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, labor_hours: event.target.value }))}
+                  inputMode="decimal"
+                  placeholder="Optional"
+                />
+              </label>
+              <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 accent-blue-600"
+                  data-testid="manual-work-item-billable"
+                  checked={manualWorkItemDraft.billable}
+                  onChange={event => setManualWorkItemDraft(draft => ({ ...draft, billable: event.target.checked }))}
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-800">Billable</span>
+                  <span className="block text-xs leading-5 text-slate-500">Non-billable items stay on the job but cannot be selected for partial invoicing.</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={closeManualWorkItemEditor} disabled={savingManualWorkItem} className={buttonClass('secondary')}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveManualWorkItem()}
+                disabled={savingManualWorkItem}
+                data-testid="save-manual-job-work-item"
+                className={buttonClass('primary')}
+              >
+                {savingManualWorkItem ? 'Saving...' : editingManualWorkItemId ? 'Save work item' : 'Add work item'}
+              </button>
             </div>
           </div>
         </div>

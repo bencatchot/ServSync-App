@@ -76,6 +76,7 @@ test.describe('partial invoicing data foundation', () => {
   let foundationAvailable = false;
   let estimateWorkItemSeedingAvailable = false;
   let simpleWorkItemSyncAvailable = false;
+  let manualWorkItemRpcAvailable = false;
 
   test.beforeAll(async () => {
     requireApprovedSandboxForMutation();
@@ -97,6 +98,12 @@ test.describe('partial invoicing data foundation', () => {
     });
     simpleWorkItemSyncAvailable = Boolean(simpleSyncProbe.error)
       && !/could not find the function|function .* does not exist/i.test(simpleSyncProbe.error.message);
+    const manualWorkItemProbe = await contractorA.client.rpc('servsync_create_job_work_item', {
+      p_inspection_id: crypto.randomUUID(),
+      p_title: 'Codex manual work item probe',
+    });
+    manualWorkItemRpcAvailable = Boolean(manualWorkItemProbe.error)
+      && !/could not find the function|function .* does not exist/i.test(manualWorkItemProbe.error.message);
   });
 
   test.afterAll(async () => {
@@ -843,6 +850,195 @@ test.describe('partial invoicing data foundation', () => {
         .eq('source_key', `codex-general-finding-${suffix}`);
       expect(generalFindingRows.error, 'General finding work item query should succeed').toBeNull();
       expect(generalFindingRows.data).toHaveLength(0);
+    } finally {
+      if (createdInvoiceIds.length > 0) {
+        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
+        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
+      }
+      if (jobId) {
+        await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
+        await contractorA.client.from('inspections').delete().eq('id', jobId);
+      }
+    }
+  });
+
+  test('manual job work item RPCs enforce billing-safe create edit and remove behavior', async () => {
+    test.skip(!foundationAvailable, 'Partial-invoicing SQL foundation is not applied in this sandbox yet.');
+    test.skip(!manualWorkItemRpcAvailable, 'Phase 2C manual work item SQL is not applied in this sandbox yet.');
+
+    const suffix = Date.now().toString(36);
+    const jobName = `Codex Manual Work Item Smoke ${suffix}`;
+    const createdInvoiceIds: string[] = [];
+    let jobId = '';
+
+    const jobInsert = await contractorA.client
+      .from('inspections')
+      .insert({
+        contractor_id: contractorAId,
+        homeowner_user_id: homeownerA.userId,
+        name: jobName,
+        summary: 'Manual work item smoke job.',
+        status: 'draft',
+        job_status: 'draft',
+        rooms_with_findings: [],
+      })
+      .select('id')
+      .single();
+
+    expect(jobInsert.error, 'Manual work item smoke job insert should succeed').toBeNull();
+    jobId = jobInsert.data!.id as string;
+
+    try {
+      const blankTitle = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: '   ',
+      });
+      expect(blankTitle.error, 'Blank manual work item title should be rejected').toBeTruthy();
+
+      const negativeQuantity = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Negative quantity',
+        p_quantity: -1,
+      });
+      expect(negativeQuantity.error, 'Negative quantity should be rejected').toBeTruthy();
+
+      const negativePrice = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Negative price',
+        p_unit_price_cents: -100,
+      });
+      expect(negativePrice.error, 'Negative price should be rejected').toBeTruthy();
+
+      const negativeLaborHours = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Negative labor hours',
+        p_labor_hours: -0.5,
+      });
+      expect(negativeLaborHours.error, 'Negative labor hours should be rejected').toBeTruthy();
+
+      const crossContractorCreate = await contractorB.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Cross contractor blocked',
+      });
+      expect(crossContractorCreate.error, 'Another contractor should not create work items for this job').toBeTruthy();
+
+      const unpricedCreate = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Manual unpriced item',
+        p_customer_description: 'Customer-facing manual description.',
+        p_internal_notes: 'Internal manual note must stay contractor-only.',
+        p_line_type: 'material',
+        p_quantity: 2,
+        p_unit: 'each',
+        p_unit_price_cents: null,
+        p_labor_hours: null,
+        p_billable: true,
+        p_completion_status: 'open',
+      });
+      expect(unpricedCreate.error, 'Unpriced manual item should be created').toBeNull();
+      const unpricedItem = unpricedCreate.data as { id: string; unit_price_cents: number | null; source_type: string; billing_status: string };
+      expect(unpricedItem.source_type).toBe('manual');
+      expect(unpricedItem.unit_price_cents).toBeNull();
+      expect(unpricedItem.billing_status).toBe('unbilled');
+
+      const zeroPriceCreate = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Manual zero-price item',
+        p_line_type: 'fee',
+        p_quantity: 1,
+        p_unit: 'job',
+        p_unit_price_cents: 0,
+        p_billable: true,
+        p_completion_status: 'completed',
+      });
+      expect(zeroPriceCreate.error, 'Zero-price completed manual item should be created').toBeNull();
+      expect((zeroPriceCreate.data as { unit_price_cents: number }).unit_price_cents).toBe(0);
+
+      const openUnpricedAttempt = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [unpricedItem.id],
+      });
+      expect(openUnpricedAttempt.error, 'Open/unpriced manual item should not be billable').toBeTruthy();
+
+      const editUnpriced = await contractorA.client.rpc('servsync_update_job_work_item', {
+        p_work_item_id: unpricedItem.id,
+        p_title: 'Manual completed priced item',
+        p_customer_description: 'Manual work visible to customer.',
+        p_internal_notes: 'Internal note should not become an invoice line.',
+        p_line_type: 'labor',
+        p_quantity: 1.5,
+        p_unit: 'hour',
+        p_unit_price_cents: 8000,
+        p_labor_hours: 1.5,
+        p_billable: true,
+        p_completion_status: 'completed',
+      });
+      expect(editUnpriced.error, 'Unbilled manual item edit should succeed').toBeNull();
+      const editedItem = editUnpriced.data as { id: string; title: string; unit_price_cents: number; completion_status: string };
+      expect(editedItem.title).toBe('Manual completed priced item');
+      expect(editedItem.unit_price_cents).toBe(8000);
+      expect(editedItem.completion_status).toBe('completed');
+
+      const removeCreate = await contractorA.client.rpc('servsync_create_job_work_item', {
+        p_inspection_id: jobId,
+        p_title: 'Manual item to remove',
+        p_billable: true,
+        p_completion_status: 'open',
+      });
+      expect(removeCreate.error, 'Manual item for remove should be created').toBeNull();
+      const removeItemId = (removeCreate.data as { id: string }).id;
+
+      const crossContractorUpdate = await contractorB.client.rpc('servsync_update_job_work_item', {
+        p_work_item_id: editedItem.id,
+        p_title: 'Cross contractor update blocked',
+      });
+      expect(crossContractorUpdate.error, 'Another contractor should not update manual work item').toBeTruthy();
+
+      const crossContractorRemove = await contractorB.client.rpc('servsync_remove_job_work_item', {
+        p_work_item_id: removeItemId,
+      });
+      expect(crossContractorRemove.error, 'Another contractor should not remove manual work item').toBeTruthy();
+
+      const removeResult = await contractorA.client.rpc('servsync_remove_job_work_item', {
+        p_work_item_id: removeItemId,
+      });
+      expect(removeResult.error, 'Unbilled manual item remove should succeed').toBeNull();
+      const removedItem = removeResult.data as { completion_status: string; billing_status: string; billable: boolean };
+      expect(removedItem.completion_status).toBe('removed');
+      expect(removedItem.billing_status).toBe('not_billable');
+      expect(removedItem.billable).toBe(false);
+
+      const partialInvoice = await contractorA.client.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: jobId,
+        p_work_item_ids: [editedItem.id],
+      });
+      expect(partialInvoice.error, 'Completed priced manual work item should be invoiceable').toBeNull();
+      const invoiceId = partialInvoice.data.invoice_id as string;
+      expect(invoiceId).toBeTruthy();
+      createdInvoiceIds.push(invoiceId);
+
+      const invoiceLine = await contractorA.client
+        .from('invoice_line_items')
+        .select('line_title,description,customer_description,unit_price_cents,job_work_item_id')
+        .eq('invoice_id', invoiceId)
+        .single();
+      expect(invoiceLine.error, 'Manual work item invoice line should query').toBeNull();
+      expect(invoiceLine.data!.job_work_item_id).toBe(editedItem.id);
+      expect(invoiceLine.data!.line_title).toBe('Manual completed priced item');
+      expect(invoiceLine.data!.description).not.toMatch(/Internal note/i);
+      expect(invoiceLine.data!.customer_description || '').not.toMatch(/Internal note/i);
+
+      const editDrafted = await contractorA.client.rpc('servsync_update_job_work_item', {
+        p_work_item_id: editedItem.id,
+        p_title: 'Should not edit drafted item',
+      });
+      expect(editDrafted.error, 'Drafted manual item should not be unsafe-edited').toBeTruthy();
+
+      const removeDrafted = await contractorA.client.rpc('servsync_remove_job_work_item', {
+        p_work_item_id: editedItem.id,
+      });
+      expect(removeDrafted.error, 'Drafted manual item should not be removed').toBeTruthy();
     } finally {
       if (createdInvoiceIds.length > 0) {
         await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
