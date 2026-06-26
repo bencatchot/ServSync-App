@@ -112,6 +112,13 @@ function cleanupCreatedInvoicesWithSandboxSql(invoiceIds: string[]) {
       '--linked',
       `
 begin;
+update public.job_work_items
+   set billing_status = 'unbilled',
+       reserved_invoice_id = null,
+       invoiced_invoice_id = null,
+       updated_at = now()
+ where reserved_invoice_id in (${quotedIds})
+    or invoiced_invoice_id in (${quotedIds});
 delete from public.invoice_backlog_items where invoice_id in (${quotedIds});
 delete from public.invoice_line_items where invoice_id in (${quotedIds});
 delete from public.invoices where id in (${quotedIds});
@@ -344,10 +351,15 @@ test.describe('partial invoicing data foundation', () => {
       await main.getByRole('button', { name: /Open Jobs/i }).click();
       const jobRow = main.getByTestId('contractor-job-row').filter({ hasText: jobName }).first();
       await expect(jobRow).toBeVisible({ timeout: 30_000 });
+      await expect(jobRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Ready to invoice$/i);
       await jobRow.getByRole('button', { name: /Continue Job/i }).click();
 
       const partialPanel = main.getByTestId('partial-invoicing-work-items-panel');
       await expect(partialPanel).toBeVisible({ timeout: 30_000 });
+      const workSummary = main.getByTestId('job-work-item-summary-strip');
+      await expect(workSummary.getByText(/^3 completed$/i)).toBeVisible();
+      await expect(workSummary.getByText(/^1 open backlog$/i)).toBeVisible();
+      await expect(workSummary.getByText(/^1 price required$/i)).toBeVisible();
       await expect(partialPanel.getByText(/^Completed, ready to invoice$/i)).toBeVisible();
       await expect(partialPanel.getByText(/^Open backlog$/i).first()).toBeVisible();
       await expect(partialPanel.getByText(/^Price Required$/i).first()).toBeVisible();
@@ -416,6 +428,13 @@ test.describe('partial invoicing data foundation', () => {
       expect(backlogRows.data).toHaveLength(1);
       expect(backlogRows.data![0].job_work_item_id).toBe(openItem.id);
       expect(backlogRows.data![0].not_included_reason).toMatch(/not included/i);
+
+      await openSidebarTab(page, /^Jobs\b/i);
+      await expectActiveTabHeading(page, /^Jobs$/i);
+      await main.getByRole('button', { name: /Open Jobs/i }).click();
+      const draftedJobRow = main.getByTestId('contractor-job-row').filter({ hasText: jobName }).first();
+      await expect(draftedJobRow).toBeVisible({ timeout: 30_000 });
+      await expect(draftedJobRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Price required$/i);
 
       const completedState = await contractorA.client
         .from('job_work_items')
@@ -575,28 +594,44 @@ test.describe('partial invoicing data foundation', () => {
       expect(guardedJob.error, 'Guarded work-item-backed job insert should succeed').toBeNull();
       guardedJobId = guardedJob.data!.id as string;
 
-      const guardedWorkItem = await contractorA.client
+      const guardedWorkItems = await contractorA.client
         .from('job_work_items')
-        .insert({
-          inspection_id: guardedJobId,
-          contractor_id: contractorAId,
-          title: 'Completed guarded item',
-          description: 'Completed work that should use item-based invoicing.',
-          line_type: 'labor',
-          quantity: 1,
-          unit: 'each',
-          unit_price_cents: 15500,
-          completion_status: 'completed',
-          billing_status: 'unbilled',
-          billable: true,
-          completed_at: new Date().toISOString(),
-          completed_by: contractorA.userId,
-          sort_order: 1,
-        })
-        .select('id')
-        .single();
-      expect(guardedWorkItem.error, 'Guarded job work item insert should succeed').toBeNull();
-      guardedWorkItemId = guardedWorkItem.data!.id as string;
+        .insert([
+          {
+            inspection_id: guardedJobId,
+            contractor_id: contractorAId,
+            title: 'Completed guarded item',
+            description: 'Completed work that should use item-based invoicing.',
+            line_type: 'labor',
+            quantity: 1,
+            unit: 'each',
+            unit_price_cents: 15500,
+            completion_status: 'completed',
+            billing_status: 'unbilled',
+            billable: true,
+            completed_at: new Date().toISOString(),
+            completed_by: contractorA.userId,
+            sort_order: 1,
+          },
+          {
+            inspection_id: guardedJobId,
+            contractor_id: contractorAId,
+            title: 'Guarded backlog item',
+            description: 'Remaining backlog that should keep the job partially invoiced.',
+            line_type: 'labor',
+            quantity: 1,
+            unit: 'each',
+            unit_price_cents: 7500,
+            completion_status: 'open',
+            billing_status: 'unbilled',
+            billable: true,
+            sort_order: 2,
+          },
+        ])
+        .select('id,title')
+        .order('title', { ascending: true });
+      expect(guardedWorkItems.error, 'Guarded job work items insert should succeed').toBeNull();
+      guardedWorkItemId = guardedWorkItems.data!.find(item => item.title === 'Completed guarded item')!.id as string;
 
       const blockedWholeJobInvoice = await contractorA.client.rpc('servsync_create_invoice_from_job', {
         p_inspection_id: guardedJobId,
@@ -613,9 +648,13 @@ test.describe('partial invoicing data foundation', () => {
         if (await backToJobs.count() > 0) await backToJobs.click();
       }
       await completedJobsButton.click();
+      const legacyRow = main.getByTestId('contractor-job-row').filter({ hasText: legacyJobName }).first();
+      await expect(legacyRow).toBeVisible({ timeout: 30_000 });
+      await expect(legacyRow.getByTestId('job-work-item-summary-badge')).toHaveCount(0);
       const guardedRow = main.getByTestId('contractor-job-row').filter({ hasText: guardedJobName }).first();
       await expect(guardedRow).toBeVisible({ timeout: 30_000 });
-      await expect(guardedRow.getByText(/use item-based invoicing/i)).toBeVisible();
+      await expect(guardedRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Ready to invoice$/i);
+      await expect(guardedRow.getByText(/Create an item-based invoice/i)).toBeVisible();
       await expect(guardedRow.getByRole('button', { name: /^Create Invoice$/i })).toHaveCount(0);
       const itemBasedButton = guardedRow.getByRole('button', { name: /^Create invoice from completed items$/i });
       await expect(itemBasedButton).toBeVisible();
@@ -635,6 +674,15 @@ test.describe('partial invoicing data foundation', () => {
       expect(partialInvoiceId).toBeTruthy();
       createdInvoiceIds.push(partialInvoiceId);
 
+      await page.reload();
+      await openSidebarTab(page, /^Jobs\b/i);
+      await expectActiveTabHeading(page, /^Jobs$/i);
+      const refreshedCompletedJobsButton = main.getByRole('button', { name: /Completed \/ Closed Jobs/i });
+      await refreshedCompletedJobsButton.click();
+      const partiallyInvoicedRow = main.getByTestId('contractor-job-row').filter({ hasText: guardedJobName }).first();
+      await expect(partiallyInvoicedRow).toBeVisible({ timeout: 30_000 });
+      await expect(partiallyInvoicedRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Partially invoiced$/i);
+
       const wholeJobAfterPartial = await contractorA.client.rpc('servsync_create_invoice_from_job', {
         p_inspection_id: guardedJobId,
       });
@@ -649,6 +697,30 @@ test.describe('partial invoicing data foundation', () => {
         .neq('status', 'void');
       expect(guardedInvoices.error, 'Guarded job invoice count should query').toBeNull();
       expect(guardedInvoices.data).toHaveLength(1);
+
+      const resolveBacklog = await contractorA.client
+        .from('job_work_items')
+        .update({
+          completion_status: 'removed',
+          billing_status: 'not_billable',
+          billable: false,
+        })
+        .eq('inspection_id', guardedJobId)
+        .eq('title', 'Guarded backlog item');
+      expect(resolveBacklog.error, 'Resolving guarded backlog item should succeed').toBeNull();
+
+      const sendGuardedInvoice = await contractorA.client.rpc('servsync_send_invoice', {
+        p_invoice_id: partialInvoiceId,
+      });
+      expect(sendGuardedInvoice.error, 'Sending guarded partial invoice should succeed').toBeNull();
+
+      await page.reload();
+      await openSidebarTab(page, /^Jobs\b/i);
+      await expectActiveTabHeading(page, /^Jobs$/i);
+      await main.getByRole('button', { name: /Completed \/ Closed Jobs/i }).click();
+      const fullyInvoicedRow = main.getByTestId('contractor-job-row').filter({ hasText: guardedJobName }).first();
+      await expect(fullyInvoicedRow).toBeVisible({ timeout: 30_000 });
+      await expect(fullyInvoicedRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Fully invoiced$/i);
     } finally {
       await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       if (guardedJobId) {
