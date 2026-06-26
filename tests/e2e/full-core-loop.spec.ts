@@ -89,7 +89,6 @@ async function advanceServiceRequestComposerToIssueStep(page: Page) {
   await dismissTourIfVisible(page);
   if (await issueTextbox.isVisible({ timeout: 2_000 }).catch(() => false)) return issueTextbox;
 
-  await expect(main.getByText(/^Choose property$/i)).toBeVisible({ timeout: 10_000 });
   const propertySelector = main.getByRole('combobox', { name: /^Request for$/i });
   await expect(propertySelector).toBeVisible({ timeout: 10_000 });
 

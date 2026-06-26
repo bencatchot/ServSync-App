@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/partial-invoicing-phase-2a-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/pdfDocuments.ts`
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Wired the Phase 2A partial-invoicing UI to the durable work-item foundation. Contractor job detail now loads and groups durable `job_work_items` when they exist, offers a guarded "Create invoice from completed items" review flow for completed, billable, priced, unbilled work items, calls `servsync_create_partial_invoice_from_job`, and keeps open backlog disabled. Invoice loads now include `invoice_backlog_items`, and backlog snapshots render separately from billable invoice lines in contractor invoice cards, homeowner invoice cards, and invoice PDFs. Also kept the full-core-loop regression test aligned with the current multi-property Service Requests composer.
+- Reason for change: Let contractors safely create draft invoices from completed work while keeping open backlog visible but excluded from subtotal, tax, and total, without global backfill, SQL changes, estimate mapping, or removal of the existing whole-job invoice flow.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Protected-scope scan
+- Known risks or follow-ups:
+  - Jobs without durable `job_work_items` intentionally keep the existing task/checklist behavior and do not expose partial invoicing.
+  - Automatic work-item creation from accepted estimates, global backfill for existing jobs, richer declined/removed closeout UI, and broader estimate-to-work-item mapping remain deferred.
+
 - Branch: `codex/partial-invoicing-data-foundation-v1`
 - Files changed:
   - `servsync-partial-invoicing-data-foundation.sql`

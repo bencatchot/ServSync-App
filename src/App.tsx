@@ -93,7 +93,9 @@ import type {
   InspectionTemplate,
   InspectionTemplateRoom,
   Invoice,
+  InvoiceBacklogItem,
   InvoiceLineItem,
+  JobWorkItem,
   JobLifecycleStatus,
   LegacyEstimateLineType,
   HomeReminder,
@@ -350,6 +352,7 @@ type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type EstimateLineDraft = {
   id: string;
+  job_work_item_id?: string | null;
   line_type: EstimateLineType;
   description: string;
   line_title: string;
@@ -553,6 +556,81 @@ function customerLineDisplayDetailRows(
   return rows;
 }
 
+function invoiceBacklogStatusLabel(item: Pick<InvoiceBacklogItem, 'completion_status' | 'billing_status'>) {
+  if (item.completion_status === 'declined') return 'Declined';
+  if (item.completion_status === 'removed') return 'Removed';
+  if (item.billing_status === 'not_billable') return 'Not billable';
+  return 'Open backlog';
+}
+
+function jobWorkItemStatusLabel(item: Pick<JobWorkItem, 'completion_status' | 'billing_status' | 'billable' | 'unit_price_cents'>) {
+  if (!item.billable || item.billing_status === 'not_billable') return 'Not billable';
+  if (item.completion_status === 'declined') return 'Declined';
+  if (item.completion_status === 'removed') return 'Removed';
+  if (item.billing_status === 'drafted') return 'Drafted';
+  if (item.billing_status === 'invoiced') return 'Invoiced';
+  if (item.completion_status === 'open') return 'Open backlog';
+  if (item.unit_price_cents === null || item.unit_price_cents === undefined) return 'Price Required';
+  return 'Ready to invoice';
+}
+
+function jobWorkItemCanInvoice(item: JobWorkItem) {
+  return item.completion_status === 'completed'
+    && item.billable
+    && item.billing_status === 'unbilled'
+    && item.unit_price_cents !== null
+    && item.unit_price_cents !== undefined;
+}
+
+function jobWorkItemLineTotalCents(item: Pick<JobWorkItem, 'quantity' | 'unit_price_cents'>) {
+  if (item.unit_price_cents === null || item.unit_price_cents === undefined) return 0;
+  return Math.round(Number(item.quantity || 0) * item.unit_price_cents);
+}
+
+function jobWorkItemPriceLabel(item: Pick<JobWorkItem, 'unit_price_cents'>) {
+  return item.unit_price_cents === null || item.unit_price_cents === undefined ? 'Price Required' : formatMoney(item.unit_price_cents);
+}
+
+function jobWorkItemTotalLabel(item: Pick<JobWorkItem, 'quantity' | 'unit_price_cents'>) {
+  return item.unit_price_cents === null || item.unit_price_cents === undefined ? 'Price Required' : formatMoney(jobWorkItemLineTotalCents(item));
+}
+
+function InvoiceBacklogSection({ invoice, compact = false }: { invoice: Pick<Invoice, 'backlog_items'>; compact?: boolean }) {
+  const backlogItems = [...(invoice.backlog_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  if (backlogItems.length === 0) return null;
+  return (
+    <div className={`rounded-xl border border-amber-200 bg-amber-50/70 ${compact ? 'p-3' : 'p-4'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-bold text-amber-950">Open backlog — not included in total</p>
+          <p className="mt-1 text-xs leading-5 text-amber-900">
+            These items were captured with the invoice for context only. They are not completed billable invoice lines.
+          </p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-amber-800">
+          {backlogItems.length} item{backlogItems.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {backlogItems.map(item => (
+          <div key={item.id} data-testid="invoice-backlog-item" className="rounded-lg border border-amber-100 bg-white/80 px-3 py-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900">{item.title || 'Backlog item'}</p>
+                {item.description && <p className="mt-0.5 text-xs leading-5 text-slate-600">{item.description}</p>}
+                {item.not_included_reason && <p className="mt-1 text-xs leading-5 text-amber-800">{item.not_included_reason}</p>}
+              </div>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                {invoiceBacklogStatusLabel(item)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function draftLineTitle(line: EstimateLineDraft) {
   return line.line_title.trim() || line.description.trim();
 }
@@ -569,7 +647,7 @@ function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate
   const lineTitle = draftLineTitle(line);
   const legacyDescription = draftLineLegacyDescription(line);
   const laborHours = draftLineCanTrackLaborHours(line) ? parseLaborHoursValue(line.labor_hours) : null;
-  return {
+  const persisted = {
     [ownerIdField]: ownerId,
     line_type: normalizeEstimateLineType(line.line_type),
     description: legacyDescription,
@@ -583,6 +661,10 @@ function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate
     labor_hours: laborHours,
     sort_order: index,
   };
+  if (ownerIdField === 'invoice_id' && line.job_work_item_id) {
+    return { ...persisted, job_work_item_id: line.job_work_item_id };
+  }
+  return persisted;
 }
 type InvoiceDraftForm = {
   invoice_number: string;
@@ -667,7 +749,7 @@ const CONTRACTOR_TEAM_ROLE_HELPER: Record<ContractorTeamRole, string> = {
 };
 
 const ESTIMATE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, inspection_id, home_id, local_home_id, title, scope, notes, terms, status, subtotal_cents, total_cents, labor_mode, labor_rate_cents, job_labor_hours, material_total_cents, labor_total_cents, fee_total_cents, other_total_cents, tax_rate_percent, tax_cents, created_at, updated_at, line_items:estimate_line_items(*)';
-const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, labor_mode, labor_rate_cents, job_labor_hours, material_total_cents, labor_total_cents, fee_total_cents, other_total_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*)';
+const INVOICE_WITH_LINES_SELECT = 'id, contractor_id, homeowner_user_id, local_contact_id, service_request_id, job_id, estimate_id, home_id, local_home_id, invoice_number, title, scope, notes, terms, status, subtotal_cents, labor_mode, labor_rate_cents, job_labor_hours, material_total_cents, labor_total_cents, fee_total_cents, other_total_cents, tax_cents, tax_rate_percent, discount_cents, discount_type, discount_value, discount_reason, total_cents, amount_paid_cents, issued_at, due_at, paid_at, voided_at, created_at, updated_at, line_items:invoice_line_items(*), backlog_items:invoice_backlog_items(*)';
 const HOMEOWNER_CONTRACTOR_INVITE_LEAD_SELECT = 'id, business_name, location, trade_category, contact_name, homeowner_status, created_at, updated_at';
 const ADMIN_INVITE_LEAD_SELECT = [
   'id',
@@ -2642,6 +2724,7 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
           .sort((a, b) => a.sort_order - b.sort_order)
           .map(line => createEstimateLineDraft({
             id: line.id,
+            job_work_item_id: line.job_work_item_id || null,
             line_type: normalizeEstimateLineType(line.line_type),
             description: line.description,
             line_title: line.line_title || line.description || '',
@@ -11538,6 +11621,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 ))}
               </div>
             )}
+            <InvoiceBacklogSection invoice={invoice} />
             {unpricedLineCount(invoice.line_items || []) > 0 && (
               <p className="rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-sm text-amber-900">
                 Invoice total does not include items marked “Price to be confirmed.”
@@ -13858,8 +13942,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               })
             )}
           </div>
-            );
-          })()}
+                  );
+                })()}
         </Card>
         </div>
 
@@ -16209,6 +16293,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [jobWorkItemsByJobId, setJobWorkItemsByJobId] = useState<Record<string, JobWorkItem[]>>({});
+  const [partialInvoiceJob, setPartialInvoiceJob] = useState<Inspection | null>(null);
+  const [partialInvoiceSelectedIds, setPartialInvoiceSelectedIds] = useState<Set<string>>(new Set());
+  const [creatingPartialInvoice, setCreatingPartialInvoice] = useState(false);
   const [contractorPriceBookDraft, setContractorPriceBookDraft] = useState<ContractorPriceBookItemDraft>(() => createBlankContractorPriceBookItemDraft());
   const [editingContractorPriceBookItemId, setEditingContractorPriceBookItemId] = useState<string | null>(null);
   const [savingContractorPriceBookItem, setSavingContractorPriceBookItem] = useState(false);
@@ -16608,9 +16696,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       // Load inspection templates and inspections
       if (loadedContractor?.id) {
-        const [tplRes, inspRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
+        const [tplRes, inspRes, jobWorkItemsRes, visitEventsRes, calendarEventsRes, calendarEventJobLinksRes, calendarEventOccurrenceExclusionsRes, localContactsRes, localClaimInvitesRes, estimatesRes, invoicesRes, estimateTemplatesRes, savedEstimateChargesRes, priceBookItemsRes] = await Promise.all([
           supabase.from('inspection_templates').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
           supabase.from('inspections').select('*').eq('contractor_id', loadedContractor.id).order('created_at', { ascending: false }),
+          supabase
+            .from('job_work_items')
+            .select('*')
+            .eq('contractor_id', loadedContractor.id)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true }),
           supabase
             .from('contractor_visit_events')
             .select('*, inspection:inspections(*)')
@@ -16671,6 +16765,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         ]);
         if (!tplRes.error) setInspectionTemplates((tplRes.data || []) as InspectionTemplate[]);
         if (!inspRes.error) setInspections((inspRes.data || []) as Inspection[]);
+        if (!jobWorkItemsRes.error) {
+          const grouped = ((jobWorkItemsRes.data || []) as JobWorkItem[]).reduce<Record<string, JobWorkItem[]>>((itemsByJob, item) => {
+            itemsByJob[item.inspection_id] = [...(itemsByJob[item.inspection_id] || []), item];
+            return itemsByJob;
+          }, {});
+          setJobWorkItemsByJobId(grouped);
+        } else {
+          setJobWorkItemsByJobId({});
+        }
         if (!visitEventsRes.error) setContractorVisitEvents((visitEventsRes.data || []) as ContractorVisitEvent[]);
         else setContractorVisitEvents([]);
         if (!calendarEventsRes.error) setContractorCalendarEvents((calendarEventsRes.data || []) as ContractorCalendarEvent[]);
@@ -16695,6 +16798,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setLocalClaimInvites([]);
         setSavedEstimateCharges([]);
         setContractorPriceBookItems([]);
+        setJobWorkItemsByJobId({});
       }
     } catch (err) {
       setError(readableError(err, 'Unable to load contractor workspace.'));
@@ -18033,6 +18137,173 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     } finally {
       setCreatingInvoiceSourceId(null);
     }
+  };
+
+  const openPartialInvoiceReview = (job: Inspection) => {
+    const readyItems = groupedWorkItemsForJob(job.id).ready.filter(jobWorkItemCanInvoice);
+    if (readyItems.length === 0) {
+      setError('This job has no completed, priced, unbilled work items ready for partial invoicing.');
+      return;
+    }
+    setError('');
+    setNotice('');
+    setPartialInvoiceJob(job);
+    setPartialInvoiceSelectedIds(new Set(readyItems.map(item => item.id)));
+  };
+
+  const togglePartialInvoiceSelection = (item: JobWorkItem, checked: boolean) => {
+    if (!jobWorkItemCanInvoice(item)) return;
+    setPartialInvoiceSelectedIds(current => {
+      const next = new Set(current);
+      if (checked) next.add(item.id);
+      else next.delete(item.id);
+      return next;
+    });
+  };
+
+  const createPartialInvoiceFromSelectedItems = async () => {
+    if (!supabase || !partialInvoiceJob) return;
+    const selectedIds = workItemsForJob(partialInvoiceJob.id)
+      .filter(item => partialInvoiceSelectedIds.has(item.id) && jobWorkItemCanInvoice(item))
+      .map(item => item.id);
+    if (selectedIds.length === 0) {
+      setError('Select at least one completed, priced work item before creating a partial invoice.');
+      return;
+    }
+    setCreatingPartialInvoice(true);
+    setCreatingInvoiceSourceId(`partial-job:${partialInvoiceJob.id}`);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_partial_invoice_from_job', {
+        p_inspection_id: partialInvoiceJob.id,
+        p_work_item_ids: selectedIds,
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
+      if (!result.invoice_id) throw new Error('Partial invoice was created, but no invoice id was returned.');
+      const invoice = await loadInvoiceById(result.invoice_id);
+      setPartialInvoiceJob(null);
+      setPartialInvoiceSelectedIds(new Set());
+      openInvoiceRecord(invoice);
+      setNotice('Draft invoice created from completed work items. Open backlog items were captured separately and are not included in the total.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create a partial invoice from completed work items.'));
+    } finally {
+      setCreatingPartialInvoice(false);
+      setCreatingInvoiceSourceId(null);
+    }
+  };
+
+  const renderDurableWorkItemRow = (item: JobWorkItem, options: { selectable?: boolean; selected?: boolean; onSelect?: (checked: boolean) => void } = {}) => {
+    const canInvoice = jobWorkItemCanInvoice(item);
+    const disabledReason = item.completion_status !== 'completed'
+      ? 'Open backlog items cannot be invoiced yet.'
+      : !item.billable || item.billing_status === 'not_billable'
+        ? 'This item is marked not billable.'
+        : item.billing_status !== 'unbilled'
+          ? `This item is already ${item.billing_status}.`
+          : item.unit_price_cents === null || item.unit_price_cents === undefined
+            ? 'Add pricing before invoicing this item.'
+            : '';
+    return (
+      <div key={item.id} data-testid="job-work-item-row" data-work-item-title={item.title} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <div className="flex flex-wrap items-start gap-3">
+          {options.selectable ? (
+            <input
+              type="checkbox"
+              aria-label={`Select work item for invoice: ${item.title}`}
+              data-testid="partial-invoice-work-item-checkbox"
+              checked={Boolean(options.selected)}
+              disabled={!canInvoice}
+              onChange={event => options.onSelect?.(event.target.checked)}
+              className="mt-1 h-4 w-4 accent-blue-600 disabled:opacity-40"
+            />
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-slate-950">{item.title || 'Work item'}</p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                canInvoice
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : item.completion_status === 'open'
+                    ? 'bg-amber-100 text-amber-700'
+                    : item.billing_status === 'drafted' || item.billing_status === 'invoiced'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-100 text-slate-600'
+              }`}>
+                {jobWorkItemStatusLabel(item)}
+              </span>
+            </div>
+            {item.customer_description && <p className="mt-1 text-sm leading-6 text-slate-600">{item.customer_description}</p>}
+            {item.description && !item.customer_description && <p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p>}
+            {disabledReason && <p className="mt-1 text-xs font-medium text-slate-500">{disabledReason}</p>}
+          </div>
+          <div className="text-left text-xs text-slate-500 sm:text-right">
+            <p>{item.quantity} {item.unit || 'each'}</p>
+            <p>{jobWorkItemPriceLabel(item)}</p>
+            <p className="font-bold text-slate-950">{jobWorkItemTotalLabel(item)}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDurableWorkItemGroup = (title: string, items: JobWorkItem[], emptyText: string) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{title}</p>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">{emptyText}</p>
+      ) : (
+        <div className="space-y-2">{items.map(item => renderDurableWorkItemRow(item))}</div>
+      )}
+    </div>
+  );
+
+  const renderPartialInvoicingPanel = (job: Inspection) => {
+    const allItems = workItemsForJob(job.id);
+    if (allItems.length === 0) return null;
+    const groups = groupedWorkItemsForJob(job.id);
+    const invoiceableItems = groups.ready.filter(jobWorkItemCanInvoice);
+    const missingPriceCount = groups.ready.filter(item => item.unit_price_cents === null || item.unit_price_cents === undefined).length;
+    return (
+      <div data-testid="partial-invoicing-work-items-panel" className="rounded-2xl border border-blue-200 bg-blue-50/45 p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Partial invoicing</p>
+            <h3 className="mt-1 text-sm font-bold text-slate-950">Durable job work items</h3>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
+              Create a draft invoice from completed, priced work items only. Open backlog stays attached to the job and is not included in invoice totals.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openPartialInvoiceReview(job)}
+            disabled={invoiceableItems.length === 0 || creatingInvoiceSourceId === `partial-job:${job.id}`}
+            data-testid="create-partial-invoice-from-completed-items"
+            className={buttonClass('primary')}
+          >
+            <Receipt size={15} />
+            {creatingInvoiceSourceId === `partial-job:${job.id}` ? 'Creating...' : 'Create invoice from completed items'}
+          </button>
+        </div>
+        {missingPriceCount > 0 && (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            {missingPriceCount} completed item{missingPriceCount === 1 ? '' : 's'} need pricing before partial invoicing.
+          </p>
+        )}
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          {renderDurableWorkItemGroup('Completed, ready to invoice', groups.ready, 'No completed unbilled work items yet.')}
+          {renderDurableWorkItemGroup('Open backlog', groups.backlog, 'No open backlog items.')}
+          {renderDurableWorkItemGroup('Already drafted/invoiced', groups.billed, 'No work items are currently drafted or invoiced.')}
+          {renderDurableWorkItemGroup('Not billable / declined / removed', groups.notBillable, 'No not-billable, declined, or removed items.')}
+        </div>
+      </div>
+    );
   };
 
   const sendEstimateToHomeowner = async (estimate: Estimate) => {
@@ -20531,6 +20802,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
   };
+  const workItemsForJob = (jobId: string) => [...(jobWorkItemsByJobId[jobId] || [])].sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const groupedWorkItemsForJob = (jobId: string) => {
+    const items = workItemsForJob(jobId);
+    return {
+      ready: items.filter(item => item.completion_status === 'completed' && item.billable && item.billing_status === 'unbilled'),
+      backlog: items.filter(item => item.completion_status === 'open'),
+      billed: items.filter(item => item.billing_status === 'drafted' || item.billing_status === 'invoiced'),
+      notBillable: items.filter(item => !item.billable || item.billing_status === 'not_billable' || item.completion_status === 'declined' || item.completion_status === 'removed'),
+    };
+  };
+  const partialInvoiceModalItems = partialInvoiceJob ? groupedWorkItemsForJob(partialInvoiceJob.id) : null;
+  const partialInvoiceSelectedItems = partialInvoiceJob
+    ? workItemsForJob(partialInvoiceJob.id).filter(item => partialInvoiceSelectedIds.has(item.id))
+    : [];
+  const partialInvoiceSelectedTotalCents = partialInvoiceSelectedItems.reduce((sum, item) => sum + jobWorkItemLineTotalCents(item), 0);
   const activeInvoiceDraftRecord = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) ?? null : null;
   const invoiceDraftCanSendToHomeowner = Boolean(selectedJobsSubject.homeownerUserId || activeInvoiceDraftRecord?.homeowner_user_id);
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
@@ -27458,9 +27744,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
                                         {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                         {invoice.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{invoice.scope}</p>}
+                                        {invoice.backlog_items && invoice.backlog_items.length > 0 && (
+                                          <p className="mt-2 text-xs font-semibold text-amber-700">
+                                            {invoice.backlog_items.length} backlog item{invoice.backlog_items.length === 1 ? '' : 's'} not included in total
+                                          </p>
+                                        )}
                                       </div>
                                       <p className="text-xl font-bold text-slate-950">{formatMoney(invoice.total_cents)}</p>
                                     </div>
+                                    {invoice.backlog_items && invoice.backlog_items.length > 0 && (
+                                      <div className="mt-3">
+                                        <InvoiceBacklogSection invoice={invoice} compact />
+                                      </div>
+                                    )}
                                     <div className="mt-3 flex flex-wrap gap-2">
                                       <button
                                         type="button"
@@ -29579,7 +29875,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   {renderJobCardHeader()}
 
                   <div className="space-y-4">
-                      <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    {renderPartialInvoicingPanel(activeInspection)}
+
+                    <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-bold text-slate-950">Tasks / Work Items</h3>
@@ -29742,14 +30040,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                     </div>
 
-	                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
                         <p className="mt-1 text-xs text-slate-500">Save changes, then complete the job when the work items are ready.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} data-testid="contractor-save-job-progress" className={buttonClass('secondary')}>
+                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} data-testid="contractor-save-job-progress" className={buttonClass('secondary')}>
                           {savingInspection ? 'Saving...' : 'Save'}
                         </button>
                         {inspectionIsOpenJob(activeInspection) && (
@@ -29783,7 +30081,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   ← Back to Jobs
                 </button>
 
-	                {renderJobCardHeader()}
+                {renderJobCardHeader()}
+
+                {renderPartialInvoicingPanel(activeInspection)}
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-100">
@@ -30442,8 +30742,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${FINDING_STATUS_CONFIG[suggested].color}`}>
                                           Suggested: {suggested}
                                         </div>
-                                      );
-                                    })()}
+                  );
+                })()}
                                     <select className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-500 bg-white"
                                       value={singleNoteRoom}
                                       onChange={e => { setSingleNoteRoom(e.target.value); setSingleNoteItem(''); }}>
@@ -31273,8 +31573,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </div>
                     </div>
                   </div>
-	                  );
-	                })()}
+                  );
+                })()}
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -31302,6 +31602,84 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             );
           })()}
 
+        </div>
+      )}
+
+      {partialInvoiceJob && partialInvoiceModalItems && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Partial invoice review</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-950">Create invoice from completed items</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Select completed, billable, priced work only. Open backlog will be saved separately and will not affect invoice totals.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={creatingPartialInvoice}
+                onClick={() => {
+                  setPartialInvoiceJob(null);
+                  setPartialInvoiceSelectedIds(new Set());
+                }}
+                className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                aria-label="Close partial invoice review"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{partialInvoiceSelectedIds.size} item{partialInvoiceSelectedIds.size === 1 ? '' : 's'} selected</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Invoice subtotal before tax/discount: {formatMoney(partialInvoiceSelectedTotalCents)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void createPartialInvoiceFromSelectedItems()}
+                  disabled={creatingPartialInvoice || partialInvoiceSelectedIds.size === 0}
+                  data-testid="confirm-create-partial-invoice"
+                  className={buttonClass('primary')}
+                >
+                  <Receipt size={15} />
+                  {creatingPartialInvoice ? 'Creating...' : 'Create draft invoice'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Completed billable work</p>
+                {partialInvoiceModalItems.ready.length === 0 ? (
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">No completed billable work items are ready.</p>
+                ) : (
+                  partialInvoiceModalItems.ready.map(item => renderDurableWorkItemRow(item, {
+                    selectable: true,
+                    selected: partialInvoiceSelectedIds.has(item.id),
+                    onSelect: checked => togglePartialInvoiceSelection(item, checked),
+                  }))
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Open backlog — not selectable</p>
+                {partialInvoiceModalItems.backlog.length === 0 ? (
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">No open backlog items.</p>
+                ) : (
+                  partialInvoiceModalItems.backlog.map(item => renderDurableWorkItemRow(item, { selectable: true, selected: false }))
+                )}
+              </div>
+
+              {(partialInvoiceModalItems.billed.length > 0 || partialInvoiceModalItems.notBillable.length > 0) && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {renderDurableWorkItemGroup('Already drafted/invoiced', partialInvoiceModalItems.billed, 'No drafted or invoiced items.')}
+                  {renderDurableWorkItemGroup('Not billable / declined / removed', partialInvoiceModalItems.notBillable, 'No not-billable items.')}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
