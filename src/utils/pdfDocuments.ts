@@ -1,6 +1,5 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 
-import { supabase } from '../supabaseClient';
 import type {
   Estimate,
   EstimateLineItem,
@@ -10,6 +9,7 @@ import type {
   InspectionRoomData,
   InspectionRoomFinding,
   Invoice,
+  InvoiceBacklogItem,
   InvoiceLineItem,
   LegacyEstimateLineType,
 } from '../types';
@@ -66,6 +66,13 @@ function lineDisplayDetailRows(line: StructuredLineDisplay) {
     lineModelSpec(line) ? `Model/spec: ${lineModelSpec(line)}` : '',
     lineSupplyStatusLabel(line),
   ].filter(Boolean);
+}
+
+function invoiceBacklogStatusLabel(item: Pick<InvoiceBacklogItem, 'completion_status' | 'billing_status'>) {
+  if (item.completion_status === 'declined') return 'Declined';
+  if (item.completion_status === 'removed') return 'Removed';
+  if (item.billing_status === 'not_billable') return 'Not billable';
+  return 'Open backlog';
 }
 
 function normalizeEstimateLaborMode(value: string | null | undefined) {
@@ -319,11 +326,14 @@ function inspectionMediaStoragePath(value: string) {
 
 async function loadInspectionPdfPhotoAsset(photo: string): Promise<PdfImageAsset | null> {
   const storagePath = inspectionMediaStoragePath(photo);
-  if (storagePath && supabase) {
-    const { data, error } = await supabase.storage
-      .from('inspection-media')
-      .createSignedUrl(storagePath, 60 * 15);
-    if (!error && data?.signedUrl) return loadPdfImageAsset(data.signedUrl, { normalizeForPdf: true });
+  if (storagePath) {
+    const { supabase } = await import('../supabaseClient');
+    if (supabase) {
+      const { data, error } = await supabase.storage
+        .from('inspection-media')
+        .createSignedUrl(storagePath, 60 * 15);
+      if (!error && data?.signedUrl) return loadPdfImageAsset(data.signedUrl, { normalizeForPdf: true });
+    }
   }
   return photo.startsWith('http') ? loadPdfImageAsset(photo, { normalizeForPdf: true }) : null;
 }
@@ -1064,6 +1074,33 @@ export async function createInvoicePdf(invoice: Invoice, context: InvoicePdfCont
     pdf.setFontSize(9);
     pdf.setTextColor(146, 64, 14);
     addWrappedText('Invoice total does not include items marked "Price to be confirmed."', margin, contentW, 9, 4);
+  }
+
+  const backlogItems = [...(invoice.backlog_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+  if (backlogItems.length > 0) {
+    sectionTitle('Open backlog — not included in total');
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(146, 64, 14);
+    addWrappedText('These items were captured for context only. They are not completed billable invoice lines and do not affect subtotal, tax, or total.', margin, contentW, 9, 4);
+    y += 1;
+    backlogItems.forEach(item => {
+      const itemText = [
+        `${item.title || 'Backlog item'} — ${invoiceBacklogStatusLabel(item)}`,
+        item.description || '',
+        item.not_included_reason || '',
+      ].filter(Boolean).join('\n');
+      const descriptionLines = pdf.splitTextToSize(itemText, contentW - 6);
+      const rowH = Math.max(11, descriptionLines.length * 4 + 6);
+      addPageIfNeeded(rowH);
+      pdf.setDrawColor(253, 230, 138);
+      pdf.line(margin, y - 3, pageW - margin, y - 3);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(descriptionLines, margin + 3, y);
+      y += rowH;
+    });
   }
 
   addPageIfNeeded(42);
