@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createInvoicePdf } from '../../src/utils/pdfDocuments';
 import type { Invoice } from '../../src/types';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
@@ -66,6 +69,57 @@ async function contractorProfileId(account: AuthenticatedClient): Promise<string
 async function foundationTableExists(client: SupabaseClient): Promise<boolean> {
   const { error } = await client.from('job_work_items').select('id', { count: 'exact', head: true });
   return !error;
+}
+
+async function cleanupCreatedInvoices(client: SupabaseClient, invoiceIds: string[]) {
+  if (invoiceIds.length === 0) return;
+  await client.from('invoice_backlog_items').delete().in('invoice_id', invoiceIds);
+  await client.from('invoice_line_items').delete().in('invoice_id', invoiceIds);
+  await client.from('invoices').delete().in('id', invoiceIds);
+
+  const remaining = await client.from('invoices').select('id').in('id', invoiceIds);
+  expect(remaining.error, 'Invoice cleanup verification should be readable by the test contractor').toBeNull();
+  const remainingIds = (remaining.data ?? []).map(row => row.id as string);
+  if (remainingIds.length === 0) return;
+
+  cleanupCreatedInvoicesWithSandboxSql(remainingIds);
+}
+
+function cleanupCreatedInvoicesWithSandboxSql(invoiceIds: string[]) {
+  const projectRefPath = resolve(process.cwd(), 'supabase/.temp/project-ref');
+  const linkedProjectRef = existsSync(projectRefPath) ? readFileSync(projectRefPath, 'utf8').trim() : '';
+  if (linkedProjectRef !== SANDBOX_SUPABASE_REF) {
+    throw new Error(
+      `Refusing SQL cleanup because Supabase CLI is linked to "${linkedProjectRef || 'unknown'}", not sandbox ${SANDBOX_SUPABASE_REF}.`,
+    );
+  }
+
+  const quotedIds = invoiceIds
+    .map(id => {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+        throw new Error(`Refusing SQL cleanup for invalid invoice id "${id}".`);
+      }
+      return `'${id}'::uuid`;
+    })
+    .join(', ');
+
+  // Contractors can only delete draft invoices through RLS; this removes exact test-created void invoices in sandbox.
+  execFileSync(
+    'supabase',
+    [
+      'db',
+      'query',
+      '--linked',
+      `
+begin;
+delete from public.invoice_backlog_items where invoice_id in (${quotedIds});
+delete from public.invoice_line_items where invoice_id in (${quotedIds});
+delete from public.invoices where id in (${quotedIds});
+commit;
+      `.trim(),
+    ],
+    { cwd: process.cwd(), encoding: 'utf8', stdio: 'pipe' },
+  );
 }
 
 test.describe('partial invoicing data foundation', () => {
@@ -397,11 +451,7 @@ test.describe('partial invoicing data foundation', () => {
       expect(releasedState.data!.invoiced_invoice_id).toBeNull();
       await consoleErrors.assertClean(testInfo);
     } finally {
-      if (createdInvoiceIds.length > 0) {
-        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
-      }
+      await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
       await contractorA.client.from('inspections').delete().eq('id', jobId);
     }
@@ -594,11 +644,7 @@ test.describe('partial invoicing data foundation', () => {
       expect(partialInvoiceLine.data!.line_title).toBe(pricedWorkItem.title);
       expect(partialInvoiceLine.data!.unit_price_cents).toBe(12500);
     } finally {
-      if (createdInvoiceIds.length > 0) {
-        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
-      }
+      await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       if (jobId) {
         await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
         await contractorA.client.from('inspections').delete().eq('id', jobId);
@@ -851,11 +897,7 @@ test.describe('partial invoicing data foundation', () => {
       expect(generalFindingRows.error, 'General finding work item query should succeed').toBeNull();
       expect(generalFindingRows.data).toHaveLength(0);
     } finally {
-      if (createdInvoiceIds.length > 0) {
-        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
-      }
+      await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       if (jobId) {
         await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
         await contractorA.client.from('inspections').delete().eq('id', jobId);
@@ -863,7 +905,7 @@ test.describe('partial invoicing data foundation', () => {
     }
   });
 
-  test('manual job work item RPCs enforce billing-safe create edit and remove behavior', async () => {
+  test('manual job work item RPCs and editor enforce billing-safe create edit and remove behavior', async ({ page }) => {
     test.skip(!foundationAvailable, 'Partial-invoicing SQL foundation is not applied in this sandbox yet.');
     test.skip(!manualWorkItemRpcAvailable, 'Phase 2C manual work item SQL is not applied in this sandbox yet.');
 
@@ -922,6 +964,62 @@ test.describe('partial invoicing data foundation', () => {
         p_title: 'Cross contractor blocked',
       });
       expect(crossContractorCreate.error, 'Another contractor should not create work items for this job').toBeTruthy();
+
+      await loginAs(page, 'contractor');
+      const main = page.getByRole('main');
+      await openSidebarTab(page, /^Jobs\b/i);
+      await expectActiveTabHeading(page, /^Jobs$/i);
+      await main.getByRole('button', { name: /Open Jobs/i }).click();
+      const jobRow = main.getByTestId('contractor-job-row').filter({ hasText: jobName }).first();
+      await expect(jobRow).toBeVisible({ timeout: 30_000 });
+      await jobRow.getByRole('button', { name: /Continue Job/i }).click();
+
+      const partialPanel = main.getByTestId('partial-invoicing-work-items-panel');
+      await expect(partialPanel).toBeVisible({ timeout: 30_000 });
+      await partialPanel.getByTestId('add-manual-job-work-item').click();
+
+      let manualDialog = page.getByRole('dialog', { name: /^Add work item$/i });
+      await expect(manualDialog).toBeVisible();
+      await manualDialog.getByTestId('save-manual-job-work-item').click();
+      await expect(page.getByText('Enter a work item title.')).toBeVisible();
+
+      const uiItemTitle = `Manual UI smoke item ${suffix}`;
+      await manualDialog.getByTestId('manual-work-item-title').fill(uiItemTitle);
+      await manualDialog.getByTestId('manual-work-item-customer-description').fill('Manual UI smoke description.');
+      await manualDialog.getByTestId('manual-work-item-internal-note').fill('Manual UI smoke internal note.');
+      await manualDialog.getByTestId('manual-work-item-quantity').fill('2');
+      await manualDialog.getByTestId('manual-work-item-unit').fill('each');
+      await manualDialog.getByTestId('manual-work-item-unit-price').fill('');
+      await manualDialog.getByTestId('save-manual-job-work-item').click();
+      await expect(page.getByRole('dialog', { name: /^Add work item$/i })).toBeHidden({ timeout: 30_000 });
+
+      let uiItemRow = partialPanel.getByTestId('job-work-item-row').filter({ hasText: uiItemTitle }).first();
+      await expect(uiItemRow).toBeVisible({ timeout: 30_000 });
+      await expect(uiItemRow.getByText('Manual UI smoke description.')).toBeVisible();
+      await expect(uiItemRow.getByText('Price Required').first()).toBeVisible();
+
+      await uiItemRow.getByRole('button', { name: /^Edit$/i }).click();
+      manualDialog = page.getByRole('dialog', { name: /^Edit work item$/i });
+      await expect(manualDialog).toBeVisible();
+      await expect(manualDialog.getByTestId('manual-work-item-title')).toHaveValue(new RegExp(`^${uiItemTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+      const updatedUiItemTitle = `Manual UI smoke item updated ${suffix}`;
+      await manualDialog.getByTestId('manual-work-item-title').fill(updatedUiItemTitle);
+      await manualDialog.getByTestId('manual-work-item-customer-description').fill('Manual UI smoke description updated.');
+      await manualDialog.getByTestId('manual-work-item-unit-price').fill('123.45');
+      await manualDialog.getByTestId('manual-work-item-completion-status').selectOption('completed');
+      await manualDialog.getByTestId('save-manual-job-work-item').click();
+      await expect(page.getByRole('dialog', { name: /^Edit work item$/i })).toBeHidden({ timeout: 30_000 });
+
+      uiItemRow = partialPanel.getByTestId('job-work-item-row').filter({ hasText: updatedUiItemTitle }).first();
+      await expect(uiItemRow).toBeVisible({ timeout: 30_000 });
+      await expect(uiItemRow.getByText('Manual UI smoke description updated.')).toBeVisible();
+      await expect(uiItemRow.getByText('$123.45')).toBeVisible();
+
+      page.once('dialog', dialog => dialog.accept());
+      await uiItemRow.getByRole('button', { name: /^Remove$/i }).click();
+      uiItemRow = partialPanel.getByTestId('job-work-item-row').filter({ hasText: updatedUiItemTitle }).first();
+      await expect(uiItemRow).toBeVisible({ timeout: 30_000 });
+      await expect(uiItemRow.getByText(/Not billable/i)).toBeVisible();
 
       const unpricedCreate = await contractorA.client.rpc('servsync_create_job_work_item', {
         p_inspection_id: jobId,
@@ -1040,11 +1138,7 @@ test.describe('partial invoicing data foundation', () => {
       });
       expect(removeDrafted.error, 'Drafted manual item should not be removed').toBeTruthy();
     } finally {
-      if (createdInvoiceIds.length > 0) {
-        await contractorA.client.from('invoice_backlog_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoice_line_items').delete().in('invoice_id', createdInvoiceIds);
-        await contractorA.client.from('invoices').delete().in('id', createdInvoiceIds).eq('status', 'draft');
-      }
+      await cleanupCreatedInvoices(contractorA.client, createdInvoiceIds);
       if (jobId) {
         await contractorA.client.from('job_work_items').delete().eq('inspection_id', jobId);
         await contractorA.client.from('inspections').delete().eq('id', jobId);
