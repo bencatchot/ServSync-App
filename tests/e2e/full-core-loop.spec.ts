@@ -82,6 +82,31 @@ async function chooseConnectedContractorForRequest(page: Page, issueDescription:
   await expect(main.getByText(/After you send this/i)).toBeVisible({ timeout: 10_000 });
 }
 
+async function advanceServiceRequestComposerToIssueStep(page: Page) {
+  const main = page.getByRole('main');
+  const issueTextbox = main.getByRole('textbox', { name: /^What do you need help with\?$/i });
+
+  await dismissTourIfVisible(page);
+  if (await issueTextbox.isVisible({ timeout: 2_000 }).catch(() => false)) return issueTextbox;
+
+  await expect(main.getByText(/^Choose property$/i)).toBeVisible({ timeout: 10_000 });
+  const propertySelector = main.getByRole('combobox', { name: /^Request for$/i });
+  await expect(propertySelector).toBeVisible({ timeout: 10_000 });
+
+  const selectedValue = await propertySelector.evaluate(select => (select as HTMLSelectElement).value);
+  if (!selectedValue) {
+    await propertySelector.selectOption({ index: 1 });
+  }
+
+  await dismissTourIfVisible(page);
+  const continueButton = main.getByRole('button', { name: /^Continue$/i }).first();
+  await expect(continueButton).toBeEnabled({ timeout: 10_000 });
+  await continueButton.click();
+  await expect(issueTextbox).toBeVisible({ timeout: 10_000 });
+
+  return issueTextbox;
+}
+
 async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
   const main = page.getByRole('main');
   const requestTitle = `${recordPrefix} Request`;
@@ -93,23 +118,7 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
   await main.getByRole('button', { name: /^New request$/i }).click();
   await dismissTourIfVisible(page);
 
-  const issueTextbox = main.getByRole('textbox', { name: /^What do you need help with\?$/i });
-  for (let attempts = 0; attempts < 5; attempts += 1) {
-    await dismissTourIfVisible(page);
-    if (await issueTextbox.isVisible({ timeout: 2_000 }).catch(() => false)) break;
-    const propertySelector = main.getByRole('combobox', { name: /^Request for$/i });
-    if (await propertySelector.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      const selectedValue = await propertySelector.inputValue().catch(() => '');
-      if (!selectedValue) {
-        await propertySelector.selectOption({ index: 1 }).catch(() => undefined);
-      }
-      await main.getByRole('button', { name: /^Continue$/i }).click({ force: true });
-      continue;
-    }
-    break;
-  }
-
-  await expect(issueTextbox).toBeVisible({ timeout: 10_000 });
+  await advanceServiceRequestComposerToIssueStep(page);
   await chooseConnectedContractorForRequest(page, requestDescription);
 
   await main.getByRole('textbox', { name: /^Request title$/i }).fill(requestTitle);
