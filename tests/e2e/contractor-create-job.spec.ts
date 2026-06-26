@@ -22,8 +22,8 @@ test.describe('contractor mutating job creation', () => {
 
     await main.getByRole('button', { name: /^Create job\b/i }).click();
     await expectActiveTabHeading(page, /^Jobs$/i);
-    await expect(main.getByRole('heading', { name: /^New job$/i })).toBeVisible();
-    await expect(main.getByText(new RegExp(`Creating job for:\\s*${escapeRegExp(customerName)}`, 'i'))).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
+    await expect(main.getByRole('combobox', { name: /Customer/i })).toContainText(customerName);
 
     await main.getByRole('button', { name: /Service Job/i }).click();
     await main.getByLabel(/^Job name$/i).fill(jobName);
@@ -41,7 +41,7 @@ test.describe('contractor mutating job creation', () => {
 
     await expect(main.getByRole('heading', { level: 2, name: new RegExp(escapeRegExp(jobName), 'i') })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByRole('button', { name: /Back to Jobs/i })).toBeVisible();
-    await expect(main.getByText(customerName, { exact: true })).toBeVisible();
+    await expect(main.getByText(new RegExp(escapeRegExp(customerName), 'i')).first()).toBeVisible();
 
     await consoleErrors.assertClean(testInfo);
   });

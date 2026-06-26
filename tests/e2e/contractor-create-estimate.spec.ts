@@ -48,9 +48,9 @@ test.describe('contractor mutating estimate creation', () => {
 
     const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
     const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
-    const lineDescriptionField = main.getByRole('textbox', { name: /^Line item 1 description$/i });
-    const lineQuantityField = main.getByRole('spinbutton', { name: /^Line item 1 quantity$/i });
-    const lineUnitPriceField = main.getByRole('textbox', { name: /^Line item 1 unit price$/i });
+    const lineDescriptionField = main.getByRole('textbox', { name: /^Estimate line item 1 description$/i });
+    const lineQuantityField = main.getByRole('spinbutton', { name: /^Estimate line item 1 quantity$/i });
+    const lineUnitPriceField = main.getByRole('textbox', { name: /^Estimate line item 1 unit price$/i });
 
     await estimateTitleField.fill(estimateTitle);
     await scopeField.fill('E2E safe estimate draft created by Playwright. No follow-up document, report, upload, or homeowner send action should be performed.');
@@ -66,7 +66,6 @@ test.describe('contractor mutating estimate creation', () => {
     await saveEstimateButton.click();
     await waitForEstimateDraftSave(main, saveEstimateButton);
 
-    await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
     await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
     await expect(main.getByText(estimateTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(new RegExp(`${escapeRegExp(customerName)}.*Updated`, 'i'))).toBeVisible();
