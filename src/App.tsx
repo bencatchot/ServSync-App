@@ -595,6 +595,120 @@ function jobWorkItemCanInvoice(item: JobWorkItem) {
     && item.unit_price_cents !== undefined;
 }
 
+type JobWorkItemSummary = {
+  totalItems: number;
+  completedCount: number;
+  openCount: number;
+  readyToInvoiceCount: number;
+  priceRequiredCount: number;
+  draftedCount: number;
+  invoicedCount: number;
+  notBillableCount: number;
+  billableActiveCount: number;
+  hasLinkedInvoice: boolean;
+};
+
+type JobWorkItemSummaryBadge = {
+  label: string;
+  className: string;
+  title: string;
+};
+
+function getJobWorkItemSummary(items: JobWorkItem[], linkedInvoice?: Pick<Invoice, 'status'> | null): JobWorkItemSummary {
+  const activeBillableItems = items.filter(item =>
+    item.billable
+    && item.billing_status !== 'not_billable'
+    && item.completion_status !== 'declined'
+    && item.completion_status !== 'removed'
+  );
+  const completedBillableUnbilled = activeBillableItems.filter(item =>
+    item.completion_status === 'completed'
+    && item.billing_status === 'unbilled'
+  );
+  return {
+    totalItems: items.length,
+    completedCount: items.filter(item => item.completion_status === 'completed').length,
+    openCount: items.filter(item => item.completion_status === 'open').length,
+    readyToInvoiceCount: items.filter(jobWorkItemCanInvoice).length,
+    priceRequiredCount: completedBillableUnbilled.filter(item => item.unit_price_cents === null || item.unit_price_cents === undefined).length,
+    draftedCount: items.filter(item => item.billing_status === 'drafted').length,
+    invoicedCount: items.filter(item => item.billing_status === 'invoiced').length,
+    notBillableCount: items.filter(item =>
+      !item.billable
+      || item.billing_status === 'not_billable'
+      || item.completion_status === 'declined'
+      || item.completion_status === 'removed'
+    ).length,
+    billableActiveCount: activeBillableItems.length,
+    hasLinkedInvoice: Boolean(linkedInvoice && linkedInvoice.status !== 'void'),
+  };
+}
+
+function getJobWorkItemSummaryBadges(summary: JobWorkItemSummary): JobWorkItemSummaryBadge[] {
+  if (summary.totalItems === 0) return [];
+  if (summary.readyToInvoiceCount > 0) {
+    return [{
+      label: 'Ready to invoice',
+      className: 'bg-emerald-50 text-emerald-700',
+      title: `${summary.readyToInvoiceCount} completed, priced item${summary.readyToInvoiceCount === 1 ? '' : 's'} ready for item-based invoicing.`,
+    }];
+  }
+  if (summary.priceRequiredCount > 0) {
+    return [{
+      label: 'Price required',
+      className: 'bg-amber-50 text-amber-700',
+      title: `${summary.priceRequiredCount} completed item${summary.priceRequiredCount === 1 ? '' : 's'} need pricing before item-based invoicing.`,
+    }];
+  }
+  if ((summary.draftedCount > 0 || summary.invoicedCount > 0) && (summary.openCount > 0 || summary.billableActiveCount > summary.draftedCount + summary.invoicedCount)) {
+    return [{
+      label: 'Partially invoiced',
+      className: 'bg-blue-50 text-blue-700',
+      title: 'Some work items are drafted or invoiced while other work remains open or unresolved.',
+    }];
+  }
+  if (summary.billableActiveCount > 0 && summary.invoicedCount === summary.billableActiveCount) {
+    return [{
+      label: 'Fully invoiced',
+      className: 'bg-emerald-50 text-emerald-700',
+      title: 'All active billable work items are invoiced.',
+    }];
+  }
+  if (summary.openCount > 0) {
+    return [{
+      label: 'Backlog open',
+      className: 'bg-amber-50 text-amber-700',
+      title: `${summary.openCount} open backlog item${summary.openCount === 1 ? '' : 's'} remain on this job.`,
+    }];
+  }
+  if (summary.completedCount > 0 && summary.completedCount < summary.billableActiveCount) {
+    return [{
+      label: 'Partially complete',
+      className: 'bg-sky-50 text-sky-700',
+      title: 'Some work items are complete and other billable work remains.',
+    }];
+  }
+  if (summary.billableActiveCount === 0) {
+    return [{
+      label: 'No billable items',
+      className: 'bg-slate-100 text-slate-600',
+      title: 'This job has durable work items, but none are currently billable.',
+    }];
+  }
+  return [];
+}
+
+function getJobWorkItemNextAction(summary: JobWorkItemSummary) {
+  if (summary.totalItems === 0) return '';
+  if (summary.readyToInvoiceCount > 0) return 'Create an item-based invoice from completed, priced work items.';
+  if (summary.priceRequiredCount > 0) return 'Add prices to completed work items before item-based invoicing.';
+  if (summary.openCount > 0 && summary.draftedCount + summary.invoicedCount > 0) return 'Continue the remaining backlog or review linked invoices.';
+  if (summary.openCount > 0) return 'Complete backlog items before invoicing them.';
+  if (summary.billableActiveCount === 0) return 'No billable work items are available for invoicing.';
+  if (summary.invoicedCount === summary.billableActiveCount) return 'All active billable work items are invoiced.';
+  return 'Review work items before invoicing.';
+}
+
 function jobWorkItemLineTotalCents(item: Pick<JobWorkItem, 'quantity' | 'unit_price_cents'>) {
   if (item.unit_price_cents === null || item.unit_price_cents === undefined) return 0;
   return Math.round(Number(item.quantity || 0) * item.unit_price_cents);
@@ -606,6 +720,29 @@ function jobWorkItemPriceLabel(item: Pick<JobWorkItem, 'unit_price_cents'>) {
 
 function jobWorkItemTotalLabel(item: Pick<JobWorkItem, 'quantity' | 'unit_price_cents'>) {
   return item.unit_price_cents === null || item.unit_price_cents === undefined ? 'Price Required' : formatMoney(jobWorkItemLineTotalCents(item));
+}
+
+function JobWorkItemSummaryStrip({ summary }: { summary: JobWorkItemSummary }) {
+  if (summary.totalItems === 0) return null;
+  const chips = [
+    { label: 'completed', value: summary.completedCount },
+    { label: 'open backlog', value: summary.openCount },
+    { label: 'price required', value: summary.priceRequiredCount },
+    { label: 'drafted', value: summary.draftedCount },
+    { label: 'invoiced', value: summary.invoicedCount },
+  ];
+  return (
+    <div data-testid="job-work-item-summary-strip" className="rounded-xl border border-blue-100 bg-white/80 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Work summary</span>
+        {chips.map(chip => (
+          <span key={chip.label} data-testid="job-work-item-summary-chip" className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+            {chip.value} {chip.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function InvoiceBacklogSection({ invoice, compact = false }: { invoice: Pick<Invoice, 'backlog_items'>; compact?: boolean }) {
@@ -28477,6 +28614,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const jobWorkItems = workItemsForJob(insp.id);
                           const hasDurableWorkItems = jobWorkItems.length > 0;
                           const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
+                          const workItemSummary = getJobWorkItemSummary(jobWorkItems, linkedInvoice);
+                          const primaryWorkItemBadge = getJobWorkItemSummaryBadges(workItemSummary)[0] ?? null;
+                          const workItemNextAction = getJobWorkItemNextAction(workItemSummary);
                           const showJobInvoiceAction = inspectionIsClosedJob(insp);
                           return (
                             <div
@@ -28498,6 +28638,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
                                     {!checklistStyle && linkedEstimate && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Estimate linked</span>}
                                     {!checklistStyle && linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
+                                    {!checklistStyle && primaryWorkItemBadge && (
+                                      <span
+                                        data-testid="job-work-item-summary-badge"
+                                        title={primaryWorkItemBadge.title}
+                                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${primaryWorkItemBadge.className}`}
+                                      >
+                                        {primaryWorkItemBadge.label}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="mt-0.5 text-xs text-slate-500">
                                     {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatDateTime(insp.updated_at)}
@@ -28512,7 +28661,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                   {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
-                                      Next step: use item-based invoicing for completed work items.
+                                      Next step: {workItemNextAction || 'use item-based invoicing for completed work items.'}
                                     </p>
                                   )}
                                   {!checklistStyle && linkedInvoice && (
@@ -30004,6 +30153,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             const activeJobWorkItems = workItemsForJob(activeInspection.id);
             const activeJobHasDurableWorkItems = activeJobWorkItems.length > 0;
             const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);
+            const activeJobWorkItemSummary = getJobWorkItemSummary(activeJobWorkItems, linkedInvoiceForJob);
+            const activeJobWorkItemBadge = getJobWorkItemSummaryBadges(activeJobWorkItemSummary)[0] ?? null;
+            const activeJobWorkItemNextAction = getJobWorkItemNextAction(activeJobWorkItemSummary);
             const linkedVisitEventForJob = contractorVisitEvents.find(event =>
               event.inspection_id === activeInspection.id && event.status !== 'cancelled'
             ) ?? null;
@@ -30034,6 +30186,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
                         {inspectionJobStatusLabel(activeInspection)}
                       </span>
+                      {activeJobWorkItemBadge && (
+                        <span
+                          data-testid="job-work-item-summary-badge"
+                          title={activeJobWorkItemBadge.title}
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeJobWorkItemBadge.className}`}
+                        >
+                          {activeJobWorkItemBadge.label}
+                        </span>
+                      )}
                       {linkedEstimateForJob && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Estimate linked</span>}
                       {linkedInvoiceForJob && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Invoice linked</span>}
                       {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">Calendar linked</span>}
@@ -30052,8 +30213,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   )}
                   {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && activeJobHasDurableWorkItems && (
                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
-                      Next step: create an item-based invoice from completed, priced work items.
+                      Next step: {activeJobWorkItemNextAction || 'create an item-based invoice from completed, priced work items.'}
                     </p>
+                  )}
+                  {activeJobHasDurableWorkItems && (
+                    <div className="mt-3">
+                      <JobWorkItemSummaryStrip summary={activeJobWorkItemSummary} />
+                    </div>
                   )}
                   {linkedInvoiceForJob && (
                     <p className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">

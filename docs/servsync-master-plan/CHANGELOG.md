@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-26
 
+- Branch: `codex/job-work-summary-badges-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added frontend-only derived job work-item summary badges for contractor job rows and job detail. Work-item-backed jobs now show compact contractor-facing status such as Ready to invoice, Price required, Partially invoiced, Fully invoiced, Backlog open, or No billable items without adding persisted job status values. Job detail also shows a Work summary strip with completed, open backlog, price required, drafted, and invoiced counts.
+- Reason for change: Help contractors understand item-based billing state at the job level after partial invoicing, work-item seeding, manual work items, and the whole-job invoice guardrail were completed.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5174 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - Changed-file secret-value scan.
+  - Static protected-scope scan confirming no SQL, Supabase/Vercel/env/settings, storage, auth, production-data, or user-record files changed.
+- Known risks or follow-ups:
+  - Badges are contractor-facing and derived from already-loaded `job_work_items`; no SQL/view/RPC summary was added.
+  - Homeowner job-level summary badges, legacy backfill, inspection finding conversion, remaining-balance automation, and multi-invoice dashboard redesign remain deferred.
+
 - Branch: `codex/whole-job-invoice-work-item-guard-v1`
 - Files changed:
   - `servsync-whole-job-invoice-work-item-guard.sql`
