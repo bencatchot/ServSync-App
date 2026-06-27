@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/refactor-job-work-summary-strip-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/WorkItemSummaryStrip.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Extracted the render-only `JobWorkItemSummaryStrip` component from `src/App.tsx` into `src/features/jobs/WorkItemSummaryStrip.tsx`.
+- Reason for change: Continue the behavior-preserving refactor sequence by moving a small presentational job work-item summary strip out of the app root while leaving summary calculation, invoice eligibility, work-item rows, partial-invoice panels, modals, Supabase queries, RPCs, and workflow state unchanged.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Partial invoicing tests
+  - Contractor smoke
+  - Homeowner smoke
+  - Full core loop
+  - RLS/privacy/storage tests
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - This is intentionally limited to presentational component extraction; labels, counts, classes, test IDs, null behavior, SQL, Supabase, Vercel, production data, and user workflows were not changed.
+
 - Branch: `codex/refactor-job-work-summary-helpers-v1`
 - Files changed:
   - `src/App.tsx`
