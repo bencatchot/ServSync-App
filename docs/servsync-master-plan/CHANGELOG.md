@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/refactor-format-status-helpers-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/format.ts`
+  - `src/features/invoices/status.ts`
+  - `src/features/estimates/status.ts`
+  - `src/features/jobs/status.ts`
+  - `src/features/requests/status.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Extracted pure formatting and status-display helpers from `src/App.tsx` into focused utility and feature modules. The extracted helpers cover money/date/phone/file-size formatting plus invoice, estimate, job, and service-request status labels/classes.
+- Reason for change: Reduce noise in the large app root while preserving existing behavior, labels, CSS classes, formatting, routing, data loading, and workflows.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts tests/e2e/full-core-loop.spec.ts tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium` (first run failed because the shell had not loaded local test env; rerun with local env passed the smoke tests, full core loop, and partial-invoicing tests)
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This is intentionally limited to pure helper extraction; no app workflow, SQL, RLS/RPC, Supabase, Vercel, or production behavior was changed.
+  - Future refactor phases should stay small and keep using smoke/core/RLS coverage before moving larger UI or data-access boundaries.
+
 - Branch: `codex/fb-020-immutable-invoice-rls-v1`
 - Files changed:
   - `servsync-fb020-immutable-invoice-rls.sql`

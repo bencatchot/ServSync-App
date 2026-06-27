@@ -77,6 +77,40 @@ import {
   type EstimateDraftLibraryItem,
   type EstimateDraftLibraryWorkCategory,
 } from './data/estimateDraftLibrary';
+import {
+  estimateStatusClass,
+  estimateStatusLabel,
+} from './features/estimates/status';
+import {
+  CLOSED_JOB_STATUSES,
+  inspectionCanSaveProgress,
+  inspectionIsClosedJob,
+  inspectionIsOpenJob,
+  inspectionJobBadgeClass,
+  inspectionJobStatus,
+  inspectionJobStatusLabel,
+  OPEN_JOB_STATUSES,
+} from './features/jobs/status';
+import {
+  invoiceCanMarkPaid,
+  invoiceCanVoid,
+  invoiceStatusClass,
+  invoiceStatusLabel,
+} from './features/invoices/status';
+import {
+  serviceRequestStatusAccent,
+  serviceRequestStatusClass,
+  serviceRequestStatusLabel,
+  urgencyLabel,
+} from './features/requests/status';
+import {
+  formatDateTime,
+  formatMoney,
+  formatPhoneInputValue,
+  formatPhoneNumber,
+  storageSizeLabel,
+  supportAttachmentSizeLabel,
+} from './utils/format';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -1980,46 +2014,6 @@ function jobTypeHelperCopy(job: Pick<Inspection, 'job_type' | 'template_id' | 'n
     estimate_visit: 'Capture site notes and scope details for an estimate.',
   };
   return helpers[(job.job_type || 'service_visit').trim()] ?? helpers.service_visit;
-}
-
-const OPEN_JOB_STATUSES: JobLifecycleStatus[] = ['draft', 'scheduled', 'in_progress'];
-const CLOSED_JOB_STATUSES: JobLifecycleStatus[] = ['completed', 'closed', 'cancelled'];
-
-function inspectionJobStatus(work: Pick<Inspection, 'status' | 'job_status'>): JobLifecycleStatus {
-  if (work.job_status) return work.job_status;
-  return work.status === 'finalized' ? 'completed' : 'draft';
-}
-
-function inspectionIsOpenJob(work: Pick<Inspection, 'status' | 'job_status'>) {
-  return OPEN_JOB_STATUSES.includes(inspectionJobStatus(work));
-}
-
-function inspectionIsClosedJob(work: Pick<Inspection, 'status' | 'job_status'>) {
-  return CLOSED_JOB_STATUSES.includes(inspectionJobStatus(work));
-}
-
-function inspectionCanSaveProgress(work: Pick<Inspection, 'status' | 'job_status'>) {
-  return work.status === 'draft' && OPEN_JOB_STATUSES.includes(inspectionJobStatus(work));
-}
-
-function inspectionJobStatusLabel(work: Pick<Inspection, 'status' | 'job_status'>) {
-  const labels: Record<JobLifecycleStatus, string> = {
-    draft: 'Draft',
-    scheduled: 'Scheduled',
-    in_progress: 'In progress',
-    completed: 'Completed',
-    closed: 'Closed',
-    cancelled: 'Cancelled',
-  };
-  return labels[inspectionJobStatus(work)];
-}
-
-function inspectionJobBadgeClass(work: Pick<Inspection, 'status' | 'job_status'>) {
-  const status = inspectionJobStatus(work);
-  if (status === 'draft' || status === 'scheduled') return 'bg-amber-50 text-amber-700';
-  if (status === 'in_progress') return 'bg-blue-50 text-blue-700';
-  if (status === 'cancelled') return 'bg-red-50 text-red-700';
-  return 'bg-emerald-50 text-emerald-700';
 }
 
 function compactText(value: string) {
@@ -5601,39 +5595,8 @@ function invoiceTotalCents(draft: Pick<InvoiceDraftForm, 'line_items' | 'tax' | 
   return invoiceTaxableCents(draft) + invoiceTaxCents(draft);
 }
 
-function formatMoney(cents: number) {
-  return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function persistedLineTotalLabel(line: Pick<EstimateLineItem | InvoiceLineItem, 'quantity' | 'unit_price_cents'>) {
   return persistedLineIsUnpriced(line) ? 'Price to be confirmed' : formatMoney(persistedLineTotalCents(line));
-}
-
-function formatPhoneNumber(value?: string | null) {
-  const original = (value || '').trim();
-  if (!original) return '';
-  const digits = original.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  return original;
-}
-
-function formatPhoneInputValue(value: string) {
-  const original = value;
-  const digits = original.replace(/\D/g, '');
-  const allowedFormattingOnly = /^[\d\s()+.-]*$/.test(original);
-  if (!allowedFormattingOnly) return original;
-  if (digits.length === 0) return '';
-  if (digits.length > 11) return original;
-  const localDigits = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-  const prefix = digits.length === 11 && digits.startsWith('1') ? '+1 ' : '';
-  if (localDigits.length <= 3) return `${prefix}${localDigits}`;
-  if (localDigits.length <= 6) return `${prefix}(${localDigits.slice(0, 3)}) ${localDigits.slice(3)}`;
-  return `${prefix}(${localDigits.slice(0, 3)}) ${localDigits.slice(3, 6)}-${localDigits.slice(6)}`;
 }
 
 const writingAssistProps = {
@@ -5643,47 +5606,6 @@ const writingAssistProps = {
   onBlur: cleanHumanTextInputOnBlur,
   onKeyUp: cleanHumanTextInputOnKeyUp,
 } as const;
-
-function invoiceStatusLabel(status: Invoice['status']) {
-  return status.replace(/_/g, ' ');
-}
-
-function estimateStatusLabel(status: Estimate['status']) {
-  const labels: Record<Estimate['status'], string> = {
-    draft: 'Draft',
-    sent: 'Sent to homeowner',
-    accepted: 'Accepted',
-    declined: 'Declined',
-    expired: 'Expired',
-    revised: 'Revised',
-  };
-  return labels[status] ?? status;
-}
-
-function estimateStatusClass(status: Estimate['status']) {
-  if (status === 'draft') return 'bg-amber-100 text-amber-700';
-  if (status === 'accepted') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'declined' || status === 'expired') return 'bg-slate-100 text-slate-600';
-  if (status === 'revised') return 'bg-violet-100 text-violet-700';
-  return 'bg-blue-100 text-blue-700';
-}
-
-function invoiceStatusClass(status: Invoice['status']) {
-  if (status === 'draft') return 'bg-amber-100 text-amber-700';
-  if (status === 'paid') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'void') return 'bg-slate-100 text-slate-600';
-  if (status === 'overdue') return 'bg-red-100 text-red-700';
-  if (status === 'sent' || status === 'viewed') return 'bg-blue-100 text-blue-700';
-  return 'bg-violet-100 text-violet-700';
-}
-
-function invoiceCanMarkPaid(status: Invoice['status']) {
-  return ['sent', 'viewed', 'overdue', 'partially_paid'].includes(status);
-}
-
-function invoiceCanVoid(status: Invoice['status']) {
-  return ['draft', 'sent', 'viewed'].includes(status);
-}
 
 function cleanInvoiceFileStem(fileName: string) {
   return fileName
@@ -5905,19 +5827,6 @@ Ben Catchot
 ServSync`,
     textBody: `Hi ${contractorName}, this is Ben with ServSync. A local homeowner requested that ${lead.business_name} be invited to join ServSync. ServSync helps contractors connect with homeowners and keep requests, estimates, jobs, invoices, and customer records organized. Contractors can start with a 30-day free trial here: ${signupLink}`,
   };
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Not used yet';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 function buildHalfHourTimeOptions(startHour: number, endHour: number) {
@@ -6284,33 +6193,6 @@ function connectionEventLabel(eventType: string) {
   return labels[eventType] || eventType.replace(/_/g, ' ');
 }
 
-function serviceRequestStatusLabel(status: ServiceRequestStatus) {
-  const labels: Record<ServiceRequestStatus, string> = {
-    open: 'Open',
-    contractor_responded: 'Responded',
-    homeowner_replied: 'Replied',
-    declined: 'Declined',
-    closed: 'Closed',
-  };
-  return labels[status] || status;
-}
-
-function serviceRequestStatusClass(status: ServiceRequestStatus) {
-  if (status === 'open') return 'bg-slate-100 text-slate-700';
-  if (status === 'contractor_responded') return 'bg-blue-50 text-blue-700';
-  if (status === 'homeowner_replied') return 'bg-amber-50 text-amber-700';
-  if (status === 'closed') return 'bg-emerald-50 text-emerald-700';
-  return 'bg-red-50 text-red-700';
-}
-
-function serviceRequestStatusAccent(status: ServiceRequestStatus) {
-  if (status === 'open') return 'border-l-slate-300';
-  if (status === 'contractor_responded') return 'border-l-blue-400';
-  if (status === 'homeowner_replied') return 'border-l-amber-400';
-  if (status === 'closed') return 'border-l-emerald-400';
-  return 'border-l-red-300';
-}
-
 function serviceRequestSearchText(request: ServiceRequestSummary) {
   return normalizeText([
     request.title,
@@ -6459,18 +6341,6 @@ function safeSupportFileName(name: string) {
     .slice(0, 90) || 'attachment';
 }
 
-function supportAttachmentSizeLabel(bytes: number | null | undefined) {
-  if (!bytes) return '';
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
-function storageSizeLabel(bytes: number | null | undefined) {
-  if (!bytes) return '0 MB';
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
 function fileExtensionFromName(name: string) {
   return name.split('.').pop()?.trim().toLowerCase() || '';
 }
@@ -6529,12 +6399,6 @@ function supportStatusClass(status: SupportInquiryStatus | string) {
   if (status === 'waiting_on_admin') return 'bg-sky-100 text-sky-700';
   if (status === 'resolved') return 'bg-emerald-100 text-emerald-700';
   return 'bg-slate-100 text-slate-700';
-}
-
-function urgencyLabel(urgency: string) {
-  if (urgency === 'urgent') return '🔴 Urgent';
-  if (urgency === 'normal') return 'Normal';
-  return 'Low';
 }
 
 function groupConnectionHistory(events: ConnectionAuditEvent[]) {
