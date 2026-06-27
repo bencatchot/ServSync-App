@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { Analytics } from '@vercel/analytics/react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -7003,6 +7004,7 @@ export default function App() {
       {profile.role === 'homeowner' && <HomeownerDashboard profile={profile} onSignOut={signOut} />}
       {profile.role === 'contractor' && <ContractorDashboard profile={profile} onSignOut={signOut} />}
       {profile.role === 'platform_admin' && <PlatformAdminDashboard onSignOut={signOut} />}
+      <Analytics />
     </>
   );
 }
