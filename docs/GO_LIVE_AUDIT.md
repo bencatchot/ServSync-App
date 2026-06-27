@@ -34,6 +34,8 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 
 FB-020 is the umbrella follow-up for the completed security/readiness audit. It should be handled through small, separately approved tasks before broader beta, public go-live, or paid contractor subscriptions.
 
+Baseline operating guidance now lives in `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`. That runbook covers backup/restore expectations, storage-object backup expectations, restore drills, applied-SQL tracking, fresh environment rebuild expectations, production smoke account policy, retention/export/deletion/cancellation decisions, and the sandbox-only read-only catalog verification command.
+
 FB-020 covers:
 
 - Deployed RLS and storage policy verification.
