@@ -6,6 +6,40 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-021-scheduling-foundation-v1`
+- Files changed:
+  - `servsync-fb021-scheduling-foundation.sql`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-021 Phase 1 scheduling foundation SQL patch and sandbox-gated probes for contractor-proposed appointment windows, homeowner acceptance/decline, contractor cancellation/rescheduling, and appointment lifecycle history.
+- Reason for change: Prepare the request-level scheduling foundation for the approved v1 flow where contractors propose up to three visit windows, homeowners accept one, field techs/viewers cannot schedule, and existing `service_request_appointments` remains the confirmed appointment summary for compatibility.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - SQL static review for safe `search_path=public`, no production refs, no hardcoded secrets, authenticated-only RPC grants, and no broad data deletes/updates.
+  - Sandbox SQL application to `zpzdkoaubyjtsomccxya` using `servsync-fb021-scheduling-foundation.sql`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium` (skipped by default unless `FB021_SCHEDULING_FOUNDATION=true` is set)
+  - `FB021_SCHEDULING_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - Sandbox cleanup count for exact Codex FB-021 scheduling probe records: service requests 0, appointment windows 0, appointment events 0, appointment summaries 0, notifications 0
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The SQL patch is not applied to production and requires separate production rollout approval after review.
+  - UI wiring for contractor proposal forms, homeowner accept/decline cards, and calendar/read-display integration remains deferred to later FB-021 phases.
+  - Existing homeowner counter-proposal RPCs remain for compatibility, but the new v1 appointment-window path does not let homeowners force-book arbitrary times.
+  - Accepted appointment windows update `service_request_appointments` as the compatibility summary with `visit_event_id = null`; any later job-linked visit-event synchronization should be handled explicitly in the read/display or calendar integration phase.
+
 - Branch: `codex/refactor-job-work-summary-strip-v1`
 - Files changed:
   - `src/App.tsx`
