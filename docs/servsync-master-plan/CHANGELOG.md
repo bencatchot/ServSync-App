@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/refactor-job-work-summary-helpers-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/workItemSummary.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Extracted pure job work-item summary helpers from `src/App.tsx` into `src/features/jobs/workItemSummary.ts`, including item-based invoice eligibility, work-item summary counts, derived badge state, and next-action text.
+- Reason for change: Continue the behavior-preserving refactor sequence by reducing app-root noise while keeping partial-invoicing and job work-item summary behavior unchanged.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts tests/e2e/full-core-loop.spec.ts tests/e2e/partial-invoicing-data-foundation.spec.ts tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This is intentionally limited to pure job work-item summary helper extraction; no summary counts, labels, badge states, invoice eligibility behavior, SQL, RLS/RPC, Supabase, Vercel, production data, or user workflows were changed.
+  - Job work-item row price/status label helpers and React UI rendering remain in `src/App.tsx`.
+
 - Branch: `codex/refactor-local-storage-helpers-v1`
 - Files changed:
   - `src/App.tsx`
