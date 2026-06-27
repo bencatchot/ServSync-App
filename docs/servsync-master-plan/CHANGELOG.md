@@ -6,6 +6,64 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-020-billing-permission-helper-v1`
+- Files changed:
+  - `servsync-fb020-billing-permission-helper.sql`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `tests/e2e/fb020-role-boundary-money-probes.spec.ts`
+  - `docs/FB-020_ROLE_BOUNDARY_PROBES.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-020 Slice 3B billing permission SQL patch to separate contractor billing/money authorization from operational job-write authorization. The patch introduces `current_user_can_manage_contractor_billing`, updates invoice/money RPCs, invoice/write RLS, invoice-line/write RLS, backlog-snapshot write RLS, and price-bearing manual work-item RPC/RLS checks so field techs remain job-execution users but cannot perform billing actions.
+- Reason for change: Slice 3A probes confirmed `field_tech` users could perform invoice create/send/void/paid, partial-invoice, and price-bearing manual work-item actions because those paths reused `current_user_can_write_contractor_jobs`.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - SQL static review for safe `search_path=public`, no public/anon execute grants on the new helper, no production refs, no hardcoded secrets, and no broad destructive data operations.
+  - Sandbox SQL application to `zpzdkoaubyjtsomccxya` using `servsync-fb020-billing-permission-helper.sql`
+  - Sandbox catalog verification confirming `current_user_can_manage_contractor_billing` and the selected billing RPCs are `SECURITY DEFINER`, set `search_path=public`, deny anon execute, and grant authenticated execute.
+  - Sandbox function-definition verification confirming targeted invoice/manual work-item RPCs now use `current_user_can_manage_contractor_billing` instead of `current_user_can_write_contractor_jobs`.
+  - Sandbox policy verification confirming invoice, invoice line item, job work item, and invoice backlog write policies now use the billing helper.
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `FB020_ROLE_BOUNDARY_PROBES=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The SQL patch has been applied and validated in sandbox only; it must not be applied to production without separate approval.
+  - The first SQL apply command used the wrong Supabase CLI argument form and exited before execution; the patch was then applied successfully with `supabase db query --linked --file`.
+  - Estimate-money and report-finalization boundaries remain separate FB-020 follow-up slices unless directly covered by the invoice/money RPCs in this patch.
+
+- Branch: `codex/fb-020-role-boundary-probes-v1`
+- Files changed:
+  - `tests/e2e/fb020-role-boundary-money-probes.spec.ts`
+  - `docs/FB-020_ROLE_BOUNDARY_PROBES.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added sandbox-only, opt-in FB-020 role-boundary money-action probe scaffolding for contractor team roles. The probes can report whether field tech, viewer, office, admin, owner, disabled-team-member, and cross-contractor fixtures can perform invoice, partial-invoice, mark-paid/void/send, and price-bearing manual work-item actions.
+- Reason for change: FB-020 Slice 3 identified that `current_user_can_write_contractor_jobs` may be too broad for money actions because it includes `field_tech`; this test/probe slice creates a safe way to capture current deployed behavior before approval-gated SQL/RPC permission hardening.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium` (5 skipped because `FB020_ROLE_BOUNDARY_PROBES=true` was not set)
+  - Created/updated sandbox-only FB-020 role fixtures on `zpzdkoaubyjtsomccxya` for admin, office, field tech, viewer, and disabled field tech; fixture credentials are stored only in ignored local env.
+  - `FB020_ROLE_BOUNDARY_PROBES=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium` (5/5 passed as probes; confirmed field tech is currently allowed to create draft invoices, send invoices, void invoices, mark invoices paid, create partial invoices, and create/update price-bearing manual work items)
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The new probes are intentionally opt-in behind `FB020_ROLE_BOUNDARY_PROBES=true`; they should remain evidence-gathering probes until the SQL/RPC permission split is approved.
+  - Field tech money actions currently report `observed=allowed`; this is evidence for the next SQL/RPC permission split and should not be treated as desired long-term behavior.
+  - A failed first sandbox fixture attempt echoed generated fixture passwords in local terminal output; the sandbox fixture passwords were immediately rotated and local ignored env values were updated before probes were run.
+
 - Branch: `codex/fb-020-readiness-runbook-catalog-checks-v1`
 - Files changed:
   - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`

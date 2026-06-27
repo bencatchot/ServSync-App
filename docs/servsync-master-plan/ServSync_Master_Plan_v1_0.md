@@ -76,6 +76,8 @@ Simpler platform wording should be preferred when describing ServSync publicly. 
 | Platform | Find local contractors. Keep the work organized. |
 | Investor/partner | A marketplace and workflow platform connecting local homeowners and small contractors through permission-based relationships and service records. |
 
+Contractor team role boundaries should stay simple for v1: owners, admins, and office users may manage billing/money actions, while field technicians are limited to job execution work such as notes, findings, photos, checklist/work completion, and similar operational updates. Field technicians should not create, send, void, or mark invoices paid, change customer-facing financial terms, or create/edit price-bearing work items unless a later explicit permissions model is approved.
+
 # 4. Target Audience
 
 ServSync should serve all small contractors broadly, but the first design and pricing decisions should favor solo operators and very small teams. The user is likely someone who gets work through referrals, Facebook, word of mouth, repeat customers, and local visibility, but lacks a clean system for the work after the lead appears.
