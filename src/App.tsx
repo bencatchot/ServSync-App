@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { Analytics } from '@vercel/analytics/react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -6775,7 +6776,7 @@ function TradeToolsPanel({
   );
 }
 
-export default function App() {
+function AppContent() {
   const [{ route, query }, setRouteState] = useState(currentRoute);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -7003,6 +7004,15 @@ export default function App() {
       {profile.role === 'homeowner' && <HomeownerDashboard profile={profile} onSignOut={signOut} />}
       {profile.role === 'contractor' && <ContractorDashboard profile={profile} onSignOut={signOut} />}
       {profile.role === 'platform_admin' && <PlatformAdminDashboard onSignOut={signOut} />}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <AppContent />
+      <Analytics />
     </>
   );
 }
