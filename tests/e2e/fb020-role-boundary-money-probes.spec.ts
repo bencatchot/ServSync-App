@@ -289,16 +289,23 @@ async function createProbeInvoice(
       job_id: jobId ?? null,
       title: `Codex FB-020 Role Boundary Invoice ${Date.now().toString(36)}`,
       scope: 'Sandbox-only role-boundary probe invoice.',
-      status,
+      status: 'draft',
       subtotal_cents: 1000,
       total_cents: 1000,
-      issued_at: status === 'sent' ? new Date().toISOString() : null,
+      issued_at: null,
     })
     .select('id')
     .single();
 
   expect(result.error, 'owner should create probe invoice fixture').toBeNull();
-  return result.data!.id as string;
+  const invoiceId = result.data!.id as string;
+
+  if (status === 'sent') {
+    const sendResult = await owner.client.rpc('servsync_send_invoice', { p_invoice_id: invoiceId });
+    expect(sendResult.error, 'owner should send probe invoice fixture').toBeNull();
+  }
+
+  return invoiceId;
 }
 
 async function createProbeWorkItem(owner: AuthenticatedClient, contractorId: string, jobId: string, title: string) {

@@ -6,6 +6,64 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-020-immutable-invoice-rls-v1`
+- Files changed:
+  - `servsync-fb020-immutable-invoice-rls.sql`
+  - `tests/e2e/fb020-immutable-invoice-probes.spec.ts`
+  - `tests/e2e/fb020-role-boundary-money-probes.spec.ts`
+  - `docs/FB-020_IMMUTABLE_INVOICE_PROBES.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-020 Slice 4B SQL patch to make direct invoice and invoice-line writes draft-only while preserving customer-facing invoice reads and explicit lifecycle RPC transitions. The immutable invoice probes now verify that sent, paid, and void invoices and invoice lines reject direct table mutation after the sandbox patch is applied. The role-boundary money probe fixture helper now creates sent invoice fixtures through draft creation plus `servsync_send_invoice`, matching the hardened invoice lifecycle.
+- Reason for change: Slice 4A probes confirmed billing-authorized users could directly mutate sent, paid, and void invoices and invoice lines, creating a records-reliability risk for customer-facing invoices and regenerated PDFs.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - SQL static review confirming no broad data deletes/updates, no production refs, no hardcoded secrets, no read/homeowner policy changes, and policy changes limited to `invoices` / `invoice_line_items` direct writes.
+  - Sandbox SQL application to `zpzdkoaubyjtsomccxya` using `servsync-fb020-immutable-invoice-rls.sql`
+  - `FB020_IMMUTABLE_INVOICE_PROBES=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-immutable-invoice-probes.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-immutable-invoice-probes.spec.ts --project=chromium` (3 skipped by default because `FB020_IMMUTABLE_INVOICE_PROBES=true` was not set)
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium` (first parallel validation attempt had one timeout; isolated rerun and full batch rerun passed 5/5)
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - `FB020_ROLE_BOUNDARY_PROBES=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium` (5/5 passed after updating sent-invoice fixtures to use draft creation plus `servsync_send_invoice`)
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Sandbox cleanup count for exact Codex immutable invoice probe records: invoices 0, invoice lines 0, backlog snapshots 0, notifications 0
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The SQL patch is approved for sandbox validation only and must not be applied to production without separate approval.
+  - Full PDF/final snapshot strategy, broader accounting audit logs, estimate immutability, and work-item billing-state direct-write hardening remain separate FB-020 follow-ups.
+
+- Branch: `codex/fb-020-immutable-invoice-probes-v1`
+- Files changed:
+  - `tests/e2e/fb020-immutable-invoice-probes.spec.ts`
+  - `docs/FB-020_IMMUTABLE_INVOICE_PROBES.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added sandbox-only, opt-in FB-020 immutable invoice probes that create exact labeled sandbox invoices, test whether billing-authorized users can directly mutate customer-facing invoice and invoice-line records after send/paid/void states, verify draft direct edits remain available, and verify approved lifecycle RPCs and homeowner visibility still work.
+- Reason for change: FB-020 Slice 4 audit found a records-reliability gap where deployed RLS may allow direct table mutations after invoices leave draft, which can let regenerated PDFs or Home History context drift from what the homeowner originally saw.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-immutable-invoice-probes.spec.ts --project=chromium` (3 skipped by default because `FB020_IMMUTABLE_INVOICE_PROBES=true` was not set)
+  - `FB020_IMMUTABLE_INVOICE_PROBES=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb020-immutable-invoice-probes.spec.ts --project=chromium` (expected-red: 1 failed, 2 passed; confirmed direct mutation exposure for sent/paid/void invoices and lines while draft edits and approved lifecycle RPCs still worked)
+  - Sandbox cleanup count for exact Codex immutable invoice probe records: invoices 0, invoice lines 0, backlog snapshots 0, notifications 0
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The probes are intentionally disabled unless `FB020_IMMUTABLE_INVOICE_PROBES=true` is set.
+  - Enabled probes may be expected-red until the follow-up immutable invoice SQL/RLS hardening slice limits direct invoice and invoice-line edits to drafts.
+  - The probes are sandbox-only and refuse production Supabase URLs.
+
 - Branch: `codex/fb-020-billing-permission-helper-v1`
 - Files changed:
   - `servsync-fb020-billing-permission-helper.sql`
