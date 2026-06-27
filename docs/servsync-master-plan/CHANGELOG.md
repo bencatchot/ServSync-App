@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-021-scheduling-read-display-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-021 Phase 2 read-only appointment-window display wiring for homeowner and contractor service request cards. Existing request reads now append RLS-filtered proposed appointment windows from `service_request_appointment_windows`, and expanded request details show confirmed appointment summaries plus pending proposed visit windows without adding scheduling action buttons.
+- Reason for change: Continue the approved scheduling foundation rollout by making the Phase 1 appointment-window data visible in the app while preserving the existing single appointment summary compatibility path and deferring proposal/accept/decline/reschedule controls to later phases.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium` (skipped by default unless `FB021_SCHEDULING_FOUNDATION=true` is set)
+  - `FB021_SCHEDULING_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - This phase is display-only; contractor proposal forms, homeowner accept/decline buttons, contractor reschedule/cancel buttons, email notifications, Google/Outlook sync, dispatch/routing, and GPS behavior remain deferred.
+  - Proposed windows are loaded through an RLS-safe client read for current request IDs and filtered to `status = 'proposed'`; declined, superseded, cancelled, accepted, and expired windows are not shown as active choices.
+  - Existing legacy homeowner counter-proposal compatibility remains in place and is not part of the new v1 appointment-window action flow.
+
 - Branch: `codex/fb-021-scheduling-foundation-v1`
 - Files changed:
   - `servsync-fb021-scheduling-foundation.sql`

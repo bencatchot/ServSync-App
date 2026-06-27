@@ -214,6 +214,7 @@ import type {
   HomeDocumentUploadSource,
   QuoteStatus,
   ServiceRequestAppointment,
+  ServiceRequestAppointmentWindow,
   ServiceRequestMedia,
   ServiceRequestQuote,
   ServiceRequestStatus,
@@ -4748,12 +4749,54 @@ function buildValueAddText(rooms: InspectionRoomData[]): string {
   return `${fixedCount} item${fixedCount !== 1 ? 's were' : ' was'} corrected during this visit. These completed fixes document work performed on site and may help the homeowner track maintenance needs over time.`;
 }
 
+function normalizeServiceRequestAppointmentWindows(windows?: ServiceRequestAppointmentWindow[] | null) {
+  return (windows || [])
+    .filter(window => window.status === 'proposed')
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+}
+
+function activeServiceRequestAppointmentWindows(request: ServiceRequestSummary) {
+  return normalizeServiceRequestAppointmentWindows(request.appointment_windows);
+}
+
+function hasProposedServiceRequestAppointmentWindows(request: ServiceRequestSummary) {
+  return activeServiceRequestAppointmentWindows(request).length > 0;
+}
+
+async function serviceRequestsWithAppointmentWindows(requests: ServiceRequestSummary[]) {
+  const normalizedRequests = requests.map(normalizeServiceRequestSummary);
+  const requestIds = normalizedRequests.map(request => request.id).filter(Boolean);
+  if (!supabase || requestIds.length === 0) return normalizedRequests;
+
+  const windowsRes = await supabase
+    .from('service_request_appointment_windows')
+    .select('id,request_id,starts_at,ends_at,status,proposal_batch_id,contractor_note,homeowner_response_note,created_at,accepted_at,cancelled_at')
+    .in('request_id', requestIds)
+    .eq('status', 'proposed')
+    .order('starts_at', { ascending: true });
+
+  if (windowsRes.error) throw windowsRes.error;
+
+  const windowsByRequest = new Map<string, ServiceRequestAppointmentWindow[]>();
+  ((windowsRes.data || []) as ServiceRequestAppointmentWindow[]).forEach(window => {
+    const existing = windowsByRequest.get(window.request_id) || [];
+    existing.push(window);
+    windowsByRequest.set(window.request_id, existing);
+  });
+
+  return normalizedRequests.map(request => ({
+    ...request,
+    appointment_windows: normalizeServiceRequestAppointmentWindows(windowsByRequest.get(request.id)),
+  }));
+}
+
 function normalizeServiceRequestSummary(request: ServiceRequestSummary): ServiceRequestSummary {
   const withDefaults = {
     ...request,
     home_id: request.home_id ?? null,
     home_label: request.home_label ?? '',
     home_address: request.home_address ?? '',
+    appointment_windows: normalizeServiceRequestAppointmentWindows(request.appointment_windows),
     review_eligible: Boolean(request.review_eligible),
   };
   if (!withDefaults.appointment) return withDefaults;
@@ -6026,6 +6069,13 @@ function serviceRequestSearchText(request: ServiceRequestSummary) {
     request.quote?.status,
     request.appointment?.status,
     request.appointment?.notes,
+    ...activeServiceRequestAppointmentWindows(request).flatMap(window => [
+      window.starts_at,
+      window.ends_at,
+      window.status,
+      window.contractor_note,
+      window.homeowner_response_note,
+    ]),
     ...(request.messages || []).map(message => message.body),
   ].filter(Boolean).join(' '));
 }
@@ -8935,8 +8985,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         : { data: [], error: null };
       if (historyRes.error) throw historyRes.error;
 
+      const loadedServiceRequests = await serviceRequestsWithAppointmentWindows((serviceRequestsRes.data || []) as ServiceRequestSummary[]);
+
       setConnections(loadedConnections);
-      setServiceRequests(((serviceRequestsRes.data || []) as ServiceRequestSummary[]).map(normalizeServiceRequestSummary));
+      setServiceRequests(loadedServiceRequests);
       if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
       if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
@@ -11720,6 +11772,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (openInvoice) return { label: 'Invoice sent', className: 'bg-amber-100 text-amber-800' };
     if (paidInvoice) return { label: 'Paid', className: 'bg-emerald-100 text-emerald-700' };
     if (request.status === 'closed') return { label: 'Closed', className: 'bg-emerald-50 text-emerald-700' };
+    if (hasProposedServiceRequestAppointmentWindows(request)) {
+      return {
+        label: request.appointment?.status === 'confirmed' ? 'New times proposed' : 'Visit times proposed',
+        className: 'bg-blue-50 text-blue-700',
+      };
+    }
     if (request.appointment?.status === 'proposed' && request.appointment.proposed_by === 'contractor') {
       return { label: 'Needs your response', className: 'bg-amber-100 text-amber-800' };
     }
@@ -14694,6 +14752,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               )}
                             </>
                           )}
+                          <ServiceRequestAppointmentWindowsCard
+                            requestId={request.id}
+                            windows={request.appointment_windows}
+                            perspective="homeowner"
+                            hasConfirmedAppointment={request.appointment?.status === 'confirmed'}
+                          />
                           <div className="space-y-3">
                             <Field label="Reply">
                               <textarea className={inputClass()} rows={3}
@@ -16337,8 +16401,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         external_review_links: normalizeExternalReviewLinks(loadedContractor.external_review_links),
       } : null);
       setContractorServiceAreas(loadedServiceAreas);
+      const loadedServiceRequests = await serviceRequestsWithAppointmentWindows((serviceRequestsRes.data || []) as ServiceRequestSummary[]);
+
       setConnections(loadedConnections);
-      setServiceRequests(((serviceRequestsRes.data || []) as ServiceRequestSummary[]).map(normalizeServiceRequestSummary));
+      setServiceRequests(loadedServiceRequests);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
       setInvites(loadedInvites);
       setConnectionRequests(loadedRequests);
@@ -23533,6 +23599,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const lastMessage = request.messages[request.messages.length - 1];
               const needsFollowUp = contractorRequestNeedsFollowUp(request);
               const hasAppointment = Boolean(request.appointment);
+              const hasAppointmentWindows = hasProposedServiceRequestAppointmentWindows(request);
               const hasQuote = Boolean(request.quote);
               const propertyLabel = serviceRequestPropertyLabel(request);
               const requestConnection = connections.find(connection =>
@@ -23584,6 +23651,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {hasAppointment && (
                             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800">
                               Appointment
+                            </span>
+                          )}
+                          {hasAppointmentWindows && (
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">
+                              Visit times proposed
                             </span>
                           )}
                           {hasQuote && (
@@ -23698,6 +23770,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             appointment={request.appointment}
                             proposedByLabel={request.appointment.proposed_by === 'homeowner' ? 'Homeowner proposed' : 'You proposed'}
                             nextActionLabel={appointmentNextActionText(request.appointment, 'contractor')}
+                          />
+                        </div>
+                      )}
+                      {hasAppointmentWindows && (
+                        <div className="mt-4">
+                          <ServiceRequestAppointmentWindowsCard
+                            requestId={request.id}
+                            windows={request.appointment_windows}
+                            perspective="contractor"
+                            hasConfirmedAppointment={request.appointment?.status === 'confirmed'}
                           />
                         </div>
                       )}
@@ -34096,6 +34178,71 @@ function ServiceRequestAppointmentCard({
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
           {statusLabel[appointment.status]}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function formatAppointmentWindowRange(window: ServiceRequestAppointmentWindow) {
+  const startsAt = new Date(window.starts_at);
+  const endsAt = new Date(window.ends_at);
+  if (Number.isNaN(startsAt.getTime())) return formatDateTime(window.starts_at);
+
+  const startText = formatDateTime(window.starts_at);
+  if (Number.isNaN(endsAt.getTime())) return startText;
+
+  const sameDay = startsAt.toDateString() === endsAt.toDateString();
+  const endText = sameDay
+    ? endsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : formatDateTime(window.ends_at);
+  return `${startText} - ${endText}`;
+}
+
+function ServiceRequestAppointmentWindowsCard({
+  requestId,
+  windows,
+  perspective,
+  hasConfirmedAppointment,
+}: {
+  requestId: string;
+  windows?: ServiceRequestAppointmentWindow[];
+  perspective: 'homeowner' | 'contractor';
+  hasConfirmedAppointment?: boolean;
+}) {
+  const proposedWindows = normalizeServiceRequestAppointmentWindows(windows);
+  if (proposedWindows.length === 0) return null;
+
+  const heading = hasConfirmedAppointment ? 'New visit times proposed' : 'Proposed visit times';
+  const helperText = perspective === 'contractor'
+    ? (hasConfirmedAppointment ? 'Replacement options sent to homeowner.' : 'Waiting for homeowner review.')
+    : (hasConfirmedAppointment ? 'Your current appointment stays scheduled.' : 'Review-only visit options from your contractor.');
+
+  return (
+    <div
+      data-testid="service-request-appointment-windows"
+      data-record-id={requestId}
+      className="rounded-xl border border-blue-200 bg-blue-50 p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
+            <Calendar size={12} className="mr-1 inline" />
+            {heading}
+          </p>
+          <p className="mt-1 text-sm font-medium text-blue-900">{helperText}</p>
+        </div>
+        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-blue-700">
+          {proposedWindows.length} option{proposedWindows.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {proposedWindows.map((window, index) => (
+          <div key={window.id} className="rounded-lg border border-blue-100 bg-white p-3">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Option {index + 1}</p>
+            <p className="mt-1 text-sm font-bold text-slate-950">{formatAppointmentWindowRange(window)}</p>
+            {window.contractor_note && <p className="mt-1 text-sm text-slate-600">{window.contractor_note}</p>}
+          </div>
+        ))}
       </div>
     </div>
   );

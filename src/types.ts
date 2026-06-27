@@ -14,6 +14,7 @@ export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
 export type QuoteStatus = 'pending' | 'accepted' | 'declined';
 export type AppointmentStatus = 'proposed' | 'confirmed' | 'completed' | 'cancelled';
+export type ServiceRequestAppointmentWindowStatus = 'proposed' | 'accepted' | 'declined' | 'superseded' | 'cancelled' | 'expired';
 export type ContractorVisitEventStatus = 'scheduled' | 'completed' | 'cancelled';
 export type ContractorVisitHomeownerResponseStatus = 'not_shared' | 'shared_waiting' | 'accepted' | 'declined' | 'countered';
 export type CalendarEventType = 'service_visit' | 'inspection_visit' | 'estimate_visit' | 'follow_up_visit' | 'custom';
@@ -49,6 +50,20 @@ export interface ServiceRequestAppointment {
   proposed_by: 'contractor' | 'homeowner';
   created_at: string;
   updated_at: string;
+}
+
+export interface ServiceRequestAppointmentWindow {
+  id: string;
+  request_id: string;
+  starts_at: string;
+  ends_at: string;
+  status: ServiceRequestAppointmentWindowStatus;
+  proposal_batch_id: string;
+  contractor_note: string | null;
+  homeowner_response_note: string | null;
+  created_at: string;
+  accepted_at?: string | null;
+  cancelled_at?: string | null;
 }
 
 export interface ServiceRequestQuote {
@@ -1176,6 +1191,7 @@ export interface ServiceRequestSummary {
   media: ServiceRequestMedia[];
   quote: ServiceRequestQuote | null;
   appointment: ServiceRequestAppointment | null;
+  appointment_windows?: ServiceRequestAppointmentWindow[];
   review: ServiceRequestReview | null;
   review_eligible?: boolean;
   created_at: string;
