@@ -111,6 +111,12 @@ import {
   storageSizeLabel,
   supportAttachmentSizeLabel,
 } from './utils/format';
+import {
+  clearSensitiveLocalStateOnSignOut,
+  STORAGE_KEYS,
+  storedStringSet,
+  storedTab,
+} from './utils/localStorage';
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
@@ -1018,44 +1024,6 @@ type StoredFieldWorkState = {
   selectedRoom?: string | null;
   draftSnapshot?: StoredFieldWorkDraft | null;
 };
-
-const STORAGE_KEYS = {
-  homeownerTab: 'servsync.homeowner.activeTab',
-  homeownerSelectedHome: 'servsync.homeowner.selectedHome',
-  homeownerRequestView: 'servsync.homeowner.requestView',
-  homeownerRequestSearch: 'servsync.homeowner.requestSearch',
-  homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
-  homeownerHomeSetupSkipped: 'servsync.homeowner.homeSetupSkipped',
-  homeownerWalkthroughSkipped: 'servsync.homeowner.walkthroughSkipped',
-  contractorTab: 'servsync.contractor.activeTab',
-  contractorHomeownerFilter: 'servsync.contractor.homeownerFilter',
-  contractorHomeownerSearch: 'servsync.contractor.homeownerSearch',
-  contractorSelectedHomeowner: 'servsync.contractor.selectedHomeowner',
-  contractorHomeownerDetailTab: 'servsync.contractor.homeownerDetailTab',
-  contractorHomeownerRequestView: 'servsync.contractor.homeownerRequestView',
-  contractorJobsCustomerFilter: 'servsync.contractor.jobsCustomerFilter',
-  contractorJobsView: 'servsync.contractor.jobsView',
-  contractorProfileSetupSkipped: 'servsync.contractor.profileSetupSkipped',
-  contractorWalkthroughSkipped: 'servsync.contractor.walkthroughSkipped',
-  contractorViewedCalendarVisits: 'servsync.contractor.viewedCalendarVisits',
-  fieldWorkState: 'servsync.contractor.fieldWorkState',
-};
-
-const SIGN_OUT_LOCAL_STORAGE_KEYS = [
-  STORAGE_KEYS.fieldWorkState,
-  STORAGE_KEYS.homeownerRequestSearch,
-  STORAGE_KEYS.contractorHomeownerSearch,
-  STORAGE_KEYS.contractorSelectedHomeowner,
-  STORAGE_KEYS.contractorJobsCustomerFilter,
-] as const;
-
-function clearSensitiveLocalStateOnSignOut() {
-  try {
-    SIGN_OUT_LOCAL_STORAGE_KEYS.forEach(key => window.localStorage.removeItem(key));
-  } catch {
-    // Local storage cleanup should never block Supabase sign-out.
-  }
-}
 
 type WalkthroughStep = {
   title: string;
@@ -3039,20 +3007,6 @@ function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, sub
           }))
       : [createEstimateLineDraft()],
   };
-}
-
-function storedTab<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
-  const stored = window.localStorage.getItem(key) as T | null;
-  return stored && allowed.includes(stored) ? stored : fallback;
-}
-
-function storedStringSet(key: string): Set<string> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]');
-    return new Set(Array.isArray(parsed) ? parsed.filter(item => typeof item === 'string') : []);
-  } catch {
-    return new Set();
-  }
 }
 
 const ROLE_LABEL: Record<UserRole, string> = {
