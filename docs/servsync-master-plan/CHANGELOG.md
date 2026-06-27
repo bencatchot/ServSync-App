@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-020-readiness-runbook-catalog-checks-v1`
+- Files changed:
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the first FB-020 readiness slice: an operations/security readiness runbook plus sandbox-only read-only security catalog checks for deployed RLS, selected high-risk RPC grants/search paths, and storage bucket privacy flags.
+- Reason for change: FB-020 needs a concrete baseline process for backup/restore, storage-object backup expectations, SQL-applied tracking, fresh environment rebuilds, production smoke account policy, retention/export/deletion/cancellation decisions, and deployed-state verification before broader beta/public go-live readiness claims.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - The new catalog check is intentionally selected and sandbox-gated; broader SQL/RLS/RPC/storage hardening remains separate approval-gated FB-020 work.
+  - The runbook documents required backup/restore, storage backup, retention/export/deletion/cancellation, and production smoke-account decisions; it does not implement those operations by itself.
+
 - Branch: `vercel/install-vercel-web-analytics-sf3b8k`
 - Files changed:
   - `package.json`
