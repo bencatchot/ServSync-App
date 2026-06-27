@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { credentialsFor, requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
 
@@ -166,20 +167,41 @@ async function activeConnectionId(homeowner: AuthenticatedClient, contractorId: 
   return result.data!.id as string;
 }
 
-async function createServiceRequest(homeowner: AuthenticatedClient, contractorId: string, label: string) {
+async function primaryHomeId(homeowner: AuthenticatedClient) {
+  const result = await homeowner.client
+    .from('homes')
+    .select('id')
+    .eq('homeowner_user_id', homeowner.userId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  expect(result.error, 'homeowner primary home lookup should not error').toBeNull();
+  return (result.data?.id as string | undefined) ?? null;
+}
+
+async function createServiceRequestRecord(homeowner: AuthenticatedClient, contractorId: string, label: string) {
   const connectionId = await activeConnectionId(homeowner, contractorId);
+  const homeId = await primaryHomeId(homeowner);
+  const title = `Codex FB-021 Scheduling ${label} ${Date.now().toString(36)}`;
   const result = await homeowner.client.rpc('servsync_create_service_request', {
     p_connection_id: connectionId,
     p_category: 'General Maintenance',
     p_urgency: 'normal',
-    p_title: `Codex FB-021 Scheduling ${label} ${Date.now().toString(36)}`,
+    p_title: title,
     p_description: 'Sandbox-only FB-021 scheduling foundation probe request.',
+    p_home_id: homeId,
   });
 
   expect(result.error, 'homeowner should create scheduling probe service request').toBeNull();
   const requestId = (result.data as { request_id?: string } | null)?.request_id;
   expect(requestId, 'created service request id should be returned').toBeTruthy();
-  return requestId!;
+  return { requestId: requestId!, title };
+}
+
+async function createServiceRequest(homeowner: AuthenticatedClient, contractorId: string, label: string) {
+  const record = await createServiceRequestRecord(homeowner, contractorId, label);
+  return record.requestId;
 }
 
 function futureWindows(count = 2, offsetDays = 7) {
@@ -207,6 +229,35 @@ async function proposeWindows(account: AuthenticatedClient, requestId: string, c
 
 async function expectRpcDenied(result: { error: { message?: string } | null }, label: string) {
   expect(result.error, label).toBeTruthy();
+}
+
+async function openRequestCard(page: Page, testId: string, title: string) {
+  const main = page.getByRole('main');
+  await openSidebarTab(page, /Service Requests/i);
+  await expectActiveTabHeading(page, /^Service Requests$/i);
+
+  const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
+  if (await skipTour.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await skipTour.click();
+  }
+
+  if (testId === 'homeowner-service-request-card') {
+    const propertyFilter = main.getByLabel(/^Property$/i);
+    if (await propertyFilter.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await propertyFilter.selectOption({ label: 'All properties' });
+      await expect(propertyFilter).toHaveValue('all');
+    }
+  }
+
+  const card = main.getByTestId(testId).filter({ hasText: title }).first();
+  await expect(card).toBeVisible({ timeout: 30_000 });
+
+  const windowsPanel = card.getByTestId('service-request-appointment-windows').first();
+  if (!(await windowsPanel.isVisible({ timeout: 1_000 }).catch(() => false))) {
+    await card.getByRole('button').first().click();
+  }
+
+  return card;
 }
 
 async function requestWindows(account: AuthenticatedClient, requestId: string) {
@@ -455,6 +506,64 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
 
     const acceptedCount = windows.filter(window => window.status === 'accepted').length;
     expect(acceptedCount, 'only one window should be accepted for the request').toBe(1);
+  });
+
+  test('homeowner and contractor request cards render appointment windows read-only', async ({ page }) => {
+    const proposedRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Proposed');
+    createdRequestIds.push(proposedRequest.requestId);
+    await proposeWindows(owner, proposedRequest.requestId, 2, 31);
+
+    const replacementRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Replacement');
+    createdRequestIds.push(replacementRequest.requestId);
+    const initial = await proposeWindows(owner, replacementRequest.requestId, 1, 34);
+    const acceptInitial = await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
+      p_window_id: initial.window_ids[0],
+    });
+    expect(acceptInitial.error, 'homeowner should accept initial UI fixture appointment').toBeNull();
+    const rescheduleResult = await owner.client.rpc('servsync_reschedule_service_request_appointment', {
+      p_request_id: replacementRequest.requestId,
+      p_windows: futureWindows(2, 35),
+      p_reason: 'Sandbox UI read-display replacement proposal.',
+    });
+    expect(rescheduleResult.error, 'owner should propose replacement windows for UI fixture').toBeNull();
+
+    await loginAs(page, 'homeowner');
+    const homeownerProposedCard = await openRequestCard(page, 'homeowner-service-request-card', proposedRequest.title);
+    await expect(homeownerProposedCard.getByText('Visit times proposed')).toBeVisible();
+    const homeownerProposedWindows = homeownerProposedCard.getByTestId('service-request-appointment-windows');
+    await expect(homeownerProposedWindows).toBeVisible();
+    await expect(homeownerProposedWindows.getByText('Proposed visit times')).toBeVisible();
+    await expect(homeownerProposedWindows.getByText('Review-only visit options from your contractor.')).toBeVisible();
+    await expect(homeownerProposedWindows.getByText('Option 1')).toBeVisible();
+    await expect(homeownerProposedWindows.getByText('Option 2')).toBeVisible();
+    await expect(homeownerProposedWindows.getByRole('button')).toHaveCount(0);
+
+    const homeownerReplacementCard = await openRequestCard(page, 'homeowner-service-request-card', replacementRequest.title);
+    await expect(homeownerReplacementCard.getByText('New times proposed')).toBeVisible();
+    await expect(homeownerReplacementCard.getByText('Confirmed', { exact: true })).toBeVisible();
+    const homeownerReplacementWindows = homeownerReplacementCard.getByTestId('service-request-appointment-windows');
+    await expect(homeownerReplacementWindows.getByText('New visit times proposed')).toBeVisible();
+    await expect(homeownerReplacementWindows.getByText('Your current appointment stays scheduled.')).toBeVisible();
+    await expect(homeownerReplacementWindows.getByRole('button')).toHaveCount(0);
+
+    await page.getByRole('button', { name: /Sign out/i }).first().click();
+    await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible({ timeout: 30_000 });
+
+    await loginAs(page, 'contractor');
+    const contractorProposedCard = await openRequestCard(page, 'contractor-service-request-card', proposedRequest.title);
+    await expect(contractorProposedCard.getByText('Visit times proposed')).toBeVisible();
+    const contractorProposedWindows = contractorProposedCard.getByTestId('service-request-appointment-windows');
+    await expect(contractorProposedWindows.getByText('Proposed visit times')).toBeVisible();
+    await expect(contractorProposedWindows.getByText('Waiting for homeowner review.')).toBeVisible();
+    await expect(contractorProposedWindows.getByRole('button')).toHaveCount(0);
+
+    const contractorReplacementCard = await openRequestCard(page, 'contractor-service-request-card', replacementRequest.title);
+    await expect(contractorReplacementCard.getByText('Appointment', { exact: true })).toBeVisible();
+    await expect(contractorReplacementCard.getByText('Visit times proposed', { exact: true })).toBeVisible();
+    const contractorReplacementWindows = contractorReplacementCard.getByTestId('service-request-appointment-windows');
+    await expect(contractorReplacementWindows.getByText('New visit times proposed')).toBeVisible();
+    await expect(contractorReplacementWindows.getByText('Replacement options sent to homeowner.')).toBeVisible();
+    await expect(contractorReplacementWindows.getByRole('button')).toHaveCount(0);
   });
 
   test('homeowner cannot accept a proposed window after the request is closed', async () => {
