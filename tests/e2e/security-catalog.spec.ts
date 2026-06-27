@@ -59,6 +59,7 @@ const CORE_PRIVATE_TABLES = [
 ];
 
 const HIGH_RISK_RPCS = [
+  'current_user_can_manage_contractor_billing',
   'servsync_contractor_pending_connection_requests',
   'servsync_create_invoice_from_job',
   'servsync_create_job_from_estimate',
@@ -208,4 +209,3 @@ order by e.bucket_id;
     }
   });
 });
-
