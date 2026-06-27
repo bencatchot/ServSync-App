@@ -4,6 +4,24 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-27
+
+- Branch: `vercel/install-vercel-web-analytics-sf3b8k`
+- Files changed:
+  - `package.json`
+  - `package-lock.json`
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Vercel Web Analytics and mounted the analytics component once at the exported app root so public routes, unauthenticated routes, and authenticated homeowner/contractor/platform admin routes can all load analytics after deployment.
+- Reason for change: Sitewide analytics should include marketing/public surfaces as well as signed-in app routes.
+- Tests/checks run:
+  - `npm ci`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` (fails from existing ESLint 9 / `@typescript-eslint/no-unused-expressions` `allowShortCircuit` configuration issue before reaching this change)
+- Known risks or follow-ups:
+  - Web Analytics still needs to be enabled in the Vercel dashboard and deployed from `main` before production analytics can collect data.
+
 ## 2026-06-26
 
 - Branch: `codex/walkthrough-notes-parser-hardening-v1`
