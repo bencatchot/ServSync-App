@@ -13,7 +13,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `tests/e2e/security-catalog.spec.ts`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Added the FB-021 Phase 1 scheduling foundation SQL patch and sandbox-gated probes for contractor-proposed appointment windows, homeowner acceptance/decline, contractor cancellation/rescheduling, and appointment lifecycle history.
+- Summary of change: Added the FB-021 Phase 1 scheduling foundation SQL patch and sandbox-gated probes for contractor-proposed appointment windows, homeowner acceptance/decline, contractor cancellation/rescheduling, appointment lifecycle history, window-count bounds, direct mutation denial, and closed-request acceptance denial.
 - Reason for change: Prepare the request-level scheduling foundation for the approved v1 flow where contractors propose up to three visit windows, homeowners accept one, field techs/viewers cannot schedule, and existing `service_request_appointments` remains the confirmed appointment summary for compatibility.
 - Tests/checks run:
   - `git status --short --branch`
@@ -39,6 +39,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - UI wiring for contractor proposal forms, homeowner accept/decline cards, and calendar/read-display integration remains deferred to later FB-021 phases.
   - Existing homeowner counter-proposal RPCs remain for compatibility, but the new v1 appointment-window path does not let homeowners force-book arbitrary times.
   - Accepted appointment windows update `service_request_appointments` as the compatibility summary with `visit_event_id = null`; any later job-linked visit-event synchronization should be handled explicitly in the read/display or calendar integration phase.
+  - Final pre-review hardening added a narrow guard so proposed windows cannot be accepted after the underlying service request is closed or declined.
 
 - Branch: `codex/refactor-job-work-summary-strip-v1`
 - Files changed:

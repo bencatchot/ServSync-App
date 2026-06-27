@@ -231,6 +231,16 @@ async function requestAppointment(account: AuthenticatedClient, requestId: strin
   return result.data as AppointmentRow | null;
 }
 
+async function requestEvents(account: AuthenticatedClient, requestId: string) {
+  const result = await account.client
+    .from('service_request_appointment_events')
+    .select('id,event_type,request_id')
+    .eq('request_id', requestId);
+
+  expect(result.error, 'appointment event history lookup should not error').toBeNull();
+  return result.data ?? [];
+}
+
 function projectRefForSandboxSql() {
   const projectRefPath = resolve(process.cwd(), 'supabase/.temp/project-ref');
   return existsSync(projectRefPath) ? readFileSync(projectRefPath, 'utf8').trim() : '';
@@ -380,6 +390,34 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
     await expectRpcDenied(crossResult, 'cross-contractor should not propose appointment windows');
   });
 
+  test('window proposal batches reject 0 or 4 windows and accept valid 1 to 3 window batches', async () => {
+    const invalidRequestId = await createServiceRequest(homeowner, contractorId, 'Window Count Invalid');
+    createdRequestIds.push(invalidRequestId);
+
+    const zeroWindowResult = await owner.client.rpc('servsync_propose_service_request_appointment_windows', {
+      p_request_id: invalidRequestId,
+      p_windows: [],
+      p_note: 'zero windows should be rejected',
+    });
+    await expectRpcDenied(zeroWindowResult, 'zero appointment windows should be rejected');
+
+    const fourWindowResult = await owner.client.rpc('servsync_propose_service_request_appointment_windows', {
+      p_request_id: invalidRequestId,
+      p_windows: futureWindows(4, 20),
+      p_note: 'four windows should be rejected',
+    });
+    await expectRpcDenied(fourWindowResult, 'four appointment windows should be rejected');
+
+    for (const count of [1, 2, 3]) {
+      const requestId = await createServiceRequest(homeowner, contractorId, `Window Count ${count}`);
+      createdRequestIds.push(requestId);
+      const proposed = await proposeWindows(owner, requestId, count, 20 + count);
+      expect(proposed.window_ids, `${count} appointment windows should be accepted`).toHaveLength(count);
+      const windows = await requestWindows(homeowner, requestId);
+      expect(windows.filter(window => window.status === 'proposed')).toHaveLength(count);
+    }
+  });
+
   test('homeowner accepts one proposed window, supersedes siblings, and preserves single appointment summary compatibility', async () => {
     const requestId = await createServiceRequest(homeowner, contractorId, 'Accept One');
     createdRequestIds.push(requestId);
@@ -417,6 +455,27 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
 
     const acceptedCount = windows.filter(window => window.status === 'accepted').length;
     expect(acceptedCount, 'only one window should be accepted for the request').toBe(1);
+  });
+
+  test('homeowner cannot accept a proposed window after the request is closed', async () => {
+    const requestId = await createServiceRequest(homeowner, contractorId, 'Closed Accept');
+    createdRequestIds.push(requestId);
+    const proposed = await proposeWindows(owner, requestId, 1, 24);
+
+    const closeResult = await homeowner.client.rpc('servsync_homeowner_update_service_request', {
+      p_request_id: requestId,
+      p_body: 'Closing this sandbox-only scheduling probe request.',
+      p_action: 'close',
+    });
+    expect(closeResult.error, 'homeowner should close own service request').toBeNull();
+
+    const acceptClosedResult = await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
+      p_window_id: proposed.window_ids[0],
+    });
+    await expectRpcDenied(acceptClosedResult, 'closed request appointment window should not be accepted');
+
+    const windows = await requestWindows(homeowner, requestId);
+    expect(windows.filter(window => window.status === 'accepted')).toHaveLength(0);
   });
 
   test('decline/cancel/reschedule lifecycle keeps current appointment until replacement is accepted', async () => {
@@ -486,6 +545,39 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
     expect(cancelResult.error, 'owner should cancel appointment').toBeNull();
     const cancelledSummary = await requestAppointment(homeowner, requestId);
     expect(cancelledSummary?.status).toBe('cancelled');
+
+    for (const actor of [
+      { label: 'admin', account: admin },
+      { label: 'office', account: office },
+    ]) {
+      if (!actor.account) {
+        console.log(`[FB-021 scheduling probe] ${actor.label} fixture is not configured; skipping positive ${actor.label} reschedule/cancel coverage.`);
+        continue;
+      }
+
+      const actorRequestId = await createServiceRequest(homeowner, contractorId, `${actor.label} Reschedule Cancel`);
+      createdRequestIds.push(actorRequestId);
+      const actorInitial = await proposeWindows(owner, actorRequestId, 1, actor.label === 'admin' ? 25 : 28);
+      const actorAccept = await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
+        p_window_id: actorInitial.window_ids[0],
+      });
+      expect(actorAccept.error, `${actor.label} fixture setup appointment should be accepted`).toBeNull();
+
+      const actorReschedule = await actor.account.client.rpc('servsync_reschedule_service_request_appointment', {
+        p_request_id: actorRequestId,
+        p_windows: futureWindows(2, actor.label === 'admin' ? 26 : 29),
+        p_reason: `${actor.label} reschedule probe`,
+      });
+      expect(actorReschedule.error, `${actor.label} should reschedule appointment`).toBeNull();
+
+      const actorCancel = await actor.account.client.rpc('servsync_cancel_service_request_appointment', {
+        p_request_id: actorRequestId,
+        p_reason: `${actor.label} cancel probe`,
+      });
+      expect(actorCancel.error, `${actor.label} should cancel appointment`).toBeNull();
+      const actorSummary = await requestAppointment(homeowner, actorRequestId);
+      expect(actorSummary?.status, `${actor.label} cancel should update appointment summary`).toBe('cancelled');
+    }
   });
 
   test('direct table mutation is denied while connected parties can read window and event history', async () => {
@@ -513,6 +605,12 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
       .eq('id', proposed.window_ids[0]);
     expect(directUpdate.error, 'direct appointment window update should be denied').toBeTruthy();
 
+    const directDelete = await owner.client
+      .from('service_request_appointment_windows')
+      .delete()
+      .eq('id', proposed.window_ids[0]);
+    expect(directDelete.error, 'direct appointment window delete should be denied').toBeTruthy();
+
     const directEventInsert = await owner.client
       .from('service_request_appointment_events')
       .insert({
@@ -527,11 +625,15 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
     const windows = await requestWindows(homeowner, requestId);
     expect(windows).toHaveLength(1);
 
-    const events = await homeowner.client
+    const events = await requestEvents(homeowner, requestId);
+    expect(events.some(event => event.event_type === 'windows_proposed')).toBe(true);
+
+    const proposedEvent = events.find(event => event.event_type === 'windows_proposed');
+    expect(proposedEvent?.id, 'windows_proposed event should exist for direct-delete denial probe').toBeTruthy();
+    const directEventDelete = await owner.client
       .from('service_request_appointment_events')
-      .select('id,event_type,request_id')
-      .eq('request_id', requestId);
-    expect(events.error, 'homeowner should read appointment event history for own request').toBeNull();
-    expect((events.data ?? []).some(event => event.event_type === 'windows_proposed')).toBe(true);
+      .delete()
+      .eq('id', proposedEvent!.id);
+    expect(directEventDelete.error, 'direct appointment event delete should be denied').toBeTruthy();
   });
 });

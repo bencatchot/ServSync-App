@@ -494,6 +494,10 @@ begin
     raise exception 'Appointment window not found.';
   end if;
 
+  if v_request.status in ('declined', 'closed') then
+    raise exception 'Cannot accept appointment windows on a closed request.';
+  end if;
+
   update public.service_request_appointment_windows
      set status = 'superseded',
          updated_at = now()
