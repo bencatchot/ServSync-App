@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/refactor-local-storage-helpers-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/localStorage.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Extracted localStorage key constants, sign-out cleanup key handling, and generic stored tab/string-set readers from `src/App.tsx` into `src/utils/localStorage.ts`.
+- Reason for change: Continue the low-risk refactor sequence by reducing noise in the app root while preserving existing localStorage keys, setup/walkthrough/tab preference behavior, draft/cache behavior, and sign-out cleanup behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/signout-local-storage.spec.ts tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts tests/e2e/full-core-loop.spec.ts tests/e2e/partial-invoicing-data-foundation.spec.ts tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This is intentionally limited to behavior-preserving localStorage helper extraction; no storage key names, preserved/removed key lists, SQL, RLS/RPC, Supabase, Vercel, production data, or user workflows were changed.
+  - Field-work draft parsing and workflow-specific localStorage reads remain in `src/App.tsx` because they are tied to job workflow state rather than generic storage helpers.
+
 - Branch: `codex/refactor-format-status-helpers-v1`
 - Files changed:
   - `src/App.tsx`
