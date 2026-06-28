@@ -73,16 +73,12 @@ async function foundationTableExists(client: SupabaseClient): Promise<boolean> {
 
 async function cleanupCreatedInvoices(client: SupabaseClient, invoiceIds: string[]) {
   if (invoiceIds.length === 0) return;
-  await client.from('invoice_backlog_items').delete().in('invoice_id', invoiceIds);
-  await client.from('invoice_line_items').delete().in('invoice_id', invoiceIds);
-  await client.from('invoices').delete().in('id', invoiceIds);
+  cleanupCreatedInvoicesWithSandboxSql(invoiceIds);
 
   const remaining = await client.from('invoices').select('id').in('id', invoiceIds);
   expect(remaining.error, 'Invoice cleanup verification should be readable by the test contractor').toBeNull();
   const remainingIds = (remaining.data ?? []).map(row => row.id as string);
-  if (remainingIds.length === 0) return;
-
-  cleanupCreatedInvoicesWithSandboxSql(remainingIds);
+  expect(remainingIds, 'Invoice cleanup should remove exact test-created invoices').toHaveLength(0);
 }
 
 function cleanupCreatedInvoicesWithSandboxSql(invoiceIds: string[]) {
@@ -103,7 +99,7 @@ function cleanupCreatedInvoicesWithSandboxSql(invoiceIds: string[]) {
     })
     .join(', ');
 
-  // Contractors can only delete draft invoices through RLS; this removes exact test-created void invoices in sandbox.
+  // Contractors can only delete draft invoices through RLS; this removes exact test-created invoice residue in sandbox.
   execFileSync(
     'supabase',
     [
@@ -112,6 +108,7 @@ function cleanupCreatedInvoicesWithSandboxSql(invoiceIds: string[]) {
       '--linked',
       `
 begin;
+delete from public.workflow_activity_events where invoice_id in (${quotedIds});
 update public.job_work_items
    set billing_status = 'unbilled',
        reserved_invoice_id = null,
