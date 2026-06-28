@@ -217,6 +217,13 @@ function futureWindows(count = 2, offsetDays = 7) {
   });
 }
 
+function futureWindowInputValues(count = 2, offsetDays = 7) {
+  return futureWindows(count, offsetDays).map(window => ({
+    startsAt: window.starts_at.slice(0, 16),
+    endsAt: window.ends_at.slice(0, 16),
+  }));
+}
+
 async function proposeWindows(account: AuthenticatedClient, requestId: string, count = 2, offsetDays = 7) {
   const result = await account.client.rpc('servsync_propose_service_request_appointment_windows', {
     p_request_id: requestId,
@@ -508,62 +515,102 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
     expect(acceptedCount, 'only one window should be accepted for the request').toBe(1);
   });
 
-  test('homeowner and contractor request cards render appointment windows read-only', async ({ page }) => {
-    const proposedRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Proposed');
-    createdRequestIds.push(proposedRequest.requestId);
-    await proposeWindows(owner, proposedRequest.requestId, 2, 31);
+  test('contractor proposes one and three windows from the request card while UI bounds stay enforced', async ({ page }) => {
+    const oneWindowRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI One Window');
+    const threeWindowRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Three Windows');
+    const closedRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Closed No Proposal');
+    const declinedRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Declined No Proposal');
+    createdRequestIds.push(oneWindowRequest.requestId, threeWindowRequest.requestId, closedRequest.requestId, declinedRequest.requestId);
 
-    const replacementRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Replacement');
-    createdRequestIds.push(replacementRequest.requestId);
-    const initial = await proposeWindows(owner, replacementRequest.requestId, 1, 34);
-    const acceptInitial = await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
-      p_window_id: initial.window_ids[0],
+    const closeResult = await homeowner.client.rpc('servsync_homeowner_update_service_request', {
+      p_request_id: closedRequest.requestId,
+      p_body: 'Closing this sandbox-only scheduling UI probe request.',
+      p_action: 'close',
     });
-    expect(acceptInitial.error, 'homeowner should accept initial UI fixture appointment').toBeNull();
-    const rescheduleResult = await owner.client.rpc('servsync_reschedule_service_request_appointment', {
-      p_request_id: replacementRequest.requestId,
-      p_windows: futureWindows(2, 35),
-      p_reason: 'Sandbox UI read-display replacement proposal.',
+    expect(closeResult.error, 'homeowner should close UI no-proposal request').toBeNull();
+
+    const declineResult = await owner.client.rpc('servsync_contractor_update_service_request', {
+      p_request_id: declinedRequest.requestId,
+      p_body: 'Declining this sandbox-only scheduling UI probe request.',
+      p_new_status: 'declined',
+      p_quote_amount_cents: null,
+      p_quote_scope: null,
+      p_closing_summary: null,
     });
-    expect(rescheduleResult.error, 'owner should propose replacement windows for UI fixture').toBeNull();
-
-    await loginAs(page, 'homeowner');
-    const homeownerProposedCard = await openRequestCard(page, 'homeowner-service-request-card', proposedRequest.title);
-    await expect(homeownerProposedCard.getByText('Visit times proposed')).toBeVisible();
-    const homeownerProposedWindows = homeownerProposedCard.getByTestId('service-request-appointment-windows');
-    await expect(homeownerProposedWindows).toBeVisible();
-    await expect(homeownerProposedWindows.getByText('Proposed visit times')).toBeVisible();
-    await expect(homeownerProposedWindows.getByText('Review-only visit options from your contractor.')).toBeVisible();
-    await expect(homeownerProposedWindows.getByText('Option 1')).toBeVisible();
-    await expect(homeownerProposedWindows.getByText('Option 2')).toBeVisible();
-    await expect(homeownerProposedWindows.getByRole('button')).toHaveCount(0);
-
-    const homeownerReplacementCard = await openRequestCard(page, 'homeowner-service-request-card', replacementRequest.title);
-    await expect(homeownerReplacementCard.getByText('New times proposed')).toBeVisible();
-    await expect(homeownerReplacementCard.getByText('Confirmed', { exact: true })).toBeVisible();
-    const homeownerReplacementWindows = homeownerReplacementCard.getByTestId('service-request-appointment-windows');
-    await expect(homeownerReplacementWindows.getByText('New visit times proposed')).toBeVisible();
-    await expect(homeownerReplacementWindows.getByText('Your current appointment stays scheduled.')).toBeVisible();
-    await expect(homeownerReplacementWindows.getByRole('button')).toHaveCount(0);
-
-    await page.getByRole('button', { name: /Sign out/i }).first().click();
-    await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible({ timeout: 30_000 });
+    expect(declineResult.error, 'contractor should decline UI no-proposal request').toBeNull();
 
     await loginAs(page, 'contractor');
-    const contractorProposedCard = await openRequestCard(page, 'contractor-service-request-card', proposedRequest.title);
-    await expect(contractorProposedCard.getByText('Visit times proposed')).toBeVisible();
-    const contractorProposedWindows = contractorProposedCard.getByTestId('service-request-appointment-windows');
-    await expect(contractorProposedWindows.getByText('Proposed visit times')).toBeVisible();
-    await expect(contractorProposedWindows.getByText('Waiting for homeowner review.')).toBeVisible();
-    await expect(contractorProposedWindows.getByRole('button')).toHaveCount(0);
 
-    const contractorReplacementCard = await openRequestCard(page, 'contractor-service-request-card', replacementRequest.title);
-    await expect(contractorReplacementCard.getByText('Appointment', { exact: true })).toBeVisible();
-    await expect(contractorReplacementCard.getByText('Visit times proposed', { exact: true })).toBeVisible();
-    const contractorReplacementWindows = contractorReplacementCard.getByTestId('service-request-appointment-windows');
-    await expect(contractorReplacementWindows.getByText('New visit times proposed')).toBeVisible();
-    await expect(contractorReplacementWindows.getByText('Replacement options sent to homeowner.')).toBeVisible();
-    await expect(contractorReplacementWindows.getByRole('button')).toHaveCount(0);
+    const oneWindowCard = await openRequestCard(page, 'contractor-service-request-card', oneWindowRequest.title);
+    await expect(oneWindowCard.getByTestId('homeowner-accept-appointment-window')).toHaveCount(0);
+    await oneWindowCard.getByTestId('contractor-propose-appointment-windows-toggle').click();
+    const oneWindowForm = oneWindowCard.getByTestId('contractor-appointment-window-form');
+    await expect(oneWindowForm).toBeVisible();
+    await expect(oneWindowForm.getByTestId('contractor-remove-appointment-window-0')).toHaveCount(0);
+    await oneWindowForm.getByTestId('contractor-submit-appointment-windows').click();
+    await expect(oneWindowForm.getByText('Option 1: choose a start and end time.')).toBeVisible();
+
+    const oneWindow = futureWindowInputValues(1, 31)[0];
+    await oneWindowForm.getByTestId('contractor-appointment-window-start-0').fill(oneWindow.startsAt);
+    await oneWindowForm.getByTestId('contractor-appointment-window-end-0').fill(oneWindow.endsAt);
+    await oneWindowForm.getByTestId('contractor-appointment-window-note').fill('Sandbox UI one-window proposal.');
+    await oneWindowForm.getByTestId('contractor-submit-appointment-windows').click();
+    await expect(oneWindowCard.getByTestId('service-request-appointment-windows')).toBeVisible({ timeout: 30_000 });
+    await expect(oneWindowCard.getByText('Option 1')).toBeVisible();
+
+    const threeWindowCard = await openRequestCard(page, 'contractor-service-request-card', threeWindowRequest.title);
+    await threeWindowCard.getByTestId('contractor-propose-appointment-windows-toggle').click();
+    const threeWindowForm = threeWindowCard.getByTestId('contractor-appointment-window-form');
+    await threeWindowForm.getByTestId('contractor-add-appointment-window').click();
+    await threeWindowForm.getByTestId('contractor-add-appointment-window').click();
+    await expect(threeWindowForm.getByTestId('contractor-add-appointment-window')).toHaveCount(0);
+
+    const threeWindows = futureWindowInputValues(3, 34);
+    for (const [index, window] of threeWindows.entries()) {
+      await threeWindowForm.getByTestId(`contractor-appointment-window-start-${index}`).fill(window.startsAt);
+      await threeWindowForm.getByTestId(`contractor-appointment-window-end-${index}`).fill(window.endsAt);
+    }
+    await threeWindowForm.getByTestId('contractor-submit-appointment-windows').click();
+    const threeWindowPanel = threeWindowCard.getByTestId('service-request-appointment-windows');
+    await expect(threeWindowPanel).toBeVisible({ timeout: 30_000 });
+    await expect(threeWindowPanel.getByText('Option 3')).toBeVisible();
+    await expect(threeWindowPanel.getByTestId('homeowner-accept-appointment-window')).toHaveCount(0);
+
+    await page.getByRole('button', { name: /Closed/i }).first().click();
+    const closedCard = await openRequestCard(page, 'contractor-service-request-card', closedRequest.title);
+    await expect(closedCard.getByTestId('contractor-propose-appointment-windows-toggle')).toHaveCount(0);
+    const declinedCard = await openRequestCard(page, 'contractor-service-request-card', declinedRequest.title);
+    await expect(declinedCard.getByTestId('contractor-propose-appointment-windows-toggle')).toHaveCount(0);
+  });
+
+  test('homeowner accepts and declines proposed appointment windows from request cards', async ({ page }) => {
+    const acceptRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Accept Window');
+    const declineRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Decline Window');
+    createdRequestIds.push(acceptRequest.requestId, declineRequest.requestId);
+    await proposeWindows(owner, acceptRequest.requestId, 2, 37);
+    await proposeWindows(owner, declineRequest.requestId, 1, 40);
+
+    await loginAs(page, 'homeowner');
+
+    const acceptCard = await openRequestCard(page, 'homeowner-service-request-card', acceptRequest.title);
+    await expect(acceptCard.getByTestId('contractor-appointment-window-proposal')).toHaveCount(0);
+    const acceptWindows = acceptCard.getByTestId('service-request-appointment-windows');
+    await expect(acceptWindows.getByText('Choose a visit time or decline any time that does not work.')).toBeVisible();
+    await expect(acceptWindows.getByTestId('homeowner-accept-appointment-window')).toHaveCount(2);
+    await acceptWindows.getByTestId('homeowner-accept-appointment-window').first().click();
+    await expect(acceptCard.getByText('Confirmed', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(acceptCard.getByTestId('service-request-appointment-windows')).toHaveCount(0);
+
+    const acceptedSummary = await requestAppointment(homeowner, acceptRequest.requestId);
+    expect(acceptedSummary?.status, 'UI accepted window should become confirmed appointment summary').toBe('confirmed');
+
+    const declineCard = await openRequestCard(page, 'homeowner-service-request-card', declineRequest.title);
+    const declineWindows = declineCard.getByTestId('service-request-appointment-windows');
+    await declineWindows.getByTestId('homeowner-decline-appointment-window-note').fill('That time does not work for this sandbox probe.');
+    await declineWindows.getByTestId('homeowner-decline-appointment-window').click();
+    await expect(declineCard.getByTestId('service-request-appointment-windows')).toHaveCount(0, { timeout: 30_000 });
+    const declinedWindows = await requestWindows(homeowner, declineRequest.requestId);
+    expect(declinedWindows.filter(window => window.status === 'declined')).toHaveLength(1);
   });
 
   test('homeowner cannot accept a proposed window after the request is closed', async () => {

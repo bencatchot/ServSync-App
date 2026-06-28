@@ -228,6 +228,13 @@ type HomeownerRequestComposerStep = 'property' | 'issue' | 'contractor' | 'revie
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
 type HomeownerWorkspaceRequestView = 'attention' | 'active' | 'closed';
 type HomeownerWorkspaceEstimateView = 'draft' | 'sent' | 'accepted' | 'closed';
+type AppointmentWindowDraftRow = { startsAt: string; endsAt: string };
+type ContractorAppointmentWindowDraft = {
+  open: boolean;
+  note: string;
+  windows: AppointmentWindowDraftRow[];
+  error: string;
+};
 type AdminContractorDraft = {
   account_status: ContractorAccountStatus;
   subscription_status: ContractorSubscriptionStatus;
@@ -4763,6 +4770,44 @@ function hasProposedServiceRequestAppointmentWindows(request: ServiceRequestSumm
   return activeServiceRequestAppointmentWindows(request).length > 0;
 }
 
+function createBlankAppointmentWindowDraftRow(): AppointmentWindowDraftRow {
+  return { startsAt: '', endsAt: '' };
+}
+
+function createBlankContractorAppointmentWindowDraft(open = false): ContractorAppointmentWindowDraft {
+  return {
+    open,
+    note: '',
+    windows: [createBlankAppointmentWindowDraftRow()],
+    error: '',
+  };
+}
+
+function validateAppointmentWindowDraft(rows: AppointmentWindowDraftRow[]) {
+  if (rows.length < 1) return 'Add at least one visit time.';
+  if (rows.length > 3) return 'You can propose up to 3 visit times.';
+
+  const now = Date.now();
+  for (const [index, row] of rows.entries()) {
+    const label = `Option ${index + 1}`;
+    if (!row.startsAt || !row.endsAt) return `${label}: choose a start and end time.`;
+
+    const startsAt = new Date(row.startsAt);
+    const endsAt = new Date(row.endsAt);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return `${label}: choose valid start and end times.`;
+    }
+    if (startsAt.getTime() <= now) return `${label}: start time must be in the future.`;
+    if (endsAt.getTime() <= startsAt.getTime()) return `${label}: end time must be after the start time.`;
+  }
+
+  return '';
+}
+
+function activeServiceRequestCanReceiveAppointmentProposal(request: ServiceRequestSummary) {
+  return !['closed', 'declined'].includes(request.status);
+}
+
 async function serviceRequestsWithAppointmentWindows(requests: ServiceRequestSummary[]) {
   const normalizedRequests = requests.map(normalizeServiceRequestSummary);
   const requestIds = normalizedRequests.map(request => request.id).filter(Boolean);
@@ -8815,6 +8860,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [counterProposeDrafts, setCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [homeownerRescheduleDrafts, setHomeownerRescheduleDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [homeownerReschedulingId, setHomeownerReschedulingId] = useState<string | null>(null);
+  const [respondingAppointmentWindowId, setRespondingAppointmentWindowId] = useState<string | null>(null);
+  const [appointmentWindowDeclineNotes, setAppointmentWindowDeclineNotes] = useState<Record<string, string>>({});
   const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(() => storedStringSet(STORAGE_KEYS.homeownerExpandedRequests));
   const [reopenDrafts, setReopenDrafts] = useState<Record<string, { open: boolean; body: string }>>({});
   const [reopeningRequestId, setReopeningRequestId] = useState<string | null>(null);
@@ -10400,6 +10447,42 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to respond to appointment.'));
     } finally {
       setUpdatingAppointmentRequestId(null);
+    }
+  };
+
+  const respondToAppointmentWindow = async (
+    window: ServiceRequestAppointmentWindow,
+    action: 'accept' | 'decline',
+  ) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setRespondingAppointmentWindowId(window.id);
+    try {
+      const { error: appointmentWindowError } = action === 'accept'
+        ? await supabase.rpc('servsync_accept_service_request_appointment_window', {
+            p_window_id: window.id,
+          })
+        : await supabase.rpc('servsync_decline_service_request_appointment_window', {
+            p_window_id: window.id,
+            p_note: cleanHumanWrittenText(appointmentWindowDeclineNotes[window.id] ?? ''),
+          });
+      if (appointmentWindowError) throw appointmentWindowError;
+      if (action === 'accept') {
+        setNotice('Visit time confirmed.');
+      } else {
+        setNotice('Visit time declined.');
+        setAppointmentWindowDeclineNotes(current => {
+          const next = { ...current };
+          delete next[window.id];
+          return next;
+        });
+      }
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, action === 'accept' ? 'Unable to accept visit time.' : 'Unable to decline visit time.'));
+    } finally {
+      setRespondingAppointmentWindowId(null);
     }
   };
 
@@ -14757,6 +14840,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             windows={request.appointment_windows}
                             perspective="homeowner"
                             hasConfirmedAppointment={request.appointment?.status === 'confirmed'}
+                            respondingWindowId={respondingAppointmentWindowId}
+                            declineNotes={appointmentWindowDeclineNotes}
+                            onDeclineNoteChange={(windowId, note) => setAppointmentWindowDeclineNotes(current => ({ ...current, [windowId]: note }))}
+                            onAcceptWindow={window => void respondToAppointmentWindow(window, 'accept')}
+                            onDeclineWindow={window => void respondToAppointmentWindow(window, 'decline')}
                           />
                           <div className="space-y-3">
                             <Field label="Reply">
@@ -16060,6 +16148,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorResponseDrafts, setContractorResponseDrafts] = useState<Record<string, string>>({});
   const [contractorQuoteDrafts, setContractorQuoteDrafts] = useState<Record<string, { enabled: boolean; amount: string; scope: string }>>({});
   const [proposingAppointmentId, setProposingAppointmentId] = useState<string | null>(null);
+  const [contractorAppointmentWindowDrafts, setContractorAppointmentWindowDrafts] = useState<Record<string, ContractorAppointmentWindowDraft>>({});
+  const [proposingAppointmentWindowsRequestId, setProposingAppointmentWindowsRequestId] = useState<string | null>(null);
   const [contractorCounterProposeDrafts, setContractorCounterProposeDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
   const [respondingToHomeownerApptId, setRespondingToHomeownerApptId] = useState<string | null>(null);
   const [contractorExpandedRequestIds, setContractorExpandedRequestIds] = useState<Set<string>>(new Set());
@@ -17100,6 +17190,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to update service request.'));
     } finally {
       setUpdatingServiceRequestId(null);
+    }
+  };
+
+  const proposeAppointmentWindows = async (request: ServiceRequestSummary) => {
+    if (!supabase) return;
+    const draft = contractorAppointmentWindowDrafts[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+    const validationError = validateAppointmentWindowDraft(draft.windows);
+    setContractorAppointmentWindowDrafts(current => ({
+      ...current,
+      [request.id]: { ...draft, error: validationError },
+    }));
+    if (validationError) return;
+
+    setNotice('');
+    setError('');
+    setProposingAppointmentWindowsRequestId(request.id);
+    try {
+      const note = cleanHumanWrittenText(draft.note ?? '');
+      const { error: proposalError } = await supabase.rpc('servsync_propose_service_request_appointment_windows', {
+        p_request_id: request.id,
+        p_windows: draft.windows.map(window => ({
+          starts_at: new Date(window.startsAt).toISOString(),
+          ends_at: new Date(window.endsAt).toISOString(),
+          note,
+        })),
+        p_note: note,
+      });
+      if (proposalError) throw proposalError;
+      setNotice('Visit times proposed.');
+      setContractorAppointmentWindowDrafts(current => ({
+        ...current,
+        [request.id]: createBlankContractorAppointmentWindowDraft(false),
+      }));
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to propose visit times.'));
+    } finally {
+      setProposingAppointmentWindowsRequestId(null);
     }
   };
 
@@ -23615,6 +23743,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 && estimateDocumentLabel(estimate) !== 'Invoice'
                 && !['declined', 'expired', 'revised'].includes(estimate.status)
               ) ?? null;
+              const appointmentWindowDraft = contractorAppointmentWindowDrafts[request.id] ?? createBlankContractorAppointmentWindowDraft(false);
+              const canProposeAppointmentWindows = activeServiceRequestCanReceiveAppointmentProposal(request)
+                && !hasAppointmentWindows
+                && request.appointment?.status !== 'confirmed';
               const toggleInlineRequest = () => {
                 setContractorExpandedRequestIds(current => {
                   const next = new Set(current);
@@ -23781,6 +23913,155 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             perspective="contractor"
                             hasConfirmedAppointment={request.appointment?.status === 'confirmed'}
                           />
+                        </div>
+                      )}
+                      {canProposeAppointmentWindows && (
+                        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3" data-testid="contractor-appointment-window-proposal">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-slate-950">Propose visit times</p>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                Send 1 to 3 windows for the homeowner to review.
+                              </p>
+                            </div>
+                            {!appointmentWindowDraft.open && (
+                              <button
+                                type="button"
+                                className={buttonClass('secondary')}
+                                data-testid="contractor-propose-appointment-windows-toggle"
+                                onClick={() => setContractorAppointmentWindowDrafts(current => ({
+                                  ...current,
+                                  [request.id]: createBlankContractorAppointmentWindowDraft(true),
+                                }))}
+                              >
+                                <Calendar size={15} />
+                                Propose visit times
+                              </button>
+                            )}
+                          </div>
+
+                          {appointmentWindowDraft.open && (
+                            <div className="mt-3 space-y-3" data-testid="contractor-appointment-window-form">
+                              {appointmentWindowDraft.windows.map((windowDraft, index) => (
+                                <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                  <div className="mb-2 flex items-center justify-between gap-2">
+                                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Option {index + 1}</p>
+                                    {appointmentWindowDraft.windows.length > 1 && (
+                                      <button
+                                        type="button"
+                                        className="text-xs font-semibold text-slate-500 hover:text-red-600"
+                                        data-testid={`contractor-remove-appointment-window-${index}`}
+                                        onClick={() => setContractorAppointmentWindowDrafts(current => {
+                                          const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                          return {
+                                            ...current,
+                                            [request.id]: {
+                                              ...draft,
+                                              windows: draft.windows.filter((_, rowIndex) => rowIndex !== index),
+                                              error: '',
+                                            },
+                                          };
+                                        })}
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field label="Start">
+                                      <input
+                                        className={inputClass()}
+                                        type="datetime-local"
+                                        value={windowDraft.startsAt}
+                                        data-testid={`contractor-appointment-window-start-${index}`}
+                                        onChange={event => setContractorAppointmentWindowDrafts(current => {
+                                          const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                          const windows = draft.windows.map((row, rowIndex) => rowIndex === index ? { ...row, startsAt: event.target.value } : row);
+                                          return { ...current, [request.id]: { ...draft, windows, error: '' } };
+                                        })}
+                                      />
+                                    </Field>
+                                    <Field label="End">
+                                      <input
+                                        className={inputClass()}
+                                        type="datetime-local"
+                                        value={windowDraft.endsAt}
+                                        data-testid={`contractor-appointment-window-end-${index}`}
+                                        onChange={event => setContractorAppointmentWindowDrafts(current => {
+                                          const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                          const windows = draft.windows.map((row, rowIndex) => rowIndex === index ? { ...row, endsAt: event.target.value } : row);
+                                          return { ...current, [request.id]: { ...draft, windows, error: '' } };
+                                        })}
+                                      />
+                                    </Field>
+                                  </div>
+                                </div>
+                              ))}
+
+                              <Field label="Note for homeowner (optional)">
+                                <input
+                                  className={inputClass()}
+                                  value={appointmentWindowDraft.note}
+                                  placeholder="Access notes, what to expect, or preferred contact details."
+                                  data-testid="contractor-appointment-window-note"
+                                  onChange={event => setContractorAppointmentWindowDrafts(current => {
+                                    const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                    return { ...current, [request.id]: { ...draft, note: event.target.value, error: '' } };
+                                  })}
+                                />
+                              </Field>
+
+                              {appointmentWindowDraft.error && (
+                                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                                  {appointmentWindowDraft.error}
+                                </p>
+                              )}
+
+                              <div className="flex flex-wrap gap-2">
+                                {appointmentWindowDraft.windows.length < 3 && (
+                                  <button
+                                    type="button"
+                                    className={buttonClass('secondary')}
+                                    data-testid="contractor-add-appointment-window"
+                                    onClick={() => setContractorAppointmentWindowDrafts(current => {
+                                      const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                      return {
+                                        ...current,
+                                        [request.id]: {
+                                          ...draft,
+                                          windows: [...draft.windows, createBlankAppointmentWindowDraftRow()],
+                                          error: '',
+                                        },
+                                      };
+                                    })}
+                                  >
+                                    <Plus size={15} />
+                                    Add another time
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className={buttonClass('primary')}
+                                  data-testid="contractor-submit-appointment-windows"
+                                  disabled={proposingAppointmentWindowsRequestId === request.id}
+                                  onClick={() => void proposeAppointmentWindows(request)}
+                                >
+                                  {proposingAppointmentWindowsRequestId === request.id ? 'Sending...' : 'Send proposed times'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={buttonClass('secondary')}
+                                  disabled={proposingAppointmentWindowsRequestId === request.id}
+                                  onClick={() => setContractorAppointmentWindowDrafts(current => ({
+                                    ...current,
+                                    [request.id]: createBlankContractorAppointmentWindowDraft(false),
+                                  }))}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       {!['closed', 'declined'].includes(request.status) && (
@@ -34203,19 +34484,32 @@ function ServiceRequestAppointmentWindowsCard({
   windows,
   perspective,
   hasConfirmedAppointment,
+  respondingWindowId,
+  declineNotes,
+  onDeclineNoteChange,
+  onAcceptWindow,
+  onDeclineWindow,
 }: {
   requestId: string;
   windows?: ServiceRequestAppointmentWindow[];
   perspective: 'homeowner' | 'contractor';
   hasConfirmedAppointment?: boolean;
+  respondingWindowId?: string | null;
+  declineNotes?: Record<string, string>;
+  onDeclineNoteChange?: (windowId: string, note: string) => void;
+  onAcceptWindow?: (window: ServiceRequestAppointmentWindow) => void;
+  onDeclineWindow?: (window: ServiceRequestAppointmentWindow) => void;
 }) {
   const proposedWindows = normalizeServiceRequestAppointmentWindows(windows);
   if (proposedWindows.length === 0) return null;
 
+  const canRespond = perspective === 'homeowner' && Boolean(onAcceptWindow && onDeclineWindow);
   const heading = hasConfirmedAppointment ? 'New visit times proposed' : 'Proposed visit times';
   const helperText = perspective === 'contractor'
     ? (hasConfirmedAppointment ? 'Replacement options sent to homeowner.' : 'Waiting for homeowner review.')
-    : (hasConfirmedAppointment ? 'Your current appointment stays scheduled.' : 'Review-only visit options from your contractor.');
+    : canRespond
+      ? (hasConfirmedAppointment ? 'Your current appointment stays scheduled until you accept a new time.' : 'Choose a visit time or decline any time that does not work.')
+      : (hasConfirmedAppointment ? 'Your current appointment stays scheduled.' : 'Review-only visit options from your contractor.');
 
   return (
     <div
@@ -34241,6 +34535,41 @@ function ServiceRequestAppointmentWindowsCard({
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Option {index + 1}</p>
             <p className="mt-1 text-sm font-bold text-slate-950">{formatAppointmentWindowRange(window)}</p>
             {window.contractor_note && <p className="mt-1 text-sm text-slate-600">{window.contractor_note}</p>}
+            {canRespond && (
+              <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                <Field label="Decline note (optional)">
+                  <input
+                    className={inputClass()}
+                    value={declineNotes?.[window.id] ?? ''}
+                    onChange={event => onDeclineNoteChange?.(window.id, event.target.value)}
+                    placeholder="If this time does not work, add a quick note."
+                    data-testid="homeowner-decline-appointment-window-note"
+                    disabled={respondingWindowId === window.id}
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={buttonClass('primary')}
+                    onClick={() => onAcceptWindow?.(window)}
+                    disabled={respondingWindowId === window.id}
+                    data-testid="homeowner-accept-appointment-window"
+                  >
+                    <CheckCircle2 size={16} />
+                    {respondingWindowId === window.id ? 'Updating...' : 'Accept'}
+                  </button>
+                  <button
+                    type="button"
+                    className={buttonClass('secondary')}
+                    onClick={() => onDeclineWindow?.(window)}
+                    disabled={respondingWindowId === window.id}
+                    data-testid="homeowner-decline-appointment-window"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

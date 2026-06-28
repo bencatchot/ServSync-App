@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-27
 
+- Branch: `codex/fb-021-scheduling-action-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-021 Phase 3 scheduling action UI for the appointment-window flow. Contractors can propose 1-3 visit windows on active service requests through the approved RPC path, and homeowners can accept or decline proposed windows from request cards. Request views refresh after successful actions so confirmed appointment summaries and active proposed windows continue to use the Phase 2 display path.
+- Reason for change: Continue the approved scheduling foundation rollout by wiring the first safe user-facing actions without adding calendar sync, email notifications, dispatch/routing, GPS, arbitrary homeowner booking, or contractor reschedule/cancel controls.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium` (skipped by default unless `FB021_SCHEDULING_FOUNDATION=true` is set)
+  - `FB021_SCHEDULING_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts tests/e2e/contractor-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/full-core-loop.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts tests/e2e/storage-media-access.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - Contractor reschedule/cancel controls, calendar sync, email notifications, dispatch/routing, GPS, and event-history timeline UX remain deferred.
+  - The new contractor proposal UI is scoped to active requests without active proposed windows and without a confirmed appointment; replacement/reschedule proposal UX should be handled in a later explicit slice.
+  - Production SQL was already handled by Phase 1; this UI slice does not apply SQL or touch production data.
+
 - Branch: `codex/fb-021-scheduling-read-display-v1`
 - Files changed:
   - `src/App.tsx`
