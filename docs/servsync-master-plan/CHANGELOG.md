@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-025-activity-timeline-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/workflow/WorkflowActivityTimeline.tsx`
+  - `tests/e2e/fb025-job-message-thread-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-025 Slice 3A read-only derived workflow Activity timeline UI for major request/job updates. Homeowner expanded service request related updates and contractor job detail now show compact system activity rows derived from already RLS-visible request, appointment, estimate, job, invoice, and report data.
+- Reason for change: Help homeowners and contractors understand major workflow progress without mixing activity with human messages, replacing legacy request messaging, writing durable `workflow_activity_events`, adding unread badges, or claiming email/SMS/push notification delivery.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `FB025_WORKFLOW_COMMUNICATION_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts --project=chromium`
+  - `FB025_JOB_MESSAGE_THREAD_UI=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium`
+  - Relevant homeowner/contractor smoke, full core loop, partial invoicing foundation, RLS/privacy/storage, mobile smoke, changed-file secret scan, and protected-scope scan
+- Known risks or follow-ups:
+  - Slice 3A derives timeline rows from existing visible records and does not backfill or write `workflow_activity_events`.
+  - Estimate timeline timestamps use existing estimate `updated_at` values for sent/approved/declined states until later durable event-writing work is explicitly approved.
+  - Durable activity event writer SQL/RPC patches, message-created activity rows, unread badges, request-message migration, notification delivery, and photo-shared activity remain deferred.
+
 - Branch: `codex/fb-025-job-message-thread-ui-v1`
 - Files changed:
   - `src/App.tsx`
