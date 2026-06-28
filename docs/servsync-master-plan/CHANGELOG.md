@@ -4,6 +4,34 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-28
+
+- Branch: `codex/fb-024-price-book-quick-pick-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-024 Slice 1 Price Book quick-pick support inside the estimate composer. Contractors can search active Price Book items and add them as normal editable estimate lines with title, customer-safe description, unit, line type, optional price, and optional labor hours copied where the estimate draft safely supports those fields.
+- Reason for change: Make the existing contractor-owned Price Book / Pricing Library useful during estimate creation without adding SQL, changing schema/RLS, merging saved charges, auto-adding items, or exposing contractor internal notes to homeowner-facing estimate, invoice, or PDF surfaces.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - Homeowner smoke
+  - Contractor smoke
+  - Full core loop
+  - Partial invoicing foundation
+  - RLS/privacy/storage tests
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - Price Book quick-pick uses quantity `1` because no `default_quantity` schema exists yet.
+  - Category and taxable metadata are not copied into estimate lines because the current estimate draft model has no safe destination fields for them.
+  - Contractor-owned assemblies, margin/profit reminders, saved-charge migration, invoice quick-pick wiring, AI suggestions, and broader role/read-access decisions remain deferred.
+
 ## 2026-06-27
 
 - Branch: `codex/fb-021-scheduling-action-ui-v1`
