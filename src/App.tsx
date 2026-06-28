@@ -98,6 +98,10 @@ import {
   getJobWorkItemSummaryBadges,
   jobWorkItemCanInvoice,
 } from './features/jobs/workItemSummary';
+import {
+  WorkflowActivityTimeline,
+  type WorkflowActivityTimelineEvent,
+} from './features/workflow/WorkflowActivityTimeline';
 import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
 import {
   invoiceCanMarkPaid,
@@ -6181,6 +6185,137 @@ function contractorRequestQueueFor(request: ServiceRequestSummary): ContractorRe
   return 'open';
 }
 
+function estimateActivityEvents(estimate: Estimate): WorkflowActivityTimelineEvent[] {
+  if (estimate.status === 'sent') {
+    return [{
+      id: `estimate-sent-${estimate.id}`,
+      label: 'Estimate sent',
+      timestamp: estimate.updated_at,
+      detail: estimate.title,
+      tone: 'blue',
+      icon: 'estimate',
+    }];
+  }
+  if (estimate.status === 'accepted') {
+    return [{
+      id: `estimate-approved-${estimate.id}`,
+      label: 'Estimate approved',
+      timestamp: estimate.updated_at,
+      detail: estimate.title,
+      tone: 'emerald',
+      icon: 'estimate',
+    }];
+  }
+  if (estimate.status === 'declined') {
+    return [{
+      id: `estimate-declined-${estimate.id}`,
+      label: 'Estimate declined',
+      timestamp: estimate.updated_at,
+      detail: estimate.title,
+      tone: 'amber',
+      icon: 'estimate',
+    }];
+  }
+  return [];
+}
+
+function invoiceActivityEvents(invoice: Invoice): WorkflowActivityTimelineEvent[] {
+  const events: WorkflowActivityTimelineEvent[] = [];
+  if (invoice.issued_at && ['sent', 'viewed', 'overdue', 'partially_paid', 'paid', 'void'].includes(invoice.status)) {
+    events.push({
+      id: `invoice-sent-${invoice.id}`,
+      label: 'Invoice sent',
+      timestamp: invoice.issued_at,
+      detail: invoice.title || invoice.invoice_number,
+      tone: 'blue',
+      icon: 'invoice',
+    });
+  }
+  if (invoice.status === 'paid' && invoice.paid_at) {
+    events.push({
+      id: `invoice-paid-${invoice.id}`,
+      label: 'Invoice marked paid',
+      timestamp: invoice.paid_at,
+      detail: invoice.title || invoice.invoice_number,
+      tone: 'emerald',
+      icon: 'invoice',
+    });
+  }
+  if (invoice.status === 'void' && invoice.voided_at) {
+    events.push({
+      id: `invoice-voided-${invoice.id}`,
+      label: 'Invoice voided',
+      timestamp: invoice.voided_at,
+      detail: invoice.title || invoice.invoice_number,
+      tone: 'red',
+      icon: 'invoice',
+    });
+  }
+  return events;
+}
+
+function requestAppointmentActivityEvents(request: ServiceRequestSummary): WorkflowActivityTimelineEvent[] {
+  const events: WorkflowActivityTimelineEvent[] = [];
+  const proposedBatches = new Map<string, ServiceRequestAppointmentWindow>();
+  for (const window of activeServiceRequestAppointmentWindows(request)) {
+    if (!proposedBatches.has(window.proposal_batch_id)) {
+      proposedBatches.set(window.proposal_batch_id, window);
+    }
+  }
+  proposedBatches.forEach(window => {
+    events.push({
+      id: `appointment-proposed-${window.proposal_batch_id}`,
+      label: 'Visit times proposed',
+      timestamp: window.created_at,
+      detail: window.contractor_note || 'The contractor shared visit options for review.',
+      tone: 'blue',
+      icon: 'appointment',
+    });
+  });
+  if (request.appointment?.status === 'confirmed' || request.appointment?.status === 'completed') {
+    events.push({
+      id: `appointment-confirmed-${request.appointment.id}`,
+      label: 'Appointment confirmed',
+      timestamp: request.appointment.updated_at || request.appointment.proposed_at,
+      detail: `Scheduled for ${formatDateTime(request.appointment.proposed_at)}`,
+      tone: 'emerald',
+      icon: 'appointment',
+    });
+  }
+  return events;
+}
+
+function homeownerRequestActivityEvents(
+  request: ServiceRequestSummary,
+  requestEstimates: Estimate[],
+  requestInvoices: Invoice[],
+  reportEntries: MaintenanceLogEntry[],
+): WorkflowActivityTimelineEvent[] {
+  return [
+    {
+      id: `request-submitted-${request.id}`,
+      label: 'Request submitted',
+      timestamp: request.created_at,
+      detail: request.title,
+      tone: 'slate',
+      icon: 'request',
+    },
+    ...requestAppointmentActivityEvents(request),
+    ...requestEstimates.flatMap(estimateActivityEvents),
+    ...requestInvoices.flatMap(invoiceActivityEvents),
+    ...reportEntries
+      .filter(entry => entry.report_document_id)
+      .map(entry => ({
+        id: `report-shared-${entry.id}`,
+        label: 'Report shared',
+        timestamp: entry.created_at || entry.performed_at,
+        detail: entry.title || 'Job report',
+        tone: 'emerald' as const,
+        icon: 'report' as const,
+      })),
+  ];
+}
+
 function appointmentNextActionText(appointment: ServiceRequestAppointment, perspective: 'homeowner' | 'contractor') {
   if (appointment.status === 'confirmed') return 'Confirmed on both calendars.';
   if (appointment.status === 'completed') return 'Completed.';
@@ -11962,13 +12097,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         document: entry.report_document_id ? homeDocumentById.get(entry.report_document_id) ?? null : null,
       }))
       .filter(item => item.document);
+    const activityEvents = homeownerRequestActivityEvents(
+      request,
+      requestEstimates,
+      requestInvoices,
+      reportLinks.map(({ entry }) => entry),
+    );
 
-    if (requestEstimates.length === 0 && requestInvoices.length === 0 && reportLinks.length === 0 && requestJobThreadEstimates.length === 0) return null;
+    if (activityEvents.length === 0 && requestEstimates.length === 0 && requestInvoices.length === 0 && reportLinks.length === 0 && requestJobThreadEstimates.length === 0) return null;
 
     return (
       <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
         <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Related updates</p>
         <div className="mt-3 space-y-2">
+          <WorkflowActivityTimeline
+            events={activityEvents}
+            title="Activity"
+            helper="Major system updates for this request and related job."
+          />
+
           {requestEstimates.map(estimate => {
             const linkedEstimateInvoice = requestInvoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
             const statusText = estimate.status === 'sent'
@@ -22276,18 +22423,107 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       && estimate.status !== 'draft'
     )
   );
+  const contractorJobActivityEventsFor = (job: Inspection): WorkflowActivityTimelineEvent[] => {
+    const linkedRequest = job.service_request_id
+      ? serviceRequests.find(request => request.id === job.service_request_id) ?? null
+      : null;
+    const linkedEstimateIds = new Set<string>();
+    const linkedEstimates = estimates.filter(estimate => {
+      const matches = estimate.inspection_id === job.id
+        || (job.estimate_id ? estimate.id === job.estimate_id : false)
+        || (job.service_request_id ? estimate.service_request_id === job.service_request_id && estimate.inspection_id === job.id : false);
+      if (!matches || linkedEstimateIds.has(estimate.id)) return false;
+      linkedEstimateIds.add(estimate.id);
+      return true;
+    });
+    const linkedInvoiceIds = new Set<string>();
+    const linkedInvoices = invoices.filter(invoice => {
+      const matches = invoice.job_id === job.id
+        || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false)
+        || linkedEstimates.some(estimate => invoice.estimate_id === estimate.id)
+        || (job.service_request_id ? invoice.service_request_id === job.service_request_id && invoice.job_id === job.id : false);
+      if (!matches || linkedInvoiceIds.has(invoice.id)) return false;
+      linkedInvoiceIds.add(invoice.id);
+      return true;
+    });
+    const linkedVisitEvent = contractorVisitEvents.find(event =>
+      event.inspection_id === job.id && event.status !== 'cancelled'
+    ) ?? null;
+    const events: WorkflowActivityTimelineEvent[] = [];
+
+    if (linkedRequest) {
+      events.push({
+        id: `request-submitted-${linkedRequest.id}`,
+        label: 'Request submitted',
+        timestamp: linkedRequest.created_at,
+        detail: linkedRequest.title,
+        tone: 'slate',
+        icon: 'request',
+      });
+      events.push(...requestAppointmentActivityEvents(linkedRequest));
+    }
+    events.push(...linkedEstimates.flatMap(estimateActivityEvents));
+    events.push({
+      id: `job-created-${job.id}`,
+      label: 'Job created',
+      timestamp: job.created_at,
+      detail: job.name,
+      tone: 'blue',
+      icon: 'job',
+    });
+    if (linkedVisitEvent?.scheduled_at) {
+      events.push({
+        id: `job-scheduled-${linkedVisitEvent.id}`,
+        label: 'Job scheduled',
+        timestamp: linkedVisitEvent.scheduled_at,
+        detail: 'A job visit is on the schedule.',
+        tone: 'blue',
+        icon: 'appointment',
+      });
+    }
+    if (job.completed_at) {
+      events.push({
+        id: `job-completed-${job.id}`,
+        label: 'Job completed',
+        timestamp: job.completed_at,
+        detail: job.name,
+        tone: 'emerald',
+        icon: 'job',
+      });
+    }
+    events.push(...linkedInvoices.flatMap(invoiceActivityEvents));
+    if (job.report_storage_path) {
+      events.push({
+        id: `report-shared-${job.id}`,
+        label: 'Report shared',
+        timestamp: job.closed_at || job.completed_at || job.updated_at,
+        detail: job.report_file_name || 'Job report',
+        tone: 'emerald',
+        icon: 'report',
+      });
+    }
+
+    return events;
+  };
   const renderContractorJobWorkflowThread = (job: Inspection) => {
     if (!jobHasHomeownerVisibleWorkflowThread(job) || !supabase) return null;
     return (
-      <WorkflowMessageThread
-        supabaseClient={supabase}
-        currentUserId={profile.id}
-        inspectionId={job.id}
-        title="Customer messages"
-        helper="Job-specific messages shared with the homeowner. Internal work notes stay separate below."
-        canSend={contractorCanSendWorkflowMessages}
-        readOnlyReason={contractorWorkflowReadOnlyReason}
-      />
+      <div className="space-y-3">
+        <WorkflowActivityTimeline
+          events={contractorJobActivityEventsFor(job)}
+          title="Activity"
+          helper="Major system updates for this request and job. Internal work notes stay separate below."
+        />
+        <WorkflowMessageThread
+          supabaseClient={supabase}
+          currentUserId={profile.id}
+          inspectionId={job.id}
+          title="Customer messages"
+          helper="Job-specific messages shared with the homeowner. Internal work notes stay separate below."
+          canSend={contractorCanSendWorkflowMessages}
+          readOnlyReason={contractorWorkflowReadOnlyReason}
+        />
+      </div>
     );
   };
 
