@@ -1444,6 +1444,24 @@ function estimateLineDraftFromSavedCharge(charge: ContractorSavedEstimateCharge)
   });
 }
 
+function estimateLineDraftFromPriceBookItem(item: ContractorPriceBookItem): EstimateLineDraft {
+  return createEstimateLineDraft({
+    line_type: normalizeEstimateLineType(item.line_type),
+    description: item.title,
+    line_title: item.title,
+    customer_description: item.customer_description || '',
+    quantity: '1',
+    unit: item.unit || 'each',
+    unit_price: item.default_unit_price_cents === null || item.default_unit_price_cents === undefined
+      ? ''
+      : item.default_unit_price_cents === 0
+        ? '0.00'
+        : centsToDollars(item.default_unit_price_cents),
+    labor_hours: item.labor_hours === null || item.labor_hours === undefined ? '' : String(Number(item.labor_hours)),
+    editor_source_note: `Added from Price Book: ${item.title}. Review quantity, price, and scope before sending.`,
+  });
+}
+
 function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
   const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const defaultLineItems = [
@@ -16140,6 +16158,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
   const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
+  const [estimatePriceBookQuickPickSearch, setEstimatePriceBookQuickPickSearch] = useState('');
+  const [estimatePriceBookQuickPickNotice, setEstimatePriceBookQuickPickNotice] = useState('');
   const [tradeToolsExpanded, setTradeToolsExpanded] = useState(false);
   const [tradeToolSearch, setTradeToolSearch] = useState('');
   const [activeTradeToolId, setActiveTradeToolId] = useState<string | null>(null);
@@ -18810,6 +18830,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setSavedChargeQuickPickNotice(`Added "${charge.name}" as an editable estimate line item.`);
   };
 
+  const addPriceBookItemToEstimateDraft = (item: ContractorPriceBookItem) => {
+    const nextLine = estimateLineDraftFromPriceBookItem(item);
+    setEstimateDraft(draft => {
+      const usableLines = draft.line_items.filter(draftLineHasContent);
+      return {
+        ...draft,
+        line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
+      };
+    });
+    setEstimatePriceBookQuickPickNotice(`Added "${item.title}" from Price Book as an editable estimate line item.`);
+  };
+
   const renderStructuredLineDraftEditor = ({
     line,
     index,
@@ -19194,6 +19226,80 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {savedChargeQuickPickNotice && (
         <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
           {savedChargeQuickPickNotice}
+        </p>
+      )}
+    </div>
+  );
+
+  const renderPriceBookQuickPick = () => (
+    <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-bold text-slate-950">Price Book</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Add active Price Book items as normal editable estimate lines. Internal notes stay out of customer-facing estimates.
+          </p>
+        </div>
+        <span className="w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+          {activeContractorPriceBookItems.length} active
+        </span>
+      </div>
+      {activeContractorPriceBookItems.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
+          No active Price Book items yet. Add or import them from Jobs -&gt; Custom Pricing.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <Field label="Search Price Book">
+            <input
+              className={inputClass()}
+              value={estimatePriceBookQuickPickSearch}
+              onChange={event => setEstimatePriceBookQuickPickSearch(event.target.value)}
+              placeholder="Search title, trade, category, or description"
+            />
+          </Field>
+          {estimatePriceBookQuickPickItems.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
+              No active Price Book items match this search.
+            </p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {estimatePriceBookQuickPickItems.map(item => (
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-600">
+                        {estimateLineTypeLabel(item.line_type)} · {contractorPriceBookPriceLabel(item)}
+                        {item.unit ? ` / ${item.unit}` : ''}
+                      </p>
+                      {(item.trade || item.category) && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {[item.trade, item.category].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      {item.customer_description && (
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.customer_description}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addPriceBookItemToEstimateDraft(item)}
+                      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      <Plus size={13} />
+                      Add
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {estimatePriceBookQuickPickNotice && (
+        <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+          {estimatePriceBookQuickPickNotice}
         </p>
       )}
     </div>
@@ -20323,6 +20429,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const activeContractorPriceBookItems = contractorPriceBookItems
     .filter(item => item.active && !item.archived_at)
     .sort((a, b) => a.title.localeCompare(b.title) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const estimatePriceBookQuickPickSearchText = normalizeText(estimatePriceBookQuickPickSearch);
+  const estimatePriceBookQuickPickItems = activeContractorPriceBookItems
+    .filter(item => {
+      if (!estimatePriceBookQuickPickSearchText) return true;
+      return normalizeText([
+        item.title,
+        item.customer_description,
+        item.trade,
+        item.category,
+        item.unit || '',
+      ].join(' ')).includes(estimatePriceBookQuickPickSearchText);
+    });
   const archivedContractorPriceBookItems = contractorPriceBookItems
     .filter(item => !item.active || Boolean(item.archived_at))
     .sort((a, b) => a.title.localeCompare(b.title) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -26582,6 +26700,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </button>
                                       </div>
                                       {renderSavedChargeQuickPick()}
+                                      {!isInvoiceWorkspaceTab && renderPriceBookQuickPick()}
                                       {!isInvoiceWorkspaceTab && renderEstimateHelperPanel()}
                                       {estimateDraft.line_items.map((line, index) => (
                                         renderStructuredLineDraftEditor({
@@ -27630,6 +27749,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </button>
                           </div>
                           {renderSavedChargeQuickPick()}
+                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
                           {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
                           {estimateDraft.line_items.map((line, index) => (
                             renderStructuredLineDraftEditor({
