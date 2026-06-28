@@ -98,6 +98,7 @@ import {
   getJobWorkItemSummaryBadges,
   jobWorkItemCanInvoice,
 } from './features/jobs/workItemSummary';
+import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
 import {
   invoiceCanMarkPaid,
   invoiceCanVoid,
@@ -11844,6 +11845,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const requestEstimatesFor = (request: ServiceRequestSummary) => estimates
       .filter(estimate => estimate.service_request_id === request.id)
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const homeownerVisibleJobThreadEstimatesFor = (request: ServiceRequestSummary) => {
+    const seenInspectionIds = new Set<string>();
+    return requestEstimatesFor(request).filter(estimate => {
+      if (!estimate.inspection_id || estimate.status === 'draft') return false;
+      if (seenInspectionIds.has(estimate.inspection_id)) return false;
+      seenInspectionIds.add(estimate.inspection_id);
+      return true;
+    });
+  };
   const requestInvoicesFor = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
     const requestEstimateIds = new Set(requestEstimates.map(estimate => estimate.id));
@@ -11943,6 +11953,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const homeownerRequestWorkflowStages = ['Request', 'Contractor Review', 'Estimate', 'Approval', 'Job', 'Invoice', 'Home History'];
   const renderRequestLinkedWorkflow = (request: ServiceRequestSummary) => {
     const requestEstimates = requestEstimatesFor(request);
+    const requestJobThreadEstimates = homeownerVisibleJobThreadEstimatesFor(request);
     const requestInvoices = requestInvoicesFor(request);
     const reportLinks = maintenanceLog
       .filter(entry => entry.service_request_id === request.id && entry.report_document_id)
@@ -11952,7 +11963,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       }))
       .filter(item => item.document);
 
-    if (requestEstimates.length === 0 && requestInvoices.length === 0 && reportLinks.length === 0) return null;
+    if (requestEstimates.length === 0 && requestInvoices.length === 0 && reportLinks.length === 0 && requestJobThreadEstimates.length === 0) return null;
 
     return (
       <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
@@ -12004,6 +12015,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             );
           })}
+
+          {requestJobThreadEstimates.map(estimate => estimate.inspection_id && (
+            <WorkflowMessageThread
+              key={`job-thread-${estimate.inspection_id}`}
+              supabaseClient={supabase!}
+              currentUserId={profile.id}
+              inspectionId={estimate.inspection_id}
+              title="Job messages"
+              helper={`Messages about the job linked to ${estimate.title}. Your original request thread stays below.`}
+              canSend
+            />
+          ))}
 
           {reportLinks.map(({ entry, document }) => document && (
             <div key={`${entry.id}:${document.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -22233,6 +22256,40 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const canManageInspectionTemplates = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
   const canManageEstimateSettings = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
+  const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
+  const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
+  const contractorCanSendWorkflowMessages = currentContractorTeamRole === 'owner'
+    || currentContractorTeamRole === 'admin'
+    || currentContractorTeamRole === 'office';
+  const contractorWorkflowReadOnlyReason = currentContractorTeamRole === 'field_tech'
+    ? 'Field techs can view this job thread, but owner, admin, or office roles send customer-visible job messages in v1.'
+    : currentContractorTeamRole === 'viewer'
+      ? 'Viewers can read this job thread, but cannot send customer-visible job messages.'
+      : 'You can view this job thread, but this role cannot send customer-visible job messages.';
+  const jobHasHomeownerVisibleWorkflowThread = (job: Inspection) => Boolean(
+    job.homeowner_user_id
+    && job.service_request_id
+    && estimates.some(estimate =>
+      estimate.inspection_id === job.id
+      && estimate.service_request_id === job.service_request_id
+      && estimate.homeowner_user_id === job.homeowner_user_id
+      && estimate.status !== 'draft'
+    )
+  );
+  const renderContractorJobWorkflowThread = (job: Inspection) => {
+    if (!jobHasHomeownerVisibleWorkflowThread(job) || !supabase) return null;
+    return (
+      <WorkflowMessageThread
+        supabaseClient={supabase}
+        currentUserId={profile.id}
+        inspectionId={job.id}
+        title="Customer messages"
+        helper="Job-specific messages shared with the homeowner. Internal work notes stay separate below."
+        canSend={contractorCanSendWorkflowMessages}
+        readOnlyReason={contractorWorkflowReadOnlyReason}
+      />
+    );
+  };
 
   const inspectionTemplateStats = (template: InspectionTemplate) => ({
     sectionCount: template.rooms.length,
@@ -30347,6 +30404,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   {renderJobCardHeader()}
 
                   <div className="space-y-4">
+                    {renderContractorJobWorkflowThread(activeInspection)}
+
                     {renderPartialInvoicingPanel(activeInspection)}
 
                     <div id="simple-job-work-notes" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -30554,6 +30613,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </button>
 
                 {renderJobCardHeader()}
+
+                {renderContractorJobWorkflowThread(activeInspection)}
 
                 {renderPartialInvoicingPanel(activeInspection)}
 

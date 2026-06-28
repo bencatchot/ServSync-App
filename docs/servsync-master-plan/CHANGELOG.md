@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-025-job-message-thread-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/workflow/WorkflowMessageThread.tsx`
+  - `tests/e2e/fb025-job-message-thread-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-025 Slice 2A job-centered workflow message thread UI using the production-applied Slice 1 foundation. The new thread loads job-context `workflow_messages`, sends through `servsync_send_workflow_message`, and marks the job thread read through `servsync_mark_workflow_thread_read`.
+- Reason for change: Provide the first controlled homeowner/contractor job-message UI without creating broad chat, contractor cold outreach, request-message migration, unread badges, activity timeline UI, or email/SMS/push notification behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5174 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium` (safe default skip)
+  - `FB025_WORKFLOW_COMMUNICATION_FOUNDATION=true TEST_APP_URL=http://localhost:5174 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts --project=chromium`
+  - `FB025_JOB_MESSAGE_THREAD_UI=true TEST_APP_URL=http://localhost:5174 npx playwright test tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5174 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - Homeowner and contractor smoke
+  - Full core loop
+  - Partial invoicing foundation
+  - RLS/privacy/storage tests
+  - Mobile smoke
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - Contractor-side job messaging is intentionally shown only when the same job is linked to a homeowner-visible non-draft estimate and service request, so one-sided contractor-only messages are avoided.
+  - Existing `service_request_messages`, `ServiceRequestMessages`, request replies, and request media attachment behavior remain unchanged.
+  - Request-message migration/bridging, unread badges, activity timeline UI, attachments for workflow messages, and email/SMS/push notifications remain deferred.
+
 - Branch: `codex/fb-025-workflow-communication-foundation-v1`
 - Files changed:
   - `servsync-fb025-workflow-communication-foundation.sql`
