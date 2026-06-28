@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-025-activity-event-writers-v1`
+- Files changed:
+  - `servsync-fb025-workflow-activity-event-writers.sql`
+  - `tests/e2e/fb025-workflow-activity-events.spec.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-025 Slice 3B durable workflow activity event writer coverage for selected trusted lifecycle RPCs only. The SQL patch appends `workflow_activity_events` for appointment proposed/confirmed, estimate approved/declined, job created from an accepted estimate, and invoice sent/paid/voided transitions.
+- Reason for change: Improve future timeline timestamp accuracy from trusted server-side lifecycle paths while keeping the current Activity UI reader unchanged, avoiding backfill, and preserving the separation between human messages, system activity, request messaging, and notification delivery.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `FB025_WORKFLOW_ACTIVITY_EVENTS=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-activity-events.spec.ts --project=chromium`
+  - `FB025_WORKFLOW_COMMUNICATION_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts --project=chromium`
+  - `FB025_JOB_MESSAGE_THREAD_UI=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium`
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - Slice 3B does not change `WorkflowActivityTimeline` reader behavior; durable/derived timeline merge remains deferred to Slice 3C.
+  - No historical backfill is performed, so older workflow records continue to rely on derived timeline rows.
+  - `estimate_sent`, `job_completed`, `report_shared`, `photo_shared`, unread badges, request-message migration, notification delivery, email/SMS/push, and broad chat remain deferred.
+
 - Branch: `codex/fb-025-activity-timeline-ui-v1`
 - Files changed:
   - `src/App.tsx`
