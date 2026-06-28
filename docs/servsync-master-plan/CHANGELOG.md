@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-025-workflow-communication-foundation-v1`
+- Files changed:
+  - `servsync-fb025-workflow-communication-foundation.sql`
+  - `tests/e2e/fb025-workflow-communication-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-025 Slice 1 SQL/RLS/test foundation for workflow-scoped service request and inspection-backed job messages, append-only activity events, and per-user thread read tracking.
+- Reason for change: Prepare a controlled job-centered communication foundation without adding UI, replacing existing `service_request_messages`, enabling contractor cold outreach, or claiming email/SMS/push notifications are live.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts --project=chromium` (skips by default unless `FB025_WORKFLOW_COMMUNICATION_FOUNDATION=true` is set)
+  - Changed-file secret-value scan
+  - Static protected-scope scan
+- Known risks or follow-ups:
+  - SQL was not applied to sandbox or production in this implementation pass; enabled probes require the patch to be reviewed and applied to sandbox first.
+  - Existing request-card messaging remains on `service_request_messages`; a later UI slice should either migrate request UI to `workflow_messages` or temporarily bridge old and new request messages.
+  - Email, SMS, push notifications, broad social chat, contractor cold outreach, and UI wiring remain deferred.
+
 - Branch: `codex/fb-024-price-book-quick-pick-v1`
 - Files changed:
   - `src/App.tsx`
