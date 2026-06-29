@@ -45,7 +45,10 @@ Related controlled beta docs:
 - [ ] No unrelated files are included in commits.
 - [ ] No credentials, `.env` files, SQL secrets, screenshots, videos, traces, or reports are committed.
 - [ ] Production public URL loads after merge/deploy.
+- [ ] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke` passes for unauthenticated public routes.
 - [ ] FB-020 readiness items have been reviewed for the intended beta stage, especially RLS/storage verification, backup/restore expectations, dependency security triage, and records reliability risks.
+- [ ] Backup/restore and storage-object readiness remain tracked as FB-020 follow-ups until separately verified.
+- [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 
 ## 4. Sandbox QA Account Plan
 
@@ -281,6 +284,7 @@ Current policy:
 - [ ] Public/auth/legal/trust pages render.
 - [ ] Sign-in page renders.
 - [ ] No obvious public runtime/console errors.
+- [ ] The unauthenticated production public smoke spec passes without secrets or sign-in.
 - [ ] Vercel production deployment succeeds on `serv-sync-app-refresh`.
 - [ ] No authenticated production mutation is performed.
 
@@ -288,8 +292,14 @@ Before using production smoke accounts:
 
 - [ ] Dedicated production smoke homeowner account is approved.
 - [ ] Dedicated production smoke contractor account is approved.
+- [ ] Optional contractor field tech/viewer smoke accounts are approved only if role-specific production smoke is needed.
 - [ ] Credential storage is approved outside the repo.
+- [ ] Credentials are not stored in repo/docs/chats/logs/screenshots/traces.
+- [ ] Personal, founder, beta-user, and non-smoke accounts are not used for automated production smoke.
 - [ ] Allowed actions are documented.
+- [ ] Default authenticated production smoke is read-only navigation.
+- [ ] Any production mutation is separately approved before the run.
+- [ ] Any cleanup is exact-ID or approved-prefix scoped before the run.
 - [ ] Smoke records are clearly labeled and isolated from real beta customer records.
 - [ ] Production smoke accounts are not personal/founder accounts.
 
@@ -363,6 +373,7 @@ Before using production smoke accounts:
 - [ ] Add RLS/cross-user verification tests or a documented manual checklist.
 - [ ] Add a mobile read-only Playwright project or formal mobile manual QA checklist.
 - [ ] Decide whether and when to create production smoke accounts.
+- [x] Add an unauthenticated production public smoke spec and document its allowed scope.
 - [ ] Run a focused mobile polish pass.
 - [x] Add sign-out cleanup for sensitive local draft storage.
 - [ ] Create clearly labeled demo/sample data only after approval.

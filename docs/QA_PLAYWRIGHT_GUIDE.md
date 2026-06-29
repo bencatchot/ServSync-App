@@ -92,6 +92,29 @@ Coverage:
 - current homeowner-facing Home History wording
 - major console error capture
 
+## Production Public Smoke
+
+Use this only for unauthenticated, read-only production checks:
+
+```bash
+TEST_APP_URL="https://servsync.app" npm run qa:e2e:production-public-smoke
+```
+
+This runs:
+
+- `tests/e2e/production-public-smoke.spec.ts`
+
+Coverage:
+
+- public landing page loads
+- homeowner and contractor auth routes render without signing in
+- public Terms, Privacy, Acceptable Use, and Trust & Safety routes load
+- document navigation succeeds
+- page title and public content render
+- major console/page errors are captured
+
+This spec must not sign in, require secrets, create users, mutate production records, upload files, apply SQL, change settings, or manually deploy. Authenticated production smoke remains blocked until dedicated production smoke accounts, credential storage, allowed actions, and cleanup/no-cleanup rules are approved.
+
 ## Mobile Read-Only Smoke
 
 Use:
@@ -227,6 +250,7 @@ Use placeholder values only in docs. Real values belong in local environment fil
 - contractor Discover geocoding/radius coverage
 - contractor standalone calendar event create/edit/delete, when run directly
 - connected-homeowner invoice notification flow, when run directly
+- unauthenticated production public route smoke through `tests/e2e/production-public-smoke.spec.ts`
 - full homeowner request -> contractor estimate -> homeowner approval -> job -> invoice -> Home History -> reminder flow, when run directly
 - RLS/cross-user access-boundary checks, when run directly
 
@@ -288,6 +312,7 @@ Fix the root cause before rerunning the test. Do not weaken tests into generic w
 
 - Authenticated testing belongs in sandbox/preview.
 - Production smoke is public/read-only until production smoke accounts are approved.
+- Public production smoke must stay unauthenticated and non-mutating.
 - Test credentials stay in environment variables or a password manager.
 - Screenshots, videos, traces, and Playwright reports must not be committed.
 - E2E-created sandbox records are allowed to remain if clearly labeled.

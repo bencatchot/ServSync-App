@@ -23,6 +23,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - Production URL is `https://servsync.app`.
 - Supabase is connected through browser-safe `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 - `.env` files are local-only and must not be tracked by Git.
+- Unauthenticated production public smoke is now formalized as a read-only Playwright check for the public landing, legal, and trust routes.
 - Home History, invoice-to-Home-History filing v1, and homeowner-only manual Home Reminders v1 are shipped.
 - SQL provenance cleanup v1 is tracked in main; do not apply old loose SQL files if encountered elsewhere.
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
@@ -103,6 +104,7 @@ Controlled private beta can be considered separately from public go-live if all 
 - Mobile core screens are usable enough for trusted beta testers.
 - Beta users are told payment processing, automatic reminders, push/email/text alerts, recurrence, QuickBooks, native mobile apps, and full calendar sync are not live.
 - Production public smoke passes.
+- The unauthenticated production public smoke spec passes without sign-in, secrets, production mutation, SQL/settings changes, or manual deploy.
 - Authenticated production smoke is skipped or uses dedicated approved production smoke accounts only.
 
 ## Blockers Before Public Go-Live
@@ -151,6 +153,8 @@ Before public go-live:
 - Decide whether production smoke accounts will exist.
 - Store credentials outside the repo.
 - Define allowed smoke actions.
+- Keep default authenticated production smoke read-only unless a separate prompt approves mutation.
+- Require exact-ID or approved-prefix scoped cleanup for any approved production smoke records.
 - Keep smoke records clearly labeled and separated from real customer records.
 - Do not use founder/personal accounts as automated test credentials.
 
