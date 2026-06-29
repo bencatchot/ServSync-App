@@ -20,17 +20,21 @@ Prefer PR numbers, commit hashes, sanitized summaries, and high-level verificati
 
 ## Sensitivity Rules
 
+Generated backup, restore, export, query-output, storage-export, and local ops artifacts must remain local/private and must never be committed. Slice 1G `.gitignore` patterns reduce accidental commits, but they are not a substitute for operator review. Do not store credentials, service role keys, database URLs, access tokens, signed URLs, raw backup paths, customer names/emails/addresses/phone numbers, message content, raw production query output, sensitive record IDs, or production storage object path lists in repo files, docs, logs, screenshots, traces, or PR comments.
+
 Do not store:
 
 - Credentials.
 - Service role keys.
 - Database URLs.
+- Access tokens.
 - Customer names, emails, addresses, phone numbers, or message content.
 - Raw backup file paths.
 - Signed URLs or private storage URLs.
 - Raw production query output.
 - Secret values.
 - Private storage object paths.
+- Production storage object path lists.
 - Sensitive record IDs, unless explicitly approved and sanitized.
 
 Allowed when sanitized:

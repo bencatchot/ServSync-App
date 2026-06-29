@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/fb-020-backup-artifact-gitignore-v1`
+- Files changed:
+  - `.gitignore`
+  - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1G `.gitignore` hardening for local backup, restore, export, query-output, storage-export, and ops artifacts, plus docs notes that these generated artifacts must remain local/private and reviewed before any future approved drill.
+- Reason for change: Reduce the chance that future generated backup/restore/export artifacts are accidentally committed before any separately approved restore drill, backup/PITR verification, storage restore verification, or storage-export work begins.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `git diff -- .gitignore docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md docs/BETA_READINESS_CHECKLIST.md docs/GO_LIVE_AUDIT.md docs/servsync-master-plan/CHANGELOG.md docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Known risks or follow-ups:
+  - `.gitignore` reduces accidental commits for untracked artifacts, but it is not a substitute for operator review and does not protect already tracked files.
+  - No SQL, backup, restore, Supabase CLI, production data access, storage access, settings changes, deploy, code, scripts, or tests were performed.
+  - Actual restore drill, backup/PITR verification, and storage restore verification remain future separately approved work.
+
 - Branch: `codex/fb-020-backup-restore-ledger-templates-v1`
 - Files changed:
   - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
