@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/homeowner-property-proposal-review-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/connected-property-proposals.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the homeowner-side review UI for connected-homeowner property proposals. Homeowners can review property suggestions inside expanded active contractor cards, accept a pending suggestion into a new home or link it to an existing home, explicitly choose whether to share the accepted property with the suggesting contractor, or reject the suggestion.
+- Reason for change: Connected-homeowner property suggestions need explicit homeowner consent before a suggested property becomes a homeowner-owned home or becomes available to the contractor for work records.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/connected-property-proposals.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-invoice.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice uses the existing proposal RPCs and adds no SQL; production SQL is not part of this change.
+  - Notification delivery, email/SMS/push, and connected-property notification surfaces remain deferred.
+  - Homeowner local-customer multi-property claim/accept remains deferred and separate from connected-homeowner property proposals.
+
 - Branch: `codex/connected-property-proposals-contractor-ui-v1`
 - Files changed:
   - `src/App.tsx`

@@ -189,6 +189,14 @@ async function activeConnectionId(homeowner: AuthenticatedClient, contractorId: 
   return result.data!.id as string;
 }
 
+async function homeownerConnectionLabel(homeowner: AuthenticatedClient, connectionId: string) {
+  const result = await homeowner.client.rpc('servsync_get_homeowner_connections');
+  expect(result.error, 'homeowner connection RPC should not error').toBeNull();
+  const connection = ((result.data || []) as Array<{ connection_id?: string; business_name?: string }>).find(item => item.connection_id === connectionId);
+  expect(connection?.business_name, 'active connection should include contractor business name').toBeTruthy();
+  return connection!.business_name!;
+}
+
 async function snapshotConnectionPermissions(homeowner: AuthenticatedClient, connectionId: string): Promise<ConnectionPermissionSnapshot> {
   const result = await homeowner.client
     .from('connection_permissions')
@@ -427,6 +435,167 @@ test.describe('connected-homeowner property proposal RPC foundation', () => {
       expect(proposalLookup.error, 'UI proposal lookup for cleanup should not error').toBeNull();
       if (proposalLookup.data?.id) createdProposalIds.push(proposalLookup.data.id as string);
     }
+
+    await consoleErrors.assertClean(testInfo);
+  });
+
+  test('homeowner accepts a pending property suggestion into a new unshared home from the contractor card', async ({ page }, testInfo) => {
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const timestamp = timestampForRecord();
+    const proposal = await createProposal(contractorA, connectionId, `UI Accept New ${timestamp}`);
+    createdProposalIds.push(proposal.id);
+    const businessName = await homeownerConnectionLabel(homeownerA, connectionId);
+    const proposalLabel = `E2E Proposed Property UI Accept New ${timestamp}`;
+
+    await loginAs(page, 'homeowner');
+    await openSidebarTab(page, /^Contractors\b/i);
+    await expectActiveTabHeading(page, /^Contractors$/i);
+    await main.getByRole('button').filter({ hasText: businessName }).first().click();
+
+    const suggestions = main.getByTestId('homeowner-property-suggestions');
+    await expect(suggestions).toBeVisible({ timeout: 30_000 });
+    await expect(suggestions.getByText(/Nothing is added or shared unless you accept/i)).toBeVisible();
+    const card = suggestions.getByTestId('homeowner-property-suggestion-card').filter({ hasText: proposalLabel }).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByText(/Waiting for homeowner review/i)).toBeVisible();
+    await expect(card.getByText(/Accepting creates or links a property in your profile/i)).toBeVisible();
+    await card.getByRole('button', { name: /^Accept suggestion$/i }).click();
+
+    const dialog = page.getByTestId('homeowner-property-proposal-accept-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Accepting adds or links a property in your profile/i)).toBeVisible();
+    await expect(dialog.getByRole('radio', { name: /Create a new home from this suggestion/i })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Link to one of my existing homes/i })).toBeVisible();
+    await expect(dialog.getByRole('checkbox', { name: new RegExp(`Share this property with ${escapeRegExp(businessName)}`, 'i') })).not.toBeChecked();
+    await expect(dialog.getByText(/If you do not share, the home stays in your profile only/i)).toBeVisible();
+
+    const acceptResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_homeowner_accept_home_property_proposal'),
+      { timeout: 10_000 },
+    );
+    await dialog.getByRole('button', { name: /^Accept suggestion$/i }).click();
+    const acceptResponse = await acceptResponsePromise;
+    expect(acceptResponse.ok()).toBeTruthy();
+    const acceptBody = await acceptResponse.json().catch(() => null) as { accepted_home_id?: string } | null;
+    if (acceptBody?.accepted_home_id) createdHomeIds.push(acceptBody.accepted_home_id);
+
+    await expect(card.getByText(/Accepted by homeowner/i)).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByRole('button', { name: /^Accept suggestion$/i })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: /^Reject$/i })).toHaveCount(0);
+
+    const acceptedProposal = await homeownerA.client
+      .from('contractor_home_property_proposals')
+      .select('accepted_home_id,status')
+      .eq('id', proposal.id)
+      .single();
+    expect(acceptedProposal.error, 'accepted UI proposal lookup should not error').toBeNull();
+    expect(acceptedProposal.data?.status).toBe('accepted');
+    const acceptedHomeId = acceptedProposal.data!.accepted_home_id as string;
+    if (!createdHomeIds.includes(acceptedHomeId)) createdHomeIds.push(acceptedHomeId);
+
+    const sharedRows = await homeownerA.client
+      .from('connection_shared_properties')
+      .select('id')
+      .eq('connection_id', connectionId)
+      .eq('home_id', acceptedHomeId);
+    expect(sharedRows.error, 'unshared accepted proposal shared-property lookup should not error').toBeNull();
+    expect(sharedRows.data ?? []).toHaveLength(0);
+
+    await consoleErrors.assertClean(testInfo);
+  });
+
+  test('homeowner links a pending property suggestion to an existing home and shares it from the review dialog', async ({ page }, testInfo) => {
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const timestamp = timestampForRecord();
+    const existingHomeId = await createHome(homeownerA, `UI Link Shared ${timestamp}`);
+    createdHomeIds.push(existingHomeId);
+    const proposal = await createProposal(contractorA, connectionId, `UI Link Shared ${timestamp}`);
+    createdProposalIds.push(proposal.id);
+    const businessName = await homeownerConnectionLabel(homeownerA, connectionId);
+    const proposalLabel = `E2E Proposed Property UI Link Shared ${timestamp}`;
+
+    await loginAs(page, 'homeowner');
+    await openSidebarTab(page, /^Contractors\b/i);
+    await expectActiveTabHeading(page, /^Contractors$/i);
+    await main.getByRole('button').filter({ hasText: businessName }).first().click();
+
+    const card = main.getByTestId('homeowner-property-suggestion-card').filter({ hasText: proposalLabel }).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await card.getByRole('button', { name: /^Accept suggestion$/i }).click();
+
+    const dialog = page.getByTestId('homeowner-property-proposal-accept-dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('radio', { name: /Link to one of my existing homes/i }).check();
+    await dialog.getByLabel(/^Existing home$/i).selectOption(existingHomeId);
+    await dialog.getByRole('checkbox', { name: new RegExp(`Share this property with ${escapeRegExp(businessName)}`, 'i') }).check();
+    await expect(dialog.getByText(/Sharing lets this contractor use the property for service requests, jobs, estimates, invoices, reports/i)).toBeVisible();
+
+    const acceptResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_homeowner_accept_home_property_proposal'),
+      { timeout: 10_000 },
+    );
+    await dialog.getByRole('button', { name: /^Accept suggestion$/i }).click();
+    const acceptResponse = await acceptResponsePromise;
+    expect(acceptResponse.ok()).toBeTruthy();
+
+    await expect(card.getByText(/Accepted by homeowner/i)).toBeVisible({ timeout: 30_000 });
+    const sharedRows = await contractorA.client
+      .from('connection_shared_properties')
+      .select('id,share_home_overview,share_address,share_preferred_vendors,share_photos')
+      .eq('connection_id', connectionId)
+      .eq('home_id', existingHomeId);
+    expect(sharedRows.error, 'contractor should see shared accepted property access').toBeNull();
+    expect(sharedRows.data ?? []).toHaveLength(1);
+    expect(sharedRows.data![0].share_home_overview).toBe(true);
+    expect(sharedRows.data![0].share_address).toBe(true);
+    expect(sharedRows.data![0].share_photos).toBe(false);
+
+    await consoleErrors.assertClean(testInfo);
+  });
+
+  test('homeowner rejects a pending property suggestion from the contractor card', async ({ page }, testInfo) => {
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const timestamp = timestampForRecord();
+    const proposal = await createProposal(contractorA, connectionId, `UI Reject ${timestamp}`);
+    createdProposalIds.push(proposal.id);
+    const businessName = await homeownerConnectionLabel(homeownerA, connectionId);
+    const proposalLabel = `E2E Proposed Property UI Reject ${timestamp}`;
+
+    await loginAs(page, 'homeowner');
+    await openSidebarTab(page, /^Contractors\b/i);
+    await expectActiveTabHeading(page, /^Contractors$/i);
+    await main.getByRole('button').filter({ hasText: businessName }).first().click();
+
+    const card = main.getByTestId('homeowner-property-suggestion-card').filter({ hasText: proposalLabel }).first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    page.once('dialog', dialog => void dialog.accept());
+    const rejectResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_homeowner_reject_home_property_proposal'),
+      { timeout: 10_000 },
+    );
+    await card.getByRole('button', { name: /^Reject$/i }).click();
+    const rejectResponse = await rejectResponsePromise;
+    expect(rejectResponse.ok()).toBeTruthy();
+
+    await expect(card.getByText(/Rejected by homeowner/i)).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByRole('button', { name: /^Accept suggestion$/i })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: /^Reject$/i })).toHaveCount(0);
+
+    const rejectedAccept = await homeownerA.client.rpc('servsync_homeowner_accept_home_property_proposal', {
+      p_proposal_id: proposal.id,
+      p_existing_home_id: null,
+      p_share_with_contractor: true,
+      p_nickname: '',
+      p_address_line1: '',
+      p_address_line2: '',
+      p_city: '',
+      p_state: '',
+      p_zip_code: '',
+    });
+    expect(rejectedAccept.error, 'rejected proposal should not be accepted later').toBeTruthy();
 
     await consoleErrors.assertClean(testInfo);
   });
