@@ -99,9 +99,9 @@ import {
   jobWorkItemCanInvoice,
 } from './features/jobs/workItemSummary';
 import {
-  WorkflowActivityTimeline,
   type WorkflowActivityTimelineEvent,
 } from './features/workflow/WorkflowActivityTimeline';
+import { WorkflowActivityTimelineWithDurableEvents } from './features/workflow/WorkflowActivityTimelineWithDurableEvents';
 import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread';
 import {
   invoiceCanMarkPaid,
@@ -6189,6 +6189,7 @@ function estimateActivityEvents(estimate: Estimate): WorkflowActivityTimelineEve
   if (estimate.status === 'sent') {
     return [{
       id: `estimate-sent-${estimate.id}`,
+      dedupeKey: `estimate_sent:${estimate.id}`,
       label: 'Estimate sent',
       timestamp: estimate.updated_at,
       detail: estimate.title,
@@ -6199,6 +6200,7 @@ function estimateActivityEvents(estimate: Estimate): WorkflowActivityTimelineEve
   if (estimate.status === 'accepted') {
     return [{
       id: `estimate-approved-${estimate.id}`,
+      dedupeKey: `estimate_approved:${estimate.id}`,
       label: 'Estimate approved',
       timestamp: estimate.updated_at,
       detail: estimate.title,
@@ -6209,6 +6211,7 @@ function estimateActivityEvents(estimate: Estimate): WorkflowActivityTimelineEve
   if (estimate.status === 'declined') {
     return [{
       id: `estimate-declined-${estimate.id}`,
+      dedupeKey: `estimate_declined:${estimate.id}`,
       label: 'Estimate declined',
       timestamp: estimate.updated_at,
       detail: estimate.title,
@@ -6224,6 +6227,7 @@ function invoiceActivityEvents(invoice: Invoice): WorkflowActivityTimelineEvent[
   if (invoice.issued_at && ['sent', 'viewed', 'overdue', 'partially_paid', 'paid', 'void'].includes(invoice.status)) {
     events.push({
       id: `invoice-sent-${invoice.id}`,
+      dedupeKey: `invoice_sent:${invoice.id}`,
       label: 'Invoice sent',
       timestamp: invoice.issued_at,
       detail: invoice.title || invoice.invoice_number,
@@ -6234,6 +6238,7 @@ function invoiceActivityEvents(invoice: Invoice): WorkflowActivityTimelineEvent[
   if (invoice.status === 'paid' && invoice.paid_at) {
     events.push({
       id: `invoice-paid-${invoice.id}`,
+      dedupeKey: `invoice_paid:${invoice.id}`,
       label: 'Invoice marked paid',
       timestamp: invoice.paid_at,
       detail: invoice.title || invoice.invoice_number,
@@ -6244,6 +6249,7 @@ function invoiceActivityEvents(invoice: Invoice): WorkflowActivityTimelineEvent[
   if (invoice.status === 'void' && invoice.voided_at) {
     events.push({
       id: `invoice-voided-${invoice.id}`,
+      dedupeKey: `invoice_voided:${invoice.id}`,
       label: 'Invoice voided',
       timestamp: invoice.voided_at,
       detail: invoice.title || invoice.invoice_number,
@@ -6265,6 +6271,7 @@ function requestAppointmentActivityEvents(request: ServiceRequestSummary): Workf
   proposedBatches.forEach(window => {
     events.push({
       id: `appointment-proposed-${window.proposal_batch_id}`,
+      dedupeKey: `appointment_proposed:${request.id}:${window.proposal_batch_id || window.created_at}`,
       label: 'Visit times proposed',
       timestamp: window.created_at,
       detail: window.contractor_note || 'The contractor shared visit options for review.',
@@ -6275,6 +6282,7 @@ function requestAppointmentActivityEvents(request: ServiceRequestSummary): Workf
   if (request.appointment?.status === 'confirmed' || request.appointment?.status === 'completed') {
     events.push({
       id: `appointment-confirmed-${request.appointment.id}`,
+      dedupeKey: `appointment_confirmed:${request.appointment.id}`,
       label: 'Appointment confirmed',
       timestamp: request.appointment.updated_at || request.appointment.proposed_at,
       detail: `Scheduled for ${formatDateTime(request.appointment.proposed_at)}`,
@@ -6294,6 +6302,7 @@ function homeownerRequestActivityEvents(
   return [
     {
       id: `request-submitted-${request.id}`,
+      dedupeKey: `service_request_submitted:${request.id}`,
       label: 'Request submitted',
       timestamp: request.created_at,
       detail: request.title,
@@ -6307,6 +6316,7 @@ function homeownerRequestActivityEvents(
       .filter(entry => entry.report_document_id)
       .map(entry => ({
         id: `report-shared-${entry.id}`,
+        dedupeKey: `report_shared:${entry.id}`,
         label: 'Report shared',
         timestamp: entry.created_at || entry.performed_at,
         detail: entry.title || 'Job report',
@@ -12110,8 +12120,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
         <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Related updates</p>
         <div className="mt-3 space-y-2">
-          <WorkflowActivityTimeline
-            events={activityEvents}
+          <WorkflowActivityTimelineWithDurableEvents
+            supabaseClient={supabase}
+            derivedEvents={activityEvents}
+            contextIds={{
+              serviceRequestIds: [request.id],
+              inspectionIds: requestJobThreadEstimates.map(estimate => estimate.inspection_id),
+              estimateIds: requestEstimates.map(estimate => estimate.id),
+              invoiceIds: requestInvoices.map(invoice => invoice.id),
+            }}
             title="Activity"
             helper="Major system updates for this request and related job."
           />
@@ -22423,7 +22440,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       && estimate.status !== 'draft'
     )
   );
-  const contractorJobActivityEventsFor = (job: Inspection): WorkflowActivityTimelineEvent[] => {
+  const contractorJobActivityContextFor = (job: Inspection): {
+    events: WorkflowActivityTimelineEvent[];
+    serviceRequestIds: string[];
+    inspectionIds: string[];
+    estimateIds: string[];
+    invoiceIds: string[];
+  } => {
     const linkedRequest = job.service_request_id
       ? serviceRequests.find(request => request.id === job.service_request_id) ?? null
       : null;
@@ -22454,6 +22477,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (linkedRequest) {
       events.push({
         id: `request-submitted-${linkedRequest.id}`,
+        dedupeKey: `service_request_submitted:${linkedRequest.id}`,
         label: 'Request submitted',
         timestamp: linkedRequest.created_at,
         detail: linkedRequest.title,
@@ -22465,6 +22489,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     events.push(...linkedEstimates.flatMap(estimateActivityEvents));
     events.push({
       id: `job-created-${job.id}`,
+      dedupeKey: `job_created:${job.id}`,
       label: 'Job created',
       timestamp: job.created_at,
       detail: job.name,
@@ -22474,6 +22499,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (linkedVisitEvent?.scheduled_at) {
       events.push({
         id: `job-scheduled-${linkedVisitEvent.id}`,
+        dedupeKey: `job_scheduled:${linkedVisitEvent.id}`,
         label: 'Job scheduled',
         timestamp: linkedVisitEvent.scheduled_at,
         detail: 'A job visit is on the schedule.',
@@ -22484,6 +22510,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (job.completed_at) {
       events.push({
         id: `job-completed-${job.id}`,
+        dedupeKey: `job_completed:${job.id}`,
         label: 'Job completed',
         timestamp: job.completed_at,
         detail: job.name,
@@ -22495,6 +22522,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (job.report_storage_path) {
       events.push({
         id: `report-shared-${job.id}`,
+        dedupeKey: `report_shared:${job.id}`,
         label: 'Report shared',
         timestamp: job.closed_at || job.completed_at || job.updated_at,
         detail: job.report_file_name || 'Job report',
@@ -22503,14 +22531,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       });
     }
 
-    return events;
+    return {
+      events,
+      serviceRequestIds: linkedRequest ? [linkedRequest.id] : [],
+      inspectionIds: [job.id],
+      estimateIds: linkedEstimates.map(estimate => estimate.id),
+      invoiceIds: linkedInvoices.map(invoice => invoice.id),
+    };
   };
   const renderContractorJobWorkflowThread = (job: Inspection) => {
     if (!jobHasHomeownerVisibleWorkflowThread(job) || !supabase) return null;
+    const activityContext = contractorJobActivityContextFor(job);
     return (
       <div className="space-y-3">
-        <WorkflowActivityTimeline
-          events={contractorJobActivityEventsFor(job)}
+        <WorkflowActivityTimelineWithDurableEvents
+          supabaseClient={supabase}
+          derivedEvents={activityContext.events}
+          contextIds={{
+            serviceRequestIds: activityContext.serviceRequestIds,
+            inspectionIds: activityContext.inspectionIds,
+            estimateIds: activityContext.estimateIds,
+            invoiceIds: activityContext.invoiceIds,
+          }}
           title="Activity"
           helper="Major system updates for this request and job. Internal work notes stay separate below."
         />

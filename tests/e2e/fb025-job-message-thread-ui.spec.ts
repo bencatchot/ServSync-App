@@ -291,6 +291,18 @@ async function expectActivityTimelineBasics(page: Page, labels: string[]) {
   await expect(timeline.getByText(/email|sms|push|unread/i)).toHaveCount(0);
 }
 
+async function expectActivityLabelCount(page: Page, label: string, count: number) {
+  const timeline = page.getByRole('main').getByTestId('workflow-activity-timeline').first();
+  await expect(timeline).toBeVisible({ timeout: 30_000 });
+  await expect(timeline.getByText(label, { exact: true })).toHaveCount(count);
+}
+
+async function expectActivityOmitsText(page: Page, text: string | RegExp) {
+  const timeline = page.getByRole('main').getByTestId('workflow-activity-timeline').first();
+  await expect(timeline).toBeVisible({ timeout: 30_000 });
+  await expect(timeline.getByText(text)).toHaveCount(0);
+}
+
 async function sendUiMessage(page: Page, body: string) {
   const main = page.getByRole('main');
   const thread = main.getByTestId('workflow-message-thread').first();
@@ -395,17 +407,23 @@ test.describe('FB-025 sandbox job message thread UI probes', () => {
 
     const homeownerPage = await freshRolePage(browser, 'homeowner');
     await openHomeownerJobThread(homeownerPage.page, context.requestTitle);
-    await expectActivityTimelineBasics(homeownerPage.page, ['Request submitted', 'Estimate approved']);
+    await expectActivityTimelineBasics(homeownerPage.page, ['Request submitted', 'Estimate approved', 'Job created']);
+    await expectActivityLabelCount(homeownerPage.page, 'Job created', 1);
     await expect(homeownerPage.page.getByText('Contractor seeded job message for UI probe.')).toBeVisible();
     await sendUiMessage(homeownerPage.page, 'Homeowner job-thread UI reply.');
+    await expectActivityOmitsText(homeownerPage.page, 'Homeowner job-thread UI reply.');
+    await expectActivityOmitsText(homeownerPage.page, /message sent/i);
     await homeownerPage.consoleErrors.assertClean(testInfo);
     await homeownerPage.context.close();
 
     const contractorPage = await freshContractorPage(browser, credentialsFor('contractor'));
     await openContractorJobThread(contractorPage.page, context.estimateTitle);
     await expectActivityTimelineBasics(contractorPage.page, ['Request submitted', 'Estimate approved', 'Job created']);
+    await expectActivityLabelCount(contractorPage.page, 'Job created', 1);
     await expect(contractorPage.page.getByText('Homeowner job-thread UI reply.')).toBeVisible({ timeout: 30_000 });
     await sendUiMessage(contractorPage.page, 'Contractor job-thread UI reply.');
+    await expectActivityOmitsText(contractorPage.page, 'Contractor job-thread UI reply.');
+    await expectActivityOmitsText(contractorPage.page, /message sent/i);
     await expect(contractorPage.page.getByTestId('workflow-message-readonly-notice')).toHaveCount(0);
     await contractorPage.consoleErrors.assertClean(testInfo);
     await contractorPage.context.close();
@@ -414,6 +432,7 @@ test.describe('FB-025 sandbox job message thread UI probes', () => {
       const rolePage = await freshContractorPage(browser, contractorRoleCredentials(role));
       await openContractorJobThread(rolePage.page, context.estimateTitle);
       await expectActivityTimelineBasics(rolePage.page, ['Request submitted', 'Estimate approved', 'Job created']);
+      await expectActivityLabelCount(rolePage.page, 'Job created', 1);
       await expect(rolePage.page.getByText('Homeowner job-thread UI reply.')).toBeVisible({ timeout: 30_000 });
       await sendUiMessage(rolePage.page, `${role} job-thread UI reply.`);
       await expect(rolePage.page.getByTestId('workflow-message-readonly-notice')).toHaveCount(0);
@@ -425,6 +444,7 @@ test.describe('FB-025 sandbox job message thread UI probes', () => {
       const rolePage = await freshContractorPage(browser, contractorRoleCredentials(role));
       await openContractorJobThread(rolePage.page, context.estimateTitle);
       await expectActivityTimelineBasics(rolePage.page, ['Request submitted', 'Estimate approved', 'Job created']);
+      await expectActivityLabelCount(rolePage.page, 'Job created', 1);
       await expect(rolePage.page.getByText('Homeowner job-thread UI reply.')).toBeVisible({ timeout: 30_000 });
       await expect(rolePage.page.getByTestId('workflow-message-readonly-notice')).toBeVisible();
       await expect(rolePage.page.getByTestId('workflow-message-composer')).toHaveCount(0);
