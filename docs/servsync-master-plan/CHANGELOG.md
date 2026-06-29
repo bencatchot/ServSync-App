@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/connected-property-proposals-contractor-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/connected-property-proposals.spec.ts`
+  - `tests/e2e/contractor-create-customer.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the first contractor-side UI for connected-homeowner property proposals. Connected homeowner customer details now show a `Property suggestions` section, let contractors submit homeowner-visible property suggestions through `servsync_create_home_property_proposal`, list proposal statuses, and revoke pending suggestions through `servsync_revoke_home_property_proposal`.
+- Reason for change: Contractors need a safe way to suggest another property for an already connected homeowner without silently creating homeowner-owned `homes`, changing `connection_shared_properties`, reusing local claim invites, or making pending suggestions available for jobs, estimates, invoices, reports, or Home History before homeowner consent.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `git diff --check`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/connected-property-proposals.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-customer.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-invoice.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Homeowner accept/reject UI remains deferred; proposal review still depends on the existing backend RPCs.
+  - Notification delivery, email/SMS/push, homeowner multi-property claim/accept, and any connected-property sharing refinements remain separate future slices.
+  - Pending proposals are intentionally kept out of shared property lists and work selectors; accepted proposals become usable for work only if the homeowner explicitly shares the accepted property through existing connection/shared-property behavior.
+
 - Branch: `codex/connected-property-proposals-sql-v1`
 - Files changed:
   - `servsync-connected-property-proposals.sql`
