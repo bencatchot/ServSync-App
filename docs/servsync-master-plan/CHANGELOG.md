@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-020-public-smoke-readiness-v1`
+- Files changed:
+  - `package.json`
+  - `tests/e2e/production-public-smoke.spec.ts`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1A/1B beta-readiness evidence and production-safe public smoke foundation. The new Playwright public smoke spec checks unauthenticated public/legal/trust routes without signing in or mutating production, and docs now distinguish public production smoke from future authenticated production smoke accounts.
+- Reason for change: Improve beta-readiness evidence with a repeatable low-risk production health check while keeping authenticated production smoke, production mutation, SQL, Supabase/storage settings, user creation, and production record changes behind separate approval gates.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npm run qa:e2e:production-public-smoke`
+  - `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke`
+- Known risks or follow-ups:
+  - Authenticated production smoke remains blocked until dedicated smoke accounts, credential storage, allowed actions, and cleanup/no-cleanup rules are explicitly approved.
+  - Backup/restore drills, storage-object backup validation, deeper RLS/security hardening, and production smoke account setup remain later FB-020 slices.
+
 - Branch: `codex/fb-025-activity-reader-merge-v1`
 - Files changed:
   - `src/App.tsx`

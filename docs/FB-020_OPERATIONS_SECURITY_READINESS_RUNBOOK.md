@@ -107,11 +107,35 @@ Before using production smoke accounts:
 - Create dedicated smoke accounts only after explicit approval.
 - Store credentials outside the repo and outside chat output.
 - Do not use founder, personal, or real customer accounts for automated smoke.
+- Document environment variable names only; never document, commit, print, screenshot, or paste credential values.
 - Define allowed actions before use.
+- Default authenticated production smoke to read-only navigation.
+- Require separate explicit approval before any production smoke action creates, sends, approves, invoices, deletes, edits, or otherwise mutates records.
 - Use clear smoke/test prefixes for any created records.
 - Prefer read-only smoke where possible.
-- Clean up any approved production smoke records and report cleanup counts.
+- Clean up any approved production smoke records only through exact-ID or approved-prefix scoped cleanup, and report cleanup counts.
 - Never create users, modify production records, or run mutating production smoke without explicit approval.
+
+Suggested environment variable names may be documented for local operator setup, for example `PROD_SMOKE_HOMEOWNER_EMAIL`, `PROD_SMOKE_HOMEOWNER_PASSWORD`, `PROD_SMOKE_CONTRACTOR_EMAIL`, and `PROD_SMOKE_CONTRACTOR_PASSWORD`. Values belong only in local ignored files or an approved password manager.
+
+## Production Public Smoke Policy
+
+Unauthenticated production public smoke is allowed as a read-only beta-readiness signal when the task explicitly scopes it that way.
+
+Allowed public smoke checks:
+
+- Load `https://servsync.app`.
+- Check stable public, auth, legal, and trust routes.
+- Confirm HTTP/navigation success, rendered public content, browser title, and console/page errors.
+- Run `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke`.
+
+Forbidden during public smoke:
+
+- Sign in.
+- Create users.
+- Create, edit, send, approve, delete, invoice, upload, or otherwise mutate production records or files.
+- Apply SQL, change Supabase settings, change storage settings, modify Vercel settings, or deploy manually.
+- Use personal, founder, beta-user, sandbox, or non-smoke credentials.
 
 ## Retention, Export, Deletion, And Cancellation Decisions
 
@@ -194,4 +218,3 @@ The check is read-only. It verifies selected deployed-state expectations for:
 - Core storage bucket existence and public/private flags.
 
 The check fails closed if the local Supabase CLI link is not the approved sandbox project.
-

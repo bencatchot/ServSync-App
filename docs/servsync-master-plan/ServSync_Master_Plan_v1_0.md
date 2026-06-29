@@ -320,6 +320,7 @@ ServSync should be positioned as beta because the job workflow and communication
 Current beta-readiness notes:
 
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are created.
+- Unauthenticated production public smoke is formalized as a read-only check for `https://servsync.app` public/legal/trust routes and must not sign in, create users, mutate production records, apply SQL, change settings, or deploy manually.
 - Preview/sandbox should remain the default place for authenticated testing.
 - Full end-to-end coverage for the core loop remains future work.
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
@@ -391,7 +392,7 @@ These items need more founder input or beta learning before they can be finalize
 1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
 2. Use FB-020 as the umbrella readiness workstream for security, records reliability, backup/restore, storage, dependency security, and scale hardening before broader beta/public go-live.
 3. Run a focused beta-readiness/release-checklist audit before starting another major feature.
-4. Decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
+4. Use the unauthenticated production public smoke check after production deploys, and decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
 5. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
 6. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
 7. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.
