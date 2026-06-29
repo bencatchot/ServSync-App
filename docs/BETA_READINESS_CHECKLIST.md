@@ -48,6 +48,8 @@ Related controlled beta docs:
 - [ ] Production public URL loads after merge/deploy.
 - [ ] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke` passes for unauthenticated public routes.
 - [ ] FB-020 readiness items have been reviewed for the intended beta stage, especially RLS/storage verification, backup/restore expectations, dependency security triage, and records reliability risks.
+- [x] Restore drill, applied-SQL ledger, production SQL rollout, and storage backup/readiness templates exist for sanitized evidence capture.
+- [ ] A non-production restore drill has been completed and recorded with the approved template.
 - [ ] Backup/restore and storage-object readiness remain tracked as FB-020 follow-ups until separately verified.
 - [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 

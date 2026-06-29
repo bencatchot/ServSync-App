@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/fb-020-backup-restore-ledger-templates-v1`
+- Files changed:
+  - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1F docs-only templates for sanitized applied-SQL ledger entries, production SQL rollout captures, non-production restore drill results, storage backup/readiness worksheets, and Edge Function/env/secret restore notes.
+- Reason for change: Improve beta-readiness evidence capture without performing backup, restore, SQL, Supabase CLI, storage, production data, settings, deploy, script, test, or `.gitignore` changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff -- docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md docs/BETA_READINESS_CHECKLIST.md docs/GO_LIVE_AUDIT.md docs/servsync-master-plan/CHANGELOG.md docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Known risks or follow-ups:
+  - The new templates are blank/sanitized capture formats only; they do not prove a restore drill, production backup/PITR verification, storage restore, or production SQL rollout has been completed.
+  - Real filled operational ledgers should stay in a private approved ops location unless intentionally sanitized for repo tracking.
+  - Future backup, restore, storage, SQL, Supabase settings, production data, user, or deploy work remains behind separate explicit approval.
+
 - Branch: `codex/fb-020-production-smoke-env-validator-v1`
 - Files changed:
   - `package.json`

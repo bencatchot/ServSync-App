@@ -66,6 +66,8 @@ Drill checklist:
 - Confirm no production settings, secrets, users, or customer data are altered during the drill.
 - Record the date, source, target, commit, SQL ledger version, storage restore result, tests run, and gaps found.
 
+FB-020 Slice 1F adds blank/sanitized templates for restore drill results, applied-SQL ledger entries, production SQL rollout captures, storage backup/readiness worksheets, and Edge Function/env/secret restore notes in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. These templates do not complete a restore drill and are not approval to run backups, restores, SQL, Supabase CLI commands, storage access, production checks, settings changes, or deploys.
+
 ## Applied-SQL Ledger And Deployed-State Tracking
 
 ServSync currently uses reviewed SQL patch files. Before broader launch, each applied SQL patch should be tracked by environment.
@@ -82,6 +84,8 @@ The ledger should include:
 - Rollback or mitigation notes, if any.
 
 Catalog checks should verify deployed state instead of assuming that repository SQL matches Supabase.
+
+Use `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md` as the sanitized capture format for future applied-SQL evidence. Real operational ledgers should stay in an approved private ops location unless intentionally sanitized for repo tracking.
 
 ## Fresh Environment Rebuild Expectations
 
@@ -219,7 +223,7 @@ Implementation-ready after approval:
 
 - Sandbox-only read-only catalog verification checks.
 - Documentation pointers from beta/go-live docs.
-- Applied-SQL ledger template.
+- Applied-SQL ledger, production SQL rollout, restore drill, and storage backup/readiness templates.
 - Test-only additions that do not mutate app records.
 
 Requires later SQL/Supabase/storage approval:
