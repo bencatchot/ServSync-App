@@ -26,6 +26,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - Unauthenticated production public smoke is now formalized as a read-only Playwright check for the public landing, legal, and trust routes.
 - Home History, invoice-to-Home-History filing v1, and homeowner-only manual Home Reminders v1 are shipped.
 - SQL provenance cleanup v1 is tracked in main; do not apply old loose SQL files if encountered elsewhere.
+- FB-020 template coverage exists for sanitized SQL rollout evidence, restore drill result capture, storage backup/readiness worksheets, and Edge Function/env/secret restore notes.
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
@@ -36,6 +37,8 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 FB-020 is the umbrella follow-up for the completed security/readiness audit. It should be handled through small, separately approved tasks before broader beta, public go-live, or paid contractor subscriptions.
 
 Baseline operating guidance now lives in `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`. That runbook covers backup/restore expectations, storage-object backup expectations, restore drills, applied-SQL tracking, fresh environment rebuild expectations, production smoke account policy, retention/export/deletion/cancellation decisions, and the sandbox-only read-only catalog verification command.
+
+Template-only capture formats for applied-SQL ledgers, production SQL rollouts, restore drill results, storage backup/readiness, and Edge Function/env/secret restore notes live in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. They do not mean a restore drill, PITR verification, storage restore, or production backup validation has been completed.
 
 FB-020 covers:
 
@@ -142,7 +145,7 @@ Recommended fix path:
 - Keep old/archive SQL out of active deployment paths.
 - Use the reviewed blank-schema sequence as the baseline for fresh environments.
 - Consider converting active SQL into Supabase migrations before public launch.
-- Document which SQL has been applied to sandbox and production.
+- Document which SQL has been applied to sandbox and production using the sanitized SQL ledger and rollout capture templates.
 
 ### 4. Production smoke account policy is not complete
 
