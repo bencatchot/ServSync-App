@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/local-customer-multi-property-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-customer.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `servsync-local-customer-multi-property.sql`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the first narrow contractor-side local customer multi-property slice. Contractors can add another local property to an existing contractor-created customer, view local property labels/statuses, filter local customer workspace records by known local property IDs, and must explicitly choose a property before starting new property-specific work for multi-property local customers.
+- Reason for change: Contractors may work for the same locally created customer at multiple properties before the homeowner claims a ServSync account. The slice improves contractor record reliability without expanding homeowner claim/accept flows.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-customer.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-invoice.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - Sandbox SQL apply and read-only catalog grant verification for `servsync_create_local_home(...)` on sandbox ref `zpzdkoaubyjtsomccxya`.
+- Known risks or follow-ups:
+  - `servsync-local-customer-multi-property.sql` has been created for sandbox/production rollout but production SQL has not been applied.
+  - Homeowner local-customer claim/accept still maps a single invite to a single local home; full homeowner multi-property claim/accept remains a future separately approved slice.
+  - No invites, email/SMS/push, new users, broad chat, cold outreach, production data changes, or deploy were added.
+
 - Branch: `codex/fb-020-restore-drill-operator-checklist-v1`
 - Files changed:
   - `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md`

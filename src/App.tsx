@@ -4900,6 +4900,26 @@ type PropertyContextRecord = {
   home_address?: string | null;
 };
 
+type LocalHomeDraft = {
+  nickname: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  notes: string;
+};
+
+const EMPTY_LOCAL_HOME_DRAFT: LocalHomeDraft = {
+  nickname: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  zip_code: '',
+  notes: '',
+};
+
 function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
   if (!home) return '';
   const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
@@ -4931,6 +4951,25 @@ function propertyRecordLabel(
     return address && address !== primary ? `${primary} — ${address}` : primary;
   }
   return '';
+}
+
+function localHomeOptionLabel(home: ContractorLocalHome, index = 0) {
+  const address = compactAddressLabel(home);
+  const primary = home.nickname || home.address_line1 || address || `Property ${index + 1}`;
+  return address && address !== primary ? `${primary} — ${address}` : primary;
+}
+
+function sortedLocalHomes(homes?: ContractorLocalHome[] | null) {
+  return [...(homes ?? [])].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return aTime - bTime || (a.nickname || '').localeCompare(b.nickname || '');
+  });
+}
+
+function singleLocalHomeId(contact?: ContractorLocalContact | null) {
+  const homes = sortedLocalHomes(contact?.homes);
+  return homes.length === 1 ? homes[0].id : '';
 }
 
 function currentRoute() {
@@ -16416,6 +16455,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [creatingLocalClaimInviteId, setCreatingLocalClaimInviteId] = useState<string | null>(null);
   const [revokingLocalClaimInviteId, setRevokingLocalClaimInviteId] = useState<string | null>(null);
   const [showQrForLocalClaimInvite, setShowQrForLocalClaimInvite] = useState<string | null>(null);
+  const [selectedHomeownerWorkspaceLocalHomeId, setSelectedHomeownerWorkspaceLocalHomeId] = useState('');
+  const [addingLocalHomeContactId, setAddingLocalHomeContactId] = useState<string | null>(null);
+  const [savingLocalHomeContactId, setSavingLocalHomeContactId] = useState<string | null>(null);
+  const [localHomeDrafts, setLocalHomeDrafts] = useState<Record<string, LocalHomeDraft>>({});
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
@@ -20594,7 +20637,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const selectedJobsCustomerName = selectedJobsConnection?.display_name || selectedJobsLocalContact?.display_name || '';
   const selectedJobsCustomerAddress = selectedJobsConnection
     ? connectedHomeList(selectedJobsConnection)[0]?.address_line1 || selectedJobsConnection.home?.address_line1 || selectedJobsConnection.city || ''
-    : selectedJobsLocalContact?.homes?.[0]?.address_line1 || selectedJobsLocalContact?.homes?.[0]?.city || '';
+    : (() => {
+        const homes = sortedLocalHomes(selectedJobsLocalContact?.homes);
+        if (homes.length > 1) return `${homes.length} properties on file`;
+        return homes[0]?.address_line1 || homes[0]?.city || '';
+      })();
   const selectedJobsCustomerWork = selectedJobsConnection
     ? fieldWorkForHomeowner(selectedJobsConnection.homeowner_user_id)
     : selectedJobsLocalContact
@@ -21135,7 +21182,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
   const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
   const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
-  const defaultLocalHomeId = selectedJobsLocalContact?.homes?.[0]?.id ?? '';
+  const defaultLocalHomeId = singleLocalHomeId(selectedJobsLocalContact);
   const recordPropertyLabelForContractor = (record: PropertyContextRecord) => propertyRecordLabel(record, {
     homes: connectedHomesForPropertyLabels,
     localHomes: localHomesForPropertyLabels,
@@ -21177,7 +21224,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
-  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string; homeId?: string | null };
+  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string; homeId?: string | null; localHomeId?: string | null };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
     const templateSource: FieldWorkTemplateSource = options?.templateSource ?? (options?.templateId ? 'custom' : options?.starterTemplateId ? 'starter' : 'blank');
     const starterTemplateId = options?.starterTemplateId ?? sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work';
@@ -21217,17 +21264,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('inspections');
   };
   const beginFieldWorkForLocalContact = (contact: ContractorLocalContact, options?: BeginFieldWorkOptions) => {
+    const currentContact = localContacts.find(item => item.id === contact.id) ?? contact;
+    const selectedLocalHomeId = options?.localHomeId ?? (selectedHomeownerWorkspaceLocalHomeId || singleLocalHomeId(currentContact));
     const { templateSource, starterTemplateId, workflowKind } = resolveFieldWorkTemplateSelection(options);
     const jobMode: JobWorkflowMode = templateSource === 'blank' && workflowKind === 'work_order' ? 'simple' : 'checklist';
-    setJobsCustomerFilterSubjectId(`local:${contact.id}`);
+    setJobsCustomerFilterSubjectId(`local:${currentContact.id}`);
     setInspectionNewDraft({
       subject_type: 'local',
       homeowner_user_id: '',
       home_id: '',
-      local_contact_id: contact.id,
-      local_home_id: contact.homes?.[0]?.id ?? '',
+      local_contact_id: currentContact.id,
+      local_home_id: selectedLocalHomeId,
       service_request_id: '',
-      name: options?.name ?? buildLocalFieldWorkName(contact, starterTemplateId, workflowKind, templateSource),
+      name: options?.name ?? buildLocalFieldWorkName(currentContact, starterTemplateId, workflowKind, templateSource),
       scope: '',
       job_mode: jobMode,
       job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
@@ -22754,6 +22803,65 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const openAddLocalHomeForm = (contact: ContractorLocalContact) => {
+    setAddingLocalHomeContactId(contact.id);
+    setLocalHomeDrafts(prev => ({
+      ...prev,
+      [contact.id]: prev[contact.id] ?? { ...EMPTY_LOCAL_HOME_DRAFT, nickname: `Property ${sortedLocalHomes(contact.homes).length + 1}` },
+    }));
+    setHomeownerDetailTab('home');
+  };
+
+  const updateLocalHomeDraft = (contactId: string, updates: Partial<LocalHomeDraft>) => {
+    setLocalHomeDrafts(prev => ({
+      ...prev,
+      [contactId]: { ...(prev[contactId] ?? EMPTY_LOCAL_HOME_DRAFT), ...updates },
+    }));
+  };
+
+  const createLocalHome = async (contact: ContractorLocalContact) => {
+    if (!supabase) return;
+    const draft = localHomeDrafts[contact.id] ?? EMPTY_LOCAL_HOME_DRAFT;
+    if (!draft.nickname.trim() && !draft.address_line1.trim()) {
+      setError('Enter a property label or street address before adding another property.');
+      return;
+    }
+    setSavingLocalHomeContactId(contact.id);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_local_home', {
+        p_local_contact_id: contact.id,
+        p_nickname: draft.nickname,
+        p_address_line1: draft.address_line1,
+        p_address_line2: draft.address_line2,
+        p_city: draft.city,
+        p_state: draft.state,
+        p_zip_code: draft.zip_code,
+        p_notes: cleanHumanWrittenText(draft.notes),
+      });
+      if (createError) throw createError;
+
+      const createdHome = data as ContractorLocalHome | null;
+      if (createdHome?.id) {
+        setLocalContacts(prev => prev.map(item => item.id === contact.id
+          ? { ...item, homes: sortedLocalHomes([...(item.homes ?? []), createdHome]) }
+          : item
+        ));
+        setSelectedHomeownerWorkspaceLocalHomeId(createdHome.id);
+        setHomeownerWorkspacePropertyScope('selected');
+        setLocalHomeDrafts(prev => ({ ...prev, [contact.id]: EMPTY_LOCAL_HOME_DRAFT }));
+        setAddingLocalHomeContactId(null);
+        setNotice('Property added to this local customer.');
+      }
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to add property.'));
+    } finally {
+      setSavingLocalHomeContactId(null);
+    }
+  };
+
   const createLocalCustomerClaimInvite = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
     const pendingInvite = localClaimInvites.find(invite =>
@@ -22766,7 +22874,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return;
     }
 
-    const localHome = contact.homes?.[0] ?? null;
+    const localHomes = sortedLocalHomes(contact.homes);
+    const localHome = localHomes.length > 1
+      ? localHomes.find(home => home.id === selectedHomeownerWorkspaceLocalHomeId) ?? null
+      : localHomes[0] ?? null;
+    if (localHomes.length > 1 && !localHome) {
+      setError('Choose one property before creating a single-property claim invite for this local customer.');
+      setHomeownerWorkspacePropertyScope('selected');
+      setHomeownerDetailTab('home');
+      return;
+    }
     setCreatingLocalClaimInviteId(contact.id);
     setNotice('');
     setError('');
@@ -25306,16 +25423,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               'connected homeowner',
             ].filter(Boolean).join(' '));
           }
-          const home = subject.contact.homes?.[0];
+          const homes = sortedLocalHomes(subject.contact.homes);
           return normalizeText([
             subject.contact.display_name,
             subject.contact.phone,
             subject.contact.email,
-            home?.nickname,
-            home?.address_line1,
-            home?.city,
-            home?.state,
-            home?.zip_code,
+            ...homes.flatMap(home => [home.nickname, home.address_line1, home.city, home.state, home.zip_code]),
             'new customer',
           ].filter(Boolean).join(' '));
         };
@@ -25424,7 +25537,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         ? 'claimed'
                         : effectiveLocalClaimInviteStatus(latestClaimInvite);
                       rowName = subject.contact.display_name || 'New customer';
-                      const home = subject.contact.homes?.[0];
+                      const homes = sortedLocalHomes(subject.contact.homes);
+                      const home = homes[0];
                       subtitle = home?.address_line1 || home?.nickname || formatPhoneNumber(subject.contact.phone) || subject.contact.email || '';
                       pills.push(localClaimStatus
                         ? {
@@ -25433,6 +25547,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           }
                         : { label: 'Not invited', tone: 'slate' }
                       );
+                      if (homes.length > 1) pills.push({ label: `${homes.length} properties`, tone: 'blue' });
                       if (draftWorkOrderCount > 0) pills.push({ label: `${draftWorkOrderCount} draft`, tone: 'amber' });
                       if (filedReportCount > 0) pills.push({ label: `${filedReportCount} report${filedReportCount === 1 ? '' : 's'}`, tone: 'slate' });
                     } else {
@@ -25446,14 +25561,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         type="button"
                         onClick={() => {
                           setSelectedHomeownerSubjectId(subject.id);
-                          if (subject.kind === 'connection') {
-                            const homes = connectedHomeList(subject.connection);
-                            setSelectedHomeownerWorkspaceHomeId(homes[0]?.id ?? subject.connection.home?.id ?? '');
-                            setHomeownerWorkspacePropertyScope('selected');
-                          } else {
-                            setSelectedHomeownerWorkspaceHomeId('');
-                            setHomeownerWorkspacePropertyScope('selected');
-                          }
+                      if (subject.kind === 'connection') {
+                        const homes = connectedHomeList(subject.connection);
+                        setSelectedHomeownerWorkspaceHomeId(homes[0]?.id ?? subject.connection.home?.id ?? '');
+                        setSelectedHomeownerWorkspaceLocalHomeId('');
+                        setHomeownerWorkspacePropertyScope('selected');
+                      } else if (subject.kind === 'local') {
+                        const homes = sortedLocalHomes(subject.contact.homes);
+                        setSelectedHomeownerWorkspaceHomeId('');
+                        setSelectedHomeownerWorkspaceLocalHomeId(homes.length === 1 ? homes[0].id : '');
+                        setHomeownerWorkspacePropertyScope(homes.length > 1 ? 'all' : 'selected');
+                      } else {
+                        setSelectedHomeownerWorkspaceHomeId('');
+                        setSelectedHomeownerWorkspaceLocalHomeId('');
+                        setHomeownerWorkspacePropertyScope('selected');
+                      }
                           setShowLocalContactForm(false);
                           setHomeownerMobileDetailOpen(true);
                           setHomeownerDetailTab('profile');
@@ -25641,18 +25763,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   (() => {
                     const isConn = selectedSubject.kind === 'connection';
                     const conn = isConn ? selectedSubject.connection : null;
-                    const localCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
+                    const selectedLocalCustomer = !isConn ? (selectedSubject as { kind: 'local'; contact: ContractorLocalContact }).contact : null;
+                    const localCustomer = selectedLocalCustomer
+                      ? localContacts.find(contact => contact.id === selectedLocalCustomer.id) ?? selectedLocalCustomer
+                      : null;
                     const perm = conn ? normalizeSharingPermissions(conn.permissions) : null;
                     const connectedHomes = conn ? connectedHomeList(conn) : [];
-                    const propertyScopeEnabled = Boolean(conn && perm?.share_home_overview && connectedHomes.length > 0);
-                    const selectedWorkspaceHome = propertyScopeEnabled
+                    const localHomes = localCustomer ? sortedLocalHomes(localCustomer.homes) : [];
+                    const connectedPropertyScopeEnabled = Boolean(conn && perm?.share_home_overview && connectedHomes.length > 0);
+                    const localPropertyScopeEnabled = Boolean(!isConn && localHomes.length > 0);
+                    const propertyScopeEnabled = connectedPropertyScopeEnabled || localPropertyScopeEnabled;
+                    const selectedWorkspaceHome = connectedPropertyScopeEnabled
                       ? connectedHomes.find(home => home.id === selectedHomeownerWorkspaceHomeId) ?? connectedHomes[0] ?? null
                       : null;
+                    const selectedWorkspaceLocalHome = localPropertyScopeEnabled
+                      ? localHomes.find(home => home.id === selectedHomeownerWorkspaceLocalHomeId) ?? (localHomes.length === 1 ? localHomes[0] : null)
+                      : null;
                     const selectedWorkspaceHomeId = selectedWorkspaceHome?.id ?? '';
+                    const selectedWorkspaceLocalHomeId = selectedWorkspaceLocalHome?.id ?? '';
                     const workspaceHomeLabel = selectedWorkspaceHome
                       ? propertyRecordLabel({ home_id: selectedWorkspaceHome.id }, { homes: connectedHomes })
                       : '';
-                    const workspaceNewRecordHomeId = propertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceHomeId : '';
+                    const workspaceLocalHomeLabel = selectedWorkspaceLocalHome
+                      ? propertyRecordLabel({ local_home_id: selectedWorkspaceLocalHome.id }, { localHomes })
+                      : '';
+                    const workspaceNewRecordHomeId = connectedPropertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceHomeId : '';
+                    const workspaceNewRecordLocalHomeId = localPropertyScopeEnabled && homeownerWorkspacePropertyScope === 'selected' ? selectedWorkspaceLocalHomeId : '';
                     const connectedHomeOptionLabel = (home: ContractorConnectedHomeownerHome, index: number) => {
                       const address = perm?.share_address ? compactAddressLabel(home) : '';
                       const location = perm?.share_home_overview ? [home.city, home.state, home.zip_code].filter(Boolean).join(' ') : '';
@@ -25661,9 +25797,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     };
                     const primaryConnectedHome = selectedWorkspaceHome ?? connectedHomes[0] ?? conn?.home ?? null;
                     const headerName = conn ? (perm!.share_contact ? (conn.display_name || 'Homeowner') : 'Homeowner') : (localCustomer!.display_name || 'New customer');
-                    const localHome = localCustomer?.homes?.[0] ?? null;
-                    const headerAddress = conn ? (perm!.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : (localHome?.address_line1 || '');
-                    const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
+                    const localHome = selectedWorkspaceLocalHome ?? localHomes[0] ?? null;
+                    const localHeaderAddress = localHomes.length > 1 && homeownerWorkspacePropertyScope === 'all'
+                      ? `${localHomes.length} properties on file`
+                      : localHome?.address_line1 || '';
+                    const localHeaderCity = localHomes.length > 1 && homeownerWorkspacePropertyScope === 'all'
+                      ? ''
+                      : `${localHome?.city ?? ''}${localHome?.state ? `, ${localHome.state}` : ''}`.trim().replace(/^,\s*/, '');
+                    const headerAddress = conn ? (perm!.share_address ? (primaryConnectedHome?.address_line1 || '') : 'Address private') : localHeaderAddress;
+                    const headerCity = conn ? (perm!.share_contact ? `${conn.city || ''}${conn.state ? `, ${conn.state}` : ''}`.trim().replace(/^,\s*/, '') : '') : localHeaderCity;
                     const localClaimInvitesForCustomer = localCustomer
                       ? localClaimInvites
                           .filter(invite => invite.local_contact_id === localCustomer.id)
@@ -25671,7 +25813,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       : [];
                     const pendingLocalClaimInvite = localClaimInvitesForCustomer.find(invite => effectiveLocalClaimInviteStatus(invite) === 'pending') ?? null;
                     const latestLocalClaimInvite = pendingLocalClaimInvite ?? localClaimInvitesForCustomer[0] ?? null;
-                    const localClaimStatus = localCustomer?.homeowner_user_id || localCustomer?.claimed_at || localHome?.home_id || localHome?.claimed_at
+                    const localClaimStatus = localCustomer?.homeowner_user_id || localCustomer?.claimed_at || localHomes.some(home => home.home_id || home.claimed_at)
                       ? 'claimed'
                       : effectiveLocalClaimInviteStatus(latestLocalClaimInvite);
                     const localCustomerIsClaimed = localClaimStatus === 'claimed';
@@ -25688,8 +25830,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const matchesWorkspacePropertyScope = (record: PropertyContextRecord) => {
                       if (!propertyScopeEnabled) return true;
                       if (homeownerWorkspacePropertyScope === 'all') return true;
-                      if (homeownerWorkspacePropertyScope === 'unassigned') return !record.home_id;
-                      return selectedWorkspaceHomeId ? record.home_id === selectedWorkspaceHomeId : !record.home_id;
+                      if (homeownerWorkspacePropertyScope === 'unassigned') return isConn ? !record.home_id : !record.local_home_id;
+                      if (isConn) return selectedWorkspaceHomeId ? record.home_id === selectedWorkspaceHomeId : !record.home_id;
+                      return selectedWorkspaceLocalHomeId ? record.local_home_id === selectedWorkspaceLocalHomeId : false;
                     };
                     const fieldWork = rawFieldWork.filter(matchesWorkspacePropertyScope);
                     const inspectionRecords = fieldWork.filter(isInspectionLikeFieldWork);
@@ -25699,23 +25842,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
                     const connReqs = rawConnReqs.filter(matchesWorkspacePropertyScope);
                     const workspaceUnassignedRecordCount = propertyScopeEnabled
-                      ? rawFieldWork.filter(work => !work.home_id).length
-                        + rawSubjectEstimates.filter(estimate => !estimate.home_id).length
+                      ? rawFieldWork.filter(work => isConn ? !work.home_id : !work.local_home_id).length
+                        + rawSubjectEstimates.filter(estimate => isConn ? !estimate.home_id : !estimate.local_home_id).length
                         + rawConnReqs.filter(request => !request.home_id).length
                       : 0;
                     const showWorkspaceUnassignedRecordNotice = propertyScopeEnabled
-                      && connectedHomes.length > 1
+                      && (isConn ? connectedHomes.length > 1 : localHomes.length > 1)
                       && homeownerWorkspacePropertyScope === 'selected'
-                      && Boolean(selectedWorkspaceHomeId)
+                      && Boolean(isConn ? selectedWorkspaceHomeId : selectedWorkspaceLocalHomeId)
                       && workspaceUnassignedRecordCount > 0;
-                    const showWorkspacePropertyControls = propertyScopeEnabled && (connectedHomes.length > 1 || workspaceUnassignedRecordCount > 0);
+                    const showWorkspacePropertyControls = propertyScopeEnabled && (isConn ? connectedHomes.length > 1 : localHomes.length > 1 || workspaceUnassignedRecordCount > 0);
                     const workspacePropertyContext = !propertyScopeEnabled
                       ? ''
                       : homeownerWorkspacePropertyScope === 'all'
                         ? 'All properties'
                         : homeownerWorkspacePropertyScope === 'unassigned'
                           ? 'Unassigned records'
-                          : workspaceHomeLabel || 'Selected property';
+                          : isConn
+                            ? workspaceHomeLabel || 'Selected property'
+                            : workspaceLocalHomeLabel || 'Choose a property';
+                    const localPropertySelectionRequired = Boolean(!isConn && localHomes.length > 1 && !workspaceNewRecordLocalHomeId);
+                    const requireLocalPropertyForNewRecord = () => {
+                      if (!localPropertySelectionRequired) return false;
+                      setError('Choose a property before creating a record for this multi-property local customer.');
+                      setHomeownerWorkspacePropertyScope('selected');
+                      setHomeownerDetailTab('home');
+                      return true;
+                    };
                     const draftEstimateCount = estimateRecords.filter(estimate => estimate.status === 'draft').length;
                     const draftInvoiceCount = invoiceRecords.filter(estimate => estimate.status === 'draft').length;
                     const activeJobRecords = [...workOrderRecords, ...inspectionRecords].filter(inspectionIsOpenJob);
@@ -25986,6 +26139,136 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const activeDocumentRecords = isInvoiceWorkspaceTab ? invoiceRecords : estimateRecords;
                     const activeDocumentSections = isInvoiceWorkspaceTab ? invoiceSections : estimateSections;
                     const selectedDocumentSection = isInvoiceWorkspaceTab ? selectedInvoiceSection : selectedEstimateSection;
+                    const renderLocalCustomerProperties = () => {
+                      if (!localCustomer) return null;
+                      const homes = localHomes;
+                      const draft = localHomeDrafts[localCustomer.id] ?? EMPTY_LOCAL_HOME_DRAFT;
+                      const isAdding = addingLocalHomeContactId === localCustomer.id;
+                      const isSaving = savingLocalHomeContactId === localCustomer.id;
+                      return (
+                        <div className="space-y-3">
+                          {homes.length === 0 ? (
+                            <EmptyState text="No property details on file for this local customer." />
+                          ) : (
+                            <div className="grid gap-3">
+                              {homes.map((home, index) => {
+                                const address = compactAddressLabel(home);
+                                const claimed = Boolean(home.home_id || home.claimed_at);
+                                const selected = selectedWorkspaceLocalHomeId === home.id;
+                                return (
+                                  <button
+                                    key={home.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedHomeownerWorkspaceLocalHomeId(home.id);
+                                      setHomeownerWorkspacePropertyScope('selected');
+                                    }}
+                                    className={`rounded-xl border p-4 text-left transition ${selected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+                                  >
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="break-words text-sm font-bold text-slate-950">{home.nickname || `Property ${index + 1}`}</p>
+                                        <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not saved'}</p>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {selected && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Selected</span>}
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${claimed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                          {claimed ? 'Claimed' : 'Local'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">City</p><p className="text-sm text-slate-800 font-medium">{[home.city, home.state].filter(Boolean).join(', ') || '—'}</p></div>
+                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{home.zip_code || '—'}</p></div>
+                                    </div>
+                                    {home.notes && (
+                                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p className="text-xs font-semibold text-slate-500 mb-1">Property notes</p>
+                                        <p className="whitespace-pre-wrap text-sm text-slate-700">{home.notes}</p>
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openAddLocalHomeForm(localCustomer)}
+                              className={buttonClass('secondary')}
+                            >
+                              <Plus size={14} />
+                              Add property
+                            </button>
+                            {homes.length > 1 && (
+                              <p className="text-xs text-slate-500">Select a property before starting property-specific work.</p>
+                            )}
+                          </div>
+                          {isAdding && (
+                            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Add property</p>
+                                  <p className="mt-1 text-sm text-blue-900">Save another local property for this customer. Claiming multiple properties is a later homeowner-flow slice.</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddingLocalHomeContactId(null)}
+                                  className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <Field label="Property label">
+                                  <input className={inputClass()} value={draft.nickname} onChange={event => updateLocalHomeDraft(localCustomer.id, { nickname: event.target.value })} placeholder="Guest house" />
+                                </Field>
+                                <Field label="Street address">
+                                  <input className={inputClass()} value={draft.address_line1} onChange={event => updateLocalHomeDraft(localCustomer.id, { address_line1: event.target.value })} placeholder="Street address" />
+                                </Field>
+                                <Field label="City">
+                                  <input className={inputClass()} value={draft.city} onChange={event => updateLocalHomeDraft(localCustomer.id, { city: event.target.value })} placeholder="City" />
+                                </Field>
+                              </div>
+                              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                                <Field label="State">
+                                  <AutocompleteInput
+                                    id={`local-home-state-${localCustomer.id}`}
+                                    value={draft.state}
+                                    onChange={state => updateLocalHomeDraft(localCustomer.id, { state })}
+                                    options={US_STATE_OPTIONS}
+                                    placeholder="Start typing a state..."
+                                  />
+                                </Field>
+                                <Field label="ZIP">
+                                  <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={draft.zip_code} onChange={event => updateLocalHomeDraft(localCustomer.id, { zip_code: event.target.value })} />
+                                </Field>
+                                <Field label="Address line 2">
+                                  <input className={inputClass()} value={draft.address_line2} onChange={event => updateLocalHomeDraft(localCustomer.id, { address_line2: event.target.value })} placeholder="Unit, suite, etc." />
+                                </Field>
+                              </div>
+                              <div className="mt-3">
+                                <Field label="Property notes">
+                                  <textarea className={`${inputClass()} min-h-[80px] resize-y`} {...writingAssistProps} value={draft.notes} onChange={event => updateLocalHomeDraft(localCustomer.id, { notes: event.target.value })} placeholder="Property-specific access notes, details, or reminders." />
+                                </Field>
+                              </div>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void createLocalHome(localCustomer)}
+                                  disabled={isSaving || (!draft.nickname.trim() && !draft.address_line1.trim())}
+                                  className={buttonClass('primary')}
+                                >
+                                  {isSaving ? 'Saving...' : 'Save property'}
+                                </button>
+                                <button type="button" onClick={() => setAddingLocalHomeContactId(null)} disabled={isSaving} className={buttonClass('secondary')}>Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
 
                     return (
                       <>
@@ -26011,6 +26294,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {showWorkspaceUnassignedRecordNotice && (
                                     <p className="mt-1 text-xs text-slate-500">Older unassigned records are available from the Unassigned view.</p>
                                   )}
+                                  {localPropertySelectionRequired && homeownerWorkspacePropertyScope === 'selected' && (
+                                    <p className="mt-1 text-xs font-semibold text-amber-700">Choose a property before creating new jobs, estimates, or invoices.</p>
+                                  )}
                                 </div>
                                 {showWorkspacePropertyControls ? (
                                   <div className="grid min-w-[220px] flex-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-none">
@@ -26026,25 +26312,45 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </select>
                                     </Field>
                                     <Field label="Property">
-                                      <select
-                                        className={inputClass()}
-                                        value={selectedWorkspaceHomeId}
-                                        onChange={event => {
-                                          setSelectedHomeownerWorkspaceHomeId(event.target.value);
-                                          setHomeownerWorkspacePropertyScope('selected');
-                                        }}
-                                      >
-                                        {connectedHomes.map((home, index) => (
-                                          <option key={home.id || `${home.nickname}-${index}`} value={home.id || ''}>
-                                            {connectedHomeOptionLabel(home, index)}
-                                          </option>
-                                        ))}
-                                      </select>
+                                      {isConn ? (
+                                        <select
+                                          className={inputClass()}
+                                          value={selectedWorkspaceHomeId}
+                                          onChange={event => {
+                                            setSelectedHomeownerWorkspaceHomeId(event.target.value);
+                                            setHomeownerWorkspacePropertyScope('selected');
+                                          }}
+                                        >
+                                          {connectedHomes.map((home, index) => (
+                                            <option key={home.id || `${home.nickname}-${index}`} value={home.id || ''}>
+                                              {connectedHomeOptionLabel(home, index)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <select
+                                          className={inputClass()}
+                                          value={selectedWorkspaceLocalHomeId}
+                                          onChange={event => {
+                                            setSelectedHomeownerWorkspaceLocalHomeId(event.target.value);
+                                            setHomeownerWorkspacePropertyScope('selected');
+                                          }}
+                                        >
+                                          <option value="">Choose property...</option>
+                                          {localHomes.map((home, index) => (
+                                            <option key={home.id || `${home.nickname}-${index}`} value={home.id || ''}>
+                                              {localHomeOptionLabel(home, index)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
                                     </Field>
                                   </div>
                                 ) : (
                                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                                    {connectedHomes.length === 1 ? 'Single property' : 'Selected property'}
+                                    {isConn
+                                      ? connectedHomes.length === 1 ? 'Single property' : 'Selected property'
+                                      : localHomes.length === 1 ? 'Single property' : 'Selected property'}
                                   </span>
                                 )}
                               </div>
@@ -26145,8 +26451,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setHomeownerDetailTab('schedule');
                                       } else if (conn) {
                                         beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                      } else if (localCustomer) {
-                                        beginFieldWorkForLocalContact(localCustomer);
+                                      } else if (localCustomer && !requireLocalPropertyForNewRecord()) {
+                                        beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                       }
                                     }}
                                     className={buttonClass('primary')}
@@ -26446,18 +26752,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 {conn && perm && (
                                   <ConnectedHomeProperties homes={connectedHomes} permissions={perm} />
                                 )}
-                                {localCustomer && localHome && (
-                                  <div className="grid gap-4 sm:grid-cols-2">
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home nickname</p><p className="text-sm text-slate-800 font-medium">{localHome.nickname || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home type</p><p className="text-sm text-slate-800 font-medium">{localHome.home_type || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Year built</p><p className="text-sm text-slate-800 font-medium">{localHome.year_built || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Square feet</p><p className="text-sm text-slate-800 font-medium">{localHome.square_feet || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Address</p><p className="text-sm text-slate-800 font-medium">{localHome.address_line1 || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{localHome.zip_code || '—'}</p></div>
-                                    {localHome.notes && <div className="sm:col-span-2"><p className="text-xs text-slate-400 font-medium mb-0.5">Home notes</p><p className="text-sm text-slate-800 whitespace-pre-wrap">{localHome.notes}</p></div>}
-                                  </div>
-                                )}
-                                {localCustomer && !localHome && <EmptyState text="No home details on file for this new customer." />}
+                                {localCustomer && renderLocalCustomerProperties()}
                               </div>
                               {conn && perm && (
                                 <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -26485,18 +26780,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 {conn && perm && (
                                   <ConnectedHomeProperties homes={connectedHomes} permissions={perm} />
                                 )}
-                                {localCustomer && localHome && (
-                                  <div className="grid gap-4 sm:grid-cols-2">
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home nickname</p><p className="text-sm text-slate-800 font-medium">{localHome.nickname || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Home type</p><p className="text-sm text-slate-800 font-medium">{localHome.home_type || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Year built</p><p className="text-sm text-slate-800 font-medium">{localHome.year_built || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Square feet</p><p className="text-sm text-slate-800 font-medium">{localHome.square_feet || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">Address</p><p className="text-sm text-slate-800 font-medium">{localHome.address_line1 || '—'}</p></div>
-                                    <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{localHome.zip_code || '—'}</p></div>
-                                    {localHome.notes && <div className="sm:col-span-2"><p className="text-xs text-slate-400 font-medium mb-0.5">Home notes</p><p className="text-sm text-slate-800 whitespace-pre-wrap">{localHome.notes}</p></div>}
-                                  </div>
-                                )}
-                                {localCustomer && !localHome && <EmptyState text="No home details on file for this new customer." />}
+                                {localCustomer && renderLocalCustomerProperties()}
                               </div>
                             </div>
                           )}
@@ -26554,7 +26838,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     type="button"
                                     onClick={() => {
                                       if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                      else if (localCustomer) beginFieldWorkForLocalContact(localCustomer);
+                                      else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                     }}
                                     className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
                                   >
@@ -26565,8 +26849,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                       if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+                                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                     }}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
@@ -26577,8 +26862,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                       if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined });
+                                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                     }}
                                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
                                   >
@@ -26716,7 +27002,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <h3 className="font-bold text-slate-950">Service jobs</h3>
                                     <p className="mt-1 text-xs text-slate-500">{fwDraftCount} draft{fwDraftCount === 1 ? '' : 's'} · {fwFinalCount} filed report{fwFinalCount === 1 ? '' : 's'}</p>
                                   </div>
-                                  <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined }); } else if (localCustomer) { beginFieldWorkForLocalContact(localCustomer); } }} className={buttonClass('primary')}>
+                                  <button type="button" onClick={() => { if (isConn && conn) { beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined }); } else if (localCustomer && !requireLocalPropertyForNewRecord()) { beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined }); } }} className={buttonClass('primary')}>
                                     <Plus size={14} />
                                     Create job
                                   </button>
@@ -26789,7 +27075,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <button
                                         type="button"
                                         onClick={() => void startNewInspection()}
-                                        disabled={savingInspection || !inspectionNewDraft.name.trim() || (inspectionNewDraft.subject_type === 'connected' ? !inspectionNewDraft.homeowner_user_id : !inspectionNewDraft.local_contact_id)}
+                                        disabled={
+                                          savingInspection
+                                          || !inspectionNewDraft.name.trim()
+                                          || (inspectionNewDraft.subject_type === 'connected'
+                                            ? !inspectionNewDraft.homeowner_user_id
+                                            : !inspectionNewDraft.local_contact_id
+                                              || sortedLocalHomes(localContacts.find(contact => contact.id === inspectionNewDraft.local_contact_id)?.homes).length > 1 && !inspectionNewDraft.local_home_id)
+                                        }
                                         className={buttonClass('primary')}
                                       >
                                         {savingInspection ? 'Creating...' : 'Create job'}
@@ -26841,8 +27134,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     onClick={() => {
                                       if (isConn && conn) {
                                         beginFieldWorkForHomeowner(conn, { workflowKind: 'inspection', homeId: workspaceNewRecordHomeId || undefined });
-                                      } else if (localCustomer) {
-                                        beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection' });
+                                      } else if (localCustomer && !requireLocalPropertyForNewRecord()) {
+                                        beginFieldWorkForLocalContact(localCustomer, { workflowKind: 'inspection', localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                       }
                                     }}
                                     className={buttonClass('primary')}
@@ -26897,7 +27190,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {isInvoiceWorkspaceTab ? (
                                       <button
                                         type="button"
-                                        onClick={() => beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', { homeId: workspaceNewRecordHomeId || undefined })}
+                                        onClick={() => {
+                                          if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                          beginInvoiceDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                        }}
                                         className={buttonClass('primary')}
                                       >
                                         <Receipt size={14} />
@@ -26907,11 +27203,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <button
                                         type="button"
                                         onClick={() => {
+                                          if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                           const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
                                           setEditingEstimateId(null);
                                           setEstimateDraft(createBlankEstimateDraft({
                                             title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
                                             home_id: workspaceNewRecordHomeId,
+                                            local_home_id: workspaceNewRecordLocalHomeId,
                                             labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                           }));
                                           setEstimateAssistantText('');
@@ -26944,9 +27242,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <p className="mt-1 text-sm font-semibold text-blue-950">
                                           Creating estimate for: <span>{conn?.display_name || localCustomer?.display_name || 'Customer'}</span>
                                         </p>
-                                        {(conn?.home?.address_line1 || localCustomer?.homes?.[0]?.address_line1) && (
+                                        {(conn?.home?.address_line1 || selectedWorkspaceLocalHome?.address_line1) && (
                                           <p className="mt-0.5 text-xs text-blue-800">
-                                            {conn?.home?.address_line1 || localCustomer?.homes?.[0]?.address_line1}
+                                            {conn?.home?.address_line1 || selectedWorkspaceLocalHome?.address_line1}
                                           </p>
                                         )}
                                         <p className="mt-2 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
@@ -27142,11 +27440,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <button
                                                 type="button"
                                                 onClick={() => {
+                                                  if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                                   const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
                                                   setEditingEstimateId(null);
                                                   setEstimateDraft({
                                                     ...estimateDraftFromStarterTemplate(template, subjectName),
                                                     home_id: workspaceNewRecordHomeId,
+                                                    local_home_id: workspaceNewRecordLocalHomeId,
                                                     labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                                   });
                                                   setEstimateAssistantText('');
@@ -27245,11 +27545,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   <button
                                                     type="button"
                                                     onClick={() => {
+                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                                       const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
                                                       setEditingEstimateId(null);
                                                       setEstimateDraft({
                                                         ...estimateDraftFromTemplate(template, subjectName),
                                                         home_id: workspaceNewRecordHomeId,
+                                                        local_home_id: workspaceNewRecordLocalHomeId,
                                                         labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                                       });
                                                       setEstimateAssistantText('');
@@ -30020,10 +30322,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const conn = subjectType === 'connected' ? connections.find(c => c.homeowner_user_id === id) : null;
                         const local = subjectType === 'local' ? localContacts.find(c => c.id === id) : null;
                         const defaultHomeId = conn ? connectedHomeList(conn)[0]?.id ?? conn.home?.id ?? '' : '';
+                        const defaultLocalHomeIdForJob = local ? singleLocalHomeId(local) : '';
                         const nextContext: InspectionTemplateSubjectContext | null = subjectType === 'connected' && id
                           ? { subject_type: 'connected', homeowner_user_id: id, home_id: defaultHomeId }
                           : subjectType === 'local' && id
-                            ? { subject_type: 'local', local_contact_id: id, local_home_id: local?.homes?.[0]?.id ?? '' }
+                            ? { subject_type: 'local', local_contact_id: id, local_home_id: defaultLocalHomeIdForJob }
                             : null;
                         const currentCustomTemplate = inspectionNewDraft.template_source === 'custom'
                           ? inspectionTemplates.find(template => template.id === inspectionNewDraft.template_id)
@@ -30043,7 +30346,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           homeowner_user_id: subjectType === 'connected' ? id : '',
                           home_id: subjectType === 'connected' ? defaultHomeId : '',
                           local_contact_id: subjectType === 'local' ? id : '',
-                          local_home_id: subjectType === 'local' ? local?.homes?.[0]?.id ?? '' : '',
+                          local_home_id: subjectType === 'local' ? defaultLocalHomeIdForJob : '',
                           service_request_id: subjectType === 'connected' ? d.service_request_id : '',
                           share_with_homeowner: subjectType === 'connected' && d.service_request_id ? d.share_with_homeowner : false,
                           template_source: keepCurrentCustomTemplate ? d.template_source : 'blank',
@@ -30078,9 +30381,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     ? localContacts.find(contact => contact.id === inspectionNewDraft.local_contact_id) ?? null
                     : null;
                   const selectedNewJobCustomerName = selectedNewJobConnection?.display_name || selectedNewJobLocalContact?.display_name || '';
+                  const selectedNewJobLocalHomes = sortedLocalHomes(selectedNewJobLocalContact?.homes);
                   const selectedNewJobAddress = selectedNewJobConnection
                     ? connectedHomeList(selectedNewJobConnection)[0]?.address_line1 || selectedNewJobConnection.home?.address_line1 || selectedNewJobConnection.city || ''
-                    : selectedNewJobLocalContact?.homes?.find(home => home.id === inspectionNewDraft.local_home_id)?.address_line1 || selectedNewJobLocalContact?.homes?.[0]?.address_line1 || selectedNewJobLocalContact?.homes?.[0]?.city || '';
+                    : selectedNewJobLocalHomes.find(home => home.id === inspectionNewDraft.local_home_id)?.address_line1 || (selectedNewJobLocalHomes.length === 1 ? selectedNewJobLocalHomes[0]?.address_line1 || selectedNewJobLocalHomes[0]?.city || '' : '');
                   if (!selectedNewJobCustomerName) return null;
                   return (
                     <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
@@ -30089,6 +30393,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </p>
                       {selectedNewJobAddress && <p className="mt-0.5 text-xs text-blue-800">{selectedNewJobAddress}</p>}
                     </div>
+                  );
+                })()}
+                {inspectionNewDraft.subject_type === 'local' && inspectionNewDraft.local_contact_id && (() => {
+                  const selectedLocalContact = localContacts.find(contact => contact.id === inspectionNewDraft.local_contact_id) ?? null;
+                  const localHomes = sortedLocalHomes(selectedLocalContact?.homes);
+                  if (!selectedLocalContact || localHomes.length === 0) return null;
+                  const selectedLocalHome = localHomes.find(home => home.id === inspectionNewDraft.local_home_id) ?? (localHomes.length === 1 ? localHomes[0] : null);
+                  const updateLocalHome = (homeId: string) => {
+                    const nextContext: InspectionTemplateSubjectContext = {
+                      subject_type: 'local',
+                      local_contact_id: inspectionNewDraft.local_contact_id,
+                      local_home_id: homeId,
+                    };
+                    const currentCustomTemplate = inspectionNewDraft.template_source === 'custom'
+                      ? inspectionTemplates.find(template => template.id === inspectionNewDraft.template_id)
+                      : null;
+                    const keepCurrentCustomTemplate = !currentCustomTemplate
+                      || templateScope(currentCustomTemplate) === 'contractor'
+                      || templateMatchesInspectionSubject(currentCustomTemplate, nextContext);
+                    setInspectionNewDraft(d => ({
+                      ...d,
+                      local_home_id: homeId,
+                      template_source: keepCurrentCustomTemplate ? d.template_source : 'blank',
+                      template_id: keepCurrentCustomTemplate ? d.template_id : '',
+                    }));
+                  };
+
+                  return (
+                    <Field label="Property">
+                      {localHomes.length > 1 ? (
+                        <select
+                          className={inputClass()}
+                          value={inspectionNewDraft.local_home_id}
+                          onChange={event => updateLocalHome(event.target.value)}
+                        >
+                          <option value="">Choose property...</option>
+                          {localHomes.map((home, index) => (
+                            <option key={home.id || localHomeOptionLabel(home, index)} value={home.id || ''}>
+                              {localHomeOptionLabel(home, index)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                          {selectedLocalHome ? localHomeOptionLabel(selectedLocalHome, 0) : 'Property not assigned'}
+                        </div>
+                      )}
+                      {localHomes.length > 1 && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {selectedLocalHome ? `Selected property: ${localHomeOptionLabel(selectedLocalHome, localHomes.findIndex(home => home.id === selectedLocalHome.id))}` : 'Choose the property for this job.'}
+                        </p>
+                      )}
+                    </Field>
                   );
                 })()}
                 {inspectionNewDraft.subject_type === 'connected' && inspectionNewDraft.homeowner_user_id && (() => {
