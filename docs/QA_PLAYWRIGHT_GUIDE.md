@@ -115,6 +115,27 @@ Coverage:
 
 This spec must not sign in, require secrets, create users, mutate production records, upload files, apply SQL, change settings, or manually deploy. Authenticated production smoke remains blocked until dedicated production smoke accounts, credential storage, allowed actions, and cleanup/no-cleanup rules are approved.
 
+## Production Smoke Credential Readiness
+
+Use this only to check whether approved production smoke variable names appear configured locally:
+
+```bash
+npm run qa:production-smoke:check
+```
+
+The command reports only variable names as `present` or `missing`. It does not print values, sign in, call Supabase Auth, call the Supabase database, validate credentials, create users, mutate production, apply SQL, change settings, or run authenticated production smoke.
+
+Required names:
+
+- `PROD_SMOKE_HOMEOWNER_EMAIL`
+- `PROD_SMOKE_HOMEOWNER_PASSWORD`
+- `PROD_SMOKE_CONTRACTOR_OWNER_EMAIL`
+- `PROD_SMOKE_CONTRACTOR_OWNER_PASSWORD`
+
+Optional role names use `PROD_SMOKE_CONTRACTOR_FIELD_TECH_*` and `PROD_SMOKE_CONTRACTOR_VIEWER_*`. Optional stable record IDs use `PROD_SMOKE_SERVICE_REQUEST_ID`, `PROD_SMOKE_INSPECTION_ID`, `PROD_SMOKE_ESTIMATE_ID`, and `PROD_SMOKE_INVOICE_ID`.
+
+Presence only means the local environment appears configured. Authenticated production smoke still requires a separate explicit approval, approved smoke records, and an allowed-actions plan. Do not print or paste ignored local credential files into reports, PRs, screenshots, traces, logs, or chat.
+
 ## Mobile Read-Only Smoke
 
 Use:
@@ -314,5 +335,6 @@ Fix the root cause before rerunning the test. Do not weaken tests into generic w
 - Production smoke is public/read-only until production smoke accounts are approved.
 - Public production smoke must stay unauthenticated and non-mutating.
 - Test credentials stay in environment variables or a password manager.
+- Ignored/local credential files must not be printed or pasted; rotate smoke/load-test credentials if a local terminal/session may have exposed them.
 - Screenshots, videos, traces, and Playwright reports must not be committed.
 - E2E-created sandbox records are allowed to remain if clearly labeled.

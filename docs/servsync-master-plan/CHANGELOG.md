@@ -4,6 +4,34 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-29
+
+- Branch: `codex/fb-020-production-smoke-env-validator-v1`
+- Files changed:
+  - `package.json`
+  - `tests/helpers/check-production-smoke-env.mjs`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1D no-secret production smoke credential readiness validation. The new local Node script reports only whether approved `PROD_SMOKE_*` variable names are present or missing and adds an npm command for operators to run before considering authenticated production smoke.
+- Reason for change: Remove ambiguity around whether production smoke credentials appear configured while preserving the rule that authenticated production smoke, user creation, production mutation, Supabase Auth/database calls, SQL, settings changes, and deploys require separate explicit approval.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `npm run qa:production-smoke:check`
+  - `npm run qa:production-smoke:check -- --strict`
+  - `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke`
+- Known risks or follow-ups:
+  - The validator checks presence only; it does not validate credentials or approve authenticated production smoke.
+  - Authenticated production smoke remains blocked until dedicated accounts, stable smoke records, credential storage, allowed actions, and any cleanup/no-cleanup rules are separately approved.
+  - Local ignored credential files must not be printed in reports or PRs; rotate smoke or load-test credentials if terminal/session persistence may have exposed them.
+
 ## 2026-06-28
 
 - Branch: `codex/fb-020-security-catalog-expansion-v1`
