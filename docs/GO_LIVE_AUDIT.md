@@ -152,11 +152,13 @@ Before public go-live:
 
 - Decide whether production smoke accounts will exist.
 - Store credentials outside the repo.
+- Use `npm run qa:production-smoke:check` to check only whether approved production smoke variable names are present locally; this command must not print values, sign in, validate credentials, or contact Supabase.
 - Define allowed smoke actions.
 - Keep default authenticated production smoke read-only unless a separate prompt approves mutation.
 - Require exact-ID or approved-prefix scoped cleanup for any approved production smoke records.
 - Keep smoke records clearly labeled and separated from real customer records.
 - Do not use founder/personal accounts as automated test credentials.
+- Do not print or paste ignored/local credential files in reports, PRs, screenshots, traces, logs, or chat; rotate smoke or load-test credentials if a local terminal/session may have exposed them.
 
 ## High-Priority Before Public Go-Live
 

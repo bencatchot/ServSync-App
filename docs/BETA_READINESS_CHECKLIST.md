@@ -25,6 +25,7 @@ Related controlled beta docs:
 - [ ] Authenticated testing happens in sandbox/preview by default.
 - [ ] Production checks are public/read-only only until production smoke accounts are separately approved.
 - [ ] Production smoke accounts have an approved credential storage and allowed-actions policy before use.
+- [ ] `npm run qa:production-smoke:check` has been run to confirm whether required production smoke credential names are present locally without printing values.
 - [ ] No production mutation happens without explicit approval.
 - [ ] Sandbox/preview uses the expected Supabase project, not production.
 - [ ] Test credentials stay in local env files or a password manager, never in commits/docs/chats/logs.
@@ -295,6 +296,8 @@ Before using production smoke accounts:
 - [ ] Optional contractor field tech/viewer smoke accounts are approved only if role-specific production smoke is needed.
 - [ ] Credential storage is approved outside the repo.
 - [ ] Credentials are not stored in repo/docs/chats/logs/screenshots/traces.
+- [ ] Ignored/local credential files are not printed or pasted in reports, PRs, logs, screenshots, traces, or chat.
+- [ ] If smoke or load-test credentials may have been exposed in a local terminal/session, those credentials are rotated before use.
 - [ ] Personal, founder, beta-user, and non-smoke accounts are not used for automated production smoke.
 - [ ] Allowed actions are documented.
 - [ ] Default authenticated production smoke is read-only navigation.

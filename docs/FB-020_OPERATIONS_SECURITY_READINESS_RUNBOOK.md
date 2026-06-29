@@ -116,7 +116,38 @@ Before using production smoke accounts:
 - Clean up any approved production smoke records only through exact-ID or approved-prefix scoped cleanup, and report cleanup counts.
 - Never create users, modify production records, or run mutating production smoke without explicit approval.
 
-Suggested environment variable names may be documented for local operator setup, for example `PROD_SMOKE_HOMEOWNER_EMAIL`, `PROD_SMOKE_HOMEOWNER_PASSWORD`, `PROD_SMOKE_CONTRACTOR_EMAIL`, and `PROD_SMOKE_CONTRACTOR_PASSWORD`. Values belong only in local ignored files or an approved password manager.
+Suggested environment variable names may be documented for local operator setup, for example `PROD_SMOKE_HOMEOWNER_EMAIL`, `PROD_SMOKE_HOMEOWNER_PASSWORD`, `PROD_SMOKE_CONTRACTOR_OWNER_EMAIL`, and `PROD_SMOKE_CONTRACTOR_OWNER_PASSWORD`. Values belong only in local ignored files or an approved password manager.
+
+Production smoke credential readiness can be checked locally without printing secrets:
+
+```bash
+npm run qa:production-smoke:check
+```
+
+The readiness check loads only `process.env`, `.env`, `.env.local`, and `.env.test.local`; reports variable names as `present` or `missing`; and does not sign in, call Supabase Auth, call the Supabase database, contact production, or validate credentials. It is a presence-only check. Passing the check does not approve authenticated production smoke.
+
+Required production smoke credential names:
+
+- `PROD_SMOKE_HOMEOWNER_EMAIL`
+- `PROD_SMOKE_HOMEOWNER_PASSWORD`
+- `PROD_SMOKE_CONTRACTOR_OWNER_EMAIL`
+- `PROD_SMOKE_CONTRACTOR_OWNER_PASSWORD`
+
+Optional role-specific credential names:
+
+- `PROD_SMOKE_CONTRACTOR_FIELD_TECH_EMAIL`
+- `PROD_SMOKE_CONTRACTOR_FIELD_TECH_PASSWORD`
+- `PROD_SMOKE_CONTRACTOR_VIEWER_EMAIL`
+- `PROD_SMOKE_CONTRACTOR_VIEWER_PASSWORD`
+
+Optional stable smoke record ID names:
+
+- `PROD_SMOKE_SERVICE_REQUEST_ID`
+- `PROD_SMOKE_INSPECTION_ID`
+- `PROD_SMOKE_ESTIMATE_ID`
+- `PROD_SMOKE_INVOICE_ID`
+
+Treat stable smoke record IDs as sensitive operational config. Do not put credential values or real record IDs in docs, repo files, chat, reports, logs, screenshots, videos, traces, or Playwright artifacts. Ignored/local credential files must not be printed or pasted into reports or PRs. If a local terminal session, report, or screen recording may have exposed smoke or load-test credentials, rotate those credentials before relying on them again.
 
 ## Production Public Smoke Policy
 
