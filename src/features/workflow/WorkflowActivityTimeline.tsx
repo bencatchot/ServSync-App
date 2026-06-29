@@ -4,6 +4,7 @@ import { formatDateTime } from '../../utils/format';
 
 export type WorkflowActivityTimelineEvent = {
   id: string;
+  dedupeKey?: string;
   label: string;
   timestamp: string | null | undefined;
   detail?: string | null;
@@ -73,7 +74,7 @@ export function WorkflowActivityTimeline({
       .filter((entry): entry is { event: WorkflowActivityTimelineEvent; time: number } => entry.time !== null)
       .sort((a, b) => b.time - a.time)
       .filter(({ event, time }) => {
-        const key = `${event.id}:${event.label}:${time}`;
+        const key = event.dedupeKey || `${event.id}:${event.label}:${time}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;

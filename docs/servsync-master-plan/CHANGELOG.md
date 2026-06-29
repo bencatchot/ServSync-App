@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-025-activity-reader-merge-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/workflow/WorkflowActivityTimeline.tsx`
+  - `src/features/workflow/WorkflowActivityTimelineWithDurableEvents.tsx`
+  - `tests/e2e/fb025-job-message-thread-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-025 Slice 3C UI-only durable Activity reader merge. The existing Activity surfaces now read approved `workflow_activity_events` rows under RLS for known visible request/job/estimate/invoice context IDs, merge them with derived fallback rows, and prefer durable timestamps when semantic event keys match.
+- Reason for change: Let the Activity UI benefit from Slice 3B durable server-side event writers for future events while preserving derived fallback rows for older records and keeping the timeline separate from human messages, notifications, unread badges, and request-message migration.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `FB025_WORKFLOW_ACTIVITY_EVENTS=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-activity-events.spec.ts --project=chromium`
+  - `FB025_JOB_MESSAGE_THREAD_UI=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium`
+  - `FB025_WORKFLOW_COMMUNICATION_FOUNDATION=true TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-workflow-communication-foundation.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Slice 3C is UI-only and does not add SQL, durable event writes, backfill, unread badges, request-message migration, or notification delivery.
+  - Historical records without durable activity rows continue to rely on derived fallback events.
+  - `estimate_sent`, `job_completed`, `report_shared`, `photo_shared`, unread badges, email/SMS/push, and broad chat remain deferred.
+
 - Branch: `codex/fb-025-activity-event-writers-v1`
 - Files changed:
   - `servsync-fb025-workflow-activity-event-writers.sql`
