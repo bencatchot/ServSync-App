@@ -57,6 +57,8 @@ Minimum expectations:
 
 A restore drill should prove that the app can recover records and files into a fresh non-production environment.
 
+Review `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md` before any restore drill execution. The preflight plan defines required approvals, isolated target-environment rules, data sensitivity rules, verification preparation, cleanup expectations, and evidence capture guidance. It does not complete a restore drill, verify backup/PITR readiness, verify storage restore readiness, or approve backup, restore, SQL, Supabase CLI, production data, storage access, settings, user, or deploy work.
+
 Drill checklist:
 
 - Confirm the source backup/export and target project.

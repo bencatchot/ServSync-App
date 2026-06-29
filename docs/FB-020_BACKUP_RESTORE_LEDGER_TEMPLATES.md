@@ -145,6 +145,8 @@ Operator/signoff:
 
 Use this only for an approved sandbox or throwaway restore drill. Do not run restore drills against production unless an incident response plan explicitly approves it.
 
+Before completing this result template, review `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md` and confirm the drill had separate explicit approval. The preflight plan is planning-only and does not itself prove backup/PITR readiness, storage restore readiness, SQL application, Supabase settings changes, production data access, or storage access.
+
 ```text
 Drill date:
 Owner:

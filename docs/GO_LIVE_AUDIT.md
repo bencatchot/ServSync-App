@@ -28,6 +28,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - SQL provenance cleanup v1 is tracked in main; do not apply old loose SQL files if encountered elsewhere.
 - FB-020 template coverage exists for sanitized SQL rollout evidence, restore drill result capture, storage backup/readiness worksheets, and Edge Function/env/secret restore notes.
 - FB-020 backup/restore artifact-ignore guardrails exist for common local generated dumps, exports, query-output, storage-export, and restore-drill output folders/files; this does not verify backup/PITR/storage restore readiness.
+- FB-020 non-production restore drill preflight planning exists; an actual restore drill, backup/PITR verification, and storage restore verification remain go-live gaps until separately approved and completed.
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
@@ -40,6 +41,8 @@ FB-020 is the umbrella follow-up for the completed security/readiness audit. It 
 Baseline operating guidance now lives in `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`. That runbook covers backup/restore expectations, storage-object backup expectations, restore drills, applied-SQL tracking, fresh environment rebuild expectations, production smoke account policy, retention/export/deletion/cancellation decisions, and the sandbox-only read-only catalog verification command.
 
 Template-only capture formats for applied-SQL ledgers, production SQL rollouts, restore drill results, storage backup/readiness, and Edge Function/env/secret restore notes live in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. They do not mean a restore drill, PITR verification, storage restore, or production backup validation has been completed.
+
+Non-production restore drill preflight planning lives in `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`. It should be reviewed before any future approved drill, but it does not complete the drill or verify backup/PITR/storage restore readiness.
 
 FB-020 covers:
 
