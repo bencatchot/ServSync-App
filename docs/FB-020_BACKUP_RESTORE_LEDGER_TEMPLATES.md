@@ -147,6 +147,8 @@ Use this only for an approved sandbox or throwaway restore drill. Do not run res
 
 Before completing this result template, review `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md` and confirm the drill had separate explicit approval. The preflight plan is planning-only and does not itself prove backup/PITR readiness, storage restore readiness, SQL application, Supabase settings changes, production data access, or storage access.
 
+Also review `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md` before completing this result template. The checklist is an operator aid only; it does not execute a restore drill or verify backup/PITR/storage restore readiness.
+
 ```text
 Drill date:
 Owner:

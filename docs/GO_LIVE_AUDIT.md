@@ -29,6 +29,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - FB-020 template coverage exists for sanitized SQL rollout evidence, restore drill result capture, storage backup/readiness worksheets, and Edge Function/env/secret restore notes.
 - FB-020 backup/restore artifact-ignore guardrails exist for common local generated dumps, exports, query-output, storage-export, and restore-drill output folders/files; this does not verify backup/PITR/storage restore readiness.
 - FB-020 non-production restore drill preflight planning exists; an actual restore drill, backup/PITR verification, and storage restore verification remain go-live gaps until separately approved and completed.
+- FB-020 non-production restore drill operator checklist coverage exists for future go/no-go review; this does not complete a restore drill or verify backup/PITR/storage restore readiness.
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
@@ -43,6 +44,8 @@ Baseline operating guidance now lives in `docs/FB-020_OPERATIONS_SECURITY_READIN
 Template-only capture formats for applied-SQL ledgers, production SQL rollouts, restore drill results, storage backup/readiness, and Edge Function/env/secret restore notes live in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. They do not mean a restore drill, PITR verification, storage restore, or production backup validation has been completed.
 
 Non-production restore drill preflight planning lives in `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`. It should be reviewed before any future approved drill, but it does not complete the drill or verify backup/PITR/storage restore readiness.
+
+The operator go/no-go checklist lives in `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md`. It supports a future approved drill but does not run the drill or verify backup/PITR/storage restore readiness by itself.
 
 FB-020 covers:
 

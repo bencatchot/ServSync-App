@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/fb-020-restore-drill-operator-checklist-v1`
+- Files changed:
+  - `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md`
+  - `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1I docs-only non-production restore drill operator checklist with go/no-go checks for approvals, branch/repo state, target environment, source backup/export, data sensitivity, artifact handling, database/storage readiness, Edge Function/env/secrets readiness, verification, RLS/security, smoke, evidence capture, stop conditions, cleanup, and signoff.
+- Reason for change: Give future operators a practical checklist before any separately approved restore drill while preserving the rule that backup, restore, SQL, Supabase CLI, storage, production, settings, code, script, test, `.gitignore`, user, and deploy work require separate approval.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `git diff -- docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md docs/BETA_READINESS_CHECKLIST.md docs/GO_LIVE_AUDIT.md docs/servsync-master-plan/CHANGELOG.md docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Known risks or follow-ups:
+  - This is operator-checklist documentation only; no restore drill, backup/PITR verification, storage restore verification, SQL application, Supabase CLI usage, production data access, storage access, settings changes, deploy, code, scripts, tests, `.gitignore` changes, or user creation were performed.
+  - Actual restore drill execution and filled operational evidence remain future separately approved work.
+
 - Branch: `codex/fb-020-restore-drill-preflight-v1`
 - Files changed:
   - `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`
