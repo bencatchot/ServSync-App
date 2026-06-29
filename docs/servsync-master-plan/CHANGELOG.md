@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/local-property-edit-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-customer.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `servsync-local-property-edit.sql`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the narrow Slice 2A contractor-side edit flow for unclaimed contractor-created local properties. Contractors can open an edit dialog from local property cards and save label, address, and contractor-private property notes through the new guarded `servsync_update_local_home(...)` RPC.
+- Reason for change: Contractors need to correct saved local property details before a homeowner claims/maps the property, while preserving existing property-linked jobs, estimates, invoices, and history.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-customer.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-create-invoice.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - Sandbox SQL apply and security-catalog verification for `servsync_update_local_home(...)` on sandbox ref `zpzdkoaubyjtsomccxya`.
+- Known risks or follow-ups:
+  - `servsync-local-property-edit.sql` is for sandbox validation and later production rollout planning; production SQL must not be applied without separate explicit approval.
+  - Claimed/mapped local properties are intentionally locked for profile-level detail edits; future contractor-suggested property updates or connected-homeowner property proposals remain separately planned work.
+  - Existing direct table grants for local homes remain an older surface; the app edit path now uses the guarded RPC, and any broader table-privilege hardening should be a separate approved slice.
+
 - Branch: `codex/local-customer-multi-property-v1`
 - Files changed:
   - `src/App.tsx`

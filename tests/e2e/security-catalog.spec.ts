@@ -110,6 +110,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_send_workflow_message',
   'servsync_submit_contextual_connection_request',
   'servsync_sync_simple_job_work_items',
+  'servsync_update_local_home',
   'servsync_update_connection_shared_properties',
   'servsync_update_job_work_item',
   'servsync_validate_manual_home_document_upload',
