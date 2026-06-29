@@ -124,6 +124,7 @@ The repository audit shows ServSync has progressed far beyond a simple prototype
 | Estimates | Working with clearer accepted-estimate handoff and scope-aware rule-based draft builder | Continue avoiding overlap with invoice actions and avoid implying AI/pricing automation until implemented. |
 | Invoices | Working, including invoice-to-Home-History filing v1 | Payment processing and contractor-side filing remain deferred. |
 | Jobs | Working but inspection-backed internally | Continue user-facing terminology cleanup without renaming schema casually. |
+| Contractor local customers | Contractor-created local customers exist for customers who are not yet on ServSync. The first local multi-property slice lets contractors save and view multiple local properties for one local customer and requires explicit property selection before starting property-specific work when more than one local property exists. | Homeowner claim/accept remains single-property for now; multi-property homeowner claim, invite, and connection handling must be planned separately before expanding that flow. |
 | Home History | Homeowner-facing v1 is shipped on top of existing maintenance-log structures | Do not build a separate timeline table until beta feedback justifies it. |
 | Reminders | Homeowner-only manual reminders v1 is shipped | No push/email/text alerts, recurrence, scheduler, or calendar sync yet. |
 | Connections | Working | Needs contextual connection request messaging/media. |
@@ -151,6 +152,7 @@ The contractor experience should be practical, not bloated. The contractor shoul
 - Contractor receives contextual connection requests with homeowner message, selected property context, and permission choices. Photos/media should come later after storage and RLS handling are designed safely.
 - Contractor can reply within homeowner-initiated allowed communication threads without forcing every conversation into a service request, but a connection alone should not grant unrestricted contractor-initiated messaging.
 - Contractor can convert serious needs into requests, estimates, jobs, invoices, and service records.
+- Contractor-created local customers can now hold multiple contractor-private local property records, and property-specific jobs/estimates/invoices should use explicit local property selection when more than one saved local property exists. This is contractor-side only; full homeowner multi-property claim/accept remains future work.
 - Contractor should see clear next actions instead of hunting across tabs. Recent cleanup work made request-to-estimate, accepted-estimate-to-job, completed-job-to-invoice, and service/checklist terminology clearer without changing stored status values or internal database names.
 
 # 10. Discover Marketplace Strategy
