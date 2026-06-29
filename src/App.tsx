@@ -4920,6 +4920,46 @@ const EMPTY_LOCAL_HOME_DRAFT: LocalHomeDraft = {
   notes: '',
 };
 
+type ConnectedPropertyProposalStatus = 'pending' | 'accepted' | 'rejected' | 'revoked';
+
+type ConnectedPropertyProposal = {
+  id: string;
+  connection_id: string;
+  status: ConnectedPropertyProposalStatus;
+  nickname: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  homeowner_visible_note: string | null;
+  accepted_home_id: string | null;
+  reviewed_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ConnectedPropertyProposalDraft = {
+  nickname: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  homeowner_visible_note: string;
+};
+
+const EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT: ConnectedPropertyProposalDraft = {
+  nickname: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  zip_code: '',
+  homeowner_visible_note: '',
+};
+
 function localHomeDraftFromHome(home: ContractorLocalHome): LocalHomeDraft {
   return {
     nickname: home.nickname ?? '',
@@ -4932,7 +4972,7 @@ function localHomeDraftFromHome(home: ContractorLocalHome): LocalHomeDraft {
   };
 }
 
-function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
+function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome | ConnectedPropertyProposal, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
   if (!home) return '';
   const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
   const cityStateZip = [home.city, home.state, home.zip_code].filter(Boolean).join(' ');
@@ -4969,6 +5009,40 @@ function localHomeOptionLabel(home: ContractorLocalHome, index = 0) {
   const address = compactAddressLabel(home);
   const primary = home.nickname || home.address_line1 || address || `Property ${index + 1}`;
   return address && address !== primary ? `${primary} — ${address}` : primary;
+}
+
+function connectedPropertyProposalLabel(proposal: ConnectedPropertyProposal) {
+  return proposal.nickname || proposal.address_line1 || 'Suggested property';
+}
+
+function connectedPropertyProposalStatusLabel(status: ConnectedPropertyProposalStatus) {
+  switch (status) {
+    case 'pending':
+      return 'Waiting for homeowner review';
+    case 'accepted':
+      return 'Accepted by homeowner';
+    case 'rejected':
+      return 'Rejected by homeowner';
+    case 'revoked':
+      return 'Revoked by contractor';
+    default:
+      return status;
+  }
+}
+
+function connectedPropertyProposalStatusClass(status: ConnectedPropertyProposalStatus) {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-700';
+    case 'accepted':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'rejected':
+      return 'bg-red-100 text-red-700';
+    case 'revoked':
+      return 'bg-slate-100 text-slate-600';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
 }
 
 function sortedLocalHomes(homes?: ContractorLocalHome[] | null) {
@@ -16474,6 +16548,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [editingLocalHome, setEditingLocalHome] = useState<{ contactId: string; homeId: string } | null>(null);
   const [editingLocalHomeDraft, setEditingLocalHomeDraft] = useState<LocalHomeDraft>(EMPTY_LOCAL_HOME_DRAFT);
   const [savingLocalHomeEditId, setSavingLocalHomeEditId] = useState<string | null>(null);
+  const [connectedPropertyProposalsByConnectionId, setConnectedPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
+  const [loadingConnectedPropertyProposalsFor, setLoadingConnectedPropertyProposalsFor] = useState<string | null>(null);
+  const [suggestingPropertyConnectionId, setSuggestingPropertyConnectionId] = useState<string | null>(null);
+  const [connectedPropertyProposalDrafts, setConnectedPropertyProposalDrafts] = useState<Record<string, ConnectedPropertyProposalDraft>>({});
+  const [creatingConnectedPropertyProposalFor, setCreatingConnectedPropertyProposalFor] = useState<string | null>(null);
+  const [revokingConnectedPropertyProposalId, setRevokingConnectedPropertyProposalId] = useState<string | null>(null);
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
@@ -22747,6 +22827,118 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setShowAddRoom(false);
   };
 
+  const loadConnectedPropertyProposals = useCallback(async (connectionId: string) => {
+    if (!supabase || !connectionId) return;
+    setLoadingConnectedPropertyProposalsFor(connectionId);
+    try {
+      const { data, error: proposalsError } = await supabase
+        .from('contractor_home_property_proposals')
+        .select('id, connection_id, status, nickname, address_line1, address_line2, city, state, zip_code, homeowner_visible_note, accepted_home_id, reviewed_at, revoked_at, created_at, updated_at')
+        .eq('connection_id', connectionId)
+        .order('created_at', { ascending: false });
+      if (proposalsError) throw proposalsError;
+      setConnectedPropertyProposalsByConnectionId(prev => ({
+        ...prev,
+        [connectionId]: (data || []) as ConnectedPropertyProposal[],
+      }));
+    } catch (err) {
+      setError(readableError(err, 'Unable to load property suggestions.'));
+    } finally {
+      setLoadingConnectedPropertyProposalsFor(current => current === connectionId ? null : current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectedHomeownerSubjectId || selectedHomeownerSubjectId.startsWith('local:') || selectedHomeownerSubjectId.startsWith('request:')) return;
+    const selectedConnection = connections.find(connection => connection.connection_id === selectedHomeownerSubjectId);
+    if (!selectedConnection?.connection_id) return;
+    void loadConnectedPropertyProposals(selectedConnection.connection_id);
+  }, [connections, selectedHomeownerSubjectId, loadConnectedPropertyProposals]);
+
+  const updateConnectedPropertyProposalDraft = (connectionId: string, updates: Partial<ConnectedPropertyProposalDraft>) => {
+    setConnectedPropertyProposalDrafts(prev => ({
+      ...prev,
+      [connectionId]: { ...(prev[connectionId] ?? EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT), ...updates },
+    }));
+  };
+
+  const openConnectedPropertyProposalForm = (connectionId: string) => {
+    setSuggestingPropertyConnectionId(connectionId);
+    setConnectedPropertyProposalDrafts(prev => ({
+      ...prev,
+      [connectionId]: prev[connectionId] ?? EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT,
+    }));
+    setHomeownerDetailTab('home');
+  };
+
+  const closeConnectedPropertyProposalForm = (connectionId: string) => {
+    setSuggestingPropertyConnectionId(current => current === connectionId ? null : current);
+    setConnectedPropertyProposalDrafts(prev => ({ ...prev, [connectionId]: EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT }));
+  };
+
+  const createConnectedPropertyProposal = async (connection: ContractorConnectedHomeowner) => {
+    if (!supabase) return;
+    const connectionId = connection.connection_id;
+    const draft = connectedPropertyProposalDrafts[connectionId] ?? EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT;
+    const nextDraft: ConnectedPropertyProposalDraft = {
+      nickname: draft.nickname.trim(),
+      address_line1: draft.address_line1.trim(),
+      address_line2: draft.address_line2.trim(),
+      city: draft.city.trim(),
+      state: draft.state.trim(),
+      zip_code: draft.zip_code.trim(),
+      homeowner_visible_note: cleanHumanWrittenText(draft.homeowner_visible_note.trim()),
+    };
+    if (!nextDraft.nickname && !nextDraft.address_line1) {
+      setError('Enter a property label or street address before suggesting this property.');
+      return;
+    }
+    setCreatingConnectedPropertyProposalFor(connectionId);
+    setNotice('');
+    setError('');
+    try {
+      const { error: createError } = await supabase.rpc('servsync_create_home_property_proposal', {
+        p_connection_id: connectionId,
+        p_nickname: nextDraft.nickname,
+        p_address_line1: nextDraft.address_line1,
+        p_address_line2: nextDraft.address_line2,
+        p_city: nextDraft.city,
+        p_state: nextDraft.state,
+        p_zip_code: nextDraft.zip_code,
+        p_homeowner_visible_note: nextDraft.homeowner_visible_note,
+      });
+      if (createError) throw createError;
+      closeConnectedPropertyProposalForm(connectionId);
+      await loadConnectedPropertyProposals(connectionId);
+      setNotice('Property suggestion sent for homeowner review.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to suggest this property.'));
+    } finally {
+      setCreatingConnectedPropertyProposalFor(null);
+    }
+  };
+
+  const revokeConnectedPropertyProposal = async (proposal: ConnectedPropertyProposal) => {
+    if (!supabase) return;
+    const confirmed = window.confirm('Revoke this property suggestion? The homeowner will no longer be able to accept it.');
+    if (!confirmed) return;
+    setRevokingConnectedPropertyProposalId(proposal.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: revokeError } = await supabase.rpc('servsync_revoke_home_property_proposal', {
+        p_proposal_id: proposal.id,
+      });
+      if (revokeError) throw revokeError;
+      await loadConnectedPropertyProposals(proposal.connection_id);
+      setNotice('Property suggestion revoked.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to revoke this property suggestion.'));
+    } finally {
+      setRevokingConnectedPropertyProposalId(null);
+    }
+  };
+
   const createLocalContact = async (options?: { autoStartFieldWork?: boolean }) => {
     if (!supabase) return;
     if (!localContactDraft.display_name.trim()) {
@@ -26436,6 +26628,192 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       );
                     };
 
+                    const renderConnectedPropertySuggestions = () => {
+                      if (!conn) return null;
+                      const connectionId = conn.connection_id;
+                      const proposals = connectedPropertyProposalsByConnectionId[connectionId] ?? [];
+                      const draft = connectedPropertyProposalDrafts[connectionId] ?? EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT;
+                      const isSuggesting = suggestingPropertyConnectionId === connectionId;
+                      const isCreating = creatingConnectedPropertyProposalFor === connectionId;
+                      const isLoadingSuggestions = loadingConnectedPropertyProposalsFor === connectionId;
+                      return (
+                        <div className="space-y-3" data-testid="connected-property-suggestions">
+                          <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-blue-950">Property suggestions</p>
+                                <p className="mt-1 text-xs leading-5 text-blue-800">
+                                  Suggest a property for this connected homeowner to review. Suggestions do not create homeowner properties, share access, or become available for jobs, estimates, invoices, reports, or Home History until the homeowner accepts and shares the property.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openConnectedPropertyProposalForm(connectionId)}
+                                className={buttonClass('primary')}
+                              >
+                                <Plus size={14} />
+                                Suggest property
+                              </button>
+                            </div>
+                          </div>
+
+                          {isSuggesting && (
+                            <div className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm" data-testid="connected-property-proposal-form">
+                              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Homeowner review required</p>
+                                  <h4 className="mt-1 text-base font-bold text-slate-950">Add property for homeowner review</h4>
+                                  <p className="mt-1 text-sm text-slate-500">The homeowner decides whether to add or share this property. This form is homeowner-visible.</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => closeConnectedPropertyProposalForm(connectionId)}
+                                  disabled={isCreating}
+                                  className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <Field label="Property label">
+                                  <input
+                                    className={inputClass()}
+                                    value={draft.nickname}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { nickname: event.target.value })}
+                                    placeholder="Guest house"
+                                  />
+                                </Field>
+                                <Field label="Street address">
+                                  <input
+                                    className={inputClass()}
+                                    value={draft.address_line1}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { address_line1: event.target.value })}
+                                    placeholder="Street address"
+                                  />
+                                </Field>
+                                <Field label="City">
+                                  <input
+                                    className={inputClass()}
+                                    value={draft.city}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { city: event.target.value })}
+                                    placeholder="City"
+                                  />
+                                </Field>
+                              </div>
+                              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                                <Field label="State">
+                                  <AutocompleteInput
+                                    id={`connected-property-proposal-state-${connectionId}`}
+                                    value={draft.state}
+                                    onChange={state => updateConnectedPropertyProposalDraft(connectionId, { state })}
+                                    options={US_STATE_OPTIONS}
+                                    placeholder="Start typing a state..."
+                                  />
+                                </Field>
+                                <Field label="ZIP">
+                                  <input
+                                    className={inputClass()}
+                                    autoComplete="postal-code"
+                                    spellCheck={false}
+                                    value={draft.zip_code}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { zip_code: event.target.value })}
+                                  />
+                                </Field>
+                                <Field label="Address line 2">
+                                  <input
+                                    className={inputClass()}
+                                    value={draft.address_line2}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { address_line2: event.target.value })}
+                                    placeholder="Unit, suite, etc."
+                                  />
+                                </Field>
+                              </div>
+                              <div className="mt-3">
+                                <Field label="Homeowner-visible note">
+                                  <textarea
+                                    className={`${inputClass()} min-h-[80px] resize-y`}
+                                    {...writingAssistProps}
+                                    value={draft.homeowner_visible_note}
+                                    onChange={event => updateConnectedPropertyProposalDraft(connectionId, { homeowner_visible_note: event.target.value })}
+                                    placeholder="Why you're suggesting this property."
+                                  />
+                                </Field>
+                              </div>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void createConnectedPropertyProposal(conn)}
+                                  disabled={isCreating || (!draft.nickname.trim() && !draft.address_line1.trim())}
+                                  className={buttonClass('primary')}
+                                >
+                                  {isCreating ? 'Sending...' : 'Send for homeowner review'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => closeConnectedPropertyProposalForm(connectionId)}
+                                  disabled={isCreating}
+                                  className={buttonClass('secondary')}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {isLoadingSuggestions && proposals.length === 0 ? (
+                            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">Loading property suggestions...</p>
+                          ) : proposals.length === 0 ? (
+                            <EmptyState text="No property suggestions for this homeowner yet." />
+                          ) : (
+                            <div className="grid gap-3">
+                              {proposals.map(proposal => {
+                                const label = connectedPropertyProposalLabel(proposal);
+                                const address = compactAddressLabel(proposal);
+                                const note = proposal.homeowner_visible_note?.trim() || '';
+                                const canRevoke = proposal.status === 'pending';
+                                return (
+                                  <div key={proposal.id} data-testid="connected-property-proposal-card" className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="break-words text-sm font-bold text-slate-950">{label}</p>
+                                        <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not included'}</p>
+                                        <p className="mt-1 text-xs text-slate-500">Submitted {formatDateTime(proposal.created_at)}</p>
+                                      </div>
+                                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${connectedPropertyProposalStatusClass(proposal.status)}`}>
+                                        {connectedPropertyProposalStatusLabel(proposal.status)}
+                                      </span>
+                                    </div>
+                                    {note && (
+                                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                                        <p className="text-xs font-semibold text-blue-700">Homeowner-visible note</p>
+                                        <p className="mt-1 whitespace-pre-wrap text-sm text-blue-900">{note}</p>
+                                      </div>
+                                    )}
+                                    {proposal.status === 'accepted' && (
+                                      <p className="mt-3 text-xs leading-5 text-slate-500">Accepted suggestions appear in work selectors only if the homeowner explicitly shares the accepted property with your business.</p>
+                                    )}
+                                    {canRevoke && (
+                                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-xs text-slate-500">Pending suggestions are not available for jobs, estimates, invoices, reports, or Home History.</p>
+                                        <button
+                                          type="button"
+                                          onClick={() => void revokeConnectedPropertyProposal(proposal)}
+                                          disabled={revokingConnectedPropertyProposalId === proposal.id}
+                                          className={buttonClass('secondary')}
+                                        >
+                                          {revokingConnectedPropertyProposalId === proposal.id ? 'Revoking...' : 'Revoke suggestion'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
                     return (
                       <>
                         <div className="bg-white border-b border-slate-200 px-6 py-4">
@@ -26528,6 +26906,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 key={t.id}
                                 type="button"
                                 onClick={() => setHomeownerDetailTab(t.id)}
+                                data-testid={`contractor-customer-tab-${t.id}`}
                                 className={`rounded-xl border p-3 text-left transition ${
                                   activeTabId === t.id
                                     ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
@@ -26920,6 +27299,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 )}
                                 {localCustomer && renderLocalCustomerProperties()}
                               </div>
+                              {conn && (
+                                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                  <div className="mb-4 flex items-center gap-2">
+                                    <Home size={18} className="text-blue-700" />
+                                    <h3 className="font-bold text-slate-950">Property suggestions</h3>
+                                  </div>
+                                  {renderConnectedPropertySuggestions()}
+                                </div>
+                              )}
                               {conn && perm && (
                                 <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 mb-3">Shared access</p>
@@ -26948,6 +27336,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 )}
                                 {localCustomer && renderLocalCustomerProperties()}
                               </div>
+                              {conn && (
+                                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                  <div className="mb-4 flex items-center gap-2">
+                                    <Home size={18} className="text-blue-700" />
+                                    <h3 className="font-bold text-slate-950">Property suggestions</h3>
+                                  </div>
+                                  {renderConnectedPropertySuggestions()}
+                                </div>
+                              )}
                             </div>
                           )}
 

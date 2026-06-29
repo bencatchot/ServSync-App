@@ -3,6 +3,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
+import { captureMajorConsoleErrors } from './helpers/console';
 import { credentialsFor, requiredEnv } from './helpers/env';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
 
@@ -62,6 +64,14 @@ function uuidArray(ids: string[]) {
 
 function boolSql(value: boolean) {
   return value ? 'true' : 'false';
+}
+
+function timestampForRecord() {
+  return new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function cleanupSandboxRecords(
@@ -329,6 +339,96 @@ test.describe('connected-homeowner property proposal RPC foundation', () => {
       p_homeowner_visible_note: '',
     });
     expect(deniedCreate.error, 'unrelated contractor should not create proposal on another contractor connection').toBeTruthy();
+  });
+
+  test('contractor creates and revokes a pending property suggestion from the customer workspace', async ({ page }, testInfo) => {
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+    const timestamp = timestampForRecord();
+    const proposedLabel = `E2E UI Proposed Property ${timestamp}`;
+    const homeownerVisibleNote = `Sandbox-only homeowner-visible proposal note ${timestamp}.`;
+
+    await loginAs(page, 'contractor');
+    await openSidebarTab(page, /Homeowners/i);
+    await expectActiveTabHeading(page, /^Homeowners$/i);
+
+    await expect(main.getByPlaceholder(/Search homeowner, city, address/i)).toBeVisible();
+    const connectedHomeownerRow = main.getByRole('button').filter({ hasText: /Connected/i }).first();
+    await expect(connectedHomeownerRow).toBeVisible({ timeout: 30_000 });
+    await connectedHomeownerRow.click();
+
+    const suggestions = main.getByTestId('connected-property-suggestions');
+    await expect(suggestions).toBeVisible({ timeout: 30_000 });
+    await expect(suggestions.getByText(/homeowner approval|homeowner review/i)).toBeVisible();
+    await suggestions.getByRole('button', { name: /^Suggest property$/i }).click();
+
+    const form = main.getByTestId('connected-property-proposal-form');
+    await expect(form).toBeVisible();
+    await expect(form.getByText(/The homeowner decides whether to add or share this property/i)).toBeVisible();
+    await form.getByLabel(/^Property label$/i).fill(proposedLabel);
+    await form.getByLabel(/^Street address$/i).fill('777 Proposal UI Street');
+    await form.getByLabel(/^City$/i).fill('Testville');
+    await form.getByPlaceholder(/Start typing a state/i).fill('AL');
+    await form.getByLabel(/^ZIP$/i).fill('36532');
+    await form.getByLabel(/^Homeowner-visible note$/i).fill(homeownerVisibleNote);
+
+    const createResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_create_home_property_proposal'),
+      { timeout: 10_000 },
+    );
+    await form.getByRole('button', { name: /^Send for homeowner review$/i }).click();
+    const createResponse = await createResponsePromise;
+    expect(createResponse.ok()).toBeTruthy();
+    const createBody = await createResponse.json().catch(() => null) as { id?: string } | null;
+    if (createBody?.id) createdProposalIds.push(createBody.id);
+
+    const proposalCard = main.getByTestId('connected-property-proposal-card').filter({ hasText: proposedLabel }).first();
+    await expect(proposalCard).toBeVisible({ timeout: 30_000 });
+    await expect(proposalCard.getByText(/Waiting for homeowner review/i)).toBeVisible();
+    await expect(proposalCard.getByText(homeownerVisibleNote)).toBeVisible();
+    await expect(proposalCard.getByText(/not available for jobs, estimates, invoices, reports, or Home History/i)).toBeVisible();
+    await expect(main.getByRole('button', { name: /Invite to ServSync|Create New ServSync Invite/i })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /Accept suggestion|Reject suggestion/i })).toHaveCount(0);
+
+    await main.getByTestId('contractor-customer-tab-fieldwork').click();
+    await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
+    await main.getByRole('button', { name: /^Create job\b/i }).click();
+    await expectActiveTabHeading(page, /^Jobs$/i);
+    await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
+    await expect(main.getByText(new RegExp(escapeRegExp(proposedLabel), 'i'))).toHaveCount(0);
+
+    await openSidebarTab(page, /Homeowners/i);
+    await expectActiveTabHeading(page, /^Homeowners$/i);
+    const reopenedConnectedHomeownerRow = main.getByRole('button').filter({ hasText: /Connected/i }).first();
+    await expect(reopenedConnectedHomeownerRow).toBeVisible();
+    await reopenedConnectedHomeownerRow.click();
+    const reopenedProposalCard = main.getByTestId('connected-property-proposal-card').filter({ hasText: proposedLabel }).first();
+    await expect(reopenedProposalCard).toBeVisible({ timeout: 30_000 });
+
+    page.once('dialog', dialog => void dialog.accept());
+    const revokeResponsePromise = page.waitForResponse(
+      response => response.url().includes('/rpc/servsync_revoke_home_property_proposal'),
+      { timeout: 10_000 },
+    );
+    await reopenedProposalCard.getByRole('button', { name: /^Revoke suggestion$/i }).click();
+    const revokeResponse = await revokeResponsePromise;
+    expect(revokeResponse.ok()).toBeTruthy();
+
+    await expect(reopenedProposalCard.getByText(/Revoked by contractor/i)).toBeVisible({ timeout: 30_000 });
+    await expect(reopenedProposalCard.getByRole('button', { name: /^Revoke suggestion$/i })).toHaveCount(0);
+
+    if (!createBody?.id) {
+      const proposalLookup = await contractorA.client
+        .from('contractor_home_property_proposals')
+        .select('id')
+        .eq('connection_id', connectionId)
+        .eq('nickname', proposedLabel)
+        .maybeSingle();
+      expect(proposalLookup.error, 'UI proposal lookup for cleanup should not error').toBeNull();
+      if (proposalLookup.data?.id) createdProposalIds.push(proposalLookup.data.id as string);
+    }
+
+    await consoleErrors.assertClean(testInfo);
   });
 
   test('homeowner accepts a proposal into a new home and explicitly shares it', async () => {

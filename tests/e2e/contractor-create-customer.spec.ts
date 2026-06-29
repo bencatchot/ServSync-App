@@ -171,6 +171,7 @@ test.describe('contractor mutating customer creation', () => {
     await main.getByRole('button', { name: /^Save property$/i }).click();
     const createHomeResponse = await createHomeResponsePromise;
     expect(createHomeResponse.ok()).toBeTruthy();
+    await expect(main.getByText(/Property added to this local customer/i)).toBeVisible({ timeout: 10_000 });
 
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(firstProperty), 'i') })).toBeVisible();
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(secondProperty), 'i') })).toBeVisible();
@@ -190,7 +191,11 @@ test.describe('contractor mutating customer creation', () => {
         response => response.url().includes('/rpc/servsync_update_local_home'),
         { timeout: 10_000 },
       ),
-      editDialog.getByRole('button', { name: /^Save changes$/i }).click(),
+      (async () => {
+        const saveChangesButton = editDialog.getByRole('button', { name: /^Save changes$/i });
+        await expect(saveChangesButton).toBeEnabled();
+        await saveChangesButton.click();
+      })(),
     ]);
     expect(updateHomeResponse.ok()).toBeTruthy();
     await expect(editDialog).toBeHidden();
