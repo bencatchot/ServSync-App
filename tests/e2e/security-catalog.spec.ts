@@ -38,6 +38,23 @@ type StoragePolicyRow = {
   exists: boolean;
 };
 
+type TablePrivilegeRow = {
+  table_name: string;
+  exists: boolean;
+  public_select: boolean | null;
+  public_insert: boolean | null;
+  public_update: boolean | null;
+  public_delete: boolean | null;
+  anon_select: boolean | null;
+  anon_insert: boolean | null;
+  anon_update: boolean | null;
+  anon_delete: boolean | null;
+  authenticated_select: boolean | null;
+  authenticated_insert: boolean | null;
+  authenticated_update: boolean | null;
+  authenticated_delete: boolean | null;
+};
+
 const CORE_PRIVATE_TABLES = [
   'profiles',
   'homeowner_profiles',
@@ -72,6 +89,7 @@ const CORE_PRIVATE_TABLES = [
   'service_request_appointments',
   'connection_shared_properties',
   'connection_request_contexts',
+  'contractor_home_property_proposals',
   'contractor_local_contacts',
   'contractor_local_homes',
   'contractor_calendar_events',
@@ -92,6 +110,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_local_home',
+  'servsync_create_home_property_proposal',
   'servsync_create_job_from_estimate',
   'servsync_create_job_work_item',
   'servsync_create_partial_invoice_from_job',
@@ -102,6 +121,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_register_manual_home_document_upload',
   'servsync_remove_job_work_item',
   'servsync_homeowner_respond_to_estimate',
+  'servsync_homeowner_accept_home_property_proposal',
+  'servsync_homeowner_reject_home_property_proposal',
   'servsync_homeowner_view_invoice',
   'servsync_mark_invoice_paid',
   'servsync_mark_workflow_thread_read',
@@ -110,6 +131,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_send_workflow_message',
   'servsync_submit_contextual_connection_request',
   'servsync_sync_simple_job_work_items',
+  'servsync_revoke_home_property_proposal',
   'servsync_update_local_home',
   'servsync_update_connection_shared_properties',
   'servsync_update_job_work_item',
@@ -248,6 +270,51 @@ order by e.table_name;
       expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
       expect(row.authenticated_execute, `${row.proname} should grant EXECUTE to authenticated`).toBe(true);
     }
+  });
+
+  test('property proposal table stays read-only for browser roles', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+with expected(table_name) as (
+  values ('contractor_home_property_proposals')
+)
+select
+  e.table_name,
+  c.oid is not null as exists,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'SELECT') end as public_select,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'INSERT') end as public_insert,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'UPDATE') end as public_update,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'DELETE') end as public_delete,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'SELECT') end as anon_select,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'INSERT') end as anon_insert,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'UPDATE') end as anon_update,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'DELETE') end as anon_delete,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'SELECT') end as authenticated_select,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'INSERT') end as authenticated_insert,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'UPDATE') end as authenticated_update,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'DELETE') end as authenticated_delete
+from expected e
+left join pg_class c
+  on c.relname = e.table_name
+ and c.relnamespace = 'public'::regnamespace
+ and c.relkind in ('r', 'p')
+order by e.table_name;
+    `);
+
+    expect(rows, 'Property proposal privilege rows should match expected table count').toHaveLength(1);
+    const row = rows[0];
+    expect(row.exists, `${row.table_name} should exist`).toBe(true);
+    expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+    expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+    expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+    expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+    expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+    expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+    expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+    expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+    expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated`).toBe(true);
+    expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
+    expect(row.authenticated_update, `${row.table_name} should not grant UPDATE to authenticated`).toBe(false);
+    expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {

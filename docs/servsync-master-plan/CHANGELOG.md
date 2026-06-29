@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/connected-property-proposals-sql-v1`
+- Files changed:
+  - `servsync-connected-property-proposals.sql`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `tests/e2e/connected-property-proposals.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the SQL/RLS/RPC foundation for connected-homeowner property proposals. Contractors with write access to an active homeowner connection can create pending property suggestions; homeowners can accept suggestions into a new or existing homeowner-owned `homes` row, optionally share the accepted property through `connection_shared_properties`, reject pending suggestions, and contractors can revoke their own pending suggestions.
+- Reason for change: Contractors need a safe way to help existing connected homeowners add another property without silently creating or overwriting homeowner-owned records, broadening local claim invites, or allowing pending suggestions to become job/estimate/invoice context before homeowner consent.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/connected-property-proposals.spec.ts --project=chromium`
+  - Sandbox SQL apply and security-catalog verification for `contractor_home_property_proposals` and the proposal RPCs on sandbox ref `zpzdkoaubyjtsomccxya`.
+- Known risks or follow-ups:
+  - This is SQL/RLS/RPC/test foundation only; contractor UI, homeowner review UI, notification delivery, and any email/SMS/push behavior remain deferred.
+  - `servsync-connected-property-proposals.sql` is for sandbox validation and later production rollout planning; production SQL must not be applied without separate explicit approval.
+  - Existing local customer claim invite flows remain single-property and are intentionally not reused for connected-homeowner property proposals.
+
 - Branch: `codex/local-property-edit-v1`
 - Files changed:
   - `src/App.tsx`
