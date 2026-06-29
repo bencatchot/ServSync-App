@@ -59,6 +59,8 @@ A restore drill should prove that the app can recover records and files into a f
 
 Review `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md` before any restore drill execution. The preflight plan defines required approvals, isolated target-environment rules, data sensitivity rules, verification preparation, cleanup expectations, and evidence capture guidance. It does not complete a restore drill, verify backup/PITR readiness, verify storage restore readiness, or approve backup, restore, SQL, Supabase CLI, production data, storage access, settings, user, or deploy work.
 
+Use `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md` as the final operator go/no-go checklist before any separately approved restore drill. The checklist is not approval to run backup, restore, SQL, Supabase CLI, storage, production data, settings, user, or deploy work.
+
 Drill checklist:
 
 - Confirm the source backup/export and target project.

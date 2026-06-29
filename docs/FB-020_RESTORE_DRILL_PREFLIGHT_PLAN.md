@@ -6,6 +6,8 @@ This document prepares ServSync for a future approved non-production restore dri
 
 Actual restore drill execution requires separate explicit approval.
 
+Use `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md` as the final go/no-go aid before any future approved drill. The operator checklist does not execute the drill and does not replace the separate approval gate.
+
 ## 1. Purpose
 
 Define the approvals, environment controls, data rules, verification plan, artifact handling, cleanup, and evidence capture needed before any non-production restore drill begins.
