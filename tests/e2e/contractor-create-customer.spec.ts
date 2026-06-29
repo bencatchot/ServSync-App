@@ -174,13 +174,37 @@ test.describe('contractor mutating customer creation', () => {
 
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(firstProperty), 'i') })).toBeVisible();
     await expect(main.getByRole('button', { name: new RegExp(escapeRegExp(secondProperty), 'i') })).toBeVisible();
-    await main.getByRole('button', { name: new RegExp(escapeRegExp(secondProperty), 'i') }).click();
-    await expect(main.getByRole('button', { name: new RegExp(`${escapeRegExp(secondProperty)}[\\s\\S]*Selected`, 'i') })).toBeVisible();
+    const editedSecondProperty = `Updated Guest E2E Property ${timestamp}`;
+    const secondPropertyCard = main.getByTestId('local-property-card').filter({ hasText: secondProperty }).first();
+    await secondPropertyCard.getByRole('button', { name: /^Edit property$/i }).click();
+    const editDialog = page.getByRole('dialog', { name: /^Edit property$/i });
+    await expect(editDialog).toBeVisible();
+    await editDialog.getByLabel(/^Property label$/i).fill(editedSecondProperty);
+    await editDialog.getByLabel(/^Street address$/i).fill('222 Updated Guest Avenue');
+    await editDialog.getByLabel(/^City$/i).fill('Updatedville');
+    await editDialog.getByPlaceholder(/Start typing a state/i).fill('AL');
+    await editDialog.getByLabel(/^ZIP$/i).fill('36535');
+    await editDialog.getByLabel(/^Property notes$/i).fill('Updated contractor-private access notes.');
+    const [updateHomeResponse] = await Promise.all([
+      page.waitForResponse(
+        response => response.url().includes('/rpc/servsync_update_local_home'),
+        { timeout: 10_000 },
+      ),
+      editDialog.getByRole('button', { name: /^Save changes$/i }).click(),
+    ]);
+    expect(updateHomeResponse.ok()).toBeTruthy();
+    await expect(editDialog).toBeHidden();
+    const editedSecondPropertyCard = main.getByTestId('local-property-card').filter({ hasText: editedSecondProperty }).first();
+    await expect(editedSecondPropertyCard).toBeVisible();
+    await expect(editedSecondPropertyCard.getByText(/222 Updated Guest Avenue/i)).toBeVisible();
+
+    await main.getByRole('button', { name: new RegExp(escapeRegExp(editedSecondProperty), 'i') }).click();
+    await expect(main.getByRole('button', { name: new RegExp(`${escapeRegExp(editedSecondProperty)}[\\s\\S]*Selected`, 'i') })).toBeVisible();
     await main.getByRole('button', { name: /\bJobs\b.*(?:Create work for this customer|Items in progress)/i }).click();
     await expect(main.getByRole('heading', { name: /^Jobs dashboard$/i })).toBeVisible();
     await main.getByRole('button', { name: /^Create job\b/i }).click();
     await expect(main.getByRole('heading', { name: /^Create Job$/i })).toBeVisible();
-    await expect(main.getByText(new RegExp(`Selected property: ${escapeRegExp(secondProperty)}`, 'i'))).toBeVisible();
+    await expect(main.getByText(new RegExp(`Selected property: ${escapeRegExp(editedSecondProperty)}`, 'i'))).toBeVisible();
 
     const contractorClient = await signInAs('contractor');
     const otherContractorClient = await signInAs('contractorB');
@@ -199,6 +223,19 @@ test.describe('contractor mutating customer creation', () => {
         expect(lookupError).toBeNull();
         expect(createdContact?.id).toBeTruthy();
 
+        const { data: editedHome, error: editedHomeLookupError } = await contractorClient
+          .from('contractor_local_homes')
+          .select('id, nickname, address_line1, city, state, zip_code, notes')
+          .eq('local_contact_id', createdContact!.id)
+          .eq('nickname', editedSecondProperty)
+          .maybeSingle();
+        expect(editedHomeLookupError).toBeNull();
+        expect(editedHome?.id, 'Edited local property should remain queryable with one stable id').toBeTruthy();
+        expect(editedHome?.address_line1).toBe('222 Updated Guest Avenue');
+        expect(editedHome?.city).toBe('Updatedville');
+        expect(editedHome?.zip_code).toBe('36535');
+        expect(editedHome?.notes).toBe('Updated contractor-private access notes.');
+
         const { error: deniedError } = await otherContractorClient.rpc('servsync_create_local_home', {
           p_local_contact_id: createdContact!.id,
           p_nickname: `Denied property ${timestamp}`,
@@ -210,6 +247,36 @@ test.describe('contractor mutating customer creation', () => {
           p_notes: '',
         });
         expect(deniedError, 'Unrelated contractor must not add a property to another contractor local customer').toBeTruthy();
+
+        const { error: deniedUpdateError } = await otherContractorClient.rpc('servsync_update_local_home', {
+          p_local_home_id: editedHome!.id,
+          p_nickname: `Denied update ${timestamp}`,
+          p_address_line1: '999 Denied Update Street',
+          p_address_line2: '',
+          p_city: 'Blocked',
+          p_state: 'AL',
+          p_zip_code: '36534',
+          p_notes: '',
+        });
+        expect(deniedUpdateError, 'Unrelated contractor must not edit another contractor local property').toBeTruthy();
+
+        const { error: markClaimedError } = await contractorClient
+          .from('contractor_local_homes')
+          .update({ claimed_at: new Date().toISOString() })
+          .eq('id', editedHome!.id);
+        expect(markClaimedError).toBeNull();
+
+        const { error: claimedUpdateError } = await contractorClient.rpc('servsync_update_local_home', {
+          p_local_home_id: editedHome!.id,
+          p_nickname: `Claimed update ${timestamp}`,
+          p_address_line1: '333 Claimed Update Street',
+          p_address_line2: '',
+          p_city: 'Blocked',
+          p_state: 'AL',
+          p_zip_code: '36536',
+          p_notes: '',
+        });
+        expect(claimedUpdateError, 'Claimed local property details must not be silently overwritten').toBeTruthy();
       } finally {
         await Promise.all([
           contractorClient.auth.signOut().catch(() => undefined),

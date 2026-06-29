@@ -4920,6 +4920,18 @@ const EMPTY_LOCAL_HOME_DRAFT: LocalHomeDraft = {
   notes: '',
 };
 
+function localHomeDraftFromHome(home: ContractorLocalHome): LocalHomeDraft {
+  return {
+    nickname: home.nickname ?? '',
+    address_line1: home.address_line1 ?? '',
+    address_line2: home.address_line2 ?? '',
+    city: home.city ?? '',
+    state: home.state ?? '',
+    zip_code: home.zip_code ?? '',
+    notes: home.notes ?? '',
+  };
+}
+
 function compactAddressLabel(home?: Pick<HomeProfile | ContractorLocalHome | ContractorConnectedHomeownerHome, 'address_line1' | 'address_line2' | 'city' | 'state' | 'zip_code'> | null) {
   if (!home) return '';
   const addressLine = [home.address_line1, home.address_line2].filter(Boolean).join(', ');
@@ -16459,6 +16471,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [addingLocalHomeContactId, setAddingLocalHomeContactId] = useState<string | null>(null);
   const [savingLocalHomeContactId, setSavingLocalHomeContactId] = useState<string | null>(null);
   const [localHomeDrafts, setLocalHomeDrafts] = useState<Record<string, LocalHomeDraft>>({});
+  const [editingLocalHome, setEditingLocalHome] = useState<{ contactId: string; homeId: string } | null>(null);
+  const [editingLocalHomeDraft, setEditingLocalHomeDraft] = useState<LocalHomeDraft>(EMPTY_LOCAL_HOME_DRAFT);
+  const [savingLocalHomeEditId, setSavingLocalHomeEditId] = useState<string | null>(null);
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
@@ -22819,6 +22834,68 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }));
   };
 
+  const openEditLocalHomeForm = (contact: ContractorLocalContact, home: ContractorLocalHome) => {
+    if (home.home_id || home.claimed_at) return;
+    setEditingLocalHome({ contactId: contact.id, homeId: home.id });
+    setEditingLocalHomeDraft(localHomeDraftFromHome(home));
+    setHomeownerDetailTab('home');
+  };
+
+  const closeEditLocalHomeForm = () => {
+    setEditingLocalHome(null);
+    setEditingLocalHomeDraft(EMPTY_LOCAL_HOME_DRAFT);
+  };
+
+  const saveLocalHomeEdit = async (contact: ContractorLocalContact, home: ContractorLocalHome) => {
+    if (!supabase) return;
+    if (home.home_id || home.claimed_at) {
+      setError('This property is linked to a homeowner profile. Property details are homeowner-controlled after claim.');
+      return;
+    }
+    if (!editingLocalHomeDraft.nickname.trim() && !editingLocalHomeDraft.address_line1.trim()) {
+      setError('Enter a property label or street address before saving this property.');
+      return;
+    }
+    setSavingLocalHomeEditId(home.id);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: updateError } = await supabase.rpc('servsync_update_local_home', {
+        p_local_home_id: home.id,
+        p_nickname: editingLocalHomeDraft.nickname,
+        p_address_line1: editingLocalHomeDraft.address_line1,
+        p_address_line2: editingLocalHomeDraft.address_line2,
+        p_city: editingLocalHomeDraft.city,
+        p_state: editingLocalHomeDraft.state,
+        p_zip_code: editingLocalHomeDraft.zip_code,
+        p_notes: cleanHumanWrittenText(editingLocalHomeDraft.notes),
+      });
+      if (updateError) throw updateError;
+
+      const updatedHome = data as ContractorLocalHome | null;
+      if (updatedHome?.id) {
+        setLocalContacts(prev => prev.map(item => item.id === contact.id
+          ? {
+              ...item,
+              homes: sortedLocalHomes((item.homes ?? []).map(candidate => (
+                candidate.id === updatedHome.id ? updatedHome : candidate
+              ))),
+            }
+          : item
+        ));
+        setSelectedHomeownerWorkspaceLocalHomeId(updatedHome.id);
+        setHomeownerWorkspacePropertyScope('selected');
+        closeEditLocalHomeForm();
+        setNotice('Property details updated.');
+      }
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update property.'));
+    } finally {
+      setSavingLocalHomeEditId(null);
+    }
+  };
+
   const createLocalHome = async (contact: ContractorLocalContact) => {
     if (!supabase) return;
     const draft = localHomeDrafts[contact.id] ?? EMPTY_LOCAL_HOME_DRAFT;
@@ -26155,39 +26232,60 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const address = compactAddressLabel(home);
                                 const claimed = Boolean(home.home_id || home.claimed_at);
                                 const selected = selectedWorkspaceLocalHomeId === home.id;
+                                const isEditingThisHome = editingLocalHome?.contactId === localCustomer.id && editingLocalHome.homeId === home.id;
                                 return (
-                                  <button
+                                  <div
                                     key={home.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedHomeownerWorkspaceLocalHomeId(home.id);
-                                      setHomeownerWorkspacePropertyScope('selected');
-                                    }}
-                                    className={`rounded-xl border p-4 text-left transition ${selected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'}`}
+                                    data-testid="local-property-card"
+                                    className={`rounded-xl border p-4 transition ${selected ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-white'}`}
                                   >
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <p className="break-words text-sm font-bold text-slate-950">{home.nickname || `Property ${index + 1}`}</p>
-                                        <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not saved'}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedHomeownerWorkspaceLocalHomeId(home.id);
+                                        setHomeownerWorkspacePropertyScope('selected');
+                                      }}
+                                      className="block w-full rounded-lg text-left transition hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    >
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="break-words text-sm font-bold text-slate-950">{home.nickname || `Property ${index + 1}`}</p>
+                                          <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not saved'}</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {selected && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Selected</span>}
+                                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${claimed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            {claimed ? 'Linked to homeowner profile' : 'Local'}
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {selected && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Selected</span>}
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${claimed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                          {claimed ? 'Claimed' : 'Local'}
-                                        </span>
+                                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                        <div><p className="text-xs text-slate-400 font-medium mb-0.5">City</p><p className="text-sm text-slate-800 font-medium">{[home.city, home.state].filter(Boolean).join(', ') || '—'}</p></div>
+                                        <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{home.zip_code || '—'}</p></div>
                                       </div>
+                                      {home.notes && (
+                                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                          <p className="text-xs font-semibold text-slate-500 mb-1">Property notes</p>
+                                          <p className="whitespace-pre-wrap text-sm text-slate-700">{home.notes}</p>
+                                        </div>
+                                      )}
+                                    </button>
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                      {claimed ? (
+                                        <p className="text-xs font-semibold text-slate-500">Property details are homeowner-controlled after claim.</p>
+                                      ) : (
+                                        <p className="text-xs text-slate-500">Contractor-local property details.</p>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditLocalHomeForm(localCustomer, home)}
+                                        disabled={claimed || isEditingThisHome}
+                                        className={buttonClass(claimed ? 'secondary' : 'secondary')}
+                                      >
+                                        {isEditingThisHome ? 'Editing...' : 'Edit property'}
+                                      </button>
                                     </div>
-                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">City</p><p className="text-sm text-slate-800 font-medium">{[home.city, home.state].filter(Boolean).join(', ') || '—'}</p></div>
-                                      <div><p className="text-xs text-slate-400 font-medium mb-0.5">ZIP</p><p className="text-sm text-slate-800 font-medium">{home.zip_code || '—'}</p></div>
-                                    </div>
-                                    {home.notes && (
-                                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                        <p className="text-xs font-semibold text-slate-500 mb-1">Property notes</p>
-                                        <p className="whitespace-pre-wrap text-sm text-slate-700">{home.notes}</p>
-                                      </div>
-                                    )}
-                                  </button>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -26263,6 +26361,74 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {isSaving ? 'Saving...' : 'Save property'}
                                 </button>
                                 <button type="button" onClick={() => setAddingLocalHomeContactId(null)} disabled={isSaving} className={buttonClass('secondary')}>Cancel</button>
+                              </div>
+                            </div>
+                          )}
+                          {editingLocalHome && (
+                            <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="edit-local-property-title">
+                              <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-5 shadow-xl sm:max-w-3xl sm:rounded-2xl">
+                                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Local property</p>
+                                    <h3 id="edit-local-property-title" className="mt-1 text-lg font-bold text-slate-950">Edit property</h3>
+                                    <p className="mt-1 text-sm text-slate-500">Updates stay on this contractor-created local customer record.</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={closeEditLocalHomeForm}
+                                    className="text-slate-400 hover:text-slate-700"
+                                    aria-label="Close edit property"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                </div>
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  <Field label="Property label">
+                                    <input className={inputClass()} value={editingLocalHomeDraft.nickname} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, nickname: event.target.value }))} placeholder="Guest house" />
+                                  </Field>
+                                  <Field label="Street address">
+                                    <input className={inputClass()} value={editingLocalHomeDraft.address_line1} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, address_line1: event.target.value }))} placeholder="Street address" />
+                                  </Field>
+                                  <Field label="City">
+                                    <input className={inputClass()} value={editingLocalHomeDraft.city} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, city: event.target.value }))} placeholder="City" />
+                                  </Field>
+                                </div>
+                                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                                  <Field label="State">
+                                    <AutocompleteInput
+                                      id={`edit-local-home-state-${editingLocalHome.homeId}`}
+                                      value={editingLocalHomeDraft.state}
+                                      onChange={state => setEditingLocalHomeDraft(prev => ({ ...prev, state }))}
+                                      options={US_STATE_OPTIONS}
+                                      placeholder="Start typing a state..."
+                                    />
+                                  </Field>
+                                  <Field label="ZIP">
+                                    <input className={inputClass()} autoComplete="postal-code" spellCheck={false} value={editingLocalHomeDraft.zip_code} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, zip_code: event.target.value }))} />
+                                  </Field>
+                                  <Field label="Address line 2">
+                                    <input className={inputClass()} value={editingLocalHomeDraft.address_line2} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, address_line2: event.target.value }))} placeholder="Unit, suite, etc." />
+                                  </Field>
+                                </div>
+                                <div className="mt-3">
+                                  <Field label="Property notes">
+                                    <textarea className={`${inputClass()} min-h-[88px] resize-y`} {...writingAssistProps} value={editingLocalHomeDraft.notes} onChange={event => setEditingLocalHomeDraft(prev => ({ ...prev, notes: event.target.value }))} placeholder="Property-specific access notes, details, or reminders." />
+                                  </Field>
+                                </div>
+                                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                                  <button type="button" onClick={closeEditLocalHomeForm} disabled={Boolean(savingLocalHomeEditId)} className={buttonClass('secondary')}>Cancel</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const home = homes.find(candidate => candidate.id === editingLocalHome.homeId);
+                                      if (home) void saveLocalHomeEdit(localCustomer, home);
+                                    }}
+                                    disabled={Boolean(savingLocalHomeEditId) || (!editingLocalHomeDraft.nickname.trim() && !editingLocalHomeDraft.address_line1.trim())}
+                                    className={buttonClass('primary')}
+                                  >
+                                    {savingLocalHomeEditId ? 'Saving...' : 'Save changes'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )}
