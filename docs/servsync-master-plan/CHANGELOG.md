@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/fb-020-restore-drill-preflight-v1`
+- Files changed:
+  - `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-020 Slice 1H docs-only non-production restore drill preflight planning, including required approvals, isolated target-environment rules, source-data sensitivity rules, verification preparation, artifact handling, cleanup, and evidence capture expectations.
+- Reason for change: Prepare for a future separately approved restore drill without running backup, restore, SQL, Supabase CLI, storage, production, settings, code, script, test, user, or deploy work.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `git diff -- docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md docs/BETA_READINESS_CHECKLIST.md docs/GO_LIVE_AUDIT.md docs/servsync-master-plan/CHANGELOG.md docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Known risks or follow-ups:
+  - This is preflight/evidence-planning documentation only; no restore drill, backup/PITR verification, storage restore verification, SQL application, Supabase CLI usage, production data access, storage access, settings changes, deploy, code, scripts, or tests were performed.
+  - Actual restore drill execution and filled operational evidence remain future separately approved work.
+
 - Branch: `codex/fb-020-backup-artifact-gitignore-v1`
 - Files changed:
   - `.gitignore`
