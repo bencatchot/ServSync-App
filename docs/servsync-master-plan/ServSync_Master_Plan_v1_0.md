@@ -329,6 +329,7 @@ Current beta-readiness notes:
 - FB-020 now tracks security, records reliability, backup/restore, storage, dependency security, and scale readiness as a cross-cutting workstream before broader beta/public go-live. This does not mean those readiness items are complete; they require separate audited implementation and verification.
 - FB-020 Slice 1C expands the sandbox security catalog for newer workflow/storage surfaces and hardens two authenticated-only homeowner lifecycle RPC grants in sandbox and production.
 - FB-020 Slice 1F adds template-only capture formats for applied-SQL ledger entries, production SQL rollout evidence, non-production restore drill results, storage backup/readiness worksheets, and Edge Function/env/secret restore notes. This does not mean a restore drill has been run or that production backup/PITR/storage restore has been verified.
+- FB-020 Slice 1G adds local `.gitignore` guardrails for generated backup, restore, export, query-output, storage-export, and ops artifacts. This reduces accidental commit risk only; it does not mean a restore drill, PITR verification, or storage restore verification has been completed.
 
 # 16. Roadmap Priorities
 

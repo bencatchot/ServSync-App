@@ -29,6 +29,8 @@ Minimum expectations:
 
 Controlled beta may proceed with a lighter process only if the beta risk is accepted and the missing restore evidence is tracked as an FB-020 follow-up.
 
+Generated backup, restore, export, query-output, storage-export, and local ops artifacts must remain local/private and must never be committed. Slice 1G adds `.gitignore` guardrails for common local dump/export/output names, but `.gitignore` is not a substitute for operator review and does not approve backup, restore, Supabase CLI, storage, production data, or settings work.
+
 ## Storage-Object Backup Expectations
 
 Database backups do not automatically back up Supabase Storage objects. Storage buckets need their own backup/export expectation.
