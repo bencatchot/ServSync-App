@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-28
 
+- Branch: `codex/fb-020-security-catalog-expansion-v1`
+- Files changed:
+  - `tests/e2e/security-catalog.spec.ts`
+  - `servsync-fb020-rpc-grant-hardening.sql`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Expanded the FB-020 sandbox security catalog and added a narrow RPC grant-hardening patch for `servsync_homeowner_respond_to_estimate(uuid, text)` and `servsync_homeowner_view_invoice(uuid)`. The patch revokes browser-unsafe `PUBLIC`/`anon` execute grants while preserving authenticated homeowner access.
+- Reason for change: Improve beta-readiness security evidence by making the catalog catch newer workflow/storage surfaces and by hardening two authenticated-only homeowner lifecycle RPCs discovered by the expanded catalog.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - The SQL patch was applied to sandbox only; production SQL requires separate explicit approval after PR review/merge planning.
+  - Slice 1C remains catalog-only/read-only after the sandbox grant patch and does not change app UI, storage settings, Supabase settings, or production data.
+
 - Branch: `codex/fb-020-public-smoke-readiness-v1`
 - Files changed:
   - `package.json`

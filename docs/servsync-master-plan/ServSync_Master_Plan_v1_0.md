@@ -326,6 +326,7 @@ Current beta-readiness notes:
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
 - Local Vercel CLI account/project mismatch is a non-blocking tooling cleanup item.
 - FB-020 now tracks security, records reliability, backup/restore, storage, dependency security, and scale readiness as a cross-cutting workstream before broader beta/public go-live. This does not mean those readiness items are complete; they require separate audited implementation and verification.
+- FB-020 Slice 1C expands the sandbox security catalog for newer workflow/storage surfaces and hardens two authenticated-only homeowner lifecycle RPC grants in sandbox. Production grant hardening remains a separate approval gate after PR review/merge planning.
 
 # 16. Roadmap Priorities
 

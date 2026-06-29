@@ -17,6 +17,7 @@ type RlsRow = {
 
 type RpcRow = {
   proname: string;
+  function_count: number;
   exists: boolean;
   security_definer: boolean | null;
   search_path_public: boolean | null;
@@ -30,6 +31,11 @@ type BucketRow = {
   exists: boolean;
   is_public: boolean | null;
   expected_public: boolean;
+};
+
+type StoragePolicyRow = {
+  policy_name: string;
+  exists: boolean;
 };
 
 const CORE_PRIVATE_TABLES = [
@@ -58,11 +64,29 @@ const CORE_PRIVATE_TABLES = [
   'support_inquiry_messages',
   'notifications',
   'contractor_price_book_items',
+  'workflow_messages',
+  'workflow_activity_events',
+  'workflow_thread_reads',
+  'homeowner_contractor_invite_leads',
+  'service_request_media',
+  'service_request_appointments',
+  'connection_shared_properties',
+  'connection_request_contexts',
+  'contractor_local_contacts',
+  'contractor_local_homes',
+  'contractor_calendar_events',
+  'contractor_visit_events',
+  'contractor_team_invites',
+  'contractor_saved_estimate_charges',
+  'estimate_templates',
+  'home_document_upload_reservations',
+  'home_document_upload_events',
 ];
 
-const HIGH_RISK_RPCS = [
+const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'current_user_can_manage_contractor_billing',
   'current_user_can_manage_contractor_schedule',
+  'current_user_can_send_contractor_workflow_messages',
   'servsync_contractor_pending_connection_requests',
   'servsync_accept_service_request_appointment_window',
   'servsync_cancel_service_request_appointment',
@@ -76,8 +100,13 @@ const HIGH_RISK_RPCS = [
   'servsync_reschedule_service_request_appointment',
   'servsync_register_manual_home_document_upload',
   'servsync_remove_job_work_item',
+  'servsync_homeowner_respond_to_estimate',
+  'servsync_homeowner_view_invoice',
+  'servsync_mark_invoice_paid',
+  'servsync_mark_workflow_thread_read',
   'servsync_respond_to_connection_request',
   'servsync_send_invoice',
+  'servsync_send_workflow_message',
   'servsync_submit_contextual_connection_request',
   'servsync_sync_simple_job_work_items',
   'servsync_update_connection_shared_properties',
@@ -86,6 +115,8 @@ const HIGH_RISK_RPCS = [
   'servsync_void_invoice',
 ];
 
+const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = ['servsync_append_workflow_activity_event'];
+
 const STORAGE_BUCKETS = [
   { bucket_id: 'contractor-assets', expected_public: true },
   { bucket_id: 'discover-media', expected_public: true },
@@ -93,6 +124,22 @@ const STORAGE_BUCKETS = [
   { bucket_id: 'inspection-media', expected_public: false },
   { bucket_id: 'service-request-media', expected_public: false },
   { bucket_id: 'support-attachments', expected_public: false },
+];
+
+const STORAGE_OBJECT_POLICIES = [
+  'home_docs_upload',
+  'home_docs_read',
+  'home_docs_delete',
+  'homeowner_upload_media',
+  'contractor_upload_media',
+  'service_request_media_read_parties',
+  'insp_media_upload',
+  'inspection_media_read_parties',
+  'insp_media_delete',
+  'support_attachments_read_inquiry_participants',
+  'support_attachments_upload_inquiry_participants',
+  'contractor_assets_insert_public_logo_bucket',
+  'discover_media_upload_contractor',
 ];
 
 function requireLinkedSandbox() {
@@ -108,6 +155,34 @@ function requireLinkedSandbox() {
 
 function sqlValues(values: string[]) {
   return values.map(value => `('${value.replace(/'/g, "''")}')`).join(',');
+}
+
+function securityDefinerRpcCatalogQuery(values: string[]) {
+  return `
+with expected(proname) as (
+  values ${sqlValues(values)}
+)
+select
+  e.proname,
+  count(p.oid)::int as function_count,
+  count(p.oid) > 0 as exists,
+  coalesce(bool_and(p.prosecdef) filter (where p.oid is not null), false) as security_definer,
+  coalesce(bool_and('search_path=public' = any(p.proconfig)) filter (where p.oid is not null), false) as search_path_public,
+  coalesce(bool_or(exists (
+    select 1
+    from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+    where acl.grantee = 0
+      and acl.privilege_type = 'EXECUTE'
+  )) filter (where p.oid is not null), false) as public_execute,
+  coalesce(bool_or(has_function_privilege('anon', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as anon_execute,
+  coalesce(bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as authenticated_execute
+from expected e
+left join pg_proc p
+  on p.proname = e.proname
+ and p.pronamespace = 'public'::regnamespace
+group by e.proname
+order by e.proname;
+  `;
 }
 
 function runCatalogQuery<T>(sql: string): T[] {
@@ -154,39 +229,41 @@ order by e.table_name;
     }
   });
 
-  test('selected high-risk RPCs are hardened for sandbox browser access', () => {
-    const rows = runCatalogQuery<RpcRow>(`
-with expected(proname) as (
-  values ${sqlValues(HIGH_RISK_RPCS)}
-)
-select
-  e.proname,
-  p.oid is not null as exists,
-  p.prosecdef as security_definer,
-  coalesce('search_path=public' = any(p.proconfig), false) as search_path_public,
-  exists (
-    select 1
-    from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
-    where acl.grantee = 0
-      and acl.privilege_type = 'EXECUTE'
-  ) as public_execute,
-  case when p.oid is null then null else has_function_privilege('anon', p.oid, 'EXECUTE') end as anon_execute,
-  case when p.oid is null then null else has_function_privilege('authenticated', p.oid, 'EXECUTE') end as authenticated_execute
-from expected e
-left join pg_proc p
-  on p.proname = e.proname
- and p.pronamespace = 'public'::regnamespace
-order by e.proname;
-    `);
+  test('selected browser-callable RPCs are hardened for sandbox browser access', () => {
+    const rows = runCatalogQuery<RpcRow>(
+      securityDefinerRpcCatalogQuery(BROWSER_CALLABLE_SECURITY_DEFINER_RPCS),
+    );
 
-    expect(rows, 'RPC catalog rows should match expected function count').toHaveLength(HIGH_RISK_RPCS.length);
+    expect(rows, 'RPC catalog rows should match expected function count').toHaveLength(
+      BROWSER_CALLABLE_SECURITY_DEFINER_RPCS.length,
+    );
     for (const row of rows) {
       expect(row.exists, `${row.proname} should exist`).toBe(true);
+      expect(row.function_count, `${row.proname} should have at least one overload`).toBeGreaterThan(0);
       expect(row.security_definer, `${row.proname} should be SECURITY DEFINER`).toBe(true);
       expect(row.search_path_public, `${row.proname} should set search_path=public`).toBe(true);
       expect(row.public_execute, `${row.proname} should not grant EXECUTE to PUBLIC`).toBe(false);
       expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
       expect(row.authenticated_execute, `${row.proname} should grant EXECUTE to authenticated`).toBe(true);
+    }
+  });
+
+  test('selected internal-only RPCs remain unavailable to browser roles', () => {
+    const rows = runCatalogQuery<RpcRow>(
+      securityDefinerRpcCatalogQuery(INTERNAL_ONLY_SECURITY_DEFINER_RPCS),
+    );
+
+    expect(rows, 'Internal RPC catalog rows should match expected function count').toHaveLength(
+      INTERNAL_ONLY_SECURITY_DEFINER_RPCS.length,
+    );
+    for (const row of rows) {
+      expect(row.exists, `${row.proname} should exist`).toBe(true);
+      expect(row.function_count, `${row.proname} should have at least one overload`).toBeGreaterThan(0);
+      expect(row.security_definer, `${row.proname} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.proname} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.proname} should not grant EXECUTE to PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
+      expect(row.authenticated_execute, `${row.proname} should not grant EXECUTE to authenticated`).toBe(false);
     }
   });
 
@@ -214,6 +291,30 @@ order by e.bucket_id;
     for (const row of rows) {
       expect(row.exists, `${row.bucket_id} should exist`).toBe(true);
       expect(row.is_public, `${row.bucket_id} public/private flag should match expected state`).toBe(row.expected_public);
+    }
+  });
+
+  test('selected storage object policies exist in the linked sandbox', () => {
+    const rows = runCatalogQuery<StoragePolicyRow>(`
+with expected(policy_name) as (
+  values ${sqlValues(STORAGE_OBJECT_POLICIES)}
+)
+select
+  e.policy_name,
+  p.policyname is not null as exists
+from expected e
+left join pg_policies p
+  on p.schemaname = 'storage'
+ and p.tablename = 'objects'
+ and p.policyname = e.policy_name
+order by e.policy_name;
+    `);
+
+    expect(rows, 'Storage policy catalog rows should match expected policy count').toHaveLength(
+      STORAGE_OBJECT_POLICIES.length,
+    );
+    for (const row of rows) {
+      expect(row.exists, `${row.policy_name} storage.objects policy should exist`).toBe(true);
     }
   });
 });
