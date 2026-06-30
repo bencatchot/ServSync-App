@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-shared-home-shell-v1`
+- Files changed:
+  - `servsync-shared-home-shell.sql`
+  - `src/App.tsx`
+  - `tests/e2e/shared-home-shell.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1E read-only shared home shell support. The new `servsync_list_my_shared_home_shells()` RPC returns only safe label/nickname, city, state, role, and active membership status fields for homes actively shared with the signed-in homeowner, and the homeowner Properties area now shows those rows in a separate `Homes shared with me` section.
+- Reason for change: Accepted household members need a visible, low-risk confirmation that a home is shared with them before broader shared record access is approved. A limited RPC avoids broadening existing `homes` RLS or exposing full addresses and owner-only work records.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-shared-home-shell.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/shared-home-shell.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no email/SMS/push delivery, no Edge Functions, no storage policy changes, no production SQL, and no shared access to service requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, contractor connections, or Home History.
+  - Full street address remains owner-only in this slice; future address sharing requires separate product and RLS review.
+  - Future slices must expand shared access table by table, with explicit tests proving unrelated homeowner and lower-role boundaries.
+
 - Branch: `codex/fb-030-home-access-ui-v1`
 - Files changed:
   - `src/App.tsx`
