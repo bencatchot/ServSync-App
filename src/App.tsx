@@ -4925,6 +4925,7 @@ type ConnectedPropertyProposalStatus = 'pending' | 'accepted' | 'rejected' | 're
 type ConnectedPropertyProposal = {
   id: string;
   connection_id: string;
+  contractor_id: string;
   status: ConnectedPropertyProposalStatus;
   nickname: string | null;
   address_line1: string | null;
@@ -4959,6 +4960,49 @@ const EMPTY_CONNECTED_PROPERTY_PROPOSAL_DRAFT: ConnectedPropertyProposalDraft = 
   zip_code: '',
   homeowner_visible_note: '',
 };
+
+type HomeownerPropertyProposalAcceptMode = 'new' | 'existing';
+
+type HomeownerPropertyProposalAcceptDraft = {
+  mode: HomeownerPropertyProposalAcceptMode;
+  existing_home_id: string;
+  share_with_contractor: boolean;
+  nickname: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+};
+
+const EMPTY_HOMEOWNER_PROPERTY_PROPOSAL_ACCEPT_DRAFT: HomeownerPropertyProposalAcceptDraft = {
+  mode: 'new',
+  existing_home_id: '',
+  share_with_contractor: false,
+  nickname: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  zip_code: '',
+};
+
+function homeownerProposalAcceptDraftFromProposal(
+  proposal: ConnectedPropertyProposal,
+  homes: HomeProfile[],
+): HomeownerPropertyProposalAcceptDraft {
+  return {
+    ...EMPTY_HOMEOWNER_PROPERTY_PROPOSAL_ACCEPT_DRAFT,
+    mode: 'new',
+    existing_home_id: homes.length === 1 ? homes[0].id : '',
+    nickname: proposal.nickname || '',
+    address_line1: proposal.address_line1 || '',
+    address_line2: proposal.address_line2 || '',
+    city: proposal.city || '',
+    state: proposal.state || '',
+    zip_code: proposal.zip_code || '',
+  };
+}
 
 function localHomeDraftFromHome(home: ContractorLocalHome): LocalHomeDraft {
   return {
@@ -9027,6 +9071,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [uploadingHomeownerProfilePhoto, setUploadingHomeownerProfilePhoto] = useState(false);
   const [uploadingHomePhoto, setUploadingHomePhoto] = useState(false);
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
+  const [homeownerPropertyProposalsByConnectionId, setHomeownerPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -9034,6 +9079,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
   const [activeSharingDrafts, setActiveSharingDrafts] = useState<Record<string, ActiveSharedPropertyDraft>>({});
+  const [homeownerProposalAccepting, setHomeownerProposalAccepting] = useState<{ proposal: ConnectedPropertyProposal; connection: HomeownerConnection } | null>(null);
+  const [homeownerProposalAcceptDraft, setHomeownerProposalAcceptDraft] = useState<HomeownerPropertyProposalAcceptDraft>(EMPTY_HOMEOWNER_PROPERTY_PROPOSAL_ACCEPT_DRAFT);
+  const [acceptingHomeownerProposalId, setAcceptingHomeownerProposalId] = useState<string | null>(null);
+  const [rejectingHomeownerProposalId, setRejectingHomeownerProposalId] = useState<string | null>(null);
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [savingConnectionId, setSavingConnectionId] = useState<string | null>(null);
   const [revokingConnectionId, setRevokingConnectionId] = useState<string | null>(null);
@@ -9320,10 +9369,23 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             .order('created_at', { ascending: false })
         : { data: [], error: null };
       if (historyRes.error) throw historyRes.error;
+      const proposalsRes = connectionIds.length
+        ? await supabase
+            .from('contractor_home_property_proposals')
+            .select('id, connection_id, contractor_id, status, nickname, address_line1, address_line2, city, state, zip_code, homeowner_visible_note, accepted_home_id, reviewed_at, revoked_at, created_at, updated_at')
+            .in('connection_id', connectionIds)
+            .order('created_at', { ascending: false })
+        : { data: [], error: null };
+      if (proposalsRes.error) throw proposalsRes.error;
 
       const loadedServiceRequests = await serviceRequestsWithAppointmentWindows((serviceRequestsRes.data || []) as ServiceRequestSummary[]);
+      const proposalsByConnectionId = ((proposalsRes.data || []) as ConnectedPropertyProposal[]).reduce<Record<string, ConnectedPropertyProposal[]>>((groups, proposal) => {
+        (groups[proposal.connection_id] ??= []).push(proposal);
+        return groups;
+      }, {});
 
       setConnections(loadedConnections);
+      setHomeownerPropertyProposalsByConnectionId(proposalsByConnectionId);
       setServiceRequests(loadedServiceRequests);
       if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
       if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
@@ -10234,6 +10296,189 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     } finally {
       setSavingConnectionId(null);
     }
+  };
+
+  const openHomeownerProposalAcceptDialog = (proposal: ConnectedPropertyProposal, connection: HomeownerConnection) => {
+    setHomeownerProposalAccepting({ proposal, connection });
+    setHomeownerProposalAcceptDraft(homeownerProposalAcceptDraftFromProposal(proposal, homes));
+    setError('');
+    setNotice('');
+  };
+
+  const closeHomeownerProposalAcceptDialog = () => {
+    setHomeownerProposalAccepting(null);
+    setHomeownerProposalAcceptDraft(EMPTY_HOMEOWNER_PROPERTY_PROPOSAL_ACCEPT_DRAFT);
+  };
+
+  const updateHomeownerProposalAcceptDraft = (updates: Partial<HomeownerPropertyProposalAcceptDraft>) => {
+    setHomeownerProposalAcceptDraft(current => ({ ...current, ...updates }));
+  };
+
+  const acceptHomeownerPropertyProposal = async () => {
+    if (!supabase || !homeownerProposalAccepting) return;
+    const { proposal, connection } = homeownerProposalAccepting;
+    const draft = homeownerProposalAcceptDraft;
+    const creatingNewHome = draft.mode === 'new';
+    const nextDraft = {
+      nickname: draft.nickname.trim(),
+      address_line1: draft.address_line1.trim(),
+      address_line2: draft.address_line2.trim(),
+      city: draft.city.trim(),
+      state: draft.state.trim(),
+      zip_code: draft.zip_code.trim(),
+    };
+    if (creatingNewHome && !nextDraft.nickname && !nextDraft.address_line1) {
+      setError('Enter a property label or street address before accepting this suggestion as a new home.');
+      return;
+    }
+    if (!creatingNewHome && !draft.existing_home_id) {
+      setError('Choose one of your existing homes before linking this suggestion.');
+      return;
+    }
+
+    setAcceptingHomeownerProposalId(proposal.id);
+    setError('');
+    setNotice('');
+    try {
+      const { error: acceptError } = await supabase.rpc('servsync_homeowner_accept_home_property_proposal', {
+        p_proposal_id: proposal.id,
+        p_existing_home_id: creatingNewHome ? null : draft.existing_home_id,
+        p_share_with_contractor: draft.share_with_contractor,
+        p_nickname: creatingNewHome ? nextDraft.nickname : '',
+        p_address_line1: creatingNewHome ? nextDraft.address_line1 : '',
+        p_address_line2: creatingNewHome ? nextDraft.address_line2 : '',
+        p_city: creatingNewHome ? nextDraft.city : '',
+        p_state: creatingNewHome ? nextDraft.state : '',
+        p_zip_code: creatingNewHome ? nextDraft.zip_code : '',
+      });
+      if (acceptError) throw acceptError;
+      closeHomeownerProposalAcceptDialog();
+      await loadHomeowner();
+      setNotice(draft.share_with_contractor
+        ? `Property suggestion accepted and shared with ${connection.business_name}.`
+        : 'Property suggestion accepted. The property stays in your profile only until you choose to share it.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to accept this property suggestion.'));
+    } finally {
+      setAcceptingHomeownerProposalId(null);
+    }
+  };
+
+  const rejectHomeownerPropertyProposal = async (proposal: ConnectedPropertyProposal) => {
+    if (!supabase) return;
+    const confirmed = window.confirm('Reject property suggestion? This closes the suggestion. It will not add a home to your profile and the contractor will not be able to use it for work records.');
+    if (!confirmed) return;
+    setRejectingHomeownerProposalId(proposal.id);
+    setError('');
+    setNotice('');
+    try {
+      const { error: rejectError } = await supabase.rpc('servsync_homeowner_reject_home_property_proposal', {
+        p_proposal_id: proposal.id,
+      });
+      if (rejectError) throw rejectError;
+      await loadHomeowner();
+      setNotice('Property suggestion rejected.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to reject this property suggestion.'));
+    } finally {
+      setRejectingHomeownerProposalId(null);
+    }
+  };
+
+  const renderHomeownerPropertySuggestions = (connection: HomeownerConnection) => {
+    const proposals = homeownerPropertyProposalsByConnectionId[connection.connection_id] ?? [];
+    const sortedProposals = [...proposals].sort((a, b) => {
+      const aPending = a.status === 'pending' ? 0 : 1;
+      const bPending = b.status === 'pending' ? 0 : 1;
+      return aPending - bPending || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return (
+      <div className="rounded-2xl border border-blue-100 bg-white p-4" data-testid="homeowner-property-suggestions">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-950">Property suggestions</p>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              This contractor suggested a property for your review. Nothing is added or shared unless you accept.
+            </p>
+          </div>
+          {proposals.some(proposal => proposal.status === 'pending') && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+              {proposals.filter(proposal => proposal.status === 'pending').length} pending
+            </span>
+          )}
+        </div>
+
+        {sortedProposals.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+            No property suggestions from {connection.business_name} yet.
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-3">
+            {sortedProposals.map(proposal => {
+              const label = connectedPropertyProposalLabel(proposal);
+              const address = compactAddressLabel(proposal);
+              const note = proposal.homeowner_visible_note?.trim() || '';
+              const canReview = proposal.status === 'pending';
+              const reviewedLabel = proposal.status === 'revoked'
+                ? proposal.revoked_at ? `Revoked ${formatDateTime(proposal.revoked_at)}` : 'Revoked'
+                : proposal.reviewed_at ? `Reviewed ${formatDateTime(proposal.reviewed_at)}` : '';
+              return (
+                <div key={proposal.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4" data-testid="homeowner-property-suggestion-card">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-bold text-slate-950">{label}</p>
+                      <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not included'}</p>
+                      <p className="mt-1 text-xs text-slate-500">Suggested by {connection.business_name} on {formatDateTime(proposal.created_at)}</p>
+                      {reviewedLabel && <p className="mt-1 text-xs text-slate-500">{reviewedLabel}</p>}
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${connectedPropertyProposalStatusClass(proposal.status)}`}>
+                      {connectedPropertyProposalStatusLabel(proposal.status)}
+                    </span>
+                  </div>
+                  {note && (
+                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-blue-700">Homeowner-visible note</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-blue-900">{note}</p>
+                    </div>
+                  )}
+                  {proposal.status === 'accepted' && (
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      Accepted suggestions are saved to your profile. This contractor can use the property only when you share it with them.
+                    </p>
+                  )}
+                  {canReview && (
+                    <>
+                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                        Accepting creates or links a property in your profile. Sharing is optional and stays under your control.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openHomeownerProposalAcceptDialog(proposal, connection)}
+                          disabled={acceptingHomeownerProposalId === proposal.id || rejectingHomeownerProposalId === proposal.id}
+                          className={buttonClass('primary')}
+                        >
+                          {acceptingHomeownerProposalId === proposal.id ? 'Accepting...' : 'Accept suggestion'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void rejectHomeownerPropertyProposal(proposal)}
+                          disabled={acceptingHomeownerProposalId === proposal.id || rejectingHomeownerProposalId === proposal.id}
+                          className={buttonClass('secondary')}
+                        >
+                          {rejectingHomeownerProposalId === proposal.id ? 'Rejecting...' : 'Reject'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const revokeConnection = async (connection: HomeownerConnection) => {
@@ -13876,12 +14121,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           </div>
                         ) : (
                           <>
-                            <div className="mt-4 space-y-4">
-                              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
-                                Choose which properties this contractor can access and what they can see for each one. Contact info is connection-level access.
-                              </div>
+	                            <div className="mt-4 space-y-4">
+	                              <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+	                                Choose which properties this contractor can access and what they can see for each one. Contact info is connection-level access.
+	                              </div>
+	                              {renderHomeownerPropertySuggestions(connection)}
 
-                              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+	                              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
                                 <input
                                   type="checkbox"
                                   className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
@@ -16359,6 +16605,211 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           onReply={inquiry => void replyToSupportInquiry(inquiry)}
           saving={savingSupport}
         />
+      )}
+
+      {homeownerProposalAccepting && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="homeowner-property-proposal-accept-title"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !acceptingHomeownerProposalId) closeHomeownerProposalAcceptDialog();
+          }}
+        >
+          <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-3xl sm:rounded-2xl" data-testid="homeowner-property-proposal-accept-dialog">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Property suggestion</p>
+                <h2 id="homeowner-property-proposal-accept-title" className="mt-1 text-xl font-bold text-slate-950">
+                  Review property from {homeownerProposalAccepting.connection.business_name}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Accepting adds or links a property in your profile. Sharing with this contractor is optional.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeHomeownerProposalAcceptDialog}
+                disabled={Boolean(acceptingHomeownerProposalId)}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Close property suggestion review"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-5 py-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-sm font-bold text-blue-950">You choose what happens next.</p>
+                <p className="mt-1 text-sm leading-6 text-blue-800">
+                  Nothing is added or shared until you accept. You can create a new home from this suggestion or link it to a home already in your profile.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-bold text-slate-950">{connectedPropertyProposalLabel(homeownerProposalAccepting.proposal)}</p>
+                <p className="mt-1 text-sm text-slate-600">{compactAddressLabel(homeownerProposalAccepting.proposal) || 'Address not included'}</p>
+                {homeownerProposalAccepting.proposal.homeowner_visible_note?.trim() && (
+                  <p className="mt-3 whitespace-pre-wrap rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-blue-900">
+                    {homeownerProposalAccepting.proposal.homeowner_visible_note.trim()}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50">
+                  <input
+                    type="radio"
+                    name="homeowner-property-proposal-accept-mode"
+                    className="mt-1 h-4 w-4 border-slate-300 accent-[#0078FF]"
+                    checked={homeownerProposalAcceptDraft.mode === 'new'}
+                    onChange={() => updateHomeownerProposalAcceptDraft({ mode: 'new' })}
+                    disabled={Boolean(acceptingHomeownerProposalId)}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-slate-950">Create a new home from this suggestion</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">You can adjust the details before saving it to your profile.</span>
+                  </span>
+                </label>
+                <label className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 transition ${homes.length === 0 ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-blue-300 hover:bg-blue-50'}`}>
+                  <input
+                    type="radio"
+                    name="homeowner-property-proposal-accept-mode"
+                    className="mt-1 h-4 w-4 border-slate-300 accent-[#0078FF]"
+                    checked={homeownerProposalAcceptDraft.mode === 'existing'}
+                    onChange={() => updateHomeownerProposalAcceptDraft({ mode: 'existing' })}
+                    disabled={Boolean(acceptingHomeownerProposalId) || homes.length === 0}
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-slate-950">Link to one of my existing homes</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">No new home is created; this suggestion is tied to a home you already own.</span>
+                  </span>
+                </label>
+              </div>
+
+              {homeownerProposalAcceptDraft.mode === 'new' ? (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">New home details</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Property label">
+                      <input
+                        className={inputClass()}
+                        value={homeownerProposalAcceptDraft.nickname}
+                        onChange={event => updateHomeownerProposalAcceptDraft({ nickname: event.target.value })}
+                        disabled={Boolean(acceptingHomeownerProposalId)}
+                        placeholder="Guest house"
+                      />
+                    </Field>
+                    <Field label="Street address">
+                      <input
+                        className={inputClass()}
+                        value={homeownerProposalAcceptDraft.address_line1}
+                        onChange={event => updateHomeownerProposalAcceptDraft({ address_line1: event.target.value })}
+                        disabled={Boolean(acceptingHomeownerProposalId)}
+                        placeholder="Street address"
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Address line 2">
+                      <input
+                        className={inputClass()}
+                        value={homeownerProposalAcceptDraft.address_line2}
+                        onChange={event => updateHomeownerProposalAcceptDraft({ address_line2: event.target.value })}
+                        disabled={Boolean(acceptingHomeownerProposalId)}
+                        placeholder="Unit, suite, etc."
+                      />
+                    </Field>
+                    <Field label="City">
+                      <input
+                        className={inputClass()}
+                        value={homeownerProposalAcceptDraft.city}
+                        onChange={event => updateHomeownerProposalAcceptDraft({ city: event.target.value })}
+                        disabled={Boolean(acceptingHomeownerProposalId)}
+                        placeholder="City"
+                      />
+                    </Field>
+                    <Field label="State">
+                      <AutocompleteInput
+                        id={`homeowner-property-proposal-state-${homeownerProposalAccepting.proposal.id}`}
+                        value={homeownerProposalAcceptDraft.state}
+                        onChange={state => updateHomeownerProposalAcceptDraft({ state })}
+                        options={US_STATE_OPTIONS}
+                        placeholder="Start typing a state..."
+                      />
+                    </Field>
+                  </div>
+                  <Field label="ZIP">
+                    <input
+                      className={`${inputClass()} max-w-xs`}
+                      autoComplete="postal-code"
+                      spellCheck={false}
+                      value={homeownerProposalAcceptDraft.zip_code}
+                      onChange={event => updateHomeownerProposalAcceptDraft({ zip_code: event.target.value })}
+                      disabled={Boolean(acceptingHomeownerProposalId)}
+                    />
+                  </Field>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <Field label="Existing home">
+                    <select
+                      className={inputClass()}
+                      aria-label="Existing home"
+                      value={homeownerProposalAcceptDraft.existing_home_id}
+                      onChange={event => updateHomeownerProposalAcceptDraft({ existing_home_id: event.target.value })}
+                      disabled={Boolean(acceptingHomeownerProposalId)}
+                    >
+                      <option value="">Choose a home...</option>
+                      {homes.map(homeOption => (
+                        <option key={homeOption.id} value={homeOption.id}>{homeProfileDisplayLabel(homeOption)}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#0078FF]"
+                  checked={homeownerProposalAcceptDraft.share_with_contractor}
+                  onChange={event => updateHomeownerProposalAcceptDraft({ share_with_contractor: event.target.checked })}
+                  disabled={Boolean(acceptingHomeownerProposalId)}
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-950">Share this property with {homeownerProposalAccepting.connection.business_name}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    Sharing lets this contractor use the property for service requests, jobs, estimates, invoices, reports, and related work records allowed by your permissions.
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    If you do not share, the home stays in your profile only and will not become available to this contractor.
+                  </span>
+                </span>
+              </label>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeHomeownerProposalAcceptDialog}
+                  disabled={Boolean(acceptingHomeownerProposalId)}
+                  className={buttonClass('secondary')}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void acceptHomeownerPropertyProposal()}
+                  disabled={Boolean(acceptingHomeownerProposalId)}
+                  className={buttonClass('primary')}
+                >
+                  {acceptingHomeownerProposalId ? 'Accepting...' : 'Accept suggestion'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {contextualConnectionTarget && (
@@ -22833,7 +23284,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     try {
       const { data, error: proposalsError } = await supabase
         .from('contractor_home_property_proposals')
-        .select('id, connection_id, status, nickname, address_line1, address_line2, city, state, zip_code, homeowner_visible_note, accepted_home_id, reviewed_at, revoked_at, created_at, updated_at')
+        .select('id, connection_id, contractor_id, status, nickname, address_line1, address_line2, city, state, zip_code, homeowner_visible_note, accepted_home_id, reviewed_at, revoked_at, created_at, updated_at')
         .eq('connection_id', connectionId)
         .order('created_at', { ascending: false });
       if (proposalsError) throw proposalsError;
