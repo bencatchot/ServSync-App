@@ -212,14 +212,24 @@ Feature/function work and marketing work must remain separate. Marketing/content
 - Codex must not treat roadmap ideas as live features.
 - Codex may push approved feature branches and open PRs when the implementation prompt or Builder Mode explicitly allows it.
 - Codex must treat merge to `main` as a separate approval gate because it can trigger production deployment.
+- Codex must review `docs/MARKETING_PRODUCT_INVENTORY.md` when a PR adds, removes, renames, or materially changes a user-facing feature, user workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item.
+- Codex must either update `docs/MARKETING_PRODUCT_INVENTORY.md` when the change affects what ServSync can honestly say to homeowners, contractors, beta users, ads, social posts, brochures, landing pages, or video scripts, or explicitly report: "Marketing inventory reviewed; no update needed."
 
-## Master Plan And Changelog Rules
+## Master Plan, Changelog, And Marketing Inventory Rules
 
 Read `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md` before planning or implementing ServSync product changes. Use it to classify the task as workflow/process documentation, product-direction documentation, roadmap/planning documentation, marketing documentation, app implementation, test/QA documentation, or SQL/schema/RLS/RPC/storage work.
 
 Update the master plan only when the task changes product direction, roadmap decisions, user workflows, feature definitions, or implementation strategy. Do not update it for simple operational docs, audit-only work, small copy fixes, small test updates, or implementation details that do not change direction.
 
 Read `docs/servsync-master-plan/CHANGELOG.md` before adding a changelog entry. Identify the latest related entry and check existing labels before writing a new one.
+
+Marketing inventory check:
+
+- Read `docs/MARKETING_PRODUCT_INVENTORY.md` when a task adds, removes, renames, or materially changes a user-facing feature, user workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item.
+- If the change affects what ServSync can honestly say to homeowners, contractors, beta users, ads, social posts, brochures, landing pages, or video scripts, update `docs/MARKETING_PRODUCT_INVENTORY.md`.
+- If no update is needed, explicitly report: "Marketing inventory reviewed; no update needed."
+- Do not use the changelog alone as the source for marketing claims.
+- Do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless `docs/MARKETING_PRODUCT_INVENTORY.md` supports that status.
 
 When adding a changelog entry:
 
@@ -288,6 +298,11 @@ Changelog check:
 - Identify the latest related entry and any relevant highest PR/item number or heading pattern.
 - Do not add a changelog entry for audit-only work.
 
+Marketing inventory check:
+- Read `docs/MARKETING_PRODUCT_INVENTORY.md` if this audit concerns a user-facing feature, user workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item.
+- Do not use the changelog alone as the source for marketing claims.
+- Identify whether the implementation would require a marketing inventory update or the explicit report: "Marketing inventory reviewed; no update needed."
+
 Questions to answer:
 - [Question 1]
 - [Question 2]
@@ -306,6 +321,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -382,6 +399,15 @@ Changelog rules:
 - Do not duplicate existing labels/headings.
 - Update the changelog for non-audit docs/app behavior changes.
 
+Marketing inventory check:
+- Does this PR add a user-facing feature?
+- Does it remove, rename, or materially change a user-facing feature?
+- Does it change a feature status from Future/Manual/Beta/Live?
+- Does it change what homeowners or contractors can honestly be told?
+- Does it create a new limitation or do-not-promise item?
+- If yes, update `docs/MARKETING_PRODUCT_INVENTORY.md`.
+- If no, report: "Marketing inventory reviewed; no update needed."
+
 Validation required:
 - git status --short --branch
 - git diff --check
@@ -400,6 +426,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -440,8 +468,19 @@ Verify:
 - No unexpected SQL/env/settings/data/user/deploy changes occurred.
 - Changelog entry is accurate and does not duplicate PR/item numbers, task names, version labels, or headings.
 - Master plan was updated only if appropriate.
+- Marketing inventory was updated if the PR changes user-facing features, workflows, feature status, value propositions, marketing claims, limitations, or do-not-promise items.
+- If no marketing inventory update was needed, the report explicitly says: "Marketing inventory reviewed; no update needed."
 - Required tests/checks passed.
 - Vercel project is correct if relevant.
+
+Marketing inventory check:
+- Does this PR add a user-facing feature?
+- Does it remove, rename, or materially change a user-facing feature?
+- Does it change a feature status from Future/Manual/Beta/Live?
+- Does it change what homeowners or contractors can honestly be told?
+- Does it create a new limitation or do-not-promise item?
+- If yes, confirm `docs/MARKETING_PRODUCT_INVENTORY.md` was updated.
+- If no, report: "Marketing inventory reviewed; no update needed."
 
 Files allowed to change:
 - [Expected changed files]
@@ -465,6 +504,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -546,6 +587,9 @@ PUBLIC / BUNDLE VERIFICATION RESULTS
 AUTHENTICATED VERIFICATION
 PRODUCTION DATA CHANGES
 SQL / DEPLOY STATUS
+MARKETING INVENTORY CHECK
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 ISSUES FOUND
 RECOMMENDED NEXT STEP
 STATUS
@@ -568,6 +612,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -590,6 +636,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -615,6 +663,8 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
 - New changelog entry label used:
 - Confirm no duplicate PR number/item number/heading was introduced:
@@ -638,6 +688,9 @@ DEPLOYMENT STATUS
 VERIFICATION RESULTS
 PRODUCTION DATA CHANGES
 SQL / DEPLOY STATUS
+MARKETING INVENTORY CHECK
+- Marketing inventory reviewed: YES / NO / NOT APPLICABLE
+- Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 ISSUES FOUND
 STOP CONDITIONS ENCOUNTERED: YES / NO
 RECOMMENDED NEXT STEP
@@ -649,7 +702,7 @@ STATUS
 Copy this into a new ChatGPT chat:
 
 ```text
-I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
+I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure Codex reviews docs/MARKETING_PRODUCT_INVENTORY.md whenever a PR adds, removes, renames, or materially changes a user-facing feature, workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item; Codex must update it when needed or report: "Marketing inventory reviewed; no update needed." Do not use the changelog alone as the source for marketing claims, and do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless the marketing inventory supports that status. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
 ```
 
 ## Notes
