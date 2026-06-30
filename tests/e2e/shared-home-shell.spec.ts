@@ -345,7 +345,7 @@ test.describe('shared home shell', () => {
 
       const panel = page.getByTestId('shared-home-shells-panel');
       await expect(page.getByText(/Homes shared with me/i)).toBeVisible();
-      await expect(panel.getByText(/Shared home records are not enabled yet/i)).toBeVisible();
+      await expect(panel.getByText(/Shared home records are limited/i)).toBeVisible();
       await expect(panel.getByText(/contractor connections, and Home History remain private/i)).toBeVisible();
 
       const card = panel.getByTestId('shared-home-shell-card').filter({ hasText: expectedLabel }).first();

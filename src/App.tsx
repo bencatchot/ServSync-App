@@ -387,6 +387,17 @@ type SharedHomeShell = {
   address_line2: string | null;
   zip_code: string | null;
 };
+type SharedHomeReminderShell = {
+  reminder_id: string;
+  home_id: string;
+  home_display_label: string | null;
+  title: string;
+  due_on: string | null;
+  status: HomeReminderStatus;
+  is_overdue: boolean | null;
+  role: Exclude<HomeMembershipRole, 'owner'>;
+  membership_status: HomeMembershipStatus;
+};
 type HomeAccessInviteDraft = {
   email: string;
   role: Exclude<HomeMembershipRole, 'owner'>;
@@ -9123,6 +9134,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeAccessEmailInvites, setHomeAccessEmailInvites] = useState<HomeAccessEmailInvite[]>([]);
   const [myHomeAccessEmailInvites, setMyHomeAccessEmailInvites] = useState<MyHomeAccessEmailInvite[]>([]);
   const [sharedHomeShells, setSharedHomeShells] = useState<SharedHomeShell[]>([]);
+  const [sharedHomeReminderShells, setSharedHomeReminderShells] = useState<SharedHomeReminderShell[]>([]);
   const [homeAccessInviteDraft, setHomeAccessInviteDraft] = useState<HomeAccessInviteDraft>({ email: '', role: 'viewer' });
   const [loadingHomeAccess, setLoadingHomeAccess] = useState(false);
   const [loadingSharedHomeShells, setLoadingSharedHomeShells] = useState(false);
@@ -9516,9 +9528,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!supabase) return;
     setLoadingSharedHomeShells(true);
     try {
-      const { data, error: sharedHomeShellError } = await supabase.rpc('servsync_list_my_shared_home_address_shells');
+      const [
+        { data, error: sharedHomeShellError },
+        { data: reminderData, error: sharedReminderShellError },
+      ] = await Promise.all([
+        supabase.rpc('servsync_list_my_shared_home_address_shells'),
+        supabase.rpc('servsync_list_my_shared_home_reminder_shells'),
+      ]);
       if (sharedHomeShellError) throw sharedHomeShellError;
+      if (sharedReminderShellError) throw sharedReminderShellError;
       setSharedHomeShells((data || []) as SharedHomeShell[]);
+      setSharedHomeReminderShells((reminderData || []) as SharedHomeReminderShell[]);
     } catch (err) {
       setError(readableError(err, 'Unable to load homes shared with you.'));
     } finally {
@@ -9819,6 +9839,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (reminder.due_on < today) return { label: 'Overdue', className: 'bg-red-100 text-red-700' };
     if (reminder.due_on === today) return { label: 'Due today', className: 'bg-amber-100 text-amber-700' };
     return { label: 'Upcoming', className: 'bg-blue-50 text-blue-700' };
+  };
+  const sharedReminderDueState = (reminder: SharedHomeReminderShell) => {
+    if (reminder.is_overdue) return { label: 'Overdue', className: 'bg-red-100 text-red-700' };
+    return { label: 'Open', className: 'bg-blue-50 text-blue-700' };
   };
   const openHomeReminderComposer = (options: Partial<HomeReminderDraft> = {}) => {
     setHomeReminderDraft({ ...emptyHomeReminderDraft(), ...options });
@@ -12953,7 +12977,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div>
               <p className="text-sm font-bold text-slate-950">Read-only shared home shell</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                Shared home records are not enabled yet. Requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded.
+                Shared home records are limited. Requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded. Open reminder shells may appear below as read-only titles and due dates; notes and linked records are not shared.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
@@ -12972,6 +12996,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sharedHomeShells.map(shell => {
               const label = shell.display_label || shell.nickname || [shell.city, shell.state].filter(Boolean).join(', ') || 'Shared home';
+              const sharedRemindersForHome = sharedHomeReminderShells.filter(reminder => reminder.home_id === shell.home_id);
               const streetLine1 = shell.address_line1?.trim() || '';
               const streetLine2 = shell.address_line2?.trim() || '';
               const cityStateZip = [
@@ -13000,6 +13025,44 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <p className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-800">
                       This shared home cannot be selected for owner dashboard records yet.
                     </p>
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3" data-testid="shared-home-reminders-section">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Shared reminders</p>
+                          <p className="mt-1 text-xs leading-5 text-blue-900">
+                            Read-only reminders shared with this home. Notes and linked records are not shared yet.
+                          </p>
+                        </div>
+                        <span className="inline-flex w-fit rounded-full bg-white px-2 py-0.5 text-xs font-bold text-blue-700">
+                          Read-only
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {sharedRemindersForHome.length === 0 ? (
+                          <p className="text-xs font-medium text-slate-500">No shared reminders for this home.</p>
+                        ) : (
+                          sharedRemindersForHome.map(reminder => {
+                            const dueState = sharedReminderDueState(reminder);
+                            return (
+                              <div key={reminder.reminder_id} className="rounded-lg border border-blue-100 bg-white px-3 py-2" data-testid="shared-home-reminder-card">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="min-w-0">
+                                    <p className="break-words text-sm font-semibold text-slate-950">{reminder.title}</p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      Due {reminder.due_on ? new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'not set'}
+                                    </p>
+                                  </div>
+                                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{reminder.status}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
