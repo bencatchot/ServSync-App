@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-access-invite-delivery-sql-v1`
+- Files changed:
+  - `servsync-home-access-invite-delivery-foundation.sql`
+  - `tests/e2e/home-access-invite-delivery-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1H-A home access invite delivery SQL/RPC foundation. The new additive SQL adds delivery metadata to pending home membership email invites, defaults newly created email invites to a 30-day expiry, adds a browser-callable delivery preparation RPC that currently returns `delivery_enabled=false`, and adds an internal-only delivery-result recording RPC for future delivery worker use.
+- Reason for change: Home Access invite delivery needs a safe database contract before any email worker or UI send action is introduced, including cooldown/cap enforcement, sanitized delivery payloads, and delivery-result tracking without revealing account existence or enabling actual email/SMS/push delivery.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-home-access-invite-delivery-foundation.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-delivery-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-email-invites.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI, no Edge Functions, no production SQL, no email/SMS/push delivery, no storage policy changes, no existing homeowner RLS expansion, and no shared access to service requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, or Home History.
+  - The prepare RPC intentionally records disabled delivery attempts while delivery remains off; a later approved delivery worker slice must decide whether to reuse or adjust that contract before sending real email.
+  - Future email delivery still needs explicit Edge Function/provider design, secrets/env review, abuse/rate-limit review, copy/link review, production rollout approval, and authenticated production smoke credentials/records.
+
 - Branch: `codex/fb-030-shared-home-reminders-ui-v1`
 - Files changed:
   - `src/App.tsx`
