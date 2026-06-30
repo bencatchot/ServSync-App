@@ -4,6 +4,30 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-06-30
+
+- Branch: `codex/fb-030-home-membership-foundation-v1`
+- Files changed:
+  - `servsync-home-membership-foundation.sql`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `tests/e2e/home-membership-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1A SQL/test foundation for future shared homeowner access. The new `home_memberships` table models home-level roles (`owner`, `admin`, `member`, `viewer`), backfills active owner memberships for existing `homes.homeowner_user_id` rows, adds hardened helper functions for future home-access RLS, and adds catalog/RLS-style coverage for the foundation.
+- Reason for change: ServSync needs a backwards-compatible base for future household/shared homeowner access without enabling shared access to existing homeowner records before each table, workflow, and storage surface is reviewed.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-home-membership-foundation.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice only adds SQL/test scaffolding; no UI was added and no existing homeowner service request, estimate, invoice, job, document, reminder, notification, storage, workflow, or contractor-connection RLS policy was broadened.
+  - `servsync-home-membership-foundation.sql` has been applied to sandbox for validation only. Production SQL has not been applied and requires separate explicit approval.
+  - Future slices must introduce invite/revoke RPCs and opt records into shared access table by table, with storage/document handling treated as a separate high-risk design area.
+
 ## 2026-06-29
 
 - Branch: `codex/production-auth-readonly-smoke-v1`
