@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-membership-rpcs-v1`
+- Files changed:
+  - `servsync-home-membership-rpcs.sql`
+  - `tests/e2e/home-membership-rpcs.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1B SQL/test foundation for guarded home membership lifecycle actions. The new SQL adds `home_membership_audit_events` plus hardened browser-callable RPCs for inviting, accepting, declining, and revoking home memberships while preserving the primary homeowner as the compatibility owner.
+- Reason for change: Household/shared homeowner access needs an explicit, audited membership lifecycle before any UI or table-by-table shared access expansion can be considered.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-home-membership-rpcs.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-rpcs.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI, no email/SMS/push invite delivery, no production SQL, and no shared access to existing homeowner service request, estimate, invoice, job, document, reminder, notification, storage, workflow, or contractor-connection records.
+  - `servsync-home-membership-rpcs.sql` has been applied to sandbox for validation only. Production SQL requires separate explicit approval.
+  - Future slices must design the homeowner/member UI and opt individual record surfaces into shared access deliberately.
+
 - Branch: `codex/fb-030-home-membership-foundation-v1`
 - Files changed:
   - `servsync-home-membership-foundation.sql`
