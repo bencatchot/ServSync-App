@@ -370,6 +370,11 @@ type HomeAccessEmailInvite = {
   created_at: string;
   updated_at?: string | null;
 };
+type HomeAccessInviteDeliveryResponse = {
+  ok?: boolean;
+  delivery_enabled?: boolean;
+  status?: string;
+};
 type MyHomeAccessEmailInvite = Pick<HomeAccessEmailInvite, 'id' | 'home_id' | 'role' | 'status' | 'invited_email' | 'expires_at' | 'created_at'> & {
   home_nickname: string | null;
   home_city: string | null;
@@ -9561,15 +9566,30 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         setError('Enter an email address before creating an invite.');
         return;
       }
-      const { error: inviteError } = await supabase.rpc('servsync_create_home_membership_email_invite', {
+      const { data: invite, error: inviteError } = await supabase.rpc('servsync_create_home_membership_email_invite', {
         p_home_id: selectedHome.id,
         p_invited_email: email,
         p_role: homeAccessInviteDraft.role,
       });
       if (inviteError) throw inviteError;
 
+      let deliveryNotice = 'Invite saved. Email delivery is currently disabled, so the person was not emailed yet. They can accept after signing in with the invited email once you share the invite manually or delivery is enabled.';
+      if (invite?.id) {
+        const { data: deliveryResult, error: deliveryError } = await supabase.functions.invoke('send-home-access-invite-email', {
+          body: { invite_id: invite.id },
+        });
+        const deliveryData = deliveryResult as HomeAccessInviteDeliveryResponse | null;
+        if (deliveryError) {
+          deliveryNotice = 'Invite was saved, but delivery could not be attempted. Email delivery is currently disabled, so the person was not emailed yet.';
+        } else if (deliveryData?.delivery_enabled === false) {
+          deliveryNotice = 'Invite saved. Email delivery is currently disabled, so the person was not emailed yet. They can accept after signing in with the invited email once you share the invite manually or delivery is enabled.';
+        } else if (deliveryData?.ok === true && deliveryData.status === 'request_accepted') {
+          deliveryNotice = 'Invite saved. Delivery request accepted.';
+        }
+      }
+
       setHomeAccessInviteDraft({ email: '', role: 'viewer' });
-      setNotice('Invite created. Email delivery is not enabled yet during this beta step.');
+      setNotice(deliveryNotice);
       await loadHomeAccess(selectedHome.id);
     } catch (err) {
       setError(readableError(err, 'Unable to create home access invite.'));
@@ -13209,7 +13229,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-sm font-bold text-slate-950">Create email invite</p>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    Creates a pending invite only. ServSync does not send an email automatically in this beta step.
+                    Creates a pending invite and checks the delivery worker. Email delivery is still disabled in this beta step.
                   </p>
                   <div className="mt-3 space-y-3">
                     <Field label="Invite email">
@@ -13243,7 +13263,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       {savingHomeAccessInvite ? 'Creating...' : 'Create invite'}
                     </button>
                     <p className="text-xs leading-5 text-amber-700">
-                      Email delivery is not enabled yet during this beta step. Do not tell someone an email was sent from ServSync.
+                      Email delivery is not enabled yet during this beta step. ServSync will only report delivery after it is explicitly enabled later.
                     </p>
                   </div>
                 </div>

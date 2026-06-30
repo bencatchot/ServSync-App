@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-access-invite-disabled-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-access-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1H-E disabled-mode Home Access invite send wiring. After a homeowner creates a pending Home Access email invite, the UI calls the deployed `send-home-access-invite-email` Edge Function using only the returned `invite_id`, then shows copy that the invite was saved and email delivery is currently disabled so the invited person was not emailed yet. If the function call fails after invite creation, the UI keeps the invite saved and shows a safe delivery-unavailable warning.
+- Reason for change: The Home Access invite flow should exercise the deployed disabled delivery function contract without misleading homeowners into thinking an email was sent or exposing invitee account existence, address, role, or message details from the browser.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-email-function.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-delivery-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-email-invites.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no SQL, no secret changes, no deployments, no provider configuration, no real email/SMS/push delivery, no storage policy changes, no existing homeowner RLS expansion, and no shared access to additional homeowner record surfaces.
+  - Delivery remains disabled in sandbox and production. Future provider-enable slices must explicitly approve provider secrets, production send behavior, abuse/rate-limit review, copy/link review, and authenticated production smoke records before any real invite email is sent.
+  - The UI now calls the deployed function, but valid invite-path calls still mutate delivery metadata/audit rows; production authenticated smoke for this path remains gated on approved disposable records.
+
 - Branch: `codex/fb-030-home-access-invite-email-function-v1`
 - Files changed:
   - `supabase/functions/send-home-access-invite-email/index.ts`
