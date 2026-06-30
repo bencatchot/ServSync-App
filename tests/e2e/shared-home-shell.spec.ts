@@ -77,6 +77,10 @@ function uuidLiteral(id: string) {
   return `'${id}'::uuid`;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function runLinkedSandboxSql(sql: string) {
   requireLinkedSandbox();
   execFileSync('supabase', ['db', 'query', '--linked', sql], {
@@ -325,11 +329,12 @@ test.describe('shared home shell', () => {
     }
   });
 
-  test('homeowner UI renders shared shells without owner-only actions or record surfaces', async ({ page }) => {
+  test('homeowner UI renders member shared address shell without owner-only actions or record surfaces', async ({ page }) => {
     const owner = await signInAs('homeowner');
     const sharedMember = await signInAs('homeownerB');
     const ownerHome = await firstHome(owner);
     const expectedLabel = ownerHome.nickname || [ownerHome.city, ownerHome.state].filter(Boolean).join(', ') || 'Shared home';
+    const expectedCityStateZip = [[ownerHome.city, ownerHome.state].filter(Boolean).join(', '), ownerHome.zip_code].filter(Boolean).join(' ');
 
     try {
       cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
@@ -351,8 +356,60 @@ test.describe('shared home shell', () => {
       await expect(card.getByRole('button')).toHaveCount(0);
 
       if (ownerHome.address_line1) {
-        await expect(panel.getByText(ownerHome.address_line1, { exact: true })).toHaveCount(0);
+        await expect(card.getByText(ownerHome.address_line1, { exact: true })).toBeVisible();
       }
+      if (ownerHome.address_line2) {
+        await expect(card.getByText(ownerHome.address_line2, { exact: true })).toBeVisible();
+      }
+      if (expectedCityStateZip) {
+        await expect(card.getByText(expectedCityStateZip, { exact: true })).toBeVisible();
+      }
+      await expect(card.getByText(/Limited location shared/i)).toHaveCount(0);
+      await expect(panel.getByText(/Service Requests shared from this home/i)).toHaveCount(0);
+      await expect(panel.getByText(/Documents shared from this home/i)).toHaveCount(0);
+    } finally {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      await signOutAll([owner, sharedMember]);
+    }
+  });
+
+  test('homeowner UI renders viewer shared shell without street or zip placeholders', async ({ page }) => {
+    const owner = await signInAs('homeowner');
+    const sharedMember = await signInAs('homeownerB');
+    const ownerHome = await firstHome(owner);
+    const expectedLabel = ownerHome.nickname || [ownerHome.city, ownerHome.state].filter(Boolean).join(', ') || 'Shared home';
+    const expectedLocation = [ownerHome.city, ownerHome.state].filter(Boolean).join(', ');
+
+    try {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      insertMembership(ownerHome.id, sharedMember.userId, 'viewer', 'active');
+
+      await loginAsHomeownerB(page);
+      await openSidebarTab(page, /^Properties$/i);
+
+      const panel = page.getByTestId('shared-home-shells-panel');
+      const card = panel.getByTestId('shared-home-shell-card').filter({ hasText: expectedLabel }).first();
+
+      await expect(card).toBeVisible();
+      await expect(card.getByText(/Viewer/i)).toBeVisible();
+      await expect(card.getByText(/Active/i)).toBeVisible();
+      await expect(card.getByText(/Limited location shared/i)).toBeVisible();
+      await expect(card.getByText(/cannot be selected for owner dashboard records yet/i)).toBeVisible();
+      await expect(card.getByRole('button')).toHaveCount(0);
+
+      if (expectedLocation) {
+        await expect(card.getByText(expectedLocation, { exact: true })).toBeVisible();
+      }
+      if (ownerHome.address_line1) {
+        await expect(card.getByText(ownerHome.address_line1, { exact: true })).toHaveCount(0);
+      }
+      if (ownerHome.address_line2) {
+        await expect(card.getByText(ownerHome.address_line2, { exact: true })).toHaveCount(0);
+      }
+      if (ownerHome.zip_code) {
+        await expect(card.getByText(new RegExp(`\\b${escapeRegExp(ownerHome.zip_code)}\\b`))).toHaveCount(0);
+      }
+      await expect(card.getByText(/undefined|null/i)).toHaveCount(0);
       await expect(panel.getByText(/Service Requests shared from this home/i)).toHaveCount(0);
       await expect(panel.getByText(/Documents shared from this home/i)).toHaveCount(0);
     } finally {

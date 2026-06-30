@@ -383,6 +383,9 @@ type SharedHomeShell = {
   state: string | null;
   role: Exclude<HomeMembershipRole, 'owner'>;
   membership_status: HomeMembershipStatus;
+  address_line1: string | null;
+  address_line2: string | null;
+  zip_code: string | null;
 };
 type HomeAccessInviteDraft = {
   email: string;
@@ -9513,7 +9516,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!supabase) return;
     setLoadingSharedHomeShells(true);
     try {
-      const { data, error: sharedHomeShellError } = await supabase.rpc('servsync_list_my_shared_home_shells');
+      const { data, error: sharedHomeShellError } = await supabase.rpc('servsync_list_my_shared_home_address_shells');
       if (sharedHomeShellError) throw sharedHomeShellError;
       setSharedHomeShells((data || []) as SharedHomeShell[]);
     } catch (err) {
@@ -12969,7 +12972,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sharedHomeShells.map(shell => {
               const label = shell.display_label || shell.nickname || [shell.city, shell.state].filter(Boolean).join(', ') || 'Shared home';
+              const streetLine1 = shell.address_line1?.trim() || '';
+              const streetLine2 = shell.address_line2?.trim() || '';
+              const cityStateZip = [
+                [shell.city, shell.state].filter(Boolean).join(', '),
+                shell.zip_code?.trim() || '',
+              ].filter(Boolean).join(' ');
               const location = [shell.city, shell.state].filter(Boolean).join(', ');
+              const hasStreetAddress = Boolean(streetLine1);
               return (
                 <div key={shell.home_id} className="rounded-xl border border-slate-200 bg-white p-3" data-testid="shared-home-shell-card">
                   <div className="flex flex-col gap-2">
@@ -12978,7 +12988,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(shell.role)}`}>{homeAccessRoleLabel(shell.role)}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(shell.membership_status)}`}>{homeAccessStatusLabel(shell.membership_status)}</span>
                     </div>
-                    <p className="text-xs text-slate-500">{location || 'Location not shared'}</p>
+                    <div className="space-y-0.5 text-xs text-slate-500">
+                      {streetLine1 && <p>{streetLine1}</p>}
+                      {streetLine2 && <p>{streetLine2}</p>}
+                      {cityStateZip && <p>{cityStateZip}</p>}
+                      {!streetLine1 && !cityStateZip && <p>Location not shared</p>}
+                      {!hasStreetAddress && location && (
+                        <p className="font-semibold text-slate-400">Limited location shared</p>
+                      )}
+                    </div>
                     <p className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-800">
                       This shared home cannot be selected for owner dashboard records yet.
                     </p>
