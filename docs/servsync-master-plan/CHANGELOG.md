@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-29
 
+- Branch: `codex/production-auth-readonly-smoke-v1`
+- Files changed:
+  - `package.json`
+  - `tests/helpers/check-production-smoke-env.mjs`
+  - `tests/e2e/production-auth-readonly-smoke.spec.ts`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/QA_PLAYWRIGHT_GUIDE.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a no-mutation authenticated production smoke scaffold. The new npm script runs a no-secret preflight that requires `TEST_APP_URL=https://servsync.app` and approved `PROD_SMOKE_*` credential names before launching a dedicated read-only Playwright spec for homeowner and contractor owner sign-in/navigation checks.
+- Reason for change: Public production smoke is healthy, but authenticated production smoke needs a separate, explicit, read-only path that does not reuse sandbox helpers, does not mutate production, and cannot start unless required production smoke credentials are configured.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run qa:production-smoke:check`
+  - `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` (expected preflight failure before browser actions because required `PROD_SMOKE_*` credentials are missing locally)
+- Known risks or follow-ups:
+  - Authenticated production smoke remains blocked until dedicated smoke accounts, credential storage, allowed read-only actions, and optional stable smoke records are separately approved and configured.
+  - This slice adds no mutation smoke. Creating users, mutating records, sending invites/email/SMS/push, applying SQL, changing settings, and deploys remain separate approval gates.
+
 - Branch: `codex/homeowner-property-proposal-review-ui-v1`
 - Files changed:
   - `src/App.tsx`

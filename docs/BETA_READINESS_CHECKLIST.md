@@ -26,6 +26,7 @@ Related controlled beta docs:
 - [ ] Production checks are public/read-only only until production smoke accounts are separately approved.
 - [ ] Production smoke accounts have an approved credential storage and allowed-actions policy before use.
 - [ ] `npm run qa:production-smoke:check` has been run to confirm whether required production smoke credential names are present locally without printing values.
+- [ ] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` is run only after approved production smoke accounts exist; it remains read-only and must not mutate records.
 - [ ] No production mutation happens without explicit approval.
 - [ ] Sandbox/preview uses the expected Supabase project, not production.
 - [ ] Test credentials stay in local env files or a password manager, never in commits/docs/chats/logs.
