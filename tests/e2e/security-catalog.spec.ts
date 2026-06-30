@@ -59,6 +59,7 @@ const CORE_PRIVATE_TABLES = [
   'profiles',
   'homeowner_profiles',
   'homes',
+  'home_memberships',
   'contractor_profiles',
   'homeowner_contractor_connections',
   'connection_permissions',
@@ -102,8 +103,13 @@ const CORE_PRIVATE_TABLES = [
 ];
 
 const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
+  'current_user_can_access_home',
+  'current_user_can_approve_home_work',
   'current_user_can_manage_contractor_billing',
   'current_user_can_manage_contractor_schedule',
+  'current_user_can_manage_home',
+  'current_user_can_manage_home_connections',
+  'current_user_home_role',
   'current_user_can_send_contractor_workflow_messages',
   'servsync_contractor_pending_connection_requests',
   'servsync_accept_service_request_appointment_window',
@@ -272,10 +278,10 @@ order by e.table_name;
     }
   });
 
-  test('property proposal table stays read-only for browser roles', () => {
+  test('foundation tables stay read-only for browser roles where expected', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 with expected(table_name) as (
-  values ('contractor_home_property_proposals')
+  values ('contractor_home_property_proposals'), ('home_memberships')
 )
 select
   e.table_name,
@@ -300,21 +306,22 @@ left join pg_class c
 order by e.table_name;
     `);
 
-    expect(rows, 'Property proposal privilege rows should match expected table count').toHaveLength(1);
-    const row = rows[0];
-    expect(row.exists, `${row.table_name} should exist`).toBe(true);
-    expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
-    expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
-    expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
-    expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
-    expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
-    expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
-    expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
-    expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
-    expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated`).toBe(true);
-    expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
-    expect(row.authenticated_update, `${row.table_name} should not grant UPDATE to authenticated`).toBe(false);
-    expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    expect(rows, 'Foundation privilege rows should match expected table count').toHaveLength(2);
+    for (const row of rows) {
+      expect(row.exists, `${row.table_name} should exist`).toBe(true);
+      expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+      expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+      expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+      expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+      expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+      expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+      expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+      expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+      expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated`).toBe(true);
+      expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
+      expect(row.authenticated_update, `${row.table_name} should not grant UPDATE to authenticated`).toBe(false);
+      expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    }
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {
