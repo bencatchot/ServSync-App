@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-access-invite-email-function-v1`
+- Files changed:
+  - `supabase/functions/send-home-access-invite-email/index.ts`
+  - `tests/e2e/home-access-invite-email-function.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1H-B Home Access invite email Edge Function scaffold. The new dedicated `send-home-access-invite-email` function validates authenticated POST requests with an `invite_id`, calls the existing `servsync_prepare_home_access_invite_delivery` RPC for trusted sanitized payload data, remains disabled by default through `HOME_ACCESS_INVITE_EMAIL_ENABLED`, and includes a gated Resend provider path that records delivery results through the internal `servsync_record_home_access_invite_delivery_result` RPC only when explicitly enabled.
+- Reason for change: Home Access invite email delivery needs a dedicated worker scaffold that can be reviewed and tested before any deployment, provider secrets, UI send action, or production delivery enablement.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-email-function.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-delivery-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-email-invites.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no SQL, no UI changes, no production deployment, no production email enablement, no real email/SMS/push delivery, no storage policy changes, no existing homeowner RLS expansion, and no shared access to additional homeowner record surfaces.
+  - Delivery remains disabled by default. Future Slice 1H-C or equivalent must explicitly approve Edge Function deployment, Supabase function secrets, provider configuration, UI send wiring, and production smoke behavior before any real invite emails are sent.
+  - Normal scaffold tests mock provider calls and do not prove production provider deliverability.
+
 - Branch: `codex/fb-030-home-access-invite-delivery-sql-v1`
 - Files changed:
   - `servsync-home-access-invite-delivery-foundation.sql`
