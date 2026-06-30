@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-shared-home-address-rpc-v1`
+- Files changed:
+  - `servsync-shared-home-address-visibility.sql`
+  - `tests/e2e/shared-home-shell.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1F-A shared-home address visibility RPC foundation. The new additive `servsync_list_my_shared_home_address_shells()` RPC returns the existing safe shared-home shell fields plus role-gated address fields: active `admin` and `member` memberships receive street/zip fields, while active `viewer` memberships receive city/state only with street/zip fields returned as `null`.
+- Reason for change: Household members need a safe next step toward useful shared-home visibility without changing the current UI, replacing the existing Slice 1E RPC, broadening `homes` RLS, or enabling shared service/work/financial/document/message/storage/contractor-connection/Home History access.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-shared-home-address-visibility.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/shared-home-shell.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI and keeps `servsync_list_my_shared_home_shells()` unchanged; a later Slice 1F-B should migrate the shared-home UI to the address-aware RPC after production SQL rollout.
+  - This slice adds no production SQL, no storage policy changes, no email/SMS/push delivery, no Edge Functions, and no shared access to service requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, contractor connections, or Home History.
+  - Future shared-record access must still be reviewed and enabled table by table with explicit RLS and UI tests.
+
 - Branch: `codex/fb-030-shared-home-shell-v1`
 - Files changed:
   - `servsync-shared-home-shell.sql`

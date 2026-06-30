@@ -20,8 +20,10 @@ type HomeFixture = {
   id: string;
   nickname: string | null;
   address_line1: string | null;
+  address_line2: string | null;
   city: string | null;
   state: string | null;
+  zip_code: string | null;
 };
 type SharedHomeShell = {
   home_id: string;
@@ -31,6 +33,11 @@ type SharedHomeShell = {
   state: string | null;
   role: HomeRole;
   membership_status: MembershipStatus;
+};
+type SharedHomeAddressShell = SharedHomeShell & {
+  address_line1: string | null;
+  address_line2: string | null;
+  zip_code: string | null;
 };
 
 function requireSandboxSupabaseConfig() {
@@ -102,7 +109,7 @@ async function signOutAll(accounts: AuthenticatedClient[]) {
 async function firstHome(account: AuthenticatedClient): Promise<HomeFixture> {
   const result = await account.client
     .from('homes')
-    .select('id, nickname, address_line1, city, state')
+    .select('id, nickname, address_line1, address_line2, city, state, zip_code')
     .eq('homeowner_user_id', account.userId)
     .order('created_at', { ascending: true })
     .limit(1)
@@ -172,6 +179,12 @@ async function listSharedHomeShells(account: AuthenticatedClient): Promise<Share
   return (result.data || []) as SharedHomeShell[];
 }
 
+async function listSharedHomeAddressShells(account: AuthenticatedClient): Promise<SharedHomeAddressShell[]> {
+  const result = await account.client.rpc('servsync_list_my_shared_home_address_shells');
+  expect(result.error, 'shared home address shell RPC should not error').toBeNull();
+  return (result.data || []) as SharedHomeAddressShell[];
+}
+
 async function loginAsHomeownerB(page: Page) {
   const credentials = credentialsFor('homeownerB');
   await page.goto('/#/homeowner');
@@ -230,6 +243,82 @@ test.describe('shared home shell', () => {
       expect((shell as Record<string, unknown>).address_line1).toBeUndefined();
       expect((shell as Record<string, unknown>).homeowner_user_id).toBeUndefined();
       expect((shell as Record<string, unknown>).contractor_id).toBeUndefined();
+    } finally {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      await signOutAll([owner, sharedMember]);
+    }
+  });
+
+  test('address shell RPC exposes street and zip only to active admin and member roles', async () => {
+    const owner = await signInAs('homeowner');
+    const sharedMember = await signInAs('homeownerB');
+    const ownerHome = await firstHome(owner);
+    const expectedKeys = [
+      'address_line1',
+      'address_line2',
+      'city',
+      'display_label',
+      'home_id',
+      'membership_status',
+      'nickname',
+      'role',
+      'state',
+      'zip_code',
+    ];
+
+    try {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+
+      for (const status of ['invited', 'declined', 'removed'] as const) {
+        insertMembership(ownerHome.id, sharedMember.userId, 'member', status);
+        const inactiveShells = await listSharedHomeAddressShells(sharedMember);
+        expect(inactiveShells.some(shell => shell.home_id === ownerHome.id), `${status} membership should not surface`).toBe(false);
+        cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      }
+
+      const ownerShells = await listSharedHomeAddressShells(owner);
+      expect(ownerShells.some(shell => shell.home_id === ownerHome.id), 'owner should not see owned home duplicated as shared').toBe(false);
+
+      for (const role of ['admin', 'member', 'viewer'] as const) {
+        insertMembership(ownerHome.id, sharedMember.userId, role, 'active');
+        const shells = await listSharedHomeAddressShells(sharedMember);
+        const shell = shells.find(row => row.home_id === ownerHome.id);
+
+        expect(shell, `${role} should see active shared home address shell`).toBeTruthy();
+        expect(Object.keys(shell!).sort()).toEqual(expectedKeys);
+        expect(shell!.role).toBe(role);
+        expect(shell!.membership_status).toBe('active');
+        expect(shell!.city).toBe(ownerHome.city);
+        expect(shell!.state).toBe(ownerHome.state);
+
+        if (role === 'viewer') {
+          expect(shell!.address_line1, 'viewer should not receive street line 1').toBeNull();
+          expect(shell!.address_line2, 'viewer should not receive street line 2').toBeNull();
+          expect(shell!.zip_code, 'viewer should not receive zip code').toBeNull();
+        } else {
+          expect(shell!.address_line1, `${role} should receive street line 1`).toBe(ownerHome.address_line1);
+          expect(shell!.address_line2, `${role} should receive street line 2`).toBe(ownerHome.address_line2);
+          expect(shell!.zip_code, `${role} should receive zip code`).toBe(ownerHome.zip_code);
+        }
+
+        expect((shell as Record<string, unknown>).homeowner_user_id).toBeUndefined();
+        expect((shell as Record<string, unknown>).owner_email).toBeUndefined();
+        expect((shell as Record<string, unknown>).contractor_id).toBeUndefined();
+        expect((shell as Record<string, unknown>).service_requests).toBeUndefined();
+        expect((shell as Record<string, unknown>).estimates).toBeUndefined();
+        expect((shell as Record<string, unknown>).invoices).toBeUndefined();
+        expect((shell as Record<string, unknown>).jobs).toBeUndefined();
+        expect((shell as Record<string, unknown>).documents).toBeUndefined();
+        expect((shell as Record<string, unknown>).messages).toBeUndefined();
+        expect((shell as Record<string, unknown>).storage).toBeUndefined();
+        expect((shell as Record<string, unknown>).contractor_connections).toBeUndefined();
+        expect((shell as Record<string, unknown>).home_history).toBeUndefined();
+
+        cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      }
+
+      const oldShells = await listSharedHomeShells(sharedMember);
+      expect(oldShells.find(row => row.home_id === ownerHome.id), 'old RPC should remain compatible after cleanup').toBeUndefined();
     } finally {
       cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
       await signOutAll([owner, sharedMember]);
