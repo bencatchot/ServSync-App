@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-access-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-access-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1D homeowner Home Access UI shell inside the Properties area. The UI lists visible home memberships and pending email invites, creates pending email invites by email and role, revokes pending email invites, allows invited signed-in homeowners to accept or decline their own pending email invites, and keeps copy explicit that email delivery and shared home dashboard records are not enabled yet.
+- Reason for change: Homeowners need a safe first UI for household access management using the existing Slice 1B/1C guarded RPCs, without exposing raw auth UUIDs, frontend email lookup, user enumeration, or broader shared homeowner record access.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium --list`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no SQL, no production SQL, no storage policy changes, no email/SMS/push delivery, no Edge Functions, and no shared access to existing homeowner service request, estimate, invoice, job, reminder, document, message, notification, storage, workflow, or contractor-connection records.
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test --list` is currently blocked by the existing production-auth read-only smoke preflight unless production smoke variables are configured; the focused Home Access spec list passed.
+  - Future slices must add delivery and shared-record access separately, with each surface explicitly reviewed.
+
 - Branch: `codex/fb-030-home-membership-email-invites-v1`
 - Files changed:
   - `servsync-home-membership-email-invites.sql`
