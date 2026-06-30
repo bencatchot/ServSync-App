@@ -130,6 +130,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_decline_home_membership_email_invite',
   'servsync_invite_home_member',
   'servsync_list_home_membership_email_invites',
+  'servsync_list_my_shared_home_shells',
   'servsync_list_my_home_membership_email_invites',
   'servsync_prepare_manual_home_document_upload',
   'servsync_propose_service_request_appointment_windows',

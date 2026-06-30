@@ -375,6 +375,15 @@ type MyHomeAccessEmailInvite = Pick<HomeAccessEmailInvite, 'id' | 'home_id' | 'r
   home_city: string | null;
   home_state: string | null;
 };
+type SharedHomeShell = {
+  home_id: string;
+  display_label: string | null;
+  nickname: string | null;
+  city: string | null;
+  state: string | null;
+  role: Exclude<HomeMembershipRole, 'owner'>;
+  membership_status: HomeMembershipStatus;
+};
 type HomeAccessInviteDraft = {
   email: string;
   role: Exclude<HomeMembershipRole, 'owner'>;
@@ -9110,8 +9119,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeAccessMemberships, setHomeAccessMemberships] = useState<HomeAccessMembership[]>([]);
   const [homeAccessEmailInvites, setHomeAccessEmailInvites] = useState<HomeAccessEmailInvite[]>([]);
   const [myHomeAccessEmailInvites, setMyHomeAccessEmailInvites] = useState<MyHomeAccessEmailInvite[]>([]);
+  const [sharedHomeShells, setSharedHomeShells] = useState<SharedHomeShell[]>([]);
   const [homeAccessInviteDraft, setHomeAccessInviteDraft] = useState<HomeAccessInviteDraft>({ email: '', role: 'viewer' });
   const [loadingHomeAccess, setLoadingHomeAccess] = useState(false);
+  const [loadingSharedHomeShells, setLoadingSharedHomeShells] = useState(false);
   const [savingHomeAccessInvite, setSavingHomeAccessInvite] = useState(false);
   const [updatingHomeAccessInviteId, setUpdatingHomeAccessInviteId] = useState<string | null>(null);
   const [revokingHomeMembershipId, setRevokingHomeMembershipId] = useState<string | null>(null);
@@ -9498,6 +9509,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void loadHomeAccess();
   }, [loadHomeAccess]);
 
+  const loadSharedHomeShells = useCallback(async () => {
+    if (!supabase) return;
+    setLoadingSharedHomeShells(true);
+    try {
+      const { data, error: sharedHomeShellError } = await supabase.rpc('servsync_list_my_shared_home_shells');
+      if (sharedHomeShellError) throw sharedHomeShellError;
+      setSharedHomeShells((data || []) as SharedHomeShell[]);
+    } catch (err) {
+      setError(readableError(err, 'Unable to load homes shared with you.'));
+    } finally {
+      setLoadingSharedHomeShells(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSharedHomeShells();
+  }, [loadSharedHomeShells]);
+
   const createHomeAccessEmailInvite = async () => {
     if (!supabase || !selectedHome?.id) return;
     setNotice('');
@@ -9560,6 +9589,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         ? 'Invite accepted. Shared home dashboard access will be enabled in a later release.'
         : 'Invite declined.');
       await loadHomeAccess(selectedHomeId);
+      await loadSharedHomeShells();
     } catch (err) {
       setError(readableError(err, action === 'accept' ? 'Unable to accept home access invite.' : 'Unable to decline home access invite.'));
     } finally {
@@ -9579,6 +9609,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (revokeError) throw revokeError;
       setNotice('Home access removed.');
       await loadHomeAccess(membership.home_id || selectedHomeId);
+      await loadSharedHomeShells();
     } catch (err) {
       setError(readableError(err, 'Unable to remove home access.'));
     } finally {
@@ -12911,6 +12942,55 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (role === 'member') return 'bg-emerald-50 text-emerald-700';
     return 'bg-slate-100 text-slate-600';
   };
+  const renderSharedHomeShellsPanel = () => (
+    <Card title="Homes shared with me" icon={<Home size={18} />}>
+      <div className="space-y-4" data-testid="shared-home-shells-panel">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-slate-950">Read-only shared home shell</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                Shared home records are not enabled yet. Requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded.
+              </p>
+            </div>
+            <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
+              Shell only
+            </span>
+          </div>
+        </div>
+
+        {loadingSharedHomeShells && (
+          <p className="text-xs font-semibold text-blue-700">Refreshing shared homes...</p>
+        )}
+
+        {sharedHomeShells.length === 0 ? (
+          <EmptyState text="No homes have been shared with you yet." />
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {sharedHomeShells.map(shell => {
+              const label = shell.display_label || shell.nickname || [shell.city, shell.state].filter(Boolean).join(', ') || 'Shared home';
+              const location = [shell.city, shell.state].filter(Boolean).join(', ');
+              return (
+                <div key={shell.home_id} className="rounded-xl border border-slate-200 bg-white p-3" data-testid="shared-home-shell-card">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-bold text-slate-950">{label}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(shell.role)}`}>{homeAccessRoleLabel(shell.role)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(shell.membership_status)}`}>{homeAccessStatusLabel(shell.membership_status)}</span>
+                    </div>
+                    <p className="text-xs text-slate-500">{location || 'Location not shared'}</p>
+                    <p className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-800">
+                      This shared home cannot be selected for owner dashboard records yet.
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
   const renderHomeAccessPanel = () => {
     const activeMemberships = homeAccessMemberships.filter(membership => membership.status === 'active' || membership.status === 'invited');
     const historicalMemberships = homeAccessMemberships.filter(membership => membership.status !== 'active' && membership.status !== 'invited');
@@ -13980,6 +14060,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               Property-specific filtering will expand as requests, documents, estimates, invoices, jobs, reports, and Home History records are linked to individual homes.
             </p>
           </Card>
+          {renderSharedHomeShellsPanel()}
           {renderHomeAccessPanel()}
         </div>
 
