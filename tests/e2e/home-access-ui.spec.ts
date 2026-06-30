@@ -23,6 +23,10 @@ type MembershipRow = {
   role: 'owner' | 'admin' | 'member' | 'viewer';
   status: 'invited' | 'active' | 'removed' | 'declined';
 };
+type FunctionPayloadCapture = {
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+};
 
 function supabaseConfig() {
   return {
@@ -122,13 +126,41 @@ test.describe('home access UI shell', () => {
     requireApprovedSandboxForMutation();
   });
 
-  test('owner creates, safely errors on duplicate, and revokes a pending email invite without claiming email was sent', async ({ page }) => {
+  test('owner creates, attempts disabled delivery, handles delivery failure, and revokes pending email invites without claiming email was sent', async ({ page }) => {
     const owner = await signInClient('homeowner');
     const homeId = await firstHomeId(owner);
     const inviteEmail = `servsync-home-access-${Date.now()}@example.invalid`;
+    const deliveryFailureEmail = `servsync-home-access-failure-${Date.now()}@example.invalid`;
+    const functionPayloads: FunctionPayloadCapture[] = [];
+    let functionCallCount = 0;
 
     try {
       await revokePendingInvitesForEmail(owner, homeId, inviteEmail);
+      await revokePendingInvitesForEmail(owner, homeId, deliveryFailureEmail);
+      await page.route(/\/functions\/v1\/send-home-access-invite-email$/, async route => {
+        functionCallCount += 1;
+        const request = route.request();
+        functionPayloads.push({
+          headers: request.headers(),
+          body: request.postDataJSON() as Record<string, unknown>,
+        });
+
+        if (functionCallCount === 1) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ ok: true, delivery_enabled: false }),
+          });
+          return;
+        }
+
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: 'temporarily_unavailable' }),
+        });
+      });
+
       await loginAs(page, 'homeowner');
       await openSidebarTab(page, /^Properties$/i);
 
@@ -147,10 +179,21 @@ test.describe('home access UI shell', () => {
       await roleSelect.selectOption('viewer');
       await panel.getByRole('button', { name: /^Create invite$/i }).click();
 
-      await expect(page.getByText(/Invite created/i)).toBeVisible();
-      await expect(page.getByText(/Email delivery is not enabled yet during this beta step/i).first()).toBeVisible();
+      await expect(page.getByText(/Invite saved/i)).toBeVisible();
+      await expect(page.getByText(/Email delivery is currently disabled, so the person was not emailed yet/i)).toBeVisible();
+      await expect(page.getByText(/They can accept after signing in with the invited email once you share the invite manually or delivery is enabled/i)).toBeVisible();
       await expect(page.getByText(/Email sent/i)).toHaveCount(0);
+      await expect(page.getByText(/email was sent/i)).toHaveCount(0);
+      await expect(page.getByText(/email queued/i)).toHaveCount(0);
       await expect(panel.getByText(inviteEmail)).toBeVisible();
+      expect(functionPayloads).toHaveLength(1);
+      expect(Object.keys(functionPayloads[0].body).sort()).toEqual(['invite_id']);
+      expect(typeof functionPayloads[0].body.invite_id).toBe('string');
+      expect(functionPayloads[0].headers.authorization).toContain('Bearer ');
+      expect(JSON.stringify(functionPayloads[0].body)).not.toContain(inviteEmail);
+      expect(JSON.stringify(functionPayloads[0].body)).not.toContain('viewer');
+      expect(JSON.stringify(functionPayloads[0].body)).not.toContain('address');
+      expect(JSON.stringify(functionPayloads[0].body)).not.toContain('message');
 
       await panel.getByPlaceholder('person@example.com').fill(inviteEmail);
       await panel.getByRole('button', { name: /^Create invite$/i }).click();
@@ -158,8 +201,25 @@ test.describe('home access UI shell', () => {
 
       await panel.getByRole('button', { name: /^Revoke invite$/i }).click();
       await expect(page.getByText(/Pending invite revoked/i)).toBeVisible();
+
+      await panel.getByPlaceholder('person@example.com').fill(deliveryFailureEmail);
+      await roleSelect.selectOption('member');
+      await panel.getByRole('button', { name: /^Create invite$/i }).click();
+      await expect(page.getByText(/Invite was saved, but delivery could not be attempted/i)).toBeVisible();
+      await expect(page.getByText(/Email delivery is currently disabled, so the person was not emailed yet/i)).toBeVisible();
+      await expect(page.getByText(/Email sent/i)).toHaveCount(0);
+      await expect(page.getByText(/account exists/i)).toHaveCount(0);
+      await expect(panel.getByText(deliveryFailureEmail)).toBeVisible();
+      expect(functionPayloads).toHaveLength(2);
+      expect(Object.keys(functionPayloads[1].body).sort()).toEqual(['invite_id']);
+      expect(JSON.stringify(functionPayloads[1].body)).not.toContain(deliveryFailureEmail);
+      expect(JSON.stringify(functionPayloads[1].body)).not.toContain('member');
+
+      await panel.getByText(deliveryFailureEmail).locator('xpath=ancestor::div[contains(@class, "rounded-xl")]').getByRole('button', { name: /^Revoke invite$/i }).click();
+      await expect(page.getByText(/Pending invite revoked/i)).toBeVisible();
     } finally {
       await revokePendingInvitesForEmail(owner, homeId, inviteEmail);
+      await revokePendingInvitesForEmail(owner, homeId, deliveryFailureEmail);
       await signOutAll([owner]);
     }
   });
