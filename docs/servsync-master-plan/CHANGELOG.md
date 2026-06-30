@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/marketing-inventory-workflow-check-v1`
+- Files changed:
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the ServSync Codex workflow template so future audit, implementation, verification, return-format, guardrail, docs-rule, and new-chat prompt sections include a Marketing Product Inventory check tied to `docs/MARKETING_PRODUCT_INVENTORY.md`.
+- Reason for change: User-facing feature, workflow, status, value proposition, claim, limitation, and do-not-promise changes need an explicit marketing inventory review so future marketing, brochure, social, landing-page, and video-script claims do not drift from the source-of-truth inventory or rely on the changelog alone.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Manual Markdown diff review
+  - Approved-file scope review
+  - Changed-file secret-value scan
+- Known risks or follow-ups:
+  - This is a workflow documentation change only. It does not update app behavior, SQL, Supabase/Vercel settings, tests, package files, or live marketing feature claims.
+  - Future feature prompts should now require Codex to update `docs/MARKETING_PRODUCT_INVENTORY.md` when marketing/product claims change, or explicitly report: "Marketing inventory reviewed; no update needed."
+
 - Branch: `codex/fb-030-home-access-invite-disabled-ui-v1`
 - Files changed:
   - `src/App.tsx`
