@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-shared-home-address-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/shared-home-shell.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1F-B shared-home address UI migration. The homeowner `Homes shared with me` panel now calls the already-live `servsync_list_my_shared_home_address_shells()` RPC and conditionally renders street/address/zip fields only when the RPC returns them. Viewer results continue to show city/state only with limited-location copy and no blank address placeholders.
+- Reason for change: Accepted household members with `admin` or `member` roles need the approved full-address visibility from Slice 1F-A in the UI, while `viewer` roles and broader owner-only record surfaces must remain protected.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/shared-home-shell.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/homeowner-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no SQL, no storage policy changes, no email/SMS/push delivery, no Edge Functions, and no shared access to service requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, contractor connections, or Home History.
+  - Shared homes remain separate from owner-owned home selectors and cannot be selected for owner dashboard records.
+  - Future shared-record access still requires separate table-by-table product and RLS review.
+
 - Branch: `codex/fb-030-shared-home-address-rpc-v1`
 - Files changed:
   - `servsync-shared-home-address-visibility.sql`
