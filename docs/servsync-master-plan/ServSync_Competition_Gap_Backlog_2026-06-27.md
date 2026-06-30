@@ -35,6 +35,7 @@ Since the original 2026-06-27 gap review, several of the recommended gaps have m
 | FB-027 | Contractor Pipeline / Follow-Up Lite | Estimates, requests, reminders, contractor dashboard | Not started as its own feature | Medium-High | Design simple follow-up queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests. Activity timeline work can inform this but does not replace it. |
 | FB-028 | Accounting Export Foundation | Invoices, customers, accounting | Not started / Later-Future | Medium | Start with CSV/export-ready invoice/customer/payment data before QuickBooks sync. Do not build full accounting. |
 | FB-029 | Recurring Maintenance / Service Plan Lite | Home reminders, contractor recurring work, homeowner relationships | Not started / Later-Future | Medium | Shape after reminders, scheduling, invoices, and Home History are stronger. Start with manual recurring maintenance opportunities, not complex memberships. |
+| FB-030 | Household / Shared Homeowner Access | Homeowner accounts, homes, permissions, family/household collaboration | Needs Audit | High | Audit how to support multiple users under one homeowner household/home account, with owner/admin/member/viewer-style roles, invite/accept/revoke flows, property-level access, approval authority, and clear audit trails. |
 
 ## Existing backlog items affected
 
@@ -104,11 +105,99 @@ Still open:
 - Any production SQL/storage/settings changes remain separate approval gates.
 - Backup/restore and storage readiness should not be claimed complete until proven by an executed drill and evidence.
 
+### FB-030 — Household / Shared Homeowner Access
+
+Purpose:
+
+Allow one home/household to be managed by more than one homeowner-side user, such as a spouse/partner, adult child, property co-owner, property manager, or trusted household member.
+
+Initial direction:
+
+- Treat this as shared access to a homeowner household or property workspace, not as multiple people sharing one login.
+- Each person should have their own authenticated user account.
+- A primary homeowner/owner should be able to invite, approve, revoke, and manage household access.
+- Access should be property-aware because a homeowner may have multiple homes and may not want every invited person to access every property.
+- Contractor connections and property-sharing permissions must remain explicit and auditable.
+
+Possible homeowner-side roles:
+
+- Owner: full household/property control, can invite/remove members, manage homes, manage contractor connections, approve estimates, view/pay invoices when payments exist, and manage sharing.
+- Admin/Co-owner: broad management rights but possibly cannot remove the primary owner.
+- Member: can view shared property history, requests, estimates, jobs, invoices, messages, and reminders; approval/payment authority must be explicitly decided.
+- Viewer: read-only access to selected homes and records.
+
+Key decisions needed before implementation:
+
+- Whether household membership is account-level, home-level, or both.
+- Whether invited members can create service requests.
+- Whether invited members can approve estimates, appointments, invoices, and contractor permissions.
+- Whether invited members can invite/remove other members.
+- Whether contractor-facing messages show the individual sender or the household name.
+- Whether contractors see household member names, roles, or only the primary homeowner unless a member messages them.
+- How removal/revocation affects existing message history, approvals, estimates, invoices, and Home History.
+- How to prevent access leakage across unrelated homes, contractors, and household members.
+
+Guardrails:
+
+- Do not allow shared passwords or multiple people using one login as the intended design.
+- Do not silently give a newly invited member access to every home unless the owner explicitly chooses that scope.
+- Do not let a viewer approve estimates, invoices, payments, contractor sharing, or account-level changes.
+- Do not let a contractor add household members.
+- Do not let one household member remove the primary owner without a later explicit account-transfer design.
+- Keep audit trails for invitations, accepts, revokes, approval actions, and permission changes.
+
+Recommended audit prompt:
+
+```text
+You are working in the ServSync repo.
+
+TASK
+Audit the current homeowner profile, homes/properties, connection permissions, service requests, estimates, jobs, invoices, reminders, messages, and RLS paths to plan FB-030: Household / Shared Homeowner Access.
+
+DO NOT CHANGE CODE.
+DO NOT APPLY SQL.
+DO NOT CREATE OR MODIFY FILES.
+DO NOT DEPLOY.
+
+GOAL
+Return an audit and implementation plan for supporting multiple authenticated users under one homeowner household/property workspace, without shared passwords and without leaking property or contractor data across unrelated users.
+
+AUDIT AREAS
+1. Current homeowner user/profile model.
+2. Current homes/property ownership model.
+3. Current connection_shared_properties and homeowner-contractor permission model.
+4. Current service request, estimate, job, invoice, reminder, document, media, and message visibility rules.
+5. Current homeowner approval actions for estimates, appointments, invoices, contractor sharing, and property suggestions.
+6. Existing RLS helpers that assume one homeowner user owns one profile/home.
+7. Existing notification/message sender display assumptions.
+8. Existing tests that would need expansion for shared homeowner access.
+
+PLANNED DIRECTION
+- Each household member has their own auth user.
+- Primary owner can invite/revoke household members.
+- Access should be property-scoped where practical.
+- Roles should likely include owner, admin/co-owner, member, and viewer.
+- Permission to approve estimates, approve appointment times, approve invoices/payments, manage contractor sharing, and invite/remove members must be explicit.
+- Contractors should not be able to add household members.
+
+RETURN
+1. Current-state summary.
+2. Recommended data model.
+3. Recommended role/permission model.
+4. Recommended homeowner UI flow.
+5. Contractor visibility/messaging considerations.
+6. RLS/security risks.
+7. Migration/RPC needs.
+8. Test plan.
+9. Recommended implementation slices, smallest safe slice first.
+10. Clear out-of-scope items.
+```
+
 ## Highest-priority next work after reconciliation
 
 ### 1. Update the official feature backlog table
 
-The official `ServSync_Feature_Backlog.md` table still needs a follow-up cleanup so FB-021 through FB-029 are represented directly in the main inventory and old statuses for FB-020/FB-011/FB-024/FB-025 are no longer misleading.
+The official `ServSync_Feature_Backlog.md` table still needs a follow-up cleanup so FB-021 through FB-030 are represented directly in the main inventory and old statuses for FB-020/FB-011/FB-024/FB-025 are no longer misleading.
 
 ### 2. Finish FB-021 Scheduling v1
 
@@ -120,7 +209,18 @@ Recommended next scheduling slice:
 - Activity timeline shows the safe appointment status updates already supported by durable events where available.
 - Keep email/SMS/push reminders, Google/Outlook sync, dispatch/routing, GPS, and homeowner-forced booking out of scope.
 
-### 3. Continue FB-024 Price Book maturity
+### 3. Audit FB-030 Household / Shared Homeowner Access
+
+Recommended next household-access step:
+
+- Audit existing homeowner/profile/home ownership assumptions.
+- Decide account-level vs home-level membership model.
+- Decide roles and approval authority.
+- Design invite/accept/revoke flow.
+- Identify RLS helpers and tests that assume a single homeowner user owns the home.
+- Keep this audit-only before any SQL or UI implementation.
+
+### 4. Continue FB-024 Price Book maturity
 
 Recommended next Price Book slice:
 
@@ -131,7 +231,7 @@ Recommended next Price Book slice:
 - Keep contractor internal notes/private pricing metadata hidden from homeowners.
 - Decide whether field tech/viewer roles can see pricing and internal metadata.
 
-### 4. Continue FB-025 communication/Activity work
+### 5. Continue FB-025 communication/Activity work
 
 Recommended next communication slice:
 
@@ -140,7 +240,7 @@ Recommended next communication slice:
 - Defer email/SMS/push delivery until notification preferences, templates, and delivery rules are clear.
 - Do not add broad chat or contractor cold-message entry points.
 
-### 5. Keep these behind the above
+### 6. Keep these behind the above
 
 - FB-026 Review + Referral Flow.
 - FB-023 Payments / Deposits.
@@ -165,9 +265,10 @@ These are useful but should not be the next build unless strategy changes:
 
 1. Official backlog table/status cleanup.
 2. FB-021 — Scheduling reschedule/cancel completion slice.
-3. FB-011 — Dedicated mobile workflow polish audit around the core beta loop.
-4. FB-024 — Price Book / Estimate Item Library maturity beyond quick-pick.
-5. FB-025 — Communication unread/status indicators and notification planning.
-6. FB-026 — Review + Referral Flow.
-7. FB-023 — Payment Collection / Deposits after invoice stability.
-8. FB-027 — Contractor Pipeline / Follow-Up Lite.
+3. FB-030 — Household / Shared Homeowner Access audit.
+4. FB-011 — Dedicated mobile workflow polish audit around the core beta loop.
+5. FB-024 — Price Book / Estimate Item Library maturity beyond quick-pick.
+6. FB-025 — Communication unread/status indicators and notification planning.
+7. FB-026 — Review + Referral Flow.
+8. FB-023 — Payment Collection / Deposits after invoice stability.
+9. FB-027 — Contractor Pipeline / Follow-Up Lite.
