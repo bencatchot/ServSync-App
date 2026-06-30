@@ -338,6 +338,47 @@ type HomeownerServiceRequestDraft = {
   title: string;
   description: string;
 };
+type HomeMembershipRole = 'owner' | 'admin' | 'member' | 'viewer';
+type HomeMembershipStatus = 'invited' | 'active' | 'removed' | 'declined';
+type HomeMembershipEmailInviteStatus = 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
+type HomeAccessMembership = {
+  id: string;
+  home_id: string;
+  user_id: string;
+  role: HomeMembershipRole;
+  status: HomeMembershipStatus;
+  invited_by_user_id: string | null;
+  accepted_at: string | null;
+  removed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type HomeAccessEmailInvite = {
+  id: string;
+  home_id: string;
+  invited_email: string;
+  invited_email_normalized?: string;
+  role: Exclude<HomeMembershipRole, 'owner'>;
+  status: HomeMembershipEmailInviteStatus;
+  invited_by_user_id?: string | null;
+  accepted_by_user_id?: string | null;
+  membership_id?: string | null;
+  expires_at?: string | null;
+  accepted_at?: string | null;
+  declined_at?: string | null;
+  revoked_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+};
+type MyHomeAccessEmailInvite = Pick<HomeAccessEmailInvite, 'id' | 'home_id' | 'role' | 'status' | 'invited_email' | 'expires_at' | 'created_at'> & {
+  home_nickname: string | null;
+  home_city: string | null;
+  home_state: string | null;
+};
+type HomeAccessInviteDraft = {
+  email: string;
+  role: Exclude<HomeMembershipRole, 'owner'>;
+};
 type HomeownerContractorInviteLeadStatus = 'submitted' | 'invite_sent' | 'contractor_joined' | 'contractor_declined' | 'no_response_30_days';
 type HomeownerContractorInviteLead = {
   id: string;
@@ -9066,6 +9107,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homes, setHomes] = useState<HomeProfile[]>([]);
   const [home, setHome] = useState<HomeProfile | null>(null);
   const [selectedHomeId, setSelectedHomeId] = useState(() => window.localStorage.getItem(STORAGE_KEYS.homeownerSelectedHome) ?? '');
+  const [homeAccessMemberships, setHomeAccessMemberships] = useState<HomeAccessMembership[]>([]);
+  const [homeAccessEmailInvites, setHomeAccessEmailInvites] = useState<HomeAccessEmailInvite[]>([]);
+  const [myHomeAccessEmailInvites, setMyHomeAccessEmailInvites] = useState<MyHomeAccessEmailInvite[]>([]);
+  const [homeAccessInviteDraft, setHomeAccessInviteDraft] = useState<HomeAccessInviteDraft>({ email: '', role: 'viewer' });
+  const [loadingHomeAccess, setLoadingHomeAccess] = useState(false);
+  const [savingHomeAccessInvite, setSavingHomeAccessInvite] = useState(false);
+  const [updatingHomeAccessInviteId, setUpdatingHomeAccessInviteId] = useState<string | null>(null);
+  const [revokingHomeMembershipId, setRevokingHomeMembershipId] = useState<string | null>(null);
   const [homeownerProfilePhotoUrl, setHomeownerProfilePhotoUrl] = useState('');
   const [homePhotoUrl, setHomePhotoUrl] = useState('');
   const [uploadingHomeownerProfilePhoto, setUploadingHomeownerProfilePhoto] = useState(false);
@@ -9409,6 +9458,133 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     void loadHomeowner();
   }, [loadHomeowner]);
+
+  const loadHomeAccess = useCallback(async (homeId = selectedHomeId) => {
+    if (!supabase) return;
+    setLoadingHomeAccess(true);
+    try {
+      const myInvitesRes = await supabase.rpc('servsync_list_my_home_membership_email_invites');
+      if (myInvitesRes.error) throw myInvitesRes.error;
+      setMyHomeAccessEmailInvites((myInvitesRes.data || []) as MyHomeAccessEmailInvite[]);
+
+      if (!homeId) {
+        setHomeAccessMemberships([]);
+        setHomeAccessEmailInvites([]);
+        return;
+      }
+
+      const [membershipsRes, emailInvitesRes] = await Promise.all([
+        supabase
+          .from('home_memberships')
+          .select('id, home_id, user_id, role, status, invited_by_user_id, accepted_at, removed_at, created_at, updated_at')
+          .eq('home_id', homeId)
+          .order('created_at', { ascending: true }),
+        supabase.rpc('servsync_list_home_membership_email_invites', { p_home_id: homeId }),
+      ]);
+
+      if (membershipsRes.error) throw membershipsRes.error;
+      if (emailInvitesRes.error) throw emailInvitesRes.error;
+
+      setHomeAccessMemberships((membershipsRes.data || []) as HomeAccessMembership[]);
+      setHomeAccessEmailInvites((emailInvitesRes.data || []) as HomeAccessEmailInvite[]);
+    } catch (err) {
+      setError(readableError(err, 'Unable to load Home Access.'));
+    } finally {
+      setLoadingHomeAccess(false);
+    }
+  }, [selectedHomeId]);
+
+  useEffect(() => {
+    void loadHomeAccess();
+  }, [loadHomeAccess]);
+
+  const createHomeAccessEmailInvite = async () => {
+    if (!supabase || !selectedHome?.id) return;
+    setNotice('');
+    setError('');
+    setSavingHomeAccessInvite(true);
+    try {
+      const email = homeAccessInviteDraft.email.trim();
+      if (!email) {
+        setError('Enter an email address before creating an invite.');
+        return;
+      }
+      const { error: inviteError } = await supabase.rpc('servsync_create_home_membership_email_invite', {
+        p_home_id: selectedHome.id,
+        p_invited_email: email,
+        p_role: homeAccessInviteDraft.role,
+      });
+      if (inviteError) throw inviteError;
+
+      setHomeAccessInviteDraft({ email: '', role: 'viewer' });
+      setNotice('Invite created. Email delivery is not enabled yet during this beta step.');
+      await loadHomeAccess(selectedHome.id);
+    } catch (err) {
+      setError(readableError(err, 'Unable to create home access invite.'));
+    } finally {
+      setSavingHomeAccessInvite(false);
+    }
+  };
+
+  const revokeHomeAccessEmailInvite = async (invite: HomeAccessEmailInvite) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setUpdatingHomeAccessInviteId(invite.id);
+    try {
+      const { error: revokeError } = await supabase.rpc('servsync_revoke_home_membership_email_invite', {
+        p_invite_id: invite.id,
+      });
+      if (revokeError) throw revokeError;
+      setNotice('Pending invite revoked.');
+      await loadHomeAccess(invite.home_id || selectedHomeId);
+    } catch (err) {
+      setError(readableError(err, 'Unable to revoke home access invite.'));
+    } finally {
+      setUpdatingHomeAccessInviteId(null);
+    }
+  };
+
+  const respondToMyHomeAccessEmailInvite = async (invite: MyHomeAccessEmailInvite, action: 'accept' | 'decline') => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setUpdatingHomeAccessInviteId(invite.id);
+    try {
+      const rpcName = action === 'accept'
+        ? 'servsync_accept_home_membership_email_invite'
+        : 'servsync_decline_home_membership_email_invite';
+      const { error: responseError } = await supabase.rpc(rpcName, { p_invite_id: invite.id });
+      if (responseError) throw responseError;
+      setNotice(action === 'accept'
+        ? 'Invite accepted. Shared home dashboard access will be enabled in a later release.'
+        : 'Invite declined.');
+      await loadHomeAccess(selectedHomeId);
+    } catch (err) {
+      setError(readableError(err, action === 'accept' ? 'Unable to accept home access invite.' : 'Unable to decline home access invite.'));
+    } finally {
+      setUpdatingHomeAccessInviteId(null);
+    }
+  };
+
+  const revokeHomeMembership = async (membership: HomeAccessMembership) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setRevokingHomeMembershipId(membership.id);
+    try {
+      const { error: revokeError } = await supabase.rpc('servsync_revoke_home_membership', {
+        p_membership_id: membership.id,
+      });
+      if (revokeError) throw revokeError;
+      setNotice('Home access removed.');
+      await loadHomeAccess(membership.home_id || selectedHomeId);
+    } catch (err) {
+      setError(readableError(err, 'Unable to remove home access.'));
+    } finally {
+      setRevokingHomeMembershipId(null);
+    }
+  };
 
   useEffect(() => {
     if (!supabase || !requestComposerOpen || requestComposerStep !== 'contractor') return;
@@ -12707,6 +12883,265 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-700',
     slate: 'border-slate-200 bg-slate-50 text-slate-600',
   }[tone]);
+  const homeAccessRoleLabel = (role: HomeMembershipRole) => ({
+    owner: 'Owner',
+    admin: 'Admin',
+    member: 'Member',
+    viewer: 'Viewer',
+  }[role]);
+  const homeAccessStatusLabel = (status: HomeMembershipStatus | HomeMembershipEmailInviteStatus) => ({
+    invited: 'Invited',
+    active: 'Active',
+    removed: 'Removed',
+    declined: 'Declined',
+    pending: 'Pending',
+    accepted: 'Accepted',
+    revoked: 'Revoked',
+    expired: 'Expired',
+  }[status]);
+  const homeAccessStatusClass = (status: HomeMembershipStatus | HomeMembershipEmailInviteStatus) => {
+    if (status === 'active' || status === 'accepted') return 'bg-emerald-50 text-emerald-700';
+    if (status === 'pending' || status === 'invited') return 'bg-amber-50 text-amber-700';
+    if (status === 'removed' || status === 'revoked') return 'bg-slate-100 text-slate-600';
+    return 'bg-rose-50 text-rose-700';
+  };
+  const homeAccessRoleClass = (role: HomeMembershipRole) => {
+    if (role === 'owner') return 'bg-slate-900 text-white';
+    if (role === 'admin') return 'bg-blue-50 text-blue-700';
+    if (role === 'member') return 'bg-emerald-50 text-emerald-700';
+    return 'bg-slate-100 text-slate-600';
+  };
+  const renderHomeAccessPanel = () => {
+    const activeMemberships = homeAccessMemberships.filter(membership => membership.status === 'active' || membership.status === 'invited');
+    const historicalMemberships = homeAccessMemberships.filter(membership => membership.status !== 'active' && membership.status !== 'invited');
+    const pendingEmailInvites = homeAccessEmailInvites.filter(invite => invite.status === 'pending');
+    const resolvedEmailInvites = homeAccessEmailInvites.filter(invite => invite.status !== 'pending');
+
+    return (
+      <Card title="Home Access" icon={<Users size={18} />}>
+        <div className="space-y-5" data-testid="home-access-panel">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-950">Household access for {selectedHome ? homeProfileDisplayLabel(selectedHome) : 'your selected home'}</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
+                  Invite trusted people to this home by email. Email delivery is not enabled yet during this beta step, and accepted members do not receive shared dashboard access to requests, estimates, invoices, jobs, reminders, documents, messages, notifications, storage, or contractor connections yet.
+                </p>
+              </div>
+              <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">
+                Home-level only
+              </span>
+            </div>
+          </div>
+
+          {myHomeAccessEmailInvites.length > 0 && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4" data-testid="home-invitations-panel">
+              <p className="text-sm font-bold text-slate-950">Home invitations for you</p>
+              <p className="mt-1 text-sm leading-6 text-emerald-900">
+                These invites are addressed to your signed-in email. Accepting records your membership, but shared home dashboard records will be enabled in a later release.
+              </p>
+              <div className="mt-3 space-y-2">
+                {myHomeAccessEmailInvites.map(invite => {
+                  const homeLabel = invite.home_nickname || [invite.home_city, invite.home_state].filter(Boolean).join(', ') || 'Shared home';
+                  return (
+                    <div key={invite.id} className="flex flex-col gap-3 rounded-xl border border-emerald-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-950">{homeLabel}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Created {formatDateTime(invite.created_at)}
+                          {invite.expires_at ? ` · Expires ${formatDateTime(invite.expires_at)}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void respondToMyHomeAccessEmailInvite(invite, 'accept')}
+                          disabled={updatingHomeAccessInviteId === invite.id}
+                          className={buttonClass('primary')}
+                        >
+                          <CheckCircle2 size={16} />
+                          {updatingHomeAccessInviteId === invite.id ? 'Updating...' : 'Accept'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void respondToMyHomeAccessEmailInvite(invite, 'decline')}
+                          disabled={updatingHomeAccessInviteId === invite.id}
+                          className={buttonClass('secondary')}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!selectedHome?.id ? (
+            <EmptyState text="Choose or save a property before managing household access." />
+          ) : (
+            <>
+              <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">Members</p>
+                      <p className="mt-1 text-sm text-slate-500">Current and prior home-level memberships visible under RLS.</p>
+                    </div>
+                    {loadingHomeAccess && <span className="text-xs font-semibold text-blue-700">Refreshing...</span>}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {activeMemberships.length === 0 ? (
+                      <EmptyState text="No active household members are visible for this home yet." />
+                    ) : activeMemberships.map(membership => {
+                      const isPrimaryOwner = membership.user_id === selectedHome.homeowner_user_id;
+                      const canRevoke = !isPrimaryOwner && membership.role !== 'owner' && ['active', 'invited'].includes(membership.status);
+                      return (
+                        <div key={membership.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-slate-950">{isPrimaryOwner ? 'Primary homeowner' : 'Household member'}</p>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(membership.role)}`}>{homeAccessRoleLabel(membership.role)}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(membership.status)}`}>{homeAccessStatusLabel(membership.status)}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {membership.accepted_at ? `Accepted ${formatDateTime(membership.accepted_at)}` : `Created ${formatDateTime(membership.created_at)}`}
+                              {isPrimaryOwner ? ' · Primary owner cannot be revoked' : ''}
+                            </p>
+                          </div>
+                          {canRevoke && (
+                            <button
+                              type="button"
+                              onClick={() => void revokeHomeMembership(membership)}
+                              disabled={revokingHomeMembershipId === membership.id}
+                              className={buttonClass('danger')}
+                            >
+                              <X size={16} />
+                              {revokingHomeMembershipId === membership.id ? 'Removing...' : 'Remove access'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {historicalMemberships.length > 0 && (
+                    <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-700">Prior membership rows</summary>
+                      <div className="mt-3 space-y-2">
+                        {historicalMemberships.map(membership => (
+                          <div key={membership.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                            <span>{membership.user_id === selectedHome.homeowner_user_id ? 'Primary homeowner' : 'Household member'}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(membership.role)}`}>{homeAccessRoleLabel(membership.role)}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(membership.status)}`}>{homeAccessStatusLabel(membership.status)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-bold text-slate-950">Create email invite</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Creates a pending invite only. ServSync does not send an email automatically in this beta step.
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    <Field label="Invite email">
+                      <input
+                        className={inputClass()}
+                        type="email"
+                        autoComplete="email"
+                        value={homeAccessInviteDraft.email}
+                        onChange={event => setHomeAccessInviteDraft(current => ({ ...current, email: event.target.value }))}
+                        placeholder="person@example.com"
+                      />
+                    </Field>
+                    <Field label="Role">
+                      <select
+                        className={inputClass()}
+                        value={homeAccessInviteDraft.role}
+                        onChange={event => setHomeAccessInviteDraft(current => ({ ...current, role: event.target.value as HomeAccessInviteDraft['role'] }))}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={() => void createHomeAccessEmailInvite()}
+                      disabled={savingHomeAccessInvite}
+                      className={buttonClass('primary')}
+                    >
+                      <Mail size={16} />
+                      {savingHomeAccessInvite ? 'Creating...' : 'Create invite'}
+                    </button>
+                    <p className="text-xs leading-5 text-amber-700">
+                      Email delivery is not enabled yet during this beta step. Do not tell someone an email was sent from ServSync.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Pending email invites</p>
+                    <p className="mt-1 text-sm text-slate-500">Invites created for this home. Pending invites can be revoked before acceptance.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{pendingEmailInvites.length} pending</span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {pendingEmailInvites.length === 0 ? (
+                    <EmptyState text="No pending email invites for this home." />
+                  ) : pendingEmailInvites.map(invite => (
+                    <div key={invite.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="break-all font-semibold text-slate-950">{invite.invited_email}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">Created {formatDateTime(invite.created_at)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void revokeHomeAccessEmailInvite(invite)}
+                        disabled={updatingHomeAccessInviteId === invite.id}
+                        className={buttonClass('danger')}
+                      >
+                        <X size={16} />
+                        {updatingHomeAccessInviteId === invite.id ? 'Revoking...' : 'Revoke invite'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {resolvedEmailInvites.length > 0 && (
+                  <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">Resolved email invites</summary>
+                    <div className="mt-3 space-y-2">
+                      {resolvedEmailInvites.map(invite => (
+                        <div key={invite.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                          <span className="break-all">{invite.invited_email}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+    );
+  };
 
   useEffect(() => {
     if (homeownerTab !== 'estimates' || unreadEstimateNotificationIds.length === 0) return;
@@ -13494,7 +13929,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       {homeownerTab === 'home' && (
         <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="lg:col-span-2">
+        <div className="space-y-4 lg:col-span-2">
           <Card title="Home / Properties" icon={<Home size={18} />}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -13545,6 +13980,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               Property-specific filtering will expand as requests, documents, estimates, invoices, jobs, reports, and Home History records are linked to individual homes.
             </p>
           </Card>
+          {renderHomeAccessPanel()}
         </div>
 
         <Card title="My profile" icon={<UserRound size={18} />}>
