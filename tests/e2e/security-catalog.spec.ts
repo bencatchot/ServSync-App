@@ -134,6 +134,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_list_my_shared_home_reminder_shells',
   'servsync_list_my_shared_home_shells',
   'servsync_list_my_home_membership_email_invites',
+  'servsync_prepare_home_access_invite_delivery',
   'servsync_prepare_manual_home_document_upload',
   'servsync_propose_service_request_appointment_windows',
   'servsync_reschedule_service_request_appointment',
@@ -160,7 +161,10 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_void_invoice',
 ];
 
-const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = ['servsync_append_workflow_activity_event'];
+const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
+  'servsync_append_workflow_activity_event',
+  'servsync_record_home_access_invite_delivery_result',
+];
 
 const STORAGE_BUCKETS = [
   { bucket_id: 'contractor-assets', expected_public: true },
