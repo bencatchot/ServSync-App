@@ -21,6 +21,7 @@ Since the original 2026-06-27 gap review, several of the recommended gaps have m
 - FB-024 Price Book / Estimate Item Library Maturity has completed a first Price Book quick-pick slice.
 - FB-025 Job-Centered Communication + Notifications has completed job message thread, Activity timeline, durable event writer, and durable Activity reader slices.
 - FB-020 readiness work has advanced through multiple public/authenticated smoke, security-catalog, backup/restore documentation, and restore-drill planning slices.
+- FB-030 Household / Shared Homeowner Access was added after the reconciliation as a new homeowner collaboration backlog item.
 
 ## Current competition-gap status
 
