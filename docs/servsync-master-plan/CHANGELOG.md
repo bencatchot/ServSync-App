@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-shared-home-reminders-rpc-v1`
+- Files changed:
+  - `servsync-shared-home-reminders-shell.sql`
+  - `tests/e2e/shared-home-reminders-shell.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1G-A shared-home reminder shell RPC foundation. The new additive `servsync_list_my_shared_home_reminder_shells()` RPC returns only open reminder shell fields for active shared `admin`, `member`, and `viewer` memberships: reminder ID, home ID/label, title, due date, open status, overdue flag, role, and membership status.
+- Reason for change: Household members need a first narrowly scoped read-only reminder surface without broadening direct `home_reminders` RLS or exposing private reminder notes, linked Home History/service/invoice records, storage paths, contractor connections, documents, messages, or financial/work data.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-shared-home-reminders-shell.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/shared-home-reminders-shell.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI, no production SQL, no reminder mutation, no storage policy changes, no email/SMS/push delivery, no Edge Functions, and no shared access to service requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, or Home History.
+  - Direct `home_reminders` RLS remains owner-only for shared members; UI display for this reminder shell should wait for a later Slice 1G-B after production SQL rollout.
+  - Completed and dismissed reminders remain excluded from the shared reminder shell until a later product decision explicitly expands the surface.
+
 - Branch: `codex/fb-030-shared-home-address-ui-v1`
 - Files changed:
   - `src/App.tsx`
