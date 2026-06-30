@@ -61,6 +61,7 @@ const CORE_PRIVATE_TABLES = [
   'homes',
   'home_memberships',
   'home_membership_audit_events',
+  'home_membership_email_invites',
   'contractor_profiles',
   'homeowner_contractor_connections',
   'connection_permissions',
@@ -112,6 +113,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'current_user_can_manage_home_connections',
   'current_user_home_role',
   'servsync_accept_home_membership_invite',
+  'servsync_accept_home_membership_email_invite',
   'current_user_can_send_contractor_workflow_messages',
   'servsync_contractor_pending_connection_requests',
   'servsync_accept_service_request_appointment_window',
@@ -123,8 +125,12 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_create_job_work_item',
   'servsync_create_partial_invoice_from_job',
   'servsync_decline_service_request_appointment_window',
+  'servsync_create_home_membership_email_invite',
   'servsync_decline_home_membership_invite',
+  'servsync_decline_home_membership_email_invite',
   'servsync_invite_home_member',
+  'servsync_list_home_membership_email_invites',
+  'servsync_list_my_home_membership_email_invites',
   'servsync_prepare_manual_home_document_upload',
   'servsync_propose_service_request_appointment_windows',
   'servsync_reschedule_service_request_appointment',
@@ -142,6 +148,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_submit_contextual_connection_request',
   'servsync_sync_simple_job_work_items',
   'servsync_revoke_home_membership',
+  'servsync_revoke_home_membership_email_invite',
   'servsync_revoke_home_property_proposal',
   'servsync_update_local_home',
   'servsync_update_connection_shared_properties',
@@ -286,7 +293,7 @@ order by e.table_name;
   test('foundation tables stay read-only for browser roles where expected', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 with expected(table_name) as (
-  values ('contractor_home_property_proposals'), ('home_memberships'), ('home_membership_audit_events')
+  values ('contractor_home_property_proposals'), ('home_memberships'), ('home_membership_audit_events'), ('home_membership_email_invites')
 )
 select
   e.table_name,
@@ -311,7 +318,7 @@ left join pg_class c
 order by e.table_name;
     `);
 
-    expect(rows, 'Foundation privilege rows should match expected table count').toHaveLength(3);
+    expect(rows, 'Foundation privilege rows should match expected table count').toHaveLength(4);
     for (const row of rows) {
       expect(row.exists, `${row.table_name} should exist`).toBe(true);
       expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);

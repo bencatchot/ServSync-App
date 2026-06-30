@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-06-30
 
+- Branch: `codex/fb-030-home-membership-email-invites-v1`
+- Files changed:
+  - `servsync-home-membership-email-invites.sql`
+  - `tests/e2e/home-membership-email-invites.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-030 Slice 1C pending email home membership invite foundation. The new SQL adds `home_membership_email_invites`, expands home membership audit event coverage for email invite lifecycle events, and adds hardened browser-callable RPCs to create, list, accept, decline, and revoke pending email invites by authenticated email.
+- Reason for change: Future homeowner-facing household invite UI should invite by email without exposing raw auth user UUIDs, without frontend user lookup by email, and without revealing whether an invited address already has a ServSync account.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-home-membership-email-invites.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-membership-email-invites.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI, no email/SMS/push invite delivery, no production SQL, no storage policy changes, and no shared access to existing homeowner service request, estimate, invoice, job, document, reminder, notification, storage, workflow, or contractor-connection records.
+  - `servsync-home-membership-email-invites.sql` has been applied to sandbox for validation only. Production SQL requires separate explicit approval.
+  - Future UI should use the pending email invite RPCs instead of raw auth user UUIDs, and any email delivery or shared-record access must be separately approved.
+
 - Branch: `codex/fb-030-home-membership-rpcs-v1`
 - Files changed:
   - `servsync-home-membership-rpcs.sql`
