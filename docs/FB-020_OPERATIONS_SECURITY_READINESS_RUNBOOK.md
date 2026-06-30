@@ -136,6 +136,14 @@ npm run qa:production-smoke:check
 
 The readiness check loads only `process.env`, `.env`, `.env.local`, and `.env.test.local`; reports variable names as `present` or `missing`; and does not sign in, call Supabase Auth, call the Supabase database, contact production, or validate credentials. It is a presence-only check. Passing the check does not approve authenticated production smoke.
 
+The dedicated authenticated production smoke scaffold is read-only and requires the production URL plus approved smoke credentials before browser actions:
+
+```bash
+TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke
+```
+
+This command first runs the no-secret preflight with `--auth-readonly --strict`, then runs only `tests/e2e/production-auth-readonly-smoke.spec.ts`. It must not be used until dedicated production smoke accounts and allowed read-only actions are separately approved.
+
 Required production smoke credential names:
 
 - `PROD_SMOKE_HOMEOWNER_EMAIL`
@@ -152,6 +160,12 @@ Optional role-specific credential names:
 
 Optional stable smoke record ID names:
 
+- `PROD_SMOKE_CONNECTION_ID`
+- `PROD_SMOKE_HOME_ID`
+- `PROD_SMOKE_SHARED_PROPERTY_ID`
+- `PROD_SMOKE_LOCAL_CONTACT_ID`
+- `PROD_SMOKE_LOCAL_HOME_ID`
+- `PROD_SMOKE_PROPERTY_PROPOSAL_ID`
 - `PROD_SMOKE_SERVICE_REQUEST_ID`
 - `PROD_SMOKE_INSPECTION_ID`
 - `PROD_SMOKE_ESTIMATE_ID`

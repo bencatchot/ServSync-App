@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ENV_FILES = ['.env', '.env.local', '.env.test.local'];
+const REQUIRED_TEST_APP_URL = 'https://servsync.app';
 
 const REQUIRED_CREDENTIALS = [
   'PROD_SMOKE_HOMEOWNER_EMAIL',
@@ -18,6 +19,12 @@ const OPTIONAL_ROLE_CREDENTIALS = [
 ];
 
 const OPTIONAL_RECORD_IDS = [
+  'PROD_SMOKE_CONNECTION_ID',
+  'PROD_SMOKE_HOME_ID',
+  'PROD_SMOKE_SHARED_PROPERTY_ID',
+  'PROD_SMOKE_LOCAL_CONTACT_ID',
+  'PROD_SMOKE_LOCAL_HOME_ID',
+  'PROD_SMOKE_PROPERTY_PROPOSAL_ID',
   'PROD_SMOKE_SERVICE_REQUEST_ID',
   'PROD_SMOKE_INSPECTION_ID',
   'PROD_SMOKE_ESTIMATE_ID',
@@ -25,6 +32,7 @@ const OPTIONAL_RECORD_IDS = [
 ];
 
 const strictMode = process.argv.includes('--strict');
+const authReadonlyMode = process.argv.includes('--auth-readonly');
 const localEnv = loadLocalEnvFiles();
 
 function loadLocalEnvFiles() {
@@ -80,6 +88,10 @@ function hasValue(name) {
   return Boolean(process.env[name]?.trim() || localEnv.get(name)?.trim());
 }
 
+function valueFor(name) {
+  return process.env[name]?.trim() || localEnv.get(name)?.trim() || '';
+}
+
 function groupStatus(names) {
   const present = names.filter(hasValue);
   return {
@@ -99,9 +111,24 @@ function printGroup(title, names) {
   return status;
 }
 
+function printTargetStatus() {
+  const target = valueFor('TEST_APP_URL');
+  const status = {
+    present: Boolean(target),
+    valid: target === REQUIRED_TEST_APP_URL,
+  };
+
+  console.log('Production auth smoke target:');
+  console.log(`- TEST_APP_URL: ${status.present ? status.valid ? 'present-valid' : 'present-invalid' : 'missing'}`);
+  console.log(`- required exact value: ${REQUIRED_TEST_APP_URL}`);
+  console.log('');
+  return status;
+}
+
 console.log('Production smoke credential readiness');
 console.log('');
 
+const targetStatus = authReadonlyMode ? printTargetStatus() : null;
 const requiredStatus = printGroup('Required credentials', REQUIRED_CREDENTIALS);
 printGroup('Optional role credentials', OPTIONAL_ROLE_CREDENTIALS);
 printGroup('Optional smoke record IDs', OPTIONAL_RECORD_IDS);
@@ -115,6 +142,11 @@ if (requiredStatus.complete) {
 console.log('Note: presence only; credentials are not validated, no sign-in is attempted, and no Supabase auth or database calls are made.');
 console.log('Note: do not print or paste ignored local credential files in reports, PRs, screenshots, traces, logs, or chat.');
 
-if (strictMode && !requiredStatus.complete) {
+if (authReadonlyMode) {
+  console.log(`Auth read-only smoke preflight: ${targetStatus.valid && requiredStatus.complete ? 'passed' : 'blocked'}.`);
+  console.log('Note: this preflight only allows the dedicated read-only production auth smoke scaffold to start; it does not approve mutation smoke.');
+}
+
+if ((strictMode || authReadonlyMode) && (!requiredStatus.complete || (targetStatus && !targetStatus.valid))) {
   process.exitCode = 1;
 }

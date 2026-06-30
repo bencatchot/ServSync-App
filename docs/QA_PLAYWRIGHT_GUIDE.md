@@ -136,6 +136,23 @@ Optional role names use `PROD_SMOKE_CONTRACTOR_FIELD_TECH_*` and `PROD_SMOKE_CON
 
 Presence only means the local environment appears configured. Authenticated production smoke still requires a separate explicit approval, approved smoke records, and an allowed-actions plan. Do not print or paste ignored local credential files into reports, PRs, screenshots, traces, logs, or chat.
 
+## Production Authenticated Read-Only Smoke
+
+Use this only after dedicated production smoke accounts, credential storage, and allowed read-only actions are approved:
+
+```bash
+TEST_APP_URL="https://servsync.app" npm run qa:e2e:production-auth-readonly-smoke
+```
+
+This runs:
+
+- `tests/helpers/check-production-smoke-env.mjs --auth-readonly --strict`
+- `tests/e2e/production-auth-readonly-smoke.spec.ts`
+
+The preflight requires `TEST_APP_URL` to be exactly `https://servsync.app` and requires the four production smoke credential variable names. The spec signs in only with `PROD_SMOKE_*` credentials, navigates safe homeowner and contractor areas, and captures major console/page errors. It must not create users, submit requests, create local customers, edit properties, create/revoke/accept/reject property suggestions, send messages, send invites, send estimates/invoices, upload files, mutate production records, apply SQL, change settings, or deploy.
+
+Optional read-only record IDs may be supplied as `PROD_SMOKE_CONNECTION_ID`, `PROD_SMOKE_HOME_ID`, `PROD_SMOKE_SHARED_PROPERTY_ID`, `PROD_SMOKE_LOCAL_CONTACT_ID`, `PROD_SMOKE_LOCAL_HOME_ID`, `PROD_SMOKE_PROPERTY_PROPOSAL_ID`, `PROD_SMOKE_SERVICE_REQUEST_ID`, `PROD_SMOKE_INSPECTION_ID`, `PROD_SMOKE_ESTIMATE_ID`, and `PROD_SMOKE_INVOICE_ID`. The current scaffold reports those names as present or missing without printing values; record-specific assertions should be added only after stable smoke records and selectors are approved.
+
 ## Mobile Read-Only Smoke
 
 Use:

@@ -324,6 +324,7 @@ Current beta-readiness notes:
 - Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are created.
 - Unauthenticated production public smoke is formalized as a read-only check for `https://servsync.app` public/legal/trust routes and must not sign in, create users, mutate production records, apply SQL, change settings, or deploy manually.
 - FB-020 Slice 1D adds a no-secret local production smoke credential readiness check so operators can see whether approved `PROD_SMOKE_*` variable names are present without printing values, signing in, validating credentials, or contacting Supabase.
+- The first authenticated production smoke scaffold is read-only, uses only approved `PROD_SMOKE_*` credentials, requires `TEST_APP_URL=https://servsync.app`, and must not run until dedicated smoke accounts and allowed actions are approved; mutation smoke remains a separate future tier.
 - Preview/sandbox should remain the default place for authenticated testing.
 - Full end-to-end coverage for the core loop remains future work.
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
