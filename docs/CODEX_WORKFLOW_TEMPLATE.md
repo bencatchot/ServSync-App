@@ -24,11 +24,21 @@ This is an internal workflow template only. It is not product strategy, marketin
 6. ChatGPT and the user decide whether to use the full approval loop or Builder Mode.
 7. ChatGPT prepares an approval, Builder Mode proceed, or implementation prompt.
 8. Codex implements only approved work.
-9. Codex reports changed files, checks, risks, and PR link when applicable.
+9. Codex self-checks the implementation and reports changed files, summary, validation, stop conditions, risks/follow-ups, branch/PR status, and PR link when applicable.
 10. User brings the Codex result back to ChatGPT.
-11. ChatGPT prepares a verification or merge-approval prompt.
+11. ChatGPT interprets the report for the user, identifies any specific concern, and prepares the next proceed prompt.
 12. Codex verifies or merges only when explicitly approved.
 13. Continue the loop until the task is complete.
+
+## Report Review Is Not A Roadblock
+
+Codex is responsible for self-checking its own implementation during and after approved Builder Mode work. The implementation report should give ChatGPT and the user enough context to decide the next step without restarting a broad review loop by default.
+
+After an approved Builder Mode implementation report, ChatGPT's role is to interpret the Codex report, explain risks in plain language, identify any specific concern, and help prepare the next proceed prompt. If ChatGPT cannot articulate a concrete concern, it should not send Codex back through another broad verification or re-review prompt. No specific concern means no workflow roadblock.
+
+Focused additional verification is appropriate when there is a concrete concern, such as unexpected changed files, failed or missing validation, unclear PR/check status, scope expansion, security/privacy/data risk, a reported stop condition, or uncertainty about whether a hard gate was respected.
+
+Post-merge verification remains appropriate after a merge, because merge to `main` can trigger production deployment and should be confirmed separately from pre-merge implementation review.
 
 ## Builder Mode
 
@@ -72,7 +82,7 @@ Important wording:
 - Vercel Preview or sandbox deployments from feature branches are allowed more liberally when they are part of the approved Builder Mode workflow.
 - Production remains protected by requiring explicit approval before merge to `main` or manual production deploy.
 
-After Builder Mode approval, ChatGPT's role is to interpret Codex reports/questions, help the user understand risks, and help decide when Codex asks for approval. ChatGPT should not micromanage every routine file change once the implementation path is approved.
+After Builder Mode approval, ChatGPT's role is to interpret Codex reports/questions, help the user understand risks, and help decide when Codex asks for approval. ChatGPT should not micromanage every routine file change once the implementation path is approved. After Codex completes and self-verifies the approved implementation, ChatGPT should move the user toward the next proceed prompt unless it can name a specific concern that requires focused verification or revision.
 
 ## Builder Mode Proceed Prompt Template
 
@@ -136,6 +146,7 @@ FILES CHANGED
 SUMMARY OF CHANGES
 VALIDATION RUN
 STOP CONDITIONS ENCOUNTERED: YES / NO
+BRANCH / PR STATUS
 PR LINK, IF OPENED
 RISKS / FOLLOW-UPS
 STATUS
@@ -434,6 +445,7 @@ CHANGELOG / MASTER PLAN CHECK
 CHANGELOG UPDATE
 VALIDATION RUN
 STOP CONDITIONS ENCOUNTERED: YES / NO
+BRANCH / PR STATUS
 RISKS / FOLLOW-UPS
 PR LINK, IF OPENED
 STATUS
@@ -447,6 +459,8 @@ Do not deploy.
 ```text
 TASK TYPE
 Final pre-merge verification only. Do not modify files. Do not push. Do not merge. Do not deploy. Do not apply SQL.
+
+Use this prompt when a concrete verification need exists, such as unexpected files, failed or missing validation, unclear PR/check status, scope expansion, security/privacy/data risk, or a reported stop condition. Do not use broad verification as a routine roadblock after a clean Builder Mode implementation report.
 
 PR:
 [PR link]
@@ -644,6 +658,7 @@ CHANGELOG / MASTER PLAN CHECK
 CHANGELOG UPDATE
 VALIDATION RUN
 STOP CONDITIONS ENCOUNTERED: YES / NO
+BRANCH / PR STATUS
 RISKS / FOLLOW-UPS
 PR LINK
 STATUS
@@ -702,7 +717,7 @@ STATUS
 Copy this into a new ChatGPT chat:
 
 ```text
-I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure Codex reviews docs/MARKETING_PRODUCT_INVENTORY.md whenever a PR adds, removes, renames, or materially changes a user-facing feature, workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item; Codex must update it when needed or report: "Marketing inventory reviewed; no update needed." Do not use the changelog alone as the source for marketing claims, and do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless the marketing inventory supports that status. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
+I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. After Codex completes a Builder Mode implementation and returns a complete self-verified report, help me interpret the report and move to the next proceed prompt unless there is a specific concern; do not create redundant broad verification loops when there is no concrete issue. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure Codex reviews docs/MARKETING_PRODUCT_INVENTORY.md whenever a PR adds, removes, renames, or materially changes a user-facing feature, workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item; Codex must update it when needed or report: "Marketing inventory reviewed; no update needed." Do not use the changelog alone as the source for marketing claims, and do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless the marketing inventory supports that status. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
 ```
 
 ## Notes
