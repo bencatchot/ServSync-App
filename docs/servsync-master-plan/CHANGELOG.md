@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-pause-public-review-display-v1`
+- Files changed:
+  - `servsync-review-public-display-pause.sql`
+  - `src/App.tsx`
+  - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-026 Slice 3A to pause public ServSync review display until moderation/public-display policy is approved. The SQL patch keeps public profile/Discover RPC shapes available while returning null/zero/empty ServSync review aggregates and snippets, the public UI uses cautious beta copy instead of ratings or "no reviews" claims, and regression coverage asserts public review text/kudos are not rendered or searched.
+- Reason for change: ServSync review capture exists for completed eligible work, but public averages, counts, snippets, kudos, names, and locations create trust/privacy risk before moderation policy is approved.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - sandbox SQL apply/idempotency for `servsync-review-public-display-pause.sql` against sandbox `zpzdkoaubyjtsomccxya`
+  - read-only sandbox function verification confirming paused public review payloads and public/profile Discover RPC availability
+- Known risks or follow-ups:
+  - Production SQL is not applied in this implementation pass; `servsync-review-public-display-pause.sql` requires separate production rollout approval after review/merge.
+  - Private homeowner review submission and party-visible request-card review context are preserved. No moderation schema, admin queue, review approval UI, contractor dispute flow, homeowner edit/delete flow, public badges, awards, paid ranking, Discover ranking change, Google review automation, referral/recommendation product expansion, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, notification delivery, production data mutation, or deploy work is included.
+  - Future FB-026 work should separately design moderation/public-rating policy before re-enabling public ServSync review display.
+
 - Branch: `codex/fb-026-review-sql-grant-hardening-v1`
 - Files changed:
   - `servsync-review-grant-hardening.sql`

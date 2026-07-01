@@ -6,6 +6,7 @@ const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 
 const appSource = () => sourceFile('src/App.tsx');
 const reviewEligibilitySql = () => sourceFile('servsync-review-eligibility.sql');
 const reviewGrantHardeningSql = () => sourceFile('servsync-review-grant-hardening.sql');
+const reviewPublicDisplayPauseSql = () => sourceFile('servsync-review-public-display-pause.sql');
 const publicReviewsSql = () => sourceFile('servsync-public-reviews.sql');
 const externalReviewLinksSql = () => sourceFile('servsync-external-review-links.sql');
 
@@ -67,8 +68,10 @@ test.describe('FB-026 review trust boundaries', () => {
 
     expect(profileSource).toContain('External review links take you to third-party review sites.');
     expect(profileSource).toContain('ServSync reviews are separate and come from completed ServSync work.');
-    expect(profileSource).toContain('ServSync Reviews ({data.review_count})');
-    expect(profileSource).toContain('From completed ServSync work.');
+    expect(source).toContain('ServSync public review display is being finalized for beta.');
+    expect(source).toContain('Reviews from completed ServSync work are not shown publicly yet.');
+    expect(profileSource).toContain('PUBLIC_REVIEW_DISPLAY_PAUSED_COPY');
+    expect(profileSource).toContain('PUBLIC_REVIEW_DISPLAY_PAUSED_HELPER');
     expect(discoverSource).toContain('These links open third-party review sites. They are separate from ServSync reviews.');
     expect(externalSql).toContain('coalesce(cp.external_review_links');
     expect(externalSql).toContain('from public.service_request_reviews r');
@@ -76,21 +79,28 @@ test.describe('FB-026 review trust boundaries', () => {
     expect(externalSql).not.toContain('external_review_links) as review_count');
   });
 
-  test('public profile and Discover review displays use public-safe fields only', () => {
+  test('public profile and Discover review displays pause ServSync review aggregates and snippets', () => {
     const source = appSource();
-    const reviewCardSource = sourceBetween(source, 'function PublicReviewCard', 'function LandingPage');
+    const profileSource = sourceBetween(source, 'function ContractorPublicProfilePage', 'function DiscoverFeed');
+    const discoverSource = sourceBetween(source, 'function DiscoverFeed', 'function EmptyState');
+    const pauseSql = reviewPublicDisplayPauseSql();
     const publicSql = publicReviewsSql();
 
-    for (const publicSafeField of [
-      'rating',
-      'body',
-      'kudos',
-      'reviewer_display_name',
-      'reviewer_location',
-      'created_at',
-    ]) {
-      expect(publicSql).toContain(publicSafeField);
-    }
+    expect(publicSql).toContain('from public.service_request_reviews');
+    expect(pauseSql).toContain("'avg_rating',             null::numeric");
+    expect(pauseSql).toContain("'review_count',           0::bigint");
+    expect(pauseSql).toContain("'reviews',                '[]'::jsonb");
+    expect(pauseSql).toContain('null::numeric as avg_rating');
+    expect(pauseSql).toContain('0::bigint as review_count');
+    expect(pauseSql).toContain("'[]'::jsonb as reviews");
+    expect(pauseSql).not.toContain('from public.service_request_reviews');
+
+    const profileReviewPauseSource = sourceBetween(profileSource, '{/* Reviews */}', '</section>');
+    const discoverReviewPauseSource = sourceBetween(
+      discoverSource,
+      '<p className="text-sm font-semibold text-slate-700">{PUBLIC_REVIEW_DISPLAY_PAUSED_COPY}</p>',
+      'External Reviews',
+    );
 
     for (const privateField of [
       'homeowner_user_id',
@@ -102,8 +112,35 @@ test.describe('FB-026 review trust boundaries', () => {
       'email',
       'closing_summary',
     ]) {
-      expect(reviewCardSource).not.toContain(privateField);
+      expect(profileReviewPauseSource).not.toContain(privateField);
+      expect(discoverReviewPauseSource).not.toContain(privateField);
     }
+
+    expect(profileSource).not.toContain('ServSync Reviews ({data.review_count})');
+    expect(profileSource).not.toContain('No ServSync reviews yet.');
+    expect(profileSource).not.toContain('data.reviews.map');
+    expect(profileSource).not.toContain('data.avg_rating.toFixed(1)');
+    expect(discoverSource).not.toContain('item.reviews.map');
+    expect(discoverSource).not.toContain('selectedPost.reviews.map');
+    expect(discoverSource).not.toContain('Common review notes');
+    expect(discoverSource).not.toContain('selectedPost.avg_rating.toFixed(1)');
+  });
+
+  test('public display pause preserves private review capture and avoids moderation schema creep', () => {
+    const source = appSource();
+    const pauseSql = reviewPublicDisplayPauseSql();
+    const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
+    const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
+
+    expect(homeownerSource).toContain("supabase.rpc('servsync_homeowner_submit_review'");
+    expect(contractorSource).toContain('Homeowner reviews');
+    expect(pauseSql).toContain('does not change review capture, private party visibility');
+    expect(pauseSql).toContain('coalesce(cp.external_review_links');
+    expect(pauseSql).not.toContain('create table');
+    expect(pauseSql).not.toContain('alter table public.service_request_reviews');
+    expect(pauseSql).not.toContain('moderation_status');
+    expect(pauseSql).not.toContain('moderated_at');
+    expect(pauseSql).not.toContain('hidden_reason');
   });
 
   test('review eligibility SQL ties reviews to completed ServSync work and blocks contractor authorship', () => {
