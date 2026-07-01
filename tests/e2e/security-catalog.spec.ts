@@ -64,6 +64,7 @@ const CORE_PRIVATE_TABLES = [
   'home_membership_email_invites',
   'servsync_runtime_settings',
   'contractor_profiles',
+  'contractor_billing_accounts',
   'homeowner_contractor_connections',
   'connection_permissions',
   'service_requests',
@@ -107,6 +108,7 @@ const CORE_PRIVATE_TABLES = [
 
 const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'current_user_can_access_home',
+  'current_user_has_contractor_entitlement',
   'current_user_can_approve_home_work',
   'current_user_can_manage_contractor_billing',
   'current_user_can_manage_contractor_schedule',
@@ -117,6 +119,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_accept_home_membership_email_invite',
   'current_user_can_send_contractor_workflow_messages',
   'servsync_contractor_pending_connection_requests',
+  'servsync_current_contractor_entitlements',
   'servsync_accept_service_request_appointment_window',
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
@@ -388,6 +391,51 @@ order by e.table_name;
       expect(row.authenticated_update, `${row.table_name} should not grant UPDATE to authenticated`).toBe(false);
       expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
     }
+  });
+
+  test('contractor billing accounts stay private with platform-admin-only browser updates', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+with expected(table_name) as (
+  values ('contractor_billing_accounts')
+)
+select
+  e.table_name,
+  c.oid is not null as exists,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'SELECT') end as public_select,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'INSERT') end as public_insert,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'UPDATE') end as public_update,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'DELETE') end as public_delete,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'SELECT') end as anon_select,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'INSERT') end as anon_insert,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'UPDATE') end as anon_update,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'DELETE') end as anon_delete,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'SELECT') end as authenticated_select,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'INSERT') end as authenticated_insert,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'UPDATE') end as authenticated_update,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'DELETE') end as authenticated_delete
+from expected e
+left join pg_class c
+  on c.relname = e.table_name
+ and c.relnamespace = 'public'::regnamespace
+ and c.relkind in ('r', 'p')
+order by e.table_name;
+    `);
+
+    expect(rows, 'Contractor billing privilege rows should match expected table count').toHaveLength(1);
+    const row = rows[0];
+    expect(row.exists, `${row.table_name} should exist`).toBe(true);
+    expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+    expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+    expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+    expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+    expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+    expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+    expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+    expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+    expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind RLS`).toBe(true);
+    expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
+    expect(row.authenticated_update, `${row.table_name} should grant UPDATE only behind platform-admin RLS`).toBe(true);
+    expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {
