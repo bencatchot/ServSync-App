@@ -289,6 +289,17 @@ async function requestAppointment(account: AuthenticatedClient, requestId: strin
   return result.data as AppointmentRow | null;
 }
 
+async function requestStatus(account: AuthenticatedClient, requestId: string) {
+  const result = await account.client
+    .from('service_requests')
+    .select('status')
+    .eq('id', requestId)
+    .maybeSingle();
+
+  expect(result.error, 'service request status lookup should not error').toBeNull();
+  return result.data?.status as string | undefined;
+}
+
 async function requestEvents(account: AuthenticatedClient, requestId: string) {
   const result = await account.client
     .from('service_request_appointment_events')
@@ -613,6 +624,85 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
     expect(declinedWindows.filter(window => window.status === 'declined')).toHaveLength(1);
   });
 
+  test('contractor reschedules with replacement windows and cancels a confirmed appointment from request cards', async ({ page }) => {
+    const rescheduleRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Replacement Reschedule');
+    const cancelRequest = await createServiceRequestRecord(homeowner, contractorId, 'UI Cancel Appointment');
+    createdRequestIds.push(rescheduleRequest.requestId, cancelRequest.requestId);
+
+    const initialReschedule = await proposeWindows(owner, rescheduleRequest.requestId, 1, 43);
+    await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
+      p_window_id: initialReschedule.window_ids[0],
+    });
+    const originalSummary = await requestAppointment(homeowner, rescheduleRequest.requestId);
+    expect(originalSummary?.status, 'reschedule UI fixture should start confirmed').toBe('confirmed');
+
+    const initialCancel = await proposeWindows(owner, cancelRequest.requestId, 1, 48);
+    await homeowner.client.rpc('servsync_accept_service_request_appointment_window', {
+      p_window_id: initialCancel.window_ids[0],
+    });
+    expect((await requestAppointment(homeowner, cancelRequest.requestId))?.status, 'cancel UI fixture should start confirmed').toBe('confirmed');
+
+    await loginAs(page, 'contractor');
+
+    const rescheduleCard = await openRequestCard(page, 'contractor-service-request-card', rescheduleRequest.title);
+    await expect(rescheduleCard.getByText('Confirmed', { exact: true })).toBeVisible();
+    await expect(rescheduleCard.getByText('Contractor proposes times; homeowner accepts or declines.')).toBeVisible();
+    await rescheduleCard.getByTestId('contractor-reschedule-appointment-toggle').click();
+    const rescheduleForm = rescheduleCard.getByTestId('contractor-appointment-reschedule-form');
+    await expect(rescheduleForm).toBeVisible();
+    await expect(rescheduleForm.getByText('Current appointment stays scheduled until the homeowner accepts a new time.')).toBeVisible();
+    await rescheduleForm.getByTestId('contractor-submit-reschedule-windows').click();
+    await expect(rescheduleForm.getByText('Option 1: choose a start and end time.')).toBeVisible();
+    await rescheduleForm.getByTestId('contractor-add-reschedule-window').click();
+    await rescheduleForm.getByTestId('contractor-add-reschedule-window').click();
+    await expect(rescheduleForm.getByTestId('contractor-add-reschedule-window')).toHaveCount(0);
+
+    const replacementWindows = futureWindowInputValues(3, 50);
+    for (const [index, window] of replacementWindows.entries()) {
+      await rescheduleForm.getByTestId(`contractor-reschedule-window-start-${index}`).fill(window.startsAt);
+      await rescheduleForm.getByTestId(`contractor-reschedule-window-end-${index}`).fill(window.endsAt);
+    }
+    await rescheduleForm.getByTestId('contractor-reschedule-window-note').fill('Sandbox UI replacement window proposal.');
+    await rescheduleForm.getByTestId('contractor-submit-reschedule-windows').click();
+    await expect(rescheduleCard.getByText('Replacement options sent to homeowner.')).toBeVisible({ timeout: 30_000 });
+    await expect(rescheduleCard.getByText('Confirmed', { exact: true })).toBeVisible();
+
+    const summaryDuringReschedule = await requestAppointment(homeowner, rescheduleRequest.requestId);
+    expect(summaryDuringReschedule?.id, 'current appointment should remain active while replacement is pending').toBe(originalSummary?.id);
+    const rescheduleEvents = await requestEvents(homeowner, rescheduleRequest.requestId);
+    expect(rescheduleEvents.some(event => event.event_type === 'reschedule_proposed'), 'UI reschedule should use replacement-window RPC').toBe(true);
+
+    await loginAs(page, 'homeowner');
+    const homeownerRescheduleCard = await openRequestCard(page, 'homeowner-service-request-card', rescheduleRequest.title);
+    const replacementPanel = homeownerRescheduleCard.getByTestId('service-request-appointment-windows');
+    await expect(replacementPanel.getByText('Your current appointment stays scheduled until you accept a new time.')).toBeVisible();
+    await expect(replacementPanel.getByTestId('homeowner-accept-appointment-window')).toHaveCount(3);
+    await replacementPanel.getByTestId('homeowner-decline-appointment-window-note').first().fill('First replacement option is not ideal.');
+    await replacementPanel.getByTestId('homeowner-decline-appointment-window').first().click();
+    await expect(homeownerRescheduleCard.getByTestId('service-request-appointment-windows')).toBeVisible({ timeout: 30_000 });
+    await homeownerRescheduleCard.getByTestId('homeowner-accept-appointment-window').first().click();
+    await expect(homeownerRescheduleCard.getByTestId('service-request-appointment-windows')).toHaveCount(0, { timeout: 30_000 });
+    const replacedSummary = await requestAppointment(homeowner, rescheduleRequest.requestId);
+    expect(replacedSummary?.status, 'accepted replacement window should keep appointment confirmed').toBe('confirmed');
+    expect(replacedSummary?.id, 'accepted replacement updates the compatibility appointment summary').not.toBe(originalSummary?.id);
+
+    await loginAs(page, 'contractor');
+    const cancelCard = await openRequestCard(page, 'contractor-service-request-card', cancelRequest.title);
+    await cancelCard.getByTestId('contractor-cancel-appointment-toggle').click();
+    const cancelForm = cancelCard.getByTestId('contractor-cancel-appointment-form');
+    await expect(cancelForm.getByText('This cancels only the confirmed appointment. The service request stays open unless you close or decline it separately.')).toBeVisible();
+    await cancelForm.getByTestId('contractor-cancel-appointment-reason').fill('Sandbox UI appointment cancellation.');
+    await cancelForm.getByTestId('contractor-submit-cancel-appointment').click();
+    await expect(cancelCard.getByText('Cancelled', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(cancelCard.getByTestId('appointment-state-helper')).toContainText('The service request is separate');
+    expect(await requestStatus(owner, cancelRequest.requestId), 'canceling appointment should not close or decline request').not.toMatch(/closed|declined/);
+
+    await loginAs(page, 'homeowner');
+    const homeownerCancelCard = await openRequestCard(page, 'homeowner-service-request-card', cancelRequest.title);
+    await expect(homeownerCancelCard.getByText('Cancelled', { exact: true })).toBeVisible();
+    await expect(homeownerCancelCard.getByTestId('appointment-state-helper')).toContainText('The service request is separate');
+  });
+
   test('homeowner cannot accept a proposed window after the request is closed', async () => {
     const requestId = await createServiceRequest(homeowner, contractorId, 'Closed Accept');
     createdRequestIds.push(requestId);
@@ -792,4 +882,12 @@ test.describe('FB-021 sandbox scheduling foundation probes', () => {
       .eq('id', proposedEvent!.id);
     expect(directEventDelete.error, 'direct appointment event delete should be denied').toBeTruthy();
   });
+});
+
+test('contractor confirmed-appointment reschedule source uses the replacement-window RPC', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+  const rescheduleHandler = appSource.match(/const rescheduleAsContractor = async[\s\S]*?const respondToHomeownerAppointment = async/);
+  expect(rescheduleHandler?.[0], 'reschedule handler should be present').toBeTruthy();
+  expect(rescheduleHandler![0]).toContain('servsync_reschedule_service_request_appointment');
+  expect(rescheduleHandler![0]).not.toContain('servsync_contractor_propose_appointment');
 });

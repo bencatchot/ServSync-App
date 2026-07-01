@@ -17825,8 +17825,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [closingExpandedId, setClosingExpandedId] = useState<string | null>(null);
   const [contractorReopenDrafts, setContractorReopenDrafts] = useState<Record<string, { open: boolean; body: string }>>({});
   const [contractorReopeningRequestId, setContractorReopeningRequestId] = useState<string | null>(null);
-  const [contractorRescheduleDrafts, setContractorRescheduleDrafts] = useState<Record<string, { open: boolean; proposedAt: string; notes: string }>>({});
+  const [contractorRescheduleDrafts, setContractorRescheduleDrafts] = useState<Record<string, ContractorAppointmentWindowDraft>>({});
   const [contractorReschedulingId, setContractorReschedulingId] = useState<string | null>(null);
+  const [contractorCancelAppointmentDrafts, setContractorCancelAppointmentDrafts] = useState<Record<string, { open: boolean; reason: string }>>({});
+  const [contractorCancellingAppointmentId, setContractorCancellingAppointmentId] = useState<string | null>(null);
   const [contractorResponseFiles, setContractorResponseFiles] = useState<Record<string, File[]>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [uploadingContractorLogo, setUploadingContractorLogo] = useState(false);
@@ -18943,34 +18945,58 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const rescheduleAsContractor = async (request: ServiceRequestSummary) => {
     if (!supabase) return;
-    const draft = contractorRescheduleDrafts[request.id];
-    if (!draft?.proposedAt) return;
+    const draft = contractorRescheduleDrafts[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+    const validationError = validateAppointmentWindowDraft(draft.windows);
+    setContractorRescheduleDrafts(current => ({
+      ...current,
+      [request.id]: { ...draft, error: validationError },
+    }));
+    if (validationError) return;
+
     setNotice('');
     setError('');
     setContractorReschedulingId(request.id);
     try {
-      const proposedDate = new Date(draft.proposedAt);
-      if (Number.isNaN(proposedDate.getTime())) {
-        setError('Choose a valid date and time.');
-        return;
-      }
-      if (proposedDate <= new Date()) {
-        setError('Choose a future date and time.');
-        return;
-      }
-      const { error: apptError } = await supabase.rpc('servsync_contractor_propose_appointment', {
+      const reason = cleanHumanWrittenText(draft.note ?? '');
+      const { error: apptError } = await supabase.rpc('servsync_reschedule_service_request_appointment', {
         p_request_id: request.id,
-        p_proposed_at: proposedDate.toISOString(),
-        p_notes: cleanHumanWrittenText(draft.notes ?? ''),
+        p_windows: draft.windows.map(window => ({
+          starts_at: new Date(window.startsAt).toISOString(),
+          ends_at: new Date(window.endsAt).toISOString(),
+          note: reason,
+        })),
+        p_reason: reason,
       });
       if (apptError) throw apptError;
-      setNotice('Reschedule proposal sent to homeowner.');
-      setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }));
+      setNotice('Replacement visit times sent. The current appointment stays scheduled until the homeowner accepts a replacement time.');
+      setContractorRescheduleDrafts(current => ({ ...current, [request.id]: createBlankContractorAppointmentWindowDraft(false) }));
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to reschedule appointment.'));
+      setError(readableError(err, 'Unable to propose replacement visit times.'));
     } finally {
       setContractorReschedulingId(null);
+    }
+  };
+
+  const cancelAppointmentAsContractor = async (request: ServiceRequestSummary) => {
+    if (!supabase) return;
+    const draft = contractorCancelAppointmentDrafts[request.id] ?? { open: true, reason: '' };
+    setNotice('');
+    setError('');
+    setContractorCancellingAppointmentId(request.id);
+    try {
+      const { error: apptError } = await supabase.rpc('servsync_cancel_service_request_appointment', {
+        p_request_id: request.id,
+        p_reason: cleanHumanWrittenText(draft.reason ?? ''),
+      });
+      if (apptError) throw apptError;
+      setNotice('Appointment canceled. The service request remains open unless you close or decline it separately.');
+      setContractorCancelAppointmentDrafts(current => ({ ...current, [request.id]: { open: false, reason: '' } }));
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to cancel appointment.'));
+    } finally {
+      setContractorCancellingAppointmentId(null);
     }
   };
 
@@ -25937,6 +25963,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const needsFollowUp = contractorRequestNeedsFollowUp(request);
               const hasAppointment = Boolean(request.appointment);
               const hasAppointmentWindows = hasProposedServiceRequestAppointmentWindows(request);
+              const contractorRescheduleDraft = contractorRescheduleDrafts[request.id] ?? createBlankContractorAppointmentWindowDraft(false);
+              const contractorCancelAppointmentDraft = contractorCancelAppointmentDrafts[request.id] ?? { open: false, reason: '' };
               const hasQuote = Boolean(request.quote);
               const propertyLabel = serviceRequestPropertyLabel(request);
               const requestConnection = connections.find(connection =>
@@ -26356,65 +26384,217 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                           {request.appointment?.status === 'confirmed' && (
                             <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                              {contractorRescheduleDrafts[request.id]?.open ? (
+                              <p className="text-xs leading-5 text-emerald-900">
+                                Contractor proposes times; homeowner accepts or declines. If you propose replacements, the current appointment stays scheduled until the homeowner accepts a new time.
+                              </p>
+                              {contractorRescheduleDraft.open ? (
                                 <>
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <Field label="New date & time">
-                                      <input
-                                        className={inputClass()}
-                                        type="datetime-local"
-                                        value={contractorRescheduleDrafts[request.id]?.proposedAt ?? ''}
-                                        onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, notes: '' }), proposedAt: event.target.value } }))}
-                                      />
-                                    </Field>
-                                    <Field label="Reason (optional)">
+                                  <div className="space-y-3 rounded-xl border border-emerald-100 bg-white p-3" data-testid="contractor-appointment-reschedule-form">
+                                    <div>
+                                      <p className="text-sm font-bold text-slate-950">Propose replacement times</p>
+                                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                                        Send 1 to 3 replacement windows. No external calendar sync or automated reminder is sent.
+                                      </p>
+                                      <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
+                                        Current appointment stays scheduled until the homeowner accepts a new time.
+                                      </p>
+                                    </div>
+                                    {contractorRescheduleDraft.windows.map((windowDraft, index) => (
+                                      <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                          <p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">Option {index + 1}</p>
+                                          {contractorRescheduleDraft.windows.length > 1 && (
+                                            <button
+                                              type="button"
+                                              className="text-xs font-semibold text-slate-500 hover:text-red-600"
+                                              data-testid={`contractor-remove-reschedule-window-${index}`}
+                                              onClick={() => setContractorRescheduleDrafts(current => {
+                                                const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                                return {
+                                                  ...current,
+                                                  [request.id]: {
+                                                    ...draft,
+                                                    windows: draft.windows.filter((_, rowIndex) => rowIndex !== index),
+                                                    error: '',
+                                                  },
+                                                };
+                                              })}
+                                            >
+                                              Remove
+                                            </button>
+                                          )}
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                          <Field label="Start">
+                                            <input
+                                              className={inputClass()}
+                                              type="datetime-local"
+                                              value={windowDraft.startsAt}
+                                              data-testid={`contractor-reschedule-window-start-${index}`}
+                                              onChange={event => setContractorRescheduleDrafts(current => {
+                                                const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                                const windows = draft.windows.map((row, rowIndex) => rowIndex === index ? { ...row, startsAt: event.target.value } : row);
+                                                return { ...current, [request.id]: { ...draft, windows, error: '' } };
+                                              })}
+                                            />
+                                          </Field>
+                                          <Field label="End">
+                                            <input
+                                              className={inputClass()}
+                                              type="datetime-local"
+                                              value={windowDraft.endsAt}
+                                              data-testid={`contractor-reschedule-window-end-${index}`}
+                                              onChange={event => setContractorRescheduleDrafts(current => {
+                                                const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                                const windows = draft.windows.map((row, rowIndex) => rowIndex === index ? { ...row, endsAt: event.target.value } : row);
+                                                return { ...current, [request.id]: { ...draft, windows, error: '' } };
+                                              })}
+                                            />
+                                          </Field>
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    <Field label="Reason for homeowner (optional)">
                                       <input
                                         className={inputClass()}
                                         placeholder="Why you need to reschedule..."
-                                        value={contractorRescheduleDrafts[request.id]?.notes ?? ''}
-                                        onChange={event => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { ...(current[request.id] || { open: true, proposedAt: '' }), notes: event.target.value } }))}
+                                        value={contractorRescheduleDraft.note}
+                                        data-testid="contractor-reschedule-window-note"
+                                        onChange={event => setContractorRescheduleDrafts(current => {
+                                          const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                          return { ...current, [request.id]: { ...draft, note: event.target.value, error: '' } };
+                                        })}
                                       />
                                     </Field>
+
+                                    {contractorRescheduleDraft.error && (
+                                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                                        {contractorRescheduleDraft.error}
+                                      </p>
+                                    )}
+
+                                    <div className="flex flex-wrap gap-2">
+                                      {contractorRescheduleDraft.windows.length < 3 && (
+                                        <button
+                                          type="button"
+                                          className={buttonClass('secondary')}
+                                          data-testid="contractor-add-reschedule-window"
+                                          onClick={() => setContractorRescheduleDrafts(current => {
+                                            const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
+                                            return {
+                                              ...current,
+                                              [request.id]: {
+                                                ...draft,
+                                                windows: [...draft.windows, createBlankAppointmentWindowDraftRow()],
+                                                error: '',
+                                              },
+                                            };
+                                          })}
+                                        >
+                                          <Plus size={15} />
+                                          Add another time
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className={buttonClass('primary')}
+                                        data-testid="contractor-submit-reschedule-windows"
+                                        disabled={contractorReschedulingId === request.id}
+                                        onClick={() => void rescheduleAsContractor(request)}
+                                      >
+                                        {contractorReschedulingId === request.id ? 'Sending...' : 'Send replacement times'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={buttonClass('secondary')}
+                                        disabled={contractorReschedulingId === request.id}
+                                        onClick={() => setContractorRescheduleDrafts(current => ({
+                                          ...current,
+                                          [request.id]: createBlankContractorAppointmentWindowDraft(false),
+                                        }))}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
                                   </div>
+                                </>
+                              ) : (
+                                <>
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       type="button"
                                       className={buttonClass('primary')}
-                                      disabled={!contractorRescheduleDrafts[request.id]?.proposedAt || contractorReschedulingId === request.id}
-                                      onClick={() => void rescheduleAsContractor(request)}
+                                      onClick={() => void completeAppointment(request)}
+                                      disabled={proposingAppointmentId === request.id}
                                     >
-                                      {contractorReschedulingId === request.id ? 'Sending...' : 'Send reschedule proposal'}
+                                      <CheckCircle2 size={16} />
+                                      {proposingAppointmentId === request.id ? 'Updating...' : 'Mark appointment complete'}
                                     </button>
                                     <button
                                       type="button"
                                       className={buttonClass('secondary')}
-                                      disabled={contractorReschedulingId === request.id}
-                                      onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
+                                      data-testid="contractor-reschedule-appointment-toggle"
+                                      onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: createBlankContractorAppointmentWindowDraft(true) }))}
                                     >
-                                      Cancel
+                                      <Calendar size={15} />
+                                      Propose replacement times
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={buttonClass('secondary')}
+                                      data-testid="contractor-cancel-appointment-toggle"
+                                      onClick={() => setContractorCancelAppointmentDrafts(current => ({ ...current, [request.id]: { open: true, reason: '' } }))}
+                                    >
+                                      Cancel appointment
                                     </button>
                                   </div>
+
+                                  {contractorCancelAppointmentDraft.open && (
+                                    <div className="space-y-3 rounded-xl border border-red-200 bg-white p-3" data-testid="contractor-cancel-appointment-form">
+                                      <div>
+                                        <p className="text-sm font-bold text-red-950">Cancel confirmed appointment</p>
+                                        <p className="mt-1 text-xs leading-5 text-red-800">
+                                          This cancels only the confirmed appointment. The service request stays open unless you close or decline it separately.
+                                        </p>
+                                      </div>
+                                      <Field label="Reason for homeowner (optional)">
+                                        <input
+                                          className={inputClass()}
+                                          value={contractorCancelAppointmentDraft.reason}
+                                          placeholder="Share a short reason or next step."
+                                          data-testid="contractor-cancel-appointment-reason"
+                                          onChange={event => setContractorCancelAppointmentDrafts(current => ({
+                                            ...current,
+                                            [request.id]: { open: true, reason: event.target.value },
+                                          }))}
+                                        />
+                                      </Field>
+                                      <div className="flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          className={buttonClass('danger')}
+                                          data-testid="contractor-submit-cancel-appointment"
+                                          disabled={contractorCancellingAppointmentId === request.id}
+                                          onClick={() => void cancelAppointmentAsContractor(request)}
+                                        >
+                                          {contractorCancellingAppointmentId === request.id ? 'Canceling...' : 'Cancel appointment'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={buttonClass('secondary')}
+                                          disabled={contractorCancellingAppointmentId === request.id}
+                                          onClick={() => setContractorCancelAppointmentDrafts(current => ({
+                                            ...current,
+                                            [request.id]: { open: false, reason: '' },
+                                          }))}
+                                        >
+                                          Keep appointment
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </>
-                              ) : (
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    className={buttonClass('primary')}
-                                    onClick={() => void completeAppointment(request)}
-                                    disabled={proposingAppointmentId === request.id}
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    {proposingAppointmentId === request.id ? 'Updating...' : 'Mark appointment complete'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={buttonClass('secondary')}
-                                    onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
-                                  >
-                                    <Calendar size={15} />
-                                    Reschedule
-                                  </button>
-                                </div>
                               )}
                             </div>
                           )}
@@ -37321,6 +37501,12 @@ function ServiceRequestAppointmentCard({
     completed: 'Completed',
     cancelled: 'Cancelled',
   };
+  const statusHelper: Record<AppointmentStatus, string> = {
+    proposed: 'Waiting for the proposed appointment time to be reviewed.',
+    confirmed: 'This appointment is confirmed. Changes stay in Service Requests; no external calendar sync or automated reminders are implied.',
+    completed: 'This appointment is marked complete.',
+    cancelled: 'The appointment was canceled. The service request is separate and may still remain open.',
+  };
 
   return (
     <div className={`rounded-xl border p-4 ${statusStyle[appointment.status]}`}>
@@ -37338,6 +37524,9 @@ function ServiceRequestAppointmentCard({
           </p>
           {appointment.notes && <p className="mt-1 text-sm text-slate-600">{appointment.notes}</p>}
           {nextActionLabel && <p className="mt-2 text-sm font-semibold text-slate-700">{nextActionLabel}</p>}
+          <p className="mt-2 text-xs leading-5 text-slate-600" data-testid="appointment-state-helper">
+            {statusHelper[appointment.status]}
+          </p>
         </div>
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
           {statusLabel[appointment.status]}

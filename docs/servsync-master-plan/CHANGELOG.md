@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-021-scheduling-closeout-abc-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+- Summary of change: Added the FB-021 scheduling closeout UI package for existing appointment infrastructure. Contractors can now propose 1-3 replacement visit windows for a confirmed appointment through the approved replacement-window RPC, cancel a confirmed appointment through the approved cancel RPC, and both parties see compact appointment state helper copy.
+- Reason for change: Close the next scheduling gap after the initial proposal/accept/decline UI without adding new SQL/RLS/RPCs, external calendar sync, notification delivery, dispatch/routing, GPS, payment/deposit requirements, or homeowner-forced booking.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - relevant security/RLS/request-visibility checks as reported in the PR package
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - This slice uses existing deployed scheduling RPCs only and applies no SQL.
+  - Appointment history remains limited to compact status/helper copy from already loaded appointment/window data; durable Activity event types for rescheduled/canceled appointments remain deferred.
+  - No Google/Outlook calendar sync, external calendar writeback, dispatch/routing, GPS, email/SMS/push reminders, broad notification delivery, public availability calendar, payment/deposit behavior, production data mutation, manual deploy, or unrelated request/job/invoice workflow change is included.
+
 - Branch: `codex/backlog-reconcile-through-pr-145-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
