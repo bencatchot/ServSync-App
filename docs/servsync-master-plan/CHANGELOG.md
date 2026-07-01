@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-027-accepted-estimates-dashboard-cta-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-027 Slice 2 accepted-estimates-needing-jobs CTA inside the existing contractor dashboard `Workflow overview` / `Needs review` area. The CTA appears only when accepted estimates lack linked jobs and routes contractors to the existing Jobs workspace / Open estimates-invoices view where established estimate-card `Create Job` and `View Job` controls already live.
+- Reason for change: Contractors should not have to hunt for the safest next step after a homeowner accepts an estimate, but the dashboard should remain navigation-only and avoid direct job creation, new queues, new statuses, backend changes, notifications, or automation.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb027-contractor-pipeline-summary.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production or sandbox data mutation, deploy, notification delivery, public review display, ranking, badges, paid placement, new lifecycle statuses, overdue-by-date invoice logic, broad job-message aggregation, new follow-up queue, card-level badge rollout, direct dashboard job creation, or broad automation is included.
+  - Future FB-027 work should separately audit completed jobs needing invoices, stale estimates, unpaid invoice nuance, and any broader queue or badge concepts after beta feedback.
+
 - Branch: `codex/fb-027-contractor-pipeline-summary-v1`
 - Files changed:
   - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
