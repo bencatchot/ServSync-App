@@ -139,6 +139,7 @@ import type {
   AdminRevenueRow,
   AppNotification,
   ConnectionAuditEvent,
+  ContractorEntitlements,
   ContractorPublicProfile,
   DiscoverFeedItem,
   Estimate,
@@ -7352,6 +7353,146 @@ function ContractorBillingCard({ contractor }: { contractor: ContractorProfile |
       <p className="mt-3 text-xs text-slate-600">Billing portal coming soon. Your subscription status is managed by the platform admin.</p>
     </Card>
   );
+}
+
+type ContractorEntitlementLoadState = {
+  entitlements: ContractorEntitlements;
+  loading: boolean;
+  error: string;
+  loadedAt: string | null;
+  source: 'fallback' | 'rpc';
+};
+
+function betaContractorEntitlementFallback(contractorId: string | null = null): ContractorEntitlements {
+  return {
+    contractor_id: contractorId,
+    billing_status: 'beta_free',
+    current_plan: 'beta_free',
+    access_mode: 'full_beta',
+    subscription_required_after: null,
+    grace_period_ends_at: null,
+    can_use_workspace: true,
+    can_create_service_requests_for_local_customers: true,
+    can_create_estimates: true,
+    can_send_estimates: true,
+    can_create_jobs: true,
+    can_create_invoices: true,
+    can_send_invoices: true,
+    can_use_discover_profile: true,
+    can_accept_new_connections: true,
+    can_use_ai_features: true,
+    can_invite_team_members: true,
+    max_team_seats: 999,
+    max_storage_mb: 1024,
+    read_only_reason: '',
+  };
+}
+
+function normalizeContractorEntitlements(row: unknown, contractorId: string): ContractorEntitlements {
+  const raw = (Array.isArray(row) ? row[0] : row) as Partial<ContractorEntitlements> | null | undefined;
+  const fallback = betaContractorEntitlementFallback(contractorId);
+  if (!raw) return fallback;
+
+  return {
+    contractor_id: raw.contractor_id ?? contractorId,
+    billing_status: raw.billing_status ?? fallback.billing_status,
+    current_plan: raw.current_plan ?? fallback.current_plan,
+    access_mode: raw.access_mode ?? fallback.access_mode,
+    subscription_required_after: raw.subscription_required_after ?? null,
+    grace_period_ends_at: raw.grace_period_ends_at ?? null,
+    can_use_workspace: raw.can_use_workspace ?? fallback.can_use_workspace,
+    can_create_service_requests_for_local_customers: raw.can_create_service_requests_for_local_customers ?? fallback.can_create_service_requests_for_local_customers,
+    can_create_estimates: raw.can_create_estimates ?? fallback.can_create_estimates,
+    can_send_estimates: raw.can_send_estimates ?? fallback.can_send_estimates,
+    can_create_jobs: raw.can_create_jobs ?? fallback.can_create_jobs,
+    can_create_invoices: raw.can_create_invoices ?? fallback.can_create_invoices,
+    can_send_invoices: raw.can_send_invoices ?? fallback.can_send_invoices,
+    can_use_discover_profile: raw.can_use_discover_profile ?? fallback.can_use_discover_profile,
+    can_accept_new_connections: raw.can_accept_new_connections ?? fallback.can_accept_new_connections,
+    can_use_ai_features: raw.can_use_ai_features ?? fallback.can_use_ai_features,
+    can_invite_team_members: raw.can_invite_team_members ?? fallback.can_invite_team_members,
+    max_team_seats: raw.max_team_seats ?? fallback.max_team_seats,
+    max_storage_mb: raw.max_storage_mb ?? fallback.max_storage_mb,
+    read_only_reason: raw.read_only_reason ?? fallback.read_only_reason,
+  };
+}
+
+function useContractorEntitlements(contractorId: string | null | undefined): ContractorEntitlementLoadState {
+  const [state, setState] = useState<ContractorEntitlementLoadState>(() => ({
+    entitlements: betaContractorEntitlementFallback(contractorId ?? null),
+    loading: false,
+    error: '',
+    loadedAt: null,
+    source: 'fallback',
+  }));
+
+  useEffect(() => {
+    let cancelled = false;
+    const activeContractorId = contractorId ?? null;
+
+    if (!supabase || !activeContractorId) {
+      setState({
+        entitlements: betaContractorEntitlementFallback(activeContractorId),
+        loading: false,
+        error: '',
+        loadedAt: null,
+        source: 'fallback',
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setState(current => ({
+      ...current,
+      entitlements: current.entitlements.contractor_id === activeContractorId
+        ? current.entitlements
+        : betaContractorEntitlementFallback(activeContractorId),
+      loading: true,
+      error: '',
+      source: current.source,
+    }));
+
+    void (async () => {
+      try {
+        const { data, error: rpcError } = await supabase.rpc('servsync_current_contractor_entitlements', { p_contractor_id: activeContractorId });
+        if (cancelled) return;
+        if (rpcError) {
+          setState({
+            entitlements: betaContractorEntitlementFallback(activeContractorId),
+            loading: false,
+            error: readableError(rpcError, 'Unable to load contractor entitlements. Current beta access is preserved.'),
+            loadedAt: null,
+            source: 'fallback',
+          });
+          return;
+        }
+
+        setState({
+          entitlements: normalizeContractorEntitlements(data, activeContractorId),
+          loading: false,
+          error: '',
+          loadedAt: new Date().toISOString(),
+          source: 'rpc',
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setState({
+          entitlements: betaContractorEntitlementFallback(activeContractorId),
+          loading: false,
+          error: readableError(err, 'Unable to load contractor entitlements. Current beta access is preserved.'),
+          loadedAt: null,
+          source: 'fallback',
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contractorId]);
+
+  return state;
 }
 
 function EmailNotificationsToggle({ initialEnabled }: { initialEnabled: boolean }) {
@@ -17823,6 +17964,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     created_at: '',
     updated_at: '',
   };
+
+  // Load-only foundation for future contractor subscription readiness; do not enforce gates in this slice.
+  useContractorEntitlements(contractor?.id ?? null);
 
   const loadContractor = useCallback(async () => {
     if (!supabase) return;
