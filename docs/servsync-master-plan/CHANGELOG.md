@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-027-contractor-pipeline-summary-v1`
+- Files changed:
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-027 Slice 1 test/docs hardening for the existing contractor dashboard `Workflow overview` / `Needs review` summary. The new regression coverage asserts that request follow-up, accepted estimates needing jobs, invoice attention, and dashboard attention counts stay derived from existing loaded workflow state without new statuses, backend changes, notifications, public review display, broad message aggregation, or automation.
+- Reason for change: The FB-027 audit found a partial contractor pipeline foundation already exists, so the smallest safe next step is to lock down the read-only derivation boundary and align the official backlog before considering any UI expansion.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb027-contractor-pipeline-summary.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Test/docs-only hardening. No app UI behavior, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, deploy, notifications, public review display, broad job-message aggregation, automation, new lifecycle statuses, card badges, or new follow-up queue UI are included.
+  - Future FB-027 work should separately audit completed jobs needing invoices, stale estimates, unpaid invoice nuance, and whether any small UI copy or badge work is justified by beta feedback.
+
 - Branch: `codex/backlog-impact-workflow-rule-v1`
 - Files changed:
   - `AGENTS.md`
