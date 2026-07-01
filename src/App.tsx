@@ -7495,6 +7495,84 @@ function useContractorEntitlements(contractorId: string | null | undefined): Con
   return state;
 }
 
+function entitlementDisplayLabel(value: string | null | undefined) {
+  if (!value) return 'Not set';
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function entitlementDateDisplay(value: string | null | undefined) {
+  return value ? formatDateTime(value) : 'Not set';
+}
+
+function contractorEntitlementAvailableCapabilityCount(entitlements: ContractorEntitlements) {
+  return [
+    entitlements.can_use_workspace,
+    entitlements.can_create_service_requests_for_local_customers,
+    entitlements.can_create_estimates,
+    entitlements.can_send_estimates,
+    entitlements.can_create_jobs,
+    entitlements.can_create_invoices,
+    entitlements.can_send_invoices,
+    entitlements.can_use_discover_profile,
+    entitlements.can_accept_new_connections,
+    entitlements.can_use_ai_features,
+    entitlements.can_invite_team_members,
+  ].filter(Boolean).length;
+}
+
+function ContractorEntitlementStatusPanel({ state }: { state: ContractorEntitlementLoadState }) {
+  const { entitlements, loading, error, source } = state;
+  const capabilityCount = contractorEntitlementAvailableCapabilityCount(entitlements);
+  const statusText = loading
+    ? 'Refreshing'
+    : source === 'fallback' && error
+      ? 'Beta access fallback'
+      : 'Beta access';
+
+  return (
+    <Card title="Beta access" icon={<ShieldCheck size={18} />}>
+      <div data-testid="contractor-entitlement-status-panel" className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{statusText}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">Informational only</span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Entitlement status is informational during beta. Stripe billing is not active. No contractor actions are blocked by this status during beta.
+            </p>
+            {error && (
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                Unable to refresh entitlement labels. Current beta access remains available.
+              </p>
+            )}
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+            Current beta access available
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <InfoBox label="Billing status" value={entitlementDisplayLabel(entitlements.billing_status)} />
+          <InfoBox label="Current plan" value={entitlementDisplayLabel(entitlements.current_plan)} />
+          <InfoBox label="Access mode" value={entitlementDisplayLabel(entitlements.access_mode)} />
+          <InfoBox label="Subscription required after" value={entitlementDateDisplay(entitlements.subscription_required_after)} />
+          <InfoBox label="Grace period ends" value={entitlementDateDisplay(entitlements.grace_period_ends_at)} />
+          <InfoBox label="Available beta capability flags" value={`${capabilityCount} current flags`} />
+        </div>
+
+        {entitlements.read_only_reason && (
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">
+            Status note: {entitlements.read_only_reason}. This label does not change access in the current beta.
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function EmailNotificationsToggle({ initialEnabled }: { initialEnabled: boolean }) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [saving, setSaving] = useState(false);
@@ -17965,8 +18043,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     updated_at: '',
   };
 
-  // Load-only foundation for future contractor subscription readiness; do not enforce gates in this slice.
-  useContractorEntitlements(contractor?.id ?? null);
+  // Load and display foundation for future contractor subscription readiness; do not enforce gates in this slice.
+  const contractorEntitlementState = useContractorEntitlements(contractor?.id ?? null);
 
   const loadContractor = useCallback(async () => {
     if (!supabase) return;
@@ -24862,6 +24940,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </div>
           </Card>
+
+          <ContractorEntitlementStatusPanel state={contractorEntitlementState} />
 
           <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" open={showContractorOnboardingChecklist || undefined}>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
