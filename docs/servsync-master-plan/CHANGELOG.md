@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-review-sql-grant-hardening-v1`
+- Files changed:
+  - `servsync-review-grant-hardening.sql`
+  - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-026 Slice 2 review SQL/RLS grant hardening for review trust boundaries. The SQL patch revokes direct browser-role table privileges on `service_request_reviews`, keeps review writes routed through `servsync_homeowner_submit_review(...)`, removes PUBLIC/anon execute from review write/helper functions, keeps completed-work evidence helper access internal, and binds homeowner review eligibility checks to the current authenticated user or platform admin. Security catalog coverage now asserts the hardened review table/function grant posture.
+- Reason for change: The Slice 1 audit found `service_request_reviews` was functionally protected by RLS but still carried broad inherited browser-role table/function grants. Review trust surfaces should be RPC-mediated before any future moderation, referral/recommendation, Google handoff, or public-rating expansion work.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - sandbox SQL apply/idempotency for `servsync-review-grant-hardening.sql`
+- Known risks or follow-ups:
+  - SQL/RLS/RPC grant hardening only. No production SQL application, production data mutation, deploy, app behavior expansion, moderation queue, public rating policy expansion, referral/recommendation product behavior, Google review automation, badges, awards, paid ranking, Discover ranking change, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, or notification delivery work.
+  - Broader default privilege cleanup across the `public` schema remains a separate platform security topic and is intentionally outside this FB-026 slice.
+  - Future FB-026 slices should separately design moderation/public-rating policy, homeowner recommendation/referral behavior, and optional Google review handoff copy/link handling.
+
 - Branch: `codex/fb-026-review-trust-boundary-v1`
 - Files changed:
   - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
