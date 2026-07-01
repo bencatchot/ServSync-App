@@ -20958,8 +20958,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <div>
           <p className="text-sm font-bold text-slate-950">Price Book</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Add active Price Book items as normal editable estimate lines. Internal notes stay out of customer-facing estimates.
+            Add active Price Book items as editable estimate lines. Quantity starts at 1; review quantity, price, and scope before sending. Internal notes stay private.
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-2 py-1">Qty starts at 1</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">Review price and scope</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1">Category/tax stays in Price Book</span>
+          </div>
         </div>
         <span className="w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
           {activeContractorPriceBookItems.length} active
@@ -21002,6 +21007,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {item.customer_description && (
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.customer_description}</p>
                       )}
+                      <p className="mt-2 text-[11px] font-medium leading-4 text-slate-500">
+                        Adds title, customer description, unit, price, and labor hours only. Private notes and tax/category metadata are not copied.
+                      </p>
                     </div>
                     <button
                       type="button"
