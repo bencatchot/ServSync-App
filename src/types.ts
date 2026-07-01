@@ -12,6 +12,7 @@ export type UniversalReferralRewardStatus = 'pending' | 'approved' | 'denied' | 
 export type ConnectionAlertLevel = 'green' | 'yellow' | 'red';
 export type ConnectionAlertStatus = 'open' | 'acknowledged' | 'contacted' | 'dismissed' | 'resolved';
 export type ExternalReviewSource = 'google' | 'facebook' | 'yelp' | 'other';
+export type ReviewModerationStatus = 'pending' | 'approved' | 'hidden' | 'rejected';
 export type ServiceRequestStatus = 'open' | 'contractor_responded' | 'homeowner_replied' | 'declined' | 'closed';
 export type ServiceRequestUrgency = 'low' | 'normal' | 'urgent';
 export type QuoteStatus = 'pending' | 'accepted' | 'declined';
@@ -682,6 +683,28 @@ export interface AdminReferral {
   reward_approved_at: string | null;
   reward_paid_at: string | null;
   rejected_at: string | null;
+}
+
+export interface AdminReviewModerationRow {
+  review_id: string;
+  request_id: string;
+  request_title: string | null;
+  request_category: string | null;
+  contractor_id: string;
+  contractor_name: string | null;
+  homeowner_user_id: string;
+  homeowner_name: string | null;
+  rating: number;
+  body: string;
+  kudos: string[];
+  reviewer_display_name: string;
+  reviewer_location: string;
+  moderation_status: ReviewModerationStatus;
+  moderation_note: string;
+  created_at: string;
+  updated_at: string;
+  moderated_at: string | null;
+  moderated_by: string | null;
 }
 
 export interface AdminContractorAdoption {

@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-admin-review-moderation-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/fb026-admin-review-moderation-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-026 Slice 3C platform-admin review moderation UI using the existing guarded review moderation RPCs. Admins can filter pending/approved/hidden/rejected/all reviews, inspect review context, record moderation notes, and set moderation status while the UI clearly states that approval records internal status only and does not publish reviews publicly yet.
+- Reason for change: The moderation SQL/RPC foundation existed in production, but platform admins still needed a minimal internal surface to review and update moderation state before any future approved-only public display slice is considered.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-admin-review-moderation-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Frontend/docs/test admin UI slice only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, deploy, public review display re-enable, approved-only public display, contractor dispute/report flow, homeowner edit/delete flow, contractor responses, badges, awards, Discover ranking change, paid ranking, Google review automation, referral/recommendation product expansion, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, or notification delivery work is included.
+  - Future FB-026 work should separately decide whether to add approved-only public review display after the internal moderation workflow is reviewed.
+
 - Branch: `codex/fb-026-review-copy-polish-v1`
 - Files changed:
   - `src/App.tsx`

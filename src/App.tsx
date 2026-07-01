@@ -18,6 +18,7 @@ import {
   Compass,
   CreditCard,
   Download,
+  EyeOff,
   FileText,
   FolderOpen,
   Home,
@@ -136,6 +137,7 @@ import type {
   AdminGrowthRow,
   AdminPlatformHealth,
   AdminReferral,
+  AdminReviewModerationRow,
   AdminRevenueRow,
   AppNotification,
   ConnectionAuditEvent,
@@ -226,6 +228,7 @@ import type {
   ServiceRequestStatus,
   ServiceRequestSummary,
   ServiceRequestUrgency,
+  ReviewModerationStatus,
 } from './types';
 
 type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement' | 'trust-safety';
@@ -258,6 +261,11 @@ type AdminReferralDraft = {
   reward_type: string;
   reward_amount: string;
   admin_notes: string;
+};
+type AdminReviewModerationFilter = ReviewModerationStatus | 'all';
+type AdminReviewModerationDraft = {
+  status: ReviewModerationStatus;
+  moderation_note: string;
 };
 type AdminConnectionAlertDraft = {
   status: ConnectionAlertStatus;
@@ -5844,6 +5852,36 @@ function referralDraftFromReferral(referral: AdminReferral): AdminReferralDraft 
     reward_type: referral.reward_type || '',
     reward_amount: referral.reward_amount_cents ? centsToDollars(referral.reward_amount_cents) : '',
     admin_notes: referral.admin_notes || '',
+  };
+}
+
+const REVIEW_MODERATION_STATUS_OPTIONS: { value: ReviewModerationStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
+const REVIEW_MODERATION_FILTER_OPTIONS: { value: AdminReviewModerationFilter; label: string }[] = [
+  ...REVIEW_MODERATION_STATUS_OPTIONS,
+  { value: 'all', label: 'All reviews' },
+];
+
+function reviewModerationStatusLabel(status?: ReviewModerationStatus | string | null) {
+  return REVIEW_MODERATION_STATUS_OPTIONS.find(option => option.value === status)?.label ?? 'Unknown';
+}
+
+function reviewModerationStatusClass(status?: ReviewModerationStatus | string | null) {
+  if (status === 'approved') return 'bg-emerald-900/40 text-emerald-300';
+  if (status === 'hidden') return 'bg-amber-900/40 text-amber-300';
+  if (status === 'rejected') return 'bg-red-900/40 text-red-300';
+  return 'bg-blue-900/40 text-blue-300';
+}
+
+function reviewModerationDraftFromRow(row: AdminReviewModerationRow): AdminReviewModerationDraft {
+  return {
+    status: row.moderation_status || 'pending',
+    moderation_note: row.moderation_note || '',
   };
 }
 
@@ -35335,19 +35373,22 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLeads, setInviteLeads] = useState<AdminInviteLead[]>([]);
   const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
+  const [adminReviewQueue, setAdminReviewQueue] = useState<AdminReviewModerationRow[]>([]);
   const [connectionOverviews, setConnectionOverviews] = useState<PlatformConnectionOverview[]>([]);
   const [adminConnectionHistory, setAdminConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [adminDrafts, setAdminDrafts] = useState<Record<string, AdminContractorDraft>>({});
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, InviteRewardDraft>>({});
   const [inviteLeadDrafts, setInviteLeadDrafts] = useState<Record<string, AdminInviteLeadDraft>>({});
   const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
+  const [adminReviewDrafts, setAdminReviewDrafts] = useState<Record<string, AdminReviewModerationDraft>>({});
   const [contractorAdoption, setContractorAdoption] = useState<AdminContractorAdoption[]>([]);
   const [connectionAlertDrafts, setConnectionAlertDrafts] = useState<Record<string, AdminConnectionAlertDraft>>({});
   const [connectionOutreachDrafts, setConnectionOutreachDrafts] = useState<Record<string, AdminOutreachMessageDraft>>({});
   const [activeConnectionOutreachId, setActiveConnectionOutreachId] = useState<string | null>(null);
   const [inviteLeadOutreachDrafts, setInviteLeadOutreachDrafts] = useState<Record<string, AdminInviteLeadOutreachDraft>>({});
   const [activeInviteLeadOutreachId, setActiveInviteLeadOutreachId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'support' | 'reports'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'homeowners' | 'contractors' | 'connections' | 'invite_leads' | 'referrals' | 'reviews' | 'support' | 'reports'>('overview');
+  const [reviewModerationFilter, setReviewModerationFilter] = useState<AdminReviewModerationFilter>('pending');
   const [adminConnectionFilter, setAdminConnectionFilter] = useState<AdminConnectionFilter>('all');
   const [adminConnectionSearch, setAdminConnectionSearch] = useState('');
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
@@ -35362,12 +35403,14 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [savingInviteId, setSavingInviteId] = useState<string | null>(null);
   const [savingInviteLeadId, setSavingInviteLeadId] = useState<string | null>(null);
   const [savingReferralId, setSavingReferralId] = useState<string | null>(null);
+  const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [savingConnectionAlertId, setSavingConnectionAlertId] = useState<string | null>(null);
   const [reportHealth, setReportHealth] = useState<AdminPlatformHealth | null>(null);
   const [reportRevenue, setReportRevenue] = useState<AdminRevenueRow[]>([]);
   const [reportGrowth, setReportGrowth] = useState<AdminGrowthRow[]>([]);
   const [reportActivity, setReportActivity] = useState<AdminContractorActivityRow[]>([]);
   const [contractorBillingReadiness, setContractorBillingReadiness] = useState<AdminContractorBillingReadinessRow[]>([]);
+  const [reviewModerationLoading, setReviewModerationLoading] = useState(false);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsLoaded, setReportsLoaded] = useState(false);
   const [notice, setNotice] = useState('');
@@ -35465,6 +35508,32 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     void loadAdmin();
   }, []);
 
+  const loadAdminReviewQueue = async (status: AdminReviewModerationFilter = reviewModerationFilter) => {
+    if (!supabase) return;
+    setReviewModerationLoading(true);
+    setError('');
+    try {
+      const { data, error: queueError } = await supabase.rpc('servsync_admin_review_moderation_queue', {
+        p_status: status,
+      });
+      if (queueError) throw queueError;
+      const rows = (data || []) as AdminReviewModerationRow[];
+      setAdminReviewQueue(rows);
+      setAdminReviewDrafts(rows.reduce<Record<string, AdminReviewModerationDraft>>((drafts, row) => {
+        drafts[row.review_id] = reviewModerationDraftFromRow(row);
+        return drafts;
+      }, {}));
+    } catch (err) {
+      setError(readableError(err, 'Unable to load review moderation queue.'));
+    } finally {
+      setReviewModerationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAdminReviewQueue(reviewModerationFilter);
+  }, [reviewModerationFilter]);
+
   const loadReports = async () => {
     if (!supabase || reportsLoading) return;
     setReportsLoading(true);
@@ -35512,6 +35581,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setAdminReferralDrafts(current => ({
       ...current,
       [referralId]: nextDraft,
+    }));
+  };
+
+  const updateAdminReviewDraft = (reviewId: string, nextDraft: AdminReviewModerationDraft) => {
+    setAdminReviewDrafts(current => ({
+      ...current,
+      [reviewId]: nextDraft,
     }));
   };
 
@@ -35706,6 +35782,29 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
+  const saveAdminReviewModeration = async (review: AdminReviewModerationRow, statusOverride?: ReviewModerationStatus) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setSavingReviewId(review.review_id);
+    try {
+      const draft = adminReviewDrafts[review.review_id] || reviewModerationDraftFromRow(review);
+      const status = statusOverride || draft.status;
+      const { error: updateError } = await supabase.rpc('servsync_admin_update_review_moderation', {
+        p_review_id: review.review_id,
+        p_status: status,
+        p_moderation_note: cleanHumanWrittenText(draft.moderation_note),
+      });
+      if (updateError) throw updateError;
+      setNotice(`Review moderation status set to ${reviewModerationStatusLabel(status).toLowerCase()}. Public ServSync review display remains paused.`);
+      await loadAdminReviewQueue(reviewModerationFilter);
+    } catch (err) {
+      setError(readableError(err, 'Unable to update review moderation status.'));
+    } finally {
+      setSavingReviewId(null);
+    }
+  };
+
   const saveConnectionAlert = async (row: AdminContractorAdoption, overrides: Partial<AdminConnectionAlertDraft> = {}) => {
     if (!supabase || !row.alert_id) return;
     setNotice('');
@@ -35815,6 +35914,9 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
   const openSupportCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const pendingReferralCount = adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
+  const pendingReviewModerationCount = reviewModerationFilter === 'pending'
+    ? adminReviewQueue.length
+    : adminReviewQueue.filter(review => review.moderation_status === 'pending').length;
   const newInviteLeadCount = inviteLeads.filter(lead => lead.admin_status === 'new').length;
   const profilesById = new Map(profiles.map(item => [item.id, item]));
   const contractorsById = new Map(contractors.map(item => [item.id, item]));
@@ -35860,6 +35962,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     { label: 'Invite Leads', value: newInviteLeadCount, icon: Mail },
     { label: 'Active Invites', value: overview?.active_invites ?? 0, icon: Mail },
     { label: 'Referral Review', value: pendingReferralCount, icon: Receipt },
+    { label: 'Review Moderation', value: pendingReviewModerationCount, icon: Star },
     { label: 'Open Support', value: openSupportCount, icon: MessageSquare },
   ];
   const connectionStatusCounts = connectionOverviews.reduce<Record<string, number>>((counts, connection) => {
@@ -35922,6 +36025,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         { id: 'connections',  label: 'Connections', icon: <Users size={17} /> },
         { id: 'invite_leads', label: 'Invite Leads', icon: <Mail size={17} />, badge: newInviteLeadCount || undefined },
         { id: 'referrals',    label: 'Referrals',   icon: <Link2 size={17} /> },
+        { id: 'reviews',      label: 'Reviews',     icon: <Star size={17} />, badge: pendingReviewModerationCount || undefined },
         { id: 'support',      label: 'Support',     icon: <MessageSquare size={17} />, badge: openSupportCount },
         { id: 'reports',      label: 'Reports',     icon: <Receipt size={17} /> },
       ]}
@@ -35952,7 +36056,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                 setAdminTab('contractors');
                 return;
               }
-              setAdminTab(label === 'Homeowners' ? 'homeowners' : label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Invite Leads' ? 'invite_leads' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Open Support' ? 'support' : 'overview');
+              setAdminTab(label === 'Homeowners' ? 'homeowners' : label === 'Contractors' ? 'contractors' : label === 'Active Connections' ? 'connections' : label === 'Invite Leads' ? 'invite_leads' : ['Active Invites', 'Referral Review'].includes(label) ? 'referrals' : label === 'Review Moderation' ? 'reviews' : label === 'Open Support' ? 'support' : 'overview');
             }}
           />
         ))}
@@ -36870,6 +36974,147 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
           </div>
         </Card>
       </div>
+      )}
+
+      {adminTab === 'reviews' && (
+        <Card title="Review moderation" icon={<Star size={18} />}>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-800/50 bg-amber-950/20 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="font-semibold text-white">Public ServSync review display remains paused.</p>
+                  <p className="mt-1 text-sm text-amber-100">
+                    Approving a review records moderation status only; it does not publish the review publicly yet.
+                  </p>
+                </div>
+                <span className="w-fit rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                  Internal admin only
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <Field label="Status filter">
+                <select
+                  className={inputClass()}
+                  value={reviewModerationFilter}
+                  onChange={event => setReviewModerationFilter(event.target.value as AdminReviewModerationFilter)}
+                >
+                  {REVIEW_MODERATION_FILTER_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </Field>
+              <button type="button" onClick={() => void loadAdminReviewQueue()} className={buttonClass('secondary')} disabled={reviewModerationLoading}>
+                <RotateCcw size={14} /> {reviewModerationLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {reviewModerationLoading && <Notice tone="info" text="Loading review moderation queue..." />}
+
+            {!reviewModerationLoading && adminReviewQueue.length === 0 ? (
+              <EmptyState text={reviewModerationFilter === 'pending' ? 'No pending reviews to moderate.' : 'No reviews match this moderation filter.'} />
+            ) : (
+              <div className="space-y-3">
+                {adminReviewQueue.map(review => {
+                  const draft = adminReviewDrafts[review.review_id] || reviewModerationDraftFromRow(review);
+                  const isSaving = savingReviewId === review.review_id;
+                  const statusLabel = reviewModerationStatusLabel(review.moderation_status);
+                  const reviewerDetails = [
+                    review.reviewer_display_name || 'No display name',
+                    review.reviewer_location || 'No location',
+                  ].join(' · ');
+
+                  return (
+                    <div key={review.review_id} className="rounded-xl border border-slate-700 bg-slate-800 p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${reviewModerationStatusClass(review.moderation_status)}`}>
+                              {statusLabel}
+                            </span>
+                            <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                              {review.rating}/5 rating
+                            </span>
+                          </div>
+                          <p className="mt-3 font-bold text-white">{review.contractor_name || 'Unknown contractor'}</p>
+                          <p className="mt-1 text-sm text-slate-400">
+                            {review.request_title || 'Untitled request'}{review.request_category ? ` · ${review.request_category}` : ''}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Homeowner: {review.homeowner_name || 'Homeowner'} · {reviewerDetails}
+                          </p>
+                        </div>
+                        <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-3 lg:min-w-[420px]">
+                          <InfoBox label="Submitted" value={formatDateTime(review.created_at)} />
+                          <InfoBox label="Updated" value={formatDateTime(review.updated_at)} />
+                          <InfoBox label="Moderated" value={formatDateTime(review.moderated_at)} />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+                        <div className="space-y-3">
+                          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Review body</p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-200">{review.body || 'No written review body.'}</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kudos</p>
+                            {review.kudos?.length ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {review.kudos.map(kudo => (
+                                  <span key={kudo} className="rounded-full bg-slate-700 px-2 py-1 text-xs font-semibold text-slate-300">{kudo}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-1 text-sm text-slate-400">No kudos selected.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Field label="Moderation status">
+                            <select
+                              className={inputClass()}
+                              value={draft.status}
+                              onChange={event => updateAdminReviewDraft(review.review_id, { ...draft, status: event.target.value as ReviewModerationStatus })}
+                            >
+                              {REVIEW_MODERATION_STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Moderation note">
+                            <textarea
+                              className={`${inputClass()} min-h-[96px]`}
+                              {...writingAssistProps}
+                              value={draft.moderation_note}
+                              onChange={event => updateAdminReviewDraft(review.review_id, { ...draft, moderation_note: event.target.value })}
+                              placeholder="Internal note for why this status was selected"
+                            />
+                          </Field>
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                            <button type="button" onClick={() => void saveAdminReviewModeration(review)} disabled={isSaving} className={buttonClass('primary')}>
+                              <ClipboardCheck size={16} /> {isSaving ? 'Saving...' : 'Save status'}
+                            </button>
+                            <button type="button" onClick={() => void saveAdminReviewModeration(review, 'approved')} disabled={isSaving} className={buttonClass('secondary')}>
+                              <CheckCircle2 size={16} /> Approve
+                            </button>
+                            <button type="button" onClick={() => void saveAdminReviewModeration(review, 'hidden')} disabled={isSaving} className={buttonClass('secondary')}>
+                              <EyeOff size={16} /> Hide
+                            </button>
+                            <button type="button" onClick={() => void saveAdminReviewModeration(review, 'rejected')} disabled={isSaving} className={buttonClass('danger')}>
+                              <X size={16} /> Reject
+                            </button>
+                            <button type="button" onClick={() => void saveAdminReviewModeration(review, 'pending')} disabled={isSaving} className={buttonClass('secondary')}>
+                              <RotateCcw size={14} /> Reset pending
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
       )}
 
       {adminTab === 'support' && (
