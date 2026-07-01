@@ -32,7 +32,7 @@ const { localDraftFromNote } = assistant;
 
 const roomCatalog = [
   { room: 'Kitchen', items: ['Kitchen sink leak', 'Garbage disposal concern', 'GFCI outlet', 'Dishwasher drain hose', 'Under-sink shutoff valve'] },
-  { room: 'Primary Bathroom', items: ['Toilet operation', 'Bathroom sink leak', 'GFCI outlet'] },
+  { room: 'Primary Bathroom', items: ['Toilet operation', 'Bathroom sink leak', 'Light fixtures', 'GFCI outlet', 'Shower operation', 'Bath fan'] },
   { room: 'Hall Bathroom', items: ['Toilet operation', 'Bathroom sink leak', 'Slow drain or clog'] },
   { room: 'Living Room', items: ['Ceiling fan noise'] },
   { room: 'Entry', items: ['Door operation issue'] },
@@ -193,6 +193,38 @@ const extraCases = [
     name: 'existing single observation still works',
     input: 'AC filter is dirty, recommend replacing.',
     count: 1,
+  },
+  {
+    name: 'master bath pass walkthrough splits into distinct checklist items',
+    input: 'Walking into the master bath, checked the toilet for function pass, checked the sinks for leaks pass, notated that the lights were functioning, and that the outlets worked, and the shower was functional with no leaks.',
+    count: 5,
+    rooms: ['Primary Bathroom', 'Primary Bathroom', 'Primary Bathroom', 'Primary Bathroom', 'Primary Bathroom'],
+    items: ['Toilet operation', 'Bathroom sink leak', 'Light fixtures', 'GFCI outlet', 'Shower operation'],
+    statuses: ['Pass', 'Pass', 'Pass', 'Pass', 'Pass'],
+  },
+  {
+    name: 'multiple rooms split with pass and monitor status',
+    input: 'Master bath toilet passed and hall bath sink is slow.',
+    count: 2,
+    rooms: ['Primary Bathroom', 'Hall Bathroom'],
+    items: ['Toilet operation', 'Bathroom sink leak'],
+    statuses: ['Pass', 'Monitor'],
+  },
+  {
+    name: 'same asset related pass details stay merged',
+    input: 'Primary bath shower was functional with no leaks.',
+    count: 1,
+    rooms: ['Primary Bathroom'],
+    items: ['Shower operation'],
+    statuses: ['Pass'],
+  },
+  {
+    name: 'same target repeated observations remain separate suggestions',
+    input: 'Primary bath outlet worked and GFCI outlet passed.',
+    count: 2,
+    rooms: ['Primary Bathroom', 'Primary Bathroom'],
+    items: ['GFCI outlet', 'GFCI outlet'],
+    statuses: ['Pass', 'Pass'],
   },
 ];
 

@@ -1,9 +1,16 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { transformSync } from 'esbuild';
+import ts from 'typescript';
 
 const source = readFileSync(new URL('../src/inspectionAssistant.ts', import.meta.url), 'utf8');
-const { code } = transformSync(source, { loader: 'ts', format: 'cjs' });
+const { outputText: code } = ts.transpileModule(source, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+    esModuleInterop: true,
+    importsNotUsedAsValues: ts.ImportsNotUsedAsValues.Remove,
+  },
+});
 const module = { exports: {} };
 vm.runInNewContext(code, { module, exports: module.exports, console });
 
@@ -35,6 +42,26 @@ const cases = [
     note: 'The water heater appears to be in good condition. No issues were observed.',
   },
   {
+    input: 'wall checked with no visible damage',
+    allowed: ['Pass'],
+    not: ['Needs Repair', 'Monitor'],
+  },
+  {
+    input: 'bathroom lights were functioning',
+    allowed: ['Pass'],
+    not: ['Needs Repair', 'Monitor'],
+  },
+  {
+    input: 'outlets worked',
+    allowed: ['Pass'],
+    not: ['Needs Repair', 'Monitor'],
+  },
+  {
+    input: 'shower was functional with no leaks',
+    allowed: ['Pass'],
+    not: ['Needs Repair', 'Monitor'],
+  },
+  {
     input: 'GFCI outlet not working',
     allowed: ['Needs Repair'],
     not: ['Pass'],
@@ -52,6 +79,11 @@ const cases = [
     allowed: ['Monitor'],
     not: ['Pass'],
     note: 'The ceiling fan is squeaking. Monitor the fan noise and inspect the mounting or blades if it worsens.',
+  },
+  {
+    input: 'bath fan has slight noise but still works',
+    allowed: ['Monitor'],
+    not: ['Pass', 'Needs Repair'],
   },
   {
     input: 'Cleaned clogged gutter while onsite.',
