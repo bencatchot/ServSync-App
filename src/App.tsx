@@ -6566,6 +6566,92 @@ function homeownerRequestActivityEvents(
   ];
 }
 
+type WorkflowJobMessageIndicator = {
+  inspectionId: string;
+  unreadCount: number;
+  latestMessageAt: string;
+  lastReadAt: string | null;
+};
+
+type WorkflowJobMessageRow = {
+  inspection_id: string | null;
+  sender_user_id: string;
+  created_at: string;
+};
+
+type WorkflowJobThreadReadRow = {
+  inspection_id: string | null;
+  last_read_at: string | null;
+};
+
+function uniqueJobMessageInspectionIds(ids: Array<string | null | undefined>) {
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))];
+}
+
+function workflowJobMessageIndicatorLabel(indicator: WorkflowJobMessageIndicator) {
+  return indicator.unreadCount === 1 ? 'New job message' : `${indicator.unreadCount} new job messages`;
+}
+
+function WorkflowJobMessageIndicatorBadge({ indicator }: { indicator?: WorkflowJobMessageIndicator }) {
+  if (!indicator || indicator.unreadCount <= 0) return null;
+
+  return (
+    <div
+      data-testid="workflow-job-message-indicator"
+      className="inline-flex w-full items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 sm:w-auto"
+    >
+      <MessageSquare size={14} aria-hidden="true" />
+      <span>{workflowJobMessageIndicatorLabel(indicator)}</span>
+    </div>
+  );
+}
+
+async function fetchWorkflowJobMessageIndicators(currentUserId: string, inspectionIds: string[]) {
+  if (!supabase) return {};
+  const visibleInspectionIds = uniqueJobMessageInspectionIds(inspectionIds);
+  if (visibleInspectionIds.length === 0) return {};
+
+  const [messagesRes, readsRes] = await Promise.all([
+    supabase
+      .from('workflow_messages')
+      .select('inspection_id, sender_user_id, created_at')
+      .eq('context_type', 'job')
+      .in('inspection_id', visibleInspectionIds)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('workflow_thread_reads')
+      .select('inspection_id, last_read_at')
+      .eq('context_type', 'job')
+      .eq('user_id', currentUserId)
+      .in('inspection_id', visibleInspectionIds),
+  ]);
+
+  if (messagesRes.error || readsRes.error) return {};
+
+  const readsByInspectionId = ((readsRes.data || []) as WorkflowJobThreadReadRow[]).reduce<Record<string, string | null>>((reads, row) => {
+    if (row.inspection_id) reads[row.inspection_id] = row.last_read_at;
+    return reads;
+  }, {});
+
+  return ((messagesRes.data || []) as WorkflowJobMessageRow[]).reduce<Record<string, WorkflowJobMessageIndicator>>((indicators, message) => {
+    if (!message.inspection_id || message.sender_user_id === currentUserId) return indicators;
+    const lastReadAt = readsByInspectionId[message.inspection_id] ?? null;
+    if (lastReadAt && new Date(message.created_at).getTime() <= new Date(lastReadAt).getTime()) return indicators;
+
+    const current = indicators[message.inspection_id];
+    indicators[message.inspection_id] = {
+      inspectionId: message.inspection_id,
+      unreadCount: (current?.unreadCount ?? 0) + 1,
+      latestMessageAt: current && new Date(current.latestMessageAt).getTime() > new Date(message.created_at).getTime()
+        ? current.latestMessageAt
+        : message.created_at,
+      lastReadAt,
+    };
+    return indicators;
+  }, {});
+}
+
 function appointmentNextActionText(appointment: ServiceRequestAppointment, perspective: 'homeowner' | 'contractor') {
   if (appointment.status === 'confirmed') return 'Confirmed on both calendars.';
   if (appointment.status === 'completed') return 'Completed.';
@@ -9578,6 +9664,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
+
+  const clearWorkflowJobMessageIndicator = useCallback((inspectionId: string) => {
+    setWorkflowJobMessageIndicators(current => {
+      if (!current[inspectionId]) return current;
+      const next = { ...current };
+      delete next[inspectionId];
+      return next;
+    });
+  }, []);
+
+  const loadWorkflowJobMessageIndicators = useCallback(async (inspectionIds: string[]) => {
+    setWorkflowJobMessageIndicators(await fetchWorkflowJobMessageIndicators(profile.id, inspectionIds));
+  }, [profile.id]);
 
   useEffect(() => {
     const skipped = window.localStorage.getItem(homeSetupStorageKey) === 'true';
@@ -9762,6 +9862,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     void loadHomeowner();
   }, [loadHomeowner]);
+
+  useEffect(() => {
+    const requestIds = new Set(serviceRequests.map(request => request.id));
+    const inspectionIds = estimates
+      .filter(estimate => estimate.inspection_id && estimate.service_request_id && requestIds.has(estimate.service_request_id) && estimate.status !== 'draft')
+      .map(estimate => estimate.inspection_id);
+    void loadWorkflowJobMessageIndicators(uniqueJobMessageInspectionIds(inspectionIds));
+  }, [estimates, loadWorkflowJobMessageIndicators, serviceRequests]);
 
   const loadHomeAccess = useCallback(async (homeId = selectedHomeId) => {
     if (!supabase) return;
@@ -13078,15 +13186,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           })}
 
           {requestJobThreadEstimates.map(estimate => estimate.inspection_id && (
-            <WorkflowMessageThread
-              key={`job-thread-${estimate.inspection_id}`}
-              supabaseClient={supabase!}
-              currentUserId={profile.id}
-              inspectionId={estimate.inspection_id}
-              title="Job messages"
-              helper={`Messages about the job linked to ${estimate.title}. Your original request thread stays below.`}
-              canSend
-            />
+            <div key={`job-thread-${estimate.inspection_id}`} className="space-y-2">
+              <WorkflowJobMessageIndicatorBadge indicator={workflowJobMessageIndicators[estimate.inspection_id]} />
+              <WorkflowMessageThread
+                supabaseClient={supabase!}
+                currentUserId={profile.id}
+                inspectionId={estimate.inspection_id}
+                title="Job messages"
+                helper={`Messages about the job linked to ${estimate.title}. Your original request thread stays below.`}
+                canSend
+                onMarkedRead={clearWorkflowJobMessageIndicator}
+              />
+            </div>
           ))}
 
           {reportLinks.map(({ entry, document }) => document && (
@@ -18021,11 +18132,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   }, [contractorViewedCalendarVisitsStorageKey]);
 
   const [loading, setLoading] = useState(true);
+  const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
   const restoredFieldWorkRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutoSaveSignatureRef = useRef('');
   const originalInspectionLayoutRef = useRef<InspectionLayoutSnapshot | null>(null);
   const inspectionLayoutDirtyRef = useRef(false);
+
+  const clearWorkflowJobMessageIndicator = useCallback((inspectionId: string) => {
+    setWorkflowJobMessageIndicators(current => {
+      if (!current[inspectionId]) return current;
+      const next = { ...current };
+      delete next[inspectionId];
+      return next;
+    });
+  }, []);
+
+  const loadWorkflowJobMessageIndicators = useCallback(async (inspectionIds: string[]) => {
+    setWorkflowJobMessageIndicators(await fetchWorkflowJobMessageIndicators(profile.id, inspectionIds));
+  }, [profile.id]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.contractorTab, contractorTab);
@@ -23988,6 +24113,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       && estimate.status !== 'draft'
     )
   );
+
+  useEffect(() => {
+    const inspectionIds = inspections
+      .filter(jobHasHomeownerVisibleWorkflowThread)
+      .map(job => job.id);
+    void loadWorkflowJobMessageIndicators(uniqueJobMessageInspectionIds(inspectionIds));
+  }, [estimates, inspections, loadWorkflowJobMessageIndicators]);
+
   const contractorJobActivityContextFor = (job: Inspection): {
     events: WorkflowActivityTimelineEvent[];
     serviceRequestIds: string[];
@@ -24090,8 +24223,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const renderContractorJobWorkflowThread = (job: Inspection) => {
     if (!jobHasHomeownerVisibleWorkflowThread(job) || !supabase) return null;
     const activityContext = contractorJobActivityContextFor(job);
+    const messageIndicator = workflowJobMessageIndicators[job.id];
     return (
       <div className="space-y-3">
+        <WorkflowJobMessageIndicatorBadge indicator={messageIndicator} />
         <WorkflowActivityTimelineWithDurableEvents
           supabaseClient={supabase}
           derivedEvents={activityContext.events}
@@ -24112,6 +24247,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           helper="Job-specific messages shared with the homeowner. Internal work notes stay separate below."
           canSend={contractorCanSendWorkflowMessages}
           readOnlyReason={contractorWorkflowReadOnlyReason}
+          onMarkedRead={clearWorkflowJobMessageIndicator}
         />
       </div>
     );
@@ -31324,6 +31460,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const primaryWorkItemBadge = getJobWorkItemSummaryBadges(workItemSummary)[0] ?? null;
                           const workItemNextAction = getJobWorkItemNextAction(workItemSummary);
                           const showJobInvoiceAction = inspectionIsClosedJob(insp);
+                          const messageIndicator = workflowJobMessageIndicators[insp.id];
                           return (
                             <div
                               key={insp.id}
@@ -31344,6 +31481,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
                                     {!checklistStyle && linkedEstimate && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Estimate linked</span>}
                                     {!checklistStyle && linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
+                                    {messageIndicator && (
+                                      <span
+                                        data-testid="contractor-job-message-indicator"
+                                        className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800"
+                                      >
+                                        <MessageSquare size={12} aria-hidden="true" />
+                                        {workflowJobMessageIndicatorLabel(messageIndicator)}
+                                      </span>
+                                    )}
                                     {!checklistStyle && primaryWorkItemBadge && (
                                       <span
                                         data-testid="job-work-item-summary-badge"
