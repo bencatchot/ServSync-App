@@ -78,6 +78,7 @@ const CORE_PRIVATE_TABLES = [
   'connection_permissions',
   'service_requests',
   'service_request_messages',
+  'service_request_reviews',
   'service_request_appointment_windows',
   'service_request_appointment_events',
   'estimates',

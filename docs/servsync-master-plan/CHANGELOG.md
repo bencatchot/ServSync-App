@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-review-trust-boundary-v1`
+- Files changed:
+  - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+- Summary of change: Added FB-026 Slice 1 review trust-boundary hardening. The new focused regression coverage asserts that existing homeowner review UI remains tied to closed `review_eligible` service requests, review submission uses the guarded `servsync_homeowner_submit_review(...)` RPC, contractors do not get review-authoring controls, external review links remain separate from ServSync reviews, public review/profile display stays limited to public-safe fields, and unsupported trust claims remain absent. Security catalog coverage now includes `service_request_reviews` in the core RLS-enabled private table inventory.
+- Reason for change: FB-026 already has partial review/profile/Discover surfaces, so the first safe slice should harden and document the existing trust boundary before any moderation, referral/recommendation, Google review handoff, or public-rating expansion work is considered.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Test/docs-only hardening. No SQL/RLS/RPC/schema/storage/auth/env/settings changes, production data mutation, deployment, moderation queue, new review/referral table, fake/seeded reviews, paid ranking, Discover ranking change, badges, Google Business Profile integration, automated Google review posting, scraping/importing Google reviews, email/SMS/push review automation, payment, billing, accounting, recurring maintenance, or notification delivery work.
+  - Future FB-026 slices should separately design moderation/public-rating policy, homeowner recommendation/referral behavior, Google review handoff copy/link handling, and any deeper SQL/RLS/RPC grant cleanup before implementation.
+
 - Branch: `codex/fb-025-job-message-indicators-v1`
 - Files changed:
   - `src/App.tsx`

@@ -121,7 +121,7 @@ Important guardrails:
 | FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
 | FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists with clearer estimate-line copy and privacy regression coverage. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
 | FB-025 | Job-Centered Communication + Notifications | Messaging, service requests, jobs, invoices, Activity | Started / Partial | High | Workflow message foundations, job message UI, derived/durable Activity timeline writers/readers, and first in-app job-message indicators using existing thread read markers are merged. Future work includes broader unread strategy, request-message migration, broader estimate/invoice communication, optional attachments, and notification delivery planning. |
-| FB-026 | Review + Referral Flow | Discover, contractor profiles, completed jobs, trust | Backlog | High | Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff. No fake ratings, paid ranking, or premature badges. |
+| FB-026 | Review + Referral Flow | Discover, contractor profiles, completed jobs, trust | Started / Partial | High | Existing ServSync review surfaces are being hardened around completed-work eligibility, public-safe profile/Discover display, and external-review separation. Future work includes moderation/public-rating policy, recommendation/referral product decisions, and optional Google review handoff. No fake ratings, paid ranking, or premature badges. |
 | FB-027 | Contractor Pipeline / Follow-Up Lite | Estimates, requests, reminders, contractor dashboard | Backlog | Medium-High | Design simple follow-up queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests. |
 | FB-028 | Accounting Export Foundation | Invoices, customers, accounting | Later / Future | Medium | Start with export-ready invoice/customer/payment data and CSV-style export before QuickBooks sync. Do not build or market full accounting sync. |
 | FB-029 | Recurring Maintenance / Service Plan Lite | Home reminders, contractor recurring work, homeowner relationships | Later / Future | Medium | Shape after reminders, scheduling, invoices, and Home History are stronger. Start with manual recurring opportunities, not complex memberships or automated reminder delivery. |
@@ -320,7 +320,7 @@ Follow-up testing:
 
 ### FB-004 — Contractor Reports
 
-Status: Backlog
+Status: Started / Partial
 
 Priority: Medium
 
@@ -421,7 +421,7 @@ Guardrails:
 
 ### FB-007 — Trade-Specific Estimate / Pre-Visit Checklists
 
-Status: Backlog
+Status: Started / Partial
 
 Priority: High
 
@@ -1086,7 +1086,7 @@ Plan broader unread strategy only after beta feedback on job-message indicators,
 
 ### FB-026 — Review + Referral Flow
 
-Status: Backlog
+Status: Started / Partial
 
 Priority: High
 
@@ -1098,10 +1098,10 @@ Product area:
 - Trust/referrals
 
 Summary:
-ServSync needs trust-building flows, but reviews/referrals are not implemented as a complete product surface. This should avoid fake ratings, paid ranking, pay-to-play placement, or premature badges.
+ServSync needs trust-building flows, but reviews/referrals are not implemented as a complete product surface. Existing partial review surfaces let homeowners leave ServSync reviews for eligible closed requests, show ServSync review snippets/aggregates on contractor profile and Discover surfaces, and keep contractor-provided external review links separate from ServSync reviews. This should avoid fake ratings, paid ranking, pay-to-play placement, premature badges, or claims that external reviews are imported or verified by ServSync.
 
 Current next step:
-Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff.
+Harden review trust-boundary tests and copy around completed-work eligibility, public-safe review display, contractor non-control of homeowner reviews, external review link separation, and cautious marketing language. Defer moderation queues, public rating policy expansion, homeowner recommendations/referrals, Google review handoff, and any Discover ranking changes to later approved slices.
 
 ### FB-027 — Contractor Pipeline / Follow-Up Lite
 
