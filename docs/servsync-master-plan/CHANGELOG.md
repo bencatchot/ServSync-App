@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-011-mobile-workflow-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/workflow/WorkflowActivityTimeline.tsx`
+  - `tests/e2e/contractor-entitlement-labels.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+- Summary of change: Added a frontend-only FB-011 mobile workflow polish pass. Mobile action rows now stack more predictably across homeowner/contractor service request cards, existing scheduling controls, estimate/Price Book quick-pick areas, job/work-item controls, invoice cards, Home Access cards, Activity timeline headers, and contractor entitlement labels.
+- Reason for change: Improve mobile scanability and tap-target hierarchy across the core beta loop without changing backend behavior, RPC paths, lifecycle rules, permissions, billing behavior, notification behavior, or feature scope.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-labels.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-readonly-ui-support.spec.ts --project=chromium`
+  - Manual 390px viewport overflow check for homeowner and contractor high-risk mobile tabs
+- Known risks or follow-ups:
+  - Frontend-only responsive polish. No SQL/RLS/RPC/storage/auth/env/settings changes, production data mutation, payments, reviews, accounting, notifications, calendar sync, dispatch/routing/GPS, native mobile app work, new scheduling behavior, or lifecycle changes.
+  - Manual mobile QA with realistic beta fixtures should continue, especially dense estimate/job/invoice records and expanded request cards.
+
 - Branch: `codex/fb-021-backlog-status-cleanup-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

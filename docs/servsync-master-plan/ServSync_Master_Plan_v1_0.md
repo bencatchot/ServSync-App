@@ -120,7 +120,7 @@ The product should be judged against the core loop: Homeowner Request -> Contrac
 
 # 7. Current Build Audit Summary
 
-The repository audit shows ServSync has progressed far beyond a simple prototype. It contains request, estimate, job, invoice, connection, permission, Discover, calendar, notification, document, report, reminder, and admin concepts. The recent PR #1-#11 sequence improved the core-loop path, Home History, manual reminders, SQL provenance, smoke-test expectations, calendar event details, and user-facing terminology. The risk is now less about finding the loop and more about beta readiness, end-to-end reliability, mobile density, and avoiding overpromising unbuilt automation.
+The repository audit shows ServSync has progressed far beyond a simple prototype. It contains request, estimate, job, invoice, connection, permission, Discover, calendar, notification, document, report, reminder, and admin concepts. The recent PR #1-#11 sequence improved the core-loop path, Home History, manual reminders, SQL provenance, smoke-test expectations, calendar event details, and user-facing terminology. FB-011 mobile polish has started with frontend-only responsive stacking, spacing, and action-hierarchy improvements across the core beta workflow, while native apps, backend lifecycle changes, notifications, payments, and calendar sync remain future work. The risk is now less about finding the loop and more about beta readiness, end-to-end reliability, mobile density, and avoiding overpromising unbuilt automation.
 
 | Area | Status | Beta concern |
 | --- | --- | --- |
