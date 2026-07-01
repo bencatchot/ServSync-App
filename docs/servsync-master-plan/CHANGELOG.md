@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/contractor-entitlement-labels-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-entitlement-labels.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added non-blocking contractor entitlement/beta status labels to the contractor dashboard. The labels use the already-loaded entitlement state to show safe status fields such as billing status, current plan, access mode, future subscription/grace dates, and current beta capability summary copy.
+- Reason for change: ServSync needs a visible, low-risk proof that contractor entitlement state is being consumed before any later read-only disabled-state or paid-plan enforcement slice is considered.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file secret scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-labels.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-loading.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-admin-visibility.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no entitlement enforcement, disabled contractor actions, hidden contractor actions, paywalls, billing UI, payment prompts, checkout, payment collection, Stripe activation, SQL, production or sandbox data mutation, provider secret changes, environment changes, homeowner billing changes, or manual deployment.
+  - Future slices should add read-only disabled-state support only behind explicit approval and should still preserve existing record visibility.
+  - Marketing inventory reviewed; no update needed because this adds authenticated in-app beta status labels and does not change public marketing claims.
+
 - Branch: `codex/contractor-entitlement-load-v1`
 - Files changed:
   - `src/App.tsx`
