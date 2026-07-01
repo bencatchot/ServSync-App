@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const appSource = () => readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const appSource = () => sourceFile('src/App.tsx');
+const typesSource = () => sourceFile('src/types.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -13,6 +15,29 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('FB-024 Price Book estimate quick-pick', () => {
+  test('Price Book does not claim live default quantity or tax/category propagation support', () => {
+    const source = appSource();
+    const types = typesSource();
+    const lineDraftSource = sourceBetween(source, 'type EstimateLineDraft = {', 'type EstimateDraftBuilderTrade');
+    const priceBookTypeSource = sourceBetween(types, 'export interface ContractorPriceBookItem', 'export interface Profile');
+    const priceBookDraftSource = sourceBetween(source, 'type ContractorPriceBookItemDraft = {', 'type ManualJobWorkItemDraft');
+    const csvFieldsSource = sourceBetween(source, 'const CONTRACTOR_PRICE_BOOK_CSV_FIELDS', 'const CONTRACTOR_PRICE_BOOK_CSV_FIELD_ALIASES');
+
+    for (const estimateLineField of ['default_quantity', 'taxable', 'category', 'sku', 'internal_notes']) {
+      expect(lineDraftSource).not.toContain(estimateLineField);
+    }
+
+    expect(priceBookTypeSource).toContain('category: string;');
+    expect(priceBookTypeSource).toContain('taxable: boolean;');
+    expect(priceBookTypeSource).not.toContain('default_quantity');
+    expect(priceBookDraftSource).toContain('category: string;');
+    expect(priceBookDraftSource).toContain('taxable: boolean;');
+    expect(priceBookDraftSource).not.toContain('default_quantity');
+    expect(csvFieldsSource).toContain("{ key: 'category'");
+    expect(csvFieldsSource).toContain("{ key: 'taxable'");
+    expect(csvFieldsSource).not.toContain('default_quantity');
+  });
+
   test('maps Price Book items into editable estimate lines with safe fields only', () => {
     const source = appSource();
     const mapperSource = sourceBetween(
@@ -32,6 +57,7 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     expect(mapperSource).toContain('Review quantity, price, and scope before sending.');
 
     for (const privateMetadata of [
+      'item.default_quantity',
       'item.internal_notes',
       'item.sku',
       'item.trade',

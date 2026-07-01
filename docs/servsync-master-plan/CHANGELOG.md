@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-024-price-book-security-tests-v1`
+- Files changed:
+  - `tests/e2e/fb024-price-book-quickpick.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `tests/e2e/rls-privacy-expanded.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-024 Slice 3 test-only hardening for Price Book privacy and non-live capability boundaries. Coverage now asserts Price Book quick-pick still maps only safe estimate fields, no live `default_quantity` or taxable/category estimate-line propagation is present, invoice quick-pick remains excluded, homeowner-facing paths do not load Price Book/private metadata, Price Book grants stay private and column-limited, and existing sandbox Price Book rows remain contractor-scoped when fixture data is available.
+- Reason for change: Increase confidence around contractor-owned Price Book privacy before any future schema, invoice, taxable/category, default quantity, bundle, or role-access work is approved.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb024-price-book-quickpick.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium` attempted with local `.env.test.local`; blocked by missing `VITE_SUPABASE_URL`
+- Known risks or follow-ups:
+  - Test/docs-only slice. No app behavior, SQL/RLS/RPC/schema/auth/storage/env/settings, production data, default quantity, taxable/category propagation, tax calculation, invoice Price Book quick-pick, invoice lifecycle, assemblies/job bundles, AI pricing, homeowner Price Book view, role-access redesign, billing, checkout, Stripe, deposits, or paywall behavior changes.
+  - Expanded RLS Price Book row-visibility coverage was added but not locally completed because the local sandbox env lacks `VITE_SUPABASE_URL`; run it once approved sandbox env is available.
+  - Role-specific masking of internal Price Book metadata remains deferred to a separately approved security/RLS/RPC design slice.
+
 - Branch: `codex/fb-024-price-book-quickpick-clarity-v1`
 - Files changed:
   - `src/App.tsx`

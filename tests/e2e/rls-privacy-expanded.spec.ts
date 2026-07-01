@@ -399,6 +399,23 @@ test.describe('expanded sandbox RLS and cross-user privacy boundaries', () => {
         await expectHiddenById(homeownerA.client, 'contractor_saved_estimate_charges', savedCharge.id, 'Homeowner should not see contractor-only saved charge');
       }
 
+      const priceBookItem = await maybeFirst(
+        contractorA.client,
+        'contractor_price_book_items',
+        'id,contractor_id,title,internal_notes,sku,category,taxable',
+        query => query.eq('contractor_id', contractorAId).order('created_at', { ascending: false }),
+      );
+      if (priceBookItem?.id) {
+        await expectVisibleById(contractorA.client, 'contractor_price_book_items', priceBookItem.id, 'Contractor A should see own Price Book item');
+        await expectHiddenById(contractorB.client, 'contractor_price_book_items', priceBookItem.id, 'Contractor B should not see Contractor A Price Book item');
+        await expectHiddenById(homeownerA.client, 'contractor_price_book_items', priceBookItem.id, 'Homeowner should not see contractor-only Price Book item');
+      } else {
+        test.info().annotations.push({
+          type: 'skip-note',
+          description: 'Price Book RLS row visibility coverage skipped because Contractor A has no contractor_price_book_items fixture.',
+        });
+      }
+
       const estimateTemplate = await maybeFirst(
         contractorA.client,
         'estimate_templates',
