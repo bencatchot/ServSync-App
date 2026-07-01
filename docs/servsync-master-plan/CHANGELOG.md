@@ -6,6 +6,22 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/backlog-impact-workflow-rule-v1`
+- Files changed:
+  - `AGENTS.md`
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a permanent Backlog Impact workflow gate requiring future implementation reports and PR handoffs to state whether `docs/servsync-master-plan/ServSync_Feature_Backlog.md` was updated, not needed, or required but blocked.
+- Reason for change: Feature implementation slices can otherwise update the changelog, master plan, and marketing inventory inconsistently while leaving official backlog status, guardrails, next steps, or follow-ups stale.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Workflow/documentation-only change. No app code, tests, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, deployment, production data mutation, or backlog reconciliation is included.
+  - No `.github/pull_request_template.md` existed to update; add one later only if the repo chooses to adopt a PR template.
+
 - Branch: `codex/walkthrough-notes-multi-observation-splitting-v1`
 - Files changed:
   - `src/walkthroughNotesParser.ts`

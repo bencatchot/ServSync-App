@@ -24,7 +24,7 @@ This is an internal workflow template only. It is not product strategy, marketin
 6. ChatGPT and the user decide whether to use the full approval loop or Builder Mode.
 7. ChatGPT prepares an approval, Builder Mode proceed, or implementation prompt.
 8. Codex implements only approved work.
-9. Codex reports changed files, checks, risks, and PR link when applicable.
+9. Codex reports changed files, Backlog Impact, checks, risks, and PR link when applicable.
 10. User brings the Codex result back to ChatGPT.
 11. ChatGPT prepares a verification or merge-approval prompt.
 12. Codex verifies or merges only when explicitly approved.
@@ -134,6 +134,9 @@ RISK LEVEL ASSESSED
 BUILDER MODE USED: YES / NO
 FILES CHANGED
 SUMMARY OF CHANGES
+BACKLOG IMPACT
+BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+REASON
 VALIDATION RUN
 STOP CONDITIONS ENCOUNTERED: YES / NO
 PR LINK, IF OPENED
@@ -162,8 +165,9 @@ Still required:
 - No SQL/env/settings/data/user changes without explicit approval.
 - Changelog update when files/docs change and changelog practice requires it.
 - Master plan update only when appropriate.
+- Backlog Impact review for implementation tasks, with `docs/servsync-master-plan/ServSync_Feature_Backlog.md` updated when feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority changes.
 - Changed-file secret scan.
-- Clear return report with risk level, fast-track use, validation, risks, and stop conditions.
+- Clear return report with risk level, fast-track use, Backlog Impact, validation, risks, and stop conditions.
 
 ### Medium-Risk Path
 
@@ -184,6 +188,8 @@ Risk-Based Workflow Instruction:
 - If this task is documentation-only, content-only, harmless copy cleanup, or an internal template update, briefly audit and then implement in the same pass if the scope is clear.
 - If this task changes app behavior, data flow, permissions, SQL, RLS, auth, storage, Edge Functions, environment variables, production data, user access, or core workflow logic, stop after audit and wait for explicit approval before implementing unless a Builder Mode proceed prompt has already approved the implementation path.
 - If Builder Mode is approved, implement in-scope work without routine approval, and you may branch, commit, push, open/update a PR, and trigger normal Vercel Preview/sandbox deployments.
+- For implementation tasks, review `docs/servsync-master-plan/ServSync_Feature_Backlog.md` when the task changes feature status, roadmap state, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority; update it or explicitly report: "Backlog reviewed; no update needed."
+- If the backlog should change but the correct update cannot be safely determined, stop and report: "Backlog update required but not completed — stop condition."
 - Builder Mode does not permit merge to main, manual production deploy, SQL application, env/settings changes, user creation, or production data changes without explicit approval.
 - If you discover the task is riskier than expected, stop and report instead of continuing.
 - Never merge, deploy production, apply SQL, change env/settings, create users, or touch production data without explicit approval.
@@ -202,6 +208,10 @@ Feature/function work and marketing work must remain separate. Marketing/content
 - Codex must not create users or touch production data without explicit approval.
 - Codex must report changed files and checks.
 - Codex must update the changelog when docs or app behavior change, unless the task is audit-only.
+- Codex must include Backlog Impact in every implementation report and PR handoff.
+- Codex must review `docs/servsync-master-plan/ServSync_Feature_Backlog.md` when a task changes feature status, roadmap state, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority.
+- Codex must either update `docs/servsync-master-plan/ServSync_Feature_Backlog.md` when needed or explicitly report: "Backlog reviewed; no update needed."
+- Codex must stop and report "Backlog update required but not completed — stop condition." when a backlog update is required but Codex cannot safely determine it.
 - Codex must read the master plan before deciding whether a change affects product direction, roadmap, workflow, or implementation strategy.
 - Codex must not update the master plan unless the task changes product direction, roadmap decisions, user workflows, feature definitions, or implementation strategy.
 - Codex must read the changelog before adding entries.
@@ -230,6 +240,17 @@ Marketing inventory check:
 - If no update is needed, explicitly report: "Marketing inventory reviewed; no update needed."
 - Do not use the changelog alone as the source for marketing claims.
 - Do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless `docs/MARKETING_PRODUCT_INVENTORY.md` supports that status.
+
+Backlog impact check:
+
+- For every implementation task/report/PR, review whether `docs/servsync-master-plan/ServSync_Feature_Backlog.md` must change.
+- Update the backlog when the task changes feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority.
+- If no update is needed, explicitly report: "Backlog reviewed; no update needed."
+- If the backlog needs an update but Codex cannot safely determine the correct wording, stop and report: "Backlog update required but not completed — stop condition."
+- Every implementation report and PR handoff must include:
+  - `BACKLOG IMPACT`
+  - `BACKLOG FILE UPDATED: YES / NO / NOT NEEDED`
+  - `REASON`
 
 When adding a changelog entry:
 
@@ -365,6 +386,7 @@ Required starting state:
 Required pre-work:
 - Read AGENTS.md.
 - Read docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md.
+- Read docs/servsync-master-plan/ServSync_Feature_Backlog.md.
 - Read docs/servsync-master-plan/CHANGELOG.md.
 - Read [additional docs/files].
 
@@ -399,6 +421,12 @@ Changelog rules:
 - Do not duplicate existing labels/headings.
 - Update the changelog for non-audit docs/app behavior changes.
 
+Backlog impact check:
+- Determine whether this implementation changes feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority.
+- If yes, update `docs/servsync-master-plan/ServSync_Feature_Backlog.md`.
+- If no, report: "Backlog reviewed; no update needed."
+- If the backlog update is required but cannot be completed safely, stop and report: "Backlog update required but not completed — stop condition."
+
 Marketing inventory check:
 - Does this PR add a user-facing feature?
 - Does it remove, rename, or materially change a user-facing feature?
@@ -422,6 +450,10 @@ BUILDER MODE USED: YES / NO
 WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
+BACKLOG IMPACT
+- Backlog reviewed: YES / NO
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- REASON:
 CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
@@ -468,6 +500,8 @@ Verify:
 - No unexpected SQL/env/settings/data/user/deploy changes occurred.
 - Changelog entry is accurate and does not duplicate PR/item numbers, task names, version labels, or headings.
 - Master plan was updated only if appropriate.
+- Backlog Impact is documented, and `docs/servsync-master-plan/ServSync_Feature_Backlog.md` was updated if feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority changed.
+- If no backlog update was needed, the report explicitly says: "Backlog reviewed; no update needed."
 - Marketing inventory was updated if the PR changes user-facing features, workflows, feature status, value propositions, marketing claims, limitations, or do-not-promise items.
 - If no marketing inventory update was needed, the report explicitly says: "Marketing inventory reviewed; no update needed."
 - Required tests/checks passed.
@@ -481,6 +515,12 @@ Marketing inventory check:
 - Does it create a new limitation or do-not-promise item?
 - If yes, confirm `docs/MARKETING_PRODUCT_INVENTORY.md` was updated.
 - If no, report: "Marketing inventory reviewed; no update needed."
+
+Backlog impact check:
+- Does this PR change feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority?
+- If yes, confirm `docs/servsync-master-plan/ServSync_Feature_Backlog.md` was updated.
+- If no, report: "Backlog reviewed; no update needed."
+- If the report says the backlog update was required but not completed, mark the PR as needing fixes before merge approval.
 
 Files allowed to change:
 - [Expected changed files]
@@ -504,6 +544,9 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Backlog reviewed: YES / NO
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- Backlog impact reason:
 - Marketing inventory reviewed: YES / NO / NOT APPLICABLE
 - Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
@@ -535,6 +578,7 @@ Confirmed before approval:
 - Changed files are limited to the approved scope.
 - Checks are passing.
 - Changelog/master plan handling is correct.
+- Backlog Impact was reviewed; `ServSync_Feature_Backlog.md` was updated or "no update needed" was explained.
 - No unexpected SQL/env/settings/data/user/deploy changes occurred.
 
 After merge:
@@ -548,6 +592,7 @@ After merge:
 Return:
 ACTION
 PRE-MERGE CHECKS
+- Backlog Impact verified: YES / NO
 MERGE RESULT
 MAIN STATUS
 VERCEL / DEPLOY STATUS
@@ -577,6 +622,7 @@ Verify:
 - Expected public or bundle evidence is present if safely inspectable.
 - No manual deploy was performed.
 - No SQL/env/settings/data/user changes happened unless explicitly approved.
+- Backlog Impact from the merged PR was reviewed; `ServSync_Feature_Backlog.md` was updated or "no update needed" was explained.
 - Authenticated production checks are skipped unless approved production smoke accounts exist.
 
 Return:
@@ -587,6 +633,10 @@ PUBLIC / BUNDLE VERIFICATION RESULTS
 AUTHENTICATED VERIFICATION
 PRODUCTION DATA CHANGES
 SQL / DEPLOY STATUS
+BACKLOG IMPACT CHECK
+- Backlog reviewed: YES / NO / NOT APPLICABLE
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- Reason:
 MARKETING INVENTORY CHECK
 - Marketing inventory reviewed: YES / NO / NOT APPLICABLE
 - Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
@@ -612,6 +662,9 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Backlog reviewed: YES / NO / NOT APPLICABLE
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- Backlog impact reason:
 - Marketing inventory reviewed: YES / NO / NOT APPLICABLE
 - Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
@@ -632,6 +685,10 @@ BUILDER MODE USED: YES / NO
 WHY FAST-TRACK WAS OR WAS NOT APPROPRIATE
 FILES CHANGED
 SUMMARY OF CHANGES
+BACKLOG IMPACT
+- Backlog reviewed: YES / NO
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- REASON:
 CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
@@ -663,6 +720,9 @@ CHANGELOG / MASTER PLAN CHECK
 - Master plan reviewed: YES / NO
 - Master plan update needed: YES / NO, with reason
 - Changelog reviewed: YES / NO
+- Backlog reviewed: YES / NO
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- Backlog impact reason:
 - Marketing inventory reviewed: YES / NO / NOT APPLICABLE
 - Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
 - Existing highest PR/item number or relevant latest entry:
@@ -688,6 +748,10 @@ DEPLOYMENT STATUS
 VERIFICATION RESULTS
 PRODUCTION DATA CHANGES
 SQL / DEPLOY STATUS
+BACKLOG IMPACT CHECK
+- Backlog reviewed: YES / NO / NOT APPLICABLE
+- BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+- Reason:
 MARKETING INVENTORY CHECK
 - Marketing inventory reviewed: YES / NO / NOT APPLICABLE
 - Marketing inventory update needed: YES / NO / NOT APPLICABLE, with reason
@@ -702,7 +766,7 @@ STATUS
 Copy this into a new ChatGPT chat:
 
 ```text
-I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure Codex reviews docs/MARKETING_PRODUCT_INVENTORY.md whenever a PR adds, removes, renames, or materially changes a user-facing feature, workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item; Codex must update it when needed or report: "Marketing inventory reviewed; no update needed." Do not use the changelog alone as the source for marketing claims, and do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless the marketing inventory supports that status. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
+I am working on ServSync. I use a controlled ChatGPT <-> Codex workflow. Help me keep this workflow disciplined and risk-based. For low-risk documentation/content/internal-template work, help me decide whether Codex can briefly audit and implement in one pass. After Codex audits a feature/fix and we approve the implementation path, help me decide whether to use Builder Mode so Codex can make routine in-scope coding decisions, branch, commit, push, open a PR, and trigger Preview/sandbox deployments without coming back for every small file decision. For high-risk app behavior, data, SQL, RLS, auth, storage, env, production, or core workflow work, keep SQL/env/settings/data/user changes, merge to main, and production deploys behind explicit approval. Keep feature planning separate from marketing. Keep roadmap ideas separate from live features. Make sure Codex reads the master plan and changelog before changes. Make sure every implementation report and PR includes Backlog Impact with `BACKLOG FILE UPDATED: YES / NO / NOT NEEDED` and a reason; Codex must review `docs/servsync-master-plan/ServSync_Feature_Backlog.md` when a task changes feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority, and must either update it or report: "Backlog reviewed; no update needed." Make sure Codex reviews docs/MARKETING_PRODUCT_INVENTORY.md whenever a PR adds, removes, renames, or materially changes a user-facing feature, workflow, feature status, value proposition, marketing claim, limitation, or do-not-promise item; Codex must update it when needed or report: "Marketing inventory reviewed; no update needed." Do not use the changelog alone as the source for marketing claims, and do not market roadmap ideas, future work, or planned features as live/beta/manual capabilities unless the marketing inventory supports that status. Make sure changelog entries do not duplicate PR numbers, item numbers, task names, version labels, or headings. Do not recommend merge/deploy/SQL/env/production changes without explicit approval.
 ```
 
 ## Notes

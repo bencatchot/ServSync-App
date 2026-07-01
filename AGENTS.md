@@ -32,6 +32,13 @@ These instructions apply to AI coding agents working in this repository.
 - If the change affects roadmap, product direction, workflows, pricing, beta strategy, permissions, Discover, contractor onboarding, homeowner onboarding, invoices, estimates, jobs, timeline, reminders, or marketplace strategy, also update `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`.
 - Do not update the changelog for audit-only tasks unless specifically asked.
 
+## Backlog Impact Review
+
+- Every implementation task/report/PR must include a Backlog Impact review for `docs/servsync-master-plan/ServSync_Feature_Backlog.md`.
+- Update the backlog when the task changes feature status, completed scope, current next step, guardrails, future follow-ups, public/private capability boundaries, or backlog priority.
+- If no backlog update is needed, explicitly report: "Backlog reviewed; no update needed."
+- If Codex cannot safely determine the correct backlog update, stop and report: "Backlog update required but not completed — stop condition."
+
 ## Safety Rules
 
 - Never modify production deployment settings, Supabase schema/RLS/RPCs, Edge Functions, environment variables, or app code unless explicitly approved.
@@ -57,6 +64,9 @@ ACTION
 FILES MODIFIED
 MASTER PLAN UPDATED: yes/no
 CHANGELOG UPDATED: yes/no
+BACKLOG IMPACT
+BACKLOG FILE UPDATED: YES / NO / NOT NEEDED
+REASON
 TESTS RUN
 RISKS
 NEXT STEP
