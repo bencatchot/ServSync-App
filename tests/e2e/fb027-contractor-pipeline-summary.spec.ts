@@ -36,6 +36,11 @@ test.describe('FB-027 contractor pipeline summary', () => {
   test('accepted estimates needing jobs use existing linked-job detection without new statuses', () => {
     const source = appSource();
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
+    const workflowOverviewSource = sourceBetween(
+      contractorSource,
+      '<Card title="Workflow overview"',
+      '<ContractorEntitlementStatusPanel',
+    );
     const acceptedEstimateSource = sourceBetween(
       contractorSource,
       'const jobForEstimate =',
@@ -48,6 +53,14 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(contractorSource).toContain("label: 'Estimates / invoices'");
     expect(contractorSource).toContain('count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length');
     expect(contractorSource).toContain("helper: `${acceptedEstimatesNeedingJobs.length} accepted`");
+    expect(workflowOverviewSource).toContain('acceptedEstimatesNeedingJobs.length > 0');
+    expect(workflowOverviewSource).toContain('Accepted estimates ready for jobs');
+    expect(workflowOverviewSource).toContain('Create jobs from approved estimates in the existing Jobs workspace.');
+    expect(workflowOverviewSource).toContain('{acceptedEstimatesNeedingJobs.length} need jobs');
+    expect(workflowOverviewSource).toContain("setContractorTab('inspections')");
+    expect(workflowOverviewSource).toContain("setContractorJobsView('open_financial')");
+    expect(workflowOverviewSource).toContain("setInspectionView('list')");
+    expect(workflowOverviewSource).not.toContain('createJobFromAcceptedEstimate');
 
     for (const unapprovedStatus of ['needs_job', 'job_needed', 'ready_for_job', 'follow_up']) {
       expect(acceptedEstimateSource).not.toContain(unapprovedStatus);
@@ -153,5 +166,28 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(workflowOverviewSource).not.toContain('.insert(');
     expect(workflowOverviewSource).not.toContain('.update(');
     expect(workflowOverviewSource).not.toContain('.delete(');
+  });
+
+  test('actual accepted-estimate job creation remains on estimate cards only', () => {
+    const source = appSource();
+    const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
+    const workflowOverviewSource = sourceBetween(
+      contractorSource,
+      '<Card title="Workflow overview"',
+      '<ContractorEntitlementStatusPanel',
+    );
+    const estimateCardSource = sourceBetween(
+      contractorSource,
+      'data-testid="contractor-estimate-card"',
+      '<Card title="Create Job"',
+    );
+
+    expect(workflowOverviewSource).not.toContain('data-testid="contractor-create-job-from-accepted-estimate"');
+    expect(workflowOverviewSource).not.toContain('aria-label={`Create job from accepted estimate');
+    expect(estimateCardSource).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
+    expect(estimateCardSource).toContain('aria-label={`Create job from accepted estimate ${estimate.title}`}');
+    expect(estimateCardSource).toContain('onClick={() => void createJobFromAcceptedEstimate(estimate)}');
+    expect(estimateCardSource).toContain('View Job');
+    expect(estimateCardSource).toContain('onClick={() => void openLinkedJobForEstimate(estimate)}');
   });
 });

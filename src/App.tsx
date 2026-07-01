@@ -25170,6 +25170,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         Items already marked by existing workflow statuses.
                       </p>
                     </div>
+                    {acceptedEstimatesNeedingJobs.length > 0 && (
+                      <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-emerald-950">Accepted estimates ready for jobs</p>
+                          <p className="mt-0.5 text-xs leading-5 text-emerald-800">Create jobs from approved estimates in the existing Jobs workspace.</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:border-emerald-300 hover:text-emerald-900 sm:w-auto"
+                          onClick={() => {
+                            setContractorTab('inspections');
+                            setContractorJobsView('open_financial');
+                            setInspectionView('list');
+                          }}
+                        >
+                          <ClipboardCheck size={14} />
+                          {acceptedEstimatesNeedingJobs.length} need jobs
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       {workflowReviewItems.map(item => (
                         <button
