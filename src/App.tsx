@@ -166,7 +166,6 @@ import type {
   HomeReminder,
   HomeReminderStatus,
   MaintenanceLogEntry,
-  PublicReview,
   ConnectionStatus,
   ContractorConnectedHomeowner,
   ContractorConnectedHomeownerHome,
@@ -7749,27 +7748,8 @@ function EmailNotificationsToggle({ initialEnabled }: { initialEnabled: boolean 
   );
 }
 
-function PublicReviewCard({ review }: { review: PublicReview }) {
-  const hasKudos = review.kudos.length > 0;
-  const attribution = [review.reviewer_display_name, review.reviewer_location].filter(Boolean).join(', ');
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <StarDisplay rating={review.rating} />
-        <p className="shrink-0 text-xs text-slate-500">{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</p>
-      </div>
-      {hasKudos && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {review.kudos.map(k => (
-            <span key={k} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{k}</span>
-          ))}
-        </div>
-      )}
-      {review.body && <p className="mt-2 text-sm italic text-slate-700">"{review.body}"</p>}
-      <p className="mt-1.5 text-xs text-slate-500">{attribution || 'Anonymous homeowner'}</p>
-    </div>
-  );
-}
+const PUBLIC_REVIEW_DISPLAY_PAUSED_COPY = 'ServSync public review display is being finalized for beta.';
+const PUBLIC_REVIEW_DISPLAY_PAUSED_HELPER = 'Reviews from completed ServSync work are not shown publicly yet.';
 
 function LandingPage() {
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
@@ -38939,13 +38919,6 @@ function ContractorPublicProfilePage({
             </div>
           </div>
 
-          {data.avg_rating !== null && (
-            <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-center">
-              <p className="text-3xl font-bold text-slate-950">{data.avg_rating.toFixed(1)}</p>
-              <StarDisplay rating={Math.round(data.avg_rating)} />
-              <p className="mt-1 text-xs text-slate-500">{data.review_count} ServSync {data.review_count === 1 ? 'review' : 'reviews'}</p>
-            </div>
-          )}
         </div>
 
         {/* CTA */}
@@ -39069,27 +39042,11 @@ function ContractorPublicProfilePage({
       )}
 
       {/* Reviews */}
-      {data.reviews.length > 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-            ServSync Reviews ({data.review_count})
-          </p>
-          <p className="mb-3 text-sm leading-6 text-slate-600">From completed ServSync work.</p>
-          <div className="space-y-3">
-            {data.reviews.map((review, i) => (
-              <PublicReviewCard key={i} review={review} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {data.reviews.length === 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
-          <p className="mt-2 text-sm text-slate-500">No ServSync reviews yet.</p>
-          <p className="mt-1 text-xs text-slate-500">ServSync reviews come from completed ServSync work.</p>
-        </section>
-      )}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
+        <p className="mt-2 text-sm font-semibold text-slate-700">{PUBLIC_REVIEW_DISPLAY_PAUSED_COPY}</p>
+        <p className="mt-1 text-sm leading-6 text-slate-500">{PUBLIC_REVIEW_DISPLAY_PAUSED_HELPER}</p>
+      </section>
     </div>
   );
 }
@@ -39215,12 +39172,6 @@ function DiscoverFeed({
     } catch {
       // View tracking should never interrupt homeowner browsing.
     }
-  };
-
-  const kudosCounts = (reviews: PublicReview[]) => {
-    const counts: Record<string, number> = {};
-    reviews.forEach(r => r.kudos.forEach(k => { counts[k] = (counts[k] ?? 0) + 1; }));
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   };
 
   const uploadPostPhotos = async (files: File[]): Promise<string[]> => {
@@ -39349,7 +39300,6 @@ function DiscoverFeed({
         item.contractor_state,
         (item.service_areas || []).map(area => contractorServiceAreaDisplay(area)).join(' '),
         item.categories.join(' '),
-        item.reviews.map(review => [review.body, review.kudos.join(' ')].join(' ')).join(' '),
       ].join(' '));
       return keywordTerms.every(term => searchableText.includes(term));
     });
@@ -39360,7 +39310,6 @@ function DiscoverFeed({
   const selectedPostSlug = selectedPost ? contractorSlugs[selectedPost.contractor_id] : undefined;
   const selectedPostExternalReviewLinks = selectedPost ? normalizeExternalReviewLinks(selectedPost.external_review_links) : [];
   const selectedPostServiceAreas = selectedPost?.service_areas || [];
-  const selectedPostTopKudos = selectedPost ? kudosCounts(selectedPost.reviews).slice(0, 4) : [];
 
   const openPostDetail = (item: DiscoverFeedItem) => {
     setSelectedPostId(item.post_id);
@@ -39609,7 +39558,6 @@ function DiscoverFeed({
 
       {visibleFeed.map(item => {
         const isOwnPost = item.contractor_id === contractorId;
-        const topKudos = kudosCounts(item.reviews).slice(0, 4);
         const existingStatus = existingConnectionMap[item.contractor_id];
         const contractorSlug = contractorSlugs[item.contractor_id];
         const externalReviewLinks = normalizeExternalReviewLinks(item.external_review_links);
@@ -39675,16 +39623,6 @@ function DiscoverFeed({
                     </div>
                   )}
 
-                  {/* Kudos chips */}
-                  {topKudos.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {topKudos.map(([k, count]) => (
-                        <span key={k} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                          {k} <span className="opacity-60">×{count}</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                   {externalReviewLinks.length > 0 && perspective === 'homeowner' && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -39697,15 +39635,6 @@ function DiscoverFeed({
 
                 {/* Rating + actions */}
                 <div className="flex shrink-0 flex-col items-end gap-2" onClick={event => event.stopPropagation()}>
-                  {item.avg_rating !== null && (
-                    <div className="flex items-center gap-1">
-                      <StarDisplay rating={Math.round(item.avg_rating)} />
-                      <span className="text-sm font-bold text-slate-950">{item.avg_rating.toFixed(1)}</span>
-                    </div>
-                  )}
-                  {item.review_count > 0 && (
-                    <p className="text-xs text-slate-500">{item.review_count} {item.review_count === 1 ? 'review' : 'reviews'}</p>
-                  )}
                   {isOwnPost && (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                       {Number(item.view_count ?? 0).toLocaleString()} {Number(item.view_count ?? 0) === 1 ? 'view' : 'views'} · {Number(item.save_count ?? 0).toLocaleString()} {Number(item.save_count ?? 0) === 1 ? 'save' : 'saves'}
@@ -39826,12 +39755,6 @@ function DiscoverFeed({
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
                   Posted {new Date(selectedPost.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </span>
-                {selectedPost.avg_rating !== null && selectedPost.review_count > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
-                    <Star size={12} />
-                    {selectedPost.avg_rating.toFixed(1)} from {selectedPost.review_count} ServSync {selectedPost.review_count === 1 ? 'review' : 'reviews'}
-                  </span>
-                )}
               </div>
 
               {selectedPost.description && (
@@ -39886,18 +39809,10 @@ function DiscoverFeed({
                 </div>
               )}
 
-              {selectedPostTopKudos.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Common review notes</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedPostTopKudos.map(([k, count]) => (
-                      <span key={k} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                        {k} <span className="opacity-60">x{count}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-700">{PUBLIC_REVIEW_DISPLAY_PAUSED_COPY}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{PUBLIC_REVIEW_DISPLAY_PAUSED_HELPER}</p>
+              </div>
 
               {selectedPostExternalReviewLinks.length > 0 && perspective === 'homeowner' && (
                 <div>
@@ -39916,17 +39831,6 @@ function DiscoverFeed({
                       >
                         View {link.label || externalReviewSourceLabel(link.source)}
                       </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedPost.reviews.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">ServSync Reviews</p>
-                  <div className="space-y-2">
-                    {selectedPost.reviews.map((review, i) => (
-                      <PublicReviewCard key={i} review={review} />
                     ))}
                   </div>
                 </div>
