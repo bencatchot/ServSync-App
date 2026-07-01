@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-review-copy-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Polished homeowner review form copy so optional reviewer name/location fields are described as future display details rather than "shown publicly" while public ServSync review display remains paused.
+- Reason for change: FB-026 now has a moderation SQL/RPC foundation, but no admin UI or approved-only public display is live yet, so homeowner review form copy should not imply those optional details are currently shown publicly.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Frontend/docs/test copy polish only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, deploy, admin moderation UI, approved-only public display, public review display re-enable, contractor dispute/report flow, homeowner edit/delete flow, contractor responses, badges, awards, Discover ranking change, paid ranking, Google review automation, referral/recommendation product expansion, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, or notification delivery work is included.
+  - Future FB-026 work should separately decide whether to add an admin moderation UI or approved-only public display slice.
+
 - Branch: `codex/fb-026-review-moderation-foundation-v1`
 - Files changed:
   - `servsync-review-moderation-foundation.sql`
@@ -32,7 +53,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Production SQL is not applied in this implementation pass; `servsync-review-moderation-foundation.sql` requires separate production rollout approval after review/merge.
   - Expanded RLS/privacy local run is blocked because ignored `.env.test.local` is missing `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; run it once approved sandbox env is available.
   - No admin moderation UI, approved-only public display, contractor dispute/report flow, homeowner edit/delete flow, contractor review responses, badges, awards, Discover ranking change, paid ranking, Google review automation, referral/recommendation product expansion, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, notification delivery, production data mutation, or deploy work is included.
-  - Existing homeowner review form copy still references optional name/location as shown publicly; since public ServSync review display remains paused, a later frontend-copy polish slice should align that wording with moderation status before broader beta exposure.
+  - Follow-up noted at merge time: homeowner review form copy referenced optional name/location as publicly shown while public ServSync review display remained paused; addressed later by `codex/fb-026-review-copy-polish-v1`.
 
 - Branch: `codex/fb-026-pause-public-review-display-v1`
 - Files changed:
