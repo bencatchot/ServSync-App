@@ -80,6 +80,18 @@ type ReviewRpcGrantRow = RpcRow & {
   authenticated_execute_all: boolean | null;
 };
 
+type ReviewModerationColumnRow = {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+  column_default: string | null;
+};
+
+type ReviewModerationConstraintRow = {
+  constraint_exists: boolean;
+  constraint_definition: string | null;
+};
+
 const CORE_PRIVATE_TABLES = [
   'profiles',
   'homeowner_profiles',
@@ -198,6 +210,8 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
 
 const ADMIN_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_admin_contractor_billing_readiness',
+  'servsync_admin_review_moderation_queue',
+  'servsync_admin_update_review_moderation',
 ];
 
 const STORAGE_BUCKETS = [
@@ -671,6 +685,65 @@ order by e.proname;
         expect(row.authenticated_execute_all, `${row.proname} should grant EXECUTE to authenticated`).toBe(true);
       }
     }
+  });
+
+  test('review moderation foundation columns and status constraint are present', () => {
+    const columns = runCatalogQuery<ReviewModerationColumnRow>(`
+select
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'service_request_reviews'
+  and column_name in (
+    'moderation_status',
+    'moderated_at',
+    'moderated_by',
+    'moderation_note',
+    'updated_at'
+  )
+order by column_name;
+    `);
+
+    expect(columns, 'Review moderation columns should exist').toHaveLength(5);
+    const byName = Object.fromEntries(columns.map(column => [column.column_name, column]));
+    expect(byName.moderation_status).toMatchObject({
+      data_type: 'text',
+      is_nullable: 'NO',
+    });
+    expect(byName.moderation_status.column_default).toContain("'pending'::text");
+    expect(byName.moderated_at).toMatchObject({ data_type: 'timestamp with time zone', is_nullable: 'YES' });
+    expect(byName.moderated_by).toMatchObject({ data_type: 'uuid', is_nullable: 'YES' });
+    expect(byName.moderation_note).toMatchObject({ data_type: 'text', is_nullable: 'NO' });
+    expect(byName.moderation_note.column_default).toContain("''::text");
+    expect(byName.updated_at).toMatchObject({ data_type: 'timestamp with time zone', is_nullable: 'NO' });
+    expect(byName.updated_at.column_default).toContain('now()');
+
+    const constraints = runCatalogQuery<ReviewModerationConstraintRow>(`
+select
+  exists (
+    select 1
+    from pg_constraint
+    where conname = 'service_request_reviews_moderation_status_check'
+      and conrelid = 'public.service_request_reviews'::regclass
+  ) as constraint_exists,
+  (
+    select pg_get_constraintdef(oid)
+    from pg_constraint
+    where conname = 'service_request_reviews_moderation_status_check'
+      and conrelid = 'public.service_request_reviews'::regclass
+    limit 1
+  ) as constraint_definition;
+    `);
+
+    expect(constraints).toHaveLength(1);
+    expect(constraints[0].constraint_exists, 'Review moderation status check should exist').toBe(true);
+    expect(constraints[0].constraint_definition).toContain('pending');
+    expect(constraints[0].constraint_definition).toContain('approved');
+    expect(constraints[0].constraint_definition).toContain('hidden');
+    expect(constraints[0].constraint_definition).toContain('rejected');
   });
 
   test('public review display RPCs remain browser-callable', () => {
