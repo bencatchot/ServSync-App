@@ -4,10 +4,20 @@ These instructions apply to AI coding agents working in this repository.
 
 ## Required Planning Context
 
+- Always review `docs/CODEX_WORKFLOW_TEMPLATE.md` before deciding task flow, approval gates, Builder Mode permissions, or risk-based routing for ServSync work.
 - Always review `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md` before planning or implementing ServSync product changes.
 - Always review `docs/servsync-master-plan/CHANGELOG.md` before making changes.
+- Treat `docs/CODEX_WORKFLOW_TEMPLATE.md` as the source of truth for the ChatGPT <-> Codex workflow, Risk-Based Fast Track, and Builder Mode.
 - Do not treat the master plan as blanket approval to change the app. Use it as planning context only.
 - Keep implementation tasks narrow and explicitly approved.
+
+## Codex Workflow Template
+
+- Follow the risk-based workflow in `docs/CODEX_WORKFLOW_TEMPLATE.md`.
+- After audit approval and Builder Mode approval, Codex may make routine in-scope coding decisions without returning for approval on every small file decision.
+- Builder Mode may include creating or switching to the approved branch, editing in-scope files, running validation, committing, pushing the feature branch, opening or updating a PR, and allowing normal Vercel Preview or sandbox deployments that are part of the approved workflow.
+- Hard approval gates still remain: no merge to `main`, manual production deploy, SQL/RLS/RPC/storage/auth/permissions/env/settings changes, production data or user-record changes, or scope expansion without explicit user approval.
+- If a task exceeds the approved risk level or scope in `docs/CODEX_WORKFLOW_TEMPLATE.md`, stop and report before continuing.
 
 ## Master Plan And Changelog Updates
 
