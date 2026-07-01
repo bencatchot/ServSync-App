@@ -46,6 +46,25 @@ test.describe('FB-026 review trust boundaries', () => {
     expect(submitReviewSource).not.toContain('.from("service_request_reviews")');
   });
 
+  test('homeowner review form copy reflects paused public display and pending moderation', () => {
+    const source = appSource();
+    const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
+    const reviewFormSource = sourceBetween(
+      homeownerSource,
+      'Leave a review for {request.contractor_name}',
+      '<Star size={15} />{submittingReviewId === request.id',
+    );
+
+    expect(reviewFormSource).toContain('Your name (optional display detail)');
+    expect(reviewFormSource).toContain('Your city/state (optional display detail)');
+    expect(reviewFormSource).toContain('Public ServSync review display is paused while moderation is finalized.');
+    expect(reviewFormSource).toContain('Optional display details may be reviewed before any future public display.');
+    expect(reviewFormSource).not.toContain('shown publicly');
+    expect(reviewFormSource).not.toContain('displayed publicly');
+    expect(reviewFormSource).not.toContain('public name');
+    expect(reviewFormSource).not.toContain('public location');
+  });
+
   test('contractor dashboard does not expose controls to create, edit, approve, or delete homeowner reviews', () => {
     const source = appSource();
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');

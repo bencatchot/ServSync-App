@@ -16513,19 +16513,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 />
                               </Field>
                               <div className="grid gap-3 sm:grid-cols-2">
-                                <Field label="Your name (optional — shown publicly)">
+                                <Field label="Your name (optional display detail)">
                                   <input className={inputClass()} placeholder="e.g. Sarah M."
                                     value={reviewDrafts[request.id]?.displayName ?? ''}
                                     onChange={e => setReviewDrafts(prev => ({ ...prev, [request.id]: { ...(prev[request.id] ?? { open: true, rating: 0, kudos: [], body: '', location: '' }), displayName: e.target.value } }))}
                                   />
                                 </Field>
-                                <Field label="Your city/state (optional — shown publicly)">
+                                <Field label="Your city/state (optional display detail)">
                                   <input className={inputClass()} placeholder="e.g. Fairhope, AL"
                                     value={reviewDrafts[request.id]?.location ?? ''}
                                     onChange={e => setReviewDrafts(prev => ({ ...prev, [request.id]: { ...(prev[request.id] ?? { open: true, rating: 0, kudos: [], body: '', displayName: '' }), location: e.target.value } }))}
                                   />
                                 </Field>
                               </div>
+                              <p className="text-xs text-slate-500">Public ServSync review display is paused while moderation is finalized. Optional display details may be reviewed before any future public display.</p>
                               <div className={mobileActionRowClass()}>
                                 <button type="button" className={mobileButtonClass('primary')}
                                   disabled={!reviewDrafts[request.id]?.rating || submittingReviewId === request.id}
