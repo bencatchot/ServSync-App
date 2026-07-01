@@ -44,12 +44,13 @@ test.describe('contractor entitlement loading foundation', () => {
     }
   });
 
-  test('contractor dashboard loads entitlements without using them as action gates', () => {
+  test('contractor dashboard loads entitlements without changing default beta access', () => {
     const source = appSource();
     const dashboardSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
 
     expect(source).toContain("rpc('servsync_current_contractor_entitlements', { p_contractor_id: activeContractorId })");
     expect(dashboardSource).toContain('useContractorEntitlements(contractor?.id ?? null);');
+    expect(dashboardSource).toContain('getContractorCapabilityState');
     expect(dashboardSource).not.toMatch(/disabled=\{[^}]*can_(?:use|create|send|accept|invite)/);
     expect(dashboardSource).not.toMatch(/if\s*\([^)]*can_(?:use|create|send|accept|invite)[^)]*\)\s*return/);
   });

@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/contractor-readonly-ui-support-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-readonly-ui-support.spec.ts`
+  - `tests/e2e/contractor-entitlement-loading.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added limited frontend support for future contractor read-only entitlement states. The dashboard now has reusable entitlement disabled-state helpers and representative read-only disabled UI for creating estimates, creating/sending invoices, and inviting team members while keeping existing records visible.
+- Reason for change: ServSync needs a safe UI pattern for future limited/read-only contractor access before any paid-plan or backend enforcement work is approved.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file secret scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-readonly-ui-support.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-labels.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-loading.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-admin-visibility.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no SQL, backend/RLS/RPC enforcement, paid-plan enforcement, hidden records or tabs, Stripe activation, checkout, billing portal, payment collection, paywall, editable billing controls, production or sandbox data mutation, provider secret changes, environment changes, homeowner billing changes, or manual deployment.
+  - Normal `beta_free` / `full_beta` contractors keep current access. Read-only disabled-state UI activates only when the entitlement response explicitly reports a read-only access mode.
+  - Marketing inventory reviewed; no update needed because this is authenticated in-app readiness support and does not change public marketing claims.
+
 - Branch: `codex/contractor-entitlement-labels-v1`
 - Files changed:
   - `src/App.tsx`

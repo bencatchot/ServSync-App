@@ -7363,6 +7363,48 @@ type ContractorEntitlementLoadState = {
   source: 'fallback' | 'rpc';
 };
 
+type ContractorEntitlementCapability =
+  | 'can_create_estimates'
+  | 'can_create_invoices'
+  | 'can_send_invoices'
+  | 'can_invite_team_members';
+
+type ContractorCapabilityState = {
+  disabled: boolean;
+  reason: string;
+};
+
+const CONTRACTOR_READ_ONLY_DISABLED_REASON = 'Read-only access is active. Existing records remain available, but new contractor actions are paused.';
+const CONTRACTOR_READ_ONLY_CREATION_CAPABILITIES: ContractorEntitlementCapability[] = [
+  'can_create_estimates',
+  'can_create_invoices',
+  'can_send_invoices',
+  'can_invite_team_members',
+];
+
+function isContractorReadOnly(entitlements: ContractorEntitlements | null | undefined) {
+  return entitlements?.access_mode === 'read_only';
+}
+
+function getContractorDisabledReason(entitlements: ContractorEntitlements | null | undefined, capability: ContractorEntitlementCapability) {
+  const state = getContractorCapabilityState(entitlements, capability);
+  return state.reason;
+}
+
+function getContractorCapabilityState(
+  entitlements: ContractorEntitlements | null | undefined,
+  capability: ContractorEntitlementCapability,
+): ContractorCapabilityState {
+  if (!entitlements) return { disabled: false, reason: '' };
+  if (isContractorReadOnly(entitlements) && CONTRACTOR_READ_ONLY_CREATION_CAPABILITIES.includes(capability)) {
+    return {
+      disabled: true,
+      reason: entitlements.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON,
+    };
+  }
+  return { disabled: false, reason: '' };
+}
+
 function betaContractorEntitlementFallback(contractorId: string | null = null): ContractorEntitlements {
   return {
     contractor_id: contractorId,
@@ -7525,6 +7567,9 @@ function contractorEntitlementAvailableCapabilityCount(entitlements: ContractorE
 function ContractorEntitlementStatusPanel({ state }: { state: ContractorEntitlementLoadState }) {
   const { entitlements, loading, error, source } = state;
   const capabilityCount = contractorEntitlementAvailableCapabilityCount(entitlements);
+  const readOnlyReason = isContractorReadOnly(entitlements)
+    ? entitlements.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
+    : '';
   const statusText = loading
     ? 'Refreshing'
     : source === 'fallback' && error
@@ -7563,9 +7608,9 @@ function ContractorEntitlementStatusPanel({ state }: { state: ContractorEntitlem
           <InfoBox label="Available beta capability flags" value={`${capabilityCount} current flags`} />
         </div>
 
-        {entitlements.read_only_reason && (
+        {readOnlyReason && (
           <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-5 text-slate-600">
-            Status note: {entitlements.read_only_reason}. This label does not change access in the current beta.
+            {readOnlyReason}
           </p>
         )}
       </div>
@@ -18045,6 +18090,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   // Load and display foundation for future contractor subscription readiness; do not enforce gates in this slice.
   const contractorEntitlementState = useContractorEntitlements(contractor?.id ?? null);
+  const createEstimateCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_create_estimates');
+  const createInvoiceCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_create_invoices');
+  const sendInvoiceCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_send_invoices');
+  const inviteTeamCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_invite_team_members');
+  const readOnlyContractorActionReason = getContractorDisabledReason(contractorEntitlementState.entitlements, 'can_create_estimates');
 
   const loadContractor = useCallback(async () => {
     if (!supabase) return;
@@ -18600,6 +18650,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const createTeamInvite = async () => {
     if (!supabase) return;
+    if (inviteTeamCapability.disabled) {
+      setError(inviteTeamCapability.reason);
+      return;
+    }
     if (!teamInviteDraft.email.trim()) {
       setError('Enter an email address before creating a team invite.');
       return;
@@ -19038,6 +19092,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     subjectName: string,
     options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate; homeId?: string | null; localHomeId?: string | null } = {},
   ) => {
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
+      return;
+    }
     setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
@@ -19075,6 +19133,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string; homeId?: string | null; localHomeId?: string | null } = {}) => {
+    if (createEstimateCapability.disabled) {
+      setError(createEstimateCapability.reason);
+      return;
+    }
     setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
@@ -19556,6 +19618,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
       return;
     }
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
+      return;
+    }
     setCreatingInvoiceSourceId(`estimate:${estimate.id}`);
     try {
       const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate', {
@@ -19599,6 +19665,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     if (workItemsForJob(job.id).length > 0) {
       setError('Use item-based invoicing for jobs with work items.');
+      return;
+    }
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
       return;
     }
     setCreatingInvoiceSourceId(`job:${job.id}`);
@@ -25246,8 +25316,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 </Field>
                 <button
                   type="button"
-                  disabled={creatingTeamInvite || !teamInviteDraft.email.trim()}
+                  disabled={inviteTeamCapability.disabled || creatingTeamInvite || !teamInviteDraft.email.trim()}
                   onClick={() => void createTeamInvite()}
+                  title={inviteTeamCapability.disabled ? inviteTeamCapability.reason : undefined}
                   className={buttonClass('primary')}
                 >
                   <Plus size={16} />
@@ -25257,6 +25328,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <p className="mt-2 text-xs text-[#223D67]/70">
                 Invite links are manual for now. Later we can send these by email automatically and connect billing to active extra seats.
               </p>
+              {inviteTeamCapability.disabled && (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  {inviteTeamCapability.reason}
+                </p>
+              )}
             </div>
           ) : (
             <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -28705,12 +28781,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
+                                    disabled={createEstimateCapability.disabled}
                                     onClick={() => {
                                       if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                       if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                                       beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                     }}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
+                                    title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
                                     <p className="mt-2 text-sm font-bold">Create estimate</p>
@@ -28718,18 +28796,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
+                                    disabled={createInvoiceCapability.disabled}
                                     onClick={() => {
                                       if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                       if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
                                       beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
                                     }}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50"
+                                    title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
+                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
                                     <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
                                     <p className="mt-2 text-sm font-bold">Create invoice</p>
                                     <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
                                   </button>
                                 </div>
+                                {(createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
+                                  <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                    {createEstimateCapability.reason || createInvoiceCapability.reason}
+                                  </p>
+                                )}
 
                                 <div className="mt-5 grid gap-3 lg:grid-cols-2">
                                   <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -30136,8 +30221,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </Field>
                           <button
                             type="button"
-                            disabled={!selectedJobsCustomerName}
+                            disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
                             onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                            title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
                             className={buttonClass('primary')}
                           >
                             <Plus size={15} />
@@ -30145,8 +30231,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </button>
                           <button
                             type="button"
-                            disabled={!selectedJobsCustomerName}
+                            disabled={!selectedJobsCustomerName || createInvoiceCapability.disabled}
                             onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                            title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
                             className={buttonClass('secondary')}
                           >
                             <Receipt size={15} />
@@ -30156,6 +30243,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         {!selectedJobsCustomerName && (
                           <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
+                        )}
+                        {readOnlyContractorActionReason && (
+                          <Notice tone="info" text={readOnlyContractorActionReason} />
                         )}
                       </>
                     )}
@@ -30447,6 +30537,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <button
                             type="button"
                             onClick={async () => {
+                              if (sendInvoiceCapability.disabled) {
+                                setError(sendInvoiceCapability.reason);
+                                return;
+                              }
                               const savedInvoice = await saveInvoiceDraft(selectedJobsSubject, { closeComposer: false });
                               if (!savedInvoice) return;
                               const sent = await sendInvoiceToHomeowner(savedInvoice);
@@ -30464,7 +30558,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 }
                               }
                             }}
-                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner}
+                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}
+                            title={sendInvoiceCapability.disabled ? sendInvoiceCapability.reason : undefined}
                             data-testid="contractor-save-and-send-invoice"
                             className={buttonClass('primary')}
                           >
@@ -30500,6 +30595,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Cancel
                           </button>
                         </div>
+                        {sendInvoiceCapability.disabled && (
+                          <Notice tone="info" text={sendInvoiceCapability.reason} />
+                        )}
                       </div>
                     )}
                   </div>
