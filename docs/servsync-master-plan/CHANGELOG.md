@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/backlog-reconcile-through-pr-145-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Reconciled the official ServSync feature backlog through PR #145 / merge commit `4ef3be8`, adding FB-021 through FB-031, folding useful competition-gap recommendations from PR #103 source material into the canonical backlog, and preserving guardrails around disabled or future capabilities.
+- Reason for change: The official backlog was stale at FB-020 while recent merged work added scheduling, Price Book, communication/Activity, shared Home Access, and contractor billing-readiness/entitlement readiness slices. The backlog now reflects current planning state without creating a competing addendum.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - manual Markdown review
+  - FB-021 through FB-031 official backlog representation check
+  - disabled/future feature wording review
+  - PR #103 state check
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation-only reconciliation. No app code, SQL, Supabase function, package, env/config, test, deployment, production data, settings, or PR #103 merge/closure changes.
+  - Marketing inventory reviewed; no update needed because this pass reconciles internal planning/backlog status and does not change public-facing feature claims.
+
 - Branch: `codex/agent-workflow-template-reference-v1`
 - Files changed:
   - `AGENTS.md`
