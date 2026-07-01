@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
 const reviewEligibilitySql = () => sourceFile('servsync-review-eligibility.sql');
+const reviewGrantHardeningSql = () => sourceFile('servsync-review-grant-hardening.sql');
 const publicReviewsSql = () => sourceFile('servsync-public-reviews.sql');
 const externalReviewLinksSql = () => sourceFile('servsync-external-review-links.sql');
 
@@ -117,6 +118,19 @@ test.describe('FB-026 review trust boundaries', () => {
     expect(sql).toContain('public.current_user_can_access_contractor(contractor_id)');
     expect(sql).not.toContain('current_user_can_manage_contractor_schedule');
     expect(sql).not.toContain('current_user_can_manage_contractor_billing');
+  });
+
+  test('review grant hardening keeps direct review table access closed to browser roles', () => {
+    const sql = reviewGrantHardeningSql();
+
+    expect(sql).toContain('Review writes should flow through servsync_homeowner_submit_review(...).');
+    expect(sql).toContain('revoke all privileges on table public.service_request_reviews from anon;');
+    expect(sql).toContain('revoke all privileges on table public.service_request_reviews from authenticated;');
+    expect(sql).toContain('grant execute on function public.servsync_homeowner_submit_review(uuid, smallint, text, text[], text, text)');
+    expect(sql).toContain('grant execute on function public.servsync_homeowner_can_review_service_request(uuid, uuid)');
+    expect(sql).not.toContain('grant select on public.service_request_reviews to anon');
+    expect(sql).not.toContain('grant insert on public.service_request_reviews to authenticated');
+    expect(sql).not.toContain('grant execute on function public.servsync_service_request_has_completed_work');
   });
 
   test('review and referral copy avoids unsupported trust claims and automation', () => {

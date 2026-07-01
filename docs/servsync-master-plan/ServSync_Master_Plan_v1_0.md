@@ -175,7 +175,7 @@ Discover is the platform-wide differentiator because it gives contractors exposu
 
 The Discover tab should not show a generic property selector at the top for single-property homeowners. It should focus on contractor exposure and recent contractor content. Contractor search belongs primarily in a contractor search/profile context, while Discover should feel more feed-like.
 
-FB-026 review/referral work is now started/partial rather than a blank slate. ServSync review surfaces already exist for eligible completed ServSync work and may appear on contractor profile/Discover contexts where real review rows exist. Contractor-provided external review links remain separate from ServSync reviews. Moderation policy, public rating expansion, homeowner recommendation/referral product decisions, Google review handoff, badges, awards, paid ranking, and pay-to-play placement remain future work and must not be implied as live.
+FB-026 review/referral work is now started/partial rather than a blank slate. ServSync review surfaces already exist for eligible completed ServSync work and may appear on contractor profile/Discover contexts where real review rows exist. Contractor-provided external review links remain separate from ServSync reviews. Review writes are intended to flow through guarded RPC logic, with direct browser table grants hardened for the review table. Moderation policy, public rating expansion, homeowner recommendation/referral product decisions, Google review handoff, badges, awards, paid ranking, and pay-to-play placement remain future work and must not be implied as live.
 
 # 11. Connection System and New Connection Request Flow
 

@@ -64,6 +64,22 @@ type PriceBookGrantRow = TablePrivilegeRow & {
   anon_column_grants: number;
 };
 
+type ReviewGrantRow = TablePrivilegeRow & {
+  public_truncate: boolean | null;
+  public_trigger: boolean | null;
+  public_references: boolean | null;
+  anon_truncate: boolean | null;
+  anon_trigger: boolean | null;
+  anon_references: boolean | null;
+  authenticated_truncate: boolean | null;
+  authenticated_trigger: boolean | null;
+  authenticated_references: boolean | null;
+};
+
+type ReviewRpcGrantRow = RpcRow & {
+  authenticated_execute_all: boolean | null;
+};
+
 const CORE_PRIVATE_TABLES = [
   'profiles',
   'homeowner_profiles',
@@ -562,6 +578,140 @@ select
     expect(row.authenticated_update_columns?.sort(), `${row.table_name} authenticated UPDATE columns should stay limited`).toEqual(expectedUpdateColumns);
     expect(row.public_column_grants, `${row.table_name} should not grant column privileges to PUBLIC`).toBe(0);
     expect(row.anon_column_grants, `${row.table_name} should not grant column privileges to anon`).toBe(0);
+  });
+
+  test('service request review table is RPC-mediated for browser roles', () => {
+    const rows = runCatalogQuery<ReviewGrantRow>(`
+with target as (
+  select c.oid
+  from pg_class c
+  where c.relname = 'service_request_reviews'
+    and c.relnamespace = 'public'::regnamespace
+    and c.relkind in ('r', 'p')
+)
+select
+  'service_request_reviews'::text as table_name,
+  exists(select 1 from target) as exists,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'SELECT') end as public_select,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'INSERT') end as public_insert,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'UPDATE') end as public_update,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'DELETE') end as public_delete,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'TRUNCATE') end as public_truncate,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'TRIGGER') end as public_trigger,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'REFERENCES') end as public_references,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'SELECT') end as anon_select,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'INSERT') end as anon_insert,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'UPDATE') end as anon_update,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'DELETE') end as anon_delete,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'TRUNCATE') end as anon_truncate,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'TRIGGER') end as anon_trigger,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'REFERENCES') end as anon_references,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'SELECT') end as authenticated_select,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'INSERT') end as authenticated_insert,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'UPDATE') end as authenticated_update,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'DELETE') end as authenticated_delete,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'TRUNCATE') end as authenticated_truncate,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'TRIGGER') end as authenticated_trigger,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'REFERENCES') end as authenticated_references;
+    `);
+
+    expect(rows, 'Review grant rows should match expected table count').toHaveLength(1);
+    const row = rows[0];
+    expect(row.exists, `${row.table_name} should exist`).toBe(true);
+
+    for (const [privilege, granted] of Object.entries(row)) {
+      if (privilege === 'table_name' || privilege === 'exists') continue;
+      expect(granted, `${row.table_name} should not grant ${privilege} to browser roles`).toBe(false);
+    }
+  });
+
+  test('review write and eligibility helper RPC grants stay non-public', () => {
+    const rows = runCatalogQuery<ReviewRpcGrantRow>(`
+with expected(proname, authenticated_expected) as (
+  values
+    ('servsync_homeowner_submit_review', true),
+    ('servsync_homeowner_can_review_service_request', true),
+    ('servsync_service_request_has_completed_work', false)
+)
+select
+  e.proname,
+  count(p.oid)::int as function_count,
+  count(p.oid) > 0 as exists,
+  coalesce(bool_and(p.prosecdef) filter (where p.oid is not null), false) as security_definer,
+  coalesce(bool_and('search_path=public' = any(p.proconfig)) filter (where p.oid is not null), false) as search_path_public,
+  coalesce(bool_or(exists (
+    select 1
+    from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+    where acl.grantee = 0
+      and acl.privilege_type = 'EXECUTE'
+  )) filter (where p.oid is not null), false) as public_execute,
+  coalesce(bool_or(has_function_privilege('anon', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as anon_execute,
+  coalesce(bool_or(has_function_privilege('authenticated', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as authenticated_execute,
+  coalesce(bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as authenticated_execute_all,
+  e.authenticated_expected
+from expected e
+left join pg_proc p
+  on p.proname = e.proname
+ and p.pronamespace = 'public'::regnamespace
+group by e.proname, e.authenticated_expected
+order by e.proname;
+    `);
+
+    expect(rows, 'Review RPC catalog rows should match expected function count').toHaveLength(3);
+    for (const row of rows) {
+      expect(row.exists, `${row.proname} should exist`).toBe(true);
+      expect(row.function_count, `${row.proname} should have one current signature`).toBe(1);
+      expect(row.security_definer, `${row.proname} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.proname} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.proname} should not grant EXECUTE to PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
+      if (row.proname === 'servsync_service_request_has_completed_work') {
+        expect(row.authenticated_execute, `${row.proname} should be internal-only`).toBe(false);
+      } else {
+        expect(row.authenticated_execute_all, `${row.proname} should grant EXECUTE to authenticated`).toBe(true);
+      }
+    }
+  });
+
+  test('public review display RPCs remain browser-callable', () => {
+    const rows = runCatalogQuery<RpcRow>(`
+with expected(proname) as (
+  values
+    ('servsync_get_public_contractor_profile'),
+    ('servsync_discover_feed')
+)
+select
+  e.proname,
+  count(p.oid)::int as function_count,
+  count(p.oid) > 0 as exists,
+  coalesce(bool_and(p.prosecdef) filter (where p.oid is not null), false) as security_definer,
+  coalesce(bool_and('search_path=public' = any(p.proconfig)) filter (where p.oid is not null), false) as search_path_public,
+  coalesce(bool_or(exists (
+    select 1
+    from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+    where acl.grantee = 0
+      and acl.privilege_type = 'EXECUTE'
+  )) filter (where p.oid is not null), false) as public_execute,
+  coalesce(bool_or(has_function_privilege('anon', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as anon_execute,
+  coalesce(bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')) filter (where p.oid is not null), false) as authenticated_execute
+from expected e
+left join pg_proc p
+  on p.proname = e.proname
+ and p.pronamespace = 'public'::regnamespace
+group by e.proname
+order by e.proname;
+    `);
+
+    expect(rows, 'Public review display RPC rows should match expected function count').toHaveLength(2);
+    for (const row of rows) {
+      expect(row.exists, `${row.proname} should exist`).toBe(true);
+      expect(row.function_count, `${row.proname} should have a current signature`).toBeGreaterThan(0);
+      expect(row.security_definer, `${row.proname} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.proname} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.proname} should remain public for browser profile/Discover display`).toBe(true);
+      expect(row.anon_execute, `${row.proname} should remain callable by anon`).toBe(true);
+      expect(row.authenticated_execute, `${row.proname} should remain callable by authenticated users`).toBe(true);
+    }
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {
