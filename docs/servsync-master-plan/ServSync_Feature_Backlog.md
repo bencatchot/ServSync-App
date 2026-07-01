@@ -116,7 +116,7 @@ Important guardrails:
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
 | FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Completed / Functional | High | v1 is complete: schema foundation and RPC/conversion preservation are merged and applied to sandbox/production; app/UI labor support and Build Estimate Draft labor cleanup are merged and passing preview. |
 | FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Major Progress / Backlog | High | Continue as an umbrella readiness program. Public smoke, security catalog, credential readiness, backup/restore templates, artifact guardrails, and restore-drill planning have advanced; production smoke credentials/records and an executed restore drill remain open. |
-| FB-021 | Scheduling + Appointment Confirmation Foundation | Scheduling, service requests, jobs, homeowner visibility | Partially Completed / Follow-up Backlog | High | Core foundation, read display, and first action UI are merged. Next: contractor reschedule/cancel controls and replacement proposal UX, while keeping calendar sync, dispatch/routing, GPS, email/SMS/push reminders, and homeowner-forced booking out of scope. |
+| FB-021 | Scheduling + Appointment Confirmation Foundation | Scheduling, service requests, jobs, homeowner visibility | v1 Closeout Complete / Follow-up Backlog | High | v1 now covers the SQL/RPC/RLS foundation, read display, contractor 1-3 window proposals, homeowner accept/decline, confirmed appointment visibility, contractor replacement reschedule, contractor appointment cancel, and compact appointment-state helper copy. Future follow-ups should focus on durable Activity rows for rescheduled/canceled appointments, richer safe history UI, and a full sandbox-mutating probe run with approved sandbox env, while keeping calendar sync, dispatch/routing, GPS, email/SMS/push reminders, notification delivery, and homeowner-forced booking out of scope. |
 | FB-022 | Online Booking / Request-to-Booking Flow | Homeowner service requests, contractor intake, scheduling | Backlog | High | Treat true online/self-booking as later. Use FB-021 as the safer contractor-controlled appointment proposal foundation before any booking workflow. |
 | FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
 | FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
@@ -962,7 +962,7 @@ Use FB-020 as the umbrella readiness workstream before broader beta/public go-li
 
 ### FB-021 — Scheduling + Appointment Confirmation Foundation
 
-Status: Partially Completed / Follow-up Backlog
+Status: v1 Closeout Complete / Follow-up Backlog
 
 Priority: High
 
@@ -975,18 +975,20 @@ Product area:
 - Calendar/request visibility
 
 Summary:
-FB-021 was added from the competition-gap review as the safer near-term alternative to full contractor auto-scheduling. The implemented slices add a SQL/RPC/RLS foundation for appointment windows and history, read-only request-card display for confirmed/pending appointment context, and first action UI where contractors can propose 1-3 windows and homeowners can accept or decline them.
+FB-021 was added from the competition-gap review as the safer near-term alternative to full contractor auto-scheduling. The implemented v1 slices add a SQL/RPC/RLS foundation for appointment windows and history, read-only request-card display for confirmed/pending appointment context, contractor 1-3 window proposals, homeowner accept/decline controls, contractor replacement-window reschedule controls, contractor appointment cancel controls, and compact appointment-state helper copy.
 
 Current guardrails:
 
 - Contractor remains in control of proposed windows.
 - Homeowner can accept/decline proposed windows but cannot force a contractor booking.
+- Contractor can propose replacement windows for a confirmed appointment, and the current appointment remains scheduled until a homeowner accepts a replacement.
+- Contractor can cancel a confirmed appointment without canceling the whole service request.
 - No Google/Outlook calendar sync.
 - No dispatch/routing/GPS.
-- No email/SMS/push reminder automation.
+- No email/SMS/push reminder automation or notification delivery.
 
 Current next step:
-Plan a narrow follow-up for contractor reschedule/cancel controls, replacement proposal UX, and safe appointment status history display.
+Optional follow-ups are durable Activity events for rescheduled/canceled appointments, richer safe appointment event/history UI, and a full sandbox-mutating probe run with approved sandbox env. Do not treat this as full online booking, public availability, automated reminders, external calendar sync, or dispatch.
 
 ### FB-022 — Online Booking / Request-to-Booking Flow
 
@@ -1005,7 +1007,7 @@ Summary:
 True online booking is not live. FB-021 covers the safer appointment proposal/confirmation foundation, but self-service booking and broader request-to-booking automation remain future work.
 
 Current next step:
-Revisit after FB-021 reschedule/cancel and contractor-controlled availability are stable. Any future booking slice must preserve contractor control and avoid homeowner-forced bookings.
+Revisit only after FB-021 v1 scheduling behavior has enough beta confidence and any contractor-controlled availability model is explicitly approved. Any future booking slice must preserve contractor control and avoid homeowner-forced bookings.
 
 ### FB-023 — Contractor Payment Collection / Deposits
 
@@ -1218,11 +1220,11 @@ Plan any next billing-readiness slice as either admin/readiness polish or a stri
 
 ## Current next recommended focus
 
-1. FB-021 scheduling closeout audit for contractor reschedule/cancel and replacement proposal UX.
-2. FB-020 operational readiness: approved production smoke credentials/records and a non-production restore drill.
-3. FB-024 Price Book maturity, one narrow slice at a time.
-4. FB-025 unread indicators or scoped communication/Activity follow-up.
-5. FB-026 review/referral flow audit after core request-to-job confidence improves.
+1. FB-020 operational readiness: approved production smoke credentials/records and a non-production restore drill.
+2. FB-024 Price Book maturity, one narrow slice at a time.
+3. FB-025 unread indicators or scoped communication/Activity follow-up, including a possible later audit for appointment rescheduled/canceled Activity rows.
+4. FB-026 review/referral flow audit after core request-to-job confidence improves.
+5. FB-021 optional follow-up only if beta feedback needs richer appointment event/history UI or a full sandbox-mutating probe closeout.
 
 ## Update rules
 
