@@ -1147,6 +1147,37 @@ export interface AdminRevenueRow {
   total_monthly_cents: number;
 }
 
+export interface AdminContractorBillingReadinessRow {
+  contractor_id: string;
+  business_name: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  trade_category: string;
+  service_area: string;
+  account_status: string;
+  legacy_subscription_status: string;
+  legacy_monthly_price_cents: number;
+  billing_status: string;
+  access_mode: string;
+  current_plan: string;
+  beta_cohort: string | null;
+  beta_started_at: string | null;
+  founder_discount_eligible: boolean;
+  subscription_required_after: string | null;
+  grace_period_ends_at: string | null;
+  monthly_price_cents: number;
+  has_stripe_customer_id: boolean;
+  has_stripe_subscription_id: boolean;
+  can_create_estimates: boolean;
+  can_create_jobs: boolean;
+  can_create_invoices: boolean;
+  can_use_ai_features: boolean;
+  can_invite_team_members: boolean;
+  max_team_seats: number;
+  max_storage_mb: number;
+}
+
 export interface AdminGrowthRow {
   month: string;
   new_homeowners: number;

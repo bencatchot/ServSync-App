@@ -170,6 +170,10 @@ const INTERNAL_ONLY_SECURITY_DEFINER_RPCS = [
   'servsync_record_home_access_invite_delivery_result',
 ];
 
+const ADMIN_ONLY_SECURITY_DEFINER_RPCS = [
+  'servsync_admin_contractor_billing_readiness',
+];
+
 const STORAGE_BUCKETS = [
   { bucket_id: 'contractor-assets', expected_public: true },
   { bucket_id: 'discover-media', expected_public: true },
@@ -454,6 +458,25 @@ order by e.table_name;
       expect(row.public_execute, `${row.proname} should not grant EXECUTE to PUBLIC`).toBe(false);
       expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
       expect(row.authenticated_execute, `${row.proname} should not grant EXECUTE to authenticated`).toBe(false);
+    }
+  });
+
+  test('selected admin-only RPCs are hardened and callable only through authenticated admin guards', () => {
+    const rows = runCatalogQuery<RpcRow>(
+      securityDefinerRpcCatalogQuery(ADMIN_ONLY_SECURITY_DEFINER_RPCS),
+    );
+
+    expect(rows, 'Admin RPC catalog rows should match expected function count').toHaveLength(
+      ADMIN_ONLY_SECURITY_DEFINER_RPCS.length,
+    );
+    for (const row of rows) {
+      expect(row.exists, `${row.proname} should exist`).toBe(true);
+      expect(row.function_count, `${row.proname} should have at least one overload`).toBeGreaterThan(0);
+      expect(row.security_definer, `${row.proname} should be SECURITY DEFINER`).toBe(true);
+      expect(row.search_path_public, `${row.proname} should set search_path=public`).toBe(true);
+      expect(row.public_execute, `${row.proname} should not grant EXECUTE to PUBLIC`).toBe(false);
+      expect(row.anon_execute, `${row.proname} should not grant EXECUTE to anon`).toBe(false);
+      expect(row.authenticated_execute, `${row.proname} should grant EXECUTE to authenticated behind admin guard`).toBe(true);
     }
   });
 
