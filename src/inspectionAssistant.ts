@@ -39,7 +39,6 @@ const NEEDS_REPAIR_PHRASES = [
   'failure',
   'broken',
   'damaged',
-  'damage',
   'defect',
   'defective',
   'faulty',
@@ -152,6 +151,13 @@ const UNRESOLVED_WORK_PHRASES = [
   'could not repair',
   'still leaking',
   'still leaks',
+  'not working',
+  'not functioning',
+  'does not work',
+  'won t work',
+  'wont work',
+  'failed',
+  'failure',
   'continues to leak',
   'continued leak',
   'needs repair',
@@ -180,11 +186,58 @@ const CLEAR_CONDITION_PHRASES = [
   'normal operation',
   'operating normally',
   'operates normally',
+  'functioning',
+  'functional',
+  'worked',
+  'working',
   'working properly',
   'working as expected',
+  'operational',
+  'pass',
   'looks good',
   'acceptable condition',
   'passed',
+];
+
+const BLOCKING_FAILURE_PHRASES = [
+  'urgent',
+  'hazardous',
+  'dangerous',
+  'unsafe',
+  'critical',
+  'active leak',
+  'actively leaking',
+  'active water intrusion',
+  'electrical hazard',
+  'gas odor',
+  'sewage backup',
+  'structural danger',
+  'immediate damage risk',
+  'not working',
+  'not functioning',
+  'does not work',
+  'won t work',
+  'wont work',
+  'failed',
+  'failure',
+  'broken',
+  'damaged',
+  'defect',
+  'defective',
+  'faulty',
+  'inoperable',
+  'malfunction',
+  'malfunctioning',
+  'dripping',
+  'drip',
+  'running',
+  'runs continuously',
+  'keeps running',
+  'loose',
+  'clogged',
+  'clog',
+  'blocked',
+  'backed up',
 ];
 
 function normalizeText(value: string) {
@@ -267,12 +320,18 @@ export function localDraftFromNote(note: string): FindingStatus {
   const lower = normalizeText(note);
   const completedOnSite = hasAny(lower, COMPLETED_WORK_PHRASES) && !hasAny(lower, UNRESOLVED_WORK_PHRASES);
   const clearlyOk = hasAny(lower, CLEAR_CONDITION_PHRASES) && !hasAny(lower, UNRESOLVED_WORK_PHRASES);
+  const hasUrgent = hasAny(lower, URGENT_PHRASES);
+  const hasBlockingFailure = hasAny(lower, BLOCKING_FAILURE_PHRASES);
+  const hasNeedsRepair = hasAny(lower, NEEDS_REPAIR_PHRASES);
+  const hasMonitor = hasAny(lower, MONITOR_PHRASES);
 
   if (completedOnSite) return 'Fixed On Site';
+  if (hasUrgent) return 'Urgent';
+  if (hasBlockingFailure) return 'Needs Repair';
+  if (hasNeedsRepair && !clearlyOk) return 'Needs Repair';
+  if (hasMonitor) return 'Monitor';
   if (clearlyOk) return 'Pass';
-  if (hasAny(lower, URGENT_PHRASES)) return 'Urgent';
-  if (hasAny(lower, NEEDS_REPAIR_PHRASES)) return 'Needs Repair';
-  if (hasAny(lower, MONITOR_PHRASES)) return 'Monitor';
+  if (hasNeedsRepair) return 'Needs Repair';
   return 'Pass';
 }
 

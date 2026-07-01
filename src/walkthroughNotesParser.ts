@@ -46,15 +46,25 @@ const ROOM_CONTEXTS: Array<{ label: string; phrases: string[] }> = [
 
 const COMPONENT_PHRASES = [
   'sink',
+  'sinks',
   'faucet',
   'garbage disposal',
   'disposal',
   'gfci',
   'outlet',
+  'outlets',
   'receptacle',
+  'receptacles',
   'switch',
   'light switch',
+  'light',
+  'lights',
+  'light fixture',
+  'light fixtures',
   'toilet',
+  'shower',
+  'tub',
+  'bathtub',
   'drain',
   'dryer vent',
   'water heater',
@@ -91,6 +101,18 @@ const CONDITION_PHRASES = [
   'failed',
   'failure',
   'running',
+  'checked',
+  'verified',
+  'confirmed',
+  'notated',
+  'function',
+  'functioning',
+  'functional',
+  'worked',
+  'working',
+  'operational',
+  'pass',
+  'passed',
   'slow',
   'squeaks',
   'squeaking',
@@ -168,7 +190,7 @@ function hasCondition(text: string) {
 function isContextOnly(text: string) {
   const lower = normalizeWalkthroughText(text);
   if (!lower) return false;
-  const withoutLeadIn = lower.replace(/^(in|inside|at|around|near|for)\s+(the\s+)?/, '');
+  const withoutLeadIn = lower.replace(/^(walking\s+)?(into|in|inside|at|around|near|for)\s+(the\s+)?/, '');
   return ROOM_CONTEXTS.some(context => context.phrases.some(phrase => normalizeWalkthroughText(phrase) === withoutLeadIn))
     && !hasComponent(text)
     && !hasCondition(text);
@@ -326,6 +348,7 @@ const ITEM_MATCH_SYNONYMS: Record<string, string[]> = {
   vent: ['vent', 'exhaust', 'fan', 'range hood', 'dryer vent'],
   gfci: ['gfci', 'outlet', 'receptacle', 'plug', 'does not trip'],
   switch: ['switch', 'light switch', 'dimmer'],
+  light: ['light', 'lights', 'light fixture', 'light fixtures', 'fixture', 'fixtures'],
   electrical: ['electrical', 'breaker', 'panel', 'wire', 'wiring', 'spark', 'sparking', 'flicker', 'flickering', 'smoke detector'],
   window: ['window', 'windows', 'window lock', 'sill', 'glass', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'],
   door: ['door', 'doors', 'front door', 'threshold', 'lock', 'hardware', 'hinge', 'sticks', 'sticking', 'stuck door', 'won t latch', 'wont latch'],
@@ -368,6 +391,7 @@ export function suggestedChecklistItemFromNote(note: string, room: string) {
     return 'Plumbing leak';
   }
   if (['toilet', 'running', 'fill valve', 'ball valve'].some(word => hasPhrase(lower, word))) return 'Toilet operation';
+  if (['shower', 'tub', 'bathtub'].some(word => hasPhrase(lower, word))) return 'Shower operation';
   if (['slow drain', 'clog', 'backup', 'not draining', 'drain'].some(word => hasPhrase(lower, word))) return 'Slow drain or clog';
   if (['dryer vent'].some(word => hasPhrase(lower, word))) return 'Dryer vent';
   if (['water heater'].some(word => hasPhrase(lower, word))) return 'Water heater';
@@ -377,6 +401,7 @@ export function suggestedChecklistItemFromNote(note: string, room: string) {
   if (['ac', 'a c', 'air conditioner', 'hvac', 'not cooling', 'weak air', 'airflow', 'air flow', 'dirty filter', 'filter'].some(word => hasPhrase(lower, word))) return 'HVAC airflow or filter concern';
   if (['gfci', 'outlet', 'receptacle', 'plug'].some(word => hasPhrase(lower, word))) return 'GFCI outlet';
   if (['switch', 'light switch'].some(word => hasPhrase(lower, word))) return 'Loose outlet or switch';
+  if (['light', 'lights', 'light fixture', 'light fixtures'].some(word => hasPhrase(lower, word))) return 'Light fixtures';
   if (['smoke detector'].some(word => hasPhrase(lower, word))) return 'Smoke detector';
   if (['wall', 'sheetrock', 'drywall', 'hole', 'paint', 'ceiling'].some(word => hasPhrase(lower, word))) return 'Wall or ceiling damage';
   if (['fan', 'ceiling fan', 'fan blade', 'squeak', 'squeaking', 'out of balance', 'wobble', 'wobbling'].some(word => hasPhrase(lower, word))) return 'Ceiling fan noise';
@@ -403,6 +428,8 @@ export function findBestChecklistItem(note: string, items: string[]) {
   const noteHasGutter = ['gutter', 'gutters', 'downspout', 'downspouts', 'gutter clogged', 'clogged gutter', 'blocked downspout', 'overflowing'].some(word => hasPhrase(lower, word));
   const noteHasHvac = ['hvac', 'ac', 'a c', 'air conditioner', 'not cooling', 'weak air', 'airflow', 'air flow', 'filter', 'dirty filter', 'thermostat'].some(word => hasPhrase(lower, word));
   const noteHasElectrical = ['outlet', 'receptacle', 'plug', 'switch', 'light switch', 'gfci', 'breaker', 'electrical', 'panel', 'smoke detector'].some(word => hasPhrase(lower, word));
+  const noteHasLight = ['light', 'lights', 'light fixture', 'light fixtures'].some(word => hasPhrase(lower, word)) && !hasPhrase(lower, 'switch');
+  const noteHasShower = ['shower', 'tub', 'bathtub'].some(word => hasPhrase(lower, word));
   const noteHasDoor = ['door', 'doors', 'hinge', 'lock', 'handle', 'sticks', 'sticking', 'won t latch', 'wont latch'].some(word => hasPhrase(lower, word));
   const noteHasWindow = ['window', 'windows', 'window lock', 'screen', 'sash', 'won t open', 'wont open', 'stuck window'].some(word => hasPhrase(lower, word));
   const noteHasMoisture = ['moisture', 'water stain', 'stain', 'staining', 'soft spot', 'mold', 'mildew'].some(word => hasPhrase(lower, word));
@@ -467,6 +494,22 @@ export function findBestChecklistItem(note: string, items: string[]) {
       return ['electrical', 'panel', 'breaker', 'gfci'].some(word => hasPhrase(itemLower, word));
     });
     if (electricalItem) return electricalItem;
+  }
+
+  if (noteHasLight) {
+    const lightItem = items.find(item => {
+      const itemLower = normalizeWalkthroughText(item);
+      return ['light', 'lights', 'light fixture', 'light fixtures', 'fixture', 'fixtures'].some(word => hasPhrase(itemLower, word));
+    });
+    if (lightItem) return lightItem;
+  }
+
+  if (noteHasShower) {
+    const showerItem = items.find(item => {
+      const itemLower = normalizeWalkthroughText(item);
+      return ['shower', 'tub', 'bathtub'].some(word => hasPhrase(itemLower, word));
+    });
+    if (showerItem) return showerItem;
   }
 
   if (noteHasDoor || noteHasWindow) {
@@ -584,6 +627,8 @@ export function findBestChecklistItem(note: string, items: string[]) {
     if (noteHasGutter && (hasPhrase(itemLower, 'gutter') || hasPhrase(itemLower, 'downspout'))) score += 28;
     if (noteHasHvac && (hasPhrase(itemLower, 'hvac') || hasPhrase(itemLower, 'filter') || hasPhrase(itemLower, 'airflow') || hasPhrase(itemLower, 'thermostat'))) score += 22;
     if (noteHasElectrical && (hasPhrase(itemLower, 'outlet') || hasPhrase(itemLower, 'switch') || hasPhrase(itemLower, 'gfci') || hasPhrase(itemLower, 'panel') || hasPhrase(itemLower, 'smoke detector'))) score += 22;
+    if (noteHasLight && (hasPhrase(itemLower, 'light') || hasPhrase(itemLower, 'fixture'))) score += 22;
+    if (noteHasShower && (hasPhrase(itemLower, 'shower') || hasPhrase(itemLower, 'tub') || hasPhrase(itemLower, 'bathtub'))) score += 22;
     if (noteHasDoor && hasPhrase(itemLower, 'door')) score += 20;
     if (noteHasWindow && hasPhrase(itemLower, 'window')) score += 20;
     if (noteHasPest && hasPhrase(itemLower, 'pest')) score += 20;

@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/walkthrough-notes-multi-observation-splitting-v1`
+- Files changed:
+  - `src/walkthroughNotesParser.ts`
+  - `src/inspectionAssistant.ts`
+  - `scripts/test-walkthrough-notes-parser.mjs`
+  - `scripts/test-inspection-assistant-classifier.mjs`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened local Walk mode walkthrough parsing so pass-style natural narration with several distinct assets in one sentence splits into separate reviewable checklist suggestions. The parser now recognizes pass-oriented cues such as checked, verified, confirmed, notated, functioning, functional, worked, working, operational, pass, and passed, and better handles lights, outlets, sinks, toilets, and showers while preserving same-asset grouping such as "shower functional with no leaks."
+- Reason for change: Contractors can narrate healthy walkthrough checks naturally, but the prior parser could under-split multiple pass observations in one room into one large checklist item.
+- Tests/checks run:
+  - `node scripts/test-walkthrough-notes-parser.mjs`
+  - `node scripts/test-inspection-assistant-classifier.mjs`
+  - `npm run lint` (blocked by existing ESLint / `@typescript-eslint/no-unused-expressions` rule-loading incompatibility before linting this slice's files)
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Local Walk mode/parser/test slice only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, Edge Function changes, production data mutation, deploy, AI mode implementation, report finalization changes, or customer-facing auto-save behavior is included.
+  - AI mode prompt parity remains deferred to a separately approved Edge Function slice if deterministic AI split guarantees are needed later.
+
 - Branch: `codex/fb-026-admin-review-moderation-ui-v1`
 - Files changed:
   - `src/App.tsx`
