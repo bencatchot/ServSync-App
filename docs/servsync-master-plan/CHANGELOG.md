@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/contractor-billing-admin-visibility-v1`
+- Files changed:
+  - `servsync-contractor-billing-admin-visibility.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/contractor-billing-admin-visibility.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added internal read-only platform-admin visibility for contractor billing-readiness state. The new admin RPC joins contractor profile basics with canonical `contractor_billing_accounts` fields and entitlement summaries, returning Stripe presence booleans instead of full provider IDs. The Platform Admin contractor accounts view now shows billing-readiness summary counts and per-contractor read-only status panels, while legacy contractor profile subscription fields are labeled as compatibility/admin-display fields.
+- Reason for change: ServSync needs a safe internal way to review beta/free/founder/future contractor billing state before later billing operations, without activating Stripe, charging users, enforcing paywalls, or changing beta contractor access.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-contractor-billing-admin-visibility.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-admin-visibility.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no Stripe checkout, no billing portal, no payment collection, no provider secret changes, no frontend paywalls, no billing enforcement, no homeowner billing changes, no production data mutation, and no manual deployment.
+  - Platform-admin visibility is read-only. Future editable billing operations should use a separately approved guarded admin RPC and should account for the fact that permitted contractor users can read their own `contractor_billing_accounts` row.
+  - Marketing inventory reviewed; no update needed because this is an internal admin visibility slice and does not change public feature claims.
+
 - Branch: `codex/contractor-billing-readiness-v1`
 - Files changed:
   - `servsync-contractor-billing-readiness.sql`

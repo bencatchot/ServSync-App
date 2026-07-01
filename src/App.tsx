@@ -132,6 +132,7 @@ import {
 import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
+  AdminContractorBillingReadinessRow,
   AdminGrowthRow,
   AdminPlatformHealth,
   AdminReferral,
@@ -34721,6 +34722,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [reportRevenue, setReportRevenue] = useState<AdminRevenueRow[]>([]);
   const [reportGrowth, setReportGrowth] = useState<AdminGrowthRow[]>([]);
   const [reportActivity, setReportActivity] = useState<AdminContractorActivityRow[]>([]);
+  const [contractorBillingReadiness, setContractorBillingReadiness] = useState<AdminContractorBillingReadinessRow[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsLoaded, setReportsLoaded] = useState(false);
   const [notice, setNotice] = useState('');
@@ -34732,7 +34734,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setLoading(true);
     setError('');
     try {
-      const [profilesRes, contractorsRes, connectionsRes, invitesRes, inviteLeadsRes, referralRes, connectionOverviewRes, adoptionRes, supportRes] = await Promise.all([
+      const [profilesRes, contractorsRes, connectionsRes, invitesRes, inviteLeadsRes, referralRes, connectionOverviewRes, adoptionRes, billingReadinessRes, supportRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('contractor_profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_connections').select('status'),
@@ -34741,6 +34743,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
         supabase.rpc('servsync_admin_referrals'),
         supabase.rpc('servsync_admin_connection_overview'),
         supabase.rpc('servsync_admin_contractor_adoption'),
+        supabase.rpc('servsync_admin_contractor_billing_readiness'),
         supabase.from('support_inquiries').select('*, messages:support_inquiry_messages(*)').order('updated_at', { ascending: false }),
       ]);
       if (profilesRes.error) throw profilesRes.error;
@@ -34757,6 +34760,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const loadedReferrals = referralRes.error ? [] : (referralRes.data || []) as AdminReferral[];
       const loadedConnectionOverviews = (connectionOverviewRes.data || []) as PlatformConnectionOverview[];
       const loadedAdoption = adoptionRes.error ? [] : (adoptionRes.data || []) as AdminContractorAdoption[];
+      const loadedBillingReadiness = billingReadinessRes.error ? [] : (billingReadinessRes.data || []) as AdminContractorBillingReadinessRow[];
       const adminConnectionIds = loadedConnectionOverviews.map(connection => connection.connection_id);
       const adminHistoryRes = adminConnectionIds.length
         ? await supabase
@@ -34782,6 +34786,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setAdminReferrals(loadedReferrals);
       setConnectionOverviews(loadedConnectionOverviews);
       setContractorAdoption(loadedAdoption);
+      setContractorBillingReadiness(loadedBillingReadiness);
       if (!supportRes.error) setSupportInquiries((supportRes.data || []) as SupportInquiry[]);
       setAdminConnectionHistory(groupConnectionHistory((adminHistoryRes.data || []) as ConnectionAuditEvent[]));
       setAdminDrafts(loadedContractors.reduce<Record<string, AdminContractorDraft>>((drafts, contractor) => {
@@ -35169,6 +35174,26 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const profilesById = new Map(profiles.map(item => [item.id, item]));
   const contractorsById = new Map(contractors.map(item => [item.id, item]));
   const adoptionByContractorId = new Map(contractorAdoption.map(row => [row.contractor_id, row]));
+  const billingReadinessByContractorId = new Map(contractorBillingReadiness.map(row => [row.contractor_id, row]));
+  const billingReadinessSummary = contractorBillingReadiness.reduce(
+    (summary, row) => {
+      if (row.billing_status === 'beta_free') summary.betaFree += 1;
+      if (row.founder_discount_eligible) summary.founderEligible += 1;
+      if (row.billing_status === 'manual_review') summary.manualReview += 1;
+      if (['read_only', 'limited', 'suspended'].includes(row.access_mode)) summary.restricted += 1;
+      if (row.has_stripe_customer_id) summary.stripeCustomerPresent += 1;
+      if (row.has_stripe_subscription_id) summary.stripeSubscriptionPresent += 1;
+      return summary;
+    },
+    {
+      betaFree: 0,
+      founderEligible: 0,
+      manualReview: 0,
+      restricted: 0,
+      stripeCustomerPresent: 0,
+      stripeSubscriptionPresent: 0,
+    },
+  );
   const connectionAlertCount = contractorAdoption.filter(isConnectionAlertNeedsOutreach).length;
   const filteredContractors = contractors.filter(contractor => {
     const adoption = adoptionByContractorId.get(contractor.id);
@@ -35348,6 +35373,27 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
               </Field>
             </div>
           </div>
+          <div className="rounded-xl border border-amber-800/50 bg-amber-950/20 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="font-semibold text-white">Billing readiness</p>
+                <p className="mt-1 text-sm text-amber-100">
+                  Billing readiness is internal tracking only. Stripe billing is not active. Beta contractors remain free. Homeowners remain free and are not part of contractor billing.
+                </p>
+              </div>
+              <span className="w-fit rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                Read-only
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <InfoBox label="Beta free" value={String(billingReadinessSummary.betaFree)} />
+              <InfoBox label="Founder eligible" value={String(billingReadinessSummary.founderEligible)} />
+              <InfoBox label="Manual review" value={String(billingReadinessSummary.manualReview)} />
+              <InfoBox label="Read-only / limited / suspended" value={String(billingReadinessSummary.restricted)} />
+              <InfoBox label="Stripe customer present" value={String(billingReadinessSummary.stripeCustomerPresent)} />
+              <InfoBox label="Stripe subscription present" value={String(billingReadinessSummary.stripeSubscriptionPresent)} />
+            </div>
+          </div>
           {contractors.length === 0 ? (
             <EmptyState text="No contractor accounts yet." />
           ) : filteredContractors.length === 0 ? (
@@ -35356,6 +35402,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
             filteredContractors.map(contractor => {
               const draft = adminDrafts[contractor.id] || adminDraftFromContractor(contractor);
               const adoption = adoptionByContractorId.get(contractor.id);
+              const billing = billingReadinessByContractorId.get(contractor.id);
               const alertDraft = adoption?.alert_id ? (connectionAlertDrafts[adoption.alert_id] || connectionAlertDraftFromAdoption(adoption)) : null;
               const outreachDraft = adoption?.alert_id ? connectionOutreachDrafts[adoption.alert_id] : null;
               const isSaving = savingContractorId === contractor.id;
@@ -35373,7 +35420,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">{contractor.account_status}</span>
-                      <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{contractor.subscription_status || 'trialing'}</span>
+                      <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">Legacy: {contractor.subscription_status || 'trialing'}</span>
+                      <span className="rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-semibold text-amber-300">Billing: {billing?.billing_status || 'not loaded'}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${connectionLevelClass(effectiveLevel)}`}>
                         {belowThreshold ? 'Building customer count' : `${connectionLevelLabel(effectiveLevel)} connection rate`}
                       </span>
@@ -35560,6 +35608,71 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                     )}
                   </div>
 
+                  <div className="mt-4 rounded-xl border border-amber-800/40 bg-slate-800/70 p-4" data-testid={`admin-billing-readiness-${contractor.id}`}>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">Billing readiness</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Internal tracking only. Stripe billing is not active, beta contractors remain free, and no subscription enforcement is live.
+                        </p>
+                      </div>
+                      <span className="w-fit rounded-full bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                        {billing ? 'Canonical billing state' : 'Not loaded'}
+                      </span>
+                    </div>
+                    {billing ? (
+                      <>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <InfoBox label="Billing status" value={billing.billing_status} />
+                          <InfoBox label="Access mode" value={billing.access_mode} />
+                          <InfoBox label="Current plan" value={billing.current_plan} />
+                          <InfoBox label="Beta cohort" value={billing.beta_cohort || '—'} />
+                          <InfoBox label="Beta started" value={formatDateTime(billing.beta_started_at)} />
+                          <InfoBox label="Founder eligible" value={billing.founder_discount_eligible ? 'Yes' : 'No'} />
+                          <InfoBox label="Subscription required after" value={formatDateTime(billing.subscription_required_after)} />
+                          <InfoBox label="Grace period ends" value={formatDateTime(billing.grace_period_ends_at)} />
+                          <InfoBox label="Monthly price placeholder" value={formatMoney(billing.monthly_price_cents)} />
+                          <InfoBox label="Stripe customer present" value={billing.has_stripe_customer_id ? 'Yes' : 'No'} />
+                          <InfoBox label="Stripe subscription present" value={billing.has_stripe_subscription_id ? 'Yes' : 'No'} />
+                          <InfoBox label="Legacy monthly profile price" value={formatMoney(billing.legacy_monthly_price_cents)} />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                          {([
+                            ['Estimates', billing.can_create_estimates],
+                            ['Jobs', billing.can_create_jobs],
+                            ['Invoices', billing.can_create_invoices],
+                            ['AI', billing.can_use_ai_features],
+                            ['Team', billing.can_invite_team_members],
+                          ] as Array<[string, boolean]>).map(([label, enabled]) => (
+                            <span
+                              key={String(label)}
+                              className={`rounded-full px-2 py-0.5 font-semibold ${enabled ? 'bg-emerald-900/40 text-emerald-200' : 'bg-slate-900/70 text-slate-300'}`}
+                            >
+                              {label}: {enabled ? 'available' : 'limited'}
+                            </span>
+                          ))}
+                          <span className="rounded-full bg-slate-900/70 px-2 py-0.5 font-semibold text-slate-300">
+                            Seats: {billing.max_team_seats}
+                          </span>
+                          <span className="rounded-full bg-slate-900/70 px-2 py-0.5 font-semibold text-slate-300">
+                            Storage: {billing.max_storage_mb} MB
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-xs text-amber-100">
+                        Billing-readiness data is unavailable in this environment. No billing action is available from this view.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-slate-600 bg-slate-800/60 p-4">
+                    <p className="text-sm font-semibold text-white">Legacy/admin profile fields</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      These profile fields are retained for compatibility and admin display. The billing-readiness state above is canonical for future contractor billing and does not activate Stripe or enforce access.
+                    </p>
+                  </div>
+
                   <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <Field label="Account status">
                       <select
@@ -35570,7 +35683,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         {ACCOUNT_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
                       </select>
                     </Field>
-                    <Field label="Subscription">
+                    <Field label="Legacy subscription">
                       <select
                         className={inputClass()}
                         value={draft.subscription_status}
@@ -35579,7 +35692,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         {SUBSCRIPTION_STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
                       </select>
                     </Field>
-                    <Field label="Monthly price">
+                    <Field label="Legacy monthly price">
                       <input
                         className={inputClass()}
                         value={draft.monthly_price}
@@ -35601,7 +35714,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                   </div>
 
                   <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <Field label="Subscription notes">
+                    <Field label="Legacy subscription notes">
                       <textarea
                         className={inputClass()}
                         rows={3}
