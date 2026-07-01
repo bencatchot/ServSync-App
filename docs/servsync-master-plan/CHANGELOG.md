@@ -6,6 +6,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-021-backlog-status-cleanup-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Updated the official feature backlog after PR #147 so FB-021 no longer lists contractor reschedule/cancel controls and replacement proposal UX as the current next step.
+- Reason for change: PR #147 merged contractor replacement-window reschedule UI, contractor appointment cancel UI, and compact appointment-state helper copy using existing scheduling RPCs, so the canonical backlog should now track FB-021 as v1 closeout complete enough while keeping richer Activity/history, sandbox-mutating probe completion, and calendar/notification automation as future follow-ups.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation-only cleanup. No app code, tests, SQL/RLS/RPC, Supabase/Vercel/env/settings, deployment, production data, user records, or `marketing-screenshots/` changes.
+  - FB-021 future follow-ups remain durable Activity rows for rescheduled/canceled appointments, richer safe appointment history UI, and a full sandbox-mutating probe run with approved sandbox env.
+
 - Branch: `codex/fb-021-scheduling-closeout-abc-v1`
 - Files changed:
   - `src/App.tsx`
