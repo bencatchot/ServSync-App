@@ -4,6 +4,33 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-01
+
+- Branch: `codex/fb-030-home-access-invite-delivery-enable-contract-v1`
+- Files changed:
+  - `servsync-home-access-invite-delivery-enable-contract.sql`
+  - `tests/e2e/home-access-invite-delivery-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Slice 1H-F-A DB delivery-enable contract for Home Access invite email. The new private `servsync_runtime_settings` table seeds `home_access_invite_email_delivery_enabled` as disabled by default, and the delivery preparation RPC now reads that DB setting before returning `delivery_enabled=true`.
+- Reason for change: The Edge Function requires both its environment flag and a database-side contract to be enabled before provider sending can run; this keeps production disabled by default while allowing a later explicitly approved sandbox provider test.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-home-access-invite-delivery-enable-contract.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-delivery-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/home-access-invite-email-function.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no UI, no Edge Function changes or deployments, no secret changes, no real email/SMS/push delivery, no production SQL, no storage policy changes, no existing homeowner RLS expansion, and no shared access to additional homeowner record surfaces.
+  - Production rollout must leave the runtime setting disabled. Sandbox provider testing still requires a separate approved operator SQL update to enable the setting, plus explicit sandbox Edge Function env/provider enablement.
+  - No service-role setter RPC is included; operator-controlled SQL remains the approved enable/disable path for this slice.
+
 ## 2026-06-30
 
 - Branch: `codex/marketing-inventory-workflow-check-v1`
