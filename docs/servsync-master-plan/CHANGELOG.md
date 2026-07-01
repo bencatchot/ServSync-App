@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-025-job-message-indicators-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/workflow/WorkflowMessageThread.tsx`
+  - `tests/e2e/fb025-job-message-thread-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+- Summary of change: Added FB-025 in-app job-message indicators on existing eligible homeowner request/job-thread and contractor job surfaces. Indicators are derived from deployed `workflow_messages` plus `workflow_thread_reads` read-marker rows, ignore the current user's own messages, and clear after the existing job thread read-marker RPC succeeds.
+- Reason for change: Improve job-centered communication awareness without adding email/SMS/push delivery, broad chat, Activity unread indicators, new Activity event types, request-message migration, or permission changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb025-job-message-thread-ui.spec.ts --project=chromium`
+  - relevant existing security/message tests as reported in the PR package
+- Known risks or follow-ups:
+  - Frontend/test/docs-only slice. No SQL/RLS/RPC/storage/auth/env/settings changes, production data mutation, notification delivery, broad/general chat, contractor cold outreach, attachments/media, request-message migration, new Activity event types, Activity unread indicators, or messaging permission changes.
+  - Later FB-025 work should separately audit broader unread strategy, request-message bridge/migration, estimate/invoice communication, optional attachments, and external notification delivery.
+
 - Branch: `codex/fb-024-price-book-security-tests-v1`
 - Files changed:
   - `tests/e2e/fb024-price-book-quickpick.spec.ts`

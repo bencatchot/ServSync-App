@@ -380,6 +380,67 @@ commit;
   );
 }
 
+function sourceFile(path: string) {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
+
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  expect(startIndex, `source should include start marker ${start}`).toBeGreaterThanOrEqual(0);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex, `source should include end marker ${end}`).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
+test.describe('FB-025 job message indicator source checks', () => {
+  test('loads in-app job message indicators from existing message read markers only', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const indicatorLoader = sourceBetween(
+      appSource,
+      'async function fetchWorkflowJobMessageIndicators',
+      'function appointmentNextActionText',
+    );
+
+    expect(indicatorLoader).toContain(".from('workflow_messages')");
+    expect(indicatorLoader).toContain(".from('workflow_thread_reads')");
+    expect(indicatorLoader).toContain(".eq('context_type', 'job')");
+    expect(indicatorLoader).toContain("message.sender_user_id === currentUserId");
+    expect(indicatorLoader).not.toContain('workflow_activity_events');
+    expect(indicatorLoader).not.toContain('notifications');
+    expect(indicatorLoader).not.toContain('servsync_send_workflow_message');
+    expect(indicatorLoader).not.toContain('servsync_append_workflow_activity_event');
+  });
+
+  test('renders visual job-message indicators without notification or activity-unread claims', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const indicatorUi = sourceBetween(
+      appSource,
+      'function workflowJobMessageIndicatorLabel',
+      'async function fetchWorkflowJobMessageIndicators',
+    );
+
+    expect(appSource).toContain('WorkflowJobMessageIndicatorBadge');
+    expect(appSource).toContain('workflow-job-message-indicator');
+    expect(appSource).toContain('contractor-job-message-indicator');
+    expect(indicatorUi).toContain('New job message');
+    expect(indicatorUi).not.toContain('Activity unread');
+    expect(indicatorUi).not.toContain('Push notification');
+    expect(indicatorUi).not.toContain('SMS notification');
+    expect(indicatorUi).not.toContain('Email notification');
+  });
+
+  test('clears indicators only after the existing workflow read-marker RPC succeeds', () => {
+    const threadSource = sourceFile('src/features/workflow/WorkflowMessageThread.tsx');
+    const markReadSource = sourceBetween(threadSource, 'const markRead = useCallback', 'const loadMessages = useCallback');
+
+    expect(markReadSource).toContain("servsync_mark_workflow_thread_read");
+    expect(markReadSource).toContain("p_context_type: 'job'");
+    expect(markReadSource).toContain('onMarkedRead?.(inspectionId)');
+    expect(markReadSource).toContain('if (!error)');
+    expect(threadSource).toContain('onMarkedRead?: (inspectionId: string) => void');
+  });
+});
+
 test.describe('FB-025 sandbox job message thread UI probes', () => {
   const createdContexts: CreatedContext[] = [];
 

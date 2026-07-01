@@ -120,7 +120,7 @@ Important guardrails:
 | FB-022 | Online Booking / Request-to-Booking Flow | Homeowner service requests, contractor intake, scheduling | Backlog | High | Treat true online/self-booking as later. Use FB-021 as the safer contractor-controlled appointment proposal foundation before any booking workflow. |
 | FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
 | FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists with clearer estimate-line copy and privacy regression coverage. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
-| FB-025 | Job-Centered Communication + Notifications | Messaging, service requests, jobs, invoices, Activity | Started / Partial | High | Workflow message foundations, job message UI, derived/durable Activity timeline writers/readers are merged. Future work includes unread badges, request-message migration, broader estimate/invoice communication, optional attachments, and notification delivery planning. |
+| FB-025 | Job-Centered Communication + Notifications | Messaging, service requests, jobs, invoices, Activity | Started / Partial | High | Workflow message foundations, job message UI, derived/durable Activity timeline writers/readers, and first in-app job-message indicators using existing thread read markers are merged. Future work includes broader unread strategy, request-message migration, broader estimate/invoice communication, optional attachments, and notification delivery planning. |
 | FB-026 | Review + Referral Flow | Discover, contractor profiles, completed jobs, trust | Backlog | High | Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff. No fake ratings, paid ranking, or premature badges. |
 | FB-027 | Contractor Pipeline / Follow-Up Lite | Estimates, requests, reminders, contractor dashboard | Backlog | Medium-High | Design simple follow-up queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests. |
 | FB-028 | Accounting Export Foundation | Invoices, customers, accounting | Later / Future | Medium | Start with export-ready invoice/customer/payment data and CSV-style export before QuickBooks sync. Do not build or market full accounting sync. |
@@ -1071,7 +1071,7 @@ Product area:
 - Notifications
 
 Summary:
-FB-025 now has a workflow-scoped SQL/RLS foundation, job-centered message thread UI, derived Activity timeline display, durable event writers for selected lifecycle RPCs, and durable Activity reader merge. This does not mean broad chat or external delivery is live.
+FB-025 now has a workflow-scoped SQL/RLS foundation, job-centered message thread UI, derived Activity timeline display, durable event writers for selected lifecycle RPCs, durable Activity reader merge, and first in-app job-message indicators backed by existing `workflow_messages` and `workflow_thread_reads` read-marker behavior. This does not mean broad chat, Activity unread indicators, or external delivery is live.
 
 Current guardrails:
 
@@ -1079,9 +1079,10 @@ Current guardrails:
 - Preserve homeowner control.
 - Do not add contractor cold outreach.
 - Do not claim email/SMS/push notification delivery is live.
+- Keep current job-message indicators visual/in-app only; do not expand them into notifications, Activity unread, or permission changes without a separate approved slice.
 
 Current next step:
-Plan unread badges or narrow unread indicators for job messages/workflow updates, then consider request-message bridge strategy and broader estimate/invoice communication.
+Plan broader unread strategy only after beta feedback on job-message indicators, then consider request-message bridge strategy and broader estimate/invoice communication.
 
 ### FB-026 — Review + Referral Flow
 

@@ -25,6 +25,7 @@ type WorkflowMessageThreadProps = {
   canSend: boolean;
   readOnlyReason?: string;
   className?: string;
+  onMarkedRead?: (inspectionId: string) => void;
 };
 
 function senderLabel(message: WorkflowMessageRow, currentUserId: string) {
@@ -43,6 +44,7 @@ export function WorkflowMessageThread({
   canSend,
   readOnlyReason,
   className = '',
+  onMarkedRead,
 }: WorkflowMessageThreadProps) {
   const [messages, setMessages] = useState<WorkflowMessageRow[]>([]);
   const [draft, setDraft] = useState('');
@@ -52,12 +54,13 @@ export function WorkflowMessageThread({
   const [sendError, setSendError] = useState('');
 
   const markRead = useCallback(async () => {
-    await supabaseClient.rpc('servsync_mark_workflow_thread_read', {
+    const { error } = await supabaseClient.rpc('servsync_mark_workflow_thread_read', {
       p_context_type: 'job',
       p_service_request_id: null,
       p_inspection_id: inspectionId,
     });
-  }, [inspectionId, supabaseClient]);
+    if (!error) onMarkedRead?.(inspectionId);
+  }, [inspectionId, onMarkedRead, supabaseClient]);
 
   const loadMessages = useCallback(async () => {
     setLoading(true);
