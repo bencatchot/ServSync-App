@@ -7,6 +7,7 @@ const appSource = () => sourceFile('src/App.tsx');
 const reviewEligibilitySql = () => sourceFile('servsync-review-eligibility.sql');
 const reviewGrantHardeningSql = () => sourceFile('servsync-review-grant-hardening.sql');
 const reviewPublicDisplayPauseSql = () => sourceFile('servsync-review-public-display-pause.sql');
+const reviewModerationFoundationSql = () => sourceFile('servsync-review-moderation-foundation.sql');
 const publicReviewsSql = () => sourceFile('servsync-public-reviews.sql');
 const externalReviewLinksSql = () => sourceFile('servsync-external-review-links.sql');
 
@@ -141,6 +142,73 @@ test.describe('FB-026 review trust boundaries', () => {
     expect(pauseSql).not.toContain('moderation_status');
     expect(pauseSql).not.toContain('moderated_at');
     expect(pauseSql).not.toContain('hidden_reason');
+  });
+
+  test('review moderation foundation defaults reviews to pending without public display re-enable', () => {
+    const sql = reviewModerationFoundationSql();
+    const pauseSql = reviewPublicDisplayPauseSql();
+
+    expect(sql).toContain('FB-026 Slice 3B-1: review moderation SQL/RPC foundation.');
+    expect(sql).toContain("add column if not exists moderation_status text not null default 'pending'");
+    expect(sql).toContain('add column if not exists moderated_at timestamptz null');
+    expect(sql).toContain('add column if not exists moderated_by uuid null references public.profiles(id)');
+    expect(sql).toContain("add column if not exists moderation_note text not null default ''");
+    expect(sql).toContain('add column if not exists updated_at timestamptz not null default now()');
+    expect(sql).toContain("check (moderation_status in ('pending', 'approved', 'hidden', 'rejected'))");
+    expect(sql).not.toContain("moderation_status = 'approved'");
+    expect(sql).toContain('from public.service_request_reviews rv');
+
+    expect(pauseSql).toContain("'avg_rating',             null::numeric");
+    expect(pauseSql).toContain("'review_count',           0::bigint");
+    expect(pauseSql).toContain("'reviews',                '[]'::jsonb");
+    expect(pauseSql).not.toContain('from public.service_request_reviews');
+  });
+
+  test('homeowner review submit resets moderation fields to pending on submit and resubmit', () => {
+    const sql = reviewModerationFoundationSql();
+    const submitSource = sourceBetween(
+      sql,
+      'create or replace function public.servsync_homeowner_submit_review',
+      'create or replace function public.servsync_admin_review_moderation_queue',
+    );
+
+    expect(submitSource).toContain("moderation_status,\n    moderated_at,\n    moderated_by,\n    moderation_note,\n    updated_at");
+    expect(submitSource).toContain("'pending',\n    null,\n    null,\n    '',\n    now()");
+    expect(submitSource).toContain("moderation_status = 'pending'");
+    expect(submitSource).toContain('moderated_at = null');
+    expect(submitSource).toContain('moderated_by = null');
+    expect(submitSource).toContain("moderation_note = ''");
+    expect(submitSource).toContain('updated_at = now()');
+    expect(submitSource).toContain('servsync_service_request_has_completed_work');
+    expect(submitSource).toContain("sr.status = 'closed'");
+    expect(submitSource).toContain('sr.homeowner_user_id = auth.uid()');
+  });
+
+  test('admin moderation RPCs are guarded and do not create public display, dispute, or UI scope', () => {
+    const sql = reviewModerationFoundationSql();
+
+    expect(sql).toContain('create or replace function public.servsync_admin_review_moderation_queue');
+    expect(sql).toContain('create or replace function public.servsync_admin_update_review_moderation');
+    expect(sql.match(/if not public\.current_user_is_platform_admin\(\) then/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(sql).toContain("raise exception 'Unauthorized'");
+    expect(sql).toContain("p_status not in ('pending', 'approved', 'hidden', 'rejected')");
+    expect(sql).toContain('revoke all privileges on table public.service_request_reviews from public;');
+    expect(sql).toContain('revoke all privileges on table public.service_request_reviews from anon;');
+    expect(sql).toContain('revoke all privileges on table public.service_request_reviews from authenticated;');
+    expect(sql).toContain('grant execute on function public.servsync_admin_review_moderation_queue(text)');
+    expect(sql).toContain('grant execute on function public.servsync_admin_update_review_moderation(uuid, text, text)');
+
+    for (const outOfScope of [
+      'create table',
+      'contractor_dispute',
+      'review_response',
+      'google',
+      'badge',
+      'award',
+      'ranking',
+    ]) {
+      expect(sql.toLowerCase()).not.toContain(outOfScope);
+    }
   });
 
   test('review eligibility SQL ties reviews to completed ServSync work and blocks contractor authorship', () => {

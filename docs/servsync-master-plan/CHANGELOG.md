@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-026-review-moderation-foundation-v1`
+- Files changed:
+  - `servsync-review-moderation-foundation.sql`
+  - `tests/e2e/fb026-review-trust-boundaries.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/MARKETING_PRODUCT_INVENTORY.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the FB-026 Slice 3B-1 review moderation SQL/RPC foundation. The new SQL patch adds pending moderation fields to `service_request_reviews`, resets homeowner-submitted or resubmitted reviews to pending moderation, and adds guarded platform-admin backend RPCs for manual/off-app review moderation while keeping public ServSync review display paused.
+- Reason for change: ServSync needs a real moderation boundary before public ServSync review averages, counts, kudos, snippets, reviewer names, or locations can be safely re-enabled.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - sandbox SQL apply/idempotency for `servsync-review-moderation-foundation.sql` against sandbox `zpzdkoaubyjtsomccxya`
+  - read-only sandbox verification confirming moderation columns, admin moderation RPC grants, and continued paused public review payloads
+- Known risks or follow-ups:
+  - Production SQL is not applied in this implementation pass; `servsync-review-moderation-foundation.sql` requires separate production rollout approval after review/merge.
+  - Expanded RLS/privacy local run is blocked because ignored `.env.test.local` is missing `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; run it once approved sandbox env is available.
+  - No admin moderation UI, approved-only public display, contractor dispute/report flow, homeowner edit/delete flow, contractor review responses, badges, awards, Discover ranking change, paid ranking, Google review automation, referral/recommendation product expansion, email/SMS/push review requests, payment, billing, accounting, recurring maintenance, notification delivery, production data mutation, or deploy work is included.
+  - Existing homeowner review form copy still references optional name/location as shown publicly; since public ServSync review display remains paused, a later frontend-copy polish slice should align that wording with moderation status before broader beta exposure.
+
 - Branch: `codex/fb-026-pause-public-review-display-v1`
 - Files changed:
   - `servsync-review-public-display-pause.sql`
