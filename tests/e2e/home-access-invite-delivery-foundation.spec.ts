@@ -8,6 +8,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 
 const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
+const DELIVERY_SETTING_KEY = 'home_access_invite_email_delivery_enabled';
 
 type CredentialKey = Parameters<typeof credentialsFor>[0];
 type AuthenticatedClient = {
@@ -21,6 +22,17 @@ type CatalogResponse<T> = {
 };
 type CountRow = {
   count: number;
+};
+type RuntimeSettingRow = {
+  setting_key: string;
+  enabled: boolean;
+  rls_enabled: boolean;
+  public_select: boolean;
+  anon_select: boolean;
+  authenticated_select: boolean;
+  authenticated_insert: boolean;
+  authenticated_update: boolean;
+  authenticated_delete: boolean;
 };
 type InviteRow = {
   id: string;
@@ -136,6 +148,53 @@ function runLinkedSandboxJson<T>(sql: string): T[] {
 
   const parsed = JSON.parse(output.slice(jsonStart, jsonEnd + 1)) as CatalogResponse<T>;
   return parsed.rows ?? [];
+}
+
+function setDeliverySetting(enabled: boolean) {
+  runLinkedSandboxSql(`
+insert into public.servsync_runtime_settings (
+  setting_key,
+  enabled,
+  updated_at,
+  notes
+) values (
+  ${textLiteral(DELIVERY_SETTING_KEY)},
+  ${enabled ? 'true' : 'false'},
+  now(),
+  'Sandbox delivery foundation test setting'
+)
+on conflict (setting_key) do update
+   set enabled = excluded.enabled,
+       updated_at = now(),
+       notes = excluded.notes;
+`);
+}
+
+function deleteDeliverySetting() {
+  runLinkedSandboxSql(`
+delete from public.servsync_runtime_settings
+ where setting_key = ${textLiteral(DELIVERY_SETTING_KEY)};
+`);
+}
+
+function runtimeSettingRows() {
+  return runLinkedSandboxJson<RuntimeSettingRow>(`
+select
+  s.setting_key,
+  s.enabled,
+  c.relrowsecurity as rls_enabled,
+  has_table_privilege('public', c.oid, 'SELECT') as public_select,
+  has_table_privilege('anon', c.oid, 'SELECT') as anon_select,
+  has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,
+  has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,
+  has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,
+  has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete
+from public.servsync_runtime_settings s
+join pg_class c
+  on c.relname = 'servsync_runtime_settings'
+ and c.relnamespace = 'public'::regnamespace
+where s.setting_key = ${textLiteral(DELIVERY_SETTING_KEY)};
+`);
 }
 
 async function signInAs(key: CredentialKey): Promise<AuthenticatedClient> {
@@ -343,14 +402,78 @@ where id = ${uuidLiteral(inviteId)};
 `);
 }
 
+function expectSanitizedDeliveryPayload(prepared: PreparePayload) {
+  const keys = Object.keys(prepared);
+  const serialized = JSON.stringify(prepared).toLowerCase();
+
+  expect(keys).not.toContain('address_line1');
+  expect(keys).not.toContain('address_line2');
+  expect(keys).not.toContain('zip_code');
+  expect(keys).not.toContain('target_user_id');
+  expect(keys).not.toContain('account_exists');
+  expect(keys).not.toContain('service_requests');
+  expect(serialized).not.toContain('address_line1');
+  expect(serialized).not.toContain('zip_code');
+  expect(serialized).not.toContain('service_request');
+  expect(serialized).not.toContain('reminder');
+  expect(serialized).not.toContain('contractor');
+  expect(serialized).not.toContain('invoice');
+  expect(serialized).not.toContain('document');
+  expect(serialized).not.toContain('message');
+  expect(serialized).not.toContain('storage');
+  expect(serialized).not.toContain('home_history');
+  expect(serialized).not.toContain('account_exists');
+}
+
 test.describe('sandbox home access invite delivery foundation', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeAll(() => {
     requireApprovedSandboxForMutation();
     requireSandboxSupabaseConfig();
     requireLinkedSandbox();
   });
 
+  test.afterEach(() => {
+    setDeliverySetting(false);
+  });
+
+  test('runtime delivery setting defaults disabled and is not browser-accessible', async () => {
+    setDeliverySetting(false);
+    const rows = runtimeSettingRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.setting_key).toBe(DELIVERY_SETTING_KEY);
+    expect(rows[0]?.enabled).toBe(false);
+    expect(rows[0]?.rls_enabled).toBe(true);
+    expect(rows[0]?.public_select).toBe(false);
+    expect(rows[0]?.anon_select).toBe(false);
+    expect(rows[0]?.authenticated_select).toBe(false);
+    expect(rows[0]?.authenticated_insert).toBe(false);
+    expect(rows[0]?.authenticated_update).toBe(false);
+    expect(rows[0]?.authenticated_delete).toBe(false);
+
+    const homeowner = await signInAs('homeowner');
+    const accounts = [homeowner];
+
+    try {
+      const readAttempt = await homeowner.client.from('servsync_runtime_settings').select('setting_key').limit(1);
+      expect(readAttempt.error, 'runtime settings should not be browser-readable').not.toBeNull();
+
+      const writeAttempt = await homeowner.client
+        .from('servsync_runtime_settings')
+        .insert({ setting_key: 'browser_write_probe', enabled: true });
+      expect(writeAttempt.error, 'runtime settings should not be browser-writable').not.toBeNull();
+    } finally {
+      runLinkedSandboxSql(`
+delete from public.servsync_runtime_settings
+ where setting_key = 'browser_write_probe';
+`);
+      await signOutAll(accounts);
+    }
+  });
+
   test('owner-created invites default to 30-day expiry and prepare returns disabled sanitized payload', async () => {
+    setDeliverySetting(false);
     const homeowner = await signInAs('homeowner');
     const accounts = [homeowner];
     const inviteEmail = uniqueEmail('owner');
@@ -379,10 +502,7 @@ test.describe('sandbox home access invite delivery foundation', () => {
       expect(prepared.role).toBe('viewer');
       expect(prepared.route_hint).toBe('home-access-invite');
       expect(prepared.home_display_label).toBeTruthy();
-      expect(Object.keys(prepared)).not.toContain('address_line1');
-      expect(Object.keys(prepared)).not.toContain('zip_code');
-      expect(Object.keys(prepared)).not.toContain('target_user_id');
-      expect(Object.keys(prepared)).not.toContain('service_requests');
+      expectSanitizedDeliveryPayload(prepared);
 
       const row = inviteRows(invite.id)[0];
       expect(row.delivery_status).toBe('disabled');
@@ -413,7 +533,83 @@ select count(*)::int as count
     }
   });
 
+  test('prepare returns enabled sanitized payload only when the DB setting is enabled', async () => {
+    setDeliverySetting(true);
+    const homeowner = await signInAs('homeowner');
+    const accounts = [homeowner];
+    const inviteEmail = uniqueEmail('enabled');
+
+    try {
+      const homeId = await firstHomeId(homeowner, 'Homeowner A');
+      cleanupDeliveryInviteArtifacts(homeId, [inviteEmail]);
+
+      const invite = await createEmailInvite(homeowner, homeId, inviteEmail, 'member');
+      const prepared = await prepareDelivery(homeowner, invite.id);
+      expect(prepared.delivery_enabled).toBe(true);
+      expect(prepared.delivery_status).toBe('not_sent');
+      expect(prepared.delivery_attempt_count).toBe(1);
+      expect(prepared.invite_id).toBe(invite.id);
+      expect(prepared.home_id).toBe(homeId);
+      expect(prepared.role).toBe('member');
+      expectSanitizedDeliveryPayload(prepared);
+
+      const row = inviteRows(invite.id)[0];
+      expect(row.status).toBe('pending');
+      expect(row.delivery_status).toBe('not_sent');
+      expect(row.delivery_attempt_count).toBe(1);
+      expect(row.last_delivery_attempt_at).toBeTruthy();
+      expect(row.last_delivery_error_code).toBeNull();
+      expect(row.last_sent_at).toBeNull();
+      expect(row.provider_message_id).toBeNull();
+
+      const auditRows = runLinkedSandboxJson<CountRow>(`
+select count(*)::int as count
+  from public.home_membership_audit_events
+ where home_id = ${uuidLiteral(homeId)}
+   and event_type = 'email_invite_delivery_prepared'
+   and metadata ->> 'email_invite_id' = ${textLiteral(invite.id)}
+   and metadata ->> 'delivery_enabled' = 'true'
+   and metadata ->> 'delivery_status' = 'not_sent';
+`);
+      expect(auditRows[0]?.count).toBe(1);
+    } finally {
+      const homeId = await firstHomeId(homeowner, 'Homeowner A');
+      cleanupDeliveryInviteArtifacts(homeId, [inviteEmail]);
+      await signOutAll(accounts);
+    }
+  });
+
+  test('missing delivery setting row fails closed to disabled delivery', async () => {
+    deleteDeliverySetting();
+    const homeowner = await signInAs('homeowner');
+    const accounts = [homeowner];
+    const inviteEmail = uniqueEmail('missing-setting');
+
+    try {
+      const homeId = await firstHomeId(homeowner, 'Homeowner A');
+      cleanupDeliveryInviteArtifacts(homeId, [inviteEmail]);
+
+      const invite = await createEmailInvite(homeowner, homeId, inviteEmail, 'viewer');
+      const prepared = await prepareDelivery(homeowner, invite.id);
+      expect(prepared.delivery_enabled).toBe(false);
+      expect(prepared.delivery_status).toBe('disabled');
+      expectSanitizedDeliveryPayload(prepared);
+
+      const row = inviteRows(invite.id)[0];
+      expect(row.status).toBe('pending');
+      expect(row.delivery_status).toBe('disabled');
+      expect(row.last_delivery_error_code).toBe('delivery_disabled');
+      expect(row.provider_message_id).toBeNull();
+    } finally {
+      setDeliverySetting(false);
+      const homeId = await firstHomeId(homeowner, 'Homeowner A');
+      cleanupDeliveryInviteArtifacts(homeId, [inviteEmail]);
+      await signOutAll(accounts);
+    }
+  });
+
   test('admin can prepare delivery for non-admin invites, but member/viewer/unrelated/contractor users cannot', async () => {
+    setDeliverySetting(false);
     const homeowner = await signInAs('homeowner');
     const homeownerB = await signInAs('homeownerB');
     const contractor = await signInAs('contractor');
@@ -508,6 +704,7 @@ select count(*)::int as count
   });
 
   test('prepare rejects expired and non-pending email invites', async () => {
+    setDeliverySetting(false);
     const homeowner = await signInAs('homeowner');
     const homeownerB = await signInAs('homeownerB');
     const accounts = [homeowner, homeownerB];
@@ -559,6 +756,7 @@ select count(*)::int as count
   });
 
   test('record delivery result is unavailable to browser roles and updates only delivery metadata internally', async () => {
+    setDeliverySetting(false);
     const homeowner = await signInAs('homeowner');
     const accounts = [homeowner];
     const inviteEmail = uniqueEmail('record');
@@ -574,7 +772,7 @@ select count(*)::int as count
         {
           p_invite_id: invite.id,
           p_delivery_status: 'sent',
-          p_provider_message_id: 'provider-secretish-id',
+          p_provider_message_id: 'provider-placeholder-id',
           p_error_code: null,
         },
         'authenticated browser role should not execute internal delivery result RPC',
