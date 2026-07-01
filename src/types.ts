@@ -3,6 +3,8 @@ export type UserRole = 'homeowner' | 'contractor' | 'platform_admin';
 export type ConnectionStatus = 'pending' | 'active' | 'declined' | 'revoked' | 'dismissed';
 export type ContractorAccountStatus = 'active' | 'inactive' | 'paused';
 export type ContractorSubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'paused' | 'canceled' | 'unpaid';
+export type ContractorBillingStatus = 'none' | 'beta_free' | 'trialing' | 'active' | 'past_due' | 'grace_period' | 'limited' | 'canceled' | 'comped' | 'manual_review';
+export type ContractorAccessMode = 'none' | 'full_beta' | 'full_paid' | 'founder' | 'read_only' | 'limited' | 'suspended';
 export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
 export type ReferralRewardStatus = 'not_eligible' | 'pending_review' | 'approved' | 'denied' | 'paid';
 export type UniversalReferralStatus = 'pending' | 'signed_up' | 'qualified' | 'reward_approved' | 'reward_paid' | 'rejected';
@@ -399,6 +401,29 @@ export interface ContractorProfile {
   permanent_invite_code: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ContractorEntitlements {
+  contractor_id: string | null;
+  billing_status: ContractorBillingStatus | string;
+  current_plan: string;
+  access_mode: ContractorAccessMode | string;
+  subscription_required_after: string | null;
+  grace_period_ends_at: string | null;
+  can_use_workspace: boolean;
+  can_create_service_requests_for_local_customers: boolean;
+  can_create_estimates: boolean;
+  can_send_estimates: boolean;
+  can_create_jobs: boolean;
+  can_create_invoices: boolean;
+  can_send_invoices: boolean;
+  can_use_discover_profile: boolean;
+  can_accept_new_connections: boolean;
+  can_use_ai_features: boolean;
+  can_invite_team_members: boolean;
+  max_team_seats: number;
+  max_storage_mb: number;
+  read_only_reason: string;
 }
 
 export interface ContractorServiceArea {

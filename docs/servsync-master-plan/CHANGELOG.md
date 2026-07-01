@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/contractor-entitlement-load-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/contractor-entitlement-loading.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a load-only contractor entitlement frontend foundation. The contractor dashboard now calls `servsync_current_contractor_entitlements(...)` after a contractor profile resolves, stores typed entitlement state in a local hook, and falls back to full beta access while loading or on RPC failure.
+- Reason for change: ServSync needs a safe frontend consumption layer for future contractor subscription readiness before any paid-plan enforcement or Stripe work is approved.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file secret scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-entitlement-loading.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-admin-visibility.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no entitlement enforcement, disabled contractor actions, paywalls, billing UI, checkout, payment collection, Stripe activation, SQL, production or sandbox data mutation, provider secret changes, environment changes, homeowner billing changes, or manual deployment.
+  - Future slices should add non-blocking labels first, then read-only disabled-state support behind explicit approval before any paid-plan enforcement.
+  - Marketing inventory reviewed; no update needed because this is internal subscription-readiness plumbing and does not change public feature claims.
+
 - Branch: `codex/contractor-billing-admin-visibility-v1`
 - Files changed:
   - `servsync-contractor-billing-admin-visibility.sql`
