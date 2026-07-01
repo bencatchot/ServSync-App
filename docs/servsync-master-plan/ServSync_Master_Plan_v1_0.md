@@ -53,6 +53,8 @@ The first commercial focus should stay on solo and small contractors. These user
 | Beta pricing direction | 30-day free trial, likely $20/mo premium after beta, possible $5/mo basic Discover/communication tier |
 | Most evolving workflow | Job workflow based on beta user feedback |
 
+FB-031 contractor beta billing-readiness adds a database-only foundation for tracking contractor beta/free/founder/future billing entitlement state separately from public contractor profile data. Existing beta contractors remain free with full beta access by default, homeowners remain outside contractor billing, and Stripe checkout, payment collection, credit-card requirements, UI enforcement, and live subscription activation remain future work until explicitly approved.
+
 # 2. Product Vision
 
 ServSync should become the organized service relationship layer between homeowners and local contractors. The homeowner should not have to chase scattered Facebook comments, text threads, old PDFs, and forgotten invoices. The contractor should not have to jump between manual estimates, messages, spreadsheets, paper notes, and one-off invoices. ServSync should give both sides a shared structure for work.
@@ -394,6 +396,7 @@ These items need more founder input or beta learning before they can be finalize
 | How does Basic vs Premium differ exactly? | $5 Basic Discover/communication, $20 Premium full tools is the current thought. | Define exact feature gates before Stripe. |
 | What homeowner features can be monetized? | Storage limits/add-ons possible later. | Do not monetize too early if it slows homeowner growth. |
 | How deep should team tools go? | Per-user pricing later; enterprise/team workflow later. | Do not build enterprise product too early. |
+| How should beta contractor billing readiness be tracked? | A DB-only contractor billing account and entitlement contract should track beta/free/founder/future status while preserving current free beta access. | Do not activate Stripe checkout, charging, UI blocking, or production billing enforcement until separately approved. |
 | Should general messaging be before or after connection? | Connection request message before; general thread after connection. | Confirm in design phase. |
 | Should contractor call tracking be prioritized? | No-priority backlog for calls made/received outside the app. | Revisit only after beta proves a strong workflow need. |
 

@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/contractor-billing-readiness-v1`
+- Files changed:
+  - `servsync-contractor-billing-readiness.sql`
+  - `tests/e2e/contractor-billing-readiness.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a DB-only contractor beta billing-readiness foundation. The new private `contractor_billing_accounts` table tracks beta/free/founder/future billing state separately from public contractor profile data, backfills existing contractors as `beta_free` / `full_beta`, and adds centralized entitlement RPCs for future plan-aware access decisions.
+- Reason for change: Contractor beta users are currently free, but ServSync needs clean entitlement tracking before later paid subscription, founder pricing, limited/read-only, or Stripe integration work.
+- Tests/checks run:
+  - Sandbox SQL apply for `servsync-contractor-billing-readiness.sql` on sandbox ref `zpzdkoaubyjtsomccxya`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/contractor-billing-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - This slice adds no Stripe checkout, no billing UI, no charging, no credit-card requirement, no production SQL, no deployment, no secret changes, no homeowner billing, and no frontend enforcement.
+  - Existing `contractor_profiles` subscription and Stripe prep fields remain in place for compatibility; the new billing account table should become the canonical entitlement source in a later UI/admin/Stripe slice.
+  - Future implementation should wire contractor UI to the centralized entitlement RPC before any paid-plan enforcement, and should keep existing records readable if an account later enters read-only or limited access.
+
 - Branch: `codex/fb-030-home-access-invite-delivery-enable-contract-v1`
 - Files changed:
   - `servsync-home-access-invite-delivery-enable-contract.sql`
