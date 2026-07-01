@@ -6,6 +6,20 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/workflow-report-review-not-roadblock-v1`
+- Files changed:
+  - `docs/CODEX_WORKFLOW_TEMPLATE.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Clarified the ServSync ChatGPT <-> Codex workflow so a complete, self-verified Builder Mode implementation report should lead to decision-level ChatGPT review and the next proceed prompt unless a specific concern exists.
+- Reason for change: Avoid redundant broad verification loops after approved Builder Mode work while preserving Codex self-checking, focused verification for concrete concerns, post-merge verification, and hard gates for merges, production deploys, SQL/RLS/RPC/storage/auth/permissions/env/settings changes, production data/user-record changes, and scope expansion.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation-only workflow clarification. No app code, SQL, Supabase function, package, env/config, test, deployment, production data, settings, or `marketing-screenshots/` changes.
+
 - Branch: `codex/fb-011-mobile-workflow-polish-v1`
 - Files changed:
   - `src/App.tsx`
