@@ -1,6 +1,8 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-06-21
+Last updated: 2026-07-01
+
+Last reconciled through PR #145 / merge commit `4ef3be8`.
 
 ## Purpose
 
@@ -48,13 +50,16 @@ Homeowner request
 Important guardrails:
 
 - Do not claim payments/Stripe checkout are live.
+- Do not claim billing enforcement, paywalls, checkout, charging, or paid contractor subscriptions are live.
 - Do not claim QuickBooks/accounting sync is live.
 - Do not claim push notifications are live unless confirmed.
 - Do not claim email/text reminder automation is live.
+- Do not claim Home Access invite email delivery is live in production; current production delivery remains disabled unless a later approved enablement says otherwise.
 - Do not claim automatic/recurring reminders are live.
 - Do not claim native iOS/Android apps are live.
 - Do not claim full external calendar sync is live.
 - Do not claim broad public marketplace lead generation is live.
+- Do not claim paid Discover rankings or pay-to-play marketplace placement are live or planned.
 - Do not claim advanced analytics/admin reporting is live.
 - Do not claim enterprise dispatch/routing is live.
 - Do not claim contractor verification/background checks are live.
@@ -104,13 +109,24 @@ Important guardrails:
 | FB-011A | Backlog-Aware Partial Invoicing | Jobs, work items, invoices, backlog closeout | Job Summary Badges In Progress | High | Phase 1 adds SQL/type/test foundation for durable job work items, invoice line linkage, backlog snapshots, and a guarded partial-invoice RPC. Phase 2A wires durable work items into contractor job detail when rows exist, creates draft invoices from selected completed/priced items, and displays backlog snapshots separately on contractor/homeowner invoice views and PDFs. Phase 2B-1 seeds durable work items from accepted estimate lines. Phase 2B-2 syncs simple service `Work Items` tasks into durable source-backed work items. Phase 2C-1 adds contractor-created manual work items with safe unbilled-only edit/remove rules. The guardrail slice keeps whole-job invoicing available for legacy/no-work-item jobs while steering work-item-backed jobs to item-based invoicing and adding SQL protection against bypassing durable work-item billing safety. The current frontend-only UX slice adds derived contractor job badges/counts for ready-to-invoice, price-required, backlog-open, partially invoiced, fully invoiced, and no-billable-item states without adding new persisted job statuses. Broad legacy backfill, general inspection finding conversion, homeowner-facing job summaries, and broader closeout UI remain future approval-gated slices. |
 | FB-012 | Push Notifications | Notifications, mobile, workflow events | Later / Future | Medium | Do not claim live unless confirmed; revisit after stable core workflows. |
 | FB-013 | QuickBooks / Accounting Integration | Accounting, invoices, integrations | Later / Future | Medium | Research later after invoice/payment workflow stabilizes. |
-| FB-014 | Payments / Stripe | Payments, invoices | Later / Future | Medium | Revisit after invoice workflow is tested. |
+| FB-014 | Payments / Stripe | Payments, invoices | Later / Future | Medium | Keep payments/Stripe future-facing despite FB-031 billing-readiness work; revisit only after invoice reliability, pricing, legal/ops, and Stripe rollout plans are approved. |
 | FB-015 | Native Mobile Apps | iOS/Android, field workflow | Later / Future | Medium | Validate responsive web first; evaluate Capacitor vs React Native/Expo later. |
 | FB-016 | PDF / Storage Strategy Audit | Storage, PDFs, media, records | Backlog | Medium | Future technical audit. |
-| FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Refine tiers and feature gating after live-feature inventory is confirmed. |
+| FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Use FB-031 entitlement readiness as planning input, but do not imply billing, paywalls, checkout, or Stripe are active. |
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
 | FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Completed / Functional | High | v1 is complete: schema foundation and RPC/conversion preservation are merged and applied to sandbox/production; app/UI labor support and Build Estimate Draft labor cleanup are merged and passing preview. |
-| FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Backlog | High | Cross-cutting readiness program before broader beta/public go-live; includes deployed RLS/storage verification, backup/restore runbooks, retention/export/cancellation policy, immutable record strategy, pagination/scale hardening, dependency security triage, and security test expansion. |
+| FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Major Progress / Backlog | High | Continue as an umbrella readiness program. Public smoke, security catalog, credential readiness, backup/restore templates, artifact guardrails, and restore-drill planning have advanced; production smoke credentials/records and an executed restore drill remain open. |
+| FB-021 | Scheduling + Appointment Confirmation Foundation | Scheduling, service requests, jobs, homeowner visibility | Partially Completed / Follow-up Backlog | High | Core foundation, read display, and first action UI are merged. Next: contractor reschedule/cancel controls and replacement proposal UX, while keeping calendar sync, dispatch/routing, GPS, email/SMS/push reminders, and homeowner-forced booking out of scope. |
+| FB-022 | Online Booking / Request-to-Booking Flow | Homeowner service requests, contractor intake, scheduling | Backlog | High | Treat true online/self-booking as later. Use FB-021 as the safer contractor-controlled appointment proposal foundation before any booking workflow. |
+| FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
+| FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
+| FB-025 | Job-Centered Communication + Notifications | Messaging, service requests, jobs, invoices, Activity | Started / Partial | High | Workflow message foundations, job message UI, derived/durable Activity timeline writers/readers are merged. Future work includes unread badges, request-message migration, broader estimate/invoice communication, optional attachments, and notification delivery planning. |
+| FB-026 | Review + Referral Flow | Discover, contractor profiles, completed jobs, trust | Backlog | High | Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff. No fake ratings, paid ranking, or premature badges. |
+| FB-027 | Contractor Pipeline / Follow-Up Lite | Estimates, requests, reminders, contractor dashboard | Backlog | Medium-High | Design simple follow-up queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests. |
+| FB-028 | Accounting Export Foundation | Invoices, customers, accounting | Later / Future | Medium | Start with export-ready invoice/customer/payment data and CSV-style export before QuickBooks sync. Do not build or market full accounting sync. |
+| FB-029 | Recurring Maintenance / Service Plan Lite | Home reminders, contractor recurring work, homeowner relationships | Later / Future | Medium | Shape after reminders, scheduling, invoices, and Home History are stronger. Start with manual recurring opportunities, not complex memberships or automated reminder delivery. |
+| FB-030 | Shared Home / Home Access | Homeowner access, shared homes, invites, reminders, permissions | Started / Guarded Partial | High | Home membership foundations, shared-home shells, shared reminder shells, invite UI, disabled email function deployment, and DB delivery-enable contract are merged/applied. Production invite email delivery remains disabled; shared record access expands only one approved surface at a time. |
+| FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
 
 ## Detailed feature notes
 
@@ -893,7 +909,7 @@ Estimate Labor Model v1 is complete. Future work should be optional regression h
 
 ### FB-020 — Security, Records Reliability, Backup/Restore, and Scale Readiness
 
-Status: Backlog
+Status: Major Progress / Backlog
 
 Priority: High
 
@@ -918,6 +934,14 @@ Audit findings to preserve:
 - Existing foundations include browser-safe Supabase client usage, RLS foundation, private home document bucket design, private media storage policies, signed URL display paths, RLS/storage tests, sign-out local storage cleanup, and duplicate prevention for invoice-to-Home-History filing.
 - Gaps include deployed-state verification, SECURITY DEFINER/RPC authorization audit, backup/restore runbooks, storage-object backup strategy, dependency audit vulnerabilities, public-media guardrails, orphan/broken storage-object handling, unpaginated growing lists, and immutable/auditable record snapshots.
 
+Progress through PR #145:
+
+- Public production smoke and smoke-readiness docs exist.
+- Security catalog coverage and selected RPC grant hardening have expanded.
+- Production smoke credential readiness checks exist, but approved production smoke credentials/records remain a separate operational gate.
+- Backup/restore ledger templates, backup artifact gitignore guardrails, restore-drill preflight planning, and a non-production restore drill operator checklist exist.
+- Authenticated production smoke remains read-only and gated on approved safe credentials/records.
+
 Recommended future implementation sequence:
 
 1. Documentation/policy decisions.
@@ -934,15 +958,271 @@ Guardrails:
 - Keep controlled private beta, broader beta, public go-live, and paid subscription readiness as separate gates.
 
 Current next step:
-Use FB-020 as the umbrella readiness workstream before broader beta/public go-live. Start with no-code policy/runbook decisions and test-only hardening before any SQL/RLS/storage/settings changes.
+Use FB-020 as the umbrella readiness workstream before broader beta/public go-live. Next operational readiness work should focus on approved production smoke credentials/records and a non-production restore drill before claiming broader readiness complete.
+
+### FB-021 — Scheduling + Appointment Confirmation Foundation
+
+Status: Partially Completed / Follow-up Backlog
+
+Priority: High
+
+Product area:
+
+- Scheduling
+- Service requests
+- Contractor-proposed appointment windows
+- Homeowner appointment confirmation
+- Calendar/request visibility
+
+Summary:
+FB-021 was added from the competition-gap review as the safer near-term alternative to full contractor auto-scheduling. The implemented slices add a SQL/RPC/RLS foundation for appointment windows and history, read-only request-card display for confirmed/pending appointment context, and first action UI where contractors can propose 1-3 windows and homeowners can accept or decline them.
+
+Current guardrails:
+
+- Contractor remains in control of proposed windows.
+- Homeowner can accept/decline proposed windows but cannot force a contractor booking.
+- No Google/Outlook calendar sync.
+- No dispatch/routing/GPS.
+- No email/SMS/push reminder automation.
+
+Current next step:
+Plan a narrow follow-up for contractor reschedule/cancel controls, replacement proposal UX, and safe appointment status history display.
+
+### FB-022 — Online Booking / Request-to-Booking Flow
+
+Status: Backlog
+
+Priority: High
+
+Product area:
+
+- Homeowner requests
+- Contractor intake
+- Scheduling
+- Booking strategy
+
+Summary:
+True online booking is not live. FB-021 covers the safer appointment proposal/confirmation foundation, but self-service booking and broader request-to-booking automation remain future work.
+
+Current next step:
+Revisit after FB-021 reschedule/cancel and contractor-controlled availability are stable. Any future booking slice must preserve contractor control and avoid homeowner-forced bookings.
+
+### FB-023 — Contractor Payment Collection / Deposits
+
+Status: Later / Future
+
+Priority: High
+
+Product area:
+
+- Invoices
+- Estimates
+- Payments
+- Deposits and receipts
+
+Summary:
+Contractor payment collection, deposits, card/ACH handling, receipts, and payment reminders are not live. Existing billing-readiness work under FB-031 is entitlement/planning infrastructure only and does not activate Stripe, checkout, payment collection, billing enforcement, or paywalls.
+
+Current next step:
+Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe rollout plans are approved.
+
+### FB-024 — Price Book / Estimate Item Library Maturity
+
+Status: Started / Partial
+
+Priority: High
+
+Product area:
+
+- Estimates
+- Saved charges
+- Contractor-owned Price Book
+- Trade libraries and reusable assemblies
+
+Summary:
+Price Book quick-pick support exists in the estimate composer. Contractors can search active private Price Book items and copy safe item data into normal editable estimate lines. Broader maturity remains future.
+
+Future directions:
+
+- Default quantity behavior.
+- Taxable/category handling.
+- Assemblies and job bundles.
+- Margin/profit reminders.
+- Invoice quick-pick wiring.
+- Role-access decisions for internal pricing metadata.
+
+Current next step:
+Audit one narrow maturity slice instead of expanding the whole library system at once.
+
+### FB-025 — Job-Centered Communication + Notifications
+
+Status: Started / Partial
+
+Priority: High
+
+Product area:
+
+- Workflow messages
+- Jobs
+- Service requests
+- Activity timeline
+- Notifications
+
+Summary:
+FB-025 now has a workflow-scoped SQL/RLS foundation, job-centered message thread UI, derived Activity timeline display, durable event writers for selected lifecycle RPCs, and durable Activity reader merge. This does not mean broad chat or external delivery is live.
+
+Current guardrails:
+
+- Keep communication tied to eligible workflow contexts.
+- Preserve homeowner control.
+- Do not add contractor cold outreach.
+- Do not claim email/SMS/push notification delivery is live.
+
+Current next step:
+Plan unread badges or narrow unread indicators for job messages/workflow updates, then consider request-message bridge strategy and broader estimate/invoice communication.
+
+### FB-026 — Review + Referral Flow
+
+Status: Backlog
+
+Priority: High
+
+Product area:
+
+- Discover
+- Contractor profiles
+- Completed jobs
+- Trust/referrals
+
+Summary:
+ServSync needs trust-building flows, but reviews/referrals are not implemented as a complete product surface. This should avoid fake ratings, paid ranking, pay-to-play placement, or premature badges.
+
+Current next step:
+Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff.
+
+### FB-027 — Contractor Pipeline / Follow-Up Lite
+
+Status: Backlog
+
+Priority: Medium-High
+
+Product area:
+
+- Contractor dashboard
+- Requests
+- Estimates
+- Jobs
+- Invoices
+- Follow-up queues
+
+Summary:
+Contractors need simple visibility into what needs follow-up, but a dedicated pipeline/follow-up lite feature is not yet built. Activity timeline work can inform this but does not replace it.
+
+Current next step:
+Design queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests.
+
+### FB-028 — Accounting Export Foundation
+
+Status: Later / Future
+
+Priority: Medium
+
+Product area:
+
+- Invoices
+- Customers
+- Accounting/export
+
+Summary:
+QuickBooks/accounting sync is not live. A safer future step is export-ready invoice/customer/payment data and CSV-style export before any full accounting integration.
+
+Current next step:
+Revisit after invoice reliability and manual payment status workflows are stable.
+
+### FB-029 — Recurring Maintenance / Service Plan Lite
+
+Status: Later / Future
+
+Priority: Medium
+
+Product area:
+
+- Home reminders
+- Contractor recurring work
+- Homeowner relationships
+- Service plans
+
+Summary:
+Recurring maintenance/service plan support is future work. Current Home Reminders are manual and in-app only; no recurring reminders, scheduler automation, email/text/push delivery, or service-plan membership automation is live.
+
+Current next step:
+Shape manual recurring maintenance opportunities after reminders, scheduling, invoices, and Home History are stronger.
+
+### FB-030 — Shared Home / Home Access
+
+Status: Started / Guarded Partial
+
+Priority: High
+
+Product area:
+
+- Homeowner home sharing
+- Home memberships
+- Home Access invites
+- Shared-home shells
+- Shared reminder shells
+- Email delivery readiness
+
+Summary:
+FB-030 adds the controlled foundation for shared homeowner/home access. Completed slices include home membership tables/RPCs, pending email invite foundations, homeowner Home Access UI, read-only shared-home shells, address-aware shared-home shells, read-only shared reminder shells, a Home Access invite email function scaffold, disabled sandbox/production deployments, disabled UI send wiring, and a DB runtime setting contract for future invite email enablement.
+
+Current guardrails:
+
+- Production Home Access invite email delivery remains disabled unless a later approved enablement says otherwise.
+- Shared homes stay out of owner selectors.
+- Shared record access expands one approved surface at a time.
+- Service requests, estimates, invoices, jobs, documents, messages, storage, and broader Home History are not broadly shared by default.
+- No email/SMS/push delivery should be claimed live from disabled infrastructure.
+
+Current next step:
+Choose the next shared-record surface deliberately, or plan controlled production invite-email enablement separately with explicit provider/secrets/send approval.
+
+### FB-031 — Contractor Beta Billing-Readiness / Entitlement Readiness
+
+Status: Started / Readiness Only
+
+Priority: High
+
+Product area:
+
+- Contractor beta/free billing state
+- Founder/future subscription readiness
+- Entitlement RPCs
+- Platform-admin billing visibility
+- Contractor dashboard entitlement consumption
+
+Summary:
+FB-031 adds contractor billing-readiness infrastructure without activating billing. Production has `contractor_billing_accounts`, existing contractor backfill as beta/free, future contractor-profile insert trigger, entitlement RPCs, read-only platform-admin visibility, contractor dashboard entitlement loading, non-blocking labels, and limited UI support for future read-only states.
+
+Current guardrails:
+
+- Beta contractors remain free.
+- Homeowners remain free and outside contractor billing.
+- Stripe checkout, billing portal, payment collection, charging, credit-card requirements, paywalls, and production billing enforcement are not live.
+- Contractor entitlement labels are informational.
+- Limited read-only UI support is not paid-plan enforcement and does not hide existing records.
+- Backend/RPC enforcement and editable billing controls remain future separately approved slices.
+
+Current next step:
+Plan any next billing-readiness slice as either admin/readiness polish or a strictly approved backend enforcement audit. Do not start Stripe/payment work without a separate product, legal/ops, and rollout approval.
 
 ## Current next recommended focus
 
-1. FB-020 security, records reliability, backup/restore, storage, and scale readiness.
-2. Estimate/mobile workflow polish.
-3. Trade-Specific Estimate / Pre-Visit Checklists.
-4. Discover Feed Strategy later.
-5. Contractor Reports later after workflow statuses are reliable.
+1. FB-021 scheduling closeout audit for contractor reschedule/cancel and replacement proposal UX.
+2. FB-020 operational readiness: approved production smoke credentials/records and a non-production restore drill.
+3. FB-024 Price Book maturity, one narrow slice at a time.
+4. FB-025 unread indicators or scoped communication/Activity follow-up.
+5. FB-026 review/referral flow audit after core request-to-job confidence improves.
 
 ## Update rules
 
