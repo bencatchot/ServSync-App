@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-024-price-book-quickpick-clarity-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb024-price-book-quickpick.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-024 Slice 2 Price Book quick-pick clarity and privacy regression coverage. The estimate composer now states that Price Book items add as editable estimate lines, quantity starts at 1, contractors should review quantity/price/scope before sending, internal notes stay private, and taxable/category metadata remains Price Book metadata for now.
+- Reason for change: Improve contractor confidence and mobile scanability around the existing Price Book quick-pick without changing schema, estimate/invoice lifecycle behavior, homeowner visibility, role access, or billing behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb024-price-book-quickpick.spec.ts --project=chromium`
+  - relevant existing estimate/mobile/security tests as reported in the PR package
+- Known risks or follow-ups:
+  - Frontend/test/docs-only slice. No SQL/RLS/RPC/schema/auth/storage/env/settings changes, production data mutation, invoice Price Book quick-pick, assemblies/job bundles, taxable/category propagation, `default_quantity`, AI pricing, role-access redesign, or billing/paywall behavior.
+  - Future FB-024 work should continue one narrow slice at a time with separate approval for schema, invoice, taxable/category, bundle, or role-access changes.
+
 - Branch: `codex/fb-011-mobile-workflow-polish-v1`
 - Files changed:
   - `src/App.tsx`

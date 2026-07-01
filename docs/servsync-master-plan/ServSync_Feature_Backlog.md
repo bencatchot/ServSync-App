@@ -119,7 +119,7 @@ Important guardrails:
 | FB-021 | Scheduling + Appointment Confirmation Foundation | Scheduling, service requests, jobs, homeowner visibility | v1 Closeout Complete / Follow-up Backlog | High | v1 now covers the SQL/RPC/RLS foundation, read display, contractor 1-3 window proposals, homeowner accept/decline, confirmed appointment visibility, contractor replacement reschedule, contractor appointment cancel, and compact appointment-state helper copy. Future follow-ups should focus on durable Activity rows for rescheduled/canceled appointments, richer safe history UI, and a full sandbox-mutating probe run with approved sandbox env, while keeping calendar sync, dispatch/routing, GPS, email/SMS/push reminders, notification delivery, and homeowner-forced booking out of scope. |
 | FB-022 | Online Booking / Request-to-Booking Flow | Homeowner service requests, contractor intake, scheduling | Backlog | High | Treat true online/self-booking as later. Use FB-021 as the safer contractor-controlled appointment proposal foundation before any booking workflow. |
 | FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
-| FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
+| FB-024 | Price Book / Estimate Item Library Maturity | Estimates, saved charges, trade libraries, contractor pricing | Started / Partial | High | Price Book quick-pick exists with clearer estimate-line copy and privacy regression coverage. Future maturity includes default quantity, taxable/category handling, assemblies/job bundles, margin reminders, invoice quick-pick wiring, and role-access decisions for internal pricing metadata. |
 | FB-025 | Job-Centered Communication + Notifications | Messaging, service requests, jobs, invoices, Activity | Started / Partial | High | Workflow message foundations, job message UI, derived/durable Activity timeline writers/readers are merged. Future work includes unread badges, request-message migration, broader estimate/invoice communication, optional attachments, and notification delivery planning. |
 | FB-026 | Review + Referral Flow | Discover, contractor profiles, completed jobs, trust | Backlog | High | Audit post-completion review requests, contractor profile review display, homeowner recommendation/referral behavior, and optional Google review handoff. No fake ratings, paid ranking, or premature badges. |
 | FB-027 | Contractor Pipeline / Follow-Up Lite | Estimates, requests, reminders, contractor dashboard | Backlog | Medium-High | Design simple follow-up queues for open requests, stale estimates, accepted estimates needing jobs, completed jobs needing invoices, unpaid invoices, and review requests. |
@@ -1042,7 +1042,7 @@ Product area:
 - Trade libraries and reusable assemblies
 
 Summary:
-Price Book quick-pick support exists in the estimate composer. Contractors can search active private Price Book items and copy safe item data into normal editable estimate lines. Broader maturity remains future.
+Price Book quick-pick support exists in the estimate composer. Contractors can search active private Price Book items and copy safe item data into normal editable estimate lines. Recent polish clarifies that quantity starts at 1, price/scope should be reviewed, internal notes stay private, and taxable/category metadata remains Price Book metadata for now. Broader maturity remains future.
 
 Future directions:
 
@@ -1054,7 +1054,7 @@ Future directions:
 - Role-access decisions for internal pricing metadata.
 
 Current next step:
-Audit one narrow maturity slice instead of expanding the whole library system at once.
+Continue with one narrow maturity slice at a time. Do not expand into invoice quick-pick, default quantity schema, taxable/category propagation, assemblies/job bundles, or role-access redesign without a separate audit and approval.
 
 ### FB-025 — Job-Centered Communication + Notifications
 
