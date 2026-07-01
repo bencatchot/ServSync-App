@@ -84,13 +84,13 @@ export function WorkflowActivityTimeline({
   const visibleEvents = showAll ? normalizedEvents : normalizedEvents.slice(0, INITIAL_EVENT_COUNT);
 
   return (
-    <section data-testid="workflow-activity-timeline" className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section data-testid="workflow-activity-timeline" className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${className}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-bold text-slate-950">{title}</h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
         </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">System updates</span>
+        <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">System updates</span>
       </div>
 
       <div className="mt-4 space-y-2">

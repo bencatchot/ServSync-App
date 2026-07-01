@@ -6754,6 +6754,14 @@ function buttonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary') {
   return 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078FF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#005FD6]';
 }
 
+function mobileActionRowClass(className = '') {
+  return ['flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center', className].filter(Boolean).join(' ');
+}
+
+function mobileButtonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary') {
+  return `${buttonClass(kind)} w-full sm:w-auto`;
+}
+
 function RoleWalkthroughCard({
   eyebrow,
   steps,
@@ -7586,7 +7594,7 @@ function ContractorEntitlementStatusPanel({ state }: { state: ContractorEntitlem
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">Informational only</span>
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Entitlement status is informational during beta. Stripe billing is not active. No contractor actions are blocked by this status during beta.
+              Informational during beta. Stripe billing is not active, beta contractors remain free, and this status does not block contractor actions.
             </p>
             {error && (
               <p className="mt-2 text-xs font-semibold text-amber-700">
@@ -12365,7 +12373,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
           <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">{formatMoney(invoice.total_cents)}</p>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className={`mt-3 ${mobileActionRowClass()}`}>
           <button
             type="button"
             onClick={() => {
@@ -12373,7 +12381,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               void viewHomeownerInvoice(invoice);
             }}
             disabled={updatingInvoiceId === invoice.id}
-            className={buttonClass(isOpen ? 'secondary' : 'primary')}
+            className={mobileButtonClass(isOpen ? 'secondary' : 'primary')}
           >
             <Receipt size={16} />
             {updatingInvoiceId === invoice.id ? 'Opening...' : isOpen ? 'Hide Details' : 'View Invoice'}
@@ -12390,7 +12398,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               customerAddress: home?.address_line1 || '',
               serviceLabel: home?.nickname || home?.address_line1 || '',
             }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
-            className={buttonClass('secondary')}
+            className={mobileButtonClass('secondary')}
           >
             <Download size={16} />
             Download PDF
@@ -12403,7 +12411,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 setHomeownerMaintenancePropertyScope(invoice.home_id ? 'all' : 'unassigned');
                 setHomeownerTab('log');
               }}
-              className={buttonClass('secondary')}
+              className={mobileButtonClass('secondary')}
             >
               <ClipboardList size={16} />
               View Home History
@@ -12417,7 +12425,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               disabled={filingInvoiceId === invoice.id || invoiceFiled}
               data-testid="homeowner-file-invoice-to-home-history"
               aria-label={`${invoiceFiled ? 'Filed invoice in Home History' : 'File invoice to Home History'}: ${invoice.title || 'Invoice'}`}
-              className={buttonClass(invoiceFiled ? 'secondary' : 'primary')}
+              className={mobileButtonClass(invoiceFiled ? 'secondary' : 'primary')}
             >
               <ClipboardList size={16} />
               {invoiceFiled ? 'Filed to Home History' : filingInvoiceId === invoice.id ? 'Filing...' : 'File to Home History'}
@@ -13402,12 +13410,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {invite.expires_at ? ` · Expires ${formatDateTime(invite.expires_at)}` : ''}
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className={mobileActionRowClass()}>
                         <button
                           type="button"
                           onClick={() => void respondToMyHomeAccessEmailInvite(invite, 'accept')}
                           disabled={updatingHomeAccessInviteId === invite.id}
-                          className={buttonClass('primary')}
+                          className={mobileButtonClass('primary')}
                         >
                           <CheckCircle2 size={16} />
                           {updatingHomeAccessInviteId === invite.id ? 'Updating...' : 'Accept'}
@@ -13416,7 +13424,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           type="button"
                           onClick={() => void respondToMyHomeAccessEmailInvite(invite, 'decline')}
                           disabled={updatingHomeAccessInviteId === invite.id}
-                          className={buttonClass('secondary')}
+                          className={mobileButtonClass('secondary')}
                         >
                           Decline
                         </button>
@@ -13465,7 +13473,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                               type="button"
                               onClick={() => void revokeHomeMembership(membership)}
                               disabled={revokingHomeMembershipId === membership.id}
-                              className={buttonClass('danger')}
+                              className={mobileButtonClass('danger')}
                             >
                               <X size={16} />
                               {revokingHomeMembershipId === membership.id ? 'Removing...' : 'Remove access'}
@@ -13522,7 +13530,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       type="button"
                       onClick={() => void createHomeAccessEmailInvite()}
                       disabled={savingHomeAccessInvite}
-                      className={buttonClass('primary')}
+                      className={mobileButtonClass('primary')}
                     >
                       <Mail size={16} />
                       {savingHomeAccessInvite ? 'Creating...' : 'Create invite'}
@@ -13559,7 +13567,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         type="button"
                         onClick={() => void revokeHomeAccessEmailInvite(invite)}
                         disabled={updatingHomeAccessInviteId === invite.id}
-                        className={buttonClass('danger')}
+                        className={mobileButtonClass('danger')}
                       >
                         <X size={16} />
                         {updatingHomeAccessInviteId === invite.id ? 'Revoking...' : 'Revoke invite'}
@@ -14991,7 +14999,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 type="button"
                                 onClick={() => void dismissConnection(connection)}
                                 disabled={isDismissing}
-                                className={buttonClass('secondary')}
+                                className={mobileButtonClass('secondary')}
                               >
                                 <X size={16} />
                                 {isDismissing ? 'Hiding...' : 'Hide from My Contractors'}
@@ -15639,7 +15647,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </div>
                                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Connected</span>
                               </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className={`mt-3 ${mobileActionRowClass()}`}>
                                 {matchesSelectedType && serviceRequestDraft.category && (
                                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
                                     Matches {serviceRequestDraft.category}
@@ -16033,7 +16041,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <button
                       type="button"
                       onClick={() => setServiceRequestDraft(current => ({ ...current, description: serviceProblemText }))}
-                      className={buttonClass('secondary')}
+                      className={mobileButtonClass('secondary')}
                     >
                       Use original wording
                     </button>
@@ -16070,13 +16078,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900">
                       After you send this, the contractor can reply, schedule a visit, send an estimate, create the job, and send an invoice when the work is ready to bill.
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setRequestComposerStep('contractor')} className={buttonClass('secondary')}>Back</button>
+                    <div className={mobileActionRowClass()}>
+                      <button type="button" onClick={() => setRequestComposerStep('contractor')} className={mobileButtonClass('secondary')}>Back</button>
                       <button
                         type="button"
                         onClick={() => void createServiceRequest()}
                         disabled={savingServiceRequest || !serviceRequestDraft.connection_id}
-                        className={buttonClass('primary')}
+                        className={mobileButtonClass('primary')}
                       >
                         {savingServiceRequest ? 'Sending...' : 'Send Request'}
                       </button>
@@ -16133,7 +16141,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     onClick={() => setExpandedRequestIds(prev => { const n = new Set(prev); n.has(request.id) ? n.delete(request.id) : n.add(request.id); return n; })}
                     className="w-full text-left px-4 py-3.5 transition-colors hover:bg-slate-50"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-slate-950">{request.title}</span>
@@ -16156,12 +16164,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <p className="mt-1 text-sm text-slate-500 line-clamp-1 italic">"{lastMessage.body}"</p>
                         )}
                       </div>
-                      <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      <ChevronDown size={16} className={`shrink-0 self-end text-slate-400 transition-transform sm:self-start ${isExpanded ? 'rotate-180' : ''}`} />
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-slate-200 px-4 pb-4 pt-4 space-y-4">
+                    <div className="space-y-3 border-t border-slate-200 px-3 pb-4 pt-4 sm:space-y-4 sm:px-4">
                       {isClosedCard && request.closing_summary && (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                           <p className="mb-1 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
@@ -16223,19 +16231,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                         />
                                       </Field>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                      <button type="button" className={buttonClass('primary')}
+                                    <div className={mobileActionRowClass()}>
+                                      <button type="button" className={mobileButtonClass('primary')}
                                         disabled={!homeownerRescheduleDrafts[request.id]?.proposedAt || homeownerReschedulingId === request.id}
                                         onClick={() => void rescheduleAsHomeowner(request)}
                                       >{homeownerReschedulingId === request.id ? 'Sending...' : 'Send reschedule request'}</button>
-                                      <button type="button" className={buttonClass('secondary')}
+                                      <button type="button" className={mobileButtonClass('secondary')}
                                         disabled={homeownerReschedulingId === request.id}
                                         onClick={() => setHomeownerRescheduleDrafts(c => ({ ...c, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
                                       >Cancel</button>
                                     </div>
                                   </div>
                                 ) : (
-                                  <button type="button" className={buttonClass('secondary')}
+                                  <button type="button" className={mobileButtonClass('secondary')}
                                     onClick={() => setHomeownerRescheduleDrafts(c => ({ ...c, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
                                   >
                                     <Calendar size={15} />
@@ -16261,28 +16269,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                           />
                                         </Field>
                                       </div>
-                                      <div className="flex flex-wrap gap-2">
-                                        <button type="button" className={buttonClass('primary')}
+                                      <div className={mobileActionRowClass()}>
+                                        <button type="button" className={mobileButtonClass('primary')}
                                           disabled={!counterProposeDrafts[request.id]?.proposedAt || updatingAppointmentRequestId === request.id}
                                           onClick={() => void respondToAppointment(request, 'counter', counterProposeDrafts[request.id]?.proposedAt, counterProposeDrafts[request.id]?.notes)}
                                         >{updatingAppointmentRequestId === request.id ? 'Sending...' : 'Send counter-proposal'}</button>
-                                        <button type="button" className={buttonClass('secondary')}
+                                        <button type="button" className={mobileButtonClass('secondary')}
                                           disabled={updatingAppointmentRequestId === request.id}
                                           onClick={() => setCounterProposeDrafts(c => ({ ...c, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
                                         >Cancel</button>
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="flex flex-wrap gap-2">
-                                      <button type="button" className={buttonClass('primary')}
+                                    <div className={mobileActionRowClass()}>
+                                      <button type="button" className={mobileButtonClass('primary')}
                                         disabled={updatingAppointmentRequestId === request.id}
                                         onClick={() => void respondToAppointment(request, 'confirm')}
                                       ><CheckCircle2 size={16} />{updatingAppointmentRequestId === request.id ? 'Updating...' : 'Confirm appointment'}</button>
-                                      <button type="button" className={buttonClass('secondary')}
+                                      <button type="button" className={mobileButtonClass('secondary')}
                                         disabled={updatingAppointmentRequestId === request.id}
                                         onClick={() => setCounterProposeDrafts(c => ({ ...c, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
                                       >Propose new time</button>
-                                      <button type="button" className={buttonClass('secondary')}
+                                      <button type="button" className={mobileButtonClass('secondary')}
                                         disabled={updatingAppointmentRequestId === request.id}
                                         onClick={() => void respondToAppointment(request, 'decline')}
                                       >Decline</button>
@@ -16341,11 +16349,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 </ul>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'reply')} disabled={isUpdating} className={buttonClass('primary')}>
+                            <div className={mobileActionRowClass()}>
+                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'reply')} disabled={isUpdating} className={mobileButtonClass('primary')}>
                                 {isUpdating ? 'Sending...' : 'Send reply'}
                               </button>
-                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'close')} disabled={isUpdating} className={buttonClass('secondary')}>
+                              <button type="button" onClick={() => void updateHomeownerServiceRequest(request, 'close')} disabled={isUpdating} className={mobileButtonClass('secondary')}>
                                 Close request
                               </button>
                             </div>
@@ -16427,18 +16435,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   />
                                 </Field>
                               </div>
-                              <div className="flex flex-wrap gap-2">
-                                <button type="button" className={buttonClass('primary')}
+                              <div className={mobileActionRowClass()}>
+                                <button type="button" className={mobileButtonClass('primary')}
                                   disabled={!reviewDrafts[request.id]?.rating || submittingReviewId === request.id}
                                   onClick={() => void submitReview(request)}
                                 ><Star size={15} />{submittingReviewId === request.id ? 'Submitting...' : 'Submit review'}</button>
-                                <button type="button" className={buttonClass('secondary')}
+                                <button type="button" className={mobileButtonClass('secondary')}
                                   onClick={() => setReviewDrafts(prev => ({ ...prev, [request.id]: { ...prev[request.id], open: false } }))}
                                 >Cancel</button>
                               </div>
                             </div>
                           ) : canLeaveReview ? (
-                            <button type="button" className={buttonClass('secondary')}
+                            <button type="button" className={mobileButtonClass('secondary')}
                               onClick={() => setReviewDrafts(prev => ({ ...prev, [request.id]: { open: true, rating: 0, kudos: [], body: '', displayName: '', location: '' } }))}
                             ><Star size={15} />Leave a review</button>
                           ) : null}
@@ -16468,15 +16476,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                     onChange={e => setLogDraft(d => ({ ...d, notes: e.target.value }))}
                                   />
                                 </Field>
-                                <div className="flex flex-wrap gap-2">
-                                  <button type="button" className={buttonClass('primary')} disabled={savingLogEntry} onClick={() => void saveLogEntry()}>
+                                <div className={mobileActionRowClass()}>
+                                  <button type="button" className={mobileButtonClass('primary')} disabled={savingLogEntry} onClick={() => void saveLogEntry()}>
                                     <ClipboardList size={15} />{savingLogEntry ? 'Saving...' : 'Save to Home History'}
                                   </button>
-                                  <button type="button" className={buttonClass('secondary')} onClick={() => setQuickLogDrafts(p => ({ ...p, [request.id]: false }))}>Cancel</button>
+                                  <button type="button" className={mobileButtonClass('secondary')} onClick={() => setQuickLogDrafts(p => ({ ...p, [request.id]: false }))}>Cancel</button>
                                 </div>
                               </div>
                             ) : (
-                              <button type="button" className={buttonClass('secondary')}
+                              <button type="button" className={mobileButtonClass('secondary')}
                                 onClick={() => {
                                   setLogDraft({
                                     service_request_id: request.id,
@@ -16507,17 +16515,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   placeholder="Describe what needs follow-up..."
                                 />
                               </Field>
-                              <div className="flex flex-wrap gap-2">
-                                <button type="button" className={buttonClass('primary')} disabled={reopeningRequestId === request.id} onClick={() => void reopenRequest(request)}>
+                              <div className={mobileActionRowClass()}>
+                                <button type="button" className={mobileButtonClass('primary')} disabled={reopeningRequestId === request.id} onClick={() => void reopenRequest(request)}>
                                   <RotateCcw size={15} />{reopeningRequestId === request.id ? 'Reopening...' : 'Reopen request'}
                                 </button>
-                                <button type="button" className={buttonClass('secondary')} disabled={reopeningRequestId === request.id}
+                                <button type="button" className={mobileButtonClass('secondary')} disabled={reopeningRequestId === request.id}
                                   onClick={() => setReopenDrafts(c => ({ ...c, [request.id]: { open: false, body: '' } }))}
                                 >Cancel</button>
                               </div>
                             </div>
                           ) : (
-                            <button type="button" className={buttonClass('secondary')}
+                            <button type="button" className={mobileButtonClass('secondary')}
                               onClick={() => setReopenDrafts(c => ({ ...c, [request.id]: { open: true, body: '' } }))}
                             ><RotateCcw size={15} />Reopen for follow-up</button>
                           )}
@@ -16955,7 +16963,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   type="button"
                                   disabled={updatingHomeReminderId === reminder.id}
                                   onClick={() => void updateHomeReminderStatus(reminder, 'completed')}
-                                  className={buttonClass('secondary')}
+                                  className={mobileButtonClass('secondary')}
                                 >
                                   <CheckCircle2 size={15} />Complete
                                 </button>
@@ -20916,7 +20924,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               onClick={() => addSavedChargeToEstimateDraft(charge)}
               className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-950">{charge.name}</p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -20927,7 +20935,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     Default {Number(charge.default_quantity || 1)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')}
                   </p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white">
+                <span className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white sm:w-auto">
                   <Plus size={13} />
                   Add
                 </span>
@@ -20998,7 +21006,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <button
                       type="button"
                       onClick={() => addPriceBookItemToEstimateDraft(item)}
-                      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                      className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 sm:w-auto"
                     >
                       <Plus size={13} />
                       Add
@@ -26056,11 +26064,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   </button>
 
                   {requestConnection && !['closed', 'declined'].includes(request.status) && (
-                    <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className={`${mobileActionRowClass()} border-t border-slate-200 bg-slate-50 px-3 py-3 sm:px-4`}>
                       <button
                         type="button"
                         onClick={toggleInlineRequest}
-                        className={buttonClass('secondary')}
+                        className={mobileButtonClass('secondary')}
                       >
                         Review / respond
                       </button>
@@ -26079,7 +26087,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         }}
                         data-testid={linkedRequestEstimate ? 'contractor-open-estimate-from-request' : 'contractor-create-estimate-from-request'}
                         aria-label={`${linkedRequestEstimate ? 'Open estimate' : 'Create estimate'} for ${request.title}`}
-                        className={buttonClass('primary')}
+                        className={mobileButtonClass('primary')}
                       >
                         <FileText size={15} />
                         {linkedRequestEstimate ? 'Open Estimate' : 'Create Estimate'}
@@ -26099,7 +26107,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             templateSource: 'blank',
                           });
                         }}
-                        className={buttonClass('secondary')}
+                        className={mobileButtonClass('secondary')}
                       >
                         <ClipboardCheck size={15} />
                         {activeRequestVisit ? 'View service visit' : 'Create service visit'}
@@ -26108,7 +26116,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   )}
 
                   {isExpanded && (
-                    <div className="border-t border-slate-200 bg-slate-50 px-4 pb-4 pt-4">
+                    <div className="space-y-3 border-t border-slate-200 bg-slate-50 px-3 pb-4 pt-4 sm:space-y-4 sm:px-4">
                       {!requestConnection && (
                         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                           <p className="text-sm font-semibold text-amber-950">Homeowner connection not loaded</p>
@@ -26117,7 +26125,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </p>
                         </div>
                       )}
-                      <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
                         {request.description || 'No request description provided.'}
                       </p>
                       <details className="mt-4" open>
@@ -26154,7 +26162,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       )}
                       {canProposeAppointmentWindows && (
                         <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3" data-testid="contractor-appointment-window-proposal">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                               <p className="text-sm font-bold text-slate-950">Propose visit times</p>
                               <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -26164,7 +26172,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {!appointmentWindowDraft.open && (
                               <button
                                 type="button"
-                                className={buttonClass('secondary')}
+                                className={mobileButtonClass('secondary')}
                                 data-testid="contractor-propose-appointment-windows-toggle"
                                 onClick={() => setContractorAppointmentWindowDrafts(current => ({
                                   ...current,
@@ -26254,11 +26262,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </p>
                               )}
 
-                              <div className="flex flex-wrap gap-2">
+                              <div className={mobileActionRowClass()}>
                                 {appointmentWindowDraft.windows.length < 3 && (
                                   <button
                                     type="button"
-                                    className={buttonClass('secondary')}
+                                    className={mobileButtonClass('secondary')}
                                     data-testid="contractor-add-appointment-window"
                                     onClick={() => setContractorAppointmentWindowDrafts(current => {
                                       const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
@@ -26278,7 +26286,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 )}
                                 <button
                                   type="button"
-                                  className={buttonClass('primary')}
+                                  className={mobileButtonClass('primary')}
                                   data-testid="contractor-submit-appointment-windows"
                                   disabled={proposingAppointmentWindowsRequestId === request.id}
                                   onClick={() => void proposeAppointmentWindows(request)}
@@ -26287,7 +26295,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </button>
                                 <button
                                   type="button"
-                                  className={buttonClass('secondary')}
+                                  className={mobileButtonClass('secondary')}
                                   disabled={proposingAppointmentWindowsRequestId === request.id}
                                   onClick={() => setContractorAppointmentWindowDrafts(current => ({
                                     ...current,
@@ -26325,10 +26333,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       />
                                     </Field>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className={mobileActionRowClass()}>
                                     <button
                                       type="button"
-                                      className={buttonClass('primary')}
+                                      className={mobileButtonClass('primary')}
                                       disabled={!contractorCounterProposeDrafts[request.id]?.proposedAt || respondingToHomeownerApptId === request.id}
                                       onClick={() => void respondToHomeownerAppointment(request, 'counter', contractorCounterProposeDrafts[request.id]?.proposedAt, contractorCounterProposeDrafts[request.id]?.notes)}
                                     >
@@ -26336,7 +26344,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </button>
                                     <button
                                       type="button"
-                                      className={buttonClass('secondary')}
+                                      className={mobileButtonClass('secondary')}
                                       disabled={respondingToHomeownerApptId === request.id}
                                       onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }))}
                                     >
@@ -26345,10 +26353,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </div>
                                 </div>
                               ) : (
-                                <div className="flex flex-wrap gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                                <div className={`${mobileActionRowClass()} rounded-xl border border-blue-200 bg-blue-50 p-3`}>
                                   <button
                                     type="button"
-                                    className={buttonClass('primary')}
+                                    className={mobileButtonClass('primary')}
                                     disabled={respondingToHomeownerApptId === request.id}
                                     onClick={() => void respondToHomeownerAppointment(request, 'confirm')}
                                   >
@@ -26357,7 +26365,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    className={buttonClass('secondary')}
+                                    className={mobileButtonClass('secondary')}
                                     disabled={respondingToHomeownerApptId === request.id}
                                     onClick={() => setContractorCounterProposeDrafts(current => ({ ...current, [request.id]: { open: true, proposedAt: '', notes: '' } }))}
                                   >
@@ -26365,7 +26373,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                   <button
                                     type="button"
-                                    className={buttonClass('secondary')}
+                                    className={mobileButtonClass('secondary')}
                                     disabled={respondingToHomeownerApptId === request.id}
                                     onClick={() => void respondToHomeownerAppointment(request, 'decline')}
                                   >
@@ -26474,11 +26482,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </p>
                                     )}
 
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className={mobileActionRowClass()}>
                                       {contractorRescheduleDraft.windows.length < 3 && (
                                         <button
                                           type="button"
-                                          className={buttonClass('secondary')}
+                                          className={mobileButtonClass('secondary')}
                                           data-testid="contractor-add-reschedule-window"
                                           onClick={() => setContractorRescheduleDrafts(current => {
                                             const draft = current[request.id] ?? createBlankContractorAppointmentWindowDraft(true);
@@ -26498,7 +26506,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       )}
                                       <button
                                         type="button"
-                                        className={buttonClass('primary')}
+                                        className={mobileButtonClass('primary')}
                                         data-testid="contractor-submit-reschedule-windows"
                                         disabled={contractorReschedulingId === request.id}
                                         onClick={() => void rescheduleAsContractor(request)}
@@ -26507,7 +26515,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                       <button
                                         type="button"
-                                        className={buttonClass('secondary')}
+                                        className={mobileButtonClass('secondary')}
                                         disabled={contractorReschedulingId === request.id}
                                         onClick={() => setContractorRescheduleDrafts(current => ({
                                           ...current,
@@ -26521,10 +26529,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className={mobileActionRowClass()}>
                                     <button
                                       type="button"
-                                      className={buttonClass('primary')}
+                                      className={mobileButtonClass('primary')}
                                       onClick={() => void completeAppointment(request)}
                                       disabled={proposingAppointmentId === request.id}
                                     >
@@ -26533,7 +26541,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </button>
                                     <button
                                       type="button"
-                                      className={buttonClass('secondary')}
+                                      className={mobileButtonClass('secondary')}
                                       data-testid="contractor-reschedule-appointment-toggle"
                                       onClick={() => setContractorRescheduleDrafts(current => ({ ...current, [request.id]: createBlankContractorAppointmentWindowDraft(true) }))}
                                     >
@@ -26542,7 +26550,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </button>
                                     <button
                                       type="button"
-                                      className={buttonClass('secondary')}
+                                      className={mobileButtonClass('secondary')}
                                       data-testid="contractor-cancel-appointment-toggle"
                                       onClick={() => setContractorCancelAppointmentDrafts(current => ({ ...current, [request.id]: { open: true, reason: '' } }))}
                                     >
@@ -26570,10 +26578,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           }))}
                                         />
                                       </Field>
-                                      <div className="flex flex-wrap gap-2">
+                                      <div className={mobileActionRowClass()}>
                                         <button
                                           type="button"
-                                          className={buttonClass('danger')}
+                                          className={mobileButtonClass('danger')}
                                           data-testid="contractor-submit-cancel-appointment"
                                           disabled={contractorCancellingAppointmentId === request.id}
                                           onClick={() => void cancelAppointmentAsContractor(request)}
@@ -26582,7 +26590,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </button>
                                         <button
                                           type="button"
-                                          className={buttonClass('secondary')}
+                                          className={mobileButtonClass('secondary')}
                                           disabled={contractorCancellingAppointmentId === request.id}
                                           onClick={() => setContractorCancelAppointmentDrafts(current => ({
                                             ...current,
@@ -26689,10 +26697,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   placeholder="Describe the work completed, parts used, next steps, etc."
                                 />
                               </Field>
-                              <div className="flex flex-wrap gap-2">
+                              <div className={mobileActionRowClass()}>
                                 <button
                                   type="button"
-                                  className={buttonClass('primary')}
+                                  className={mobileButtonClass('primary')}
                                   disabled={isUpdating}
                                   onClick={() => void updateContractorServiceRequest(request, 'close')}
                                 >
@@ -26700,7 +26708,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </button>
                                 <button
                                   type="button"
-                                  className={buttonClass('secondary')}
+                                  className={mobileButtonClass('secondary')}
                                   disabled={isUpdating}
                                   onClick={() => setClosingExpandedId(null)}
                                 >
@@ -26710,12 +26718,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           )}
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className={mobileActionRowClass()}>
                             <button
                               type="button"
                               onClick={() => void updateContractorServiceRequest(request, 'respond')}
                               disabled={isUpdating}
-                              className={buttonClass('primary')}
+                              className={mobileButtonClass('primary')}
                             >
                               {isUpdating ? 'Sending...' : 'Send response'}
                             </button>
@@ -26723,7 +26731,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               type="button"
                               onClick={() => void updateContractorServiceRequest(request, 'decline')}
                               disabled={isUpdating}
-                              className={buttonClass('secondary')}
+                              className={mobileButtonClass('secondary')}
                             >
                               Decline
                             </button>
@@ -26732,7 +26740,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 type="button"
                                 onClick={() => setClosingExpandedId(request.id)}
                                 disabled={isUpdating}
-                                className={buttonClass('secondary')}
+                                className={mobileButtonClass('secondary')}
                               >
                                 Close
                               </button>
@@ -26777,10 +26785,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   placeholder="Describe what needs follow-up..."
                                 />
                               </Field>
-                              <div className="flex flex-wrap gap-2">
+                              <div className={mobileActionRowClass()}>
                                 <button
                                   type="button"
-                                  className={buttonClass('primary')}
+                                  className={mobileButtonClass('primary')}
                                   disabled={contractorReopeningRequestId === request.id}
                                   onClick={() => void reopenContractorRequest(request)}
                                 >
@@ -26789,7 +26797,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </button>
                                 <button
                                   type="button"
-                                  className={buttonClass('secondary')}
+                                  className={mobileButtonClass('secondary')}
                                   disabled={contractorReopeningRequestId === request.id}
                                   onClick={() => setContractorReopenDrafts(current => ({ ...current, [request.id]: { open: false, body: '' } }))}
                                 >
@@ -26800,7 +26808,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           ) : (
                             <button
                               type="button"
-                              className={buttonClass('secondary')}
+                              className={mobileButtonClass('secondary')}
                               onClick={() => setContractorReopenDrafts(current => ({ ...current, [request.id]: { open: true, body: '' } }))}
                             >
                               <RotateCcw size={15} />
@@ -28323,7 +28331,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const canRevoke = proposal.status === 'pending';
                                 return (
                                   <div key={proposal.id} data-testid="connected-property-proposal-card" className="rounded-xl border border-slate-200 bg-white p-4">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                       <div className="min-w-0">
                                         <p className="break-words text-sm font-bold text-slate-950">{label}</p>
                                         <p className="mt-1 break-words text-xs font-semibold text-slate-500">{address || 'Address not included'}</p>
@@ -30921,7 +30929,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <InvoiceBacklogSection invoice={invoice} compact />
                                       </div>
                                     )}
-                                    <div className="mt-3 flex flex-wrap gap-2">
+                                    <div className={`mt-3 ${mobileActionRowClass()}`}>
                                       <button
                                         type="button"
                                         onClick={() => void downloadInvoicePdf(invoice, {
@@ -30934,7 +30942,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           customerAddress,
                                           serviceLabel: customerServiceLabel,
                                         }).catch(err => setError(readableError(err, 'Unable to download invoice PDF.')))}
-                                        className={buttonClass('secondary')}
+                                        className={mobileButtonClass('secondary')}
                                       >
                                         <Download size={15} />
                                         Download PDF
@@ -30947,14 +30955,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             Connect this customer to a ServSync homeowner before sending the invoice through the portal.
                                           </p>
                                         )}
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className={mobileActionRowClass()}>
                                           <button
                                             type="button"
                                             onClick={() => void sendInvoiceToHomeowner(invoice)}
                                             disabled={updatingInvoiceId === invoice.id || !invoice.homeowner_user_id}
                                             data-testid="contractor-send-invoice"
                                             aria-label={`Send invoice ${invoice.title || 'Invoice draft'} to homeowner`}
-                                            className={buttonClass('primary')}
+                                            className={mobileButtonClass('primary')}
                                           >
                                             <Send size={15} />
                                             {updatingInvoiceId === invoice.id ? 'Sending...' : invoice.homeowner_user_id ? 'Send Invoice' : 'Connect homeowner to send'}
@@ -30969,7 +30977,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               setEstimateComposerOpen(false);
                                               setContractorJobsView('new_financial');
                                             }}
-                                            className={buttonClass('secondary')}
+                                            className={mobileButtonClass('secondary')}
                                           >
                                             Edit draft
                                           </button>
@@ -30977,7 +30985,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             type="button"
                                             onClick={() => void voidInvoice(invoice)}
                                             disabled={updatingInvoiceId === invoice.id}
-                                            className={buttonClass('secondary')}
+                                            className={mobileButtonClass('secondary')}
                                           >
                                             <X size={15} />
                                             Void
@@ -30986,12 +30994,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </div>
                                     )}
                                     {invoiceCanMarkPaid(invoice.status) && (
-                                      <div className="mt-3 flex flex-wrap gap-2">
+                                      <div className={`mt-3 ${mobileActionRowClass()}`}>
                                         <button
                                           type="button"
                                           onClick={() => void markInvoicePaid(invoice)}
                                           disabled={updatingInvoiceId === invoice.id}
-                                          className={buttonClass('primary')}
+                                          className={mobileButtonClass('primary')}
                                         >
                                           <CheckCircle2 size={15} />
                                           {updatingInvoiceId === invoice.id ? 'Updating...' : 'Mark Paid'}
@@ -31001,7 +31009,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             type="button"
                                             onClick={() => void voidInvoice(invoice)}
                                             disabled={updatingInvoiceId === invoice.id}
-                                            className={buttonClass('secondary')}
+                                            className={mobileButtonClass('secondary')}
                                           >
                                             <X size={15} />
                                             Void
@@ -31067,7 +31075,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <Download size={15} />
                                   Download PDF
                                 </button>
-                                <button type="button" onClick={() => void saveEstimateAsTemplate(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={buttonClass('secondary')}>
+                                <button type="button" onClick={() => void saveEstimateAsTemplate(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
                                   <Receipt size={15} />
                                   {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                 </button>
@@ -31091,7 +31099,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateComposerOpen(true);
                                         setContractorJobsView('new_financial');
                                       }}
-                                      className={buttonClass('secondary')}
+                                      className={mobileButtonClass('secondary')}
                                     >
                                       Edit draft
                                     </button>
@@ -31101,7 +31109,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
                                       data-testid="contractor-send-estimate"
                                       aria-label={`Send estimate ${estimate.title} to homeowner`}
-                                      className={buttonClass('primary')}
+                                      className={mobileButtonClass('primary')}
                                     >
                                       <Send size={15} />
                                       {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
@@ -31117,7 +31125,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         disabled={convertingEstimateId === estimate.id}
                                         data-testid="contractor-create-job-from-accepted-estimate"
                                         aria-label={`Create job from accepted estimate ${estimate.title}`}
-                                        className={buttonClass('primary')}
+                                        className={mobileButtonClass('primary')}
                                       >
                                         <ClipboardCheck size={15} />
                                         {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
@@ -31128,7 +31136,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="button"
                                         onClick={() => void openLinkedJobForEstimate(estimate)}
                                         disabled={convertingEstimateId === estimate.id}
-                                        className={buttonClass('primary')}
+                                        className={mobileButtonClass('primary')}
                                       >
                                         <ClipboardCheck size={15} />
                                         View Job
@@ -31142,7 +31150,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         else void createInvoiceFromEstimate(estimate);
                                       }}
                                       disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
-                                      className={buttonClass('secondary')}
+                                      className={mobileButtonClass('secondary')}
                                     >
                                       <Receipt size={15} />
                                       {creatingInvoiceSourceId === `estimate:${estimate.id}`
@@ -31222,7 +31230,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 clearJobFilters();
                                 setContractorJobsView('overview');
                               }}
-                              className={buttonClass('secondary')}
+                              className={mobileButtonClass('secondary')}
                             >
                               Back to Jobs Overview
                             </button>
@@ -31316,7 +31324,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               data-record-title={insp.name}
                               className={`rounded-xl border bg-white px-4 py-3 shadow-sm ${inspectionIsOpenJob(insp) ? 'border-amber-200' : 'border-slate-200'}`}
                             >
-                              <div className="flex flex-wrap items-center gap-3">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="truncate text-sm font-medium text-slate-950">{insp.name}</p>
@@ -31365,11 +31373,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     Delete
                                   </button>
                                 )}
-                                <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
+                                <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
                                   {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                                 </button>
                                 {!checklistStyle && inspectionIsOpenJob(insp) && (
-                                  <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={buttonClass('primary')}>
+                                  <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('primary')}>
                                     <CheckCircle2 size={15} />
                                     Complete Job
                                   </button>
@@ -31379,7 +31387,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     type="button"
                                     onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)}
                                     disabled={!linkedInvoice && !hasDurableWorkItems && creatingInvoiceSourceId === `job:${insp.id}`}
-                                    className={buttonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
+                                    className={mobileButtonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
                                   >
                                     <Receipt size={15} />
                                     {creatingInvoiceSourceId === `job:${insp.id}` && !hasDurableWorkItems
@@ -33232,7 +33240,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
 
                         <div className="mt-4 space-y-2">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Work items</p>
                             <p className="text-xs text-slate-500">{incompleteTaskCount} not complete</p>
                           </div>
@@ -33246,7 +33254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 const taskComplete = row.finding.status === 'Fixed On Site';
                                 return (
                                   <div key={row.key} data-testid="contractor-work-item" data-work-title={row.finding.title} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <div className="flex flex-wrap items-start gap-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
                                       <label className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600">
                                         <input
                                           type="checkbox"
@@ -33262,7 +33270,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         />
                                         {taskComplete ? 'Complete' : 'Not complete'}
                                       </label>
-                                      <div className="min-w-[220px] flex-1">
+                                      <div className="min-w-0 flex-1 basis-full sm:basis-0">
                                         <label className="block text-xs font-semibold text-slate-500">Task</label>
                                         <input
                                           key={`${row.key}-title`}
@@ -33278,7 +33286,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="button"
                                         disabled={simpleJobReadonly}
                                         onClick={() => removeSimpleTask(row.roomKey, row.finding.title)}
-                                        className="mt-6 rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40"
+                                        className="w-full rounded-lg border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40 sm:mt-6 sm:w-auto"
                                       >
                                         Remove
                                       </button>
@@ -33318,7 +33326,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 }}
                                 placeholder="e.g. Install new outlet"
                               />
-                              <button type="button" onClick={addSimpleTask} disabled={!simpleTaskTitleDraft.trim()} className={buttonClass('primary')}>
+                              <button type="button" onClick={addSimpleTask} disabled={!simpleTaskTitleDraft.trim()} className={mobileButtonClass('primary')}>
                                 <Plus size={15} />
                                 Add Task
                               </button>
@@ -33347,18 +33355,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <h3 className="text-sm font-bold text-slate-950">Job controls</h3>
                         <p className="mt-1 text-xs text-slate-500">Save changes, then complete the job when the work items are ready.</p>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} data-testid="contractor-save-job-progress" className={buttonClass('secondary')}>
+                      <div className={mobileActionRowClass()}>
+                        <button type="button" onClick={() => void saveInspectionProgress(activeInspection)} disabled={savingInspection || activeInspection.status !== 'draft' || completed} data-testid="contractor-save-job-progress" className={mobileButtonClass('secondary')}>
                           {savingInspection ? 'Saving...' : 'Save'}
                         </button>
                         {inspectionIsOpenJob(activeInspection) && (
-                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} disabled={savingInspection} data-testid="contractor-complete-job" className={buttonClass('primary')}>
+                          <button type="button" onClick={() => void completeSimpleServiceJob(activeInspection)} disabled={savingInspection} data-testid="contractor-complete-job" className={mobileButtonClass('primary')}>
                             <CheckCircle2 size={15} />
                             Complete Job
                           </button>
                         )}
                         {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
-                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 sm:w-auto">
                             <Trash2 size={13} /> Delete
                           </button>
                         )}
@@ -37447,7 +37455,7 @@ function ServiceRequestQuoteCard({
 
   return (
     <div className={`rounded-xl border p-4 ${statusStyle[quote.status]}`}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Quote</p>
           <p className="mt-1 text-2xl font-bold text-slate-950">
@@ -37460,12 +37468,12 @@ function ServiceRequestQuoteCard({
         </span>
       </div>
       {showActions && quote.status === 'pending' && onAccept && onDecline && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={onAccept} disabled={isUpdating} className={buttonClass('primary')}>
+        <div className={`mt-4 ${mobileActionRowClass()}`}>
+          <button type="button" onClick={onAccept} disabled={isUpdating} className={mobileButtonClass('primary')}>
             <CheckCircle2 size={16} />
             {isUpdating ? 'Updating...' : 'Accept quote'}
           </button>
-          <button type="button" onClick={onDecline} disabled={isUpdating} className={buttonClass('secondary')}>
+          <button type="button" onClick={onDecline} disabled={isUpdating} className={mobileButtonClass('secondary')}>
             Decline
           </button>
         </div>
@@ -37510,8 +37518,8 @@ function ServiceRequestAppointmentCard({
 
   return (
     <div className={`rounded-xl border p-4 ${statusStyle[appointment.status]}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
             <Calendar size={12} className="mr-1 inline" />
             {proposedByLabel ?? 'Appointment'}
@@ -37528,7 +37536,7 @@ function ServiceRequestAppointmentCard({
             {statusHelper[appointment.status]}
           </p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
+        <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
           {statusLabel[appointment.status]}
         </span>
       </div>
@@ -37619,10 +37627,10 @@ function ServiceRequestAppointmentWindowsCard({
                     disabled={respondingWindowId === window.id}
                   />
                 </Field>
-                <div className="flex flex-wrap gap-2">
+                <div className={mobileActionRowClass()}>
                   <button
                     type="button"
-                    className={buttonClass('primary')}
+                    className={mobileButtonClass('primary')}
                     onClick={() => onAcceptWindow?.(window)}
                     disabled={respondingWindowId === window.id}
                     data-testid="homeowner-accept-appointment-window"
@@ -37632,7 +37640,7 @@ function ServiceRequestAppointmentWindowsCard({
                   </button>
                   <button
                     type="button"
-                    className={buttonClass('secondary')}
+                    className={mobileButtonClass('secondary')}
                     onClick={() => onDeclineWindow?.(window)}
                     disabled={respondingWindowId === window.id}
                     data-testid="homeowner-decline-appointment-window"

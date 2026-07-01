@@ -21,9 +21,10 @@ test.describe('contractor entitlement labels', () => {
     expect(dashboardSource).toContain('const contractorEntitlementState = useContractorEntitlements(contractor?.id ?? null);');
     expect(dashboardSource).toContain('<ContractorEntitlementStatusPanel state={contractorEntitlementState} />');
     expect(panelSource).toContain('data-testid="contractor-entitlement-status-panel"');
-    expect(panelSource).toContain('Entitlement status is informational during beta.');
-    expect(panelSource).toContain('Stripe billing is not active.');
-    expect(panelSource).toContain('No contractor actions are blocked by this status during beta.');
+    expect(panelSource).toContain('Informational during beta.');
+    expect(panelSource).toContain('Stripe billing is not active');
+    expect(panelSource).toContain('beta contractors remain free');
+    expect(panelSource).toContain('this status does not block contractor actions');
     expect(panelSource).toContain('Billing status');
     expect(panelSource).toContain('Current plan');
     expect(panelSource).toContain('Access mode');
