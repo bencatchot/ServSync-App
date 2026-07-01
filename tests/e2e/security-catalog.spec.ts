@@ -55,6 +55,15 @@ type TablePrivilegeRow = {
   authenticated_delete: boolean | null;
 };
 
+type PriceBookGrantRow = TablePrivilegeRow & {
+  authenticated_insert_table_grant: boolean | null;
+  authenticated_update_table_grant: boolean | null;
+  authenticated_insert_columns: string[] | null;
+  authenticated_update_columns: string[] | null;
+  public_column_grants: number;
+  anon_column_grants: number;
+};
+
 const CORE_PRIVATE_TABLES = [
   'profiles',
   'homeowner_profiles',
@@ -440,6 +449,118 @@ order by e.table_name;
     expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
     expect(row.authenticated_update, `${row.table_name} should grant UPDATE only behind platform-admin RLS`).toBe(true);
     expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+  });
+
+  test('contractor Price Book item grants stay private and column-limited', () => {
+    const expectedInsertColumns = [
+      'active',
+      'archived_at',
+      'category',
+      'contractor_id',
+      'customer_description',
+      'default_unit_price_cents',
+      'internal_notes',
+      'labor_hours',
+      'line_type',
+      'sku',
+      'source',
+      'taxable',
+      'title',
+      'trade',
+      'unit',
+    ].sort();
+    const expectedUpdateColumns = expectedInsertColumns.filter(column => column !== 'contractor_id').sort();
+
+    const rows = runCatalogQuery<PriceBookGrantRow>(`
+with target as (
+  select c.oid
+  from pg_class c
+  where c.relname = 'contractor_price_book_items'
+    and c.relnamespace = 'public'::regnamespace
+    and c.relkind in ('r', 'p')
+)
+select
+  'contractor_price_book_items'::text as table_name,
+  exists(select 1 from target) as exists,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'SELECT') end as public_select,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'INSERT') end as public_insert,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'UPDATE') end as public_update,
+  case when exists(select 1 from target) then has_table_privilege('public', (select oid from target), 'DELETE') end as public_delete,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'SELECT') end as anon_select,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'INSERT') end as anon_insert,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'UPDATE') end as anon_update,
+  case when exists(select 1 from target) then has_table_privilege('anon', (select oid from target), 'DELETE') end as anon_delete,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'SELECT') end as authenticated_select,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'INSERT') end as authenticated_insert,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'UPDATE') end as authenticated_update,
+  case when exists(select 1 from target) then has_table_privilege('authenticated', (select oid from target), 'DELETE') end as authenticated_delete,
+  exists (
+    select 1
+    from information_schema.role_table_grants
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'authenticated'
+      and privilege_type = 'INSERT'
+  ) as authenticated_insert_table_grant,
+  exists (
+    select 1
+    from information_schema.role_table_grants
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'authenticated'
+      and privilege_type = 'UPDATE'
+  ) as authenticated_update_table_grant,
+  coalesce((
+    select array_agg(column_name::text order by column_name)
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'authenticated'
+      and privilege_type = 'INSERT'
+  ), '{}'::text[]) as authenticated_insert_columns,
+  coalesce((
+    select array_agg(column_name::text order by column_name)
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'authenticated'
+      and privilege_type = 'UPDATE'
+  ), '{}'::text[]) as authenticated_update_columns,
+  (
+    select count(*)::int
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'PUBLIC'
+  ) as public_column_grants,
+  (
+    select count(*)::int
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'contractor_price_book_items'
+      and grantee = 'anon'
+  ) as anon_column_grants;
+    `);
+
+    expect(rows, 'Price Book grant rows should match expected table count').toHaveLength(1);
+    const row = rows[0];
+    expect(row.exists, `${row.table_name} should exist`).toBe(true);
+    expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+    expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+    expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+    expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+    expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+    expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+    expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+    expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+    expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind RLS`).toBe(true);
+    expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    expect(row.authenticated_insert_table_grant, `${row.table_name} should not have broad authenticated INSERT`).toBe(false);
+    expect(row.authenticated_update_table_grant, `${row.table_name} should not have broad authenticated UPDATE`).toBe(false);
+    expect(row.authenticated_insert_columns?.sort(), `${row.table_name} authenticated INSERT columns should stay limited`).toEqual(expectedInsertColumns);
+    expect(row.authenticated_update_columns?.sort(), `${row.table_name} authenticated UPDATE columns should stay limited`).toEqual(expectedUpdateColumns);
+    expect(row.public_column_grants, `${row.table_name} should not grant column privileges to PUBLIC`).toBe(0);
+    expect(row.anon_column_grants, `${row.table_name} should not grant column privileges to anon`).toBe(0);
   });
 
   test('selected internal-only RPCs remain unavailable to browser roles', () => {
