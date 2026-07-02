@@ -891,3 +891,13 @@ test('contractor confirmed-appointment reschedule source uses the replacement-wi
   expect(rescheduleHandler![0]).toContain('servsync_reschedule_service_request_appointment');
   expect(rescheduleHandler![0]).not.toContain('servsync_contractor_propose_appointment');
 });
+
+test('confirmed appointment copy does not imply external calendar sync', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+  const unsafeCalendarCopy = ['Confirmed on both', 'calendars.'].join(' ');
+  expect(appSource).toContain('Confirmed for both parties.');
+  expect(appSource).not.toContain(unsafeCalendarCopy);
+  expect(appSource).not.toContain('schedule instantly');
+  expect(appSource).not.toContain('homeowner self-booking');
+  expect(appSource).not.toContain('external calendar writeback');
+});

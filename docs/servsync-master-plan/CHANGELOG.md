@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-022-scheduling-copy-guardrail-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Replaced the old calendar-based confirmed appointment helper text with `Confirmed for both parties.` and added source-static scheduling coverage to keep that copy from implying external calendar sync.
+- Reason for change: The FB-022 workflow expansion audit found that the old wording could be read as external calendar integration, while ServSync currently supports contractor-controlled appointment proposals and confirmations without Google/Outlook calendar sync, reminders, notification delivery, dispatch/routing/GPS, homeowner self-booking, or online booking.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - source grep for the old calendar-based confirmed appointment helper text
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs-only copy guardrail polish. No SQL/RLS/RPC/schema behavior, Supabase function, Vercel/env/auth/provider setting, package/dependency, production data, sandbox data, deploy, external calendar sync, reminder, notification delivery, dispatch/routing/GPS, homeowner self-booking, online booking, or `marketing-screenshots/` changes are included.
+  - FB-022 remains Backlog. True online/self-booking and broader request-to-booking automation remain future work behind separate approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Existing FB-021/FB-022 backlog wording already preserves the contractor-controlled appointment proposal foundation and excludes external calendar sync, reminders, notification delivery, dispatch/routing/GPS, homeowner-forced booking, scheduling redesign, and true online/self-booking.
+
 - Branch: `codex/fb-020-storage-restore-verification-plan-v1`
 - Files changed:
   - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
