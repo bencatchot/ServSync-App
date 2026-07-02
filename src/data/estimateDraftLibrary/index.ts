@@ -1,4 +1,5 @@
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
+import { hvacSeasonalTuneUpBundle } from './hvac/service/hvac-seasonal-tune-up';
 import type {
   EstimateDraftLibraryBundle,
   EstimateDraftLibraryTrade,
@@ -18,6 +19,7 @@ export type {
 
 const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   hvacSystemReplacementBundle,
+  hvacSeasonalTuneUpBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {
