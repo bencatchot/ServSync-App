@@ -70,6 +70,11 @@ test.describe('FB-027 contractor pipeline summary', () => {
   test('invoice attention is status-based and does not invent overdue-by-date automation', () => {
     const source = appSource();
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
+    const workflowOverviewSource = sourceBetween(
+      contractorSource,
+      '<Card title="Workflow overview"',
+      '<ContractorEntitlementStatusPanel',
+    );
     const invoiceAttentionSource = sourceBetween(
       contractorSource,
       'const openInvoiceRecords =',
@@ -78,8 +83,21 @@ test.describe('FB-027 contractor pipeline summary', () => {
 
     expect(invoiceAttentionSource).toContain("const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));");
     expect(invoiceAttentionSource).toContain("const invoiceAttentionRecords = openInvoiceRecords.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));");
+    expect(invoiceAttentionSource).not.toContain("['sent', 'viewed'");
+    expect(invoiceAttentionSource).not.toContain("['sent', 'viewed', 'overdue', 'partially_paid']");
     expect(contractorSource).toContain("label: 'Invoices'");
     expect(contractorSource).toContain("helper: `${invoiceAttentionRecords.length} need attention`");
+    expect(workflowOverviewSource).toContain('invoiceAttentionRecords.length > 0');
+    expect(workflowOverviewSource).toContain('Invoices need attention');
+    expect(workflowOverviewSource).toContain('Review drafts, overdue, or partially paid invoices.');
+    expect(workflowOverviewSource).toContain('{invoiceAttentionRecords.length} review');
+    expect(workflowOverviewSource).toContain("setContractorJobsView('open_financial')");
+    expect(workflowOverviewSource).not.toContain('sendInvoiceToHomeowner');
+    expect(workflowOverviewSource).not.toContain('markInvoicePaid');
+    expect(workflowOverviewSource).not.toContain('voidInvoice');
+    expect(workflowOverviewSource.toLowerCase()).not.toContain('collect');
+    expect(workflowOverviewSource.toLowerCase()).not.toContain('payment due');
+    expect(workflowOverviewSource.toLowerCase()).not.toContain('reminder');
 
     expect(invoiceAttentionSource).not.toContain('due_at');
     expect(invoiceAttentionSource).not.toContain('due_date');

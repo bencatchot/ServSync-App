@@ -25198,7 +25198,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         Items already marked by existing workflow statuses.
                       </p>
                     </div>
-                    {(acceptedEstimatesNeedingJobs.length > 0 || completedJobsReadyToInvoice.length > 0) && (
+                    {(acceptedEstimatesNeedingJobs.length > 0 || completedJobsReadyToInvoice.length > 0 || invoiceAttentionRecords.length > 0) && (
                       <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[260px]">
                         {acceptedEstimatesNeedingJobs.length > 0 && (
                           <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
@@ -25217,6 +25217,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             >
                               <ClipboardCheck size={14} />
                               {acceptedEstimatesNeedingJobs.length} need jobs
+                            </button>
+                          </div>
+                        )}
+                        {invoiceAttentionRecords.length > 0 && (
+                          <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-amber-950">Invoices need attention</p>
+                              <p className="mt-0.5 text-xs leading-5 text-amber-800">Review drafts, overdue, or partially paid invoices.</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 transition hover:border-amber-300 hover:text-amber-900 sm:w-auto"
+                              onClick={() => {
+                                setContractorTab('inspections');
+                                setContractorJobsView('open_financial');
+                                setInspectionView('list');
+                              }}
+                            >
+                              <FileText size={14} />
+                              {invoiceAttentionRecords.length} review
                             </button>
                           </div>
                         )}
