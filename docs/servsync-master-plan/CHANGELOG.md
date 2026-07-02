@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/signup-confirmation-resend-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/signup-confirmation-modal.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a conservative resend-confirmation action to the signup email confirmation modal. The resend action uses the just-submitted signup email, waits 60 seconds before enabling, allows one attempt per opened modal, calls Supabase Auth's existing signup resend path, and uses generic success/error copy without promising instant delivery.
+- Reason for change: Users who miss the original confirmation email need a safe, obvious next step from the existing confirmation modal without adding custom email delivery, account-enumeration surfaces, or backend/auth configuration changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/signup-confirmation-modal.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs-only slice. No SQL/RLS/RPC/schema/Supabase function/auth config/Vercel/env/dependency/package/deployment/production setting changes, production data mutation, sandbox data mutation, email template changes, custom email delivery, resend from signin/password reset, or `marketing-screenshots/` changes are included.
+  - The resend UI is intentionally client-limited and conservative; project-level Supabase Auth rate-limit posture remains outside this slice.
+
 - Branch: `codex/signup-confirmation-modal-v1`
 - Files changed:
   - `src/App.tsx`

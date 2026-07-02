@@ -8507,6 +8507,50 @@ function SignupEmailConfirmationModal({
   onPrimary: () => void;
 }) {
   const normalizedEmail = email.trim();
+  const [resendDelaySeconds, setResendDelaySeconds] = useState(60);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendAttempted, setResendAttempted] = useState(false);
+  const [resendSucceeded, setResendSucceeded] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+
+  useEffect(() => {
+    if (resendDelaySeconds <= 0) return undefined;
+    const timer = window.setTimeout(() => {
+      setResendDelaySeconds(current => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendDelaySeconds]);
+
+  const handleResendConfirmation = async () => {
+    if (!supabase || !normalizedEmail || resendDelaySeconds > 0 || resendBusy || resendAttempted) return;
+    setResendBusy(true);
+    setResendAttempted(true);
+    setResendMessage('');
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: normalizedEmail,
+      });
+      if (error) throw error;
+      setResendSucceeded(true);
+      setResendMessage('We requested another confirmation email. It may take a minute to arrive.');
+    } catch {
+      setResendMessage('We could not resend that email right now. Wait a minute and try again.');
+    } finally {
+      setResendBusy(false);
+    }
+  };
+
+  const resendButtonLabel = resendBusy
+    ? 'Requesting...'
+    : resendSucceeded
+      ? 'Confirmation email requested'
+      : resendAttempted
+        ? 'Try again later'
+      : resendDelaySeconds > 0
+        ? `Resend available in ${resendDelaySeconds}s`
+        : 'Resend confirmation email';
+
   return (
     <div
       className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4"
@@ -8543,6 +8587,17 @@ function SignupEmailConfirmationModal({
         <button type="button" onClick={onPrimary} className={`${buttonClass('primary')} mt-5 w-full justify-center`}>
           I’ll check my email
         </button>
+        <button
+          type="button"
+          onClick={() => void handleResendConfirmation()}
+          disabled={!normalizedEmail || resendDelaySeconds > 0 || resendBusy || resendAttempted}
+          className={`${buttonClass('secondary')} mt-3 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          {resendButtonLabel}
+        </button>
+        {resendMessage && (
+          <p className="mt-3 text-center text-xs font-medium text-slate-500">{resendMessage}</p>
+        )}
       </div>
     </div>
   );
