@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-021-activity-sql-apply-evidence-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Recorded FB-021 Closeout D sandbox SQL apply/probe success and Closeout E production SQL apply success for durable appointment reschedule/cancel Activity rows. The backlog now reflects that `appointment_reschedule_proposed` and `appointment_cancelled` durable `workflow_activity_events` support is merged and SQL-applied to sandbox and production.
+- Reason for change: The official backlog/changelog still described the FB-021 durable Activity SQL patch as merged but awaiting SQL apply/probe evidence. Closeout D and Closeout E completed that operator evidence, so the canonical docs needed to distinguish live SQL/RPC-layer support from remaining optional UI/test hardening.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - Manual Markdown review
+  - `npm run typecheck`
+  - `npm run build`
+- Evidence recorded:
+  - Closeout C / PR #178 merged at `b2daee9f45b7b476528735d6aa96a94803bc18cb`, adding `servsync-fb021-reschedule-cancel-activity-events.sql`, Activity timeline mapping, and source-static coverage for `appointment_reschedule_proposed` and `appointment_cancelled`.
+  - Closeout D applied the SQL to sandbox ref `zpzdkoaubyjtsomccxya`, avoided production ref `uqgtheclhxqlnjpfmheq`, and verified new event types, preserved existing event types, reschedule/cancel writers, RLS/grants, direct mutation denial, durable row creation, duplicate prevention, homeowner/contractor visibility, unrelated-user denial, no notification/calendar/reminder/dispatch/GPS/homeowner self-booking behavior, cleanup completion, and no residual Codex probe records.
+  - Closeout D validation included the FB-025 workflow activity events probe passing 7/7 and a custom sanitized sandbox durable Activity probe passing. The FB-021 scheduling foundation suite had one role-switch/auth-state UI test failure unrelated to SQL/RPC durable Activity behavior; RPC/lifecycle/security cases passed.
+  - Closeout E applied the SQL to production ref `uqgtheclhxqlnjpfmheq`, avoided sandbox ref `zpzdkoaubyjtsomccxya` in that step, verified new event types, preserved existing event types including `appointment_proposed`, `appointment_confirmed`, and `invoice_voided`, confirmed reschedule/cancel writers, preserved RLS/grants, kept authenticated users select-only, and restored the local Supabase CLI link back to sandbox after verification.
+- Known risks or follow-ups:
+  - Documentation-only evidence alignment. No app code, tests, SQL/RLS/RPC/schema behavior, Supabase/Vercel/env/auth/provider settings, package/dependency files, production data, sandbox data, deploy, or `marketing-screenshots/` changes are included.
+  - No production appointment lifecycle mutation probe was run.
+  - Richer safe appointment event/history UI and broader safe appointment history display remain future if needed and separately approved.
+  - The unrelated FB-021 role-switch/auth-state UI probe failure may be hardened separately if it repeats.
+  - No notification delivery, email/SMS/push reminders, calendar sync, dispatch/routing/GPS, homeowner-forced booking, scheduling redesign, or new appointment statuses were added.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-021 status and next-step wording now reflect sandbox and production SQL apply evidence for durable reschedule/cancel Activity rows while preserving richer history UI, targeted test hardening, production mutation probes, and notification/calendar/dispatch/self-booking exclusions as follow-ups.
+
 - Branch: `codex/fb-021-reschedule-cancel-activity-events-v1`
 - Files changed:
   - `servsync-fb021-reschedule-cancel-activity-events.sql`
