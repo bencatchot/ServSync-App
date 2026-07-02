@@ -6690,7 +6690,7 @@ async function fetchWorkflowJobMessageIndicators(currentUserId: string, inspecti
 }
 
 function appointmentNextActionText(appointment: ServiceRequestAppointment, perspective: 'homeowner' | 'contractor') {
-  if (appointment.status === 'confirmed') return 'Confirmed on both calendars.';
+  if (appointment.status === 'confirmed') return 'Confirmed for both parties.';
   if (appointment.status === 'completed') return 'Completed.';
   if (appointment.status === 'cancelled') return 'Cancelled.';
   if (appointment.status === 'proposed') {
