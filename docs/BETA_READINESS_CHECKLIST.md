@@ -49,14 +49,16 @@ Related controlled beta docs:
 - [ ] No credentials, `.env` files, SQL secrets, screenshots, videos, traces, or reports are committed.
 - [ ] Production public URL loads after merge/deploy.
 - [ ] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-public-smoke` passes for unauthenticated public routes.
-- [ ] FB-020 readiness items have been reviewed for the intended beta stage, especially RLS/storage verification, backup/restore expectations, dependency security triage, and records reliability risks.
+- [x] FB-020 controlled private beta baseline is met for the intended beta stage, supported by production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, and a first non-production database-only schema restore drill.
 - [x] Restore drill, applied-SQL ledger, production SQL rollout, and storage backup/readiness templates exist for sanitized evidence capture.
 - [x] Local backup/restore/export/query-output/storage-export artifact ignore rules are in place before any future approved drill.
 - [x] A non-production restore drill preflight plan exists for future separately approved restore drill execution.
 - [x] A non-production restore drill operator checklist exists for future go/no-go review.
 - [x] A first non-production database-only schema restore drill completed against an isolated throwaway target and was cleaned up.
+- [x] Schema restore verification matched 66 public tables, 179 public functions, and 66 RLS-enabled public tables; the throwaway restore target and local artifacts were cleaned up, and no secrets/artifacts were committed.
 - [ ] Full data restore remains open because public rows reference `auth.users`, and auth-user restore was not approved for the first drill.
-- [ ] Backup/restore and storage-object readiness remain tracked as FB-020 follow-ups until separately verified.
+- [ ] Backup/PITR verification, storage restore, and storage-object backup/restore strategy remain tracked as FB-020 follow-ups until separately verified.
+- [ ] Public go-live readiness and paid-subscription readiness remain separate gates from controlled private beta.
 - [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 
 ## 4. Sandbox QA Account Plan

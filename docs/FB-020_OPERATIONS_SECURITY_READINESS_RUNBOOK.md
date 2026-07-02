@@ -1,10 +1,12 @@
 # FB-020 Operations And Security Readiness Runbook
 
-Status: baseline runbook for controlled beta and public go-live readiness.
+Status: controlled private beta baseline met; follow-up runbook for public go-live, paid-subscription, full restore, storage restore, and backup/PITR readiness.
 
 This runbook is part of FB-020: Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness. It documents the process ServSync should follow before broad beta expansion, public launch, or paid contractor subscriptions.
 
 This document is not approval to change production, apply SQL, modify RLS/storage policies, create users, or run production smoke tests. Those remain separate approval gates.
+
+FB-020 has met the controlled private beta baseline for the current beta stage. The baseline is supported by production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, a first non-production database-only schema restore drill, schema restore verification matching 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no committed secrets/artifacts. FB-020 is not fully complete: full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
 
 ## Operating Principles
 
@@ -27,7 +29,7 @@ Minimum expectations:
 - Record the latest successful restore drill date.
 - Keep restore testing in a non-production project unless an incident response plan explicitly approves otherwise.
 
-Controlled beta may proceed with a lighter process only if the beta risk is accepted and the missing restore evidence is tracked as an FB-020 follow-up.
+Controlled private beta may proceed on the current baseline because the missing full data/auth restore, storage restore, storage-object backup/restore strategy, and backup/PITR evidence remain tracked as FB-020 follow-ups. Broader beta, public go-live, paid-subscription readiness, or incident-response readiness may require stronger evidence before launch.
 
 Generated backup, restore, export, query-output, storage-export, and local ops artifacts must remain local/private and must never be committed. Slice 1G adds `.gitignore` guardrails for common local dump/export/output names, but `.gitignore` is not a substitute for operator review and does not approve backup, restore, Supabase CLI, storage, production data, or settings work.
 

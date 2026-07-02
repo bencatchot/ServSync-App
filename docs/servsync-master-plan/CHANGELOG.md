@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-020-controlled-beta-baseline-v1`
+- Files changed:
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Marked FB-020 as `Controlled Beta Baseline Met / Follow-up Backlog` for the current private beta stage. The docs now tie the baseline to production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, the first non-production database-only schema restore drill, schema restore verification for 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no committed secrets/artifacts.
+- Reason for change: FB-020 readiness evidence is sufficient for controlled private beta baseline, but the docs needed a conservative status that preserves full data/auth restore, storage restore, backup/PITR verification, optional smoke roles/records, public go-live readiness, and paid-subscription readiness as follow-up backlog.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation/readiness status only. No app code, tests, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, restore execution, production/sandbox/throwaway data mutation, user-record changes, credential disclosure, raw logs, screenshots, traces, backup artifacts, or deploy is included.
+  - FB-020 is not fully complete. Full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production smoke role credentials and optional stable production smoke record IDs remain future/not configured, and public go-live plus paid-subscription readiness remain separate gates.
+
 - Branch: `codex/fb-020-partial-restore-drill-evidence-v1`
 - Files changed:
   - `docs/GO_LIVE_AUDIT.md`
