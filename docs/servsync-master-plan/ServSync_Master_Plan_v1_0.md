@@ -342,6 +342,7 @@ Current beta-readiness notes:
 - FB-020 Slice 1G adds local `.gitignore` guardrails for generated backup, restore, export, query-output, storage-export, and ops artifacts. This reduces accidental commit risk only; it does not mean a restore drill, PITR verification, or storage restore verification has been completed.
 - FB-020 Slice 1H adds a docs-only non-production restore drill preflight plan covering required approvals, isolated target-environment rules, data handling, verification preparation, artifact handling, cleanup, and evidence capture. This does not mean a restore drill has been run or that backup/PITR/storage restore readiness has been verified.
 - FB-020 Slice 1I adds a docs-only non-production restore drill operator checklist for future go/no-go review. This does not mean a restore drill has been run or that backup/PITR/storage restore readiness has been verified.
+- FB-020 Closeout B completed the first non-production database-only schema restore drill against an isolated throwaway Supabase project. Public schema restore and sanitized shape verification passed, but full data restore stopped because public rows reference `auth.users` and auth-user restore was not approved. Storage restore, production data, backup/PITR verification, and full data/auth restore remain future approval-gated work.
 
 # 16. Roadmap Priorities
 
