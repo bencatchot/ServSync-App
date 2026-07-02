@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-020-production-auth-smoke-readiness-v1`
+- Files changed:
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Recorded FB-020 Closeout A readiness evidence that production authenticated read-only smoke passed for the required homeowner and contractor owner smoke accounts. The docs now note that preflight passed, required sign-in/navigation passed 2/2, credential values were not recorded, optional role credentials and optional stable smoke record IDs remain future/not configured, and mutation smoke is still not approved.
+- Reason for change: The FB-020 readiness docs still described authenticated production smoke credentials/sign-in as incomplete even after the approved read-only production smoke run succeeded.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation/readiness evidence only. No app code, tests, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production or sandbox data mutation, user creation, credential disclosure, or manual deploy is included.
+  - A non-production restore drill remains open. Optional production smoke role credentials and optional stable smoke record IDs remain future/not configured.
+
 - Branch: `codex/fb-027-invoice-attention-cta-v1`
 - Files changed:
   - `src/App.tsx`

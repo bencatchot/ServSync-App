@@ -328,10 +328,10 @@ ServSync should be positioned as beta because the job workflow and communication
 
 Current beta-readiness notes:
 
-- Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are created.
+- Required authenticated production read-only smoke is configured for dedicated homeowner and contractor owner smoke accounts; the latest run passed preflight plus 2/2 read-only sign-in/navigation tests without production mutation, SQL, settings changes, or manual deploy.
 - Unauthenticated production public smoke is formalized as a read-only check for `https://servsync.app` public/legal/trust routes and must not sign in, create users, mutate production records, apply SQL, change settings, or deploy manually.
 - FB-020 Slice 1D adds a no-secret local production smoke credential readiness check so operators can see whether approved `PROD_SMOKE_*` variable names are present without printing values, signing in, validating credentials, or contacting Supabase.
-- The first authenticated production smoke scaffold is read-only, uses only approved `PROD_SMOKE_*` credentials, requires `TEST_APP_URL=https://servsync.app`, and must not run until dedicated smoke accounts and allowed actions are approved; mutation smoke remains a separate future tier.
+- The first authenticated production smoke scaffold is read-only, uses only approved `PROD_SMOKE_*` credentials, requires `TEST_APP_URL=https://servsync.app`, and now has passing required homeowner/contractor owner sign-in/navigation evidence. Optional role credentials and optional stable smoke record IDs remain future/not configured; mutation smoke remains a separate future tier.
 - Preview/sandbox should remain the default place for authenticated testing.
 - Full end-to-end coverage for the core loop remains future work.
 - Mobile visual QA remains important because contractor and homeowner cards can become dense.
@@ -353,7 +353,7 @@ The roadmap should stay disciplined. The app already has many features. Recent c
 | 2 | Beta readiness and release checklist | Confirms the cleaned-up core loop is dependable enough for friendly beta users. |
 | 3 | Full E2E core-loop coverage | Protects request -> estimate -> approval -> job -> invoice -> Home History -> reminder behavior. |
 | 4 | Mobile core-loop QA | Contractors will use this in the field, and recent cards/actions need real viewport review. |
-| 5 | Production smoke account plan | Enables safe authenticated production smoke without using personal or fragile accounts. |
+| 5 | Production smoke account and record plan | Maintains safe authenticated production smoke without using personal or fragile accounts, and leaves optional role credentials/stable smoke records as separately approved follow-ups. |
 | 6 | Contextual connection request with message, selected properties, and per-property permissions | This strengthens the main differentiator. Photos/media should follow later after storage/RLS design. |
 | 7 | General connection-level messaging | Allows questions without forcing service requests. |
 | 8 | Discover feed strategy audit | Keeps marketplace work grounded in real contractor posts/photos and homeowner discovery needs. |
@@ -409,7 +409,7 @@ These items need more founder input or beta learning before they can be finalize
 1. Treat PRs #1-#11 as the current shipped cleanup baseline for the core MVP loop.
 2. Use FB-020 as the umbrella readiness workstream for security, records reliability, backup/restore, storage, dependency security, and scale hardening before broader beta/public go-live.
 3. Run a focused beta-readiness/release-checklist audit before starting another major feature.
-4. Use the unauthenticated production public smoke check after production deploys, and decide whether to create dedicated production smoke accounts; until then, keep authenticated smoke testing in preview/sandbox.
+4. Use the unauthenticated production public smoke check after production deploys, keep authenticated production smoke read-only and limited to dedicated approved smoke accounts, and add optional role credentials or stable smoke records only after separate approval.
 5. Use the approved contextual connection request direction in Sections 11 and 13 as the product/spec baseline.
 6. Implement contextual connection requests in small reviewed PRs: SQL/RLS/RPC foundation, homeowner request UI without photos, contractor pending request review UI, active connection per-property sharing editor, contractor workspace routing polish, and optional media/photo support later.
 7. Do not ask Codex to implement photos/media, general messaging, or new permission categories until those are separately audited and approved.

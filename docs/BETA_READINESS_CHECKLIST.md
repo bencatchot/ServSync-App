@@ -23,10 +23,11 @@ Related controlled beta docs:
 ## 2. Beta QA Operating Model
 
 - [ ] Authenticated testing happens in sandbox/preview by default.
-- [ ] Production checks are public/read-only only until production smoke accounts are separately approved.
-- [ ] Production smoke accounts have an approved credential storage and allowed-actions policy before use.
-- [ ] `npm run qa:production-smoke:check` has been run to confirm whether required production smoke credential names are present locally without printing values.
-- [ ] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` is run only after approved production smoke accounts exist; it remains read-only and must not mutate records.
+- [ ] Production checks remain read-only only unless a separate task explicitly approves mutation.
+- [x] Required production smoke homeowner and contractor owner account credentials are configured for local operator use without documenting values.
+- [x] Authenticated production read-only smoke preflight has passed for required homeowner and contractor owner credential names without printing values.
+- [x] `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` passed required homeowner and contractor owner sign-in/navigation; it remains read-only and must not mutate records.
+- [ ] Optional role credentials and optional stable smoke record IDs are configured only if separately approved.
 - [ ] No production mutation happens without explicit approval.
 - [ ] Sandbox/preview uses the expected Supabase project, not production.
 - [ ] Test credentials stay in local env files or a password manager, never in commits/docs/chats/logs.
@@ -292,24 +293,25 @@ Current policy:
 - [ ] Sign-in page renders.
 - [ ] No obvious public runtime/console errors.
 - [ ] The unauthenticated production public smoke spec passes without secrets or sign-in.
+- [x] The authenticated production read-only smoke spec passed preflight and required homeowner/contractor owner sign-in/navigation without mutation.
 - [ ] Vercel production deployment succeeds on `serv-sync-app-refresh`.
 - [ ] No authenticated production mutation is performed.
 
 Before using production smoke accounts:
 
-- [ ] Dedicated production smoke homeowner account is approved.
-- [ ] Dedicated production smoke contractor account is approved.
+- [x] Dedicated production smoke homeowner account is approved for read-only smoke.
+- [x] Dedicated production smoke contractor owner account is approved for read-only smoke.
 - [ ] Optional contractor field tech/viewer smoke accounts are approved only if role-specific production smoke is needed.
-- [ ] Credential storage is approved outside the repo.
-- [ ] Credentials are not stored in repo/docs/chats/logs/screenshots/traces.
+- [x] Required credential storage is approved outside the repo.
+- [x] Required credential values are not stored in repo/docs/chats/logs/screenshots/traces.
 - [ ] Ignored/local credential files are not printed or pasted in reports, PRs, logs, screenshots, traces, or chat.
 - [ ] If smoke or load-test credentials may have been exposed in a local terminal/session, those credentials are rotated before use.
 - [ ] Personal, founder, beta-user, and non-smoke accounts are not used for automated production smoke.
-- [ ] Allowed actions are documented.
-- [ ] Default authenticated production smoke is read-only navigation.
+- [x] Allowed authenticated production smoke actions are read-only navigation only.
+- [x] Default authenticated production smoke is read-only navigation.
 - [ ] Any production mutation is separately approved before the run.
 - [ ] Any cleanup is exact-ID or approved-prefix scoped before the run.
-- [ ] Smoke records are clearly labeled and isolated from real beta customer records.
+- [ ] Optional stable smoke records are approved, clearly labeled, and isolated from real beta customer records before record-specific assertions are added.
 - [ ] Production smoke accounts are not personal/founder accounts.
 
 ## 13. Beta Tester Onboarding Plan
@@ -381,7 +383,7 @@ Before using production smoke accounts:
 - [ ] Add Home Reminders Playwright coverage.
 - [ ] Add RLS/cross-user verification tests or a documented manual checklist.
 - [ ] Add a mobile read-only Playwright project or formal mobile manual QA checklist.
-- [ ] Decide whether and when to create production smoke accounts.
+- [ ] Decide whether and when to add optional production smoke role credentials and optional stable smoke record IDs.
 - [x] Add an unauthenticated production public smoke spec and document its allowed scope.
 - [ ] Run a focused mobile polish pass.
 - [x] Add sign-out cleanup for sensitive local draft storage.
