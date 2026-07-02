@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-007-estimate-draft-library-regression-v1`
+- Files changed:
+  - `tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-007 Slice 1A source-static regression coverage for the existing Estimate Draft Library path-flow foundation. The new focused spec verifies the one wired HVAC replacement proof bundle, resolver match/fallback behavior, editable price-required draft-line output, price-free bundle/type boundaries, editor-only contractor review reminders, and homeowner/PDF/invoice/advanced-tool exposure boundaries.
+- Reason for change: FB-007 already had a code-only Estimate Draft Library foundation, but the next safe step was to harden the path-flow before approving any second bundle, broad trade library, homeowner pre-visit form, AI generation, or pricing/invoice expansion.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Test/docs-only slice. No app code, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, sandbox data mutation, deploy, broad trade libraries, homeowner pre-visit forms, AI generation, pricing/margin/tax/category/default quantity/assembly work, invoice quick-pick wiring, or `marketing-screenshots/` changes are included.
+  - Future FB-007 work should remain separately approved and small: either one tiny proof-bundle expansion or authenticated preview smoke before broader trade libraries or homeowner pre-visit checklist work.
+
 - Branch: `codex/fb-002-custom-pricing-csv-preview-v1`
 - Files changed:
   - `src/App.tsx`

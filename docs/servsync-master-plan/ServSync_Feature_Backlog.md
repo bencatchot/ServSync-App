@@ -101,7 +101,7 @@ Important guardrails:
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
 | FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
-| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Backlog | High | Review the Estimate Draft Library path-flow foundation v1 after PR validation; broader trade libraries and homeowner pre-visit checklist work remain future. |
+| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Started / Partial | High | After path-flow regression hardening, consider one separately approved tiny proof-bundle expansion or authenticated preview smoke before broader trade library or homeowner pre-visit checklist work. |
 | FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
 | FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
 | FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
@@ -476,7 +476,11 @@ Foundation slice:
 - v1 starts with one HVAC replacement proof bundle only.
 - The library is price-free and does not replace contractor review.
 - Existing Build Estimate Draft fallback behavior must remain in place whenever no matching bundle exists.
+- Focused path-flow regression coverage now protects the HVAC replacement proof-bundle resolver, fallback behavior, price-free output, editor-only review reminders, and homeowner/PDF/invoice boundary.
 - This does not complete full trade-specific estimate/pre-visit checklist coverage.
+
+Current next step:
+After path-flow regression hardening, consider one separately approved tiny proof-bundle expansion or authenticated preview smoke before broader trade library or homeowner pre-visit checklist work.
 
 ### FB-008 — Discover Engagement Filter / Recently Active Contractors
 
