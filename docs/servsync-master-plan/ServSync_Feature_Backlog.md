@@ -96,7 +96,7 @@ Important guardrails:
 | ID | Feature / Topic | Product Area | Status | Priority | Current Next Step |
 | --- | --- | --- | --- | --- | --- |
 | FB-001 | Invite a Contractor to ServSync | Homeowner Contractors tab, service request support, contractor acquisition | Completed / Functional | Medium | Future outreach/claim-flow improvements later. |
-| FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates, Custom Pricing | Completed / Functional; Needs Testing | High | Validate Custom Pricing CSV import preview/sandbox behavior; estimate/invoice quick-pick integration remains future. |
+| FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates, Custom Pricing | Beta Ready / Follow-up Backlog | High | Use in controlled beta with CSV preview regression coverage in place; invoice quick-pick, smart dedupe/overwrite, XLSX/PDF/AI import cleanup, and broader trade-library work remain future. |
 | FB-003 | Contextual Connection Request Flow with Multi-Property Permission Access | Connections, permissions, property sharing | Completed / Functional | High | Follow-up testing of permission enforcement and contractor visibility. |
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
@@ -166,7 +166,7 @@ Future possible improvements:
 
 ### FB-002 — Contractor Estimate Defaults & Templates
 
-Status: Completed / Functional; Needs Testing
+Status: Beta Ready / Follow-up Backlog
 
 Priority: High
 
@@ -181,11 +181,11 @@ Summary:
 Contractors can save recurring estimate charges and estimate templates so they do not have to rebuild common estimates from scratch.
 
 Current next step:
-Validate the Custom Pricing / Pricing Library CSV import path after preview/sandbox review. Estimate/invoice quick-pick integration remains a separate future slice.
+Use the existing saved charges, estimate templates, and private Custom Pricing / Pricing Library workflow in controlled beta. CSV import now has focused regression coverage for preview-before-import, row/file limits, required title validation, invalid/negative price blocking, blank price versus `$0`, warning-only line-type fallback, warning-only duplicate detection, valid-row-only import, add-only insert behavior, estimate-only Price Book quick-pick, and homeowner/invoice privacy boundaries. Future work should keep invoice quick-pick, smart dedupe/overwrite, XLSX/PDF/AI import cleanup, default quantity/tax/category propagation, and broader trade-library or FB-007 checklist work separate.
 
 Key decisions:
 
-- The current feature was recommended by Codex/ChatGPT but has not been personally/manual tested by the user yet.
+- The current feature has code and static regression coverage suitable for controlled beta use, but contractor beta feedback should still validate the CSV import workflow with representative files before any larger import expansion.
 - Saved charges should not auto-load into every estimate.
 - Contractors should choose saved charges from a quick-pick list.
 - Labor should support flat labor charges and hourly rate × estimated hours.
@@ -194,7 +194,7 @@ Key decisions:
 - Copied line items must remain editable/removable per estimate.
 - Homeowners only see final estimate line items, not internal templates.
 - Contractors should be able to save an estimate they create as a reusable template.
-- Custom Pricing / Pricing Library v1 should remain a private contractor-owned price-book foundation; CSV import may add new private items, but separate approval is still required before wiring those items into estimates, invoices, XLSX/PDF imports, AI cleanup, or automation.
+- Custom Pricing / Pricing Library v1 should remain a private contractor-owned price-book foundation; CSV import may add new private items after preview, but separate approval is still required before invoice quick-pick wiring, smart dedupe/overwrite, XLSX/PDF imports, AI cleanup, automation, broader trade library work, or FB-007 pre-visit/checklist expansion.
 
 Initial trades to support/test:
 

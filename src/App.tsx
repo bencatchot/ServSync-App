@@ -31771,7 +31771,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div>
                               <p className="text-sm font-bold text-slate-950">Upload CSV</p>
                               <p className="mt-1 max-w-3xl text-xs leading-5 text-emerald-900">
-                                Upload a CSV price list to add multiple pricing items at once. You'll review everything before it's saved. Blank price means Price Required; $0 means intentional no-charge. Excel support is planned later; export Excel as CSV for now.
+                                Upload a CSV price list to add multiple pricing items at once. You'll review everything before it's saved. Duplicate matches are warning-only; CSV import adds valid rows and does not overwrite existing pricing. Blank price means Price Required; $0 means intentional no-charge. Excel support is planned later; export Excel as CSV for now.
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -31833,7 +31833,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                   <div>
                                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Preview before import</p>
-                                    <p className="mt-1 text-xs leading-5 text-slate-500">Only valid rows will be imported. Invalid rows stay out of your pricing library.</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-500">Only valid rows will be imported. Invalid rows stay out of your pricing library. Review warnings before importing.</p>
                                   </div>
                                   <button
                                     type="button"

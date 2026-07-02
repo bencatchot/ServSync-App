@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-002-custom-pricing-csv-preview-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb002-custom-pricing-csv.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-002 Closeout A regression coverage for the contractor Custom Pricing CSV preview/import path. The new focused source-static Playwright spec verifies the preview-first CSV surface, row/file limits, required title and invalid/negative price blocking, blank price versus `$0`, warning-only line-type fallback, warning-only duplicate detection, valid-row-only add-only import behavior, estimate-only Price Book quick-pick, and homeowner/invoice privacy boundaries. Tiny Custom Pricing copy now clarifies that duplicate matches are warning-only, valid CSV rows are added, and existing pricing is not overwritten.
+- Reason for change: FB-002 was functional but still listed CSV preview/sandbox behavior as the beta-readiness testing gap. This closes the safe local regression gap without mutating sandbox/production data or expanding estimate/invoice behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb002-custom-pricing-csv.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb024-price-book-quickpick.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/docs/test-only slice. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, sandbox data mutation, deploy, invoice quick-pick wiring, smart dedupe/overwrite behavior, XLSX/PDF/AI import cleanup, new templates, FB-007 trade checklist work, FB-024 expansion, or broader estimate-library work is included.
+  - The new coverage is source-static and validates the existing parser/import boundaries without uploading through a live fixture. Contractor beta use should still exercise representative CSV files manually before any larger import expansion.
+
 - Branch: `codex/fb-020-controlled-beta-baseline-v1`
 - Files changed:
   - `docs/GO_LIVE_AUDIT.md`
