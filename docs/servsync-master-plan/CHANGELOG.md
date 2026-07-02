@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-007-plumbing-faucet-replacement-bundle-v1`
+- Files changed:
+  - `src/data/estimateDraftLibrary/plumbing/replace/plumbing-faucet-replacement.ts`
+  - `src/data/estimateDraftLibrary/index.ts`
+  - `tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-007 Slice 1C's first bounded non-HVAC Estimate Draft Library proof bundle for plumbing faucet replacement scopes under `plumbing/replace/plumbing_faucet_replacement`. The bundle remains price-free, contractor-editable, and contractor-reviewed, and the focused FB-007 regression spec now verifies all three approved proof bundles, plumbing replacement resolver behavior, repair-only/adjacent-scope fallback preservation, price-free output, editor-only rationale, and homeowner/PDF/invoice/backend exposure boundaries.
+- Reason for change: Prove the Estimate Draft Library can safely support one tightly bounded plumbing replacement bundle without adding broad plumbing/electrical/carpentry libraries, homeowner pre-visit checklist behavior, AI generation, pricing behavior, invoice quick-pick wiring, or backend work.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Data/test/docs-only slice. No app code, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production data mutation, sandbox data mutation, deploy, broad plumbing/electrical/carpentry libraries, additional plumbing bundles, homeowner pre-visit forms, AI generation, pricing/margin/tax/category/default quantity/assembly work, invoice quick-pick wiring, or `marketing-screenshots/` changes are included.
+  - Future FB-007 work should remain separately approved and small: authenticated preview smoke for the first plumbing proof bundle or one separately approved tiny proof-bundle expansion before broader trade libraries or homeowner pre-visit checklist work.
+
 - Branch: `codex/fb-007-hvac-seasonal-tune-up-bundle-v1`
 - Files changed:
   - `src/data/estimateDraftLibrary/hvac/service/hvac-seasonal-tune-up.ts`

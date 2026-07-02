@@ -101,7 +101,7 @@ Important guardrails:
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
 | FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
-| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Started / Partial | High | After the second bounded HVAC proof bundle, consider authenticated preview smoke or one separately approved tiny non-HVAC proof bundle before broader trade library or homeowner pre-visit checklist work. |
+| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Started / Partial | High | After the first bounded non-HVAC plumbing faucet proof bundle, consider authenticated preview smoke or one separately approved tiny proof-bundle expansion before broader trade library or homeowner pre-visit checklist work. |
 | FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
 | FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
 | FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
@@ -473,15 +473,16 @@ After estimate defaults/templates are audited, tested, and mobile estimate workf
 Foundation slice:
 
 - Estimate Draft Library path-flow v1 introduces a code-only app data structure for trade -> work category -> job bundle -> estimate sections -> recommended items -> scope wording helpers -> notes/terms candidates -> contractor review reminders.
-- v1 starts with bounded HVAC proof bundles only: HVAC system replacement and HVAC seasonal tune-up / maintenance visit.
+- v1 starts with bounded proof bundles only: HVAC system replacement, HVAC seasonal tune-up / maintenance visit, and plumbing faucet replacement.
 - The library is price-free and does not replace contractor review.
 - Existing Build Estimate Draft fallback behavior must remain in place whenever no matching bundle exists.
 - Focused path-flow regression coverage now protects the HVAC replacement proof-bundle resolver, fallback behavior, price-free output, editor-only review reminders, and homeowner/PDF/invoice boundary.
 - A second bounded HVAC seasonal tune-up proof bundle adds a price-free service/maintenance path while preserving fallback behavior, contractor review, and homeowner/PDF/invoice boundaries.
+- A first bounded non-HVAC plumbing faucet replacement proof bundle adds a price-free replacement path while keeping faucet repair-only, drain relocation, sink replacement, garbage disposal, toilet, water heater, electrical, and carpentry scopes on fallback behavior unless separately approved.
 - This does not complete full trade-specific estimate/pre-visit checklist coverage.
 
 Current next step:
-After the second bounded HVAC proof bundle, consider authenticated preview smoke or one separately approved tiny non-HVAC proof bundle before broader trade library or homeowner pre-visit checklist work.
+After the first bounded non-HVAC plumbing faucet proof bundle, consider authenticated preview smoke or one separately approved tiny proof-bundle expansion before broader trade library or homeowner pre-visit checklist work.
 
 ### FB-008 — Discover Engagement Filter / Recently Active Contractors
 
