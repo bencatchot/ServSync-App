@@ -1,6 +1,7 @@
 import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';
 import { hvacSeasonalTuneUpBundle } from './hvac/service/hvac-seasonal-tune-up';
 import { plumbingFaucetReplacementBundle } from './plumbing/replace/plumbing-faucet-replacement';
+import { carpentryTrimBaseboardRepairBundle } from './carpentry/repair/carpentry-trim-baseboard-repair';
 import type {
   EstimateDraftLibraryBundle,
   EstimateDraftLibraryTrade,
@@ -22,6 +23,7 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   hvacSystemReplacementBundle,
   hvacSeasonalTuneUpBundle,
   plumbingFaucetReplacementBundle,
+  carpentryTrimBaseboardRepairBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {
