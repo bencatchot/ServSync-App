@@ -105,7 +105,7 @@ Important guardrails:
 | FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
 | FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
 | FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
-| FB-011 | Mobile Workflow Polish | Mobile/responsive UX, field workflow | Started / Partial | High | First frontend-only polish pass improves mobile stacking, action hierarchy, spacing, and scanability across request cards, scheduling controls, estimate/Price Book areas, job/work-item cards, invoice cards, Activity timeline, Home Access cards, and entitlement labels. Continue mobile QA with real beta fixtures; native apps, backend changes, lifecycle changes, notifications, payments, and calendar sync remain out of scope. |
+| FB-011 | Mobile Workflow Polish | Mobile/responsive UX, field workflow | Started / Partial | High | First frontend-only polish pass improves mobile stacking, action hierarchy, spacing, and scanability across request cards, scheduling controls, estimate/Price Book areas, job/work-item cards, invoice cards, Activity timeline, Home Access cards, and entitlement labels. Closeout B fixes a narrow iPhone SE-width homeowner Properties / Home Access overflow and adds settled regression coverage. Continue mobile QA with real beta fixtures; native apps, backend changes, lifecycle changes, notifications, payments, and calendar sync remain out of scope. |
 | FB-011A | Backlog-Aware Partial Invoicing | Jobs, work items, invoices, backlog closeout | Job Summary Badges In Progress | High | Phase 1 adds SQL/type/test foundation for durable job work items, invoice line linkage, backlog snapshots, and a guarded partial-invoice RPC. Phase 2A wires durable work items into contractor job detail when rows exist, creates draft invoices from selected completed/priced items, and displays backlog snapshots separately on contractor/homeowner invoice views and PDFs. Phase 2B-1 seeds durable work items from accepted estimate lines. Phase 2B-2 syncs simple service `Work Items` tasks into durable source-backed work items. Phase 2C-1 adds contractor-created manual work items with safe unbilled-only edit/remove rules. The guardrail slice keeps whole-job invoicing available for legacy/no-work-item jobs while steering work-item-backed jobs to item-based invoicing and adding SQL protection against bypassing durable work-item billing safety. The current frontend-only UX slice adds derived contractor job badges/counts for ready-to-invoice, price-required, backlog-open, partially invoiced, fully invoiced, and no-billable-item states without adding new persisted job statuses. Broad legacy backfill, general inspection finding conversion, homeowner-facing job summaries, and broader closeout UI remain future approval-gated slices. |
 | FB-012 | Push Notifications | Notifications, mobile, workflow events | Later / Future | Medium | Do not claim live unless confirmed; revisit after stable core workflows. |
 | FB-013 | QuickBooks / Accounting Integration | Accounting, invoices, integrations | Later / Future | Medium | Research later after invoice/payment workflow stabilizes. |
@@ -580,12 +580,18 @@ After contextual connection flow is tested.
 
 ### FB-011 — Mobile Workflow Polish
 
-Status: Backlog
+Status: Started / Partial
 
 Priority: High
 
 Purpose:
 Improve mobile usability for field use and homeowner convenience.
+
+Current closeout evidence:
+
+- First frontend-only polish pass improved mobile stacking, action hierarchy, spacing, and scanability across core homeowner and contractor beta surfaces.
+- Closeout A mobile fixture QA found one narrow homeowner Properties / Home Access overflow at iPhone SE width.
+- Closeout B fixes that narrow overflow and adds a settled iPhone SE regression check for the homeowner Properties / Home Access surface.
 
 Areas to watch:
 

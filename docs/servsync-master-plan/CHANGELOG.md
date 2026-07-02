@@ -6,6 +6,29 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-011-homeowner-properties-mobile-overflow-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-smoke.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-011 Closeout B narrow-mobile containment polish for the homeowner Properties / Home Access surface. The Properties tab stack now keeps its cards, property selector grid, and Add property action inside the mobile viewport, and the mobile smoke spec includes a settled iPhone SE-width regression check for that surface.
+- Reason for change: FB-011 Closeout A mobile fixture QA found a persistent 38px horizontal overflow on the homeowner Properties / Home Access surface at 320x568 after panels settled, while other audited homeowner and contractor surfaces remained clean.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium`
+  - Inline 320x568 homeowner Properties / Home Access overflow verification
+- Known risks or follow-ups:
+  - Frontend/test/docs-only slice. No SQL/RLS/RPC/schema/Supabase function/Vercel/env/auth/provider/package/dependency/deployment changes, production data mutation, sandbox app-data mutation, native app behavior, push notifications, payments, calendar sync, lifecycle behavior changes, permission rule changes, or `marketing-screenshots/` changes are included.
+  - FB-011 remains Started / Partial. Continue mobile QA with real beta fixtures, especially dense detail records and mutation-gated shared-home flows.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 backlog wording was aligned from the stale detailed `Backlog` status to `Started / Partial`, and the current next-step evidence now records Closeout B's narrow homeowner Properties / Home Access overflow polish while preserving native apps, backend changes, lifecycle changes, notifications, payments, and calendar sync as out of scope.
+
 - Branch: `codex/fb-003-permission-evidence-alignment-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
