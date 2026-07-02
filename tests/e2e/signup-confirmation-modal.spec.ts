@@ -27,7 +27,27 @@ test.describe('signup email confirmation modal', () => {
     expect(modalSource).toContain('Open that link to activate your ServSync account.');
     expect(modalSource).toContain('Don’t see it? Check your spam, junk, or promotions folder. It may take a minute to arrive.');
     expect(modalSource).toContain('I’ll check my email');
+    expect(modalSource).toContain('Resend confirmation email');
+    expect(modalSource).toContain('Resend available in');
     expect(modalSource).toContain('normalizedEmail ? <span');
+  });
+
+  test('resend action is delayed, one-attempt, and uses the submitted signup email only', () => {
+    const source = appSource();
+    const modalSource = sourceBetween(source, 'function SignupEmailConfirmationModal', 'function ContractorReferralInvitePage');
+
+    expect(modalSource).toContain('const [resendDelaySeconds, setResendDelaySeconds] = useState(60);');
+    expect(modalSource).toContain('const [resendAttempted, setResendAttempted] = useState(false);');
+    expect(modalSource).toContain('if (!supabase || !normalizedEmail || resendDelaySeconds > 0 || resendBusy || resendAttempted) return;');
+    expect(modalSource).toContain('await supabase.auth.resend({');
+    expect(modalSource).toContain("type: 'signup'");
+    expect(modalSource).toContain('email: normalizedEmail');
+    expect(modalSource).not.toContain('emailRedirectTo');
+    expect(modalSource).toContain('We requested another confirmation email. It may take a minute to arrive.');
+    expect(modalSource).toContain('We could not resend that email right now. Wait a minute and try again.');
+    expect(modalSource).toContain('disabled={!normalizedEmail || resendDelaySeconds > 0 || resendBusy || resendAttempted}');
+    expect(modalSource).toContain('Confirmation email requested');
+    expect(modalSource).toContain('Try again later');
   });
 
   test('successful signup without an immediate session opens the modal with the local email state', () => {
@@ -71,6 +91,21 @@ test.describe('signup email confirmation modal', () => {
 
     for (const catchBlock of catchBlocks) {
       expect(catchBlock).not.toContain('setSignupConfirmation({');
+      expect(catchBlock).not.toContain('auth.resend');
+    }
+  });
+
+  test('resend is not wired into signin or password reset flows', () => {
+    const source = appSource();
+    const authPageSource = sourceBetween(source, 'function AuthPage', 'function SignupEmailConfirmationModal');
+    const referralSource = sourceBetween(source, 'function ContractorReferralInvitePage', 'function LocalCustomerClaimPage');
+    const claimSource = sourceBetween(source, 'function LocalCustomerClaimPage', 'function ContextualConnectionRequestModal');
+
+    expect(authPageSource).toContain('await supabase.auth.resetPasswordForEmail(email, {');
+    for (const componentSource of [authPageSource, referralSource, claimSource]) {
+      expect(componentSource).toContain('await supabase.auth.signInWithPassword');
+      expect(componentSource).toContain('await supabase.auth.signUp({');
+      expect(componentSource).not.toContain('auth.resend');
     }
   });
 
