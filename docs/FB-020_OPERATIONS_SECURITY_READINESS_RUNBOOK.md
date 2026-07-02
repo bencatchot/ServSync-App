@@ -74,6 +74,14 @@ Drill checklist:
 
 FB-020 Slice 1F adds blank/sanitized templates for restore drill results, applied-SQL ledger entries, production SQL rollout captures, storage backup/readiness worksheets, and Edge Function/env/secret restore notes in `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`. These templates do not complete a restore drill and are not approval to run backups, restores, SQL, Supabase CLI commands, storage access, production checks, settings changes, or deploys.
 
+Latest restore drill evidence as of 2026-07-02: a controlled database-only drill restored the sandbox public schema into isolated throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`, then verified 66 public tables, 179 public functions, and 66 public RLS-enabled tables. Public data restore stopped safely because public rows reference `auth.users`, and auth-user restore was not explicitly approved. Storage restore was not in scope. Production was not touched. The throwaway target was deleted, the local link was restored to sandbox `zpzdkoaubyjtsomccxya`, and private local dump/restore artifacts were deleted.
+
+Future drill decision options:
+
+- Approve a future full database restore including required auth schema/user rows into a throwaway target.
+- Create a sanitized matching auth fixture/export for restore drills.
+- Accept schema-only restore as the first drill milestone and defer full data restore.
+
 ## Applied-SQL Ledger And Deployed-State Tracking
 
 ServSync currently uses reviewed SQL patch files. Before broader launch, each applied SQL patch should be tracked by environment.

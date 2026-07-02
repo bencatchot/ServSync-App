@@ -6,6 +6,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-020-partial-restore-drill-evidence-v1`
+- Files changed:
+  - `docs/GO_LIVE_AUDIT.md`
+  - `docs/BETA_READINESS_CHECKLIST.md`
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Recorded FB-020 Closeout B partial non-production restore drill evidence. The docs now state that a database-only schema restore drill completed against throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`, with public schema restore and sanitized shape verification for 66 public tables, 179 public functions, and 66 RLS-enabled public tables.
+- Reason for change: FB-020 readiness should reflect the actual restore-drill evidence without overstating it as full data, auth, storage, production backup/PITR, or public go-live readiness.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - Manual Markdown review
+  - changed-file secret-value scan
+- Known risks or follow-ups:
+  - Documentation/readiness evidence only. No restore, app code, tests, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production/sandbox/throwaway data mutation, user creation, credential disclosure, raw logs, screenshots, traces, backup artifacts, or deploy is included.
+  - Full data restore remains open because public rows reference `auth.users`, and auth-user restore was not approved for the first drill. Follow-up options are to approve a future full database restore including required auth rows, create sanitized matching auth fixtures, or accept schema-only restore as the first drill milestone and defer full data restore.
+
 - Branch: `codex/fb-020-production-auth-smoke-readiness-v1`
 - Files changed:
   - `docs/GO_LIVE_AUDIT.md`

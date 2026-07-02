@@ -54,7 +54,8 @@ Related controlled beta docs:
 - [x] Local backup/restore/export/query-output/storage-export artifact ignore rules are in place before any future approved drill.
 - [x] A non-production restore drill preflight plan exists for future separately approved restore drill execution.
 - [x] A non-production restore drill operator checklist exists for future go/no-go review.
-- [ ] A non-production restore drill has been completed and recorded with the approved template.
+- [x] A first non-production database-only schema restore drill completed against an isolated throwaway target and was cleaned up.
+- [ ] Full data restore remains open because public rows reference `auth.users`, and auth-user restore was not approved for the first drill.
 - [ ] Backup/restore and storage-object readiness remain tracked as FB-020 follow-ups until separately verified.
 - [ ] Public, auth, legal, trust, and beta copy avoid fake/demo claims, unsupported compliance claims, or misleading data.
 

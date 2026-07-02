@@ -28,7 +28,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - SQL provenance cleanup v1 is tracked in main; do not apply old loose SQL files if encountered elsewhere.
 - FB-020 template coverage exists for sanitized SQL rollout evidence, restore drill result capture, storage backup/readiness worksheets, and Edge Function/env/secret restore notes.
 - FB-020 backup/restore artifact-ignore guardrails exist for common local generated dumps, exports, query-output, storage-export, and restore-drill output folders/files; this does not verify backup/PITR/storage restore readiness.
-- FB-020 non-production restore drill preflight planning exists; an actual restore drill, backup/PITR verification, and storage restore verification remain go-live gaps until separately approved and completed.
+- FB-020 non-production restore drill preflight planning exists. A first database-only schema restore drill against an isolated throwaway Supabase project completed safely, including public schema restore and sanitized shape verification, but full data restore stopped because public rows referenced `auth.users` and auth-user restore was not approved. Backup/PITR verification, full data restore, and storage restore verification remain go-live gaps until separately approved and completed.
 - FB-020 non-production restore drill operator checklist coverage exists for future go/no-go review; this does not complete a restore drill or verify backup/PITR/storage restore readiness.
 - Authenticated production read-only smoke now has required dedicated homeowner and contractor owner smoke credentials configured for local operator use without documenting values. The latest run passed preflight and 2/2 read-only sign-in/navigation tests. Optional role credentials and optional stable smoke record IDs remain future/not configured, and mutation smoke remains unapproved.
 - Preview/sandbox remains the default for authenticated testing.
@@ -46,6 +46,8 @@ Template-only capture formats for applied-SQL ledgers, production SQL rollouts, 
 Non-production restore drill preflight planning lives in `docs/FB-020_RESTORE_DRILL_PREFLIGHT_PLAN.md`. It should be reviewed before any future approved drill, but it does not complete the drill or verify backup/PITR/storage restore readiness.
 
 The operator go/no-go checklist lives in `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md`. It supports a future approved drill but does not run the drill or verify backup/PITR/storage restore readiness by itself.
+
+Latest restore drill evidence as of 2026-07-02: an approved database-only drill used sandbox `zpzdkoaubyjtsomccxya` as the source and throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`. Public schema export and restore completed, and sanitized verification confirmed 66 public tables, 179 public functions, and 66 public RLS-enabled tables on the restored target. Public data restore stopped safely because public rows reference `auth.users`, and auth-user restore was outside the approved scope. Storage was not restored, production was not touched, the throwaway target was deleted, and private local dump/restore artifacts were deleted.
 
 FB-020 covers:
 
