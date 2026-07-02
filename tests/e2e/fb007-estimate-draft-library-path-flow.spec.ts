@@ -12,6 +12,7 @@ const libraryIndexSource = () => sourceFile('src/data/estimateDraftLibrary/index
 const libraryTypesSource = () => sourceFile('src/data/estimateDraftLibrary/types.ts');
 const hvacBundleSource = () => sourceFile('src/data/estimateDraftLibrary/hvac/replace/hvac-system-replacement.ts');
 const hvacTuneUpBundleSource = () => sourceFile('src/data/estimateDraftLibrary/hvac/service/hvac-seasonal-tune-up.ts');
+const plumbingFaucetBundleSource = () => sourceFile('src/data/estimateDraftLibrary/plumbing/replace/plumbing-faucet-replacement.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -22,16 +23,18 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
-  test('Estimate Draft Library module exists and keeps only approved HVAC proof bundles wired', () => {
+  test('Estimate Draft Library module exists and keeps only approved proof bundles wired', () => {
     const indexSource = libraryIndexSource();
     const typesSource = libraryTypesSource();
     const bundleSource = hvacBundleSource();
     const tuneUpBundleSource = hvacTuneUpBundleSource();
+    const plumbingSource = plumbingFaucetBundleSource();
     const bundleListSource = sourceBetween(indexSource, 'const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [', '] satisfies EstimateDraftLibraryBundle[];');
 
     expect(indexSource).toContain("import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacement';");
     expect(indexSource).toContain("import { hvacSeasonalTuneUpBundle } from './hvac/service/hvac-seasonal-tune-up';");
-    expect(indexSource).toContain('const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [\n  hvacSystemReplacementBundle,\n  hvacSeasonalTuneUpBundle,\n] satisfies EstimateDraftLibraryBundle[];');
+    expect(indexSource).toContain("import { plumbingFaucetReplacementBundle } from './plumbing/replace/plumbing-faucet-replacement';");
+    expect(indexSource).toContain('const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [\n  hvacSystemReplacementBundle,\n  hvacSeasonalTuneUpBundle,\n  plumbingFaucetReplacementBundle,\n] satisfies EstimateDraftLibraryBundle[];');
     expect(indexSource).toContain('findEstimateDraftLibraryBundleForScope');
     expect(indexSource).toContain('estimateDraftLibraryTradeFromText');
 
@@ -53,12 +56,23 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(tuneUpBundleSource).toContain("'seasonal hvac tune up'");
     expect(tuneUpBundleSource).toContain("'filter check'");
 
-    expect(bundleListSource).not.toContain('plumbing');
+    expect(plumbingSource).toContain("trade: 'plumbing'");
+    expect(plumbingSource).toContain("work_category: 'replace'");
+    expect(plumbingSource).toContain("job_bundle: 'plumbing_faucet_replacement'");
+    expect(plumbingSource).toContain("display_name: 'Plumbing Faucet Replacement'");
+    expect(plumbingSource).toContain("'replace kitchen faucet'");
+    expect(plumbingSource).toContain("'install replacement lavatory faucet'");
+
+    expect(bundleListSource).toContain('hvacSystemReplacementBundle');
+    expect(bundleListSource).toContain('hvacSeasonalTuneUpBundle');
+    expect(bundleListSource).toContain('plumbingFaucetReplacementBundle');
+    expect(bundleListSource).not.toContain('toilet');
+    expect(bundleListSource).not.toContain('garbage');
     expect(bundleListSource).not.toContain('electrical');
     expect(bundleListSource).not.toContain('carpentry');
   });
 
-  test('resolver matches HVAC replacement and seasonal tune-up scopes while leaving unrelated scopes to fallback', () => {
+  test('resolver matches approved proof-bundle scopes while leaving unrelated scopes to fallback', () => {
     const matchingReplacementBundle = findEstimateDraftLibraryBundleForScope({
       trade: 'hvac',
       work_category: 'replace',
@@ -73,6 +87,46 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
       trade: 'hvac',
       work_category: 'service',
       rough_scope: 'HVAC maintenance visit for AC tune-up and furnace tune-up',
+    });
+    const matchingFaucetBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'replace',
+      rough_scope: 'Replace kitchen faucet with owner-approved replacement fixture',
+    });
+    const matchingLavatoryBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'replace',
+      rough_scope: 'Install replacement lavatory faucet in the bathroom vanity',
+    });
+    const nonMatchingFaucetRepair = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'repair',
+      rough_scope: 'Repair leaking faucet cartridge and diagnose drip',
+    });
+    const nonMatchingPlumbingDisposal = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'replace',
+      rough_scope: 'Replace garbage disposal under kitchen sink',
+    });
+    const nonMatchingPlumbingToilet = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'replace',
+      rough_scope: 'Toilet replacement with wax ring and flange review',
+    });
+    const nonMatchingWaterHeater = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'replace',
+      rough_scope: 'Water heater replacement and pan installation',
+    });
+    const nonMatchingElectrical = findEstimateDraftLibraryBundleForScope({
+      trade: 'electrical',
+      work_category: 'replace',
+      rough_scope: 'Replace outlet and switch',
+    });
+    const nonMatchingCarpentry = findEstimateDraftLibraryBundleForScope({
+      trade: 'carpentry',
+      work_category: 'repair',
+      rough_scope: 'Repair baseboard trim in hallway',
     });
     const nonMatchingTrade = findEstimateDraftLibraryBundleForScope({
       trade: 'plumbing',
@@ -96,6 +150,16 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(matchingTuneUpBundle?.job_bundle).toBe('hvac_seasonal_tune_up');
     expect(matchingTuneUpBundle?.work_category).toBe('service');
     expect(matchingMaintenanceBundle?.job_bundle).toBe('hvac_seasonal_tune_up');
+    expect(matchingFaucetBundle?.job_bundle).toBe('plumbing_faucet_replacement');
+    expect(matchingFaucetBundle?.trade).toBe('plumbing');
+    expect(matchingFaucetBundle?.work_category).toBe('replace');
+    expect(matchingLavatoryBundle?.job_bundle).toBe('plumbing_faucet_replacement');
+    expect(nonMatchingFaucetRepair).toBeNull();
+    expect(nonMatchingPlumbingDisposal).toBeNull();
+    expect(nonMatchingPlumbingToilet).toBeNull();
+    expect(nonMatchingWaterHeater).toBeNull();
+    expect(nonMatchingElectrical).toBeNull();
+    expect(nonMatchingCarpentry).toBeNull();
     expect(nonMatchingTrade).toBeNull();
     expect(nonMatchingReplacementScope).toBeNull();
     expect(nonMatchingServiceScope).toBeNull();
@@ -114,6 +178,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     const app = appSource();
     const bundleSource = hvacBundleSource();
     const tuneUpBundleSource = hvacTuneUpBundleSource();
+    const plumbingSource = plumbingFaucetBundleSource();
     const builderSource = sourceBetween(app, 'function estimateDraftLibraryBundleItems', 'function estimateDraftLibraryNotes');
     const seedSource = sourceBetween(app, 'function estimateDraftLibrarySeedFromItem', 'function estimateDraftLibraryBundleItems');
     const lineSource = sourceBetween(app, 'function estimateBuilderLineFromSeed', 'function customerFacingRoughScope');
@@ -122,7 +187,11 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(bundleSource).toContain("suggestion_behavior: 'optional_candidate'");
     expect(tuneUpBundleSource).toContain("suggestion_behavior: 'default_candidate'");
     expect(tuneUpBundleSource).toContain("suggestion_behavior: 'optional_candidate'");
+    expect(plumbingSource).toContain("suggestion_behavior: 'default_candidate'");
+    expect(plumbingSource).toContain("suggestion_behavior: 'optional_candidate'");
+    expect(plumbingSource).toContain("suggestion_behavior: 'review_only'");
     expect(builderSource).toContain("return behavior === 'default_candidate' || behavior === 'optional_candidate';");
+    expect(builderSource).not.toContain("behavior === 'review_only'");
     expect(seedSource).toContain('line_type: item.line_type');
     expect(seedSource).toContain('description: item.title');
     expect(seedSource).toContain('unit: item.unit');
@@ -134,7 +203,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
   });
 
   test('library bundle remains price-free and avoids pricing/tax/category/assembly behavior', () => {
-    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource()];
+    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource()];
     const typesSource = libraryTypesSource();
 
     bundleSources.forEach(bundleSource => {
@@ -160,7 +229,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
 
   test('contractor review reminders and rationale remain editor-only', () => {
     const app = appSource();
-    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource()];
+    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource()];
     const editorNoteSource = sourceBetween(app, 'function estimateDraftLibraryItemEditorNote', 'function estimateDraftLibrarySeedFromItem');
     const homeownerSource = sourceBetween(app, 'function HomeownerDashboard', 'function ContractorDashboard');
     const pdfSource = pdfDocumentsSource();
@@ -206,6 +275,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
       expect(libraryIndexSource()).not.toContain(prohibitedPath);
       expect(hvacBundleSource()).not.toContain(prohibitedPath);
       expect(hvacTuneUpBundleSource()).not.toContain(prohibitedPath);
+      expect(plumbingFaucetBundleSource()).not.toContain(prohibitedPath);
     }
   });
 });
