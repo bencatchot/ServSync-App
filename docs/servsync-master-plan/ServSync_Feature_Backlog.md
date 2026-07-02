@@ -115,7 +115,7 @@ Important guardrails:
 | FB-017 | Pricing Levels / Feature Tier Direction | Pricing, packaging, plan strategy | Brainstorming | High | Use FB-031 entitlement readiness as planning input, but do not imply billing, paywalls, checkout, or Stripe are active. |
 | FB-018 | Estimate Helper v1 | Contractor tools, estimates, scope/revenue suggestion support | Completed / Functional | High | Passed implementation validation, Vercel preview smoke, and user preview review; ready for merge after final PR checks. |
 | FB-019 | Estimate Labor Model / Line-Specific Labor Inputs | Contractor tools, estimates, invoices, pricing UX | Completed / Functional | High | v1 is complete: schema foundation and RPC/conversion preservation are merged and applied to sandbox/production; app/UI labor support and Build Estimate Draft labor cleanup are merged and passing preview. |
-| FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Major Progress / Backlog | High | Continue as an umbrella readiness program. Public smoke, security catalog, required authenticated production read-only smoke, backup/restore templates, artifact guardrails, restore-drill planning, and a first non-production schema restore drill have advanced; optional role/stable smoke records, full data/auth restore, storage restore verification, and broader readiness remain open. |
+| FB-020 | Security, Records Reliability, Backup/Restore, and Scale Readiness | Security, RLS, storage, records, operations, performance | Controlled Beta Baseline Met / Follow-up Backlog | High | Controlled private beta baseline is met through public smoke coverage, required authenticated production read-only smoke, no-mutation smoke boundaries, backup/restore templates, artifact guardrails, restore-drill planning, and a first non-production schema restore drill. FB-020 is not fully complete; optional role/stable smoke records, full data/auth restore, storage restore verification, backup/PITR verification, public go-live readiness, paid-subscription readiness, and broader readiness remain follow-up backlog. |
 | FB-021 | Scheduling + Appointment Confirmation Foundation | Scheduling, service requests, jobs, homeowner visibility | v1 Closeout Complete / Follow-up Backlog | High | v1 now covers the SQL/RPC/RLS foundation, read display, contractor 1-3 window proposals, homeowner accept/decline, confirmed appointment visibility, contractor replacement reschedule, contractor appointment cancel, and compact appointment-state helper copy. Future follow-ups should focus on durable Activity rows for rescheduled/canceled appointments, richer safe history UI, and a full sandbox-mutating probe run with approved sandbox env, while keeping calendar sync, dispatch/routing, GPS, email/SMS/push reminders, notification delivery, and homeowner-forced booking out of scope. |
 | FB-022 | Online Booking / Request-to-Booking Flow | Homeowner service requests, contractor intake, scheduling | Backlog | High | Treat true online/self-booking as later. Use FB-021 as the safer contractor-controlled appointment proposal foundation before any booking workflow. |
 | FB-023 | Contractor Payment Collection / Deposits | Invoices, estimates, payments | Later / Future | High | Revisit after invoice reliability, partial invoicing, pricing, legal/ops, and Stripe plans are approved. Do not claim card/ACH, deposits, receipts, reminders, or payment status automation as live. |
@@ -909,7 +909,7 @@ Estimate Labor Model v1 is complete. Future work should be optional regression h
 
 ### FB-020 — Security, Records Reliability, Backup/Restore, and Scale Readiness
 
-Status: Major Progress / Backlog
+Status: Controlled Beta Baseline Met / Follow-up Backlog
 
 Priority: High
 
@@ -930,7 +930,7 @@ FB-016 remains focused on PDF/storage strategy. FB-020 is broader and owns secur
 
 Audit findings to preserve:
 
-- Current confidence is medium for many app security foundations, low for backup/restore readiness, low for deletion/retention/export readiness, medium-low for 1,000-user performance readiness, and low for public go-live readiness.
+- Current confidence is sufficient for the controlled private beta baseline, medium for many app security foundations, low for full backup/restore readiness, low for deletion/retention/export readiness, medium-low for 1,000-user performance readiness, and low for public go-live readiness.
 - Existing foundations include browser-safe Supabase client usage, RLS foundation, private home document bucket design, private media storage policies, signed URL display paths, RLS/storage tests, sign-out local storage cleanup, and duplicate prevention for invoice-to-Home-History filing.
 - Gaps include deployed-state verification, SECURITY DEFINER/RPC authorization audit, backup/restore runbooks, storage-object backup strategy, dependency audit vulnerabilities, public-media guardrails, orphan/broken storage-object handling, unpaginated growing lists, and immutable/auditable record snapshots.
 
@@ -942,6 +942,8 @@ Progress through PR #145:
 - Backup/restore ledger templates, backup artifact gitignore guardrails, restore-drill preflight planning, and a non-production restore drill operator checklist exist.
 - A first database-only schema restore drill completed against an isolated throwaway Supabase project and was cleaned up. Full data restore remains open because public rows reference `auth.users`, and auth-user restore was not approved for the first drill.
 - Authenticated production smoke remains read-only and gated on approved safe credentials/records; optional role credentials and optional stable smoke record IDs remain future/not configured.
+- Controlled private beta baseline is met by the combination of production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, the first non-production database-only schema restore drill, schema restore verification matching 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no secrets/artifacts committed.
+- FB-020 remains follow-up backlog rather than fully complete. Full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
 
 Recommended future implementation sequence:
 
@@ -955,11 +957,11 @@ Recommended future implementation sequence:
 Guardrails:
 
 - Do not treat this backlog item as implementation approval.
-- Do not claim security, backup/restore, compliance, public go-live, or production RLS/storage verification is complete until proven by code, SQL/config, deployed-state checks, tests, and completed implementation reports.
+- Do not claim full security, full backup/restore, compliance, public go-live, paid-subscription readiness, production RLS/storage verification, storage restore, or backup/PITR verification is complete until proven by code, SQL/config, deployed-state checks, tests, and completed implementation reports.
 - Keep controlled private beta, broader beta, public go-live, and paid subscription readiness as separate gates.
 
 Current next step:
-Use FB-020 as the umbrella readiness workstream before broader beta/public go-live. Next operational readiness work should decide whether to approve a full database restore including required auth rows, create sanitized matching auth fixtures, or accept schema-only restore as the first milestone; optional stable smoke records, optional role smoke credentials, storage restore verification, and broader backup/PITR readiness remain separate follow-ups.
+Treat FB-020 as controlled private beta baseline met while keeping it open as a follow-up readiness backlog. Next operational readiness work should decide whether to approve a full database restore including required auth rows, create sanitized matching auth fixtures, or accept schema-only restore as the first milestone; optional stable smoke records, optional role smoke credentials, storage restore verification, storage-object backup/restore strategy, public go-live readiness, paid-subscription readiness, and broader backup/PITR readiness remain separate follow-ups.
 
 ### FB-021 — Scheduling + Appointment Confirmation Foundation
 
@@ -1222,7 +1224,7 @@ Plan any next billing-readiness slice as either admin/readiness polish or a stri
 
 ## Current next recommended focus
 
-1. FB-020 operational readiness: decide the full data/auth restore path after the first schema-only restore drill, plus optional stable smoke records or optional role smoke credentials if needed.
+1. FB-020 follow-up readiness: controlled private beta baseline is met; decide the full data/auth restore path after the first schema-only restore drill, plus storage restore, backup/PITR verification, optional stable smoke records, optional role smoke credentials, public go-live readiness, and paid-subscription readiness when needed.
 2. FB-024 Price Book maturity, one narrow slice at a time.
 3. FB-025 unread indicators or scoped communication/Activity follow-up, including a possible later audit for appointment rescheduled/canceled Activity rows.
 4. FB-026 review/referral flow audit after core request-to-job confidence improves.

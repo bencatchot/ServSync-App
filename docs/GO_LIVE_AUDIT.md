@@ -31,9 +31,10 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - FB-020 non-production restore drill preflight planning exists. A first database-only schema restore drill against an isolated throwaway Supabase project completed safely, including public schema restore and sanitized shape verification, but full data restore stopped because public rows referenced `auth.users` and auth-user restore was not approved. Backup/PITR verification, full data restore, and storage restore verification remain go-live gaps until separately approved and completed.
 - FB-020 non-production restore drill operator checklist coverage exists for future go/no-go review; this does not complete a restore drill or verify backup/PITR/storage restore readiness.
 - Authenticated production read-only smoke now has required dedicated homeowner and contractor owner smoke credentials configured for local operator use without documenting values. The latest run passed preflight and 2/2 read-only sign-in/navigation tests. Optional role credentials and optional stable smoke record IDs remain future/not configured, and mutation smoke remains unapproved.
+- FB-020 has met the controlled private beta baseline for readiness evidence. That baseline is supported by production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, a first non-production database-only schema restore drill with sanitized verification of 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no committed secrets/artifacts.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
-- FB-020 now tracks the broader Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness workstream. It is a backlog/readiness program, not proof that security, backup/restore, production RLS/storage verification, or public go-live readiness is complete.
+- FB-020 now tracks the broader Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness workstream. It has met controlled private beta baseline, but it is not proof that full security, full backup/restore, production RLS/storage verification, storage restore, backup/PITR verification, public go-live readiness, or paid-subscription readiness is complete.
 
 ## FB-020 Readiness Workstream
 
@@ -48,6 +49,8 @@ Non-production restore drill preflight planning lives in `docs/FB-020_RESTORE_DR
 The operator go/no-go checklist lives in `docs/FB-020_RESTORE_DRILL_OPERATOR_CHECKLIST.md`. It supports a future approved drill but does not run the drill or verify backup/PITR/storage restore readiness by itself.
 
 Latest restore drill evidence as of 2026-07-02: an approved database-only drill used sandbox `zpzdkoaubyjtsomccxya` as the source and throwaway target `servsync-restore-drill-2026-07-02` / `nxzermkvfimtxwkoozfh`. Public schema export and restore completed, and sanitized verification confirmed 66 public tables, 179 public functions, and 66 public RLS-enabled tables on the restored target. Public data restore stopped safely because public rows reference `auth.users`, and auth-user restore was outside the approved scope. Storage was not restored, production was not touched, the throwaway target was deleted, and private local dump/restore artifacts were deleted.
+
+Controlled private beta baseline status: met for the current private beta stage. This does not mark FB-020 fully complete. Full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
 
 FB-020 covers:
 
@@ -118,6 +121,7 @@ Controlled private beta can be considered separately from public go-live if all 
 - Production public smoke passes.
 - The unauthenticated production public smoke spec passes without sign-in, secrets, production mutation, SQL/settings changes, or manual deploy.
 - Authenticated production smoke uses dedicated approved smoke accounts for read-only navigation only. Required homeowner and contractor owner sign-in/navigation passed in the latest authenticated production read-only smoke run; mutation smoke remains unapproved.
+- FB-020 controlled private beta baseline is met for the current beta stage, while full data/auth restore, storage restore, backup/PITR verification, public go-live readiness, and paid-subscription readiness remain separate follow-up gates.
 
 ## Blockers Before Public Go-Live
 
