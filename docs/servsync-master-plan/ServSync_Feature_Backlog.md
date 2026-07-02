@@ -961,6 +961,7 @@ Progress through PR #145:
 - Authenticated production smoke remains read-only and gated on approved safe credentials/records; optional role credentials and optional stable smoke record IDs remain future/not configured.
 - Controlled private beta baseline is met by the combination of production public smoke coverage, required production authenticated read-only smoke for homeowner and contractor owner accounts, no production mutation during smoke testing, restore drill preflight/operator docs, backup/restore evidence templates, backup/restore artifact `.gitignore` guardrails, the first non-production database-only schema restore drill, schema restore verification matching 66 public tables, 179 public functions, and 66 RLS-enabled public tables, cleanup of the throwaway restore target and local artifacts, and no secrets/artifacts committed.
 - FB-020 remains follow-up backlog rather than fully complete. Full data/auth restore remains open due to the `auth.users` scope boundary, storage restore remains open, backup/PITR verification remains open, storage-object backup/restore strategy remains unverified, optional production role credentials remain future/not configured, optional stable production smoke record IDs remain future/not configured, public go-live readiness remains a separate gate, and paid-subscription readiness remains a separate gate.
+- The storage restore verification planning slice adds a docs-only operational plan and sanitized evidence template for future Supabase Storage backup/restore verification. It does not execute a restore, download storage objects, create backup artifacts, verify storage restore readiness, mutate production or sandbox data, or change Supabase/Vercel/env/auth/provider settings.
 
 Recommended future implementation sequence:
 
@@ -978,7 +979,7 @@ Guardrails:
 - Keep controlled private beta, broader beta, public go-live, and paid subscription readiness as separate gates.
 
 Current next step:
-Treat FB-020 as controlled private beta baseline met while keeping it open as a follow-up readiness backlog. Next operational readiness work should decide whether to approve a full database restore including required auth rows, create sanitized matching auth fixtures, or accept schema-only restore as the first milestone; optional stable smoke records, optional role smoke credentials, storage restore verification, storage-object backup/restore strategy, public go-live readiness, paid-subscription readiness, and broader backup/PITR readiness remain separate follow-ups.
+Treat FB-020 as controlled private beta baseline met while keeping it open as a follow-up readiness backlog. Storage restore verification now has a docs-only plan/template, but actual storage restore execution remains future and separately approved. Next operational readiness work should decide whether to approve a full database restore including required auth rows, create sanitized matching auth fixtures, or accept schema-only restore as the first milestone; optional stable smoke records, optional role smoke credentials, storage restore execution, storage-object backup/restore strategy execution, public go-live readiness, paid-subscription readiness, and broader backup/PITR readiness remain separate follow-ups.
 
 ### FB-021 — Scheduling + Appointment Confirmation Foundation
 
