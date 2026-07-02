@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-030-disabled-invite-delivery-evidence-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Recorded FB-030 disabled Home Access invite delivery evidence. The backlog now notes that sandbox ref `zpzdkoaubyjtsomccxya` was verified with `home_access_invite_email_delivery_enabled` set to `enabled=false`, browser/anon runtime-setting reads blocked as expected, mocked disabled Edge Function behavior covered, no real provider call occurred, no invite email was sent, production ref `uqgtheclhxqlnjpfmheq` was avoided, and no runtime setting was toggled.
+- Reason for change: The official backlog/changelog needed to reflect that disabled-delivery posture has been verified before any future invite email enablement planning.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - Manual Markdown review
+  - Read-only sandbox DB flag query for `home_access_invite_email_delivery_enabled`
+  - Browser/anon-style runtime-setting read attempt
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-access-invite-email-function.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Documentation-only evidence alignment. No app code, tests, SQL/RLS/RPC/schema behavior, Supabase/Vercel/env/auth/provider settings, package/dependency files, production data, sandbox data, email delivery enablement, invite sends, deploy, or `marketing-screenshots/` changes are included.
+  - Production Home Access invite email delivery remains disabled.
+  - Real email enablement requires separate approval for provider/secrets/send behavior, abuse/rate-limit posture, copy/link review, and production-safe verification.
+  - The full `home-access-invite-delivery-foundation.spec.ts` toggles `servsync_runtime_settings` via `setDeliverySetting(false)`, `setDeliverySetting(true)`, and `deleteDeliverySetting()`, so it should not be used for disabled-only verification without explicit approval.
+  - Shared record access remains guarded and should expand one approved surface at a time.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-030 wording now records disabled-delivery foundation evidence while preserving invite email enablement and shared-record expansion as follow-up backlog.
+
 - Branch: `codex/fb-021-activity-sql-apply-evidence-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
