@@ -87,6 +87,57 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(invoiceAttentionSource).not.toContain('new Date()');
   });
 
+  test('completed jobs ready to invoice use existing linked-invoice and work-item billing rules', () => {
+    const source = appSource();
+    const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
+    const completedJobInvoiceSource = sourceBetween(
+      contractorSource,
+      'const linkedNonVoidInvoiceForJob =',
+      'const openFinancialRecords =',
+    );
+    const workflowOverviewSource = sourceBetween(
+      contractorSource,
+      '<Card title="Workflow overview"',
+      '<ContractorEntitlementStatusPanel',
+    );
+    const jobRowSource = sourceBetween(
+      contractorSource,
+      'data-testid="contractor-job-row"',
+      '{showLocalContactForm &&',
+    );
+    const jobDetailInvoiceActionSource = sourceBetween(
+      contractorSource,
+      'const linkedInvoiceForJob = linkedNonVoidInvoiceForJob(activeInspection);',
+      'Standalone scheduling coming soon',
+    );
+
+    expect(completedJobInvoiceSource).toContain("invoice.status !== 'void'");
+    expect(completedJobInvoiceSource).toContain('invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false)');
+    expect(completedJobInvoiceSource).toContain("if (status !== 'completed' && status !== 'closed') return false;");
+    expect(completedJobInvoiceSource).toContain('if (linkedNonVoidInvoiceForJob(job)) return false;');
+    expect(completedJobInvoiceSource).toContain('if (jobWorkItems.length > 0) return jobWorkItems.some(jobWorkItemCanInvoice);');
+    expect(completedJobInvoiceSource).toContain('const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);');
+    expect(completedJobInvoiceSource).not.toContain('cancelled');
+    expect(completedJobInvoiceSource).not.toContain('due_at');
+    expect(completedJobInvoiceSource).not.toContain('Date.now');
+
+    expect(contractorSource).toContain('+ completedJobsReadyToInvoice.length');
+    expect(contractorSource).toContain("label: 'Completed jobs'");
+    expect(workflowOverviewSource).toContain('completedJobsReadyToInvoice.length > 0');
+    expect(workflowOverviewSource).toContain('Completed jobs ready to invoice');
+    expect(workflowOverviewSource).toContain('Review recent closed jobs and create invoices from completed work.');
+    expect(workflowOverviewSource).toContain('{completedJobsReadyToInvoice.length} ready');
+    expect(workflowOverviewSource).toContain('onClick={openCompletedJobsReadyToInvoice}');
+    expect(completedJobInvoiceSource).toContain("setContractorJobsView('closed_jobs')");
+    expect(workflowOverviewSource).not.toContain('createInvoiceFromJob');
+    expect(workflowOverviewSource).not.toContain('openPartialInvoiceReview');
+
+    expect(jobRowSource).toContain('linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)');
+    expect(jobDetailInvoiceActionSource).toContain('if (linkedInvoiceForJob) openInvoiceRecord(linkedInvoiceForJob);');
+    expect(jobDetailInvoiceActionSource).toContain('else if (activeJobHasDurableWorkItems) openPartialInvoiceReview(activeInspection);');
+    expect(jobDetailInvoiceActionSource).toContain('else void createInvoiceFromJob(activeInspection);');
+  });
+
   test('dashboard summary stays lightweight and uses existing loaded workflow data', () => {
     const source = appSource();
     const contractorSource = sourceBetween(source, 'function ContractorDashboard', 'function PlatformAdminDashboard');
@@ -100,10 +151,11 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(contractorSource).toContain('+ homeownerAppointmentRequests.length');
     expect(contractorSource).toContain('+ contractorFollowUpCount');
     expect(contractorSource).toContain('+ acceptedEstimatesNeedingJobs.length');
+    expect(contractorSource).toContain('+ completedJobsReadyToInvoice.length');
     expect(contractorSource).toContain('+ invoiceAttentionRecords.length');
     expect(contractorSource).toContain('+ (contractorProfileOnboardingComplete ? 0 : 1)');
 
-    for (const label of ['Connections', 'Calendar requests', 'Requests', 'Estimates / invoices', 'Profile setup']) {
+    for (const label of ['Connections', 'Calendar requests', 'Requests', 'Estimates / invoices', 'Completed jobs', 'Profile setup']) {
       expect(contractorSource).toContain(`label: '${label}'`);
     }
 

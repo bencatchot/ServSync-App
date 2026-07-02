@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-01
 
+- Branch: `codex/fb-027-completed-jobs-ready-invoice-cta-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-027 Slice 3 completed-jobs-ready-to-invoice CTA inside the existing contractor dashboard `Workflow overview` / `Needs review` area. The CTA appears only for completed/closed, non-cancelled jobs that lack a linked non-void invoice, and durable work-item-backed jobs count only when existing `jobWorkItemCanInvoice(...)` logic says at least one item is ready. The CTA routes to the existing Closed jobs view and leaves invoice creation on job cards/details.
+- Reason for change: Contractors should have an easier dashboard hint for completed work that appears ready for billing follow-up, while keeping invoice creation, partial-invoice review, linked-invoice handling, and billing safety on the existing job/invoice surfaces.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb027-contractor-pipeline-summary.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production or sandbox data mutation, deploy, notification delivery, public review display, ranking, badges, paid placement, new lifecycle statuses, overdue-by-date invoice logic, broad job-message aggregation, new follow-up queue, card-level badge rollout, direct dashboard invoice creation, payment/deposit behavior, QuickBooks/accounting behavior, or broad automation is included.
+  - The CTA routes to the existing Closed jobs view, which is not a full dedicated invoice queue; future FB-027 work should separately audit stale estimates, unpaid invoice nuance, stronger filtering, and any broader queue concepts after beta feedback.
+
 - Branch: `codex/fb-027-accepted-estimates-dashboard-cta-v1`
 - Files changed:
   - `src/App.tsx`

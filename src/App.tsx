@@ -22368,8 +22368,31 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     openInspection(job);
     setNotice('Opened the job linked to this accepted estimate.');
   };
+  const workItemsForJob = (jobId: string) => [...(jobWorkItemsByJobId[jobId] || [])].sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const linkedNonVoidInvoiceForJob = (job: Pick<Inspection, 'id' | 'estimate_id'>) => invoices.find(invoice =>
+    invoice.status !== 'void'
+    && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
+  ) ?? null;
+  const jobReadyForInvoiceFollowUp = (job: Inspection) => {
+    const status = inspectionJobStatus(job);
+    if (status !== 'completed' && status !== 'closed') return false;
+    if (linkedNonVoidInvoiceForJob(job)) return false;
+    const jobWorkItems = workItemsForJob(job.id);
+    if (jobWorkItems.length > 0) return jobWorkItems.some(jobWorkItemCanInvoice);
+    return true;
+  };
+  const openCompletedJobsReadyToInvoice = () => {
+    setContractorTab('inspections');
+    setContractorJobsView('closed_jobs');
+    setInspectionView('list');
+    setJobsCustomerFilterSubjectId(null);
+    setJobsListDateFilter('');
+    setJobsListStatusFilter('all');
+    setJobsListTypeFilter('all');
+  };
   const openJobs = inspections.filter(inspectionIsOpenJob);
   const closedJobs = inspections.filter(inspectionIsClosedJob);
+  const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = invoices.filter(invoice => !['paid', 'void'].includes(invoice.status));
@@ -22626,6 +22649,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     + homeownerAppointmentRequests.length
     + contractorFollowUpCount
     + acceptedEstimatesNeedingJobs.length
+    + completedJobsReadyToInvoice.length
     + invoiceAttentionRecords.length
     + (contractorProfileOnboardingComplete ? 0 : 1);
   const workflowReviewItems: Array<{
@@ -22656,6 +22680,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setContractorJobsView('open_financial');
         setInspectionView('list');
       },
+    },
+    {
+      label: 'Completed jobs',
+      count: completedJobsReadyToInvoice.length,
+      onClick: openCompletedJobsReadyToInvoice,
     },
     {
       label: 'Profile setup',
@@ -22789,7 +22818,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
   };
-  const workItemsForJob = (jobId: string) => [...(jobWorkItemsByJobId[jobId] || [])].sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const groupedWorkItemsForJob = (jobId: string) => {
     const items = workItemsForJob(jobId);
     return {
@@ -25170,24 +25198,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         Items already marked by existing workflow statuses.
                       </p>
                     </div>
-                    {acceptedEstimatesNeedingJobs.length > 0 && (
-                      <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-emerald-950">Accepted estimates ready for jobs</p>
-                          <p className="mt-0.5 text-xs leading-5 text-emerald-800">Create jobs from approved estimates in the existing Jobs workspace.</p>
-                        </div>
-                        <button
-                          type="button"
-                          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:border-emerald-300 hover:text-emerald-900 sm:w-auto"
-                          onClick={() => {
-                            setContractorTab('inspections');
-                            setContractorJobsView('open_financial');
-                            setInspectionView('list');
-                          }}
-                        >
-                          <ClipboardCheck size={14} />
-                          {acceptedEstimatesNeedingJobs.length} need jobs
-                        </button>
+                    {(acceptedEstimatesNeedingJobs.length > 0 || completedJobsReadyToInvoice.length > 0) && (
+                      <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[260px]">
+                        {acceptedEstimatesNeedingJobs.length > 0 && (
+                          <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-emerald-950">Accepted estimates ready for jobs</p>
+                              <p className="mt-0.5 text-xs leading-5 text-emerald-800">Create jobs from approved estimates in the existing Jobs workspace.</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:border-emerald-300 hover:text-emerald-900 sm:w-auto"
+                              onClick={() => {
+                                setContractorTab('inspections');
+                                setContractorJobsView('open_financial');
+                                setInspectionView('list');
+                              }}
+                            >
+                              <ClipboardCheck size={14} />
+                              {acceptedEstimatesNeedingJobs.length} need jobs
+                            </button>
+                          </div>
+                        )}
+                        {completedJobsReadyToInvoice.length > 0 && (
+                          <div className="flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-blue-950">Completed jobs ready to invoice</p>
+                              <p className="mt-0.5 text-xs leading-5 text-blue-800">Review recent closed jobs and create invoices from completed work.</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-800 transition hover:border-blue-300 hover:text-blue-900 sm:w-auto"
+                              onClick={openCompletedJobsReadyToInvoice}
+                            >
+                              <Receipt size={14} />
+                              {completedJobsReadyToInvoice.length} ready
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
@@ -31488,10 +31536,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const subjectLabel = fieldWorkSubjectLabel(insp);
                           const subjectAddress = fieldWorkSubjectAddress(insp);
                           const linkedEstimate = insp.estimate_id ? estimates.find(estimate => estimate.id === insp.estimate_id) ?? null : null;
-                          const linkedInvoice = invoices.find(invoice =>
-                            invoice.status !== 'void'
-                            && (invoice.job_id === insp.id || (insp.estimate_id ? invoice.estimate_id === insp.estimate_id : false))
-                          ) ?? null;
+                          const linkedInvoice = linkedNonVoidInvoiceForJob(insp);
                           const jobWorkItems = workItemsForJob(insp.id);
                           const hasDurableWorkItems = jobWorkItems.length > 0;
                           const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
@@ -33092,10 +33137,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             const linkedEstimateForJob = activeInspection.estimate_id
               ? estimates.find(estimate => estimate.id === activeInspection.estimate_id) ?? null
               : null;
-            const linkedInvoiceForJob = invoices.find(invoice =>
-              invoice.status !== 'void'
-              && (invoice.job_id === activeInspection.id || (activeInspection.estimate_id ? invoice.estimate_id === activeInspection.estimate_id : false))
-            ) ?? null;
+            const linkedInvoiceForJob = linkedNonVoidInvoiceForJob(activeInspection);
             const activeJobWorkItems = workItemsForJob(activeInspection.id);
             const activeJobHasDurableWorkItems = activeJobWorkItems.length > 0;
             const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);
