@@ -55,6 +55,73 @@ Minimum expectations:
 - Define an orphan-object audit and cleanup process for files without matching app metadata.
 - Define recovery expectations for missing or corrupted media/PDF objects.
 
+## Storage Restore Verification Plan
+
+This plan prepares a future approval-gated storage restore verification. It does not execute a restore, download storage objects, create backup artifacts, change storage policies, touch production data, or prove public go-live or paid-subscription readiness.
+
+Purpose:
+
+- Verify that the Supabase Storage backup/restore strategy can recover representative storage objects into an approved target without exposing private customer data.
+- Confirm that restored objects can be reconnected to app metadata and remain protected by the intended storage access controls.
+- Capture enough sanitized evidence for operational readiness without committing raw file contents, signed URLs, private object paths, customer identifiers, or backup details.
+
+Preconditions before any future execution:
+
+- Separate explicit approval for the storage restore verification scope, source, target, operator, and allowed object sample.
+- Confirmed source project/ref and restore target, with a non-production restore target preferred.
+- Service credentials, access tokens, database URLs, storage credentials, and provider credentials handled outside the repo and outside chat/log output.
+- Approved fixture object set, sanitized representative objects, or a privacy-reviewed sample strategy that avoids private customer-identifying paths in repo-tracked evidence.
+- Confirmed cleanup plan for restored objects, local artifacts, temporary exports, and any throwaway target.
+- No raw secrets, signed URLs, private object contents, private object paths, raw backup paths, or customer-identifying values in docs, reports, PRs, logs, screenshots, traces, or terminal captures.
+
+Storage surfaces to consider:
+
+- Homeowner/contractor uploaded photos or media, if currently used by the app.
+- Generated PDFs, final snapshots, legal/trust documents, or filed records, if stored in Supabase Storage.
+- Request, job/inspection, support, Discover, and contractor profile media, if applicable.
+- Any other buckets currently used by the app at the time the verification is approved.
+
+Evidence to capture, sanitized only:
+
+- Bucket names, if safe to record.
+- Object counts, sample counts, or hash/checksum summaries only when privacy-safe and not derived from private identifying paths.
+- Source environment label and restore target identifier, redacted if needed.
+- Verification method, such as inventory comparison, representative object availability check, checksum/hash comparison, metadata reconnect check, or storage policy/catalog check.
+- Operator, date/time, approval reference, pass/fail/blocked result, cleanup confirmation, residual-artifact status, and follow-up actions.
+
+Privacy and artifact rules:
+
+- Do not commit raw object contents, signed URLs, private storage URLs, customer names, addresses, emails, phone numbers, object paths with private identifiers, raw backup paths, or raw production query output.
+- Keep generated backup, restore, export, storage-export, checksum, inventory, and local ops artifacts gitignored, local/private, or in an approved private ops location.
+- Prefer high-level summaries such as "representative private object restored and access-checked" rather than object-level lists.
+- Treat object paths and record IDs as sensitive unless explicitly approved and sanitized.
+
+Verification approach:
+
+- Start with read-only inventory and catalog checks before any restore action.
+- Restore only to an isolated non-production target unless an incident response plan explicitly approves otherwise.
+- Verify representative object availability and integrity without exposing contents.
+- Verify metadata reconnect behavior where applicable, such as matching object metadata to a restored app record or sanitized fixture.
+- Verify storage access controls and storage policies where applicable, including private bucket access behavior and public bucket expectations.
+- Verify cleanup of temporary restore artifacts, local exports, restored object samples, and throwaway targets.
+
+Failure handling:
+
+- Stop immediately if the source or target is ambiguous, if production is accidentally targeted, or if secrets/private object details may be exposed.
+- Redact errors before writing any report.
+- Document partial restore risk, affected bucket labels, failed verification step, rollback or cleanup steps, and follow-up owner.
+- Do not retry with broader permissions, larger samples, or production targets without separate approval.
+
+Explicit exclusions:
+
+- Not public go-live readiness.
+- Not paid-subscription readiness.
+- Not full data/auth restore.
+- Not backup/PITR verification.
+- Not storage restore execution in this docs-only slice.
+- Not a deploy.
+- Not a production mutation.
+
 ## Restore Drill Process
 
 A restore drill should prove that the app can recover records and files into a fresh non-production environment.

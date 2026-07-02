@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-020-storage-restore-verification-plan-v1`
+- Files changed:
+  - `docs/FB-020_OPERATIONS_SECURITY_READINESS_RUNBOOK.md`
+  - `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a docs-only FB-020 storage restore verification plan and sanitized evidence template for future Supabase Storage backup/restore verification. The runbook now describes purpose, scope, preconditions, storage surfaces, evidence capture, privacy/artifact rules, verification approach, failure handling, cleanup expectations, and explicit exclusions.
+- Reason for change: FB-020 controlled private beta baseline is met, but storage restore verification remains an operational follow-up before broader readiness, public go-live, paid-subscription readiness, or incident-response confidence.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - Manual Markdown review
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Documentation/ops planning only. No app code, tests, SQL/RLS/RPC/schema behavior, Supabase/Vercel/env/auth/provider settings, package/dependency files, production data, sandbox data, deploy, restore drill, storage object access/download, backup artifact creation, or `marketing-screenshots/` changes are included.
+  - No storage restore was executed or verified by this slice.
+  - No storage objects were accessed or downloaded.
+  - No backup artifacts were created.
+  - Future storage restore execution requires separate approval, target confirmation, privacy-reviewed sample strategy, credential handling outside the repo, sanitized evidence capture, and cleanup reporting.
+  - Full data/auth restore and backup/PITR verification remain future follow-ups.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-020 wording now records the storage restore verification plan while preserving storage restore execution, full data/auth restore, backup/PITR verification, public go-live readiness, and paid-subscription readiness as future follow-up backlog.
+
 - Branch: `codex/fb-030-disabled-invite-delivery-evidence-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

@@ -200,6 +200,84 @@ Use one row per bucket. Backup/export and restore methods must be approved later
 | `contractor-assets` | Public | Contractor logos/profile assets | Medium | TBD | TBD | TBD | Contractor/profile asset metadata | Public object access | TBD | Monitor egress | Public assets only | Catalog plus public asset check in non-prod | TBD |
 | `discover-media` | Public | Discover/public contractor media | Medium | TBD | TBD | TBD | Post/media metadata | Public object access | TBD | Compress/resize and monitor egress | Public showcase media only | Catalog plus Discover media check in non-prod | TBD |
 
+## Storage Restore Verification Evidence Template
+
+Use this only after a future storage restore verification has separate approval. This template is not approval to download storage objects, run restores, create backup artifacts, change storage policies, touch production data, print secrets, or expose private customer data.
+
+Do not include real secrets, signed URLs, private object contents, raw backup paths, customer names, customer addresses, customer emails, customer phone numbers, raw production query output, private object paths, or object paths containing private identifiers.
+
+```text
+Verification title:
+Date/time:
+Operator:
+Approval reference:
+Source project/ref, redacted if needed:
+Restore target project/ref:
+Environment boundaries confirmed:
+- Production targeted: yes/no
+- Non-production restore target used: yes/no
+- Storage/provider settings changed: yes/no
+
+Buckets reviewed:
+- Bucket:
+  Public/private:
+  Business purpose:
+  Sample included: yes/no
+  Notes:
+
+Object sample strategy:
+- Approved fixture objects / sanitized representative objects / count-only inventory / other:
+- Sample size summary:
+- Private object path exposure avoided: yes/no
+- Customer-identifying path/value exposure avoided: yes/no
+
+Object count/hash/checksum approach, if used:
+- Count method:
+- Hash/checksum method:
+- Raw hashes safe to record here: yes/no
+- Privacy review completed: yes/no
+
+Restore action summary:
+- Restore method:
+- Restore target:
+- Objects restored:
+- Metadata reconnect method:
+- Partial restore risk:
+
+Access-control verification summary:
+- Private bucket behavior:
+- Public bucket behavior:
+- Storage policy/catalog checks:
+- App-level access check, if approved:
+- Unauthorized access check, if approved:
+
+Cleanup:
+- Temporary local artifacts created:
+- Temporary local artifacts deleted:
+- Restored objects cleaned up:
+- Throwaway target cleaned up:
+- Residual artifacts/targets:
+- Follow-up cleanup needed:
+
+Result: pass/fail/blocked
+Follow-up actions:
+
+Secret/artifact confirmation:
+- Secrets printed or stored in repo: no
+- Signed URLs stored in repo: no
+- Private object contents stored in repo: no
+- Raw customer-identifying object paths stored in repo: no
+- Backup/restore artifacts stored in repo: no
+
+Public/customer-data exposure confirmation:
+- Public data exposure observed:
+- Customer/private data exposure observed:
+- Mitigation/follow-up:
+
+Operator/signoff:
+Approver/signoff:
+```
+
 ## Edge Function/Env/Secrets Restore Checklist
 
 Secret names may be documented. Secret values must never be stored in repo docs.
