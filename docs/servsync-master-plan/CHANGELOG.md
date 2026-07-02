@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/email-notification-foundation-v1`
+- Files changed:
+  - `supabase/functions/send-notification-email/index.ts`
+  - `tests/e2e/send-notification-email-function.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the smallest safe email-notification foundation on top of existing in-app notifications. The existing `send-notification-email` Edge Function now keeps email as a gated external delivery channel for a narrow allowlist of trusted `public.notifications` event types: `homeowner_request`, `appointment_confirmed`, `appointment_cancelled`, `estimate_sent`, `estimate_accepted`, `estimate_declined`, and `invoice_sent`.
+- Reason for change: ServSync needs a transactional email path for important existing in-app notifications without replacing the in-app notification record, enabling production sends, exposing provider keys to the frontend, adding SQL/RLS changes, or adding SMS/push/marketing behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/send-notification-email-function.spec.ts --project=chromium`
+  - `npm run lint`
+  - `npm run test` (not available; package has no `test` script)
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Production email delivery remains disabled/gated unless `EMAIL_ENABLED`, `NOTIFICATION_WEBHOOK_SECRET`, provider keys, and the database webhook are separately approved and configured.
+  - No SQL was added or applied. No durable `notification_deliveries` table exists yet for generic notification email attempts; provider/function logs remain the current non-durable result trace.
+  - Appointment reschedule email remains deferred because durable reschedule Activity rows are not the same as in-app `public.notifications` rows, and this slice does not create a new notification hook.
+  - Home Access invite email remains on the separate FB-030 disabled-delivery foundation and is not folded into the generic notification email function by this slice.
+  - SMS/text, push notifications, marketing email, bulk email, campaigns, checkout, payment, and unrelated notification categories remain out of scope.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-025 wording now records the gated transactional email foundation while preserving in-app notifications as the source of truth and keeping production activation, durable delivery logs, appointment reschedule email, and Home Access invite delivery as separate follow-ups.
+
 - Branch: `codex/fb-022-scheduling-copy-guardrail-v1`
 - Files changed:
   - `src/App.tsx`
