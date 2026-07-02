@@ -4,6 +4,28 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-02
+
+- Branch: `codex/fb-027-invoice-attention-cta-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-027 Slice 4 invoice-attention CTA polish inside the existing contractor dashboard `Workflow overview` / `Needs review` area. The CTA appears only when existing `invoiceAttentionRecords` are present, uses the current status-only `draft`, `overdue`, and `partially_paid` bucket, and routes to the existing Open estimates/invoices financial view.
+- Reason for change: Contractors should have a clearer dashboard path to invoice records that already need attention without turning the dashboard into a collection queue, payment workflow, reminder system, or invoice-action surface.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm audit --audit-level=moderate`
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/fb027-contractor-pipeline-summary.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/storage/settings changes, production or sandbox data mutation, deploy, notification delivery, email/SMS/push, payment/deposit behavior, QuickBooks/accounting behavior, public review display, ranking, badges, paid placement, new invoice lifecycle statuses, overdue-by-date logic, due-date attention derivation, broad automation, new queue page, card-level invoice badges, reminder/collection copy, or dashboard send/mark-paid/void actions are included.
+  - The dashboard now has three conditional compact CTA rows; future FB-027 work should audit consolidation before adding more dashboard follow-up categories.
+
 ## 2026-07-01
 
 - Branch: `codex/fb-027-completed-jobs-ready-invoice-cta-v1`
