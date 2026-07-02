@@ -1197,7 +1197,7 @@ Product area:
 - Email delivery readiness
 
 Summary:
-FB-030 adds the controlled foundation for shared homeowner/home access. Completed slices include home membership tables/RPCs, pending email invite foundations, homeowner Home Access UI, read-only shared-home shells, address-aware shared-home shells, read-only shared reminder shells, a Home Access invite email function scaffold, disabled sandbox/production deployments, disabled UI send wiring, and a DB runtime setting contract for future invite email enablement.
+FB-030 adds the controlled foundation for shared homeowner/home access. Completed slices include home membership tables/RPCs, pending email invite foundations, homeowner Home Access UI, read-only shared-home shells, address-aware shared-home shells, read-only shared reminder shells, a Home Access invite email function scaffold, disabled sandbox/production deployments, disabled UI send wiring, and a DB runtime setting contract for future invite email enablement. Disabled-delivery evidence is now recorded: sandbox ref `zpzdkoaubyjtsomccxya` was verified with the Home Access invite email DB flag `home_access_invite_email_delivery_enabled` set to `enabled=false`, browser/anon runtime-setting reads blocked as expected, mocked disabled Edge Function behavior covered, no real provider call occurred, no invite email was sent, production ref `uqgtheclhxqlnjpfmheq` was avoided, and no runtime setting was toggled.
 
 Current guardrails:
 
@@ -1208,7 +1208,7 @@ Current guardrails:
 - No email/SMS/push delivery should be claimed live from disabled infrastructure.
 
 Current next step:
-Choose the next shared-record surface deliberately, or plan controlled production invite-email enablement separately with explicit provider/secrets/send approval.
+Choose the next shared-record surface deliberately, or plan controlled invite-email enablement separately with explicit provider/secrets/send approval. Future disabled-only probes should use read-only DB verification or a narrowed test path that does not toggle `servsync_runtime_settings`; the full delivery foundation spec includes runtime-setting toggle/delete cases and should not be used for disabled-only evidence without explicit approval.
 
 ### FB-031 — Contractor Beta Billing-Readiness / Entitlement Readiness
 
