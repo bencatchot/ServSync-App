@@ -256,6 +256,10 @@ function projectRefForSandboxSql() {
   return existsSync(projectRefPath) ? readFileSync(projectRefPath, 'utf8').trim() : '';
 }
 
+function sourceFile(path: string) {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
+
 function quoteUuidList(ids: string[]) {
   return [...new Set(ids)]
     .map(id => {
@@ -327,6 +331,136 @@ commit;
     { cwd: process.cwd(), encoding: 'utf8', stdio: 'pipe' },
   );
 }
+
+test.describe('FB-021 durable appointment Activity source-static coverage', () => {
+  test('SQL patch extends only the workflow Activity event type allowlist and preserves existing event types', () => {
+    const sql = sourceFile('servsync-fb021-reschedule-cancel-activity-events.sql');
+    const existingWriterSql = sourceFile('servsync-fb025-workflow-activity-event-writers.sql');
+    const expectedEventTypes = [
+      'service_request_submitted',
+      'homeowner_message_sent',
+      'contractor_message_sent',
+      'appointment_proposed',
+      'appointment_confirmed',
+      'appointment_reschedule_proposed',
+      'appointment_cancelled',
+      'estimate_sent',
+      'estimate_approved',
+      'estimate_declined',
+      'job_created',
+      'job_completed',
+      'invoice_sent',
+      'invoice_paid',
+      'invoice_voided',
+      'report_shared',
+      'photo_shared',
+    ];
+
+    expect(sql).toContain('workflow_activity_events_event_type_check');
+    expect(sql).toContain('drop constraint if exists workflow_activity_events_event_type_check');
+    for (const eventType of expectedEventTypes) {
+      expect(sql, `workflow Activity event type ${eventType} should remain allowed`).toContain(`'${eventType}'`);
+    }
+    expect(sql.match(/appointment_reschedule_proposed/g)?.length || 0).toBeGreaterThanOrEqual(3);
+    expect(sql.match(/appointment_cancelled/g)?.length || 0).toBeGreaterThanOrEqual(3);
+    expect(existingWriterSql, 'existing proposal writer should remain the source pattern').toContain('appointment_proposed');
+    expect(existingWriterSql, 'existing confirmation writer should remain the source pattern').toContain('appointment_confirmed');
+  });
+
+  test('SQL patch writes reschedule and cancel Activity rows only from trusted RPCs with duplicate prevention', () => {
+    const sql = sourceFile('servsync-fb021-reschedule-cancel-activity-events.sql');
+
+    expect(sql).toContain("'public.servsync_reschedule_service_request_appointment(uuid, jsonb, text)'::regprocedure");
+    expect(sql).toContain("'public.servsync_cancel_service_request_appointment(uuid, text)'::regprocedure");
+    expect(sql).toContain("where wae.event_type = ''appointment_reschedule_proposed''");
+    expect(sql).toContain("and wae.service_request_id = v_request.id");
+    expect(sql).toContain("and wae.metadata @> jsonb_build_object(''proposal_batch_id'', v_batch_id)");
+    expect(sql).toContain("where wae.event_type = ''appointment_cancelled''");
+    expect(sql).toContain("and wae.appointment_id = v_appointment.id");
+    expect(sql).toContain('if v_appointment.id is not null and not exists');
+    expect(sql).toContain("p_actor_user_id => auth.uid()");
+    expect(sql).toContain("p_event_type => ''appointment_reschedule_proposed''");
+    expect(sql).toContain("p_event_type => ''appointment_cancelled''");
+  });
+
+  test('SQL patch keeps metadata minimal and avoids notification, calendar, reminder, and private note behavior', () => {
+    const sql = sourceFile('servsync-fb021-reschedule-cancel-activity-events.sql');
+    const appendBlocks = sql
+      .split('perform public.servsync_append_workflow_activity_event')
+      .slice(1)
+      .map(block => block.split(');')[0]);
+    expect(appendBlocks, 'patch should add exactly two durable Activity appends').toHaveLength(2);
+
+    const serializedBlocks = appendBlocks.join('\n');
+    for (const expectedMetadataKey of [
+      'source_rpc',
+      'proposal_batch_id',
+      'window_count',
+      'existing_confirmed_appointment_preserved',
+      'cancelled_window_count',
+    ]) {
+      expect(serializedBlocks).toContain(expectedMetadataKey);
+    }
+    for (const forbidden of [
+      'p_reason',
+      'event_note',
+      'window_ids',
+      'contractor_note',
+      'homeowner_response_note',
+      'notification_id',
+      'calendar_event_id',
+      'reminder_id',
+    ]) {
+      expect(serializedBlocks).not.toContain(forbidden);
+    }
+    expect(sql).not.toContain('insert into public.notifications');
+    expect(sql).not.toContain('contractor_calendar_events');
+    expect(sql).not.toContain('home_reminders');
+  });
+
+  test('Activity timeline maps reschedule/cancel events with conservative copy and no broad scheduling claims', () => {
+    const timelineSource = sourceFile('src/features/workflow/WorkflowActivityTimelineWithDurableEvents.tsx');
+
+    expect(timelineSource).toContain("| 'appointment_reschedule_proposed'");
+    expect(timelineSource).toContain("| 'appointment_cancelled'");
+    expect(timelineSource).toContain("'appointment_reschedule_proposed',");
+    expect(timelineSource).toContain("'appointment_cancelled',");
+    expect(timelineSource).toContain('Replacement visit times proposed');
+    expect(timelineSource).toContain('The contractor proposed new visit options. The current appointment stays scheduled until a new time is accepted.');
+    expect(timelineSource).toContain('Appointment canceled');
+    expect(timelineSource).toContain('The appointment was canceled. The service request may still remain open.');
+    expect(timelineSource).toContain('appointment_reschedule_proposed:${event.service_request_id}:${metadataString');
+    expect(timelineSource).toContain('appointment_cancelled:${event.appointment_id}');
+
+    for (const forbiddenCopy of [
+      'notification',
+      'reminder',
+      'calendar sync',
+      'dispatch',
+      'routing',
+      'GPS',
+      'self-booking',
+      'request was closed',
+    ]) {
+      expect(timelineSource).not.toContain(forbiddenCopy);
+    }
+  });
+
+  test('source-static guardrails preserve existing Activity RLS posture and avoid lifecycle broadening', () => {
+    const sql = sourceFile('servsync-fb021-reschedule-cancel-activity-events.sql');
+    const schedulingSql = sourceFile('servsync-fb021-scheduling-foundation.sql');
+
+    expect(sql).toContain('revoke all on function public.servsync_append_workflow_activity_event');
+    expect(sql).not.toContain('grant insert on table public.workflow_activity_events');
+    expect(sql).not.toContain('grant update on table public.workflow_activity_events');
+    expect(sql).not.toContain('grant delete on table public.workflow_activity_events');
+    expect(sql).not.toContain('create policy');
+    expect(sql).not.toContain('alter table public.service_request_appointment_windows');
+    expect(sql).not.toContain('alter table public.service_request_appointments');
+    expect(schedulingSql).toContain('servsync_reschedule_service_request_appointment');
+    expect(schedulingSql).toContain('servsync_cancel_service_request_appointment');
+  });
+});
 
 test.describe('FB-025 sandbox workflow activity event writer probes', () => {
   let owner: AuthenticatedClient;

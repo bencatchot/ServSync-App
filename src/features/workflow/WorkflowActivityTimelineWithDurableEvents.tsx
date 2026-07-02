@@ -8,6 +8,8 @@ import {
 type DurableWorkflowActivityEventType =
   | 'appointment_proposed'
   | 'appointment_confirmed'
+  | 'appointment_reschedule_proposed'
+  | 'appointment_cancelled'
   | 'estimate_approved'
   | 'estimate_declined'
   | 'job_created'
@@ -47,6 +49,8 @@ type WorkflowActivityTimelineWithDurableEventsProps = {
 const DISPLAYED_DURABLE_EVENT_TYPES: DurableWorkflowActivityEventType[] = [
   'appointment_proposed',
   'appointment_confirmed',
+  'appointment_reschedule_proposed',
+  'appointment_cancelled',
   'estimate_approved',
   'estimate_declined',
   'job_created',
@@ -77,6 +81,12 @@ function durableEventDedupeKey(event: DurableWorkflowActivityRow) {
         : null;
     case 'appointment_confirmed':
       return event.appointment_id ? `appointment_confirmed:${event.appointment_id}` : null;
+    case 'appointment_reschedule_proposed':
+      return event.service_request_id
+        ? `appointment_reschedule_proposed:${event.service_request_id}:${metadataString(event.metadata, 'proposal_batch_id') || event.created_at}`
+        : null;
+    case 'appointment_cancelled':
+      return event.appointment_id ? `appointment_cancelled:${event.appointment_id}` : null;
     case 'estimate_approved':
       return event.estimate_id ? `estimate_approved:${event.estimate_id}` : null;
     case 'estimate_declined':
@@ -108,6 +118,20 @@ function durableEventDefaults(eventType: DurableWorkflowActivityEventType): Omit
         label: 'Appointment confirmed',
         detail: 'The visit time was confirmed.',
         tone: 'emerald',
+        icon: 'appointment',
+      };
+    case 'appointment_reschedule_proposed':
+      return {
+        label: 'Replacement visit times proposed',
+        detail: 'The contractor proposed new visit options. The current appointment stays scheduled until a new time is accepted.',
+        tone: 'amber',
+        icon: 'appointment',
+      };
+    case 'appointment_cancelled':
+      return {
+        label: 'Appointment canceled',
+        detail: 'The appointment was canceled. The service request may still remain open.',
+        tone: 'red',
         icon: 'appointment',
       };
     case 'estimate_approved':

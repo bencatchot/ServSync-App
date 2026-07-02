@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-021-reschedule-cancel-activity-events-v1`
+- Files changed:
+  - `servsync-fb021-reschedule-cancel-activity-events.sql`
+  - `src/features/workflow/WorkflowActivityTimelineWithDurableEvents.tsx`
+  - `tests/e2e/fb025-workflow-activity-events.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-021 Closeout C durable Activity support for contractor appointment replacement-window proposals and appointment cancellations. The new SQL patch extends the `workflow_activity_events` event-type allowlist with `appointment_reschedule_proposed` and `appointment_cancelled`, injects sanitized writer calls into the existing trusted reschedule/cancel RPCs, and the Activity timeline can render both rows with conservative copy.
+- Reason for change: FB-021 Closeout B found that reschedule/cancel actions already write appointment event history but do not yet write durable `workflow_activity_events`, leaving the shared Activity timeline without a durable record for those contractor scheduling changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb025-workflow-activity-events.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium`
+- Known risks or follow-ups:
+  - SQL/RPC/frontend/test/docs slice. The SQL file was added to the repo but was not applied to sandbox or production; production SQL apply requires separate approval.
+  - The added writers keep metadata minimal and do not include raw cancel reasons, exact window IDs, private notes, notification/calendar/reminder fields, or internal scheduling details.
+  - No deploy, production data mutation, sandbox data mutation, notification delivery, reminder automation, calendar sync, dispatch/routing/GPS, homeowner self-booking, new appointment statuses, package/dependency changes, or `marketing-screenshots/` changes are included.
+  - Full sandbox-mutating probe evidence and richer safe appointment history UI remain follow-up backlog.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-021 backlog wording now records that Closeout C added the planned SQL patch, Activity timeline mapping, and source-static coverage for durable reschedule/cancel Activity rows while preserving approved SQL apply/probe evidence, richer safe history UI, and notification/calendar/dispatch/self-booking exclusions as follow-ups.
+
 - Branch: `codex/fb-011-homeowner-properties-mobile-overflow-v1`
 - Files changed:
   - `src/App.tsx`
