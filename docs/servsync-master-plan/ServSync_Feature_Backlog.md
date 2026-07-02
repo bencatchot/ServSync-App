@@ -97,7 +97,7 @@ Important guardrails:
 | --- | --- | --- | --- | --- | --- |
 | FB-001 | Invite a Contractor to ServSync | Homeowner Contractors tab, service request support, contractor acquisition | Completed / Functional | Medium | Future outreach/claim-flow improvements later. |
 | FB-002 | Contractor Estimate Defaults & Templates | Contractor tools, estimates, saved charges, templates, Custom Pricing | Beta Ready / Follow-up Backlog | High | Use in controlled beta with CSV preview regression coverage in place; invoice quick-pick, smart dedupe/overwrite, XLSX/PDF/AI import cleanup, and broader trade-library work remain future. |
-| FB-003 | Contextual Connection Request Flow with Multi-Property Permission Access | Connections, permissions, property sharing | Completed / Functional | High | Follow-up testing of permission enforcement and contractor visibility. |
+| FB-003 | Contextual Connection Request Flow with Multi-Property Permission Access | Connections, permissions, property sharing | Controlled Beta Evidence Confirmed / Follow-up Backlog | High | Permission enforcement and contractor visibility audit passed for controlled beta use; future work must remain narrowly scoped around any new permission categories, broader shared-home work-record access, Home History sharing, notifications, media expansion, or visibility-broadening changes. |
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
 | FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
@@ -270,7 +270,7 @@ Recommended sequence:
 
 ### FB-003 — Contextual Connection Request Flow with Multi-Property Permission Access
 
-Status: Completed / Functional
+Status: Controlled Beta Evidence Confirmed / Follow-up Backlog
 
 Product area:
 
@@ -309,14 +309,18 @@ Contractor shortcuts:
 
 Follow-up testing:
 
-- Multi-property homeowner connection request
-- Per-property permission enforcement
-- Copy-permissions UI behavior
-- Contractor visibility with one shared property vs multiple properties
-- Contractor cannot see unshared properties
-- Contractor cannot see unshared permission categories
-- Open Jobs/Estimates/Invoices routes to existing records
-- Homeowner History uses existing completed/closed records
+- FB-003 Closeout A permission enforcement and contractor visibility audit passed for controlled beta use with no blockers or high-risk issues found.
+- Validated evidence included typecheck, build, security catalog checks, cross-user RLS checks, and expanded RLS/privacy checks.
+- Confirmed boundaries: homeowner-owned homes remain owner-scoped; shared access remains property-scoped and directional; accepted shared-home shells expose limited fields; viewer shared-home access hides street/zip and shows city/state only; admin/member address-shell behavior remains scoped; contractor visibility remains mediated by active connection plus permission/shared-property/workflow rules; unrelated contractors/homeowners cannot read each other's service requests, estimates, estimate lines, jobs, invoices, invoice lines, or high-risk RPC actions; activity/timeline visibility remains scoped to authorized homeowner, contractor access, or platform admin.
+- Shared-home shell/address RPCs do not broaden base `homes` RLS and explicitly exclude work records.
+- Medium-risk follow-up: legacy/global connection permission compatibility remains sensitive and should stay under focused regression coverage if expanded.
+- Mutation-heavy shared-home specs were reviewed but not rerun during the audit because that audit did not approve sandbox fixture mutation.
+
+Future backlog guardrails:
+
+- Do not treat this as full public go-live readiness.
+- Do not imply broad shared-home work-record access, full Home History sharing, notification delivery, media sharing expansion, new permission categories, or contractor visibility beyond authorized connection/property/workflow rules.
+- Any new permission category, broader shared-home work-record access, Home History sharing, notification, media, contractor messaging, or visibility-broadening change needs its own narrow audit/implementation slice.
 
 ### FB-004 — Contractor Reports
 

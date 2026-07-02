@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-003-permission-evidence-alignment-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Recorded FB-003 Closeout A audit evidence showing that the current permission enforcement and contractor visibility foundation is acceptable for controlled beta use. Updated FB-003 from `Completed / Functional` with follow-up testing pending to `Controlled Beta Evidence Confirmed / Follow-up Backlog`, while keeping broader shared-home work-record access, Home History sharing, notifications, media expansion, new permission categories, and public go-live claims out of scope.
+- Reason for change: The official backlog still listed permission enforcement and contractor visibility follow-up testing as the next step even after the Closeout A audit found no blockers or high-risk issues and confirmed the current controlled-beta boundaries through source review and targeted validation.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - Manual Markdown review
+  - `npm run typecheck`
+  - `npm run build`
+  - Prior audit evidence recorded: `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium` passed 14/14.
+  - Prior audit evidence recorded: `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts --project=chromium` passed 1/1 after local env was loaded.
+  - Prior audit evidence recorded: `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium` passed 7/7 after local env was loaded.
+- Known risks or follow-ups:
+  - Documentation-only closeout. No app code, tests, SQL/RLS/RPC/schema/Supabase/Vercel/auth/env/provider/settings changes, production data mutation, sandbox data mutation, deploy, or `marketing-screenshots/` changes are included.
+  - Legacy/global connection permission compatibility remains sensitive and should stay under focused regression coverage if expanded.
+  - Mutation-heavy shared-home specs were reviewed but not rerun during the audit because that audit did not approve sandbox fixture mutation.
+  - Future work that could broaden visibility must remain separately approved and narrowly scoped, including new permission categories, broader shared-home work-record access, Home History sharing, notifications, media expansion, contractor messaging, or public go-live claims.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-003 status and next-step wording were updated to record the completed permission enforcement/contractor visibility audit evidence for controlled beta use while preserving visibility-broadening work as follow-up backlog.
+
 - Branch: `codex/signup-confirmation-resend-v1`
 - Files changed:
   - `src/App.tsx`
