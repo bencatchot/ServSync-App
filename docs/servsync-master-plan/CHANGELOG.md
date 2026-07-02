@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/signup-confirmation-modal-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/signup-confirmation-modal.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added an obvious mobile-friendly signup email confirmation modal after successful account creation responses that require email confirmation. The modal tells users to check their email, includes the entered email address when available, reminds them to check spam/junk/promotions, and returns the auth surface to sign-in when dismissed.
+- Reason for change: The previous inline account-created notice was easy to miss, especially on small screens, and could leave users unclear that they must confirm their email before signing in.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file secret-value scan
+  - `TEST_APP_URL=http://localhost:5173 npx playwright test tests/e2e/signup-confirmation-modal.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs-only slice. No SQL/RLS/RPC/schema/Supabase function/auth config/Vercel/env/dependency/package/deployment/production setting changes, production data mutation, sandbox data mutation, email template changes, resend behavior, or `marketing-screenshots/` changes are included.
+  - The new test is source-static and validates the success/failure/dismiss wiring without creating real accounts or mutating sandbox/production auth state.
+
 - Branch: `codex/fb-007-carpentry-trim-baseboard-bundle-v1`
 - Files changed:
   - `src/data/estimateDraftLibrary/carpentry/repair/carpentry-trim-baseboard-repair.ts`

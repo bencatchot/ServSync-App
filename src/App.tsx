@@ -8247,12 +8247,14 @@ function AuthPage({
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [signupConfirmation, setSignupConfirmation] = useState<{ email: string; nextStepHint?: string } | null>(null);
   const signupRole: Exclude<UserRole, 'platform_admin'> = role === 'contractor' ? 'contractor' : 'homeowner';
 
   const submit = async () => {
     if (!supabase) return;
     setBusy(true);
     setMessage('');
+    setSignupConfirmation(null);
     try {
       if (mode === 'reset') {
         await supabase.auth.resetPasswordForEmail(email, {
@@ -8297,7 +8299,10 @@ function AuthPage({
         });
         onAuthed();
       } else {
-        setMessage('Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder.');
+        setSignupConfirmation({
+          email,
+          nextStepHint: 'After confirming your email, return here and sign in.',
+        });
       }
     } catch (err) {
       setMessage(mode === 'reset'
@@ -8432,6 +8437,7 @@ function AuthPage({
             onClick={() => {
               setMode('reset');
               setMessage('');
+              setSignupConfirmation(null);
               setPassword('');
             }}
             className="mt-3 text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
@@ -8448,6 +8454,7 @@ function AuthPage({
                 setMode(mode === 'signin' ? 'signup' : 'signin');
                 setAcceptedLegal(false);
                 setMessage('');
+                setSignupConfirmation(null);
                 setPassword('');
               }}
               className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
@@ -8463,6 +8470,7 @@ function AuthPage({
               onClick={() => {
                 setMode('signin');
                 setMessage('');
+                setSignupConfirmation(null);
                 setPassword('');
               }}
               className="text-sm font-semibold text-[#0078FF] hover:text-[#005FD6]"
@@ -8471,6 +8479,70 @@ function AuthPage({
             </button>
           </div>
         )}
+        {signupConfirmation && (
+          <SignupEmailConfirmationModal
+            email={signupConfirmation.email}
+            nextStepHint={signupConfirmation.nextStepHint}
+            onPrimary={() => {
+              setSignupConfirmation(null);
+              setMode('signin');
+              setAcceptedLegal(false);
+              setPassword('');
+              setMessage('');
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SignupEmailConfirmationModal({
+  email,
+  nextStepHint,
+  onPrimary,
+}: {
+  email: string;
+  nextStepHint?: string;
+  onPrimary: () => void;
+}) {
+  const normalizedEmail = email.trim();
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="signup-email-confirmation-title"
+      data-testid="signup-email-confirmation-modal"
+    >
+      <div className="w-full max-w-lg rounded-t-3xl border border-blue-100 bg-white p-6 shadow-2xl sm:rounded-3xl">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+            <Mail size={22} />
+          </span>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Almost there</p>
+            <h2 id="signup-email-confirmation-title" className="mt-1 text-2xl font-bold leading-tight text-slate-950">
+              Check your email to finish creating your account
+            </h2>
+          </div>
+        </div>
+        <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+          <p>
+            We sent a confirmation link to{' '}
+            {normalizedEmail ? <span className="font-semibold text-slate-950">{normalizedEmail}</span> : 'your email address'}.
+            {' '}Open that link to activate your ServSync account.
+          </p>
+          <p className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-900">
+            Don’t see it? Check your spam, junk, or promotions folder. It may take a minute to arrive.
+          </p>
+          {nextStepHint && (
+            <p className="text-xs font-medium text-slate-500">{nextStepHint}</p>
+          )}
+        </div>
+        <button type="button" onClick={onPrimary} className={`${buttonClass('primary')} mt-5 w-full justify-center`}>
+          I’ll check my email
+        </button>
       </div>
     </div>
   );
@@ -8501,6 +8573,7 @@ function ContractorReferralInvitePage({
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  const [signupConfirmation, setSignupConfirmation] = useState<{ email: string; nextStepHint?: string } | null>(null);
   const [permissions, setPermissions] = useState<SharingPermissions>(EMPTY_PERMISSIONS);
   const [acceptBusy, setAcceptBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -8632,6 +8705,7 @@ function ContractorReferralInvitePage({
     if (!supabase) return;
     setAuthBusy(true);
     setAuthMessage('');
+    setSignupConfirmation(null);
     try {
       if (mode === 'signin') {
         const { error: signinError } = await supabase.auth.signInWithPassword({ email, password });
@@ -8670,9 +8744,12 @@ function ContractorReferralInvitePage({
           setNotice('Your ServSync account is ready. You can connect with contractors whenever you choose.');
         }
       } else {
-        setAuthMessage(choice === 'connect'
-          ? 'Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder, then reopen this contractor invitation link.'
-          : 'Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder.');
+        setSignupConfirmation({
+          email,
+          nextStepHint: choice === 'connect'
+            ? 'After confirming your email, reopen this contractor invitation link to continue.'
+            : 'After confirming your email, return here and sign in.',
+        });
       }
     } catch (err) {
       setAuthMessage(readableError(err, 'Unable to complete authentication.'));
@@ -8782,6 +8859,7 @@ function ContractorReferralInvitePage({
             onClick={() => {
               setMode(nextMode);
               setAuthMessage('');
+              setSignupConfirmation(null);
             }}
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${mode === nextMode ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
@@ -8833,6 +8911,19 @@ function ContractorReferralInvitePage({
         </button>
         {authMessage && <Notice tone="info" text={authMessage} />}
       </form>
+      {signupConfirmation && (
+        <SignupEmailConfirmationModal
+          email={signupConfirmation.email}
+          nextStepHint={signupConfirmation.nextStepHint}
+          onPrimary={() => {
+            setSignupConfirmation(null);
+            setMode('signin');
+            setPassword('');
+            setAcceptedLegal(false);
+            setAuthMessage('');
+          }}
+        />
+      )}
       <LegalLinks className="mt-4 text-slate-400" />
     </div>
   );
@@ -8990,6 +9081,7 @@ function LocalCustomerClaimPage({
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  const [signupConfirmation, setSignupConfirmation] = useState<{ email: string; nextStepHint?: string } | null>(null);
   const [existingHome, setExistingHome] = useState<HomeProfile | null>(null);
   const [loadingHome, setLoadingHome] = useState(false);
   const [profileUpdates, setProfileUpdates] = useState({
@@ -9102,6 +9194,7 @@ function LocalCustomerClaimPage({
     if (!supabase) return;
     setAuthBusy(true);
     setAuthMessage('');
+    setSignupConfirmation(null);
     try {
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -9134,7 +9227,10 @@ function LocalCustomerClaimPage({
         if (profileError) throw profileError;
         onAuthed();
       } else {
-        setAuthMessage('Account created. Check your email to confirm your ServSync account before signing in. If you don’t see it, check your spam or junk folder, then reopen this invite link.');
+        setSignupConfirmation({
+          email,
+          nextStepHint: 'After confirming your email, reopen this invite link to continue.',
+        });
       }
     } catch (err) {
       setAuthMessage(readableError(err, 'Unable to complete authentication.'));
@@ -9267,6 +9363,7 @@ function LocalCustomerClaimPage({
                     onClick={() => {
                       setMode(nextMode);
                       setAuthMessage('');
+                      setSignupConfirmation(null);
                     }}
                     className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${mode === nextMode ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                   >
@@ -9326,6 +9423,19 @@ function LocalCustomerClaimPage({
                 </button>
                 {authMessage && <Notice tone="info" text={authMessage} />}
               </form>
+              {signupConfirmation && (
+                <SignupEmailConfirmationModal
+                  email={signupConfirmation.email}
+                  nextStepHint={signupConfirmation.nextStepHint}
+                  onPrimary={() => {
+                    setSignupConfirmation(null);
+                    setMode('signin');
+                    setPassword('');
+                    setAcceptedLegal(false);
+                    setAuthMessage('');
+                  }}
+                />
+              )}
               <LegalLinks className="mt-4 text-slate-400" />
             </div>
           ) : profile.role !== 'homeowner' ? (
