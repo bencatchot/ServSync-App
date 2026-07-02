@@ -1,7 +1,11 @@
 // ServSync — send-notification-email edge function
 // Called by a Supabase database webhook on notifications INSERT.
 //
-// To activate:
+// This function is a gated external delivery channel for existing in-app
+// notifications. The in-app row in public.notifications remains the source of
+// truth, and this function is intentionally inert unless EMAIL_ENABLED is true.
+//
+// To activate later with separate approval:
 //   1. Deploy:  supabase functions deploy send-notification-email
 //   2. Set env vars in Supabase dashboard (Project Settings → Edge Functions):
 //        EMAIL_ENABLED=true
@@ -29,10 +33,20 @@ interface WebhookPayload {
 
 // Email Notifications v1 — only these in-app notification types send an email.
 // Any other notification type is in-app only. Keyed by notifications.type.
+// Only add types here after a trusted server-side path already creates the
+// public.notifications row.
 const EMAIL_V1_EVENTS: Record<string, { subject: string; intro: string }> = {
   homeowner_request: {
     subject: 'New service request on ServSync',
     intro: 'A homeowner sent you a new service request.',
+  },
+  appointment_confirmed: {
+    subject: 'Appointment confirmed on ServSync',
+    intro: 'An appointment was confirmed in ServSync.',
+  },
+  appointment_cancelled: {
+    subject: 'Appointment canceled on ServSync',
+    intro: 'An appointment was canceled in ServSync.',
   },
   estimate_sent: {
     subject: 'Your estimate is ready on ServSync',
@@ -41,6 +55,10 @@ const EMAIL_V1_EVENTS: Record<string, { subject: string; intro: string }> = {
   estimate_accepted: {
     subject: 'Your estimate was approved on ServSync',
     intro: 'A homeowner approved one of your estimates.',
+  },
+  estimate_declined: {
+    subject: 'Estimate declined on ServSync',
+    intro: 'A homeowner declined one of your estimates.',
   },
   invoice_sent: {
     subject: 'You have a new invoice on ServSync',
@@ -158,8 +176,9 @@ Deno.serve(async (req) => {
   const payload = parsedPayload;
   const { user_id, type, title, body } = payload.record;
 
-  // Email Notifications v1: only send for the in-scope event types. All other
-  // notification types remain in-app only.
+  // Email Notifications v1: only send for the in-scope event types after the
+  // in-app notification already exists. All other notification types remain
+  // in-app only.
   const eventCopy = EMAIL_V1_EVENTS[type];
   if (!eventCopy) {
     console.log(`[send-notification-email] Skipping type "${type}" — not in Email v1 scope.`);
