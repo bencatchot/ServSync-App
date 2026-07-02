@@ -30,7 +30,7 @@ Controlled private beta is not the same as public go-live. Private beta may proc
 - FB-020 backup/restore artifact-ignore guardrails exist for common local generated dumps, exports, query-output, storage-export, and restore-drill output folders/files; this does not verify backup/PITR/storage restore readiness.
 - FB-020 non-production restore drill preflight planning exists; an actual restore drill, backup/PITR verification, and storage restore verification remain go-live gaps until separately approved and completed.
 - FB-020 non-production restore drill operator checklist coverage exists for future go/no-go review; this does not complete a restore drill or verify backup/PITR/storage restore readiness.
-- Authenticated production smoke is intentionally skipped unless dedicated production smoke accounts are approved.
+- Authenticated production read-only smoke now has required dedicated homeowner and contractor owner smoke credentials configured for local operator use without documenting values. The latest run passed preflight and 2/2 read-only sign-in/navigation tests. Optional role credentials and optional stable smoke record IDs remain future/not configured, and mutation smoke remains unapproved.
 - Preview/sandbox remains the default for authenticated testing.
 - Stripe has a webhook skeleton and SQL prep, but checkout/payment activation is not complete.
 - FB-020 now tracks the broader Security, Records Reliability, Backup/Restore, Storage, and Scale Readiness workstream. It is a backlog/readiness program, not proof that security, backup/restore, production RLS/storage verification, or public go-live readiness is complete.
@@ -115,7 +115,7 @@ Controlled private beta can be considered separately from public go-live if all 
 - Beta users are told payment processing, automatic reminders, push/email/text alerts, recurrence, QuickBooks, native mobile apps, and full calendar sync are not live.
 - Production public smoke passes.
 - The unauthenticated production public smoke spec passes without sign-in, secrets, production mutation, SQL/settings changes, or manual deploy.
-- Authenticated production smoke is skipped or uses dedicated approved production smoke accounts only.
+- Authenticated production smoke uses dedicated approved smoke accounts for read-only navigation only. Required homeowner and contractor owner sign-in/navigation passed in the latest authenticated production read-only smoke run; mutation smoke remains unapproved.
 
 ## Blockers Before Public Go-Live
 
@@ -154,17 +154,17 @@ Recommended fix path:
 - Consider converting active SQL into Supabase migrations before public launch.
 - Document which SQL has been applied to sandbox and production using the sanitized SQL ledger and rollout capture templates.
 
-### 4. Production smoke account policy is not complete
+### 4. Production smoke account policy has required read-only coverage but is not complete
 
-Authenticated production smoke currently remains intentionally skipped unless dedicated production smoke accounts are created.
+Authenticated production read-only smoke is no longer blocked for the required homeowner and contractor owner smoke accounts. The latest local run of `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` passed preflight and 2/2 read-only sign-in/navigation tests without production mutation, SQL, settings changes, or manual deploy.
 
 Before public go-live:
 
-- Decide whether production smoke accounts will exist.
 - Store credentials outside the repo.
 - Use `npm run qa:production-smoke:check` to check only whether approved production smoke variable names are present locally; this command must not print values, sign in, validate credentials, or contact Supabase.
 - Define allowed smoke actions.
 - Keep default authenticated production smoke read-only unless a separate prompt approves mutation.
+- Decide whether optional role smoke credentials and optional stable smoke record IDs are needed.
 - Require exact-ID or approved-prefix scoped cleanup for any approved production smoke records.
 - Keep smoke records clearly labeled and separated from real customer records.
 - Do not use founder/personal accounts as automated test credentials.

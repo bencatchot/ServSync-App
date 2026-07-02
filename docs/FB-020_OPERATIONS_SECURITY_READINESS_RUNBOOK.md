@@ -110,7 +110,7 @@ Minimum rebuild checklist:
 
 ## Production Smoke Account Policy
 
-Authenticated production smoke is skipped unless production smoke accounts are separately approved.
+Authenticated production smoke is read-only only and must use dedicated approved production smoke accounts. Required homeowner and contractor owner read-only smoke is configured for local operator use and has passed; optional role-specific and record-specific smoke remains future/not configured.
 
 Before using production smoke accounts:
 
@@ -143,6 +143,8 @@ TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke
 ```
 
 This command first runs the no-secret preflight with `--auth-readonly --strict`, then runs only `tests/e2e/production-auth-readonly-smoke.spec.ts`. It must not be used until dedicated production smoke accounts and allowed read-only actions are separately approved.
+
+Latest readiness evidence as of 2026-07-02: the required homeowner and contractor owner production smoke credential names were present locally without printing values, preflight passed, and `TEST_APP_URL=https://servsync.app npm run qa:e2e:production-auth-readonly-smoke` passed 2/2 read-only sign-in/navigation tests. Optional role credentials and optional stable smoke record IDs remain missing/not configured. This does not approve mutation smoke, production data changes, SQL, settings changes, user creation, or manual deploys.
 
 Required production smoke credential names:
 
