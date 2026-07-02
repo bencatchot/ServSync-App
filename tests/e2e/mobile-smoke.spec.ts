@@ -43,13 +43,13 @@ async function openMobileDrawer(page: Page): Promise<Locator> {
   return drawer;
 }
 
-async function openMobileTab(page: Page, name: RegExp, label: string) {
+async function openMobileTab(page: Page, name: RegExp, label: string, checkOverflow = true) {
   const drawer = await openMobileDrawer(page);
   await drawer.getByRole('button', { name }).first().click();
   await expect(drawer).toBeHidden();
   await expect(mobileHeader(page).getByText(label, { exact: true })).toBeVisible();
   await expect(page.getByRole('main')).toBeVisible();
-  await expectNoHorizontalOverflow(page);
+  if (checkOverflow) await expectNoHorizontalOverflow(page);
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -127,6 +127,27 @@ test.describe('mobile read-only smoke', () => {
 
     await openMobileTab(page, /Business Profile/i, 'Business Profile');
     await expect(main.getByRole('heading', { level: 2, name: /^Business profile$/i })).toBeVisible();
+
+    await consoleErrors.assertClean(testInfo);
+  });
+});
+
+test.describe('iPhone SE homeowner properties mobile layout', () => {
+  test.use({ viewport: { width: 320, height: 568 } });
+
+  test('homeowner Properties and Home Access settle without horizontal overflow', async ({ page }, testInfo) => {
+    const consoleErrors = captureMajorConsoleErrors(page);
+    const main = page.getByRole('main');
+
+    await loginMobile(page, 'homeowner');
+    await dismissTourIfVisible(page);
+
+    await openMobileTab(page, /^Properties\b/i, 'Properties', false);
+    await expect(main.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i })).toBeVisible();
+    await expect(main.getByTestId('shared-home-shells-panel')).toBeVisible();
+    await expect(main.getByTestId('home-access-panel')).toBeVisible();
+    await page.waitForTimeout(1_000);
+    await expectNoHorizontalOverflow(page);
 
     await consoleErrors.assertClean(testInfo);
   });

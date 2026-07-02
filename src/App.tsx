@@ -14676,17 +14676,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       )}
 
       {homeownerTab === 'home' && (
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="space-y-4 lg:col-span-2">
+        <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="min-w-0 max-w-full space-y-4 lg:col-span-2">
           <Card title="Home / Properties" icon={<Home size={18} />}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
+            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-950">Manage the homes connected to your account.</p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                   Pick the property you want to view or edit. Existing requests, estimates, invoices, documents, and home history remain account-level in this PR.
                 </p>
               </div>
-              <button type="button" onClick={startAddProperty} className={buttonClass('primary')}>
+              <button type="button" onClick={startAddProperty} className={mobileButtonClass('primary')}>
                 <Plus size={16} />
                 Add property
               </button>
@@ -14697,7 +14697,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <p className="mt-1 text-sm text-slate-500">Use the property editor below to add your first home record.</p>
               </div>
             ) : (
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-4 grid min-w-0 max-w-full gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {homes.map(candidate => {
                   const isSelected = selectedHome?.id === candidate.id;
                   const address = [candidate.address_line1, candidate.city, candidate.state].filter(Boolean).join(', ');
@@ -14706,13 +14706,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       key={candidate.id}
                       type="button"
                       onClick={() => selectHome(candidate.id)}
-                      className={`rounded-xl border p-3 text-left transition ${
+                      className={`min-w-0 w-full max-w-full rounded-xl border p-3 text-left transition ${
                         isSelected
                           ? 'border-blue-300 bg-blue-50 shadow-sm ring-2 ring-blue-100'
                           : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-bold text-slate-950">{candidate.nickname || 'Unnamed property'}</p>
                           <p className="mt-1 truncate text-xs text-slate-500">{address || 'No address added yet'}</p>
