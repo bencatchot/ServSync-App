@@ -1,8 +1,8 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-01
+Last updated: 2026-07-03
 
-Last reconciled through PR #145 / merge commit `4ef3be8`.
+Last reconciled through PR #192 / merge commit `6be737031addb1804ee0f803b99a8809dd98c62f`.
 
 ## Purpose
 
@@ -1125,7 +1125,7 @@ Summary:
 ServSync needs trust-building flows, but reviews/referrals are not implemented as a complete product surface. Existing partial review surfaces let homeowners leave ServSync reviews for eligible closed requests, preserve party-visible review context where existing request-card data supports it, and keep contractor-provided external review links separate from ServSync reviews. Review writes are intended to flow through guarded RPC logic rather than direct browser table writes. Public ServSync review averages, counts, kudos, and snippets are paused during beta until moderation/public-display policy is approved. A moderation SQL/RPC foundation now defaults reviews to pending moderation and gives platform admins a guarded backend moderation boundary plus an internal admin UI for review status and note updates, but approved-only public display is not live yet. Homeowner review form copy now reflects that optional display details may be reviewed before any future public display. This should avoid fake ratings, paid ranking, pay-to-play placement, premature badges, or claims that external reviews are imported or verified by ServSync.
 
 Current next step:
-Review the contractor-to-contractor referral platform-admin tracking UI after packaging. Defer email/outreach delivery, public referral links, rewards/credits, billing, homeowner recommendations/referrals, Google review handoff, badges/awards, contractor disputes/responses, signup attribution, contractor permissions/team access, account/profile creation, and any Discover ranking changes to later approved slices.
+Contractor-to-contractor referral core loop is closed out through PR #192: production-applied foundation SQL/RLS/RPC, contractor submit UI, and platform-admin manual tracking UI. Defer email/outreach delivery, public referral links, rewards/credits, billing, homeowner recommendations/referrals, Google review handoff, badges/awards, contractor disputes/responses, signup attribution, contractor permissions/team access, account/profile creation, matching automation, and any Discover ranking changes to later approved slices.
 
 Contractor-to-contractor referral foundation:
 
@@ -1135,7 +1135,7 @@ Contractor-to-contractor referral foundation:
 - Slice 3A adds a distinct platform-admin `Contractor-to-Contractor Referrals` tracking card inside the existing admin `Referrals` tab, using only the existing admin list/update RPCs for manual status, notes, and outreach-date/count tracking.
 - Keeps contractor referral leads separate from `homeowner_contractor_invite_leads`, `referrals`, `referral_codes`, `contractor_invites`, `contractor_team_invites`, Home Access invite tables, service requests, connection requests, and contractor-team access.
 - No public landing page, email/SMS/push delivery, rewards, credits, subscriptions, billing, paywalls, automatic contractor profile creation, account creation, contractor-to-contractor permissions, contractor team access, homeowner connection, service request, job, estimate, invoice, notification, or workflow automation is included.
-- Next step after admin tracking UI review should be a final PR audit/merge decision. Outreach/email, rewards/credits, public referral links, signup attribution, matching, account/profile creation, and permission/team-access behavior require separate approval.
+- Outreach/email, rewards/credits, public referral links, signup attribution, matching, account/profile creation, and permission/team-access behavior require separate approval.
 
 ### FB-027 — Contractor Pipeline / Follow-Up Lite
 
