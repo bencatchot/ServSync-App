@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/contractor-referral-submit-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-referral-submit-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the contractor-to-contractor referral Slice 2 submit UI. Eligible contractor owner/admin/office users can submit another contractor's business/contact details from the existing contractor `Invites & Referrals` area through the production-applied `servsync_submit_contractor_referral_invite` RPC.
+- Reason for change: The SQL/RLS/RPC foundation from PR #190 is merged and production-applied, so the next smallest safe slice is a contractor-facing manual lead submission card without admin tracking UI, email delivery, public referral links, rewards, billing, permissions, or workflow automation.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for forbidden direct table writes, admin UI, rewards, billing, public links, team access, and workflow automation
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-referral-submit-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL, production data mutation, deployment, admin UI, referral listing/history, email/SMS/push delivery, rewards, credits, billing, paywalls, public referral links, contractor-to-contractor permissions, contractor team access, automatic contractor profile/account/connection creation, homeowner/job/property/estimate/invoice sharing, or workflow automation is included.
+  - Existing homeowner invite links and QR/referral-credit language remain separate pre-existing flows; this slice does not change them.
+  - Platform-admin contractor referral tracking UI, email/outreach, rewards/credits, public referral links, and signup attribution remain future slices requiring separate approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-026 now records the production-applied contractor referral foundation and Slice 2 contractor submit UI while preserving admin tracking, outreach, rewards, billing, public links, permissions, and automation as future work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now reflects that contractor-to-contractor referrals have a contractor submit UI for ServSync team follow-up only, while preserving future approval gates for admin UI, outreach, rewards, public links, permissions, and automation.
+
 - Branch: `codex/contractor-referral-foundation-v1`
 - Files changed:
   - `servsync-contractor-referral-foundation.sql`
