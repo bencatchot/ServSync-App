@@ -18,6 +18,7 @@ Add as new future/backlog items unless the backlog owner chooses to split or mer
 | --- | --- | --- | --- | --- | --- |
 | FB-033 | Trust Layer Differentiators | Estimates, jobs, Home History, homeowner permissions, Discover, contractor trust | Backlog | High | Preserve as product direction. Later split into narrow audited slices for estimate clarity, change approvals, completion summaries, controlled shared notes, Emergency Binder export, and completed-job Discover posts. |
 | FB-034 | Discover Post Queue + Homeowner-Approved Project Share | Discover, completed jobs, media library, homeowner approval, contractor marketing | Backlog | High | Treat as a high-priority Discover expansion. First audit storage/privacy/RLS and the completed-job photo/source surfaces, then implement `Save for Discover` before optional homeowner approval badges. |
+| FB-035 | Discover Work-Generation Hub | Discover, contractor search, maintenance education, request starters, project pages | Backlog | High | Keep separate from FB-034. Shape Discover around helping homeowners find contractors and helping contractors get work. First audit current Discover/search/request surfaces, then prioritize `I need this` request starters, `New to ServSync` visibility, ServSync maintenance cards, and project-type pages. |
 
 ## Included backlog ideas
 
@@ -305,6 +306,77 @@ Possible implementation slices:
 6. Add `Homeowner approved` badge to approved posts.
 7. Add plan-aware storage usage/limits only after actual media usage patterns are clearer.
 
+### 12B. Discover Work-Generation Hub
+
+Status: Backlog
+
+Priority: High
+
+Purpose:
+
+Make Discover a focused work-generation hub, not a full social feed. The two primary goals are to help contractors be discovered and get more work, and to help homeowners find contractors who can do the work they need.
+
+Relationship to FB-034:
+
+- FB-034 is specifically about completed-job marketing workflow: `Save for Discover`, post queue, privacy-safe job drafts, optional homeowner approval, and homeowner-approved project share badges.
+- FB-035 is the broader Discover experience: contractor search, maintenance education, New to ServSync visibility, request starters, project-type pages, watchlists, and simple Discover sections.
+- Do not duplicate FB-034's completed-job post queue or homeowner-approved badge flow inside FB-035 implementation slices.
+
+Product direction:
+
+- Keep Discover simple and action-oriented, with three primary homeowner sections: `Find a Contractor`, `Home Maintenance Ideas`, and `Recent Local Work`.
+- Use Discover to educate homeowners about maintenance items they may not have considered, then connect them to contractors who can help.
+- Let ServSync-created maintenance content create homeowner engagement and free demand-generation for contractors.
+- Make every useful Discover item actionable through `Find contractors for this`, `Start a request`, `I need this`, `View contractor`, or `Save contractor`.
+- Keep contractor-facing Discover focused on profile visibility, service cards, simple post prompts, and real activity metrics.
+
+Included ideas:
+
+- `Find a Contractor` section with search/filter by trade, service area, type of work, recently active contractors, New to ServSync, recent project posts, saved contractors, and already-connected contractors.
+- `Home Maintenance Ideas` cards created by ServSync, such as HVAC drain line reminders, water shutoff readiness, water heater inspection prompts, electrical safety prompts, and exterior caulk/trim reminders.
+- `Recent Local Work` section for practical contractor posts, including recent completed work, before/after examples, New to ServSync introductions, seasonal availability, service-specific posts, and `We handle this type of work` posts.
+- `New to ServSync` / `Recently joined` contractor intro posts generated from a completed contractor profile.
+- `I Need This` / `I need help with this` action on maintenance cards, project pages, contractor service cards, and Discover posts.
+- `Local Home Maintenance Pulse` / `What homeowners are checking this month` section, starting as clearly labeled seasonal/editorial guidance and later using real ServSync activity only when real data exists.
+- Contractor Post Ideas Assistant with prompts such as introduce your business, post a seasonal reminder, post a common repair, post a service you want more of, and reuse a previous post format.
+- Homeowner watchlist by trade/category, such as HVAC maintenance, plumbing repairs, electrical safety, carpentry repairs, seasonal reminders, emergency prep, and home improvement ideas.
+- Project-type pages for common jobs, such as water heater replacement, HVAC tune-up, AC not cooling, faucet replacement, garbage disposal replacement, outlet/switch issue, light fixture install, panel concern, baseboard repair, door repair, dryer vent cleaning, gutter issue, and exterior caulking.
+- Simple contractor Discover dashboard with public profile preview, services offered, service area, recent posts, service cards, post creation options, profile views, post views, saves, and requests started from Discover.
+
+`I Need This` request-starter direction:
+
+- A homeowner clicking `I need this` should enter the request flow with useful prefilled context.
+- Example for water heater: trade `Plumbing`, request title `Water heater inspection / issue`, suggested photos such as water heater label/base/leak area/shutoff, suggested notes such as age/symptoms/urgency, and matching nearby contractors.
+- The action should help the homeowner start a request without knowing the perfect search terms.
+- Do not auto-send requests to contractors without homeowner confirmation.
+
+ServSync-created maintenance content guardrails:
+
+- Maintenance cards should be educational and practical, not alarmist.
+- Do not imply ServSync inspected the home or knows a homeowner needs a repair unless there is a real homeowner/job/home record basis.
+- Early Home Maintenance Pulse content must be labeled as seasonal/editorial guidance, not as platform activity.
+- Only use copy like `Based on recent ServSync activity in your area` after real activity data and privacy-safe aggregation are implemented.
+- Maintenance content should drive homeowners toward contractor search/request flows without creating fake urgency.
+
+Discover simplicity guardrails:
+
+- Avoid public comments, likes/reactions, follower counts, public arguments, complaint threads, bidding wars, or engagement-bait mechanics.
+- Avoid paid ranking, guaranteed leads, `Top contractor`, `Best contractor`, `Trusted by ServSync`, or `Verified Pro` labels unless separately implemented and supportable.
+- Prefer labels such as `New to ServSync`, `Recently joined`, `Recently active`, `Recently posted work`, `Active contractors near you`, and `Recent project posts near you`.
+- Keep the UI from becoming busy: avoid too many tabs; prefer one search/action area plus a few focused sections.
+
+Possible implementation slices:
+
+1. Audit current Discover, contractor profile, service request, and search surfaces.
+2. Add `I Need This` request starters from existing Discover cards/posts where safe.
+3. Add `New to ServSync` intro posts from completed contractor profiles.
+4. Add ServSync-created maintenance cards with `Find contractors for this` and `Start a request` actions.
+5. Add lightweight `Find a Contractor` section filters for trade, service area, recent activity, New to ServSync, saved contractors, and connected contractors.
+6. Add project-type pages for the highest-value common jobs with suggested photos/questions and request starters.
+7. Add homeowner trade/category watchlist.
+8. Add contractor service cards and simple Discover activity metrics.
+9. Add Home Maintenance Pulse using editorial/seasonal content first, then real privacy-safe aggregated ServSync activity only after the data model and privacy policy are ready.
+
 ### 13. Scope Agreement / Shared Scope Record
 
 Product direction:
@@ -340,12 +412,12 @@ Possible first slice:
 
 ## Suggested split sequence
 
-1. Discover Post Queue + Homeowner-Approved Project Share.
-2. Estimate Clarity Assistant and Scope Summary.
-3. No-Surprise Work Changes.
-4. After-the-Job Assistant.
-5. Smart Reminder from Completed Job.
-6. Completed Job to Discover Post.
+1. Discover Work-Generation Hub: audit current Discover/search/request surfaces and start with `I Need This` request starters.
+2. Discover Post Queue + Homeowner-Approved Project Share.
+3. Estimate Clarity Assistant and Scope Summary.
+4. No-Surprise Work Changes.
+5. After-the-Job Assistant.
+6. Smart Reminder from Completed Job.
 7. Homeowner-Controlled Shared Notes.
 8. Emergency Binder Export.
 9. Service Memory / Reuse Prior Work.
@@ -358,6 +430,7 @@ Possible first slice:
 - Keep homeowners in control of shared notes, access instructions, Emergency Binder export, and private home data.
 - Keep contractor-private notes separate from homeowner-visible notes.
 - Keep Discover posts privacy-safe and contractor-confirmed before publishing.
+- Keep Discover focused on helping homeowners find contractors and helping contractors get work, not social engagement mechanics.
 - Keep trust signals transparent and activity/profile-based, not fake verification or paid ranking.
 - Keep AI/rule-based explanations advisory and organizational, not legal, pricing, inspection, or dispute judgments.
 - Do not claim any of these features are live until code, deployed behavior, and implementation reports confirm them.
