@@ -51,6 +51,17 @@ import {
 import { QRCodeCanvas } from 'qrcode.react';
 import { supabase, supabaseConfigured } from './supabaseClient';
 import {
+  APP_ROUTE_NAMES,
+  appHashRoute,
+  appRouteUrl,
+  contractorProfileUrl,
+  contractorTeamInviteUrl,
+  homeownerClaimUrl,
+  homeownerInviteUrl,
+  passwordResetRedirectTo,
+  type AppRouteName,
+} from './appLinks';
+import {
   classifyHomeownerRequest,
   cleanHomeownerRequestText,
   suggestServiceCategories,
@@ -236,7 +247,7 @@ import type {
   ReviewModerationStatus,
 } from './types';
 
-type RouteName = 'home' | 'homeowner' | 'contractor' | 'admin' | 'profile' | 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement' | 'trust-safety';
+type RouteName = AppRouteName;
 type HomeownerRequestView = 'open_pending' | 'closed' | 'invoiced';
 type HomeownerRequestComposerStep = 'property' | 'issue' | 'contractor' | 'review';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
@@ -5332,18 +5343,13 @@ function currentRoute() {
   const [path, query = ''] = rawHash.split('?');
   const route = (path || 'home') as RouteName;
   return {
-    route: ['home', 'homeowner', 'contractor', 'admin', 'profile', 'terms', 'privacy', 'acceptable-use', 'contractor-agreement', 'trust-safety'].includes(route) ? route : 'home',
+    route: (APP_ROUTE_NAMES as readonly string[]).includes(route) ? route : 'home',
     query: new URLSearchParams(query),
   };
 }
 
 function updateRoute(route: RouteName, query = '') {
   window.location.hash = query ? `/${route}?${query}` : `/${route}`;
-}
-
-function passwordResetRedirectTo(role: UserRole) {
-  const route: RouteName = role === 'contractor' ? 'contractor' : role === 'platform_admin' ? 'admin' : 'homeowner';
-  return `${window.location.origin}/#/${route}?mode=reset-password`;
 }
 
 function LegalLinks({ contractor = false, className = '' }: { contractor?: boolean; className?: string }) {
@@ -6340,7 +6346,7 @@ function effectiveLocalClaimInviteStatus(invite?: LocalCustomerClaimInvite | nul
 }
 
 function localCustomerClaimInviteUrl(token: string) {
-  return `${window.location.origin}${window.location.pathname}#/homeowner?claim=${encodeURIComponent(token)}`;
+  return homeownerClaimUrl(token);
 }
 
 function toList(value: string) {
@@ -9129,11 +9135,11 @@ function ContractorReferralInvitePage({
             />
             <span>
               I agree to the{' '}
-              <button type="button" onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/terms`, '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
+              <button type="button" onClick={() => window.open(appRouteUrl('terms'), '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
                 Terms of Service
               </button>
               {' '}and{' '}
-              <button type="button" onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/privacy`, '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
+              <button type="button" onClick={() => window.open(appRouteUrl('privacy'), '_blank', 'noopener,noreferrer')} className="font-semibold text-blue-700 hover:text-blue-800">
                 Privacy Policy
               </button>.
             </span>
@@ -9635,7 +9641,7 @@ function LocalCustomerClaimPage({
                       I agree to the{' '}
                       <button
                         type="button"
-                        onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/terms`, '_blank', 'noopener,noreferrer')}
+                        onClick={() => window.open(appRouteUrl('terms'), '_blank', 'noopener,noreferrer')}
                         className="font-semibold text-blue-700 hover:text-blue-800"
                       >
                         Terms of Service
@@ -9643,7 +9649,7 @@ function LocalCustomerClaimPage({
                       {' '}and{' '}
                       <button
                         type="button"
-                        onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/privacy`, '_blank', 'noopener,noreferrer')}
+                        onClick={() => window.open(appRouteUrl('privacy'), '_blank', 'noopener,noreferrer')}
                         className="font-semibold text-blue-700 hover:text-blue-800"
                       >
                         Privacy Policy
@@ -19631,7 +19637,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         });
       if (inviteError) throw inviteError;
 
-      setInviteLink(`${window.location.origin}${window.location.pathname}#/homeowner?invite=${encodeURIComponent(code)}`);
+      setInviteLink(homeownerInviteUrl(code));
       setNotice('Invite link created.');
       await loadContractor();
     } catch (err) {
@@ -26712,7 +26718,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   <EmptyState text="No pending team invites." />
                 ) : (
                   (teamAccess?.invites || []).filter(invite => invite.status === 'pending').map(invite => {
-                    const inviteUrl = `${window.location.origin}${window.location.pathname}#/contractor?team_invite=${encodeURIComponent(invite.invite_code)}`;
+                    const inviteUrl = contractorTeamInviteUrl(invite.invite_code);
                     return (
                       <div key={invite.id} className="rounded-lg border border-[#E1E3E7] bg-white p-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -27173,7 +27179,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <button
               type="button"
               onClick={() => {
-                const url = `${window.location.origin}${window.location.pathname}#/profile?slug=${contractor.slug}`;
+                const url = contractorProfileUrl(contractor.slug);
                 void navigator.clipboard.writeText(url);
                 setNotice('Profile link copied to clipboard.');
               }}
@@ -27186,7 +27192,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         </div>
         {contractor?.slug && (
           <p className="mt-3 text-xs text-slate-500">
-            Public profile: <span className="font-mono text-slate-400">#/profile?slug={contractor.slug}</span>
+            Public profile: <span className="font-mono text-slate-400">{appHashRoute('profile', { slug: contractor.slug })}</span>
           </p>
         )}
         <div className="mt-4 border-t border-slate-700 pt-4">
@@ -28492,7 +28498,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   Put this on business cards, yard signs, or flyers. Any new homeowner who scans it and creates an account counts as your referral automatically.
                 </p>
                 <QRDisplay
-                  value={`${window.location.origin}${window.location.pathname}#/homeowner?invite=${encodeURIComponent(contractor.permanent_invite_code)}`}
+                  value={homeownerInviteUrl(contractor.permanent_invite_code)}
                   fileName={`servsync-qr-${contractor.slug || 'referral'}`}
                 />
                 <div className="mt-4 border-t border-slate-200 pt-4">
@@ -28547,7 +28553,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <EmptyState text="No invite links created yet." />
               ) : (
                 invites.slice(0, 8).map(invite => {
-                  const inviteUrl = `${window.location.origin}${window.location.pathname}#/homeowner?invite=${encodeURIComponent(invite.invite_code)}`;
+                  const inviteUrl = homeownerInviteUrl(invite.invite_code);
                   const isShowingQr = showQrForInvite === invite.id;
                   return (
                     <div key={invite.id} className="rounded-xl border border-slate-200 bg-white p-4">
