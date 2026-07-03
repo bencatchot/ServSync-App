@@ -524,6 +524,15 @@ type ServiceAgreementOfferDraft = {
   ends_on: string;
   terms_summary: string;
 };
+type ContractorReferralSubmitDraft = {
+  business_name: string;
+  email: string;
+  contact_name: string;
+  phone: string;
+  trade_category: string;
+  location: string;
+  note: string;
+};
 type EstimateLineDraft = {
   id: string;
   job_work_item_id?: string | null;
@@ -1288,6 +1297,19 @@ function createBlankServiceAgreementOfferDraft(overrides: Partial<ServiceAgreeme
     starts_on: '',
     ends_on: '',
     terms_summary: '',
+    ...overrides,
+  };
+}
+
+function createBlankContractorReferralSubmitDraft(overrides: Partial<ContractorReferralSubmitDraft> = {}): ContractorReferralSubmitDraft {
+  return {
+    business_name: '',
+    email: '',
+    contact_name: '',
+    phone: '',
+    trade_category: '',
+    location: '',
+    note: '',
     ...overrides,
   };
 }
@@ -7616,6 +7638,17 @@ function isContractorReadOnly(entitlements: ContractorEntitlements | null | unde
 }
 
 function userCanManageServiceAgreementUi(
+  contractor: Pick<ContractorProfile, 'owner_user_id'> | null | undefined,
+  teamAccess: ContractorTeamAccess | null | undefined,
+  profileId: string,
+) {
+  if (!contractor) return false;
+  if (contractor.owner_user_id === profileId) return true;
+  const activeMember = teamAccess?.members.find(member => member.user_id === profileId && member.status === 'active');
+  return activeMember?.role === 'admin' || activeMember?.role === 'office';
+}
+
+function userCanSubmitContractorReferralUi(
   contractor: Pick<ContractorProfile, 'owner_user_id'> | null | undefined,
   teamAccess: ContractorTeamAccess | null | undefined,
   profileId: string,
@@ -18467,6 +18500,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorPriceBookItems, setContractorPriceBookItems] = useState<ContractorPriceBookItem[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLink, setInviteLink] = useState('');
+  const [contractorReferralDraft, setContractorReferralDraft] = useState<ContractorReferralSubmitDraft>(() => createBlankContractorReferralSubmitDraft());
+  const [submittingContractorReferral, setSubmittingContractorReferral] = useState(false);
   const [contractorTab, setContractorTab] = useState<ContractorTab>(() => storedTab(STORAGE_KEYS.contractorTab, ['overview', 'profile', 'connections', 'requests', 'calendar', 'invites', 'discover', 'inspections', 'trust', 'privacy', 'support'] as const, 'overview'));
   const [homeownerFilter, setHomeownerFilter] = useState<'active' | 'inactive'>(() => storedTab(STORAGE_KEYS.contractorHomeownerFilter, ['active', 'inactive'] as const, 'active'));
   const [homeownerWorkspaceSearch, setHomeownerWorkspaceSearch] = useState(() => window.localStorage.getItem(STORAGE_KEYS.contractorHomeownerSearch) ?? '');
@@ -19564,6 +19599,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to create invite link.'));
+    }
+  };
+
+  const submitContractorReferral = async () => {
+    if (!supabase) return;
+    const businessName = contractorReferralDraft.business_name.trim();
+    const email = contractorReferralDraft.email.trim().toLowerCase();
+
+    setNotice('');
+    setError('');
+    if (contractorReferralControlsDisabled) {
+      setError(contractorReferralDisabledReason);
+      return;
+    }
+    if (!businessName) {
+      setError('Business name is required.');
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Enter a valid email address before submitting the referral.');
+      return;
+    }
+
+    setSubmittingContractorReferral(true);
+    try {
+      const { error: submitError } = await supabase.rpc('servsync_submit_contractor_referral_invite', {
+        p_referrer_contractor_id: contractorDraft.id,
+        p_referred_business_name: businessName,
+        p_referred_email: email,
+        p_referred_contact_name: contractorReferralDraft.contact_name.trim() || null,
+        p_referred_phone: contractorReferralDraft.phone.trim() || null,
+        p_referred_trade_category: contractorReferralDraft.trade_category.trim() || null,
+        p_referred_location: contractorReferralDraft.location.trim() || null,
+        p_referrer_note: cleanHumanWrittenText(contractorReferralDraft.note).trim() || null,
+      });
+      if (submitError) throw submitError;
+
+      setContractorReferralDraft(createBlankContractorReferralSubmitDraft());
+      setNotice('Referral submitted. The ServSync team can review it for follow-up.');
+    } catch {
+      setError('We could not submit this referral. Please check the required fields and try again.');
+    } finally {
+      setSubmittingContractorReferral(false);
     }
   };
 
@@ -25043,6 +25121,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
   const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
+  const canSubmitContractorReferral = userCanSubmitContractorReferralUi(contractorDraft, teamAccess, profile.id);
+  const contractorReferralRoleDeniedReason = 'Only the contractor owner, admin, or office role can submit contractor referrals.';
+  const contractorReferralActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
+    ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
+    : '';
+  const contractorReferralDisabledReason = !contractor?.id
+    ? 'Save the business profile once before referring another contractor.'
+    : contractorReferralActionsDisabledReason || (!canSubmitContractorReferral ? contractorReferralRoleDeniedReason : '');
+  const contractorReferralControlsDisabled = Boolean(contractorReferralDisabledReason);
   const serviceAgreementRoleDeniedReason = 'Only the contractor owner, admin, or office role can manage service agreement templates and offers.';
   const serviceAgreementActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
     ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
@@ -28242,6 +28329,125 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       {contractorTab === 'invites' && (
       <div className="space-y-5">
+          <Card title="Refer another contractor" icon={<Users size={18} />}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-950">Know another small contractor who could use ServSync?</p>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                  Send their details to the ServSync team for follow-up.
+                </p>
+                <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+                  This does not connect your accounts or share any customer, job, estimate, invoice, or home information.
+                </p>
+              </div>
+              <span className="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                ServSync follow-up
+              </span>
+            </div>
+
+            {!canSubmitContractorReferral ? (
+              <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {contractorReferralRoleDeniedReason}
+              </p>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Business name">
+                    <input
+                      className={inputClass()}
+                      value={contractorReferralDraft.business_name}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, business_name: event.target.value }))}
+                      placeholder="Example: Bay Area Plumbing"
+                    />
+                  </Field>
+                  <Field label="Email">
+                    <input
+                      className={inputClass()}
+                      type="email"
+                      autoComplete="email"
+                      spellCheck={false}
+                      value={contractorReferralDraft.email}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, email: event.target.value }))}
+                      placeholder="owner@example.com"
+                    />
+                  </Field>
+                  <Field label="Contact name">
+                    <input
+                      className={inputClass()}
+                      value={contractorReferralDraft.contact_name}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, contact_name: event.target.value }))}
+                      placeholder="Optional"
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <input
+                      className={inputClass()}
+                      type="tel"
+                      autoComplete="tel"
+                      spellCheck={false}
+                      value={contractorReferralDraft.phone}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, phone: formatPhoneInputValue(event.target.value) }))}
+                      placeholder="Optional"
+                    />
+                  </Field>
+                  <Field label="Trade/category">
+                    <input
+                      className={inputClass()}
+                      value={contractorReferralDraft.trade_category}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, trade_category: event.target.value }))}
+                      placeholder="Optional"
+                    />
+                  </Field>
+                  <Field label="Location">
+                    <input
+                      className={inputClass()}
+                      value={contractorReferralDraft.location}
+                      disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                      onChange={event => setContractorReferralDraft(current => ({ ...current, location: event.target.value }))}
+                      placeholder="Optional city or service area"
+                    />
+                  </Field>
+                </div>
+                <Field label="Note">
+                  <textarea
+                    className={inputClass()}
+                    rows={3}
+                    {...writingAssistProps}
+                    value={contractorReferralDraft.note}
+                    disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                    onChange={event => setContractorReferralDraft(current => ({ ...current, note: event.target.value }))}
+                    placeholder="Optional context for the ServSync team"
+                  />
+                </Field>
+                {contractorReferralControlsDisabled && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    {contractorReferralDisabledReason}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={contractorReferralControlsDisabled || submittingContractorReferral}
+                    onClick={() => void submitContractorReferral()}
+                    title={contractorReferralControlsDisabled ? contractorReferralDisabledReason : undefined}
+                    className={buttonClass('primary')}
+                  >
+                    <Send size={16} />
+                    {submittingContractorReferral ? 'Submitting...' : 'Submit referral'}
+                  </button>
+                  <p className="text-xs leading-5 text-slate-500">
+                    This creates a referral lead for ServSync review only.
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+
           <Card title="Permanent referral QR" icon={<Link2 size={18} />}>
             {contractor?.permanent_invite_code ? (
               <>
