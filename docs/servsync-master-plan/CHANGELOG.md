@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/mobile-auth-link-normalization-v1`
+- Files changed:
+  - `src/appLinks.ts`
+  - `src/App.tsx`
+  - `tests/e2e/mobile-auth-link-readiness.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile Readiness Slice 2A as a small frontend auth/app-link normalization foundation. Current hash-routed ServSync URLs for password reset redirects, homeowner claim/invite links, contractor team invite links, public profile links, and legal route links now use a shared dependency-free helper while preserving current web route shapes.
+- Reason for change: Future PWA, Capacitor, universal-link, app-link, and notification routing work needs a clear route contract before native or settings work begins. This slice reduces duplicated frontend URL construction without changing auth flow semantics.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for service worker, custom scheme, Capacitor/native, universal/app-link, Edge Function, SQL/RLS/RPC, env/config/package, and signup-confirmation drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-auth-link-readiness.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/static/docs/test only. No SQL/RLS/RPC, Supabase functions, env/config/package, Capacitor/native projects, service worker, offline sync, Supabase Auth settings changes, signup confirmation behavior changes, Edge Function email-link changes, record-specific estimate/invoice/appointment/notification deep links, deployment, or production data mutation is included.
+  - Future mobile-readiness work still needs separate audit/approval for Supabase Auth redirect settings, native custom scheme or universal/app-link handling, Edge Function email-link targets, record-specific deep links, real-device installed-PWA QA, file upload/camera behavior, and any Capacitor proof of concept.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Mobile Readiness Slice 2A as frontend-only hash-route app-link normalization while keeping native apps, universal/app links, service workers/offline sync, Supabase Auth setting changes, Edge Function email-link changes, backend changes, record-specific deep links, notifications, payments, and calendar sync out of scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing mobile-web-first path without changing native-app strategy, product scope, or launch positioning.
+
 - Branch: `codex/mobile-readiness-pwa-metadata-v1`
 - Files changed:
   - `index.html`
