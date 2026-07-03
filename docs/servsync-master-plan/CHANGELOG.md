@@ -6,6 +6,40 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-02
 
+- Branch: `codex/fb-032-service-agreements-sql-rls-rpc-v1`
+- Files changed:
+  - `servsync-service-agreements-foundation.sql`
+  - `tests/e2e/fb032-service-agreements-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-032 Service Agreements Foundation Slice 2 as a SQL/RLS/RPC foundation. The patch creates contractor-owned service agreement templates, property-scoped service agreement offers for connected homeowners/homes, homeowner accept/decline RPC behavior, and accepted agreement snapshots. It was applied and probed in sandbox only; production SQL apply remains a separate approval step.
+- Reason for change: ServSync needs a narrow, reviewable backend foundation before any Service Agreements UI, visit planning, job linking, invoice reminders, renewals, or member pricing indicators are built.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file secret-value scan
+  - source-static SQL guardrail review
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-foundation.spec.ts --project=chromium`
+  - sandbox SQL apply to ref `zpzdkoaubyjtsomccxya`
+  - focused sandbox runtime SQL/RLS/RPC probe with transaction rollback
+  - zero residual probe records check
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` rule-loading error while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - SQL file was applied and verified in sandbox only; production SQL apply requires separate approval.
+  - No UI, app wiring, Service Agreement visits, jobs, invoices, reminders, notifications, email/SMS/push delivery, Stripe/autopay, QuickBooks/accounting sync, legal e-signature integration, automatic renewal, payment processing, deployment, or data mutation is included.
+  - Existing sandbox security catalog tests now include the new tables/RPCs and passed after the SQL patch was applied to sandbox.
+  - Next step after merge should be a separate production SQL apply approval/release step before any UI slice.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-032 now records Slice 2 as SQL/RLS/RPC foundation packaged for review while preserving no-live-UI and no-automation guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now notes Service Agreements as a future workflow with SQL/RLS/RPC foundation packaged but still separate from jobs, invoices, payments, reminders, notifications, renewals, e-signatures, and external delivery.
+
 - Branch: `codex/email-notification-foundation-v1`
 - Files changed:
   - `supabase/functions/send-notification-email/index.ts`

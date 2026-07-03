@@ -127,6 +127,7 @@ Important guardrails:
 | FB-029 | Recurring Maintenance / Service Plan Lite | Home reminders, contractor recurring work, homeowner relationships | Later / Future | Medium | Shape after reminders, scheduling, invoices, and Home History are stronger. Start with manual recurring opportunities, not complex memberships or automated reminder delivery. |
 | FB-030 | Shared Home / Home Access | Homeowner access, shared homes, invites, reminders, permissions | Started / Guarded Partial | High | Home membership foundations, shared-home shells, shared reminder shells, invite UI, disabled email function deployment, and DB delivery-enable contract are merged/applied. Production invite email delivery remains disabled; shared record access expands only one approved surface at a time. |
 | FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
+| FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Started / SQL Foundation Packaged | Medium-High | Slice 2 packages an additive SQL/RLS/RPC foundation for contractor-owned templates, property-scoped offers to connected homeowners, homeowner accept/decline, and accepted agreement snapshots. The SQL is not applied by this branch, there is no UI, and Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
 
 ## Detailed feature notes
 
@@ -1241,6 +1242,73 @@ Current guardrails:
 
 Current next step:
 Plan any next billing-readiness slice as either admin/readiness polish or a strictly approved backend enforcement audit. Do not start Stripe/payment work without a separate product, legal/ops, and rollout approval.
+
+### FB-032 — Service Agreements Foundation
+
+Status: Started / SQL Foundation Packaged + Sandbox Verified
+
+Priority: Medium-High
+
+Product area:
+
+- Contractor recurring service agreements
+- Maintenance plan templates
+- Connected homeowner/property agreement offers
+- Agreement status and renewal tracking
+- Future planned visits, job links, invoice reminders, renewals, and member indicators
+
+Product goal:
+Contractors should eventually be able to create reusable service agreement templates, send property-scoped offers to connected homeowners, let homeowners accept or decline, track pending/active/expired/canceled/renewal-due agreements, and later connect agreement context to visits, jobs, invoices, and customer workflows through explicit links/actions.
+
+Current status:
+Slice 1 planning captured the Service Agreements product model and guardrails. Slice 2 packages `servsync-service-agreements-foundation.sql` with the smallest SQL/RLS/RPC foundation for `service_agreement_templates`, `service_agreement_offers`, and `service_agreements`, plus source-static and security-catalog coverage. The SQL file was applied and probed in sandbox ref `zpzdkoaubyjtsomccxya` only; production SQL apply remains future and separately approved, and no UI is live.
+
+MVP guardrails:
+
+- No Stripe/autopay or automatic recurring payments.
+- No QuickBooks/accounting sync.
+- No legal e-signature integration.
+- No automatic renewal.
+- No automatic job creation.
+- No automatic invoice creation.
+- No silent discount or pricing changes inside estimates/invoices.
+- No production SQL apply without separate approval.
+- No broad shared-home access expansion.
+- No SMS, push, marketing email, bulk email, or email delivery expansion.
+- No service agreement visits until the core template/offer/accept lifecycle is stable.
+
+Product model:
+Service Agreements are their own workflow, separate from service requests, estimates, jobs/inspections, invoices, appointment scheduling, and Home reminders. Future integrations should link to those workflows only through explicit contractor/homeowner-visible actions.
+
+Slice 2 SQL/RLS/RPC direction:
+
+- Contractor owner/admin/office and platform admins can manage templates and offers through RPCs.
+- Field tech/viewer roles cannot create pricing-bearing templates or offers.
+- Homeowners can select only their own non-draft offers and their own accepted agreements.
+- Draft offers are hidden from homeowners.
+- Homeowner accept/decline happens through `servsync_homeowner_respond_to_service_agreement_offer`.
+- Accepting a sent offer creates exactly one active `service_agreements` row from the offer snapshot.
+- Declining a sent offer does not create an agreement.
+- Direct browser table writes are denied; authenticated users receive only RLS-scoped select grants.
+
+Recommended implementation sequence:
+
+1. Slice 1: docs-only product/RLS/RPC planning.
+2. Slice 2: SQL/RLS/RPC foundation only.
+3. Slice 3: contractor template and offer UI.
+4. Slice 4: homeowner offer review accept/decline UI.
+5. Slice 5: agreement dashboard and status tracking.
+6. Slice 6: planned agreement visits.
+7. Slice 7: job linking from planned visits.
+8. Slice 8: invoice reminders or draft invoices.
+9. Slice 9: renewals and cancellations.
+10. Slice 10: member perks/pricing indicators.
+
+Relationship to FB-029:
+FB-029 remains reminder/service-plan-lite oriented unless the backlog owner later decides to merge or rename it. FB-032 is broader and contractor-agreement centered. Do not claim either feature is live, and do not use FB-032 as approval to add recurring reminders, service-plan billing, subscriptions, recurring invoices, or automatic maintenance automation.
+
+Current next step:
+After merge, run a separate `FB-032 Slice 2 production SQL apply approval/release step` before any UI work. Do not build Slice 3 UI or apply production SQL from this branch alone.
 
 ## Current next recommended focus
 
