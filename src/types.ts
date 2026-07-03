@@ -332,6 +332,50 @@ export interface ContractorPriceBookItem {
   updated_at: string;
 }
 
+export type ServiceAgreementTemplateStatus = 'active' | 'archived';
+export type ServiceAgreementOfferStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'withdrawn';
+
+export interface ServiceAgreementTemplate {
+  id: string;
+  contractor_id: string;
+  name: string;
+  description: string | null;
+  service_frequency: string | null;
+  default_duration_months: number | null;
+  default_price_cents: number | null;
+  included_visit_count: number | null;
+  terms_summary: string | null;
+  status: ServiceAgreementTemplateStatus;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceAgreementOffer {
+  id: string;
+  template_id: string | null;
+  contractor_id: string;
+  homeowner_user_id: string;
+  home_id: string;
+  connection_id: string;
+  title: string;
+  description: string | null;
+  price_cents: number | null;
+  duration_months: number | null;
+  included_visit_count: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  terms_summary: string | null;
+  status: ServiceAgreementOfferStatus;
+  sent_at: string | null;
+  responded_at: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;

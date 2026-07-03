@@ -1245,7 +1245,7 @@ Plan any next billing-readiness slice as either admin/readiness polish or a stri
 
 ### FB-032 — Service Agreements Foundation
 
-Status: Started / SQL Foundation Packaged + Sandbox Verified
+Status: Started / Contractor UI Slice Added
 
 Priority: Medium-High
 
@@ -1261,7 +1261,7 @@ Product goal:
 Contractors should eventually be able to create reusable service agreement templates, send property-scoped offers to connected homeowners, let homeowners accept or decline, track pending/active/expired/canceled/renewal-due agreements, and later connect agreement context to visits, jobs, invoices, and customer workflows through explicit links/actions.
 
 Current status:
-Slice 1 planning captured the Service Agreements product model and guardrails. Slice 2 packages `servsync-service-agreements-foundation.sql` with the smallest SQL/RLS/RPC foundation for `service_agreement_templates`, `service_agreement_offers`, and `service_agreements`, plus source-static and security-catalog coverage. The SQL file was applied and probed in sandbox ref `zpzdkoaubyjtsomccxya` only; production SQL apply remains future and separately approved, and no UI is live.
+Slice 1 planning captured the Service Agreements product model and guardrails. Slice 2 merged `servsync-service-agreements-foundation.sql` with the smallest SQL/RLS/RPC foundation for `service_agreement_templates`, `service_agreement_offers`, and `service_agreements`, plus source-static and security-catalog coverage. The SQL foundation has been applied and verified in sandbox and production. Slice 3A adds the first contractor-side UI only: authorized contractor owner/admin/office users can manage templates, create property-scoped draft offers for explicitly shared connected-homeowner properties, and send draft offers. Homeowner offer review/accept/decline UI remains future Slice 4.
 
 MVP guardrails:
 
@@ -1272,7 +1272,7 @@ MVP guardrails:
 - No automatic job creation.
 - No automatic invoice creation.
 - No silent discount or pricing changes inside estimates/invoices.
-- No production SQL apply without separate approval.
+- No future SQL apply without separate approval.
 - No broad shared-home access expansion.
 - No SMS, push, marketing email, bulk email, or email delivery expansion.
 - No service agreement visits until the core template/offer/accept lifecycle is stable.
@@ -1295,7 +1295,7 @@ Recommended implementation sequence:
 
 1. Slice 1: docs-only product/RLS/RPC planning.
 2. Slice 2: SQL/RLS/RPC foundation only.
-3. Slice 3: contractor template and offer UI.
+3. Slice 3A: contractor template and offer UI.
 4. Slice 4: homeowner offer review accept/decline UI.
 5. Slice 5: agreement dashboard and status tracking.
 6. Slice 6: planned agreement visits.
@@ -1308,7 +1308,7 @@ Relationship to FB-029:
 FB-029 remains reminder/service-plan-lite oriented unless the backlog owner later decides to merge or rename it. FB-032 is broader and contractor-agreement centered. Do not claim either feature is live, and do not use FB-032 as approval to add recurring reminders, service-plan billing, subscriptions, recurring invoices, or automatic maintenance automation.
 
 Current next step:
-After merge, run a separate `FB-032 Slice 2 production SQL apply approval/release step` before any UI work. Do not build Slice 3 UI or apply production SQL from this branch alone.
+Audit/review Slice 3A before merge. After merge, plan Slice 4 homeowner offer review/accept/decline UI separately; do not add agreement visits, job linking, invoice reminders, renewals/cancellations, payments, reminders, notifications, email/SMS/push, or automation without separate approval.
 
 ## Current next recommended focus
 
