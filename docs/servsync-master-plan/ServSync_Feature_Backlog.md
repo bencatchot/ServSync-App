@@ -127,7 +127,7 @@ Important guardrails:
 | FB-029 | Recurring Maintenance / Service Plan Lite | Home reminders, contractor recurring work, homeowner relationships | Later / Future | Medium | Shape after reminders, scheduling, invoices, and Home History are stronger. Start with manual recurring opportunities, not complex memberships or automated reminder delivery. |
 | FB-030 | Shared Home / Home Access | Homeowner access, shared homes, invites, reminders, permissions | Started / Guarded Partial | High | Home membership foundations, shared-home shells, shared reminder shells, invite UI, disabled email function deployment, and DB delivery-enable contract are merged/applied. Production invite email delivery remains disabled; shared record access expands only one approved surface at a time. |
 | FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
-| FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Started / Homeowner Response UI Added | Medium-High | Slice 2 SQL/RLS/RPC foundation is merged and production-applied. Slice 3A adds contractor-side template/offer UI. Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
+| FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Foundation Loop Complete / Closeout Polish Pending | Medium-High | The core foundation loop is complete: Slice 2 SQL/RLS/RPC foundation is merged and production-applied, Slice 3A adds contractor-side template/offer UI, and Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
 
 ## Detailed feature notes
 
@@ -1245,7 +1245,7 @@ Plan any next billing-readiness slice as either admin/readiness polish or a stri
 
 ### FB-032 — Service Agreements Foundation
 
-Status: Started / Contractor UI Slice Added
+Status: Foundation Loop Complete / Closeout Polish Pending
 
 Priority: Medium-High
 
@@ -1261,7 +1261,7 @@ Product goal:
 Contractors should eventually be able to create reusable service agreement templates, send property-scoped offers to connected homeowners, let homeowners accept or decline, track pending/active/expired/canceled/renewal-due agreements, and later connect agreement context to visits, jobs, invoices, and customer workflows through explicit links/actions.
 
 Current status:
-Slice 1 planning captured the Service Agreements product model and guardrails. Slice 2 merged `servsync-service-agreements-foundation.sql` with the smallest SQL/RLS/RPC foundation for `service_agreement_templates`, `service_agreement_offers`, and `service_agreements`, plus source-static and security-catalog coverage. The SQL foundation has been applied and verified in sandbox and production. Slice 3A adds the first contractor-side UI only: authorized contractor owner/admin/office users can manage templates, create property-scoped draft offers for explicitly shared connected-homeowner properties, and send draft offers. Slice 4A adds homeowner-side offer review, accept/decline through the existing response RPC, and read-only accepted agreement cards inside the homeowner Estimates / Invoices area. Contractor scheduling and billing remain separate.
+Slice 1 planning captured the Service Agreements product model and guardrails. Slice 2 merged `servsync-service-agreements-foundation.sql` with the smallest SQL/RLS/RPC foundation for `service_agreement_templates`, `service_agreement_offers`, and `service_agreements`, plus source-static and security-catalog coverage. The SQL foundation has been applied and verified in sandbox and production. Slice 3A adds contractor-side UI: authorized contractor owner/admin/office users can manage templates, create property-scoped draft offers for explicitly shared connected-homeowner properties, and send draft offers. Slice 4A adds homeowner-side offer review, accept/decline through the existing response RPC, and read-only accepted agreement cards inside the homeowner Estimates / Invoices area. This completes the first template -> offer -> homeowner response -> read-only agreement foundation loop. Contractor scheduling and billing remain separate.
 
 MVP guardrails:
 
@@ -1297,18 +1297,19 @@ Recommended implementation sequence:
 2. Slice 2: SQL/RLS/RPC foundation only.
 3. Slice 3A: contractor template and offer UI.
 4. Slice 4A: homeowner offer review accept/decline UI and read-only agreement display.
-5. Slice 5: agreement dashboard and status tracking.
-6. Slice 6: planned agreement visits.
-7. Slice 7: job linking from planned visits.
-8. Slice 8: invoice reminders or draft invoices.
-9. Slice 9: renewals and cancellations.
-10. Slice 10: member perks/pricing indicators.
+5. Future separately approved subtrack: Service Agreement Visits.
+6. Future separately approved subtrack: Agreement-to-Job Linking.
+7. Future separately approved subtrack: Agreement Invoice Reminders / Draft Invoices.
+8. Future separately approved subtrack: Renewals / Cancellations.
+9. Future separately approved subtrack: Member Perks / Pricing Indicators.
+10. Future separately approved subtrack: Service Agreement Notifications.
+11. Future separately approved subtrack: Payment / Autopay Integration.
 
 Relationship to FB-029:
 FB-029 remains reminder/service-plan-lite oriented unless the backlog owner later decides to merge or rename it. FB-032 is broader and contractor-agreement centered. Do not claim either feature is live, and do not use FB-032 as approval to add recurring reminders, service-plan billing, subscriptions, recurring invoices, or automatic maintenance automation.
 
 Current next step:
-Audit/review Slice 3A before merge. After merge, plan Slice 4 homeowner offer review/accept/decline UI separately; do not add agreement visits, job linking, invoice reminders, renewals/cancellations, payments, reminders, notifications, email/SMS/push, or automation without separate approval.
+Close out the foundation loop with copy/docs/test alignment. After closeout, pause automation-heavy Service Agreement expansion until a separate backlog item or explicitly approved subtrack is selected; do not add agreement visits, job linking, invoice reminders/drafts, renewals/cancellations, member perks, payments/autopay, reminders, notifications, email/SMS/push, scheduling, Home Timeline writes, or automation without separate approval.
 
 ## Current next recommended focus
 

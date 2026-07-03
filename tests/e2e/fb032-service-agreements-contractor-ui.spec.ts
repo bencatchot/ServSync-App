@@ -34,8 +34,10 @@ test.describe('FB-032 contractor Service Agreements UI source guardrails', () =>
     expect(serviceAgreementSource).toContain('<Card title="Service Agreements"');
     expect(serviceAgreementSource).toContain('Draft agreement offers are not visible to the homeowner until sent.');
     expect(serviceAgreementSource).toContain('Choose one explicitly shared property for this offer.');
-    expect(serviceAgreementSource).toContain('This does not create jobs, schedule visits, create invoices, set up autopay, or send reminders.');
-    expect(serviceAgreementSource).toContain('Homeowner review and response is planned for a later slice.');
+    expect(serviceAgreementSource).toContain('Homeowners can now review and respond to sent offers, and accepted agreements stay read-only.');
+    expect(serviceAgreementSource).toContain('Scheduling and billing are coordinated separately.');
+    expect(serviceAgreementSource).toContain('This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.');
+    expect(serviceAgreementSource).not.toContain('Homeowner review and response is planned for a later slice.');
   });
 
   test('loads manager-visible lists with direct RLS-scoped reads only after manager checks', () => {
