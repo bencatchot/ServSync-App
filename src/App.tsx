@@ -212,6 +212,8 @@ import type {
   SupportAttachment,
   SupportInquiryCategory,
   SupportInquiryStatus,
+  ServiceAgreementOffer,
+  ServiceAgreementTemplate,
   UserRole,
   ReferralRewardStatus,
   UniversalReferralRewardStatus,
@@ -496,9 +498,31 @@ type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'cale
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
-type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing';
+type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing' | 'service_agreements';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
+type ServiceAgreementTemplateDraft = {
+  name: string;
+  description: string;
+  service_frequency: string;
+  default_duration_months: string;
+  default_price: string;
+  included_visit_count: string;
+  terms_summary: string;
+};
+type ServiceAgreementOfferDraft = {
+  template_id: string;
+  connection_id: string;
+  home_id: string;
+  title: string;
+  description: string;
+  price: string;
+  duration_months: string;
+  included_visit_count: string;
+  starts_on: string;
+  ends_on: string;
+  terms_summary: string;
+};
 type EstimateLineDraft = {
   id: string;
   job_work_item_id?: string | null;
@@ -1223,6 +1247,79 @@ function contractorPriceBookItemDraftFromRecord(item: ContractorPriceBookItem): 
     sku: item.sku || '',
     active: item.active && !item.archived_at,
   });
+}
+
+function createBlankServiceAgreementTemplateDraft(overrides: Partial<ServiceAgreementTemplateDraft> = {}): ServiceAgreementTemplateDraft {
+  return {
+    name: '',
+    description: '',
+    service_frequency: '',
+    default_duration_months: '',
+    default_price: '',
+    included_visit_count: '',
+    terms_summary: '',
+    ...overrides,
+  };
+}
+
+function serviceAgreementTemplateDraftFromRecord(template: ServiceAgreementTemplate): ServiceAgreementTemplateDraft {
+  return createBlankServiceAgreementTemplateDraft({
+    name: template.name || '',
+    description: template.description || '',
+    service_frequency: template.service_frequency || '',
+    default_duration_months: template.default_duration_months === null || template.default_duration_months === undefined ? '' : String(template.default_duration_months),
+    default_price: template.default_price_cents === null || template.default_price_cents === undefined ? '' : centsToDollars(template.default_price_cents),
+    included_visit_count: template.included_visit_count === null || template.included_visit_count === undefined ? '' : String(template.included_visit_count),
+    terms_summary: template.terms_summary || '',
+  });
+}
+
+function createBlankServiceAgreementOfferDraft(overrides: Partial<ServiceAgreementOfferDraft> = {}): ServiceAgreementOfferDraft {
+  return {
+    template_id: '',
+    connection_id: '',
+    home_id: '',
+    title: '',
+    description: '',
+    price: '',
+    duration_months: '',
+    included_visit_count: '',
+    starts_on: '',
+    ends_on: '',
+    terms_summary: '',
+    ...overrides,
+  };
+}
+
+function serviceAgreementOfferDraftFromTemplate(template: ServiceAgreementTemplate, overrides: Partial<ServiceAgreementOfferDraft> = {}): ServiceAgreementOfferDraft {
+  return createBlankServiceAgreementOfferDraft({
+    template_id: template.id,
+    title: template.name || '',
+    description: template.description || '',
+    price: template.default_price_cents === null || template.default_price_cents === undefined ? '' : centsToDollars(template.default_price_cents),
+    duration_months: template.default_duration_months === null || template.default_duration_months === undefined ? '' : String(template.default_duration_months),
+    included_visit_count: template.included_visit_count === null || template.included_visit_count === undefined ? '' : String(template.included_visit_count),
+    terms_summary: template.terms_summary || '',
+    ...overrides,
+  });
+}
+
+function parseOptionalWholeNumber(value: string, label: string, options: { positive?: boolean } = {}) {
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null as number | null };
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 0 || (options.positive && parsed <= 0)) {
+    return { value: null as number | null, error: `${label} must be ${options.positive ? 'a whole number greater than zero' : 'zero or a whole number greater than zero'}.` };
+  }
+  return { value: parsed };
+}
+
+function parseOptionalDollarCents(value: string, label: string) {
+  const trimmed = value.replace(/[$,]/g, '').trim();
+  if (!trimmed) return { value: null as number | null };
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return { value: null as number | null, error: `${label} must be zero or more.` };
+  return { value: Math.round(parsed * 100) };
 }
 
 function createBlankManualJobWorkItemDraft(overrides: Partial<ManualJobWorkItemDraft> = {}): ManualJobWorkItemDraft {
@@ -7515,6 +7612,17 @@ const CONTRACTOR_READ_ONLY_CREATION_CAPABILITIES: ContractorEntitlementCapabilit
 
 function isContractorReadOnly(entitlements: ContractorEntitlements | null | undefined) {
   return entitlements?.access_mode === 'read_only';
+}
+
+function userCanManageServiceAgreementUi(
+  contractor: Pick<ContractorProfile, 'owner_user_id'> | null | undefined,
+  teamAccess: ContractorTeamAccess | null | undefined,
+  profileId: string,
+) {
+  if (!contractor) return false;
+  if (contractor.owner_user_id === profileId) return true;
+  const activeMember = teamAccess?.members.find(member => member.user_id === profileId && member.status === 'active');
+  return activeMember?.role === 'admin' || activeMember?.role === 'office';
 }
 
 function getContractorDisabledReason(entitlements: ContractorEntitlements | null | undefined, capability: ContractorEntitlementCapability) {
@@ -18029,6 +18137,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [estimateTemplates, setEstimateTemplates] = useState<EstimateTemplate[]>([]);
+  const [serviceAgreementTemplates, setServiceAgreementTemplates] = useState<ServiceAgreementTemplate[]>([]);
+  const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
   const [savedEstimateCharges, setSavedEstimateCharges] = useState<ContractorSavedEstimateCharge[]>([]);
   const [contractorPriceBookItems, setContractorPriceBookItems] = useState<ContractorPriceBookItem[]>([]);
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
@@ -18043,7 +18153,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerWorkspacePropertyScope, setHomeownerWorkspacePropertyScope] = useState<ContractorHomeownerPropertyScope>('selected');
   const [selectedHomeownerWorkspaceHomeId, setSelectedHomeownerWorkspaceHomeId] = useState('');
   const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
-  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates', 'custom_pricing'] as const, 'overview');
+  const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates', 'custom_pricing', 'service_agreements'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
   const [jobsListDateFilter, setJobsListDateFilter] = useState('');
   const [jobsListStatusFilter, setJobsListStatusFilter] = useState<JobLifecycleStatus | 'all'>('all');
@@ -18080,6 +18190,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorPriceBookCsvMapping, setContractorPriceBookCsvMapping] = useState<ContractorPriceBookCsvMapping>({});
   const [contractorPriceBookCsvError, setContractorPriceBookCsvError] = useState('');
   const [importingContractorPriceBookCsv, setImportingContractorPriceBookCsv] = useState(false);
+  const [serviceAgreementTemplateDraft, setServiceAgreementTemplateDraft] = useState<ServiceAgreementTemplateDraft>(() => createBlankServiceAgreementTemplateDraft());
+  const [editingServiceAgreementTemplateId, setEditingServiceAgreementTemplateId] = useState<string | null>(null);
+  const [savingServiceAgreementTemplate, setSavingServiceAgreementTemplate] = useState(false);
+  const [togglingServiceAgreementTemplateId, setTogglingServiceAgreementTemplateId] = useState<string | null>(null);
+  const [serviceAgreementOfferDraft, setServiceAgreementOfferDraft] = useState<ServiceAgreementOfferDraft>(() => createBlankServiceAgreementOfferDraft());
+  const [savingServiceAgreementOffer, setSavingServiceAgreementOffer] = useState(false);
+  const [sendingServiceAgreementOfferId, setSendingServiceAgreementOfferId] = useState<string | null>(null);
   const [creatingInvoiceSourceId, setCreatingInvoiceSourceId] = useState<string | null>(null);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
@@ -18603,6 +18720,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         if (!estimateTemplatesRes.error) setEstimateTemplates((estimateTemplatesRes.data || []) as EstimateTemplate[]);
         if (!savedEstimateChargesRes.error) setSavedEstimateCharges((savedEstimateChargesRes.data || []) as ContractorSavedEstimateCharge[]);
         if (!priceBookItemsRes.error) setContractorPriceBookItems((priceBookItemsRes.data || []) as ContractorPriceBookItem[]);
+        if (userCanManageServiceAgreementUi(loadedContractor, loadedTeamAccess, profile.id)) {
+          const [serviceAgreementTemplatesRes, serviceAgreementOffersRes] = await Promise.all([
+            supabase
+              .from('service_agreement_templates')
+              .select('*')
+              .eq('contractor_id', loadedContractor.id)
+              .order('status', { ascending: true })
+              .order('updated_at', { ascending: false }),
+            supabase
+              .from('service_agreement_offers')
+              .select('*')
+              .eq('contractor_id', loadedContractor.id)
+              .order('updated_at', { ascending: false }),
+          ]);
+          if (!serviceAgreementTemplatesRes.error) setServiceAgreementTemplates((serviceAgreementTemplatesRes.data || []) as ServiceAgreementTemplate[]);
+          if (!serviceAgreementOffersRes.error) setServiceAgreementOffers((serviceAgreementOffersRes.data || []) as ServiceAgreementOffer[]);
+        } else {
+          setServiceAgreementTemplates([]);
+          setServiceAgreementOffers([]);
+        }
       } else {
         setContractorVisitEvents([]);
         setContractorCalendarEvents([]);
@@ -18612,6 +18749,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setLocalClaimInvites([]);
         setSavedEstimateCharges([]);
         setContractorPriceBookItems([]);
+        setServiceAgreementTemplates([]);
+        setServiceAgreementOffers([]);
         setJobWorkItemsByJobId({});
       }
     } catch (err) {
@@ -20735,6 +20874,226 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const resetServiceAgreementTemplateDraft = () => {
+    setEditingServiceAgreementTemplateId(null);
+    setServiceAgreementTemplateDraft(createBlankServiceAgreementTemplateDraft());
+  };
+
+  const editServiceAgreementTemplate = (template: ServiceAgreementTemplate) => {
+    setEditingServiceAgreementTemplateId(template.id);
+    setServiceAgreementTemplateDraft(serviceAgreementTemplateDraftFromRecord(template));
+    setContractorJobsView('service_agreements');
+    setInspectionView('list');
+  };
+
+  const serviceAgreementTemplatePayload = () => {
+    const name = cleanHumanWrittenText(serviceAgreementTemplateDraft.name);
+    if (!name) return { error: 'Enter a service agreement template name.' };
+    const duration = parseOptionalWholeNumber(serviceAgreementTemplateDraft.default_duration_months, 'Default duration months', { positive: true });
+    if (duration.error) return { error: duration.error };
+    const price = parseOptionalDollarCents(serviceAgreementTemplateDraft.default_price, 'Default price');
+    if (price.error) return { error: price.error };
+    const visitCount = parseOptionalWholeNumber(serviceAgreementTemplateDraft.included_visit_count, 'Included visit count');
+    if (visitCount.error) return { error: visitCount.error };
+
+    const editingTemplate = editingServiceAgreementTemplateId
+      ? serviceAgreementTemplates.find(template => template.id === editingServiceAgreementTemplateId)
+      : null;
+    if (editingTemplate?.default_duration_months !== null && editingTemplate?.default_duration_months !== undefined && duration.value === null) {
+      return { error: 'Enter a duration greater than zero before saving this existing template. Clearing a saved duration requires a later agreement RPC update.' };
+    }
+    if (editingTemplate?.default_price_cents !== null && editingTemplate?.default_price_cents !== undefined && price.value === null) {
+      return { error: 'Enter a default price of zero or more before saving this existing template. Clearing a saved price requires a later agreement RPC update.' };
+    }
+    if (editingTemplate?.included_visit_count !== null && editingTemplate?.included_visit_count !== undefined && visitCount.value === null) {
+      return { error: 'Enter an included visit count of zero or more before saving this existing template. Clearing a saved visit count requires a later agreement RPC update.' };
+    }
+
+    return {
+      payload: {
+        p_name: name,
+        p_description: cleanHumanWrittenText(serviceAgreementTemplateDraft.description),
+        p_service_frequency: cleanHumanWrittenText(serviceAgreementTemplateDraft.service_frequency),
+        p_default_duration_months: duration.value,
+        p_default_price_cents: price.value,
+        p_included_visit_count: visitCount.value,
+        p_terms_summary: cleanHumanWrittenText(serviceAgreementTemplateDraft.terms_summary),
+      },
+    };
+  };
+
+  const saveServiceAgreementTemplate = async () => {
+    if (!supabase || !contractor?.id) return;
+    if (!canManageServiceAgreements) {
+      setError(serviceAgreementRoleDeniedReason);
+      return;
+    }
+    if (serviceAgreementActionsDisabledReason) {
+      setError(serviceAgreementActionsDisabledReason);
+      return;
+    }
+    const parsed = serviceAgreementTemplatePayload();
+    if ('error' in parsed) {
+      setError(parsed.error || 'Check the service agreement template fields and try again.');
+      return;
+    }
+    setSavingServiceAgreementTemplate(true);
+    setNotice('');
+    setError('');
+    try {
+      const rpcName = editingServiceAgreementTemplateId
+        ? 'servsync_update_service_agreement_template'
+        : 'servsync_create_service_agreement_template';
+      const rpcPayload = editingServiceAgreementTemplateId
+        ? { p_template_id: editingServiceAgreementTemplateId, ...parsed.payload }
+        : { p_contractor_id: contractor.id, ...parsed.payload };
+      const { error: saveError } = await supabase.rpc(rpcName, rpcPayload);
+      if (saveError) throw saveError;
+      setNotice(editingServiceAgreementTemplateId ? 'Service agreement template updated.' : 'Service agreement template created.');
+      resetServiceAgreementTemplateDraft();
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this service agreement template.'));
+    } finally {
+      setSavingServiceAgreementTemplate(false);
+    }
+  };
+
+  const toggleServiceAgreementTemplateStatus = async (template: ServiceAgreementTemplate) => {
+    if (!supabase) return;
+    if (!canManageServiceAgreements) {
+      setError(serviceAgreementRoleDeniedReason);
+      return;
+    }
+    if (serviceAgreementActionsDisabledReason) {
+      setError(serviceAgreementActionsDisabledReason);
+      return;
+    }
+    const nextStatus = template.status === 'active' ? 'archived' : 'active';
+    setTogglingServiceAgreementTemplateId(template.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: updateError } = await supabase.rpc('servsync_update_service_agreement_template', {
+        p_template_id: template.id,
+        p_status: nextStatus,
+      });
+      if (updateError) throw updateError;
+      if (editingServiceAgreementTemplateId === template.id && nextStatus === 'archived') resetServiceAgreementTemplateDraft();
+      setNotice(nextStatus === 'active' ? 'Service agreement template reactivated.' : 'Service agreement template archived.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to update this service agreement template.'));
+    } finally {
+      setTogglingServiceAgreementTemplateId(null);
+    }
+  };
+
+  const beginServiceAgreementOffer = (template: ServiceAgreementTemplate) => {
+    const firstEligibleConnection = connections.find(connection => connection.status === 'active' && connectedHomeList(connection).some(home => Boolean(home.id)));
+    const firstHome = firstEligibleConnection ? connectedHomeList(firstEligibleConnection).find(home => Boolean(home.id)) : null;
+    setServiceAgreementOfferDraft(serviceAgreementOfferDraftFromTemplate(template, {
+      connection_id: firstEligibleConnection?.connection_id || '',
+      home_id: firstHome?.id || '',
+    }));
+    setContractorJobsView('service_agreements');
+    setInspectionView('list');
+  };
+
+  const serviceAgreementOfferPayload = () => {
+    const title = cleanHumanWrittenText(serviceAgreementOfferDraft.title);
+    if (!title) return { error: 'Enter an offer title.' };
+    if (!serviceAgreementOfferDraft.template_id) return { error: 'Choose an active template before creating an offer.' };
+    if (!serviceAgreementOfferDraft.connection_id) return { error: 'Choose a connected homeowner before creating an offer.' };
+    if (!serviceAgreementOfferDraft.home_id) return { error: 'Choose one explicitly shared property for this offer.' };
+    const selectedConnection = connections.find(connection => connection.connection_id === serviceAgreementOfferDraft.connection_id);
+    if (!selectedConnection || selectedConnection.status !== 'active') return { error: 'Choose an active connected homeowner.' };
+    const selectedHome = connectedHomeList(selectedConnection).find(home => home.id === serviceAgreementOfferDraft.home_id);
+    if (!selectedHome?.id) return { error: 'Choose one explicitly shared property for this offer.' };
+    const price = parseOptionalDollarCents(serviceAgreementOfferDraft.price, 'Offer price');
+    if (price.error) return { error: price.error };
+    const duration = parseOptionalWholeNumber(serviceAgreementOfferDraft.duration_months, 'Offer duration months', { positive: true });
+    if (duration.error) return { error: duration.error };
+    const visitCount = parseOptionalWholeNumber(serviceAgreementOfferDraft.included_visit_count, 'Included visit count');
+    if (visitCount.error) return { error: visitCount.error };
+    if (serviceAgreementOfferDraft.starts_on && serviceAgreementOfferDraft.ends_on && serviceAgreementOfferDraft.ends_on < serviceAgreementOfferDraft.starts_on) {
+      return { error: 'Offer end date cannot be before the start date.' };
+    }
+    return {
+      payload: {
+        p_connection_id: serviceAgreementOfferDraft.connection_id,
+        p_home_id: serviceAgreementOfferDraft.home_id,
+        p_template_id: serviceAgreementOfferDraft.template_id,
+        p_title: title,
+        p_description: cleanHumanWrittenText(serviceAgreementOfferDraft.description),
+        p_price_cents: price.value,
+        p_duration_months: duration.value,
+        p_included_visit_count: visitCount.value,
+        p_starts_on: serviceAgreementOfferDraft.starts_on || null,
+        p_ends_on: serviceAgreementOfferDraft.ends_on || null,
+        p_terms_summary: cleanHumanWrittenText(serviceAgreementOfferDraft.terms_summary),
+      },
+    };
+  };
+
+  const saveServiceAgreementOfferDraft = async () => {
+    if (!supabase) return;
+    if (!canManageServiceAgreements) {
+      setError(serviceAgreementRoleDeniedReason);
+      return;
+    }
+    if (serviceAgreementActionsDisabledReason) {
+      setError(serviceAgreementActionsDisabledReason);
+      return;
+    }
+    const parsed = serviceAgreementOfferPayload();
+    if ('error' in parsed) {
+      setError(parsed.error || 'Check the service agreement offer fields and try again.');
+      return;
+    }
+    setSavingServiceAgreementOffer(true);
+    setNotice('');
+    setError('');
+    try {
+      const { error: createError } = await supabase.rpc('servsync_create_service_agreement_offer', parsed.payload);
+      if (createError) throw createError;
+      setNotice('Draft service agreement offer saved. Draft offers are not visible to the homeowner until sent.');
+      setServiceAgreementOfferDraft(createBlankServiceAgreementOfferDraft());
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save this service agreement offer.'));
+    } finally {
+      setSavingServiceAgreementOffer(false);
+    }
+  };
+
+  const sendServiceAgreementOffer = async (offer: ServiceAgreementOffer) => {
+    if (!supabase) return;
+    if (!canManageServiceAgreements) {
+      setError(serviceAgreementRoleDeniedReason);
+      return;
+    }
+    if (serviceAgreementActionsDisabledReason) {
+      setError(serviceAgreementActionsDisabledReason);
+      return;
+    }
+    setSendingServiceAgreementOfferId(offer.id);
+    setNotice('');
+    setError('');
+    try {
+      const { error: sendError } = await supabase.rpc('servsync_send_service_agreement_offer', {
+        p_offer_id: offer.id,
+      });
+      if (sendError) throw sendError;
+      setNotice('Service agreement offer sent for homeowner review. Homeowner response controls are planned for a later slice.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to send this service agreement offer.'));
+    } finally {
+      setSendingServiceAgreementOfferId(null);
+    }
+  };
+
   const resetContractorPriceBookCsvImport = () => {
     setContractorPriceBookCsvFileName('');
     setContractorPriceBookCsvHeaders([]);
@@ -22471,6 +22830,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const activeContractorPriceBookItems = contractorPriceBookItems
     .filter(item => item.active && !item.archived_at)
     .sort((a, b) => a.title.localeCompare(b.title) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const activeServiceAgreementTemplates = serviceAgreementTemplates
+    .filter(template => template.status === 'active')
+    .sort((a, b) => a.name.localeCompare(b.name) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const archivedServiceAgreementTemplates = serviceAgreementTemplates
+    .filter(template => template.status === 'archived')
+    .sort((a, b) => a.name.localeCompare(b.name) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const serviceAgreementDraftOffers = serviceAgreementOffers.filter(offer => offer.status === 'draft');
+  const serviceAgreementSentOffers = serviceAgreementOffers.filter(offer => offer.status === 'sent');
+  const serviceAgreementClosedOffers = serviceAgreementOffers.filter(offer => !['draft', 'sent'].includes(offer.status));
+  const serviceAgreementEligibleConnections = connections
+    .filter(connection => connection.status === 'active' && connectedHomeList(connection).some(home => Boolean(home.id)));
+  const selectedServiceAgreementOfferTemplate = serviceAgreementOfferDraft.template_id
+    ? activeServiceAgreementTemplates.find(template => template.id === serviceAgreementOfferDraft.template_id) ?? null
+    : null;
+  const selectedServiceAgreementOfferConnection = serviceAgreementOfferDraft.connection_id
+    ? serviceAgreementEligibleConnections.find(connection => connection.connection_id === serviceAgreementOfferDraft.connection_id) ?? null
+    : null;
+  const selectedServiceAgreementOfferHomes = selectedServiceAgreementOfferConnection
+    ? connectedHomeList(selectedServiceAgreementOfferConnection).filter(home => Boolean(home.id))
+    : [];
   const estimatePriceBookQuickPickSearchText = normalizeText(estimatePriceBookQuickPickSearch);
   const estimatePriceBookQuickPickItems = activeContractorPriceBookItems
     .filter(item => {
@@ -22492,6 +22871,38 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (!contractorPriceBookSearchText) return true;
       return normalizeText(`${item.title} ${item.customer_description} ${item.internal_notes} ${item.trade} ${item.category} ${item.sku || ''}`).includes(contractorPriceBookSearchText);
     });
+  const serviceAgreementMoneyLabel = (cents?: number | null) =>
+    cents === null || cents === undefined ? 'Price not set' : formatMoney(cents);
+  const serviceAgreementDurationLabel = (months?: number | null) =>
+    months === null || months === undefined ? 'Duration not set' : `${months} month${months === 1 ? '' : 's'}`;
+  const serviceAgreementVisitCountLabel = (count?: number | null) =>
+    count === null || count === undefined ? 'Visits not set' : `${count} visit${count === 1 ? '' : 's'}`;
+  const serviceAgreementOfferStatusLabel = (status: ServiceAgreementOffer['status']) => ({
+    draft: 'Draft',
+    sent: 'Sent',
+    accepted: 'Accepted',
+    declined: 'Declined',
+    expired: 'Expired',
+    withdrawn: 'Withdrawn',
+  }[status] || status);
+  const serviceAgreementOfferStatusClass = (status: ServiceAgreementOffer['status']) => {
+    if (status === 'draft') return 'bg-amber-50 text-amber-700';
+    if (status === 'sent') return 'bg-blue-50 text-blue-700';
+    if (status === 'accepted') return 'bg-emerald-50 text-emerald-700';
+    return 'bg-slate-100 text-slate-600';
+  };
+  const serviceAgreementConnectionLabel = (connectionId: string) => {
+    const connection = connections.find(item => item.connection_id === connectionId);
+    return connection?.display_name || 'Connected homeowner';
+  };
+  const serviceAgreementHomeLabel = (connectionId: string, homeId: string) => {
+    const connection = connections.find(item => item.connection_id === connectionId);
+    const home = connection ? connectedHomeList(connection).find(item => item.id === homeId) : null;
+    if (!home) return 'Shared property';
+    const label = home.nickname || home.address_line1 || 'Shared property';
+    const location = [home.city, home.state].filter(Boolean).join(', ');
+    return [label, location].filter(Boolean).join(' · ');
+  };
   const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => inspections.find(insp =>
     insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)
   ) ?? null;
@@ -24307,6 +24718,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const canManageEstimateSettings = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
+  const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
+  const serviceAgreementRoleDeniedReason = 'Only the contractor owner, admin, or office role can manage service agreement templates and offers.';
+  const serviceAgreementActionsDisabledReason = isContractorReadOnly(contractorEntitlementState.entitlements)
+    ? contractorEntitlementState.entitlements?.read_only_reason || CONTRACTOR_READ_ONLY_DISABLED_REASON
+    : '';
+  const serviceAgreementDisabledReason = !contractor?.id
+    ? 'Save the business profile once before adding service agreement templates.'
+    : serviceAgreementActionsDisabledReason || (!canManageServiceAgreements ? serviceAgreementRoleDeniedReason : '');
+  const serviceAgreementControlsDisabled = Boolean(serviceAgreementDisabledReason);
   const contractorCanSendWorkflowMessages = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
@@ -30744,7 +31164,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <ClipboardList size={16} className="text-blue-700" />
                       <h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-2">
+                    <div className="grid gap-2 md:grid-cols-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -30775,6 +31195,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                         <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-blue-700">Custom Pricing</p>
                         <p className="mt-1 break-words text-xs leading-5 text-blue-900">Private pricing library</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractorJobsView('service_agreements');
+                          setInspectionView('list');
+                        }}
+                        className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
+                          <span className="shrink-0 text-base font-bold sm:text-lg">{activeServiceAgreementTemplates.length}</span>
+                        </div>
+                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Service Agreements</p>
+                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Templates and offers</p>
                       </button>
                     </div>
                   </div>
@@ -32275,6 +32710,411 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {contractorJobsView === 'service_agreements' && (
+                <Card title="Service Agreements" icon={<ClipboardList size={18} />}>
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Contractor-side foundation</p>
+                        <h3 className="mt-1 text-lg font-bold text-slate-950">Create maintenance plan templates and draft offers.</h3>
+                        <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
+                          Draft agreement offers are not visible to the homeowner until sent. Choose one explicitly shared property for this offer. This does not create jobs, schedule visits, create invoices, set up autopay, or send reminders. Homeowner review and response is planned for a later slice.
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
+                        Back to Jobs
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-5">
+                      <InfoBox label="Active templates" value={String(activeServiceAgreementTemplates.length)} />
+                      <InfoBox label="Archived templates" value={String(archivedServiceAgreementTemplates.length)} />
+                      <InfoBox label="Draft offers" value={String(serviceAgreementDraftOffers.length)} />
+                      <InfoBox label="Sent offers" value={String(serviceAgreementSentOffers.length)} />
+                      <InfoBox label="Closed offers" value={String(serviceAgreementClosedOffers.length)} />
+                    </div>
+
+                    {serviceAgreementDisabledReason && (
+                      <Notice tone="info" text={serviceAgreementDisabledReason} />
+                    )}
+
+                    {!serviceAgreementDisabledReason && (
+                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-slate-950">{editingServiceAgreementTemplateId ? 'Edit agreement template' : 'Create agreement template'}</p>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">Templates are private to your contractor account until you create and send an offer.</p>
+                            </div>
+                            {editingServiceAgreementTemplateId && (
+                              <button type="button" onClick={resetServiceAgreementTemplateDraft} className={buttonClass('secondary')}>
+                                Cancel edit
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <Field label="Template name">
+                              <input
+                                className={inputClass()}
+                                value={serviceAgreementTemplateDraft.name}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, name: event.target.value }))}
+                                placeholder="Seasonal maintenance plan"
+                              />
+                            </Field>
+                            <Field label="Service frequency">
+                              <input
+                                className={inputClass()}
+                                value={serviceAgreementTemplateDraft.service_frequency}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, service_frequency: event.target.value }))}
+                                placeholder="Quarterly, twice yearly..."
+                              />
+                            </Field>
+                            <Field label="Default duration months">
+                              <input
+                                className={inputClass()}
+                                inputMode="numeric"
+                                value={serviceAgreementTemplateDraft.default_duration_months}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, default_duration_months: event.target.value }))}
+                                placeholder="12"
+                              />
+                            </Field>
+                            <Field label="Default price">
+                              <input
+                                className={inputClass()}
+                                inputMode="decimal"
+                                value={serviceAgreementTemplateDraft.default_price}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, default_price: event.target.value }))}
+                                placeholder="Optional"
+                              />
+                            </Field>
+                            <Field label="Included visit count">
+                              <input
+                                className={inputClass()}
+                                inputMode="numeric"
+                                value={serviceAgreementTemplateDraft.included_visit_count}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, included_visit_count: event.target.value }))}
+                                placeholder="Optional"
+                              />
+                            </Field>
+                            <Field label="Description">
+                              <textarea
+                                className={`${inputClass()} min-h-[86px] resize-y`}
+                                {...writingAssistProps}
+                                value={serviceAgreementTemplateDraft.description}
+                                onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, description: event.target.value }))}
+                                placeholder="Plain-language scope for the homeowner."
+                              />
+                            </Field>
+                            <div className="lg:col-span-2">
+                              <Field label="Terms summary">
+                                <textarea
+                                  className={`${inputClass()} min-h-[86px] resize-y`}
+                                  {...writingAssistProps}
+                                  value={serviceAgreementTemplateDraft.terms_summary}
+                                  onChange={event => setServiceAgreementTemplateDraft(current => ({ ...current, terms_summary: event.target.value }))}
+                                  placeholder="Short, plain terms summary. Not an e-signature workflow."
+                                />
+                              </Field>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={serviceAgreementControlsDisabled || savingServiceAgreementTemplate || !serviceAgreementTemplateDraft.name.trim()}
+                              onClick={() => void saveServiceAgreementTemplate()}
+                              className={buttonClass('primary')}
+                            >
+                              <Plus size={16} />
+                              {savingServiceAgreementTemplate ? 'Saving...' : editingServiceAgreementTemplateId ? 'Save template' : 'Create template'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div>
+                            <p className="text-sm font-bold text-slate-950">Draft an offer</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Start from an active template, then choose one connected homeowner and one explicitly shared property.</p>
+                          </div>
+                          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <Field label="Template">
+                              <select
+                                className={inputClass()}
+                                value={serviceAgreementOfferDraft.template_id}
+                                onChange={event => {
+                                  const template = activeServiceAgreementTemplates.find(item => item.id === event.target.value) ?? null;
+                                  setServiceAgreementOfferDraft(current => template
+                                    ? serviceAgreementOfferDraftFromTemplate(template, {
+                                      connection_id: current.connection_id,
+                                      home_id: current.home_id,
+                                      starts_on: current.starts_on,
+                                      ends_on: current.ends_on,
+                                    })
+                                    : { ...current, template_id: event.target.value });
+                                }}
+                              >
+                                <option value="">Choose active template...</option>
+                                {activeServiceAgreementTemplates.map(template => (
+                                  <option key={template.id} value={template.id}>{template.name}</option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Connected homeowner">
+                              <select
+                                className={inputClass()}
+                                value={serviceAgreementOfferDraft.connection_id}
+                                onChange={event => {
+                                  const connection = serviceAgreementEligibleConnections.find(item => item.connection_id === event.target.value) ?? null;
+                                  const firstHome = connection ? connectedHomeList(connection).find(home => Boolean(home.id)) : null;
+                                  setServiceAgreementOfferDraft(current => ({
+                                    ...current,
+                                    connection_id: event.target.value,
+                                    home_id: firstHome?.id || '',
+                                  }));
+                                }}
+                              >
+                                <option value="">Choose connected homeowner...</option>
+                                {serviceAgreementEligibleConnections.map(connection => (
+                                  <option key={connection.connection_id} value={connection.connection_id}>
+                                    {connection.display_name || 'Homeowner'} · {connectedHomeList(connection).filter(home => Boolean(home.id)).length} shared propert{connectedHomeList(connection).filter(home => Boolean(home.id)).length === 1 ? 'y' : 'ies'}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Explicitly shared property">
+                              <select
+                                className={inputClass()}
+                                value={serviceAgreementOfferDraft.home_id}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, home_id: event.target.value }))}
+                                disabled={!selectedServiceAgreementOfferConnection}
+                              >
+                                <option value="">Choose shared property...</option>
+                                {selectedServiceAgreementOfferHomes.map((home, index) => {
+                                  const label = home.nickname || home.address_line1 || `Shared property ${index + 1}`;
+                                  const location = [home.city, home.state].filter(Boolean).join(', ');
+                                  return (
+                                    <option key={home.id} value={home.id}>
+                                      {[label, location].filter(Boolean).join(' · ')}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </Field>
+                            <Field label="Offer title">
+                              <input
+                                className={inputClass()}
+                                value={serviceAgreementOfferDraft.title}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, title: event.target.value }))}
+                                placeholder={selectedServiceAgreementOfferTemplate?.name || 'Maintenance agreement'}
+                              />
+                            </Field>
+                            <Field label="Price">
+                              <input
+                                className={inputClass()}
+                                inputMode="decimal"
+                                value={serviceAgreementOfferDraft.price}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, price: event.target.value }))}
+                                placeholder="Optional"
+                              />
+                            </Field>
+                            <Field label="Duration months">
+                              <input
+                                className={inputClass()}
+                                inputMode="numeric"
+                                value={serviceAgreementOfferDraft.duration_months}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, duration_months: event.target.value }))}
+                                placeholder="Optional"
+                              />
+                            </Field>
+                            <Field label="Included visits">
+                              <input
+                                className={inputClass()}
+                                inputMode="numeric"
+                                value={serviceAgreementOfferDraft.included_visit_count}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, included_visit_count: event.target.value }))}
+                                placeholder="Optional"
+                              />
+                            </Field>
+                            <Field label="Starts on">
+                              <input
+                                className={inputClass()}
+                                type="date"
+                                value={serviceAgreementOfferDraft.starts_on}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, starts_on: event.target.value }))}
+                              />
+                            </Field>
+                            <Field label="Ends on">
+                              <input
+                                className={inputClass()}
+                                type="date"
+                                value={serviceAgreementOfferDraft.ends_on}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, ends_on: event.target.value }))}
+                              />
+                            </Field>
+                            <Field label="Offer description">
+                              <textarea
+                                className={`${inputClass()} min-h-[86px] resize-y`}
+                                {...writingAssistProps}
+                                value={serviceAgreementOfferDraft.description}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, description: event.target.value }))}
+                                placeholder="What is included for this property?"
+                              />
+                            </Field>
+                            <Field label="Terms summary">
+                              <textarea
+                                className={`${inputClass()} min-h-[86px] resize-y`}
+                                {...writingAssistProps}
+                                value={serviceAgreementOfferDraft.terms_summary}
+                                onChange={event => setServiceAgreementOfferDraft(current => ({ ...current, terms_summary: event.target.value }))}
+                                placeholder="Plain-language terms for homeowner review."
+                              />
+                            </Field>
+                          </div>
+                          {serviceAgreementEligibleConnections.length === 0 && (
+                            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                              Connect with a homeowner and share a property before creating agreement offers.
+                            </p>
+                          )}
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={serviceAgreementControlsDisabled || savingServiceAgreementOffer || !serviceAgreementOfferDraft.template_id || !serviceAgreementOfferDraft.connection_id || !serviceAgreementOfferDraft.home_id}
+                              onClick={() => void saveServiceAgreementOfferDraft()}
+                              className={buttonClass('primary')}
+                            >
+                              <Plus size={16} />
+                              {savingServiceAgreementOffer ? 'Saving draft...' : 'Save draft offer'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-slate-950">Templates</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Archived templates stay out of new offer creation.</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{serviceAgreementTemplates.length}</span>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          {serviceAgreementTemplates.length === 0 ? (
+                            <EmptyState text={canManageServiceAgreements ? 'No service agreement templates yet.' : 'Service agreement templates are available to contractor owner, admin, and office roles.'} />
+                          ) : serviceAgreementTemplates.map(template => {
+                            const archived = template.status === 'archived';
+                            return (
+                              <div key={template.id} className={`rounded-xl border p-3 ${archived ? 'border-slate-200 bg-slate-50' : 'border-blue-100 bg-blue-50/40'}`}>
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-bold text-slate-950">{template.name}</p>
+                                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                        {archived ? 'Archived' : 'Active'}
+                                      </span>
+                                    </div>
+                                    {template.description && <p className="mt-2 text-sm leading-5 text-slate-700">{template.description}</p>}
+                                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                                      {[template.service_frequency, serviceAgreementDurationLabel(template.default_duration_months), serviceAgreementMoneyLabel(template.default_price_cents), serviceAgreementVisitCountLabel(template.included_visit_count)].filter(Boolean).join(' · ')}
+                                    </p>
+                                    {template.terms_summary && (
+                                      <p className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
+                                        Terms: {template.terms_summary}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {canManageServiceAgreements && (
+                                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                                      <button
+                                        type="button"
+                                        disabled={Boolean(serviceAgreementActionsDisabledReason)}
+                                        onClick={() => editServiceAgreementTemplate(template)}
+                                        className={buttonClass('secondary')}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={Boolean(serviceAgreementActionsDisabledReason) || togglingServiceAgreementTemplateId === template.id}
+                                        onClick={() => void toggleServiceAgreementTemplateStatus(template)}
+                                        className={buttonClass('secondary')}
+                                      >
+                                        {togglingServiceAgreementTemplateId === template.id ? 'Updating...' : archived ? 'Reactivate' : 'Archive'}
+                                      </button>
+                                      {!archived && (
+                                        <button
+                                          type="button"
+                                          disabled={Boolean(serviceAgreementActionsDisabledReason)}
+                                          onClick={() => beginServiceAgreementOffer(template)}
+                                          className={buttonClass('primary')}
+                                        >
+                                          Create offer
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-slate-950">Offers</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Draft offers can be sent once they are ready for homeowner review.</p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{serviceAgreementOffers.length}</span>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          {serviceAgreementOffers.length === 0 ? (
+                            <EmptyState text="No service agreement offers yet." />
+                          ) : serviceAgreementOffers.map(offer => (
+                            <div key={offer.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-bold text-slate-950">{offer.title}</p>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceAgreementOfferStatusClass(offer.status)}`}>
+                                      {serviceAgreementOfferStatusLabel(offer.status)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                                    {serviceAgreementConnectionLabel(offer.connection_id)} · {serviceAgreementHomeLabel(offer.connection_id, offer.home_id)}
+                                  </p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                                    {[serviceAgreementMoneyLabel(offer.price_cents), serviceAgreementDurationLabel(offer.duration_months), serviceAgreementVisitCountLabel(offer.included_visit_count)].join(' · ')}
+                                  </p>
+                                  {offer.description && <p className="mt-2 text-sm leading-5 text-slate-700">{offer.description}</p>}
+                                  {offer.terms_summary && (
+                                    <p className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-500">
+                                      Terms: {offer.terms_summary}
+                                    </p>
+                                  )}
+                                </div>
+                                {canManageServiceAgreements && offer.status === 'draft' && (
+                                  <button
+                                    type="button"
+                                    disabled={Boolean(serviceAgreementActionsDisabledReason) || sendingServiceAgreementOfferId === offer.id}
+                                    onClick={() => void sendServiceAgreementOffer(offer)}
+                                    className={buttonClass('primary')}
+                                  >
+                                    <Send size={15} />
+                                    {sendingServiceAgreementOfferId === offer.id ? 'Sending...' : 'Send offer'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -4,6 +4,36 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-03
+
+- Branch: `codex/fb-032-service-agreements-contractor-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/fb032-service-agreements-contractor-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-032 Service Agreements Foundation Slice 3A contractor-side UI. Authorized contractor owner/admin/office users can view/create/edit/archive/reactivate service agreement templates, create property-scoped draft offers from active templates for explicitly shared connected-homeowner properties, and send draft offers through existing RPCs.
+- Reason for change: The SQL/RLS/RPC foundation is merged, production-applied, and verified, so ServSync needed the smallest safe contractor UI layer without adding homeowner offer response UI, visits, jobs, invoices, payments, renewals, reminders, notifications, external delivery, or new SQL/RPCs.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for forbidden automation/payment/job/invoice/notification behavior
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-contractor-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Contractor UI only. Homeowner offer review/accept/decline remains Slice 4.
+  - Numeric defaults on existing templates can be changed but not cleared to blank because the current update RPC preserves `null` parameters; clear-to-null can be handled by a future SQL/RPC slice if beta feedback needs it.
+  - No app-visible Service Agreement visits, job linking, invoice reminders/drafts, renewals/cancellations, payments, Stripe/autopay, QuickBooks/accounting sync, legal e-signature integration, reminders, notifications, email/SMS/push, deployment, or production data mutation is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-032 now records the production-applied SQL foundation and Slice 3A contractor-side template/offer UI while preserving homeowner response, visits, jobs, invoices, payments, reminders, notifications, and automation as future follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now reflects that the SQL/RLS/RPC foundation is applied and verified and that Slice 3A is contractor-side UI only.
+
 ## 2026-07-02
 
 - Branch: `codex/fb-032-service-agreements-sql-rls-rpc-v1`
