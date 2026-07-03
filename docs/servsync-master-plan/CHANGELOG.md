@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/contractor-referral-foundation-v1`
+- Files changed:
+  - `servsync-contractor-referral-foundation.sql`
+  - `tests/e2e/contractor-referral-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a foundation-only contractor-to-contractor referral package for `contractor_refers_contractor`. The SQL patch creates a dedicated `servsync_referral_invites` table, contractor manager submit RPC, platform-admin list/update RPCs, RLS/privilege hardening, and source/security catalog coverage.
+- Reason for change: ServSync needs a safe backend boundary for contractor-submitted contractor referrals before any contractor UI, platform-admin UI, outreach/email, public referral landing, signup attribution, reward, billing, or permission behavior is considered.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for forbidden email/billing/reward/team/access/workflow automation behavior
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-referral-foundation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/RPC foundation only. No contractor-facing UI, platform-admin UI, public landing page, email/SMS/push delivery, rewards, credits, subscriptions, billing, paywalls, contractor-to-contractor permissions, contractor team access, automatic contractor profile creation, connection request, service request, job, estimate, invoice, notification, deployment, or production SQL apply is included.
+  - Runtime RLS/RPC behavior still requires a separately approved sandbox SQL apply/probe before any production SQL apply is considered.
+  - Existing homeowner contractor invite lead, reward referral, contractor-homeowner invite, contractor team invite, Home Access invite, and service request flows remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-026 now records the contractor-to-contractor referral foundation package while preserving UI, email/outreach, rewards, billing, and automation as future approval-gated work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records contractor-to-contractor referrals as a backend-only FB-026 trust/growth foundation separate from existing homeowner invite leads, reward referrals, contractor-homeowner invites, team invites, billing, permissions, and email.
+
 - Branch: `codex/fb-032-foundation-closeout-polish-v1`
 - Files changed:
   - `src/App.tsx`
