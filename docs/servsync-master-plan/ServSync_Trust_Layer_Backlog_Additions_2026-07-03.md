@@ -12,11 +12,12 @@ Do not describe this direction as legal mediation, contractor certification, exp
 
 ## Recommended canonical backlog fold-in
 
-Add as a new future/backlog umbrella item unless the backlog owner chooses to split it into separate FB IDs immediately.
+Add as new future/backlog items unless the backlog owner chooses to split or merge IDs differently.
 
 | Proposed ID | Feature / Topic | Product Area | Status | Priority | Current Next Step |
 | --- | --- | --- | --- | --- | --- |
 | FB-033 | Trust Layer Differentiators | Estimates, jobs, Home History, homeowner permissions, Discover, contractor trust | Backlog | High | Preserve as product direction. Later split into narrow audited slices for estimate clarity, change approvals, completion summaries, controlled shared notes, Emergency Binder export, and completed-job Discover posts. |
+| FB-034 | Discover Post Queue + Homeowner-Approved Project Share | Discover, completed jobs, media library, homeowner approval, contractor marketing | Backlog | High | Treat as a high-priority Discover expansion. First audit storage/privacy/RLS and the completed-job photo/source surfaces, then implement `Save for Discover` before optional homeowner approval badges. |
 
 ## Included backlog ideas
 
@@ -232,6 +233,78 @@ Possible first slice:
 
 - `Create Discover post from completed job` draft action with privacy checklist and no auto-publish.
 
+### 12A. Discover Post Queue + Homeowner-Approved Project Share
+
+Status: Backlog
+
+Priority: High
+
+Product direction:
+
+- Add a `Save for Discover` action so contractors can keep a backlog of completed jobs that are good candidates for future Discover posts.
+- Give contractors a simple Discover content queue instead of forcing them to post immediately after job completion.
+- Let ServSync generate privacy-safe Discover drafts from existing job records, completion summaries, and contractor-selected job photos.
+- Let contractors review, edit, save, archive, or publish drafts later.
+- Add an optional homeowner approval flow for posts based on completed work.
+- If the homeowner approves the post, show a simple badge such as `Homeowner approved` or `Shared with homeowner approval`.
+- Keep public homeowner identity hidden by default. Public homeowner tagging/linking should be a later, separately approved opt-in enhancement, not MVP behavior.
+
+Why this matters:
+
+- Contractors get more marketing value from work they already completed inside ServSync.
+- Contractors can build a lightweight posting backlog without manual photo hunting or caption writing.
+- Homeowners get more trustworthy local project examples when browsing Discover.
+- Homeowner approval can create stronger social proof without turning Discover into a social platform.
+- This directly supports the core Discover objective: help contractors be discovered and get more work while helping homeowners find a contractor.
+
+Recommended contractor workflow:
+
+1. Contractor completes a job.
+2. ServSync offers `Create Discover post`, `Save for Discover`, or `Not interested`.
+3. If saved, the job appears in a Discover queue with status such as `Saved for Discover`, `Draft ready`, `Needs contractor review`, `Approval requested`, `Approved by homeowner`, `Posted`, or `Archived`.
+4. Contractor selects job photos and confirms which ones are safe for public posting.
+5. ServSync drafts a post using safe job context only.
+6. Contractor reviews the final public preview before publishing.
+7. Contractor can optionally request homeowner approval before publishing or before adding the homeowner-approved badge.
+
+Recommended homeowner approval workflow:
+
+- Homeowner receives a simple approval card showing contractor name, project type, public service area, selected photos, and draft public description.
+- Approval card clearly states the post will not show homeowner name, street address, contact information, private notes, access details, invoice/payment details, or documents.
+- Homeowner can approve, decline, or request changes.
+- Approval should be one-tap simple where possible, but never automatic.
+- Declining approval should not affect the completed job record, invoice, warranty notes, or contractor-homeowner relationship.
+
+Privacy and safety guardrails:
+
+- ServSync should strip or avoid sensitive customer information by default when generating the draft.
+- Do not include homeowner name, street address, exact property address, phone/email, access notes, alarm/gate/lockbox codes, private job notes, invoice/payment details, internal pricing metadata, documents, or homeowner-uploaded media unless a future explicit permission model approves it.
+- Contractor must still review and confirm the public preview before posting.
+- Homeowner-uploaded request/home photos should not be marketing-eligible by default.
+- Contractor-owned job documentation photos can become marketing-eligible only through contractor selection and privacy review.
+- Homeowner approval badge confirms the homeowner approved sharing that post; it must not imply ServSync verified workmanship, pricing fairness, contractor licensing, insurance, or legal compliance.
+- Do not implement public comments, likes, followers, complaint threads, public homeowner profiles, or broad homeowner tagging as part of this feature.
+
+Storage/data-limit guardrails:
+
+- Audit storage and media flows before implementation.
+- Prefer references to existing job photos where safe instead of duplicating full-size images for posts.
+- Generate thumbnails/optimized public versions for Discover.
+- Strip sensitive metadata from public images.
+- Add plan-aware storage limits later if needed, with clear usage visibility for paying contractors.
+- Keep final/legal job record snapshots separate from marketing/post assets.
+- Do not let Discover media growth compromise core job record storage reliability.
+
+Possible implementation slices:
+
+1. Audit current job/photo/media surfaces and storage/RLS boundaries.
+2. Add `Save for Discover` from completed jobs with a private contractor-only queue.
+3. Add contractor draft creation from saved completed jobs using selected photos and safe job metadata.
+4. Add privacy checklist and final contractor public-preview confirmation.
+5. Add optional homeowner approval request flow.
+6. Add `Homeowner approved` badge to approved posts.
+7. Add plan-aware storage usage/limits only after actual media usage patterns are clearer.
+
 ### 13. Scope Agreement / Shared Scope Record
 
 Product direction:
@@ -267,17 +340,18 @@ Possible first slice:
 
 ## Suggested split sequence
 
-1. Estimate Clarity Assistant and Scope Summary.
-2. No-Surprise Work Changes.
-3. After-the-Job Assistant.
-4. Smart Reminder from Completed Job.
-5. Completed Job to Discover Post.
-6. Homeowner-Controlled Shared Notes.
-7. Emergency Binder Export.
-8. Service Memory / Reuse Prior Work.
-9. Temporary Home Access Handoff.
-10. Contractor Trust Card.
-11. Homeowner Decision Folder.
+1. Discover Post Queue + Homeowner-Approved Project Share.
+2. Estimate Clarity Assistant and Scope Summary.
+3. No-Surprise Work Changes.
+4. After-the-Job Assistant.
+5. Smart Reminder from Completed Job.
+6. Completed Job to Discover Post.
+7. Homeowner-Controlled Shared Notes.
+8. Emergency Binder Export.
+9. Service Memory / Reuse Prior Work.
+10. Temporary Home Access Handoff.
+11. Contractor Trust Card.
+12. Homeowner Decision Folder.
 
 ## Cross-feature guardrails
 
