@@ -212,6 +212,7 @@ import type {
   SupportAttachment,
   SupportInquiryCategory,
   SupportInquiryStatus,
+  ServiceAgreement,
   ServiceAgreementOffer,
   ServiceAgreementTemplate,
   UserRole,
@@ -488,7 +489,7 @@ type StarterEstimateTemplate = {
   line_items: EstimateTemplateLineItem[];
 };
 type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'calendar' | 'estimates' | 'log' | 'documents' | 'discover' | 'trust' | 'privacy' | 'support';
-type HomeownerRecordSection = 'needs_review' | 'open_invoices' | 'accepted' | 'closed';
+type HomeownerRecordSection = 'needs_review' | 'agreement_offers' | 'open_invoices' | 'accepted' | 'agreements' | 'closed';
 type HomeownerRecordPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerRequestPropertyScope = 'selected' | 'all' | 'unassigned';
 type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'website' | 'profileDetails' | 'discoverPosts';
@@ -9805,6 +9806,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [serviceAgreementOffers, setServiceAgreementOffers] = useState<ServiceAgreementOffer[]>([]);
+  const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([]);
   const [directoryContractors, setDirectoryContractors] = useState<ContractorProfile[]>([]);
   const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
   const [requestingConnectionId, setRequestingConnectionId] = useState<string | null>(null);
@@ -9915,7 +9918,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [updatingEstimateId, setUpdatingEstimateId] = useState<string | null>(null);
   const [viewingEstimateId, setViewingEstimateId] = useState<string | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const [viewingServiceAgreementOfferId, setViewingServiceAgreementOfferId] = useState<string | null>(null);
+  const [viewingServiceAgreementId, setViewingServiceAgreementId] = useState<string | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [respondingServiceAgreementOfferId, setRespondingServiceAgreementOfferId] = useState<string | null>(null);
   const [filingEstimateId, setFilingEstimateId] = useState<string | null>(null);
   const [filingInvoiceId, setFilingInvoiceId] = useState<string | null>(null);
   const [homeownerRecordSearch, setHomeownerRecordSearch] = useState('');
@@ -10068,7 +10074,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setLoading(true);
     setError('');
     try {
-      const [profileRes, homeRes, connectionsRes, directoryRes, inviteLeadsRes, serviceRequestsRes, estimatesRes, invoicesRes, notifRes, logRes, remindersRes, docsRes, supportRes] = await Promise.all([
+      const [profileRes, homeRes, connectionsRes, directoryRes, inviteLeadsRes, serviceRequestsRes, estimatesRes, invoicesRes, serviceAgreementOffersRes, serviceAgreementsRes, notifRes, logRes, remindersRes, docsRes, supportRes] = await Promise.all([
         supabase.from('homeowner_profiles').select('*').eq('user_id', profile.id).maybeSingle(),
         supabase.from('homes').select('*').eq('homeowner_user_id', profile.id).order('created_at', { ascending: true }),
         supabase.rpc('servsync_get_homeowner_connections'),
@@ -10077,6 +10083,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         supabase.rpc('servsync_homeowner_service_requests'),
         supabase.from('estimates').select(ESTIMATE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
         supabase.from('invoices').select(INVOICE_WITH_LINES_SELECT).eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
+        supabase.from('service_agreement_offers').select('*').eq('homeowner_user_id', profile.id).neq('status', 'draft').order('updated_at', { ascending: false }),
+        supabase.from('service_agreements').select('*').eq('homeowner_user_id', profile.id).order('updated_at', { ascending: false }),
         supabase.from('notifications').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('home_maintenance_log').select('*').eq('homeowner_user_id', profile.id).order('performed_at', { ascending: false }),
         supabase.from('home_reminders').select('*').eq('homeowner_user_id', profile.id).order('due_on', { ascending: true }),
@@ -10133,6 +10141,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setServiceRequests(loadedServiceRequests);
       if (!estimatesRes.error) setEstimates((estimatesRes.data || []) as Estimate[]);
       if (!invoicesRes.error) setInvoices((invoicesRes.data || []) as Invoice[]);
+      if (!serviceAgreementOffersRes.error) setServiceAgreementOffers((serviceAgreementOffersRes.data || []) as ServiceAgreementOffer[]);
+      if (!serviceAgreementsRes.error) setServiceAgreements((serviceAgreementsRes.data || []) as ServiceAgreement[]);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
       setActiveSharingDrafts(loadedConnections.reduce<Record<string, ActiveSharedPropertyDraft>>((drafts, connection) => {
         drafts[connection.connection_id] = activeSharingDraftFromConnection(connection, loadedHomes, loadedHome?.id ?? '');
@@ -11713,6 +11723,30 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
+  const respondToServiceAgreementOffer = async (offer: ServiceAgreementOffer, response: 'accepted' | 'declined') => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setRespondingServiceAgreementOfferId(offer.id);
+    try {
+      const { error: responseError } = await supabase.rpc('servsync_homeowner_respond_to_service_agreement_offer', {
+        p_offer_id: offer.id,
+        p_response: response,
+      });
+      if (responseError) throw responseError;
+      setNotice(response === 'accepted'
+        ? 'Service agreement accepted. Your contractor will still coordinate scheduling and billing separately.'
+        : 'Service agreement offer declined.'
+      );
+      setViewingServiceAgreementOfferId(null);
+      await loadHomeowner();
+    } catch (err) {
+      setError(readableError(err, 'Unable to respond to this service agreement offer.'));
+    } finally {
+      setRespondingServiceAgreementOfferId(null);
+    }
+  };
+
   const viewHomeownerInvoice = async (invoice: Invoice) => {
     if (!supabase) return;
     setViewingInvoiceId(current => current === invoice.id ? null : invoice.id);
@@ -12139,6 +12173,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const dashboardServiceRequests = serviceRequests.filter(dashboardPropertyMatches);
   const dashboardEstimates = estimates.filter(dashboardPropertyMatches);
   const dashboardInvoices = invoices.filter(dashboardPropertyMatches);
+  const dashboardServiceAgreementOffers = serviceAgreementOffers.filter(dashboardPropertyMatches);
   const dashboardHomeDocuments = homeDocuments.filter(dashboardPropertyMatches);
   const dashboardMaintenanceLog = maintenanceLog.filter(dashboardPropertyMatches);
   const dashboardHomeReminders = homeReminders.filter(dashboardPropertyMatches);
@@ -12149,6 +12184,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     ...serviceRequests,
     ...estimates,
     ...invoices,
+    ...serviceAgreementOffers,
+    ...serviceAgreements,
     ...homeDocuments,
     ...maintenanceLog,
     ...homeReminders,
@@ -12188,15 +12225,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 3);
   const dashboardOpenInvoiceRecords = dashboardInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
+  const dashboardPendingServiceAgreementOffers = dashboardServiceAgreementOffers.filter(offer => offer.status === 'sent');
   const pendingEstimateCount = dashboardNeedsReviewEstimates.length;
   const openHomeownerInvoiceCount = dashboardOpenInvoiceRecords.length;
+  const pendingHomeownerServiceAgreementOfferCount = dashboardPendingServiceAgreementOffers.length;
   const dashboardEstimateIds = new Set(dashboardEstimates.map(estimate => estimate.id));
   const unreadEstimateNotificationIds = notifications
     .filter(notification => !notification.read_at && notification.estimate_id && dashboardEstimateIds.has(notification.estimate_id))
     .map(notification => notification.id);
   const unreadEstimateNotificationKey = unreadEstimateNotificationIds.join('|');
   const unviewedHomeownerInvoiceCount = dashboardInvoices.filter(invoice => invoice.status === 'sent').length;
-  const homeownerFinancialBadgeCount = unreadEstimateNotificationIds.length + unviewedHomeownerInvoiceCount;
+  const homeownerFinancialBadgeCount = unreadEstimateNotificationIds.length + unviewedHomeownerInvoiceCount + pendingHomeownerServiceAgreementOfferCount;
   const openSupportInquiryCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
   const waitingOnHomeownerSupportCount = supportInquiries.filter(inquiry => inquiry.status === 'waiting_on_user').length;
   const recentLogEntries = dashboardMaintenanceLog.slice(0, 3);
@@ -12554,7 +12593,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedPropertyLabel = selectedHome ? homeProfileDisplayLabel(selectedHome) : 'selected property';
   const unassignedEstimateCount = estimates.filter(estimate => !estimate.home_id).length;
   const unassignedInvoiceCount = invoices.filter(invoice => !invoice.home_id).length;
-  const unassignedRecordCount = unassignedEstimateCount + unassignedInvoiceCount;
+  const unassignedServiceAgreementOfferCount = serviceAgreementOffers.filter(offer => !offer.home_id).length;
+  const unassignedServiceAgreementCount = serviceAgreements.filter(agreement => !agreement.home_id).length;
+  const unassignedRecordCount = unassignedEstimateCount + unassignedInvoiceCount + unassignedServiceAgreementOfferCount + unassignedServiceAgreementCount;
   const homeownerRecordPropertyMatches = (record: Pick<Estimate | Invoice, 'home_id'>) => {
     if (homeownerRecordPropertyScope === 'all') return true;
     if (homeownerRecordPropertyScope === 'unassigned') return !record.home_id;
@@ -12562,8 +12603,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const propertyScopedEstimates = estimates.filter(homeownerRecordPropertyMatches);
   const propertyScopedInvoices = invoices.filter(homeownerRecordPropertyMatches);
+  const propertyScopedServiceAgreementOffers = serviceAgreementOffers.filter(homeownerRecordPropertyMatches);
+  const propertyScopedServiceAgreements = serviceAgreements.filter(homeownerRecordPropertyMatches);
   const needsReviewEstimates = propertyScopedEstimates.filter(estimate => estimate.status === 'sent');
+  const pendingServiceAgreementOffers = propertyScopedServiceAgreementOffers.filter(offer => offer.status === 'sent');
   const acceptedEstimates = propertyScopedEstimates.filter(estimate => estimate.status === 'accepted');
+  const visibleAgreementRecords = propertyScopedServiceAgreements.filter(agreement => ['active', 'cancelled', 'expired'].includes(agreement.status));
   const closedEstimateRecords = propertyScopedEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
   const openInvoiceRecords = propertyScopedInvoices.filter(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status));
   const closedInvoiceRecords = propertyScopedInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
@@ -12575,6 +12620,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const homeownerRecordContractors = Array.from(
     new Map(
       [...propertyScopedEstimates.map(estimate => estimate.contractor_id), ...propertyScopedInvoices.map(invoice => invoice.contractor_id)]
+        .concat(propertyScopedServiceAgreementOffers.map(offer => offer.contractor_id), propertyScopedServiceAgreements.map(agreement => agreement.contractor_id))
         .map(contractorId => [contractorId, homeownerRecordContractorName(contractorId)] as const)
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
@@ -12608,6 +12654,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       invoice.status,
     ])
   );
+  const homeownerServiceAgreementOfferMatchesFilters = (offer: ServiceAgreementOffer) => (
+    (homeownerRecordContractorFilter === 'all' || offer.contractor_id === homeownerRecordContractorFilter)
+    && homeownerRecordMatchesQuery([
+      offer.title,
+      homeownerRecordContractorName(offer.contractor_id),
+      propertyRecordLabel(offer, { homes }),
+      offer.description,
+      offer.terms_summary,
+      offer.status,
+    ])
+  );
+  const homeownerServiceAgreementMatchesFilters = (agreement: ServiceAgreement) => (
+    (homeownerRecordContractorFilter === 'all' || agreement.contractor_id === homeownerRecordContractorFilter)
+    && homeownerRecordMatchesQuery([
+      agreement.title,
+      homeownerRecordContractorName(agreement.contractor_id),
+      propertyRecordLabel(agreement, { homes }),
+      agreement.description,
+      agreement.terms_summary,
+      agreement.status,
+    ])
+  );
   const sortHomeownerEstimates = (items: Estimate[]) => [...items].sort((a, b) => {
     const aTime = new Date(a.updated_at || a.created_at).getTime();
     const bTime = new Date(b.updated_at || b.created_at).getTime();
@@ -12618,27 +12686,47 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const bTime = new Date(b.issued_at || b.updated_at || b.created_at).getTime();
     return homeownerRecordSort === 'newest' ? bTime - aTime : aTime - bTime;
   });
+  const sortHomeownerServiceAgreementOffers = (items: ServiceAgreementOffer[]) => [...items].sort((a, b) => {
+    const aTime = new Date(a.sent_at || a.responded_at || a.updated_at || a.created_at).getTime();
+    const bTime = new Date(b.sent_at || b.responded_at || b.updated_at || b.created_at).getTime();
+    return homeownerRecordSort === 'newest' ? bTime - aTime : aTime - bTime;
+  });
+  const sortHomeownerServiceAgreements = (items: ServiceAgreement[]) => [...items].sort((a, b) => {
+    const aTime = new Date(a.starts_on || a.updated_at || a.created_at).getTime();
+    const bTime = new Date(b.starts_on || b.updated_at || b.created_at).getTime();
+    return homeownerRecordSort === 'newest' ? bTime - aTime : aTime - bTime;
+  });
   const visibleNeedsReviewEstimates = sortHomeownerEstimates(needsReviewEstimates.filter(homeownerEstimateMatchesFilters));
+  const visibleServiceAgreementOffers = sortHomeownerServiceAgreementOffers(propertyScopedServiceAgreementOffers.filter(homeownerServiceAgreementOfferMatchesFilters));
   const visibleOpenInvoiceRecords = sortHomeownerInvoices(openInvoiceRecords.filter(homeownerInvoiceMatchesFilters));
   const visibleAcceptedEstimates = sortHomeownerEstimates(acceptedEstimates.filter(homeownerEstimateMatchesFilters));
+  const visibleServiceAgreements = sortHomeownerServiceAgreements(visibleAgreementRecords.filter(homeownerServiceAgreementMatchesFilters));
   const visibleClosedInvoiceRecords = sortHomeownerInvoices(closedInvoiceRecords.filter(homeownerInvoiceMatchesFilters));
   const visibleClosedEstimateRecords = sortHomeownerEstimates(closedEstimateRecords.filter(homeownerEstimateMatchesFilters));
   const defaultHomeownerRecordSection: HomeownerRecordSection = needsReviewEstimates.length > 0
     ? 'needs_review'
+    : pendingServiceAgreementOffers.length > 0
+      ? 'agreement_offers'
     : openInvoiceRecords.length > 0
       ? 'open_invoices'
       : acceptedEstimates.length > 0
         ? 'accepted'
-        : 'closed';
+        : visibleAgreementRecords.length > 0
+          ? 'agreements'
+          : 'closed';
   const selectedHomeownerRecordSection = homeownerRecordSection ?? defaultHomeownerRecordSection;
   const selectedHomeownerRecordCount = selectedHomeownerRecordSection === 'needs_review'
     ? visibleNeedsReviewEstimates.length
+    : selectedHomeownerRecordSection === 'agreement_offers'
+      ? visibleServiceAgreementOffers.length
     : selectedHomeownerRecordSection === 'open_invoices'
       ? visibleOpenInvoiceRecords.length
       : selectedHomeownerRecordSection === 'accepted'
         ? visibleAcceptedEstimates.length
-        : visibleClosedInvoiceRecords.length + visibleClosedEstimateRecords.length;
-  const homeownerHasAnyPropertyScopedRecords = propertyScopedEstimates.length > 0 || propertyScopedInvoices.length > 0;
+        : selectedHomeownerRecordSection === 'agreements'
+          ? visibleServiceAgreements.length
+          : visibleClosedInvoiceRecords.length + visibleClosedEstimateRecords.length;
+  const homeownerHasAnyPropertyScopedRecords = propertyScopedEstimates.length > 0 || propertyScopedInvoices.length > 0 || propertyScopedServiceAgreementOffers.length > 0 || propertyScopedServiceAgreements.length > 0;
   const homeownerRecordScopeLabel = homeownerRecordPropertyScope === 'all'
     ? 'all properties'
     : homeownerRecordPropertyScope === 'unassigned'
@@ -12648,6 +12736,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         : 'unassigned records';
   const sumEstimateCents = (items: Estimate[]) => items.reduce((total, estimate) => total + (estimate.total_cents || 0), 0);
   const sumInvoiceCents = (items: Invoice[]) => items.reduce((total, invoice) => total + (invoice.total_cents || 0), 0);
+  const sumServiceAgreementOfferCents = (items: ServiceAgreementOffer[]) => items.reduce((total, offer) => total + (offer.price_cents || 0), 0);
+  const sumServiceAgreementCents = (items: ServiceAgreement[]) => items.reduce((total, agreement) => total + (agreement.price_cents || 0), 0);
   const homeownerRecordSectionTiles: Array<{
     id: HomeownerRecordSection;
     title: string;
@@ -12667,6 +12757,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       tone: 'attention',
     },
     {
+      id: 'agreement_offers',
+      title: 'Agreement Offers',
+      helper: 'Review maintenance offers',
+      emptyText: 'No service agreement offers are waiting here.',
+      count: propertyScopedServiceAgreementOffers.length,
+      totalCents: sumServiceAgreementOfferCents(propertyScopedServiceAgreementOffers),
+      tone: 'attention',
+    },
+    {
       id: 'open_invoices',
       title: 'Open Invoices',
       helper: 'Sent and unpaid',
@@ -12682,6 +12781,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       emptyText: 'No accepted estimates yet.',
       count: acceptedEstimates.length,
       totalCents: sumEstimateCents(acceptedEstimates),
+      tone: 'accepted',
+    },
+    {
+      id: 'agreements',
+      title: 'Agreements',
+      helper: 'Accepted agreement snapshots',
+      emptyText: 'No accepted service agreements yet.',
+      count: visibleAgreementRecords.length,
+      totalCents: sumServiceAgreementCents(visibleAgreementRecords),
       tone: 'accepted',
     },
     {
@@ -12733,6 +12841,212 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         : 'border-slate-300 bg-white shadow-sm hover:border-slate-400 hover:shadow-md before:bg-slate-400',
     };
     return `relative overflow-hidden rounded-xl border p-3 transition before:absolute before:inset-y-0 before:left-0 before:w-1.5 sm:p-4 ${tones[tone]}`;
+  };
+
+  const homeownerServiceAgreementOfferStatusLabel = (status: ServiceAgreementOffer['status']) => ({
+    sent: 'Sent',
+    accepted: 'Accepted',
+    declined: 'Declined',
+    expired: 'Expired',
+    withdrawn: 'Withdrawn',
+    draft: 'Draft',
+  }[status] || status);
+  const homeownerServiceAgreementStatusLabel = (status: ServiceAgreement['status']) => ({
+    active: 'Active',
+    cancelled: 'Cancelled',
+    expired: 'Expired',
+  }[status] || status);
+  const homeownerServiceAgreementStatusClass = (status: ServiceAgreementOffer['status'] | ServiceAgreement['status']) => {
+    if (status === 'sent') return 'bg-blue-50 text-blue-700';
+    if (status === 'accepted' || status === 'active') return 'bg-emerald-50 text-emerald-700';
+    if (status === 'declined' || status === 'withdrawn' || status === 'cancelled') return 'bg-slate-100 text-slate-600';
+    return 'bg-amber-50 text-amber-700';
+  };
+  const homeownerServiceAgreementDateLabel = (value?: string | null) => (
+    value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+  );
+  const homeownerServiceAgreementDetailRows = (record: Pick<ServiceAgreementOffer | ServiceAgreement, 'price_cents' | 'duration_months' | 'included_visit_count' | 'starts_on' | 'ends_on'>) => [
+    record.price_cents === null || record.price_cents === undefined ? null : `Price: ${formatMoney(record.price_cents)}`,
+    record.duration_months === null || record.duration_months === undefined ? null : `Duration: ${record.duration_months} month${record.duration_months === 1 ? '' : 's'}`,
+    record.included_visit_count === null || record.included_visit_count === undefined ? null : `Included visits: ${record.included_visit_count}`,
+    record.starts_on ? `Starts: ${homeownerServiceAgreementDateLabel(record.starts_on)}` : null,
+    record.ends_on ? `Ends: ${homeownerServiceAgreementDateLabel(record.ends_on)}` : null,
+  ].filter(Boolean) as string[];
+
+  const renderServiceAgreementGuardrailCopy = () => (
+    <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm leading-6 text-blue-900">
+      <p className="font-semibold">Service agreement guardrails</p>
+      <ul className="mt-1 list-disc space-y-1 pl-4">
+        <li>Accepting this agreement does not set up autopay.</li>
+        <li>Accepting does not create an invoice, schedule a visit, or create a job.</li>
+        <li>This is not a legal e-signature flow.</li>
+        <li>Your contractor will still coordinate scheduling and billing separately.</li>
+      </ul>
+    </div>
+  );
+
+  const renderHomeownerServiceAgreementOfferCard = (offer: ServiceAgreementOffer) => {
+    const contractorName = homeownerRecordContractorName(offer.contractor_id);
+    const isOpen = viewingServiceAgreementOfferId === offer.id;
+    const propertyLabel = propertyRecordLabel(offer, { homes });
+    const details = homeownerServiceAgreementDetailRows(offer);
+    const canRespond = offer.status === 'sent';
+    const busy = respondingServiceAgreementOfferId === offer.id;
+
+    return (
+      <div
+        key={offer.id}
+        data-testid="homeowner-service-agreement-offer-card"
+        data-record-id={offer.id}
+        data-record-title={offer.title}
+        className={homeownerRecordCardChrome(canRespond ? 'attention' : offer.status === 'accepted' ? 'accepted' : 'closed', isOpen)}
+      >
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 break-words font-bold text-slate-950">{offer.title}</p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeownerServiceAgreementStatusClass(offer.status)}`}>
+                {homeownerServiceAgreementOfferStatusLabel(offer.status)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {contractorName}
+              {offer.sent_at ? ` · Sent ${formatDateTime(offer.sent_at)}` : ''}
+            </p>
+            {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+          </div>
+          <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">{offer.price_cents === null || offer.price_cents === undefined ? 'Price not set' : formatMoney(offer.price_cents)}</p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setViewingEstimateId(null);
+              setViewingInvoiceId(null);
+              setViewingServiceAgreementId(null);
+              setViewingServiceAgreementOfferId(current => current === offer.id ? null : offer.id);
+            }}
+            className={buttonClass(canRespond && !isOpen ? 'primary' : 'secondary')}
+          >
+            <ClipboardCheck size={16} />
+            {isOpen ? 'Hide Details' : canRespond ? 'Review Agreement' : 'View Details'}
+          </button>
+        </div>
+        {isOpen && (
+          <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
+            {canRespond && <Notice tone="info" text="Review this service agreement offer, then accept or decline when you are ready." />}
+            {renderServiceAgreementGuardrailCopy()}
+            {details.length > 0 && (
+              <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                {details.map(detail => <span key={detail} className="text-slate-600">{detail}</span>)}
+              </div>
+            )}
+            {offer.description && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{offer.description}</p>}
+            {offer.terms_summary && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms summary</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.terms_summary}</p>
+              </div>
+            )}
+            {canRespond && (
+              <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={() => void respondToServiceAgreementOffer(offer, 'accepted')}
+                  disabled={busy}
+                  data-testid="homeowner-accept-service-agreement-offer"
+                  aria-label={`Accept service agreement offer ${offer.title}`}
+                  className={buttonClass('primary')}
+                >
+                  <CheckCircle2 size={16} />
+                  {busy ? 'Updating...' : 'Accept agreement'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void respondToServiceAgreementOffer(offer, 'declined')}
+                  disabled={busy}
+                  data-testid="homeowner-decline-service-agreement-offer"
+                  aria-label={`Decline service agreement offer ${offer.title}`}
+                  className={buttonClass('secondary')}
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+            {offer.status === 'accepted' && <Notice tone="success" text="You accepted this agreement. Active agreement details appear in the Agreements section." />}
+            {offer.status === 'declined' && <Notice tone="info" text="You declined this agreement offer." />}
+            {offer.status === 'expired' && <Notice tone="info" text="This agreement offer has expired." />}
+            {offer.status === 'withdrawn' && <Notice tone="info" text="This agreement offer was withdrawn by the contractor." />}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderHomeownerServiceAgreementCard = (agreement: ServiceAgreement) => {
+    const contractorName = homeownerRecordContractorName(agreement.contractor_id);
+    const isOpen = viewingServiceAgreementId === agreement.id;
+    const propertyLabel = propertyRecordLabel(agreement, { homes });
+    const details = homeownerServiceAgreementDetailRows(agreement);
+
+    return (
+      <div
+        key={agreement.id}
+        data-testid="homeowner-service-agreement-card"
+        data-record-id={agreement.id}
+        data-record-title={agreement.title}
+        className={homeownerRecordCardChrome(agreement.status === 'active' ? 'accepted' : 'closed', isOpen)}
+      >
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 break-words font-bold text-slate-950">{agreement.title}</p>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeownerServiceAgreementStatusClass(agreement.status)}`}>
+                {homeownerServiceAgreementStatusLabel(agreement.status)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{contractorName}</p>
+            {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+          </div>
+          <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">{agreement.price_cents === null || agreement.price_cents === undefined ? 'Price not set' : formatMoney(agreement.price_cents)}</p>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setViewingEstimateId(null);
+              setViewingInvoiceId(null);
+              setViewingServiceAgreementOfferId(null);
+              setViewingServiceAgreementId(current => current === agreement.id ? null : agreement.id);
+            }}
+            className={buttonClass(isOpen ? 'secondary' : 'primary')}
+          >
+            <ClipboardCheck size={16} />
+            {isOpen ? 'Hide Details' : 'View Agreement'}
+          </button>
+        </div>
+        {isOpen && (
+          <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm leading-6 text-emerald-900">
+              This is a read-only agreement snapshot. Your contractor still coordinates scheduling and billing separately.
+            </div>
+            {renderServiceAgreementGuardrailCopy()}
+            {details.length > 0 && (
+              <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                {details.map(detail => <span key={detail} className="text-slate-600">{detail}</span>)}
+              </div>
+            )}
+            {agreement.description && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{agreement.description}</p>}
+            {agreement.terms_summary && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms summary</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{agreement.terms_summary}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderHomeownerInvoiceCard = (invoice: Invoice, options: { showPaymentGuidance?: boolean } = {}) => {
@@ -13123,14 +13437,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const selectedHomeownerRecordChildren = selectedHomeownerRecordSection === 'needs_review'
     ? visibleNeedsReviewEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { needsReview: true }))
+    : selectedHomeownerRecordSection === 'agreement_offers'
+      ? visibleServiceAgreementOffers.map(renderHomeownerServiceAgreementOfferCard)
     : selectedHomeownerRecordSection === 'open_invoices'
       ? visibleOpenInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice, { showPaymentGuidance: true }))
       : selectedHomeownerRecordSection === 'accepted'
         ? visibleAcceptedEstimates.map(estimate => renderHomeownerEstimateCard(estimate, { accepted: true }))
-        : [
-            ...visibleClosedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
-            ...visibleClosedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
-          ];
+        : selectedHomeownerRecordSection === 'agreements'
+          ? visibleServiceAgreements.map(renderHomeownerServiceAgreementCard)
+          : [
+              ...visibleClosedInvoiceRecords.map(invoice => renderHomeownerInvoiceCard(invoice)),
+              ...visibleClosedEstimateRecords.map(estimate => renderHomeownerEstimateCard(estimate)),
+            ];
   const homeownerRecordFiltersActive = Boolean(homeownerRecordSearch || homeownerRecordContractorFilter !== 'all');
   const homeownerRecordControlsDirty = homeownerRecordFiltersActive || homeownerRecordSort !== 'newest';
 
@@ -13138,9 +13456,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
       <div className="space-y-5">
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-900">Review estimates and invoices from connected contractors</p>
+          <p className="text-sm font-semibold text-blue-900">Review estimates, invoices, and service agreement offers from connected contractors</p>
           <p className="mt-1 text-sm text-blue-800">
-            Drafts stay private to the contractor. Sent estimates need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
+            Drafts stay private to the contractor. Sent estimates and agreement offers need your decision, accepted estimates wait for the contractor to create or schedule the job, and invoices are the billing step after work is ready.
           </p>
         </div>
 
@@ -13151,7 +13469,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <p className="mt-1 text-sm font-semibold text-slate-950">Showing records for: {homeownerRecordScopeLabel}</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {homeownerHasMultipleProperties && unassignedRecordCount > 0
-                  ? 'Use All properties to see every record, or Unassigned to find older estimates and invoices that are not tied to a property yet.'
+                  ? 'Use All properties to see every record, or Unassigned to find older records that are not tied to a property yet.'
                   : homeownerHasMultipleProperties
                     ? 'Use All properties to see records across every property.'
                     : 'Use the menu to switch between selected, all, or unassigned records.'}
@@ -13191,7 +13509,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {homeownerRecordSectionTiles.map(tile => {
             const active = tile.id === selectedHomeownerRecordSection;
             return (
@@ -13202,6 +13520,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   setHomeownerRecordSection(tile.id);
                   setViewingEstimateId(null);
                   setViewingInvoiceId(null);
+                  setViewingServiceAgreementOfferId(null);
+                  setViewingServiceAgreementId(null);
                 }}
                 className={homeownerRecordTileChrome(tile.tone, active)}
               >
@@ -13267,11 +13587,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             selectedHomeownerRecordTile.title,
             selectedHomeownerRecordSection === 'needs_review'
               ? 'Estimates waiting for your approval or decline.'
+              : selectedHomeownerRecordSection === 'agreement_offers'
+                ? 'Service agreement offers sent by connected contractors. Draft offers stay hidden until sent.'
               : selectedHomeownerRecordSection === 'open_invoices'
                 ? 'Invoices that have been sent and are not marked paid or void.'
                 : selectedHomeownerRecordSection === 'accepted'
                   ? 'Approved estimates and any linked job or invoice status ServSync can show.'
-                  : 'Paid invoices, void invoices, and estimates that are no longer active.',
+                  : selectedHomeownerRecordSection === 'agreements'
+                    ? 'Accepted service agreement snapshots. Scheduling and billing remain separate.'
+                    : 'Paid invoices, void invoices, and estimates that are no longer active.',
             selectedHomeownerRecordEmptyText,
             selectedHomeownerRecordChildren,
             selectedHomeownerRecordTile.tone

@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/fb-032-homeowner-agreement-response-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-032 Service Agreements Foundation Slice 4A homeowner-side UI. Homeowners can view non-draft service agreement offers in the existing Estimates / Invoices area, review contractor/property/terms context, accept or decline sent offers through the existing homeowner response RPC, and view accepted agreements as read-only cards.
+- Reason for change: Slice 3A allowed contractors to send property-scoped agreement offers, so the smallest safe next step is homeowner review/response UI without adding new SQL/RPCs, visits, jobs, invoices, payments, reminders, notifications, external delivery, scheduling, Home Timeline writes, renewals, or contractor workflow expansion.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for forbidden automation/payment/job/invoice/notification behavior
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Homeowner UI reads non-draft offers and agreements directly through existing RLS-scoped selects; no new list RPC was added.
+  - Structured service frequency remains template-only and is not queried from homeowner UI. Contractors can include frequency in offer title, description, or terms until a later SQL/RPC slice snapshots it onto offers.
+  - Active agreements are read-only. No Service Agreement visits, job linking, invoice reminders/drafts, payments, Stripe/autopay, QuickBooks/accounting sync, legal e-signature integration, reminders, notifications, email/SMS/push, scheduling, calendar events, Home Timeline writes, deployment, or production data mutation is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-032 now records Slice 4A homeowner offer review/accept/decline UI while preserving visits, jobs, invoices, payments, reminders, notifications, scheduling, renewals, and automation as future follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now reflects that homeowner offer review/response UI exists while Service Agreements remain separate from jobs, invoices, payments, reminders, notifications, renewals, e-signatures, scheduling, and external delivery.
+
 - Branch: `codex/fb-032-service-agreements-contractor-ui-v1`
 - Files changed:
   - `src/App.tsx`

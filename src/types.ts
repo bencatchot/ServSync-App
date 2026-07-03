@@ -334,6 +334,7 @@ export interface ContractorPriceBookItem {
 
 export type ServiceAgreementTemplateStatus = 'active' | 'archived';
 export type ServiceAgreementOfferStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'withdrawn';
+export type ServiceAgreementStatus = 'active' | 'cancelled' | 'expired';
 
 export interface ServiceAgreementTemplate {
   id: string;
@@ -372,6 +373,28 @@ export interface ServiceAgreementOffer {
   responded_at: string | null;
   created_by: string | null;
   updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceAgreement {
+  id: string;
+  offer_id: string;
+  contractor_id: string;
+  homeowner_user_id: string;
+  home_id: string;
+  connection_id: string;
+  title: string;
+  description: string | null;
+  price_cents: number | null;
+  duration_months: number | null;
+  included_visit_count: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  renewal_due_on: string | null;
+  terms_summary: string | null;
+  status: ServiceAgreementStatus;
+  cancelled_at: string | null;
   created_at: string;
   updated_at: string;
 }
