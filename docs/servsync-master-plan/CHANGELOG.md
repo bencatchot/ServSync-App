@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/contractor-referral-admin-ui-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/contractor-referral-admin-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the contractor-to-contractor referral Slice 3A platform-admin tracking UI. Platform admins can view contractor-submitted `contractor_refers_contractor` leads in the existing admin `Referrals` tab, filter/search locally, and update admin status, private notes, outreach count, last outreach date, and next follow-up date through the production-applied `servsync_admin_referral_invites` and `servsync_admin_update_referral_invite` RPCs.
+- Reason for change: The backend/admin RPC foundation and contractor submit UI are merged and production-applied, so the next smallest safe slice is manual admin tracking without outreach delivery, public links, rewards, billing, account/profile creation, permissions, team access, or automation.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - implementation-only forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-referral-admin-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-referral-submit-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL, production data mutation, deployment, email/SMS/push delivery, rewards, credits, billing, paywalls, public referral links, account creation, contractor profile creation, contractor-to-contractor permissions, contractor team access, automatic matching, homeowner/job/property/estimate/invoice/customer sharing, or workflow automation is included.
+  - Admin matching fields are displayed read-only when returned by the existing RPC; matching lookup/edit UI remains deferred.
+  - Future referral work should separately approve outreach/email, rewards/credits, public referral links, signup attribution, account/profile creation, permissions, team access, and any automation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-026 now records Slice 3A platform-admin manual tracking UI while preserving outreach, rewards, public links, billing, account/profile creation, permissions, team access, and automation as future approval-gated work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now reflects the admin tracking surface while keeping contractor-to-contractor referrals separate from outreach delivery, rewards, billing, public links, permissions, account/profile creation, and workflow automation.
+
 - Branch: `codex/contractor-referral-submit-ui-v1`
 - Files changed:
   - `src/App.tsx`
