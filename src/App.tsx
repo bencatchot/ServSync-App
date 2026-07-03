@@ -33048,7 +33048,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Contractor-side foundation</p>
                         <h3 className="mt-1 text-lg font-bold text-slate-950">Create maintenance plan templates and draft offers.</h3>
                         <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                          Draft agreement offers are not visible to the homeowner until sent. Choose one explicitly shared property for this offer. This does not create jobs, schedule visits, create invoices, set up autopay, or send reminders. Homeowner review and response is planned for a later slice.
+                          Draft agreement offers are not visible to the homeowner until sent. Choose one explicitly shared property for this offer. Homeowners can now review and respond to sent offers, and accepted agreements stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
                         </p>
                       </div>
                       <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>

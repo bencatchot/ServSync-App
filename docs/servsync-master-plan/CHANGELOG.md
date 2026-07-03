@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/fb-032-foundation-closeout-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb032-service-agreements-contractor-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Polished FB-032 Service Agreements Foundation closeout copy and backlog status after Slice 2, Slice 3A, and Slice 4A merged. Contractor-side copy now says homeowners can review/respond to sent offers and accepted agreements remain read-only, while preserving no-automation guardrails.
+- Reason for change: The foundation loop is functionally complete, but stale contractor copy and detailed backlog next-step text still described homeowner response as future work.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for forbidden automation/payment/job/invoice/notification behavior
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-contractor-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Copy/docs/test polish only. No Service Agreement visits, job linking, invoice reminders/drafts, renewals/cancellations, payments, Stripe/autopay, QuickBooks/accounting sync, legal e-signature integration, reminders, notifications, email/SMS/push, scheduling, calendar events, Home Timeline writes, deployment, production data mutation, or automation is included.
+  - Future Service Agreement work should be split into separately approved backlog items or subtracks before implementation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-032 now records the first foundation loop as complete with closeout polish pending and separates visits, job linking, invoice reminders/drafts, renewals/cancellations, member perks, notifications, and payment/autopay integration as future separately approved work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now reflects the FB-032 foundation loop as being in closeout while preserving automation-heavy features as future explicit slices.
+
 - Branch: `codex/fb-032-homeowner-agreement-response-ui-v1`
 - Files changed:
   - `src/App.tsx`
