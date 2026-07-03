@@ -134,6 +134,7 @@ import type {
   AdminContractorAdoption,
   AdminContractorActivityRow,
   AdminContractorBillingReadinessRow,
+  AdminContractorReferralInvite,
   AdminGrowthRow,
   AdminPlatformHealth,
   AdminReferral,
@@ -142,6 +143,7 @@ import type {
   AppNotification,
   ConnectionAuditEvent,
   ContractorEntitlements,
+  ContractorReferralInviteAdminStatus,
   ContractorPublicProfile,
   DiscoverFeedItem,
   Estimate,
@@ -264,6 +266,13 @@ type AdminReferralDraft = {
   reward_type: string;
   reward_amount: string;
   admin_notes: string;
+};
+type AdminContractorReferralInviteDraft = {
+  admin_status: ContractorReferralInviteAdminStatus;
+  admin_notes: string;
+  outreach_attempt_count: string;
+  last_outreach_at: string;
+  next_follow_up_at: string;
 };
 type AdminReviewModerationFilter = ReviewModerationStatus | 'all';
 type AdminReviewModerationDraft = {
@@ -980,6 +989,19 @@ const ADMIN_INVITE_LEAD_STATUS_OPTIONS: { value: AdminInviteLeadStatus; label: s
   { value: 'duplicate', label: 'Duplicate' },
 ];
 
+const CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS: { value: ContractorReferralInviteAdminStatus; label: string }[] = [
+  { value: 'new', label: 'New' },
+  { value: 'reviewing', label: 'Reviewing' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'followed_up', label: 'Followed up' },
+  { value: 'joined', label: 'Joined' },
+  { value: 'duplicate', label: 'Duplicate' },
+  { value: 'bad_contact_info', label: 'Bad contact info' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'no_response', label: 'No response' },
+  { value: 'archived', label: 'Archived' },
+];
+
 const HOMEOWNER_CONTRACTOR_INVITE_STATUS_OPTIONS: { value: HomeownerContractorInviteLeadStatus; label: string }[] = [
   { value: 'submitted', label: 'Submitted' },
   { value: 'invite_sent', label: 'Invite sent' },
@@ -992,6 +1014,11 @@ const ADMIN_INVITE_LEAD_STATUS_LABELS = ADMIN_INVITE_LEAD_STATUS_OPTIONS.reduce<
   labels[option.value] = option.label;
   return labels;
 }, {} as Record<AdminInviteLeadStatus, string>);
+
+const CONTRACTOR_REFERRAL_ADMIN_STATUS_LABELS = CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS.reduce<Record<ContractorReferralInviteAdminStatus, string>>((labels, option) => {
+  labels[option.value] = option.label;
+  return labels;
+}, {} as Record<ContractorReferralInviteAdminStatus, string>);
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -5972,6 +5999,16 @@ function referralDraftFromReferral(referral: AdminReferral): AdminReferralDraft 
     reward_type: referral.reward_type || '',
     reward_amount: referral.reward_amount_cents ? centsToDollars(referral.reward_amount_cents) : '',
     admin_notes: referral.admin_notes || '',
+  };
+}
+
+function contractorReferralInviteDraftFromReferral(referral: AdminContractorReferralInvite): AdminContractorReferralInviteDraft {
+  return {
+    admin_status: referral.admin_status || 'new',
+    admin_notes: referral.admin_notes || '',
+    outreach_attempt_count: String(referral.outreach_attempt_count ?? 0),
+    last_outreach_at: referral.last_outreach_at ? referral.last_outreach_at.slice(0, 10) : '',
+    next_follow_up_at: referral.next_follow_up_at ? referral.next_follow_up_at.slice(0, 10) : '',
   };
 }
 
@@ -36990,6 +37027,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [invites, setInvites] = useState<ContractorInvite[]>([]);
   const [inviteLeads, setInviteLeads] = useState<AdminInviteLead[]>([]);
   const [adminReferrals, setAdminReferrals] = useState<AdminReferral[]>([]);
+  const [adminContractorReferrals, setAdminContractorReferrals] = useState<AdminContractorReferralInvite[]>([]);
   const [adminReviewQueue, setAdminReviewQueue] = useState<AdminReviewModerationRow[]>([]);
   const [connectionOverviews, setConnectionOverviews] = useState<PlatformConnectionOverview[]>([]);
   const [adminConnectionHistory, setAdminConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
@@ -36997,6 +37035,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, InviteRewardDraft>>({});
   const [inviteLeadDrafts, setInviteLeadDrafts] = useState<Record<string, AdminInviteLeadDraft>>({});
   const [adminReferralDrafts, setAdminReferralDrafts] = useState<Record<string, AdminReferralDraft>>({});
+  const [adminContractorReferralDrafts, setAdminContractorReferralDrafts] = useState<Record<string, AdminContractorReferralInviteDraft>>({});
   const [adminReviewDrafts, setAdminReviewDrafts] = useState<Record<string, AdminReviewModerationDraft>>({});
   const [contractorAdoption, setContractorAdoption] = useState<AdminContractorAdoption[]>([]);
   const [connectionAlertDrafts, setConnectionAlertDrafts] = useState<Record<string, AdminConnectionAlertDraft>>({});
@@ -37011,6 +37050,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [adminConnectionStatusFilter, setAdminConnectionStatusFilter] = useState<'all' | ConnectionStatus>('all');
   const [inviteLeadSearch, setInviteLeadSearch] = useState('');
   const [inviteLeadStatusFilter, setInviteLeadStatusFilter] = useState<'all' | AdminInviteLeadStatus>('all');
+  const [contractorReferralSearch, setContractorReferralSearch] = useState('');
+  const [contractorReferralAdminStatusFilter, setContractorReferralAdminStatusFilter] = useState<'all' | ContractorReferralInviteAdminStatus>('all');
   const [supportInquiries, setSupportInquiries] = useState<SupportInquiry[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | SupportInquiryStatus>('all');
   const [supportSearch, setSupportSearch] = useState('');
@@ -37020,6 +37061,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   const [savingInviteId, setSavingInviteId] = useState<string | null>(null);
   const [savingInviteLeadId, setSavingInviteLeadId] = useState<string | null>(null);
   const [savingReferralId, setSavingReferralId] = useState<string | null>(null);
+  const [savingContractorReferralId, setSavingContractorReferralId] = useState<string | null>(null);
   const [savingReviewId, setSavingReviewId] = useState<string | null>(null);
   const [savingConnectionAlertId, setSavingConnectionAlertId] = useState<string | null>(null);
   const [reportHealth, setReportHealth] = useState<AdminPlatformHealth | null>(null);
@@ -37039,13 +37081,14 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     setLoading(true);
     setError('');
     try {
-      const [profilesRes, contractorsRes, connectionsRes, invitesRes, inviteLeadsRes, referralRes, connectionOverviewRes, adoptionRes, billingReadinessRes, supportRes] = await Promise.all([
+      const [profilesRes, contractorsRes, connectionsRes, invitesRes, inviteLeadsRes, referralRes, contractorReferralRes, connectionOverviewRes, adoptionRes, billingReadinessRes, supportRes] = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('contractor_profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_connections').select('status'),
         supabase.from('contractor_invites').select('*').order('created_at', { ascending: false }),
         supabase.from('homeowner_contractor_invite_leads').select(ADMIN_INVITE_LEAD_SELECT).order('created_at', { ascending: false }),
         supabase.rpc('servsync_admin_referrals'),
+        supabase.rpc('servsync_admin_referral_invites'),
         supabase.rpc('servsync_admin_connection_overview'),
         supabase.rpc('servsync_admin_contractor_adoption'),
         supabase.rpc('servsync_admin_contractor_billing_readiness'),
@@ -37056,6 +37099,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       if (connectionsRes.error) throw connectionsRes.error;
       if (invitesRes.error) throw invitesRes.error;
       if (inviteLeadsRes.error) throw inviteLeadsRes.error;
+      if (contractorReferralRes.error) throw contractorReferralRes.error;
       if (connectionOverviewRes.error) throw connectionOverviewRes.error;
 
       const profiles = (profilesRes.data || []) as Profile[];
@@ -37063,6 +37107,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       const loadedInvites = (invitesRes.data || []) as ContractorInvite[];
       const loadedInviteLeads = (inviteLeadsRes.data || []) as unknown as AdminInviteLead[];
       const loadedReferrals = referralRes.error ? [] : (referralRes.data || []) as AdminReferral[];
+      const loadedContractorReferrals = (contractorReferralRes.data || []) as AdminContractorReferralInvite[];
       const loadedConnectionOverviews = (connectionOverviewRes.data || []) as PlatformConnectionOverview[];
       const loadedAdoption = adoptionRes.error ? [] : (adoptionRes.data || []) as AdminContractorAdoption[];
       const loadedBillingReadiness = billingReadinessRes.error ? [] : (billingReadinessRes.data || []) as AdminContractorBillingReadinessRow[];
@@ -37089,6 +37134,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       setInvites(loadedInvites);
       setInviteLeads(loadedInviteLeads);
       setAdminReferrals(loadedReferrals);
+      setAdminContractorReferrals(loadedContractorReferrals);
       setConnectionOverviews(loadedConnectionOverviews);
       setContractorAdoption(loadedAdoption);
       setContractorBillingReadiness(loadedBillingReadiness);
@@ -37108,6 +37154,10 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       }, {}));
       setAdminReferralDrafts(loadedReferrals.reduce<Record<string, AdminReferralDraft>>((drafts, referral) => {
         drafts[referral.referral_id] = referralDraftFromReferral(referral);
+        return drafts;
+      }, {}));
+      setAdminContractorReferralDrafts(loadedContractorReferrals.reduce<Record<string, AdminContractorReferralInviteDraft>>((drafts, referral) => {
+        drafts[referral.referral_id] = contractorReferralInviteDraftFromReferral(referral);
         return drafts;
       }, {}));
       setConnectionAlertDrafts(loadedAdoption.reduce<Record<string, AdminConnectionAlertDraft>>((drafts, row) => {
@@ -37196,6 +37246,13 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
   const updateAdminReferralDraft = (referralId: string, nextDraft: AdminReferralDraft) => {
     setAdminReferralDrafts(current => ({
+      ...current,
+      [referralId]: nextDraft,
+    }));
+  };
+
+  const updateAdminContractorReferralDraft = (referralId: string, nextDraft: AdminContractorReferralInviteDraft) => {
+    setAdminContractorReferralDrafts(current => ({
       ...current,
       [referralId]: nextDraft,
     }));
@@ -37399,6 +37456,32 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
     }
   };
 
+  const saveAdminContractorReferral = async (referral: AdminContractorReferralInvite) => {
+    if (!supabase) return;
+    setNotice('');
+    setError('');
+    setSavingContractorReferralId(referral.referral_id);
+    try {
+      const draft = adminContractorReferralDrafts[referral.referral_id] || contractorReferralInviteDraftFromReferral(referral);
+      const outreachCount = Math.max(0, Number.parseInt(draft.outreach_attempt_count || '0', 10) || 0);
+      const { error: updateError } = await supabase.rpc('servsync_admin_update_referral_invite', {
+        p_referral_id: referral.referral_id,
+        p_admin_status: draft.admin_status,
+        p_admin_notes: cleanHumanWrittenText(draft.admin_notes),
+        p_outreach_attempt_count: outreachCount,
+        p_last_outreach_at: draft.last_outreach_at ? new Date(`${draft.last_outreach_at}T12:00:00`).toISOString() : null,
+        p_next_follow_up_at: draft.next_follow_up_at ? new Date(`${draft.next_follow_up_at}T12:00:00`).toISOString() : null,
+      });
+      if (updateError) throw updateError;
+      setNotice('Referral tracking updated.');
+      await loadAdmin();
+    } catch {
+      setError('We could not update this referral. Please try again.');
+    } finally {
+      setSavingContractorReferralId(null);
+    }
+  };
+
   const saveAdminReviewModeration = async (review: AdminReviewModerationRow, statusOverride?: ReviewModerationStatus) => {
     if (!supabase) return;
     setNotice('');
@@ -37530,7 +37613,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
   };
 
   const openSupportCount = supportInquiries.filter(inquiry => !['resolved', 'closed'].includes(inquiry.status)).length;
-  const pendingReferralCount = adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
+  const pendingContractorReferralCount = adminContractorReferrals.filter(referral => ['new', 'reviewing', 'contacted', 'followed_up'].includes(referral.admin_status)).length;
+  const pendingReferralCount = pendingContractorReferralCount + adminReferrals.filter(referral => ['signed_up', 'qualified'].includes(referral.status) && !['denied', 'paid', 'not_eligible'].includes(referral.reward_status)).length;
   const pendingReviewModerationCount = reviewModerationFilter === 'pending'
     ? adminReviewQueue.length
     : adminReviewQueue.filter(review => review.moderation_status === 'pending').length;
@@ -37629,6 +37713,23 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
       homeowner?.email,
     ].filter(Boolean).join(' ').toLowerCase();
     const matchesStatus = inviteLeadStatusFilter === 'all' || lead.admin_status === inviteLeadStatusFilter;
+    return matchesStatus && (!search || haystack.includes(search));
+  });
+  const filteredContractorReferrals = adminContractorReferrals.filter(referral => {
+    const search = contractorReferralSearch.trim().toLowerCase();
+    const haystack = [
+      referral.referred_business_name,
+      referral.referred_contact_name,
+      referral.referred_email,
+      referral.referred_phone,
+      referral.referred_trade_category,
+      referral.referred_location,
+      referral.referrer_contractor_name,
+      referral.referrer_name,
+      referral.referrer_email,
+      referral.referrer_note,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchesStatus = contractorReferralAdminStatusFilter === 'all' || referral.admin_status === contractorReferralAdminStatusFilter;
     return matchesStatus && (!search || haystack.includes(search));
   });
 
@@ -38425,6 +38526,155 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
 
       {adminTab === 'referrals' && (
       <div className="space-y-5">
+        <Card title="Contractor-to-Contractor Referrals" icon={<Users size={18} />}>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="font-semibold text-white">Manual admin tracking only.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    ServSync does not send outreach, create accounts, create contractor profiles, create permissions, or award rewards from this view.
+                  </p>
+                </div>
+                <span className="w-fit rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                  contractor_refers_contractor
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_240px]">
+                <Field label="Search contractor referrals" labelClassName="text-slate-200">
+                  <input
+                    className={inputClass()}
+                    value={contractorReferralSearch}
+                    onChange={event => setContractorReferralSearch(event.target.value)}
+                    placeholder="Business, contact, email, trade, location, or referrer"
+                  />
+                </Field>
+                <Field label="Admin status" labelClassName="text-slate-200">
+                  <select
+                    className={inputClass()}
+                    value={contractorReferralAdminStatusFilter}
+                    onChange={event => setContractorReferralAdminStatusFilter(event.target.value as 'all' | ContractorReferralInviteAdminStatus)}
+                  >
+                    <option value="all">All statuses</option>
+                    {CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </div>
+
+            {adminContractorReferrals.length === 0 ? (
+              <EmptyState text="No contractor-to-contractor referral leads have been submitted yet." />
+            ) : filteredContractorReferrals.length === 0 ? (
+              <EmptyState text="No contractor referral leads match those filters." />
+            ) : (
+              filteredContractorReferrals.map(referral => {
+                const draft = adminContractorReferralDrafts[referral.referral_id] || contractorReferralInviteDraftFromReferral(referral);
+                const isSaving = savingContractorReferralId === referral.referral_id;
+                const referrerLabel = referral.referrer_contractor_name || referral.referrer_name || referral.referrer_email || referral.referrer_contractor_id?.slice(0, 8) || 'Unknown referrer';
+                const matchedLabel = referral.matched_contractor_name || referral.matched_user_email || 'Not matched';
+
+                return (
+                  <div key={referral.referral_id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-bold text-white">{referral.referred_business_name}</p>
+                        <p className="mt-1 text-sm text-slate-300">
+                          {referral.referred_location || 'Location not provided'}
+                          {referral.referred_trade_category ? ` · ${referral.referred_trade_category}` : ''}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Submitted {formatDateTime(referral.created_at)} by {referrerLabel}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{referral.status}</span>
+                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                          {CONTRACTOR_REFERRAL_ADMIN_STATUS_LABELS[referral.admin_status] ?? 'New'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <InfoBox label="Referred business" value={referral.referred_business_name} />
+                      <InfoBox label="Contact name" value={referral.referred_contact_name || 'Not provided'} />
+                      <InfoBox label="Phone" value={formatPhoneNumber(referral.referred_phone) || 'Not provided'} />
+                      <InfoBox label="Email" value={referral.referred_email || 'Not provided'} />
+                      <InfoBox label="Referring user" value={referral.referrer_name || referral.referrer_email || 'Not provided'} />
+                      <InfoBox label="Referring contractor" value={referral.referrer_contractor_name || 'Not provided'} />
+                      <InfoBox label="Matched record" value={matchedLabel} />
+                      <InfoBox label="Last outreach" value={formatDateTime(referral.last_outreach_at)} />
+                      <InfoBox label="Next follow-up" value={formatDateTime(referral.next_follow_up_at)} />
+                    </div>
+
+                    {referral.referrer_note && (
+                      <div className="mt-4 rounded-lg border border-slate-600 bg-slate-800/60 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Referrer note</p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{referral.referrer_note}</p>
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-[180px_150px_160px_160px_1fr_auto]">
+                      <Field label="Admin status" labelClassName="text-slate-100">
+                        <select
+                          className={inputClass()}
+                          value={draft.admin_status}
+                          onChange={event => updateAdminContractorReferralDraft(referral.referral_id, { ...draft, admin_status: event.target.value as ContractorReferralInviteAdminStatus })}
+                        >
+                          {CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Outreach count" labelClassName="text-slate-100">
+                        <input
+                          className={inputClass()}
+                          inputMode="numeric"
+                          value={draft.outreach_attempt_count}
+                          onChange={event => updateAdminContractorReferralDraft(referral.referral_id, { ...draft, outreach_attempt_count: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="Last outreach" labelClassName="text-slate-100">
+                        <input
+                          type="date"
+                          className={inputClass()}
+                          value={draft.last_outreach_at}
+                          onChange={event => updateAdminContractorReferralDraft(referral.referral_id, { ...draft, last_outreach_at: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="Next follow-up" labelClassName="text-slate-100">
+                        <input
+                          type="date"
+                          className={inputClass()}
+                          value={draft.next_follow_up_at}
+                          onChange={event => updateAdminContractorReferralDraft(referral.referral_id, { ...draft, next_follow_up_at: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="Admin notes" labelClassName="text-slate-100">
+                        <input
+                          className={inputClass()}
+                          {...writingAssistProps}
+                          value={draft.admin_notes}
+                          onChange={event => updateAdminContractorReferralDraft(referral.referral_id, { ...draft, admin_notes: event.target.value })}
+                          placeholder="Private tracking notes"
+                        />
+                      </Field>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => void saveAdminContractorReferral(referral)}
+                          disabled={isSaving}
+                          className={buttonClass('primary')}
+                        >
+                          <ClipboardCheck size={16} />
+                          {isSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Card>
+
         <Card title="Universal referrals" icon={<Link2 size={18} />}>
           <div className="space-y-3">
             {adminReferrals.length === 0 ? (

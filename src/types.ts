@@ -9,6 +9,8 @@ export type InviteStatus = 'active' | 'used' | 'revoked' | 'expired';
 export type ReferralRewardStatus = 'not_eligible' | 'pending_review' | 'approved' | 'denied' | 'paid';
 export type UniversalReferralStatus = 'pending' | 'signed_up' | 'qualified' | 'reward_approved' | 'reward_paid' | 'rejected';
 export type UniversalReferralRewardStatus = 'pending' | 'approved' | 'denied' | 'paid' | 'not_eligible';
+export type ContractorReferralInviteStatus = 'created' | 'sent' | 'signed_up' | 'accepted' | 'expired' | 'cancelled' | 'duplicate' | 'admin_review';
+export type ContractorReferralInviteAdminStatus = 'new' | 'reviewing' | 'contacted' | 'followed_up' | 'joined' | 'duplicate' | 'bad_contact_info' | 'declined' | 'no_response' | 'archived';
 export type ConnectionAlertLevel = 'green' | 'yellow' | 'red';
 export type ConnectionAlertStatus = 'open' | 'acknowledged' | 'contacted' | 'dismissed' | 'resolved';
 export type ExternalReviewSource = 'google' | 'facebook' | 'yelp' | 'other';
@@ -750,6 +752,35 @@ export interface AdminReferral {
   reward_approved_at: string | null;
   reward_paid_at: string | null;
   rejected_at: string | null;
+}
+
+export interface AdminContractorReferralInvite {
+  referral_id: string;
+  referral_type: 'contractor_refers_contractor';
+  referrer_user_id: string | null;
+  referrer_email: string | null;
+  referrer_name: string | null;
+  referrer_contractor_id: string | null;
+  referrer_contractor_name: string | null;
+  referred_business_name: string;
+  referred_contact_name: string | null;
+  referred_email: string;
+  referred_phone: string | null;
+  referred_trade_category: string | null;
+  referred_location: string | null;
+  referrer_note: string | null;
+  status: ContractorReferralInviteStatus;
+  admin_status: ContractorReferralInviteAdminStatus;
+  admin_notes: string | null;
+  outreach_attempt_count: number;
+  last_outreach_at: string | null;
+  next_follow_up_at: string | null;
+  matched_contractor_id: string | null;
+  matched_contractor_name: string | null;
+  matched_user_id: string | null;
+  matched_user_email: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AdminReviewModerationRow {
