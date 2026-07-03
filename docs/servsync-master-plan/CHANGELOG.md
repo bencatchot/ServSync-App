@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/mobile-readiness-pwa-metadata-v1`
+- Files changed:
+  - `index.html`
+  - `public/manifest.webmanifest`
+  - `public/servsync-pwa-192.png`
+  - `public/servsync-pwa-512.png`
+  - `tests/e2e/mobile-pwa-readiness.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile Readiness Slice 1 as a conservative PWA metadata and installability foundation. The app shell now references a web manifest, theme color, Apple mobile web metadata, and minimal PWA icon derivatives from existing ServSync branding, with source-static coverage for manifest validity and no service worker/native-project drift.
+- Reason for change: ServSync is moving toward mobile readiness through mobile-first web/PWA prep before any Capacitor/native proof of concept. This gives the web app accurate installability metadata without claiming offline support or changing auth/backend behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - PWA/native/offline guardrail scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-pwa-readiness.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/static/docs/test only. No SQL/RLS/RPC, Supabase functions, env/config/package, Capacitor/native projects, service worker, offline sync, push notifications, auth redirect changes, deployment, or production data mutation is included.
+  - Mobile smoke with authenticated fixtures remains an optional follow-up when local credentials and a running app target are available.
+  - Next mobile-readiness work should stay audit-first around auth redirect/deep-link behavior, file upload/camera behavior, installability QA on real devices, and eventual Capacitor proof-of-concept planning.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records PWA metadata/installability preparation as a mobile-readiness slice while keeping native apps, service workers/offline sync, auth redirect changes, backend changes, notifications, payments, and calendar sync out of scope; FB-015 remains future-gated.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice does not change product strategy or native-app roadmap direction beyond the already documented mobile-web-first path.
+
 - Branch: `codex/contractor-referral-admin-ui-v1`
 - Files changed:
   - `src/App.tsx`
