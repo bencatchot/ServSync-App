@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-jobs-tile-priority-v1`
+- Starting main SHA: `80079c81e49bb5fbd72d8f2367886f48adbb72a9`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1D to prioritize the contractor mobile Jobs overview tile layout. Open Jobs is now the full-width top tile on mobile, while New Jobs and Completed / Closed Jobs remain compact secondary tiles below it.
+- Reason for change: Real-device mobile review found that the compact two-column Jobs layout should promote the most-used active work queue instead of leaving Open Jobs as a standard half-width tile or accidentally promoting closed/history work because it is the odd final item.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes only the contractor Jobs overview tile priority; homeowner layout, global mobile nav, badges, counts, labels, and state transitions remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1D contractor Jobs mobile tile-priority polish.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing mobile-web-first direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-ui-foundation-slice-1c`
 - Files changed:
   - `src/App.tsx`

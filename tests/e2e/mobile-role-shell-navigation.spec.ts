@@ -128,9 +128,19 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview"');
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview-tile-grid"');
     expect(jobsOverviewSource).toContain('grid grid-cols-2 gap-2 md:grid-cols-3');
-    expect(jobsOverviewSource).toContain('p-2.5 text-left transition sm:p-3');
+    expect(jobsOverviewSource).toContain("id: 'new_jobs', label: 'New Jobs'");
+    expect(jobsOverviewSource).toContain("id: 'open_jobs', label: 'Open Jobs'");
+    expect(jobsOverviewSource).toContain("id: 'closed_jobs', label: 'Completed / Closed Jobs'");
+    expect(jobsOverviewSource.indexOf("id: 'new_jobs', label: 'New Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'"));
+    expect(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'closed_jobs', label: 'Completed / Closed Jobs'"));
+    expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1'");
+    expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-2 md:order-none'");
+    expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-3 md:order-none'");
+    expect(jobsOverviewSource).toContain('${item.mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3');
     expect(jobsOverviewSource).toContain('line-clamp-2');
     expect(jobsOverviewSource).toContain('setContractorJobsViewAndScroll(item.id)');
+    expect(jobsOverviewSource).toContain("if (item.id === 'new_jobs') setInspectionView('new')");
+    expect(jobsOverviewSource).toContain("if (item.id !== 'new_jobs') setInspectionView('list')");
     expect(jobsOverviewSource).not.toContain('overflow-x-auto');
   });
 
