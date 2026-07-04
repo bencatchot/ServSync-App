@@ -31802,10 +31802,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} /> },
-                        { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
-                        { id: 'closed_jobs', label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} /> },
-                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
+                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' },
+                        { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
+                        { id: 'closed_jobs', label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
+                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
                           <button
@@ -31816,7 +31816,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               if (item.id === 'new_jobs') setInspectionView('new');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
-	                            className={`rounded-xl border p-2.5 text-left transition sm:p-3 ${
+	                            className={`${item.mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3 ${
 	                              active
 	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
 	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
