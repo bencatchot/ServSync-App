@@ -117,6 +117,16 @@ test.describe('mobile role shell navigation source guardrails', () => {
       "{contractorJobsView === 'overview' && (",
       "{contractorJobsView === 'new_financial' && (",
     );
+    const financialOverviewSource = sourceBetween(
+      jobsOverviewSource,
+      '<h3 className="text-sm font-bold text-slate-950">Estimates / Invoices</h3>',
+      '<h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>',
+    );
+    const toolsOverviewSource = sourceBetween(
+      jobsOverviewSource,
+      '<h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>',
+      '</section>',
+    );
 
     expect(appSource).toContain('const setContractorJobsViewAndScroll = useCallback((view: ContractorJobsView) => {');
     expect(appSource).toContain("window.matchMedia('(max-width: 767px)').matches");
@@ -146,6 +156,25 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsOverviewSource).toContain("if (item.id === 'new_jobs') setInspectionView('new')");
     expect(jobsOverviewSource).toContain("if (item.id !== 'new_jobs') setInspectionView('list')");
     expect(jobsOverviewSource).not.toContain('overflow-x-auto');
+
+    expect(financialOverviewSource).toContain("id: 'new_financial', label: 'New Estimate/Invoice'");
+    expect(financialOverviewSource).toContain("id: 'open_financial', label: 'Open Estimates / Invoices'");
+    expect(financialOverviewSource).toContain("id: 'closed_financial', label: 'Closed / Billed Records'");
+    expect(financialOverviewSource).toContain("mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1'");
+    expect(financialOverviewSource).toContain("index === 0 ? 'order-2 md:order-none' : 'order-3 md:order-none'");
+    expect(financialOverviewSource).toContain('setContractorJobsViewAndScroll(item.id)');
+    expect(financialOverviewSource).toContain("setInspectionView('list')");
+
+    expect(toolsOverviewSource).toContain('data-testid="contractor-jobs-overview-tools-list"');
+    expect(toolsOverviewSource).toContain('space-y-2 md:grid md:grid-cols-3 md:gap-2 md:space-y-0');
+    expect(toolsOverviewSource).toContain("id: 'templates'");
+    expect(toolsOverviewSource).toContain("id: 'custom_pricing'");
+    expect(toolsOverviewSource).toContain("id: 'service_agreements'");
+    expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('templates')");
+    expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('custom_pricing')");
+    expect(toolsOverviewSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
+    expect(toolsOverviewSource).not.toContain('col-span-2');
+    expect(toolsOverviewSource).not.toContain('order-1');
   });
 
   test('shared shell keeps desktop sidebar and adds mobile-only bottom nav with five-item cap', () => {

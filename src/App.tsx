@@ -31841,10 +31841,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
-                        { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} /> },
+                        { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
                         { id: 'closed_financial', label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
-                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode }>).map(item => {
+                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName?: string }>).map((item, index) => {
                         const active = contractorJobsView === item.id;
+                        const mobileTileClassName = item.mobileTileClassName || (index === 0 ? 'order-2 md:order-none' : 'order-3 md:order-none');
                         return (
                           <button
                             key={item.id}
@@ -31853,7 +31854,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               setContractorJobsViewAndScroll(item.id);
                               setInspectionView('list');
                             }}
-	                            className={`rounded-xl border p-2.5 text-left transition sm:p-3 ${
+	                            className={`${mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3 ${
 	                              active
 	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
 	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
@@ -31876,53 +31877,57 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <ClipboardList size={16} className="text-blue-700" />
                       <h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>
                     </div>
-                    <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setContractorJobsViewAndScroll('templates');
-                          setInspectionView('list');
-                          setShowTemplateLibrary(true);
-                        }}
-                        className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50 sm:p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
-                          <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
-                        </div>
-                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-slate-600 sm:mt-2 sm:text-xs sm:leading-5">Templates</p>
-                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">Workflow and estimate starters</p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setContractorJobsViewAndScroll('custom_pricing');
-                          setInspectionView('list');
-                        }}
-                        className="w-full rounded-xl border border-blue-100 bg-blue-50 p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-100 sm:p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="rounded-lg bg-white p-1.5 text-blue-700"><Receipt size={15} /></span>
-                          <span className="shrink-0 text-base font-bold sm:text-lg">{activeContractorPriceBookItems.length}</span>
-                        </div>
-                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-blue-700 sm:mt-2 sm:text-xs sm:leading-5">Custom Pricing</p>
-                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-blue-900 sm:text-xs sm:leading-5">Private pricing library</p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setContractorJobsViewAndScroll('service_agreements');
-                          setInspectionView('list');
-                        }}
-                        className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50 sm:p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
-                          <span className="shrink-0 text-base font-bold sm:text-lg">{activeServiceAgreementTemplates.length}</span>
-                        </div>
-                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-slate-600 sm:mt-2 sm:text-xs sm:leading-5">Service Agreements</p>
-                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">Templates and offers</p>
-                      </button>
+                    <div data-testid="contractor-jobs-overview-tools-list" className="space-y-2 md:grid md:grid-cols-3 md:gap-2 md:space-y-0">
+                      {([
+                        {
+                          id: 'templates',
+                          label: 'Templates',
+                          value: String(contractorScopedInspectionTemplates.length + estimateTemplates.length),
+                          helper: 'Workflow and estimate starters',
+                          icon: <ClipboardList size={15} />,
+                          onClick: () => {
+                            setContractorJobsViewAndScroll('templates');
+                            setInspectionView('list');
+                            setShowTemplateLibrary(true);
+                          },
+                        },
+                        {
+                          id: 'custom_pricing',
+                          label: 'Custom Pricing',
+                          value: String(activeContractorPriceBookItems.length),
+                          helper: 'Private pricing library',
+                          icon: <Receipt size={15} />,
+                          onClick: () => {
+                            setContractorJobsViewAndScroll('custom_pricing');
+                            setInspectionView('list');
+                          },
+                        },
+                        {
+                          id: 'service_agreements',
+                          label: 'Service Agreements',
+                          value: String(activeServiceAgreementTemplates.length),
+                          helper: 'Templates and offers',
+                          icon: <ClipboardList size={15} />,
+                          onClick: () => {
+                            setContractorJobsViewAndScroll('service_agreements');
+                            setInspectionView('list');
+                          },
+                        },
+                      ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; onClick: () => void }>).map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.onClick}
+                          className="relative flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50 sm:p-3 md:block"
+                        >
+                          <span className="shrink-0 rounded-lg bg-slate-100 p-1.5 text-slate-600 md:inline-flex">{item.icon}</span>
+                          <span className="min-w-0 flex-1 md:mt-2 md:block md:pr-10">
+                            <span className="block break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-slate-600 sm:text-xs sm:leading-5">{item.label}</span>
+                            <span className="mt-0.5 block line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5 md:mt-1">{item.helper}</span>
+                          </span>
+                          <span className="shrink-0 text-base font-bold sm:text-lg md:absolute md:right-3 md:top-3">{item.value}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
