@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-jobs-bottom-nav-return-v1`
+- Starting main SHA: `3ca285eec4749e96d8df55e80e9ee4c24300ffde`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1J to remove the contractor Jobs fixed nested mobile header and spacer. Contractors can return to Jobs overview by re-tapping the persistent bottom-nav `Jobs` item, and existing top-of-card back controls remain as secondary fallbacks.
+- Reason for change: Real-device feedback after Slice 1I confirmed the fixed header worked but still felt like extra UI taking mobile screen space. The existing bottom-nav Jobs re-tap behavior provides a cleaner return path.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - local runtime probe for contractor Jobs > Templates bottom-nav Jobs return behavior
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice removes only the mobile-only contractor Jobs fixed nested header and spacer. Jobs overview, Slice 1F tile patterns, mobile bottom nav labels, homeowner layouts, desktop behavior, labels, counts, click behavior, search/filter behavior, and badge behavior remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1J contractor Jobs fixed-header removal and bottom-nav return behavior.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing mobile polish direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-jobs-header-weight-tuning-v1`
 - Starting main SHA: `f6e57cc541b26f2e45b88b1de14a346d2161fd85`
 - Files changed:
