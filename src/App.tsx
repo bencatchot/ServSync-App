@@ -529,6 +529,18 @@ type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'que
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing' | 'service_agreements';
+const CONTRACTOR_JOBS_VIEW_LABELS: Record<ContractorJobsView, string> = {
+  overview: 'Jobs overview',
+  new_jobs: 'New Jobs',
+  open_jobs: 'Open Jobs',
+  closed_jobs: 'Completed / Closed Jobs',
+  new_financial: 'New Estimate / Invoice',
+  open_financial: 'Open Estimates / Invoices',
+  closed_financial: 'Closed / Billed Records',
+  templates: 'Templates',
+  custom_pricing: 'Custom Pricing',
+  service_agreements: 'Service Agreements',
+};
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type ServiceAgreementTemplateDraft = {
@@ -14413,6 +14425,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void markNotificationsRead(unreadEstimateNotificationIds);
   }, [homeownerTab, unreadEstimateNotificationKey]);
 
+  const homeownerRequestsBadgeCount = homeownerActionRequestCount;
+  const homeownerCalendarBadgeCount = homeownerCalendarActionCount;
+  const homeownerEstimatesInvoicesBadgeCount = homeownerFinancialBadgeCount;
+  const homeownerSupportBadgeCount = supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
+
   const homeownerMobileNavItems: MobileNavItem[] = [
     {
       id: 'discover',
@@ -14425,7 +14442,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       id: 'requests',
       label: 'Requests',
       icon: <MessageSquare size={18} />,
-      badge: homeownerActionRequestCount,
+      badge: homeownerRequestsBadgeCount,
       active: homeownerTab === 'requests',
       onSelect: () => setHomeownerTab('requests'),
     },
@@ -14433,7 +14450,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       id: 'dashboard',
       label: 'Dashboard',
       icon: <LayoutDashboard size={18} />,
-      badge: dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount,
       active: homeownerTab === 'overview',
       onSelect: () => setHomeownerTab('overview'),
     },
@@ -14459,15 +14475,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         { id: 'overview',     label: 'Dashboard',         icon: <LayoutDashboard size={17} />, group: 'Home' },
         { id: 'home',         label: 'Properties',        icon: <Home size={17} />, group: 'Home' },
         { id: 'contractors',  label: 'Contractors',       icon: <Users size={17} />, group: 'Contractors' },
-        { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerActionRequestCount, group: 'Contractors' },
-        { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarActionCount, group: 'Contractors' },
-        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: homeownerFinancialBadgeCount, group: 'Contractors' },
+        { id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerRequestsBadgeCount, group: 'Contractors' },
+        { id: 'calendar',     label: 'Calendar',          icon: <Calendar size={17} />, badge: homeownerCalendarBadgeCount, group: 'Contractors' },
+        { id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: homeownerEstimatesInvoicesBadgeCount, group: 'Contractors' },
         { id: 'log',          label: 'Home History',      icon: <ClipboardList size={17} />, group: 'Records' },
         { id: 'documents',    label: 'Documents',         icon: <FolderOpen size={17} />, group: 'Records' },
         { id: 'discover',     label: 'Discover',          icon: <Compass size={17} />, group: 'Explore' },
         { id: 'trust',        label: 'Trust & Safety',    icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',    icon: <ShieldCheck size={17} />, group: 'Help' },
-        { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
+        { id: 'support',      label: 'Support',           icon: <MessageSquare size={17} />, badge: homeownerSupportBadgeCount, group: 'Help' },
       ]}
       activeTab={homeownerTab}
       onChange={tab => setHomeownerTab(tab as typeof homeownerTab)}
@@ -18606,6 +18622,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [jobsCustomerFilterSubjectId, setJobsCustomerFilterSubjectId] = useState<string | null>(() => window.localStorage.getItem(STORAGE_KEYS.contractorJobsCustomerFilter));
   const initialContractorJobsView = storedTab(STORAGE_KEYS.contractorJobsView, ['overview', 'new_jobs', 'open_jobs', 'closed_jobs', 'new_financial', 'open_financial', 'closed_financial', 'templates', 'custom_pricing', 'service_agreements'] as const, 'overview');
   const [contractorJobsView, setContractorJobsView] = useState<ContractorJobsView>(initialContractorJobsView);
+  const setContractorJobsViewAndScroll = useCallback((view: ContractorJobsView) => {
+    setContractorJobsView(view);
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }, []);
   const [jobsListDateFilter, setJobsListDateFilter] = useState('');
   const [jobsListStatusFilter, setJobsListStatusFilter] = useState<JobLifecycleStatus | 'all'>('all');
   const [jobsListTypeFilter, setJobsListTypeFilter] = useState('all');
@@ -23722,6 +23745,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     + completedJobsReadyToInvoice.length
     + invoiceAttentionRecords.length
     + (contractorProfileOnboardingComplete ? 0 : 1);
+  const contractorJobsAttentionCount = openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length;
+  const contractorHomeownersBadgeCount = connectionRequests.length;
+  const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;
+  const contractorSupportBadgeCount = supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
   const workflowReviewItems: Array<{
     label: string;
     count: number;
@@ -25927,11 +25954,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       id: 'jobs',
       label: 'Jobs',
       icon: <ClipboardCheck size={18} />,
-      badge: openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length,
+      badge: contractorJobsAttentionCount,
       active: contractorTab === 'inspections',
       onSelect: () => {
         setContractorTab('inspections');
-        setContractorJobsView('overview');
+        setContractorJobsViewAndScroll('overview');
         setInspectionView('list');
       },
     },
@@ -25939,7 +25966,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       id: 'dashboard',
       label: 'Dashboard',
       icon: <LayoutDashboard size={18} />,
-      badge: actionReviewCount,
       active: contractorTab === 'overview',
       onSelect: () => setContractorTab('overview'),
     },
@@ -25947,7 +25973,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       id: 'homeowners',
       label: 'Homeowners',
       icon: <Users size={18} />,
-      badge: connectionRequests.length,
+      badge: contractorHomeownersBadgeCount,
       active: contractorTab === 'connections',
       onSelect: () => setContractorTab('connections'),
     },
@@ -25965,21 +25991,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       tabs={[
         { id: 'overview',     label: 'Dashboard',          icon: <LayoutDashboard size={17} />, group: 'Workspace' },
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
-        { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: connectionRequests.length, group: 'Homeowner Work' },
-        { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorFollowUpCount || openServiceRequestCount, group: 'Homeowner Work' },
+        { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Homeowner Work' },
+        { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Homeowner Work' },
         { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: contractorCalendarBadgeCount, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
-        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
+        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, badge: contractorJobsAttentionCount, group: 'Add-ons' },
         { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
-        { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length, group: 'Help' },
+        { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: contractorSupportBadgeCount, group: 'Help' },
       ]}
       activeTab={contractorTab}
       onChange={tab => {
         if (tab === 'inspections') {
           setContractorTab('inspections');
-          setContractorJobsView('overview');
+          setContractorJobsViewAndScroll('overview');
           setInspectionView('list');
           setActiveInspection(null);
           setEstimateComposerOpen(false);
@@ -31692,12 +31718,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       {(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (
         <div className="space-y-5">
+          {contractorTab === 'inspections' && contractorJobsView !== 'overview' && (
+            <div
+              data-testid="contractor-jobs-mobile-sticky-subheader"
+              className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur md:hidden"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setInspectionView('list');
+                  setActiveInspection(null);
+                  setContractorJobsViewAndScroll('overview');
+                }}
+                className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67] shadow-sm"
+              >
+                Back to Jobs
+              </button>
+              <p className="min-w-0 flex-1 truncate text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                {CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]}
+              </p>
+            </div>
+          )}
 
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
               {contractorJobsView === 'overview' && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-bold text-slate-950">Jobs</h2>
@@ -31738,7 +31785,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {acceptedEstimatesNeedingJobs.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setContractorJobsView('open_financial')}
+                          onClick={() => setContractorJobsViewAndScroll('open_financial')}
                           className={buttonClass('primary')}
                         >
                           <ClipboardCheck size={15} />
@@ -31753,7 +31800,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <ClipboardCheck size={16} className="text-blue-700" />
                       <h3 className="text-sm font-bold text-slate-950">Jobs</h3>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-3">
+                    <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} /> },
                         { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} /> },
@@ -31765,11 +31812,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             key={item.id}
                             type="button"
                             onClick={() => {
-                              setContractorJobsView(item.id);
+                              setContractorJobsViewAndScroll(item.id);
                               if (item.id === 'new_jobs') setInspectionView('new');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
-	                            className={`rounded-xl border p-3 text-left transition ${
+	                            className={`rounded-xl border p-2.5 text-left transition sm:p-3 ${
 	                              active
 	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
 	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
@@ -31779,8 +31826,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
 	                              <span className="shrink-0 text-base font-bold sm:text-lg">{item.value}</span>
 	                            </div>
-	                            <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
-	                            <p className={`mt-1 break-words text-xs leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+	                            <p className={`mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] sm:mt-2 sm:text-xs sm:leading-5 ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+	                            <p className={`mt-1 line-clamp-2 break-words text-[11px] leading-4 sm:text-xs sm:leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
 	                          </button>
                         );
                       })}
@@ -31792,7 +31839,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <Receipt size={16} className="text-blue-700" />
                       <h3 className="text-sm font-bold text-slate-950">Estimates / Invoices</h3>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-3">
+                    <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
                         { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
                         { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} /> },
@@ -31804,10 +31851,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             key={item.id}
                             type="button"
                             onClick={() => {
-                              setContractorJobsView(item.id);
+                              setContractorJobsViewAndScroll(item.id);
                               setInspectionView('list');
                             }}
-	                            className={`rounded-xl border p-3 text-left transition ${
+	                            className={`rounded-xl border p-2.5 text-left transition sm:p-3 ${
 	                              active
 	                                ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
 	                                : 'border-slate-200 bg-white text-slate-950 hover:border-blue-300 hover:bg-blue-50'
@@ -31817,8 +31864,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                              <span className={`rounded-lg p-1.5 ${active ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>{item.icon}</span>
 	                              <span className="shrink-0 text-base font-bold sm:text-lg">{item.value}</span>
 	                            </div>
-	                            <p className={`mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
-	                            <p className={`mt-1 break-words text-xs leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
+	                            <p className={`mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] sm:mt-2 sm:text-xs sm:leading-5 ${active ? 'text-blue-50' : 'text-slate-600'}`}>{item.label}</p>
+	                            <p className={`mt-1 line-clamp-2 break-words text-[11px] leading-4 sm:text-xs sm:leading-5 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{item.helper}</p>
 	                          </button>
                         );
                       })}
@@ -31830,52 +31877,52 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <ClipboardList size={16} className="text-blue-700" />
                       <h3 className="text-sm font-bold text-slate-950">Templates & pricing</h3>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-3">
+                    <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       <button
                         type="button"
                         onClick={() => {
-                          setContractorJobsView('templates');
+                          setContractorJobsViewAndScroll('templates');
                           setInspectionView('list');
                           setShowTemplateLibrary(true);
                         }}
-                        className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
+                        className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50 sm:p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
                           <span className="shrink-0 text-base font-bold sm:text-lg">{contractorScopedInspectionTemplates.length + estimateTemplates.length}</span>
                         </div>
-                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Templates</p>
-                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Workflow and estimate starters</p>
+                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-slate-600 sm:mt-2 sm:text-xs sm:leading-5">Templates</p>
+                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">Workflow and estimate starters</p>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setContractorJobsView('custom_pricing');
+                          setContractorJobsViewAndScroll('custom_pricing');
                           setInspectionView('list');
                         }}
-                        className="w-full rounded-xl border border-blue-100 bg-blue-50 p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-100"
+                        className="w-full rounded-xl border border-blue-100 bg-blue-50 p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-100 sm:p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="rounded-lg bg-white p-1.5 text-blue-700"><Receipt size={15} /></span>
                           <span className="shrink-0 text-base font-bold sm:text-lg">{activeContractorPriceBookItems.length}</span>
                         </div>
-                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-blue-700">Custom Pricing</p>
-                        <p className="mt-1 break-words text-xs leading-5 text-blue-900">Private pricing library</p>
+                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-blue-700 sm:mt-2 sm:text-xs sm:leading-5">Custom Pricing</p>
+                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-blue-900 sm:text-xs sm:leading-5">Private pricing library</p>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setContractorJobsView('service_agreements');
+                          setContractorJobsViewAndScroll('service_agreements');
                           setInspectionView('list');
                         }}
-                        className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50"
+                        className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left text-slate-950 transition hover:border-blue-300 hover:bg-blue-50 sm:p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600"><ClipboardList size={15} /></span>
                           <span className="shrink-0 text-base font-bold sm:text-lg">{activeServiceAgreementTemplates.length}</span>
                         </div>
-                        <p className="mt-2 break-words text-xs font-bold uppercase leading-5 tracking-[0.06em] text-slate-600">Service Agreements</p>
-                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Templates and offers</p>
+                        <p className="mt-1.5 break-words text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-slate-600 sm:mt-2 sm:text-xs sm:leading-5">Service Agreements</p>
+                        <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">Templates and offers</p>
                       </button>
                     </div>
                   </div>
@@ -31901,7 +31948,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               setEditingEstimateId(null);
                               setInvoiceComposerOpen(false);
                               setEditingInvoiceId(null);
-                              setContractorJobsView('overview');
+                              setContractorJobsViewAndScroll('overview');
                             }}
                             className={buttonClass('secondary')}
                           >
@@ -32350,7 +32397,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 type="button"
                                 onClick={() => {
                                   setFocusedEstimateRecordId(null);
-                                  setContractorJobsView('overview');
+                                  setContractorJobsViewAndScroll('overview');
                                 }}
                                 className={buttonClass('secondary')}
                               >
@@ -32745,7 +32792,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               type="button"
                               onClick={() => {
                                 clearJobFilters();
-                                setContractorJobsView('overview');
+                                setContractorJobsViewAndScroll('overview');
                               }}
                               className={mobileButtonClass('secondary')}
                             >
@@ -33014,7 +33061,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                          Phase 1 stores manually managed Custom Pricing items only. These records stay private to your contractor account and do not automatically load into estimates, invoices, homeowner-facing screens, or suggestions.
                         </p>
                       </div>
-                      <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
+                      <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
                         Back to Jobs
                       </button>
                     </div>
@@ -33393,7 +33440,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           Draft agreement offers are not visible to the homeowner until sent. Choose one explicitly shared property for this offer. Homeowners can now review and respond to sent offers, and accepted agreements stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
                         </p>
                       </div>
-                      <button type="button" onClick={() => setContractorJobsView('overview')} className={buttonClass('secondary')}>
+                      <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
                         Back to Jobs
                       </button>
                     </div>

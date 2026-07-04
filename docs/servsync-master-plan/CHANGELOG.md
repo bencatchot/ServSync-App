@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-ui-foundation-slice-1c`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1C to keep mobile and desktop navigation badge sources aligned where they represent the same workflow, remove mobile-only Dashboard badges, make the contractor Jobs overview more compact on mobile with two-column section tiles, and add a mobile-only sticky nested Jobs back control.
+- Reason for change: Real-device mobile QA found that mobile-only Dashboard/Jobs badge behavior could drift from desktop navigation, contractor Jobs overview tiles created extra vertical scrolling, and nested Jobs sections made users scroll back to the top to return to the overview.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-pwa-readiness.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - The compact tile treatment is intentionally limited to the contractor Jobs overview as the first representative mobile-density improvement.
+  - Authenticated real-device/mobile smoke remains a follow-up where test fixtures are available.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1C badge consistency, contractor Jobs mobile density, and nested Jobs back-navigation polish.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing mobile-web-first direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-ui-nav-safe-area-v1`
 - Files changed:
   - `index.html`
