@@ -39,6 +39,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(navSource).toContain("id: 'jobs'");
     expect(navSource).toContain("setContractorTab('inspections')");
     expect(navSource).toContain("setContractorJobsViewAndScroll('overview')");
+    expect(navSource).toContain("setInspectionView('list')");
     expect(sourceBetween(navSource, "id: 'jobs'", "id: 'dashboard'")).not.toContain('badge:');
     expect(navSource).not.toContain("setContractorJobsView('open_financial')");
     expect(navSource).not.toContain("id: 'money'");
@@ -105,7 +106,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(homeownerNavSource).not.toContain('dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount');
   });
 
-  test('contractor Jobs keeps compact mobile overview tiles and a mobile-only nested back control', () => {
+  test('contractor Jobs keeps compact mobile overview tiles and relies on bottom-nav return behavior', () => {
     const appSource = readRepoFile('src/App.tsx');
     const jobsShellSource = sourceBetween(
       appSource,
@@ -130,26 +131,22 @@ test.describe('mobile role shell navigation source guardrails', () => {
 
     expect(appSource).toContain('const setContractorJobsViewAndScroll = useCallback((view: ContractorJobsView) => {');
     expect(appSource).toContain("window.matchMedia('(max-width: 767px)').matches");
-    expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-fixed-subheader"');
-    expect(jobsShellSource).toContain("contractorTab === 'inspections' && contractorJobsView !== 'overview'");
-    expect(jobsShellSource).toContain('role="navigation"');
-    expect(jobsShellSource).toContain('aria-label="Contractor Jobs section navigation"');
-    expect(jobsShellSource).toContain('fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)]');
+    expect(appSource).not.toContain('data-testid="contractor-jobs-mobile-fixed-subheader"');
+    expect(appSource).not.toContain('data-testid="contractor-jobs-mobile-fixed-subheader-spacer"');
+    expect(appSource).not.toContain('data-testid="contractor-jobs-mobile-overview-back"');
+    expect(jobsShellSource).not.toContain("contractorTab === 'inspections' && contractorJobsView !== 'overview'");
+    expect(jobsShellSource).not.toContain('aria-label="Contractor Jobs section navigation"');
+    expect(jobsShellSource).not.toContain('fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)]');
     expect(jobsShellSource).not.toContain('sticky top-0');
     expect(jobsShellSource).not.toContain('sticky top-[calc(env(safe-area-inset-top)+0.5rem)]');
-    expect(jobsShellSource).toContain('z-50');
-    expect(jobsShellSource).toContain('border-y border-slate-200 bg-white/95');
-    expect(jobsShellSource).toContain('px-3 py-1 shadow-sm');
+    expect(jobsShellSource).not.toContain('z-50');
+    expect(jobsShellSource).not.toContain('border-y border-slate-200 bg-white/95');
+    expect(jobsShellSource).not.toContain('px-3 py-1 shadow-sm');
     expect(jobsShellSource).not.toContain('bg-blue-50/95');
     expect(jobsShellSource).not.toContain('shadow-lg');
-    expect(jobsShellSource).toContain('md:hidden');
-    expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-fixed-subheader-spacer"');
-    expect(jobsShellSource).toContain('className="h-[4rem] md:hidden"');
-    expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-overview-back"');
-    expect(jobsShellSource).toContain('min-h-[44px]');
-    expect(jobsShellSource).toContain('← Jobs overview');
-    expect(jobsShellSource).toContain('CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]');
-    expect(jobsShellSource).toContain("setContractorJobsViewAndScroll('overview')");
+    expect(jobsShellSource).not.toContain('className="h-[4rem] md:hidden"');
+    expect(appSource).toContain('Back to Jobs Overview');
+    expect(appSource).toContain('Back to Jobs');
 
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview"');
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview-tile-grid"');
@@ -208,6 +205,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(shellSource).toContain('pb-[calc(env(safe-area-inset-bottom)+0.5rem)]');
     expect(shellSource).toContain('min-h-[52px]');
     expect(shellSource).toContain('setMobileOpen(true)');
+    expect(shellSource).toContain('item.onSelect?.();');
     expect(shellSource).toContain('{visibleMobileNavItems.map(renderMobileNavButton)}');
   });
 

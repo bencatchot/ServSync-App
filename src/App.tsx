@@ -529,18 +529,6 @@ type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'que
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing' | 'service_agreements';
-const CONTRACTOR_JOBS_VIEW_LABELS: Record<ContractorJobsView, string> = {
-  overview: 'Jobs overview',
-  new_jobs: 'New Jobs',
-  open_jobs: 'Open Jobs',
-  closed_jobs: 'Completed / Closed Jobs',
-  new_financial: 'New Estimate / Invoice',
-  open_financial: 'Open Estimates / Invoices',
-  closed_financial: 'Closed / Billed Records',
-  templates: 'Templates',
-  custom_pricing: 'Custom Pricing',
-  service_agreements: 'Service Agreements',
-};
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type ServiceAgreementTemplateDraft = {
@@ -31717,34 +31705,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       {(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (
         <div className="space-y-5">
-          {contractorTab === 'inspections' && contractorJobsView !== 'overview' && (
-            <>
-            <div
-              data-testid="contractor-jobs-mobile-fixed-subheader"
-              role="navigation"
-              aria-label="Contractor Jobs section navigation"
-              className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)] z-50 flex items-center justify-between gap-2 border-y border-slate-200 bg-white/95 px-3 py-1 shadow-sm backdrop-blur md:hidden"
-            >
-              <button
-                type="button"
-                data-testid="contractor-jobs-mobile-overview-back"
-                onClick={() => {
-                  setInspectionView('list');
-                  setActiveInspection(null);
-                  setContractorJobsViewAndScroll('overview');
-                }}
-                className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67]"
-              >
-                ← Jobs overview
-              </button>
-              <p className="min-w-0 flex-1 truncate text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                {CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]}
-              </p>
-            </div>
-            <div data-testid="contractor-jobs-mobile-fixed-subheader-spacer" aria-hidden="true" className="h-[4rem] md:hidden" />
-            </>
-          )}
-
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
