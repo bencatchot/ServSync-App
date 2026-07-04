@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/fb030-shared-home-boundary-tests-v2`
+- Starting main SHA: `760dccb8674d8c9fa91a77986a27bf27fa8e1ff5`
+- Files changed:
+  - `tests/e2e/shared-home-shell.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added FB-030 Closeout A shared-home permission-boundary coverage. The shared-home shell spec now directly covers property-scoped/non-reciprocal access, owner-owned home selector separation, removed-membership shell cleanup in RPC/UI, and shared-member denial for owner home/reminder mutations while preserving read-only shared reminder shell behavior.
+- Reason for change: The FB-030 closeout audit found remaining permission-boundary gaps that could be covered with tests only, without app behavior, SQL, RLS/RPC, Edge Function, deployment, or production-data changes.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/shared-home-shell.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-membership-foundation.spec.ts tests/e2e/home-membership-rpcs.spec.ts tests/e2e/home-membership-email-invites.spec.ts tests/e2e/home-access-invite-delivery-foundation.spec.ts tests/e2e/shared-home-reminders-shell.spec.ts tests/e2e/security-catalog.spec.ts tests/e2e/rls-privacy-expanded.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/shared-home-shell.spec.ts tests/e2e/shared-home-reminders-ui.spec.ts tests/e2e/home-access-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+- Known risks or follow-ups:
+  - Test/docs only. No app behavior, SQL/RLS/RPC, Supabase functions, env/config/package, auth, entitlement/billing, backend behavior, native projects, service worker/offline sync, deployment, or production data mutation is included.
+  - This slice covers representative owner-home and reminder mutation denial plus shell/UI boundaries. Broader shared work-record write denial for service requests, jobs, estimates, invoices, documents/media, Home History, and reminders should remain table-by-table future candidates when those surfaces are intentionally expanded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-030 now records Closeout A permission-boundary test evidence.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this test-only closeout evidence does not change shared-home product scope or roadmap direction.
+
 - Branch: `codex/mobile-drawer-badge-cleanup-v1`
 - Starting main SHA: `a1d34c6a5f466e8dfc4c7016ad303297efd19520`
 - Files changed:
