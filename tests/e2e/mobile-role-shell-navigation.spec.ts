@@ -138,11 +138,13 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsShellSource).not.toContain('sticky top-0');
     expect(jobsShellSource).not.toContain('sticky top-[calc(env(safe-area-inset-top)+0.5rem)]');
     expect(jobsShellSource).toContain('z-50');
-    expect(jobsShellSource).toContain('bg-blue-50/95');
-    expect(jobsShellSource).toContain('shadow-lg');
+    expect(jobsShellSource).toContain('border-y border-slate-200 bg-white/95');
+    expect(jobsShellSource).toContain('px-3 py-1 shadow-sm');
+    expect(jobsShellSource).not.toContain('bg-blue-50/95');
+    expect(jobsShellSource).not.toContain('shadow-lg');
     expect(jobsShellSource).toContain('md:hidden');
     expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-fixed-subheader-spacer"');
-    expect(jobsShellSource).toContain('className="h-[4.75rem] md:hidden"');
+    expect(jobsShellSource).toContain('className="h-[4rem] md:hidden"');
     expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-overview-back"');
     expect(jobsShellSource).toContain('min-h-[44px]');
     expect(jobsShellSource).toContain('← Jobs overview');

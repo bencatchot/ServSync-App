@@ -31723,7 +31723,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               data-testid="contractor-jobs-mobile-fixed-subheader"
               role="navigation"
               aria-label="Contractor Jobs section navigation"
-              className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)] z-50 flex items-center justify-between gap-3 border-y border-blue-200 bg-blue-50/95 px-4 py-2 shadow-lg backdrop-blur md:hidden"
+              className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)] z-50 flex items-center justify-between gap-2 border-y border-slate-200 bg-white/95 px-3 py-1 shadow-sm backdrop-blur md:hidden"
             >
               <button
                 type="button"
@@ -31733,7 +31733,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   setActiveInspection(null);
                   setContractorJobsViewAndScroll('overview');
                 }}
-                className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67] shadow-sm"
+                className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67]"
               >
                 ← Jobs overview
               </button>
@@ -31741,7 +31741,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 {CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]}
               </p>
             </div>
-            <div data-testid="contractor-jobs-mobile-fixed-subheader-spacer" aria-hidden="true" className="h-[4.75rem] md:hidden" />
+            <div data-testid="contractor-jobs-mobile-fixed-subheader-spacer" aria-hidden="true" className="h-[4rem] md:hidden" />
             </>
           )}
 
