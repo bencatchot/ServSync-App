@@ -4,6 +4,39 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-04
+
+- Branch: `codex/mobile-ui-role-shell-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1A with a mobile-only, prop-driven bottom navigation shell in the shared `SidebarLayout`. Contractor mobile nav now exposes Dashboard, Jobs, Money, Messages, and More using existing contractor tab/view state; homeowner mobile nav exposes Home, Requests, Projects, Contractors, and More using existing homeowner tabs/views. The existing desktop sidebar and mobile drawer remain intact.
+- Reason for change: ServSync mobile should feel more like a daily command center while preserving existing workflows. This slice gives homeowner and contractor users five clear mobile destinations without introducing new routes, backend concepts, or business logic.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - source/static guardrail scan for SQL/RLS/RPC/auth/entitlement/backend/native/package drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-pwa-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-auth-link-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium` attempted; blocked by missing local authenticated test account environment variables.
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked if the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts` remains.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - The `Messages` label intentionally maps to the existing contractor requests/workflow follow-up surface; it does not add broad chat behavior.
+  - The homeowner `Projects` label intentionally maps to the existing estimates/records surface using accepted work, open invoices, service agreement offers, and agreements already available in state; it does not add project-management backend behavior.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Mobile UI Foundation Slice 1A as a mobile-only role-based shell/navigation foundation using existing tabs and data.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing mobile-web-first direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 ## 2026-07-03
 
 - Branch: `codex/homeowner-invite-link-copy-polish-v1`

@@ -516,6 +516,15 @@ type RequestContractorAttributeFilter = 'licensed' | 'insured' | 'bonded' | 'web
 type HomeownerDocumentPropertyScope = 'selected' | 'all' | 'unassigned';
 type HomeownerMaintenancePropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorTab = 'overview' | 'profile' | 'connections' | 'requests' | 'calendar' | 'invites' | 'discover' | 'inspections' | 'trust' | 'privacy' | 'support';
+type MobileNavItem = {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  badge?: number;
+  active?: boolean;
+  opensMenu?: boolean;
+  onSelect?: () => void;
+};
 type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'question';
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
@@ -14404,6 +14413,58 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void markNotificationsRead(unreadEstimateNotificationIds);
   }, [homeownerTab, unreadEstimateNotificationKey]);
 
+  const homeownerProjectSection: HomeownerRecordSection = acceptedEstimates.length > 0
+    ? 'accepted'
+    : openInvoiceRecords.length > 0
+      ? 'open_invoices'
+      : pendingServiceAgreementOffers.length > 0
+        ? 'agreement_offers'
+        : visibleAgreementRecords.length > 0
+          ? 'agreements'
+          : defaultHomeownerRecordSection;
+  const homeownerMobileNavItems: MobileNavItem[] = [
+    {
+      id: 'home',
+      label: 'Home',
+      icon: <Home size={18} />,
+      active: homeownerTab === 'overview',
+      onSelect: () => setHomeownerTab('overview'),
+    },
+    {
+      id: 'requests',
+      label: 'Requests',
+      icon: <MessageSquare size={18} />,
+      badge: homeownerActionRequestCount,
+      active: homeownerTab === 'requests',
+      onSelect: () => setHomeownerTab('requests'),
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      icon: <ClipboardCheck size={18} />,
+      badge: dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount,
+      active: homeownerTab === 'estimates',
+      onSelect: () => {
+        setHomeownerRecordPropertyScope('selected');
+        setHomeownerRecordSection(homeownerProjectSection);
+        setHomeownerTab('estimates');
+      },
+    },
+    {
+      id: 'contractors',
+      label: 'Contractors',
+      icon: <Users size={18} />,
+      active: homeownerTab === 'contractors',
+      onSelect: () => setHomeownerTab('contractors'),
+    },
+    {
+      id: 'more',
+      label: 'More',
+      icon: <Menu size={18} />,
+      opensMenu: true,
+    },
+  ];
+
   return (
     <SidebarLayout
       brand={{ name: 'ServSync', subtitle: 'Homeowner Portal' }}
@@ -14423,6 +14484,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       ]}
       activeTab={homeownerTab}
       onChange={tab => setHomeownerTab(tab as typeof homeownerTab)}
+      mobileNavItems={homeownerMobileNavItems}
       actions={<NotificationBell
         notifications={notifications}
         unreadCount={unreadNotificationCount}
@@ -25866,6 +25928,53 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setRevokingLocalClaimInviteId(null);
     }
   };
+  const contractorMobileNavItems: MobileNavItem[] = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard size={18} />,
+      active: contractorTab === 'overview',
+      onSelect: () => setContractorTab('overview'),
+    },
+    {
+      id: 'jobs',
+      label: 'Jobs',
+      icon: <ClipboardCheck size={18} />,
+      badge: openJobs.length,
+      active: contractorTab === 'inspections' && (contractorJobsView === 'new_jobs' || contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs'),
+      onSelect: () => {
+        setContractorTab('inspections');
+        setContractorJobsView('open_jobs');
+        setInspectionView('list');
+      },
+    },
+    {
+      id: 'money',
+      label: 'Money',
+      icon: <Receipt size={18} />,
+      badge: invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length,
+      active: contractorTab === 'inspections' && (contractorJobsView === 'new_financial' || contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial'),
+      onSelect: () => {
+        setContractorTab('inspections');
+        setContractorJobsView('open_financial');
+        setInspectionView('list');
+      },
+    },
+    {
+      id: 'messages',
+      label: 'Messages',
+      icon: <MessageSquare size={18} />,
+      badge: contractorFollowUpCount || openServiceRequestCount,
+      active: contractorTab === 'requests',
+      onSelect: () => setContractorTab('requests'),
+    },
+    {
+      id: 'more',
+      label: 'More',
+      icon: <Menu size={18} />,
+      opensMenu: true,
+    },
+  ];
 
   return (
     <SidebarLayout
@@ -25902,6 +26011,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         }
         setContractorTab(tab as typeof contractorTab);
       }}
+      mobileNavItems={contractorMobileNavItems}
       actions={<NotificationBell
         notifications={notifications}
         unreadCount={contractorUnreadNotificationCount}
@@ -42021,6 +42131,7 @@ function SidebarLayout({
   tabs,
   activeTab,
   onChange,
+  mobileNavItems = [],
   actions,
   children,
   brand,
@@ -42032,6 +42143,7 @@ function SidebarLayout({
   tabs: { id: string; label: string; icon: React.ReactNode; badge?: number; group?: string }[];
   activeTab: string;
   onChange: (id: string) => void;
+  mobileNavItems?: MobileNavItem[];
   actions?: React.ReactNode;
   children: React.ReactNode;
   brand: { name: string; subtitle: string };
@@ -42042,6 +42154,7 @@ function SidebarLayout({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeTabMeta = tabs.find(tab => tab.id === activeTab);
+  const visibleMobileNavItems = mobileNavItems.slice(0, 5);
   const groupedTabs = tabs.reduce<Array<{ group: string; tabs: typeof tabs }>>((groups, tab) => {
     const groupName = tab.group || 'Navigation';
     const existing = groups.find(group => group.group === groupName);
@@ -42130,6 +42243,39 @@ function SidebarLayout({
       </div>
     </div>
   );
+  const renderMobileNavButton = (item: MobileNavItem) => {
+    const active = Boolean(item.active || (!item.opensMenu && item.id === activeTab));
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => {
+          if (item.opensMenu) {
+            setMobileOpen(true);
+            return;
+          }
+          item.onSelect?.();
+          setMobileOpen(false);
+        }}
+        aria-label={item.opensMenu ? 'Open more navigation' : item.label}
+        className={`relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-1 text-[11px] font-bold transition ${
+          active
+            ? 'bg-blue-50 text-[#0078FF]'
+            : 'text-slate-500 hover:bg-slate-50 hover:text-[#223D67]'
+        }`}
+      >
+        <span className="relative">
+          {item.icon}
+          {item.badge !== undefined && item.badge > 0 && (
+            <span className="absolute -right-2.5 -top-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#0078FF] px-1 text-[10px] font-bold leading-none text-white">
+              {item.badge > 99 ? '99+' : item.badge}
+            </span>
+          )}
+        </span>
+        <span className="max-w-full truncate leading-tight">{item.label}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-[#F7F9FC] md:h-screen md:overflow-hidden">
@@ -42158,7 +42304,7 @@ function SidebarLayout({
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
         <main className="min-h-0 flex-1 overflow-y-visible md:overflow-y-auto">
-          <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
+          <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 pb-24 sm:px-6 md:pb-5">
             <div className="hidden items-center justify-between gap-3 md:flex">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0078FF]">{activeTabMeta?.group || brand.subtitle}</p>
@@ -42169,6 +42315,16 @@ function SidebarLayout({
           </div>
         </main>
       </div>
+      {visibleMobileNavItems.length > 0 && (
+        <nav
+          aria-label={`${brand.subtitle} mobile navigation`}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur md:hidden"
+        >
+          <div className="mx-auto flex max-w-xl gap-1">
+            {visibleMobileNavItems.map(renderMobileNavButton)}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }
