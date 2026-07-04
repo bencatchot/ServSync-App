@@ -25,6 +25,10 @@ type HomeFixture = {
   state: string | null;
   zip_code: string | null;
 };
+type ReminderFixture = {
+  id: string;
+  title: string;
+};
 type SharedHomeShell = {
   home_id: string;
   display_label: string | null;
@@ -177,6 +181,45 @@ insert into public.home_memberships (
 `);
 }
 
+async function createReminder(owner: AuthenticatedClient, homeId: string, title: string): Promise<ReminderFixture> {
+  const result = await owner.client
+    .from('home_reminders')
+    .insert({
+      homeowner_user_id: owner.userId,
+      home_id: homeId,
+      title,
+      notes: `Private reminder notes for ${title}`,
+      due_on: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      status: 'open',
+    })
+    .select('id, title')
+    .single();
+
+  expect(result.error, 'owner reminder fixture insert should not error').toBeNull();
+  expect(result.data?.id, 'owner reminder fixture should be created').toBeTruthy();
+  return result.data as ReminderFixture;
+}
+
+async function cleanupReminders(owner: AuthenticatedClient, reminderIds: string[]) {
+  if (!reminderIds.length) {
+    return;
+  }
+
+  const result = await owner.client.from('home_reminders').delete().in('id', reminderIds);
+  expect(result.error, 'sandbox reminder cleanup should not error').toBeNull();
+}
+
+function expectMutationDenied(
+  result: { error: { message?: string } | null; data: unknown[] | null },
+  description: string,
+) {
+  if (result.error) {
+    return;
+  }
+
+  expect(result.data ?? [], description).toHaveLength(0);
+}
+
 async function listSharedHomeShells(account: AuthenticatedClient): Promise<SharedHomeShell[]> {
   const result = await account.client.rpc('servsync_list_my_shared_home_shells');
   expect(result.error, 'shared home shell RPC should not error').toBeNull();
@@ -204,6 +247,8 @@ async function loginAsHomeownerB(page: Page) {
 }
 
 test.describe('shared home shell', () => {
+  test.describe.configure({ timeout: 60_000 });
+
   test.beforeEach(() => {
     requireApprovedSandboxForMutation();
   });
@@ -325,6 +370,103 @@ test.describe('shared home shell', () => {
       expect(oldShells.find(row => row.home_id === ownerHome.id), 'old RPC should remain compatible after cleanup').toBeUndefined();
     } finally {
       cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      await signOutAll([owner, sharedMember]);
+    }
+  });
+
+  test('shared access is property-scoped, non-reciprocal, and removed memberships leave no stale shell UI', async ({ page }) => {
+    const owner = await signInAs('homeowner');
+    const sharedMember = await signInAs('homeownerB');
+    const ownerHome = await firstHome(owner);
+    const memberHome = await firstHome(sharedMember);
+    const expectedLabel = ownerHome.nickname || [ownerHome.city, ownerHome.state].filter(Boolean).join(', ') || 'Shared home';
+
+    try {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      cleanupMembershipArtifacts(memberHome.id, owner.userId);
+
+      insertMembership(ownerHome.id, sharedMember.userId, 'member', 'active');
+
+      const sharedShells = await listSharedHomeShells(sharedMember);
+      expect(sharedShells.some(shell => shell.home_id === ownerHome.id), 'shared member should see only the explicitly shared home shell').toBe(true);
+
+      const ownerShells = await listSharedHomeShells(owner);
+      expect(ownerShells.some(shell => shell.home_id === memberHome.id), 'sharing owner Home A should not receive reciprocal access to member Home B').toBe(false);
+
+      const ownerAddressShells = await listSharedHomeAddressShells(owner);
+      expect(
+        ownerAddressShells.some(shell => shell.home_id === memberHome.id),
+        'address shell access should also remain non-reciprocal',
+      ).toBe(false);
+
+      const ownedHomeSelector = await sharedMember.client
+        .from('homes')
+        .select('id, homeowner_user_id')
+        .eq('homeowner_user_id', sharedMember.userId);
+      expect(ownedHomeSelector.error, 'owned-home selector query should not error').toBeNull();
+      expect(
+        (ownedHomeSelector.data ?? []).some(row => row.id === ownerHome.id),
+        'shared homes should stay out of owner-owned home selector results',
+      ).toBe(false);
+
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      insertMembership(ownerHome.id, sharedMember.userId, 'member', 'removed');
+
+      const removedShells = await listSharedHomeShells(sharedMember);
+      expect(removedShells.some(shell => shell.home_id === ownerHome.id), 'removed shared access should not return shell rows').toBe(false);
+
+      const removedAddressShells = await listSharedHomeAddressShells(sharedMember);
+      expect(
+        removedAddressShells.some(shell => shell.home_id === ownerHome.id),
+        'removed shared access should not return address shell rows',
+      ).toBe(false);
+
+      await loginAsHomeownerB(page);
+      await openSidebarTab(page, /^Properties$/i);
+
+      const panel = page.getByTestId('shared-home-shells-panel');
+      await expect(panel).toBeVisible();
+      await expect(panel.getByTestId('shared-home-shell-card').filter({ hasText: expectedLabel })).toHaveCount(0);
+    } finally {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      cleanupMembershipArtifacts(memberHome.id, owner.userId);
+      await signOutAll([owner, sharedMember]);
+    }
+  });
+
+  test('shared members cannot mutate owner homes or reminder records through browser RLS', async () => {
+    const owner = await signInAs('homeowner');
+    const sharedMember = await signInAs('homeownerB');
+    const ownerHome = await firstHome(owner);
+    const reminderIds: string[] = [];
+
+    try {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      insertMembership(ownerHome.id, sharedMember.userId, 'admin', 'active');
+
+      const reminder = await createReminder(owner, ownerHome.id, `FB030 shared mutation boundary ${Date.now()}`);
+      reminderIds.push(reminder.id);
+
+      const homeUpdate = await sharedMember.client
+        .from('homes')
+        .update({ nickname: ownerHome.nickname })
+        .eq('id', ownerHome.id)
+        .select('id');
+      expectMutationDenied(homeUpdate, 'shared admin should not mutate the owner home row');
+
+      const reminderUpdate = await sharedMember.client
+        .from('home_reminders')
+        .update({ title: reminder.title })
+        .eq('id', reminder.id)
+        .select('id');
+      expectMutationDenied(reminderUpdate, 'shared admin should not mutate owner reminder rows through direct table access');
+
+      const directReminderRows = await sharedMember.client.from('home_reminders').select('id').eq('id', reminder.id);
+      expect(directReminderRows.error, 'direct shared-member reminder table probe should not error').toBeNull();
+      expect(directReminderRows.data, 'shared members should not receive owner reminder table rows directly').toHaveLength(0);
+    } finally {
+      cleanupMembershipArtifacts(ownerHome.id, sharedMember.userId);
+      await cleanupReminders(owner, reminderIds);
       await signOutAll([owner, sharedMember]);
     }
   });
