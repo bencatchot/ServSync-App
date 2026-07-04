@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-jobs-nested-navigation-v1`
+- Starting main SHA: `45630f7a836170c06b5cbfc05a2f41ea753f4f95`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1G to strengthen the contractor Jobs nested-section mobile subheader. Nested Jobs sections now have a clearer, safe-area-aware mobile Jobs overview escape control with the current section title.
+- Reason for change: Real-device mobile review found that long/search-heavy contractor Jobs sections still made returning to the Jobs overview feel clumsy after users scrolled or filtered inside a nested section.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes only the mobile-only contractor Jobs nested-section subheader. Jobs overview, Slice 1F tile patterns, mobile bottom nav, homeowner layouts, desktop behavior, labels, counts, click behavior, and search/filter behavior remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1G contractor Jobs nested-section navigation polish.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing mobile polish direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-jobs-tile-consistency-v1`
 - Starting main SHA: `f7b3e965321837ac3dcaa4648ce048b1d6d9fa91`
 - Files changed:
