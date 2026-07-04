@@ -31718,11 +31718,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       {(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (
         <div className="space-y-5">
           {contractorTab === 'inspections' && contractorJobsView !== 'overview' && (
+            <>
             <div
-              data-testid="contractor-jobs-mobile-sticky-subheader"
+              data-testid="contractor-jobs-mobile-fixed-subheader"
               role="navigation"
               aria-label="Contractor Jobs section navigation"
-              className="sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 -mx-4 flex items-center justify-between gap-3 border-y border-slate-200 bg-white/95 px-4 py-2 shadow-md backdrop-blur md:hidden"
+              className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)] z-50 flex items-center justify-between gap-3 border-y border-blue-200 bg-blue-50/95 px-4 py-2 shadow-lg backdrop-blur md:hidden"
             >
               <button
                 type="button"
@@ -31740,6 +31741,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 {CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]}
               </p>
             </div>
+            <div data-testid="contractor-jobs-mobile-fixed-subheader-spacer" aria-hidden="true" className="h-[4.75rem] md:hidden" />
+            </>
           )}
 
           {/* ── LIST VIEW ── */}
