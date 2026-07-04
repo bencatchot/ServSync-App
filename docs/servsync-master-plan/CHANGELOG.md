@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-ui-nav-safe-area-v1`
+- Files changed:
+  - `index.html`
+  - `src/index.css`
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `tests/e2e/mobile-pwa-readiness.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1B to align mobile bottom-nav labels with existing web terminology and harden real-device mobile viewport/safe-area behavior. Contractor mobile nav now reads Discover / Jobs / Dashboard / Homeowners / More; homeowner mobile nav now reads Discover / Requests / Dashboard / Contractors / More. The viewport now uses `viewport-fit=cover`, global root width/overflow guards are in place, the mobile header accounts for iOS top safe area, and shared inputs use `text-base md:text-sm` to reduce iOS input-focus zoom.
+- Reason for change: Real-device review found the Slice 1A mobile shell felt slightly too close around the top status-bar area and that `Money`, `Messages`, and `Projects` introduced terminology drift from the existing web app grouping. This slice keeps Jobs as the existing contractor grouping for jobs, estimates, and invoices, and avoids implying a homeowner project hub before that product surface exists.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-pwa-readiness.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-auth-link-readiness.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - Authenticated real-device/mobile smoke remains a follow-up where test fixtures are available.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1B as label alignment plus viewport/safe-area/root overflow hardening.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing mobile-web-first direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-ui-role-shell-v1`
 - Files changed:
   - `src/App.tsx`

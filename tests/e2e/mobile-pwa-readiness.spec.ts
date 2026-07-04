@@ -18,7 +18,9 @@ test.describe('mobile PWA readiness metadata', () => {
     expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
     expect(html).toContain('<meta name="apple-mobile-web-app-title" content="ServSync" />');
     expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default" />');
-    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
+    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
+    expect(html).not.toContain('user-scalable=no');
+    expect(html).not.toContain('maximum-scale=1');
   });
 
   test('manifest is valid JSON with required installability fields and existing icons', () => {

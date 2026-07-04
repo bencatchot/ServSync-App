@@ -29,22 +29,28 @@ test.describe('mobile role shell navigation source guardrails', () => {
       '  return (\n    <SidebarLayout\n      brand={{ name: contractorDraft.business_name',
     );
 
-    expect(labelsFrom(navSource)).toEqual(['Dashboard', 'Jobs', 'Money', 'Messages', 'More']);
+    expect(labelsFrom(navSource)).toEqual(['Discover', 'Jobs', 'Dashboard', 'Homeowners', 'More']);
+    expect(labelsFrom(navSource)).not.toContain('Money');
+    expect(labelsFrom(navSource)).not.toContain('Messages');
+    expect(navSource).toContain("id: 'discover'");
+    expect(navSource).toContain("onSelect: () => setContractorTab('discover')");
     expect(navSource).toContain("id: 'dashboard'");
     expect(navSource).toContain("onSelect: () => setContractorTab('overview')");
     expect(navSource).toContain("id: 'jobs'");
-    expect(navSource).toContain("setContractorJobsView('open_jobs')");
-    expect(navSource).toContain("id: 'money'");
-    expect(navSource).toContain("setContractorJobsView('open_financial')");
-    expect(navSource).toContain("id: 'messages'");
-    expect(navSource).toContain("onSelect: () => setContractorTab('requests')");
+    expect(navSource).toContain("setContractorTab('inspections')");
+    expect(navSource).toContain("setContractorJobsView('overview')");
+    expect(navSource).not.toContain("setContractorJobsView('open_financial')");
+    expect(navSource).not.toContain("id: 'money'");
+    expect(navSource).not.toContain("id: 'messages'");
+    expect(navSource).toContain("id: 'homeowners'");
+    expect(navSource).toContain("onSelect: () => setContractorTab('connections')");
     expect(navSource).toContain("id: 'more'");
     expect(navSource).toContain('opensMenu: true');
     expect(navSource.toLowerCase()).not.toContain('general chat');
     expect(navSource.toLowerCase()).not.toContain('broad chat');
   });
 
-  test('homeowner mobile nav has exactly the approved five items and keeps Projects on existing records', () => {
+  test('homeowner mobile nav has exactly the approved five items and avoids project-hub overpromising', () => {
     const appSource = readRepoFile('src/App.tsx');
     const navSource = sourceBetween(
       appSource,
@@ -52,11 +58,14 @@ test.describe('mobile role shell navigation source guardrails', () => {
       '  return (\n    <SidebarLayout\n      brand={{ name: \'ServSync\'',
     );
 
-    expect(labelsFrom(navSource)).toEqual(['Home', 'Requests', 'Projects', 'Contractors', 'More']);
+    expect(labelsFrom(navSource)).toEqual(['Discover', 'Requests', 'Dashboard', 'Contractors', 'More']);
+    expect(labelsFrom(navSource)).not.toContain('Projects');
+    expect(navSource).toContain("id: 'discover'");
+    expect(navSource).toContain("onSelect: () => setHomeownerTab('discover')");
     expect(navSource).toContain("onSelect: () => setHomeownerTab('overview')");
     expect(navSource).toContain("onSelect: () => setHomeownerTab('requests')");
-    expect(navSource).toContain("setHomeownerTab('estimates')");
-    expect(navSource).toContain('setHomeownerRecordSection(homeownerProjectSection)');
+    expect(navSource).not.toContain("setHomeownerTab('estimates')");
+    expect(navSource).not.toContain('homeownerProjectSection');
     expect(navSource).toContain("onSelect: () => setHomeownerTab('contractors')");
     expect(navSource).toContain('opensMenu: true');
     expect(appSource).not.toContain("type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'projects'");
@@ -77,9 +86,26 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(shellSource).toContain('className="hidden md:flex md:w-64 md:shrink-0 md:flex-col"');
     expect(shellSource).toContain('className="fixed inset-x-0 bottom-0');
     expect(shellSource).toContain('md:hidden');
+    expect(shellSource).toContain('pt-[calc(env(safe-area-inset-top)+0.75rem)]');
+    expect(shellSource).toContain('pb-[calc(env(safe-area-inset-bottom)+0.5rem)]');
     expect(shellSource).toContain('min-h-[52px]');
     expect(shellSource).toContain('setMobileOpen(true)');
     expect(shellSource).toContain('{visibleMobileNavItems.map(renderMobileNavButton)}');
+  });
+
+  test('viewport and root CSS support safe mobile chrome without hostile zoom restrictions', () => {
+    const htmlSource = readRepoFile('index.html');
+    const cssSource = readRepoFile('src/index.css');
+    const appSource = readRepoFile('src/App.tsx');
+
+    expect(htmlSource).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
+    expect(htmlSource).not.toContain('user-scalable=no');
+    expect(htmlSource).not.toContain('maximum-scale=1');
+    expect(cssSource).toContain('html,\nbody,\n#root');
+    expect(cssSource).toContain('width: 100%;');
+    expect(cssSource).toContain('overflow-x: hidden;');
+    expect(appSource).toContain('text-base text-[#02132D]');
+    expect(appSource).toContain('md:text-sm');
   });
 
   test('slice does not add backend, auth, native, or package scope', () => {
