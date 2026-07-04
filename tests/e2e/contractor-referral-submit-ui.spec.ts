@@ -23,7 +23,7 @@ test.describe('contractor-to-contractor referral submit UI source guardrails', (
     const cardSource = sourceBetween(
       invitesSource,
       '<Card title="Refer another contractor"',
-      '<Card title="Permanent referral QR"',
+      '<Card title="Permanent homeowner invite QR"',
     );
 
     expect(source).toContain("{ id: 'invites',      label: 'Invites & Referrals'");
@@ -54,7 +54,7 @@ test.describe('contractor-to-contractor referral submit UI source guardrails', (
     const cardSource = sourceBetween(
       source,
       '<Card title="Refer another contractor"',
-      '<Card title="Permanent referral QR"',
+      '<Card title="Permanent homeowner invite QR"',
     );
 
     expect(helperSource).toContain('contractor.owner_user_id === profileId');
@@ -102,7 +102,7 @@ test.describe('contractor-to-contractor referral submit UI source guardrails', (
     const cardSource = sourceBetween(
       source,
       '<Card title="Refer another contractor"',
-      '<Card title="Permanent referral QR"',
+      '<Card title="Permanent homeowner invite QR"',
     );
 
     for (const forbidden of [
@@ -131,15 +131,26 @@ test.describe('contractor-to-contractor referral submit UI source guardrails', (
 
   test('preserves existing invite and team invite flows as separate code paths', () => {
     const source = appSource();
+    const invitesSource = sourceBetween(
+      source,
+      "{contractorTab === 'invites' && (",
+      "{contractorTab === 'connections' &&",
+    );
 
     expect(source).toContain("supabase.rpc('servsync_submit_homeowner_contractor_invite_lead'");
     expect(source).toContain("supabase.rpc('servsync_create_contractor_team_invite'");
     expect(source).toContain("supabase.rpc('servsync_accept_contractor_team_invite'");
     expect(source).toContain("supabase.rpc('servsync_revoke_contractor_team_invite'");
     expect(source).toContain(".from('contractor_invites')");
-    expect(source).toContain('<Card title="Permanent referral QR"');
-    expect(source).toContain('<Card title="One-time invite links"');
-    expect(source).toContain('<Card title="Referral status"');
+    expect(invitesSource).toContain('<Card title="Permanent homeowner invite QR"');
+    expect(invitesSource).toContain('<Card title="Homeowner invite links"');
+    expect(invitesSource).toContain('<Card title="Homeowner invite / referral status"');
+    expect(invitesSource).toContain('Create homeowner invite link');
+    expect(invitesSource).toContain('New homeowner invite link');
+    expect(invitesSource).toContain('No homeowner invite links created yet.');
+    expect(invitesSource).not.toContain('Create invite link');
+    expect(invitesSource).not.toContain('<Card title="One-time invite links"');
+    expect(invitesSource).not.toContain('<Card title="Permanent referral QR"');
   });
 
   test('does not introduce forbidden referral-scope integrations', () => {

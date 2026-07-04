@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/homeowner-invite-link-copy-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-referral-submit-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Clarified contractor `Invites & Referrals` copy so the existing permanent QR, one-time invite links, create-link action, and status card identify the homeowner/customer invite flow instead of using generic referral/invite wording.
+- Reason for change: Contractor-to-contractor referrals now sit beside homeowner/customer invite links, so the UI needs clearer labels to keep contractor referrals, homeowner/customer invites, and reward/referral status distinct without changing behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - source/static forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-referral-submit-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs copy polish only. No behavior, SQL/RLS/RPC, production data, deployment, email/SMS/push delivery, rewards, credits, billing, public referral links, contractor permissions, contractor team access, account/profile creation, matching automation, or workflow automation is included.
+  - Contractor-to-contractor referral submit/admin tracking behavior remains unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-026 now records the homeowner/customer invite-link copy clarification while keeping contractor-to-contractor referrals separate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is UI copy clarification only and does not change product strategy, roadmap scope, or feature behavior.
+
 - Branch: `codex/mobile-pwa-real-device-qa-checklist-v1`
 - Files changed:
   - `docs/mobile-readiness-pwa-qa-checklist.md`

@@ -28491,11 +28491,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             )}
           </Card>
 
-          <Card title="Permanent referral QR" icon={<Link2 size={18} />}>
+          <Card title="Permanent homeowner invite QR" icon={<Link2 size={18} />}>
             {contractor?.permanent_invite_code ? (
               <>
                 <p className="text-sm text-slate-500 mb-4">
-                  Put this on business cards, yard signs, or flyers. Any new homeowner who scans it and creates an account counts as your referral automatically.
+                  Put this on business cards, yard signs, or flyers. Any new homeowner/customer who scans it and creates an account counts as your homeowner invite referral automatically.
                 </p>
                 <QRDisplay
                   value={homeownerInviteUrl(contractor.permanent_invite_code)}
@@ -28526,17 +28526,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             )}
           </Card>
 
-          <Card title="One-time invite links" icon={<Mail size={18} />}>
+          <Card title="Homeowner invite links" icon={<Mail size={18} />}>
             <p className="text-sm text-slate-500">
-              Generate a single-use invite link. The homeowner chooses what to share after connecting. Each link tracks referral credit.
+              Generate a single-use homeowner/customer invite link. The homeowner chooses what to share after connecting. Each link tracks homeowner invite referral credit.
             </p>
             <button type="button" onClick={() => void createInvite()} className={`${buttonClass('primary')} mt-4`}>
               <Plus size={16} />
-              Create invite link
+              Create homeowner invite link
             </button>
             {inviteLink && (
               <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700 mb-3">New invite link</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700 mb-3">New homeowner invite link</p>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   <div className="flex-1">
                     <p className="break-all text-sm font-semibold text-blue-950">{inviteLink}</p>
@@ -28547,10 +28547,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             )}
           </Card>
 
-          <Card title="Referral status" icon={<Receipt size={18} />}>
+          <Card title="Homeowner invite / referral status" icon={<Receipt size={18} />}>
             <div className="space-y-3">
               {invites.length === 0 ? (
-                <EmptyState text="No invite links created yet." />
+                <EmptyState text="No homeowner invite links created yet." />
               ) : (
                 invites.slice(0, 8).map(invite => {
                   const inviteUrl = homeownerInviteUrl(invite.invite_code);
