@@ -132,9 +132,15 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(appSource).toContain("window.matchMedia('(max-width: 767px)').matches");
     expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-sticky-subheader"');
     expect(jobsShellSource).toContain("contractorTab === 'inspections' && contractorJobsView !== 'overview'");
-    expect(jobsShellSource).toContain('sticky top-0');
+    expect(jobsShellSource).toContain('role="navigation"');
+    expect(jobsShellSource).toContain('aria-label="Contractor Jobs section navigation"');
+    expect(jobsShellSource).toContain('sticky top-[calc(env(safe-area-inset-top)+0.5rem)]');
+    expect(jobsShellSource).not.toContain('sticky top-0');
+    expect(jobsShellSource).toContain('z-40');
     expect(jobsShellSource).toContain('md:hidden');
-    expect(jobsShellSource).toContain('Back to Jobs');
+    expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-overview-back"');
+    expect(jobsShellSource).toContain('min-h-[44px]');
+    expect(jobsShellSource).toContain('← Jobs overview');
     expect(jobsShellSource).toContain('CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]');
     expect(jobsShellSource).toContain("setContractorJobsViewAndScroll('overview')");
 

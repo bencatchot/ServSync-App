@@ -31720,18 +31720,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {contractorTab === 'inspections' && contractorJobsView !== 'overview' && (
             <div
               data-testid="contractor-jobs-mobile-sticky-subheader"
-              className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur md:hidden"
+              role="navigation"
+              aria-label="Contractor Jobs section navigation"
+              className="sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 -mx-4 flex items-center justify-between gap-3 border-y border-slate-200 bg-white/95 px-4 py-2 shadow-md backdrop-blur md:hidden"
             >
               <button
                 type="button"
+                data-testid="contractor-jobs-mobile-overview-back"
                 onClick={() => {
                   setInspectionView('list');
                   setActiveInspection(null);
                   setContractorJobsViewAndScroll('overview');
                 }}
-                className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67] shadow-sm"
+                className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-[#223D67] shadow-sm"
               >
-                Back to Jobs
+                ← Jobs overview
               </button>
               <p className="min-w-0 flex-1 truncate text-right text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                 {CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]}
