@@ -38,7 +38,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(navSource).toContain("onSelect: () => setContractorTab('overview')");
     expect(navSource).toContain("id: 'jobs'");
     expect(navSource).toContain("setContractorTab('inspections')");
-    expect(navSource).toContain("setContractorJobsView('overview')");
+    expect(navSource).toContain("setContractorJobsViewAndScroll('overview')");
     expect(navSource).not.toContain("setContractorJobsView('open_financial')");
     expect(navSource).not.toContain("id: 'money'");
     expect(navSource).not.toContain("id: 'messages'");
@@ -70,6 +70,68 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(navSource).toContain('opensMenu: true');
     expect(appSource).not.toContain("type HomeownerTab = 'overview' | 'home' | 'contractors' | 'requests' | 'projects'");
     expect(appSource).not.toContain("homeownerTab === 'projects'");
+  });
+
+  test('mobile and desktop nav badges use shared workflow counts without Dashboard badges', () => {
+    const appSource = readRepoFile('src/App.tsx');
+    const contractorNavSource = sourceBetween(
+      appSource,
+      'const contractorMobileNavItems: MobileNavItem[] = [',
+      '  return (\n    <SidebarLayout\n      brand={{ name: contractorDraft.business_name',
+    );
+    const homeownerNavSource = sourceBetween(
+      appSource,
+      'const homeownerMobileNavItems: MobileNavItem[] = [',
+      '  return (\n    <SidebarLayout\n      brand={{ name: \'ServSync\'',
+    );
+
+    expect(appSource).toContain('const contractorJobsAttentionCount = openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length;');
+    expect(appSource).toContain('const contractorHomeownersBadgeCount = connectionRequests.length;');
+    expect(appSource).toContain('const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;');
+    expect(appSource).toContain("badge: contractorJobsAttentionCount");
+    expect(appSource).toContain("{ id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, badge: contractorJobsAttentionCount");
+    expect(contractorNavSource).toContain('badge: contractorJobsAttentionCount');
+    expect(contractorNavSource).toContain('badge: contractorHomeownersBadgeCount');
+    expect(contractorNavSource).not.toContain('badge: actionReviewCount');
+
+    expect(appSource).toContain('const homeownerRequestsBadgeCount = homeownerActionRequestCount;');
+    expect(appSource).toContain('const homeownerEstimatesInvoicesBadgeCount = homeownerFinancialBadgeCount;');
+    expect(appSource).toContain("{ id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerRequestsBadgeCount");
+    expect(appSource).toContain("{ id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: homeownerEstimatesInvoicesBadgeCount");
+    expect(homeownerNavSource).toContain('badge: homeownerRequestsBadgeCount');
+    expect(homeownerNavSource).not.toContain('dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount');
+  });
+
+  test('contractor Jobs keeps compact mobile overview tiles and a mobile-only nested back control', () => {
+    const appSource = readRepoFile('src/App.tsx');
+    const jobsShellSource = sourceBetween(
+      appSource,
+      "{(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (",
+      '          {/* ── LIST VIEW ── */}',
+    );
+    const jobsOverviewSource = sourceBetween(
+      appSource,
+      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'new_financial' && (",
+    );
+
+    expect(appSource).toContain('const setContractorJobsViewAndScroll = useCallback((view: ContractorJobsView) => {');
+    expect(appSource).toContain("window.matchMedia('(max-width: 767px)').matches");
+    expect(jobsShellSource).toContain('data-testid="contractor-jobs-mobile-sticky-subheader"');
+    expect(jobsShellSource).toContain("contractorTab === 'inspections' && contractorJobsView !== 'overview'");
+    expect(jobsShellSource).toContain('sticky top-0');
+    expect(jobsShellSource).toContain('md:hidden');
+    expect(jobsShellSource).toContain('Back to Jobs');
+    expect(jobsShellSource).toContain('CONTRACTOR_JOBS_VIEW_LABELS[contractorJobsView]');
+    expect(jobsShellSource).toContain("setContractorJobsViewAndScroll('overview')");
+
+    expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview"');
+    expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview-tile-grid"');
+    expect(jobsOverviewSource).toContain('grid grid-cols-2 gap-2 md:grid-cols-3');
+    expect(jobsOverviewSource).toContain('p-2.5 text-left transition sm:p-3');
+    expect(jobsOverviewSource).toContain('line-clamp-2');
+    expect(jobsOverviewSource).toContain('setContractorJobsViewAndScroll(item.id)');
+    expect(jobsOverviewSource).not.toContain('overflow-x-auto');
   });
 
   test('shared shell keeps desktop sidebar and adds mobile-only bottom nav with five-item cap', () => {
