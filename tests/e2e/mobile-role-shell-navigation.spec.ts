@@ -39,6 +39,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(navSource).toContain("id: 'jobs'");
     expect(navSource).toContain("setContractorTab('inspections')");
     expect(navSource).toContain("setContractorJobsViewAndScroll('overview')");
+    expect(sourceBetween(navSource, "id: 'jobs'", "id: 'dashboard'")).not.toContain('badge:');
     expect(navSource).not.toContain("setContractorJobsView('open_financial')");
     expect(navSource).not.toContain("id: 'money'");
     expect(navSource).not.toContain("id: 'messages'");
@@ -72,7 +73,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(appSource).not.toContain("homeownerTab === 'projects'");
   });
 
-  test('mobile and desktop nav badges use shared workflow counts without Dashboard badges', () => {
+  test('mobile Jobs nav suppresses inconsistent badge while preserving shared workflow counts elsewhere', () => {
     const appSource = readRepoFile('src/App.tsx');
     const contractorNavSource = sourceBetween(
       appSource,
@@ -84,13 +85,15 @@ test.describe('mobile role shell navigation source guardrails', () => {
       'const homeownerMobileNavItems: MobileNavItem[] = [',
       '  return (\n    <SidebarLayout\n      brand={{ name: \'ServSync\'',
     );
+    const contractorJobsMobileNavSource = sourceBetween(contractorNavSource, "id: 'jobs'", "id: 'dashboard'");
 
     expect(appSource).toContain('const contractorJobsAttentionCount = openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length;');
     expect(appSource).toContain('const contractorHomeownersBadgeCount = connectionRequests.length;');
     expect(appSource).toContain('const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;');
     expect(appSource).toContain("badge: contractorJobsAttentionCount");
     expect(appSource).toContain("{ id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, badge: contractorJobsAttentionCount");
-    expect(contractorNavSource).toContain('badge: contractorJobsAttentionCount');
+    expect(contractorJobsMobileNavSource).not.toContain('badge:');
+    expect(contractorNavSource).not.toContain('badge: contractorJobsAttentionCount');
     expect(contractorNavSource).toContain('badge: contractorHomeownersBadgeCount');
     expect(contractorNavSource).not.toContain('badge: actionReviewCount');
 
@@ -130,6 +133,7 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsOverviewSource).toContain('grid grid-cols-2 gap-2 md:grid-cols-3');
     expect(jobsOverviewSource).toContain("id: 'new_jobs', label: 'New Jobs'");
     expect(jobsOverviewSource).toContain("id: 'open_jobs', label: 'Open Jobs'");
+    expect(jobsOverviewSource).toContain("value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length)");
     expect(jobsOverviewSource).toContain("id: 'closed_jobs', label: 'Completed / Closed Jobs'");
     expect(jobsOverviewSource.indexOf("id: 'new_jobs', label: 'New Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'"));
     expect(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'closed_jobs', label: 'Completed / Closed Jobs'"));

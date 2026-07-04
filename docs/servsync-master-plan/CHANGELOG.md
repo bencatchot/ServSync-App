@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-jobs-badge-cleanup-v1`
+- Starting main SHA: `4ed64f0ab8a9c32ac442fbc28df6dfffcb7f9632`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1E to remove the inconsistent contractor mobile Jobs bottom-nav badge while preserving Jobs overview tile counts and existing Jobs click behavior.
+- Reason for change: Real-device mobile review found that the mobile Jobs/Open Jobs badge drifted from the desktop/web navigation semantics. This slice keeps the useful Open Jobs count inside the Jobs overview content without adding desktop badges or new count logic.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes only the contractor mobile Jobs bottom-nav badge; Jobs overview counts, desktop navigation, homeowner mobile navigation, labels, and state transitions remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1E contractor mobile Jobs badge cleanup.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing mobile polish direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-jobs-tile-priority-v1`
 - Starting main SHA: `80079c81e49bb5fbd72d8f2367886f48adbb72a9`
 - Files changed:
