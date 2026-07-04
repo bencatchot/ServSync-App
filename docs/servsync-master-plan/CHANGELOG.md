@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-jobs-header-weight-tuning-v1`
+- Starting main SHA: `f6e57cc541b26f2e45b88b1de14a346d2161fd85`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1I to tune the contractor Jobs nested fixed mobile header from the heavier Slice 1H treatment to a more compact neutral bar while preserving the persistent Jobs overview escape path.
+- Reason for change: Real-device feedback after Slice 1H confirmed the fixed header worked but felt too visually heavy and consumed too much mobile screen space.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes only the mobile-only contractor Jobs nested fixed-header visual weight. Fixed behavior, Jobs overview, Slice 1F tile patterns, mobile bottom nav, homeowner layouts, desktop behavior, labels, counts, click behavior, and search/filter behavior remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1I contractor Jobs fixed-header visual weight tuning.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing mobile polish direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-jobs-nested-header-visibility-v1`
 - Starting main SHA: `a4dbf38bc3919d38389a30ef5ab05682af72281f`
 - Files changed:
