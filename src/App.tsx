@@ -25954,7 +25954,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       id: 'jobs',
       label: 'Jobs',
       icon: <ClipboardCheck size={18} />,
-      badge: contractorJobsAttentionCount,
       active: contractorTab === 'inspections',
       onSelect: () => {
         setContractorTab('inspections');
