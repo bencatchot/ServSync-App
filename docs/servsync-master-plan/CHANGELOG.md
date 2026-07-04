@@ -6,6 +6,28 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-03
 
+- Branch: `codex/mobile-pwa-real-device-qa-checklist-v1`
+- Files changed:
+  - `docs/mobile-readiness-pwa-qa-checklist.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a docs-only Mobile PWA Real-Device QA Checklist for installed-PWA and mobile browser testing. The checklist covers iPhone Safari, iPhone Add to Home Screen, Android Chrome, Android installed PWA/Add to Home Screen, auth and recovery-link observations, current hash-route links, workflow smoke checks, file/photo/PDF checks, future Capacitor proof-of-concept notes, and a repeatable result-recording table.
+- Reason for change: ServSync is preparing for future mobile app work through mobile-first web/PWA readiness first. The next safe step after PWA metadata and app-link helper normalization is a reusable manual QA checklist before any native wrapper, settings, or deep-link implementation is considered.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard confirming only approved docs changed
+- Known risks or follow-ups:
+  - Docs/checklist only. No app code, SQL/RLS/RPC, Supabase functions, env/config/package, Capacitor/native projects, service worker/offline sync, auth behavior, Supabase/Vercel settings, deployment, or production data mutation is included.
+  - The checklist is not evidence that installed-PWA behavior has passed on real devices; actual iPhone/Android QA remains a follow-up activity.
+  - Future mobile-readiness work still needs separate audit/approval for real-device QA evidence capture, Supabase Auth redirect settings, native custom scheme or universal/app-link handling, Edge Function email-link targets, record-specific deep links, file upload/camera behavior, and any Capacitor proof of concept.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records the Mobile PWA Real-Device QA Checklist as docs-only installed-PWA/mobile-browser testing preparation while preserving native apps, Capacitor, universal/app links, service workers/offline sync, Supabase/Vercel setting changes, auth behavior changes, backend changes, notifications, payments, and calendar sync as out of scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this docs-only checklist supports the existing mobile-web-first QA path without changing mobile/native strategy, product scope, or launch positioning.
+
 - Branch: `codex/mobile-auth-link-normalization-v1`
 - Files changed:
   - `src/appLinks.ts`
