@@ -1140,6 +1140,7 @@ Contractor-to-contractor referral foundation:
 - Adds RPC boundaries for contractor owner/admin/office submission and platform-admin listing/update.
 - Slice 2 adds a compact contractor `Invites & Referrals` submit card for eligible contractor owner/admin/office users to send another contractor's details to the ServSync team for follow-up.
 - Slice 3A adds a distinct platform-admin `Contractor-to-Contractor Referrals` tracking card inside the existing admin `Referrals` tab, using only the existing admin list/update RPCs for manual status, notes, and outreach-date/count tracking.
+- Contractor `Invites & Referrals` copy now labels the existing one-time links and permanent QR as homeowner/customer invite flows so they stay distinct from contractor-to-contractor referrals.
 - Keeps contractor referral leads separate from `homeowner_contractor_invite_leads`, `referrals`, `referral_codes`, `contractor_invites`, `contractor_team_invites`, Home Access invite tables, service requests, connection requests, and contractor-team access.
 - No public landing page, email/SMS/push delivery, rewards, credits, subscriptions, billing, paywalls, automatic contractor profile creation, account creation, contractor-to-contractor permissions, contractor team access, homeowner connection, service request, job, estimate, invoice, notification, or workflow automation is included.
 - Outreach/email, rewards/credits, public referral links, signup attribution, matching, account/profile creation, and permission/team-access behavior require separate approval.
