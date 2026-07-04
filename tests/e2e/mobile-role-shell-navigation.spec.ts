@@ -74,12 +74,22 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(appSource).not.toContain("homeownerTab === 'projects'");
   });
 
-  test('mobile Jobs nav suppresses inconsistent badge while preserving shared workflow counts elsewhere', () => {
+  test('contractor drawer/sidebar suppresses raw Calendar and Jobs badges while preserving content counts', () => {
     const appSource = readRepoFile('src/App.tsx');
     const contractorNavSource = sourceBetween(
       appSource,
       'const contractorMobileNavItems: MobileNavItem[] = [',
       '  return (\n    <SidebarLayout\n      brand={{ name: contractorDraft.business_name',
+    );
+    const contractorShellSource = sourceBetween(
+      appSource,
+      'const contractorMobileNavItems: MobileNavItem[] = [',
+      '      mobileNavItems={contractorMobileNavItems}',
+    );
+    const contractorTabsSource = sourceBetween(
+      contractorShellSource,
+      "tabs={[\n        { id: 'overview',     label: 'Dashboard'",
+      '      ]}\n      activeTab={contractorTab}',
     );
     const homeownerNavSource = sourceBetween(
       appSource,
@@ -87,12 +97,19 @@ test.describe('mobile role shell navigation source guardrails', () => {
       '  return (\n    <SidebarLayout\n      brand={{ name: \'ServSync\'',
     );
     const contractorJobsMobileNavSource = sourceBetween(contractorNavSource, "id: 'jobs'", "id: 'dashboard'");
+    const contractorCalendarTabSource = sourceBetween(contractorTabsSource, "id: 'calendar'", "id: 'invites'");
+    const contractorJobsTabSource = sourceBetween(contractorTabsSource, "id: 'inspections'", "id: 'trust'");
 
-    expect(appSource).toContain('const contractorJobsAttentionCount = openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length;');
     expect(appSource).toContain('const contractorHomeownersBadgeCount = connectionRequests.length;');
     expect(appSource).toContain('const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;');
-    expect(appSource).toContain("badge: contractorJobsAttentionCount");
-    expect(appSource).toContain("{ id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, badge: contractorJobsAttentionCount");
+    expect(appSource).not.toContain('const contractorJobsAttentionCount =');
+    expect(appSource).not.toContain('const contractorCalendarBadgeCount =');
+    expect(appSource).not.toContain('badge: contractorJobsAttentionCount');
+    expect(appSource).not.toContain('badge: contractorCalendarBadgeCount');
+    expect(contractorCalendarTabSource).toContain("label: 'Calendar'");
+    expect(contractorCalendarTabSource).not.toContain('badge:');
+    expect(contractorJobsTabSource).toContain("label: 'Jobs'");
+    expect(contractorJobsTabSource).not.toContain('badge:');
     expect(contractorJobsMobileNavSource).not.toContain('badge:');
     expect(contractorNavSource).not.toContain('badge: contractorJobsAttentionCount');
     expect(contractorNavSource).toContain('badge: contractorHomeownersBadgeCount');

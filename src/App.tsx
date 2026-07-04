@@ -22690,10 +22690,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     .sort((a, b) => new Date(a.appointment?.proposed_at ?? 0).getTime() - new Date(b.appointment?.proposed_at ?? 0).getTime());
   const contractorVisitViewedKey = (event: Pick<ContractorVisitEvent, 'id'>) => `visit:${event.id}`;
   const activeVisitEvents = contractorVisitEvents.filter(event => event.status === 'scheduled');
-  const unviewedActiveVisitEventCount = activeVisitEvents.filter(
-    event => !viewedContractorVisitKeys.has(contractorVisitViewedKey(event)),
-  ).length;
-  const contractorCalendarBadgeCount = homeownerAppointmentRequests.length + unviewedActiveVisitEventCount;
   const markContractorVisitViewed = (event: ContractorVisitEvent) => {
     const viewedKey = contractorVisitViewedKey(event);
     setViewedContractorVisitKeys(previousKeys => {
@@ -23733,7 +23729,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     + completedJobsReadyToInvoice.length
     + invoiceAttentionRecords.length
     + (contractorProfileOnboardingComplete ? 0 : 1);
-  const contractorJobsAttentionCount = openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length;
   const contractorHomeownersBadgeCount = connectionRequests.length;
   const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;
   const contractorSupportBadgeCount = supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
@@ -25980,10 +25975,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         { id: 'profile',      label: 'Business Profile',   icon: <Building2 size={17} />, group: 'Workspace' },
         { id: 'connections',  label: 'Homeowners',         icon: <Users size={17} />, badge: contractorHomeownersBadgeCount, group: 'Homeowner Work' },
         { id: 'requests',     label: 'Service Requests',   icon: <MessageSquare size={17} />, badge: contractorServiceRequestsBadgeCount, group: 'Homeowner Work' },
-        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, badge: contractorCalendarBadgeCount, group: 'Homeowner Work' },
+        { id: 'calendar',     label: 'Calendar',           icon: <Calendar size={17} />, group: 'Homeowner Work' },
         { id: 'invites',      label: 'Invites & Referrals', icon: <Link2 size={17} />, group: 'Growth' },
         { id: 'discover',     label: 'Discover',           icon: <Compass size={17} />, group: 'Growth' },
-        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, badge: contractorJobsAttentionCount, group: 'Add-ons' },
+        { id: 'inspections',  label: 'Jobs',               icon: <ClipboardCheck size={17} />, group: 'Add-ons' },
         { id: 'trust',        label: 'Trust & Safety',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'privacy',      label: 'Privacy & Data',     icon: <ShieldCheck size={17} />, group: 'Help' },
         { id: 'support',      label: 'Support',            icon: <MessageSquare size={17} />, badge: contractorSupportBadgeCount, group: 'Help' },

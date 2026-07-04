@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-04
 
+- Branch: `codex/mobile-drawer-badge-cleanup-v1`
+- Starting main SHA: `a1d34c6a5f466e8dfc4c7016ad303297efd19520`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Mobile UI Foundation Slice 1K to remove inconsistent contractor drawer/sidebar nav badges for Jobs and Calendar while preserving destination-screen counts and data.
+- Reason for change: Real-device QA after Slice 1J found raw-count badges in the mobile drawer/sidebar that did not clearly represent urgent/action-required work and duplicated counts better shown inside destination screens.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-line credential-shaped secret scan
+  - changed-file scope guard
+  - source/static forbidden-scope scan for SQL/RLS/RPC/auth/entitlement/backend/native/service-worker/package/config/env/deploy drift
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium`
+  - local runtime probe for contractor mobile drawer/sidebar Calendar and Jobs badge cleanup
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, Capacitor/native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice removes only contractor drawer/sidebar nav badges for Jobs and Calendar. Counts/data inside destination screens, Jobs overview tile counts, Calendar data, mobile bottom nav labels, Jobs re-tap return behavior, homeowner layouts, desktop layout, labels, click behavior, search/filter behavior, and action-oriented badges remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-011 now records Slice 1K contractor drawer/sidebar badge cleanup.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing mobile polish direction without changing native-app strategy, product scope, or backend workflow behavior.
+
 - Branch: `codex/mobile-jobs-bottom-nav-return-v1`
 - Starting main SHA: `3ca285eec4749e96d8df55e80e9ee4c24300ffde`
 - Files changed:
