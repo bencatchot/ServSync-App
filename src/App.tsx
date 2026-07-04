@@ -7036,7 +7036,7 @@ function readableError(err: unknown, fallback: string) {
 }
 
 function inputClass() {
-  return 'w-full rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-sm text-[#02132D] placeholder:text-slate-400 outline-none transition focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/15';
+  return 'w-full rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-base text-[#02132D] placeholder:text-slate-400 outline-none transition focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/15 md:text-sm';
 }
 
 function buttonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary') {
@@ -14413,22 +14413,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void markNotificationsRead(unreadEstimateNotificationIds);
   }, [homeownerTab, unreadEstimateNotificationKey]);
 
-  const homeownerProjectSection: HomeownerRecordSection = acceptedEstimates.length > 0
-    ? 'accepted'
-    : openInvoiceRecords.length > 0
-      ? 'open_invoices'
-      : pendingServiceAgreementOffers.length > 0
-        ? 'agreement_offers'
-        : visibleAgreementRecords.length > 0
-          ? 'agreements'
-          : defaultHomeownerRecordSection;
   const homeownerMobileNavItems: MobileNavItem[] = [
     {
-      id: 'home',
-      label: 'Home',
-      icon: <Home size={18} />,
-      active: homeownerTab === 'overview',
-      onSelect: () => setHomeownerTab('overview'),
+      id: 'discover',
+      label: 'Discover',
+      icon: <Compass size={18} />,
+      active: homeownerTab === 'discover',
+      onSelect: () => setHomeownerTab('discover'),
     },
     {
       id: 'requests',
@@ -14439,16 +14430,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       onSelect: () => setHomeownerTab('requests'),
     },
     {
-      id: 'projects',
-      label: 'Projects',
-      icon: <ClipboardCheck size={18} />,
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard size={18} />,
       badge: dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount,
-      active: homeownerTab === 'estimates',
-      onSelect: () => {
-        setHomeownerRecordPropertyScope('selected');
-        setHomeownerRecordSection(homeownerProjectSection);
-        setHomeownerTab('estimates');
-      },
+      active: homeownerTab === 'overview',
+      onSelect: () => setHomeownerTab('overview'),
     },
     {
       id: 'contractors',
@@ -25930,43 +25917,39 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
   const contractorMobileNavItems: MobileNavItem[] = [
     {
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: <LayoutDashboard size={18} />,
-      active: contractorTab === 'overview',
-      onSelect: () => setContractorTab('overview'),
+      id: 'discover',
+      label: 'Discover',
+      icon: <Compass size={18} />,
+      active: contractorTab === 'discover',
+      onSelect: () => setContractorTab('discover'),
     },
     {
       id: 'jobs',
       label: 'Jobs',
       icon: <ClipboardCheck size={18} />,
-      badge: openJobs.length,
-      active: contractorTab === 'inspections' && (contractorJobsView === 'new_jobs' || contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs'),
+      badge: openJobs.length + invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length,
+      active: contractorTab === 'inspections',
       onSelect: () => {
         setContractorTab('inspections');
-        setContractorJobsView('open_jobs');
+        setContractorJobsView('overview');
         setInspectionView('list');
       },
     },
     {
-      id: 'money',
-      label: 'Money',
-      icon: <Receipt size={18} />,
-      badge: invoiceAttentionRecords.length + acceptedEstimatesNeedingJobs.length,
-      active: contractorTab === 'inspections' && (contractorJobsView === 'new_financial' || contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial'),
-      onSelect: () => {
-        setContractorTab('inspections');
-        setContractorJobsView('open_financial');
-        setInspectionView('list');
-      },
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard size={18} />,
+      badge: actionReviewCount,
+      active: contractorTab === 'overview',
+      onSelect: () => setContractorTab('overview'),
     },
     {
-      id: 'messages',
-      label: 'Messages',
-      icon: <MessageSquare size={18} />,
-      badge: contractorFollowUpCount || openServiceRequestCount,
-      active: contractorTab === 'requests',
-      onSelect: () => setContractorTab('requests'),
+      id: 'homeowners',
+      label: 'Homeowners',
+      icon: <Users size={18} />,
+      badge: connectionRequests.length,
+      active: contractorTab === 'connections',
+      onSelect: () => setContractorTab('connections'),
     },
     {
       id: 'more',
@@ -42293,7 +42276,7 @@ function SidebarLayout({
       )}
 
       <div className="flex min-h-screen flex-1 min-w-0 flex-col md:min-h-0 md:overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 py-3 md:hidden shrink-0">
+        <div className="flex items-center gap-3 border-b border-[#E1E3E7] bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden shrink-0">
           <button type="button" onClick={() => setMobileOpen(true)} className="text-[#223D67] hover:text-[#0078FF] transition-colors">
             <Menu size={22} />
           </button>
