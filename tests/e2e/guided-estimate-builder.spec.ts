@@ -110,4 +110,30 @@ test.describe('Guided Estimate Draft Builder Slice A', () => {
     expect(referenceSource).toContain('renderEstimateHelperPanel()');
     expect(referenceSource).toContain('renderAdvancedTradeTools(subjectName)');
   });
+
+  test('estimate flow can create a new customer without starting a job', () => {
+    const source = appSource();
+    const createHelperSource = sourceBetween(source, 'const createLocalContact = async', 'const openAddLocalHomeForm =');
+    const estimateCustomerSource = sourceBetween(source, 'const openEstimateCustomerCreate =', 'const openAddLocalHomeForm =');
+    const financialWorkspaceSource = sourceBetween(source, "{contractorJobsView === 'new_financial' && (", "{invoiceComposerOpen && selectedJobsCustomerName && (");
+
+    expect(financialWorkspaceSource).toContain('Create new customer');
+    expect(financialWorkspaceSource).toContain('Add a customer so you can build an estimate now. You can invite them to ServSync later.');
+    expect(financialWorkspaceSource).toContain('Customer name');
+    expect(financialWorkspaceSource).toContain('Phone');
+    expect(financialWorkspaceSource).toContain('Email');
+    expect(financialWorkspaceSource).toContain('Service address');
+    expect(financialWorkspaceSource).toContain('Notes');
+    expect(financialWorkspaceSource).toContain('Save customer and continue');
+    expect(financialWorkspaceSource).toContain('This creates a contractor-only customer record. It does not invite the customer or create a ServSync account.');
+    expect(estimateCustomerSource).toContain('autoStartFieldWork: false');
+    expect(estimateCustomerSource).toContain('Customer saved. Continue building the estimate.');
+    expect(estimateCustomerSource).toContain('setJobsCustomerFilterSubjectId(`local:${contact.id}`)');
+    expect(estimateCustomerSource).toContain('beginEstimateDraftForCustomer(contact.display_name || \'Customer\'');
+    expect(estimateCustomerSource).toContain('localHomeId: home?.id ?? singleLocalHomeId(contact) ?? undefined');
+    expect(estimateCustomerSource).not.toContain('beginFieldWorkForLocalContact');
+    expect(createHelperSource).toContain('servsync_create_local_contact');
+    expect(createHelperSource).toContain('options?.onCreated');
+    expect(createHelperSource).toContain('} else if (autoStart) {');
+  });
 });

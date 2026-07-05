@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/guided-estimate-builder-slice-b-customer-v1`
+- Starting main SHA: `94d75a400b05bbaad66b3171607eff3db242ba00`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Guided Estimate Draft Builder Slice B so contractors can create a new contractor-private customer/property from the Jobs estimate creation flow, then continue directly into the guided estimate builder for that new customer.
+- Reason for change: Slice A made existing connected/local customer estimate creation focused, but contractors still needed an inline way to create estimates for customers who were not connected homeowners and were not already saved as local customers.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium` attempted; blocked locally because sandbox credential env vars such as `TEST_CONTRACTOR_EMAIL` were not loaded
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - The new customer path reuses the existing `servsync_create_local_contact` RPC with job-start disabled. It does not create jobs, inspections, invoices, ServSync accounts, invites, connections, notifications, or homeowner accounts.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Guided Estimate Draft Builder Slice B and removes inline estimate customer creation from the deferred next step.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing contractor-local-customer and estimate workflow direction without changing backend workflow behavior, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/guided-estimate-builder-slice-a-v1`
 - Starting main SHA: `f0894293fe10576e51960fdec021732a79855bd9`
 - Files changed:
