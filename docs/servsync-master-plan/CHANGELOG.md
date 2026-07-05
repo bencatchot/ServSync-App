@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/guided-estimate-builder-slice-c-template-start-v1`
+- Starting main SHA: `bcfb92bc3fdf415a1117482236446e9b69ffed11`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Guided Estimate Draft Builder Slice C so Create Estimate now starts with Build from saved template, Build with guided draft builder, and Start blank choices. Contractor-owned saved templates can populate an editable draft through the existing clone helper, with copied-pricing or structure-only review copy before sending.
+- Reason for change: Saved Estimate Templates already existed but were secondary/reference tools after the guided builder. Contractors need saved templates as a first-class estimate start path without changing template persistence or save-as-template behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - Slice C does not add save-as-template pricing choices, does not expose ServSync app-owned recipe bundles in the saved-template picker, and does not insert, update, or delete saved template records.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Guided Estimate Draft Builder Slice C and keeps save-as-template behavior deferred to a later approved slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing contractor-owned template and estimate workflow direction without changing backend workflow behavior, pricing recommendations, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/pressure-washing-estimate-recipes-v1`
 - Starting main SHA: `724f25cac2d88125442f65730987cf5bc7740367`
 - Files changed:

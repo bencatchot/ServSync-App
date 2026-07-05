@@ -14,19 +14,70 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('Guided Estimate Draft Builder Slice A', () => {
-  test('new estimate creation opens the guided builder for existing customers only', () => {
+test.describe('Guided Estimate Draft Builder Slice A-C', () => {
+  test('new estimate creation opens the estimate start choice for existing customers only', () => {
     const source = appSource();
     const beginSource = sourceBetween(source, 'const beginEstimateDraftForCustomer =', 'const closeActiveInvoiceEditor =');
-    const customerWorkspaceCreateSource = sourceBetween(source, 'const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();', 'Create estimate');
 
-    expect(beginSource).toContain('setEstimateGuidedBuilderActive(true)');
+    expect(beginSource).toContain("setEstimateStartMode('choose')");
+    expect(beginSource).toContain('setEstimateGuidedBuilderActive(false)');
     expect(beginSource).toContain('setEstimateReferenceToolsExpanded(false)');
     expect(beginSource).toContain('setEstimateDraftBuilderJobType(\'replacement\')');
-    expect(customerWorkspaceCreateSource).toContain('setEstimateGuidedBuilderActive(true)');
+    expect(source).toContain("beginEstimateDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer'");
     expect(beginSource).not.toContain('servsync_create_local_contact');
     expect(beginSource).not.toContain('createLocalContact');
     expect(source).not.toContain('createLocalContactForEstimate');
+  });
+
+  test('estimate start screen offers saved template, guided builder, and blank paths', () => {
+    const source = appSource();
+    const startChoiceSource = sourceBetween(source, 'const renderEstimateStartChoice =', 'const renderSavedEstimateTemplateStartPicker =');
+    const financialWorkspaceSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+
+    expect(startChoiceSource).toContain('data-testid="estimate-start-choice"');
+    expect(startChoiceSource).toContain('Start your estimate');
+    expect(startChoiceSource).toContain('Choose how you want to begin.');
+    expect(startChoiceSource).toContain('Build from saved template');
+    expect(startChoiceSource).toContain('Use one of your reusable estimate templates.');
+    expect(startChoiceSource).toContain('Build with guided draft builder');
+    expect(startChoiceSource).toContain('Answer a few questions and let ServSync suggest a draft.');
+    expect(startChoiceSource).toContain('Start blank');
+    expect(startChoiceSource).toContain('Create the estimate manually.');
+    expect(startChoiceSource).toContain("setEstimateStartMode('template')");
+    expect(startChoiceSource).toContain("setEstimateStartMode('guided')");
+    expect(startChoiceSource).toContain('setEstimateGuidedBuilderActive(true)');
+    expect(startChoiceSource).toContain("setEstimateStartMode('draft')");
+    expect(financialWorkspaceSource).toContain('renderEstimateStartChoice()');
+    expect(source).toContain('{renderEstimateStartChoice()}');
+  });
+
+  test('saved template start picker uses contractor-owned templates without mutating template records', () => {
+    const source = appSource();
+    const pickerSource = sourceBetween(source, 'const renderSavedEstimateTemplateStartPicker =', 'const renderBuildEstimateDraftPanel =');
+    const applySource = sourceBetween(source, 'const applySavedEstimateTemplateStart =', 'const closeActiveInvoiceEditor =');
+
+    expect(pickerSource).toContain('data-testid="estimate-saved-template-picker"');
+    expect(pickerSource).toContain('Choose a template');
+    expect(pickerSource).toContain('Use template');
+    expect(pickerSource).toContain('No saved templates yet');
+    expect(pickerSource).toContain('Create a template from a finished estimate so you can reuse it later.');
+    expect(pickerSource).toContain('estimateTemplates.map(template =>');
+    expect(pickerSource).not.toContain('STARTER_ESTIMATE_TEMPLATES');
+    expect(pickerSource).not.toContain('estimateDraftFromStarterTemplate');
+    expect(applySource).toContain('estimateDraftFromTemplate(template, subjectName || \'Customer\')');
+    expect(applySource).toContain('setEstimateTemplateStartNotice(estimateTemplateStartNoticeForTemplate(template))');
+    expect(applySource).not.toMatch(/\\.from\\('estimate_templates'\\)\\.(insert|update|delete)/);
+  });
+
+  test('saved template start path warns about copied pricing or structure-only templates', () => {
+    const source = appSource();
+    const noticeSource = sourceBetween(source, 'function estimateTemplateHasCopiedPricing', 'function estimateDraftFromStarterTemplate');
+    const financialWorkspaceSource = sourceBetween(source, "{estimateComposerOpen && selectedJobsCustomerName && (", "{invoiceComposerOpen && selectedJobsCustomerName && (");
+
+    expect(noticeSource).toContain('unit_price_cents !== null && line.unit_price_cents !== undefined');
+    expect(noticeSource).toContain('Pricing copied from saved template. Review all prices before sending. New/current pricing has not been entered for this estimate yet.');
+    expect(noticeSource).toContain('Prices were not saved with this template. Add pricing before sending.');
+    expect(financialWorkspaceSource).toContain('data-testid="estimate-template-pricing-notice"');
   });
 
   test('guided builder includes required copy, profile-trade priority, work type, and labor style controls', () => {
@@ -89,9 +140,11 @@ test.describe('Guided Estimate Draft Builder Slice A', () => {
     expect(applySource).toContain('? buildEstimateDraftFromLibraryBundle({');
     expect(applySource).toContain(': buildRuleBasedEstimateDraft({');
     expect(applySource).toContain('setEstimateGuidedBuilderActive(false)');
+    expect(applySource).toContain('setEstimateStartMode(\'draft\')');
     expect(panelSource).toContain("onClick={() => applyEstimateDraftBuilder(subjectName, { libraryBundle: match.bundle })}");
     expect(panelSource).toContain("onClick={() => applyEstimateDraftBuilder(subjectName, { forceGeneral: true })}");
     expect(panelSource).toContain('Start blank estimate');
+    expect(panelSource).toContain('setEstimateStartMode(\'draft\')');
     expect(panelSource).toContain('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
   });
 
