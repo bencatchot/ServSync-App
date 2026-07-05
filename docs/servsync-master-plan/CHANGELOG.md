@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/home-setup-guide-shell-v1`
+- Starting main SHA: `4130d1e7bc501bff96af25b1772eac67101794a2`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-setup-clarity.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a lightweight homeowner Home Setup guide shell in the Properties/Home area using only existing property profile, home photo, document, reminder, and notes surfaces. The guide clearly states that Home Setup Templates, Rooms & Systems, Key Home Locations, and Home Map are future tools, and that Home Map should start as a simple not-to-scale room/system map rather than a measured floor plan.
+- Reason for change: Follow-up audit found ServSync has basic property/profile, document/photo, reminder, shared-home shell, local property, and inspection/checklist surfaces, but does not yet have durable structured models for home-level rooms, systems/assets, key locations, room map layout, true Home Setup Templates, or full Home Map.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-setup-clarity.spec.ts tests/e2e/template-taxonomy.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, deployment, production data mutation, shared-home permission, address-visibility, contractor visibility, estimate/job/invoice, service agreement, room/system/key-location persistence, map/layout metadata, storage bucket, floor-plan, CAD, LiDAR, scanning, measured-layout, or 3D model behavior changes are included.
+  - True Home Setup Templates, structured Rooms & Systems, Key Home Locations, and Home Map remain future design/data-model work. Home-specific Inspection Checklists remain separate inspection/report layouts.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the Home Setup guide shell and preserves true Home Setup Templates/Home Map as future structured-data work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice adds conservative guidance around existing homeowner property/document/reminder surfaces and does not change product strategy, roadmap direction, data models, backend behavior, permissions, or core workflows.
+
 - Branch: `codex/clarify-manual-job-template-limits-v1`
 - Starting main SHA: `cd99aeb44fc7a3f43341e4229344a1cb7820808c`
 - Files changed:

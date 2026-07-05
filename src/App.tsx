@@ -12302,6 +12302,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const completedHomeFields = homeProfileFields.filter(Boolean).length;
   const homeProfileScore = Math.round((completedHomeFields / homeProfileFields.length) * 100);
+  const homeSetupGuideItems = [
+    {
+      label: 'Complete property details',
+      helper: 'Fill in the core property profile fields ServSync already supports.',
+      complete: homeProfileScore === 100,
+    },
+    {
+      label: 'Add a home photo',
+      helper: 'Use the existing home photo slot for quick visual context.',
+      complete: Boolean(homeDraft.home_photo_path),
+    },
+    {
+      label: 'Upload important documents',
+      helper: 'Store warranties, manuals, permits, receipts, or other home files in Documents.',
+      complete: selectedHomeManualDocuments.length > 0,
+    },
+    {
+      label: 'Create maintenance reminders',
+      helper: 'Use manual Home Reminders for follow-up tasks tied to this property.',
+      complete: propertyScopedHomeReminders.filter(reminder => reminder.status === 'open').length > 0,
+    },
+    {
+      label: 'Add useful notes',
+      helper: 'Keep practical property notes in the existing home notes field.',
+      complete: Boolean(homeDraft.notes.trim()),
+    },
+  ];
   const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
   const showHomeownerWalkthrough = !loading && !showInitialHomeSetupPrompt && !homeownerWalkthroughSkipped;
   const homeownerOnboardingItems: Array<{
@@ -15123,6 +15150,47 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
               Property-specific filtering will expand as requests, documents, estimates, invoices, jobs, reports, and Home History records are linked to individual homes.
             </p>
+          </Card>
+          <Card title="Home Setup" icon={<ClipboardCheck size={18} />}>
+            <div className="space-y-4" data-testid="home-setup-guide">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">
+                  Start with the basics: property details, photos, documents, reminders, and notes.
+                </p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                  Home Setup Templates, Rooms &amp; Systems, Key Home Locations, and Home Map are future tools.
+                </p>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                {homeSetupGuideItems.map(item => (
+                  <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="flex items-start gap-2">
+                      <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {item.complete ? <CheckCircle2 size={14} /> : <span className="h-2 w-2 rounded-full bg-current" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-950">{item.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.helper}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                  <p className="text-sm font-bold text-blue-950">Future Home Map</p>
+                  <p className="mt-1 text-xs leading-5 text-blue-800">
+                    Home Map will start as a simple not-to-scale room and system map, not a measured floor plan.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
+                  <p className="text-sm font-bold text-amber-950">Inspection checklist boundary</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-800">
+                    Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.
+                  </p>
+                </div>
+              </div>
+            </div>
           </Card>
           {renderSharedHomeShellsPanel()}
           {renderHomeAccessPanel()}
