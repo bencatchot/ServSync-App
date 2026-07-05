@@ -18746,6 +18746,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [jobsListTypeFilter, setJobsListTypeFilter] = useState('all');
   const [selectedHomeownerRequestId, setSelectedHomeownerRequestId] = useState<string | null>(null);
   const [estimateComposerOpen, setEstimateComposerOpen] = useState(false);
+  const [estimateCustomerCreateOpen, setEstimateCustomerCreateOpen] = useState(false);
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
   const [focusedEstimateRecordId, setFocusedEstimateRecordId] = useState<string | null>(null);
   const [estimateDraft, setEstimateDraft] = useState<EstimateDraft>(() => createBlankEstimateDraft());
@@ -18944,6 +18945,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [homeownerMobileDetailOpen, setHomeownerMobileDetailOpen] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const [localContactDraft, setLocalContactDraft] = useState({
+    display_name: '',
+    phone: '',
+    email: '',
+    notes: '',
+    home_nickname: 'Home',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    home_type: '',
+    year_built: '',
+    square_feet: '',
+    home_notes: '',
+  });
+  const resetLocalContactDraft = () => setLocalContactDraft({
     display_name: '',
     phone: '',
     email: '',
@@ -25925,7 +25942,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const createLocalContact = async (options?: { autoStartFieldWork?: boolean }) => {
+  const createLocalContact = async (options?: {
+    autoStartFieldWork?: boolean;
+    onCreated?: (created: { contact: ContractorLocalContact; home?: ContractorLocalHome | null }) => void;
+    successNotice?: string;
+  }) => {
     if (!supabase) return;
     if (!localContactDraft.display_name.trim()) {
       setError('Enter a customer name before saving a new customer.');
@@ -25961,7 +25982,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           homes: created.home ? [created.home] : [],
         };
         setLocalContacts(prev => [contactWithHome, ...prev]);
-        if (autoStart) {
+        if (options?.onCreated) {
+          options.onCreated({ contact: contactWithHome, home: created.home ?? null });
+        } else if (autoStart) {
           beginFieldWorkForLocalContact(contactWithHome);
         } else {
           setSelectedHomeownerSubjectId(`local:${contactWithHome.id}`);
@@ -25970,30 +25993,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         }
       }
 
-      setLocalContactDraft({
-        display_name: '',
-        phone: '',
-        email: '',
-        notes: '',
-        home_nickname: 'Home',
-        address_line1: '',
-        address_line2: '',
-        city: '',
-        state: '',
-        zip_code: '',
-        home_type: '',
-        year_built: '',
-        square_feet: '',
-        home_notes: '',
-      });
+      resetLocalContactDraft();
       setShowLocalContactForm(false);
-      setNotice(autoStart ? 'New customer saved. You can start a job now.' : 'New customer saved.');
+      setNotice(options?.successNotice ?? (autoStart ? 'New customer saved. You can start a job now.' : 'New customer saved.'));
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to save new customer.'));
     } finally {
       setSavingInspection(false);
     }
+  };
+
+  const openEstimateCustomerCreate = () => {
+    resetLocalContactDraft();
+    setError('');
+    setNotice('');
+    setEstimateCustomerCreateOpen(true);
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setShowLocalContactForm(false);
+  };
+
+  const saveEstimateCustomerAndContinue = async () => {
+    if (!localContactDraft.display_name.trim()) {
+      setError('Enter a customer name before saving a new customer.');
+      return;
+    }
+    if (!localContactDraft.address_line1.trim()) {
+      setError('Enter a service address before saving this customer for an estimate.');
+      return;
+    }
+    await createLocalContact({
+      autoStartFieldWork: false,
+      successNotice: 'Customer saved. Continue building the estimate.',
+      onCreated: ({ contact, home }) => {
+        setEstimateCustomerCreateOpen(false);
+        setJobsCustomerFilterSubjectId(`local:${contact.id}`);
+        beginEstimateDraftForCustomer(contact.display_name || 'Customer', {
+          localHomeId: home?.id ?? singleLocalHomeId(contact) ?? undefined,
+        });
+      },
+    });
   };
 
   const openAddLocalHomeForm = (contact: ContractorLocalContact) => {
@@ -32240,7 +32282,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Back to Jobs Overview
                           </button>
                         </div>
-                        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+                        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
                               className={inputClass()}
@@ -32256,6 +32298,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               ))}
                             </select>
                           </Field>
+                          <button
+                            type="button"
+                            onClick={openEstimateCustomerCreate}
+                            className={buttonClass('secondary')}
+                          >
+                            <Plus size={15} />
+                            Create new customer
+                          </button>
                           <button
                             type="button"
                             disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
@@ -32283,6 +32333,93 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         )}
                         {readOnlyContractorActionReason && (
                           <Notice tone="info" text={readOnlyContractorActionReason} />
+                        )}
+
+                        {estimateCustomerCreateOpen && (
+                          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Create new customer</p>
+                                <h3 className="mt-1 text-lg font-bold text-blue-950">Add a customer for this estimate</h3>
+                                <p className="mt-1 text-sm leading-6 text-blue-900">
+                                  Add a customer so you can build an estimate now. You can invite them to ServSync later.
+                                </p>
+                                <p className="mt-2 rounded-xl border border-blue-200 bg-white/80 px-3 py-2 text-xs font-semibold leading-5 text-blue-900">
+                                  This creates a contractor-only customer record. It does not invite the customer or create a ServSync account.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEstimateCustomerCreateOpen(false)}
+                                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-3">
+                              <Field label="Customer name">
+                                <input
+                                  className={inputClass()}
+                                  value={localContactDraft.display_name}
+                                  onChange={event => setLocalContactDraft(d => ({ ...d, display_name: event.target.value }))}
+                                  placeholder="e.g. Becky Thomas"
+                                />
+                              </Field>
+                              <Field label="Phone">
+                                <input
+                                  className={inputClass()}
+                                  type="tel"
+                                  autoComplete="tel"
+                                  spellCheck={false}
+                                  value={localContactDraft.phone}
+                                  onChange={event => setLocalContactDraft(d => ({ ...d, phone: formatPhoneInputValue(event.target.value) }))}
+                                  placeholder="(555) 555-5555"
+                                />
+                              </Field>
+                              <Field label="Email">
+                                <input
+                                  className={inputClass()}
+                                  type="email"
+                                  autoComplete="email"
+                                  spellCheck={false}
+                                  value={localContactDraft.email}
+                                  onChange={event => setLocalContactDraft(d => ({ ...d, email: event.target.value }))}
+                                  placeholder="customer@example.com"
+                                />
+                              </Field>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                              <Field label="Service address">
+                                <input
+                                  className={inputClass()}
+                                  value={localContactDraft.address_line1}
+                                  onChange={event => setLocalContactDraft(d => ({ ...d, address_line1: event.target.value }))}
+                                  placeholder="Street address"
+                                />
+                              </Field>
+                              <Field label="Notes">
+                                <input
+                                  className={inputClass()}
+                                  value={localContactDraft.notes}
+                                  onChange={event => setLocalContactDraft(d => ({ ...d, notes: event.target.value }))}
+                                  placeholder="Optional customer notes"
+                                />
+                              </Field>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void saveEstimateCustomerAndContinue()}
+                                disabled={savingInspection}
+                                className={buttonClass('primary')}
+                              >
+                                {savingInspection ? 'Saving...' : 'Save customer and continue'}
+                              </button>
+                              <button type="button" onClick={() => setEstimateCustomerCreateOpen(false)} className={buttonClass('secondary')}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </>
                     )}
