@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/clarify-manual-job-template-limits-v1`
+- Starting main SHA: `cd99aeb44fc7a3f43341e4229344a1cb7820808c`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/template-taxonomy.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Clarified selected-customer/context Saved Work Template manual job starts so contractors see that Start Manual Job copies template name/scope only, template line items and pricing are intentionally not copied into jobs, and job work items can be added after the job is created.
+- Reason for change: Follow-up audit found line-item-to-job-work-item mapping should remain future design work because job work items affect completion, billability, partial invoicing, invoice reservations, whole-job invoice behavior, and billing lifecycle.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs-only copy and guardrail coverage. No SQL/RLS/RPC, backend, Supabase functions, env/config/package, auth, billing/entitlement, native/mobile, service worker/offline, deployment, production data, estimate approval, job lifecycle, invoice reservation, whole-job invoice, homeowner visibility, or pricing behavior changes are included.
+  - Full line-item-to-job-work-item mapping remains future design work and should not copy prices into jobs without separate lifecycle/backend approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the manual-job template-limits clarity slice and keeps full line-item-to-job-work-item mapping deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice clarifies existing Saved Work Template job-start limits without changing product strategy, backend workflow behavior, job lifecycle, or billing/invoicing behavior.
+
 - Branch: `codex/start-manual-jobs-from-saved-work-templates-v1`
 - Starting main SHA: `7c6b2f6767f2a3076cc53662f7feb17aea554e29`
 - Files changed:
