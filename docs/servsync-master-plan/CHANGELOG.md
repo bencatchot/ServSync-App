@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/start-manual-jobs-from-saved-work-templates-v1`
+- Starting main SHA: `7c6b2f6767f2a3076cc53662f7feb17aea554e29`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/template-taxonomy.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added selected-customer/context-only Start Manual Job support for Saved Work Templates. Contractors can use a selected connected homeowner or local/manual customer workspace to open the existing direct job form prefilled with the template name and scope only.
+- Reason for change: Contractors need a minimal direct-job starter from reusable Saved Work Templates without copying financial line items into job work items or blurring estimate approval, job lifecycle, and invoiceability.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - The template action does not create a job automatically. The job remains unsaved until the contractor uses the existing Create job action.
+  - Template line items, quantities, prices, labor hours, terms, model/spec, supply status, billable status, completion status, and invoice reservation fields are not copied to the job. Full line-item-to-job-work-item mapping remains future design work.
+  - Global direct-job-from-template without selected customer context remains future work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records selected-context-only manual job form starts from Saved Work Templates and keeps broader direct-job template mapping deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this frontend/test/docs slice opens the existing direct job form with title/scope prefill only and does not change product scope, data models, backend behavior, estimate approval, job lifecycle, invoice behavior, pricing, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/saved-work-template-invoice-draft-v1`
 - Starting main SHA: `b2b57dee954547729720727598fec15685380569`
 - Files changed:
