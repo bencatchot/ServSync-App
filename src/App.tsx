@@ -583,6 +583,7 @@ type EstimateLineDraft = {
 type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry' | 'Other';
 type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
 type EstimateDraftBuilderLaborMode = 'job_total' | 'line_specific';
+type EstimateStartMode = 'choose' | 'template' | 'guided' | 'draft';
 type EstimateDraftBuilderLineSeed = {
   line_type: EstimateLineType;
   description: string;
@@ -3238,6 +3239,16 @@ function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: stri
           }))
       : [createEstimateLineDraft()],
   };
+}
+
+function estimateTemplateHasCopiedPricing(template: EstimateTemplate) {
+  return (template.line_items || []).some(line => line.unit_price_cents !== null && line.unit_price_cents !== undefined);
+}
+
+function estimateTemplateStartNoticeForTemplate(template: EstimateTemplate) {
+  return estimateTemplateHasCopiedPricing(template)
+    ? 'Pricing copied from saved template. Review all prices before sending. New/current pricing has not been entered for this estimate yet.'
+    : 'Prices were not saved with this template. Add pricing before sending.';
 }
 
 function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, subjectName: string): EstimateDraft {
@@ -18806,10 +18817,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderJobType, setEstimateDraftBuilderJobType] = useState<EstimateDraftBuilderJobType>('repair');
   const [estimateDraftBuilderLaborMode, setEstimateDraftBuilderLaborMode] = useState<EstimateDraftBuilderLaborMode>('job_total');
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
+  const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
   const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false);
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
+  const [estimateTemplateStartNotice, setEstimateTemplateStartNotice] = useState('');
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
   const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
@@ -20289,9 +20302,45 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderJobType('replacement');
     setEstimateDraftBuilderLaborMode('job_total');
     setEstimateDraftBuilderLastOutput(null);
-    setEstimateGuidedBuilderActive(true);
+    setEstimateStartMode('choose');
+    setEstimateGuidedBuilderActive(false);
     setEstimateReferenceToolsExpanded(false);
     setEstimateAssistantNotice('');
+    setEstimateTemplateStartNotice('');
+    setEstimateHelperNotice('');
+    setEstimateHelperExpanded(false);
+    setSavedChargeQuickPickNotice('');
+    setEstimateComposerOpen(true);
+    setInvoiceComposerOpen(false);
+    setHomeownerWorkspaceEstimateView('draft');
+    setContractorJobsView('new_financial');
+    setContractorTab('inspections');
+  };
+
+  const applySavedEstimateTemplateStart = (
+    template: EstimateTemplate,
+    subjectName: string,
+    options: { homeId?: string | null; localHomeId?: string | null } = {},
+  ) => {
+    setEditingEstimateId(null);
+    setEstimateDraft(current => ({
+      ...estimateDraftFromTemplate(template, subjectName || 'Customer'),
+      service_request_id: current.service_request_id,
+      inspection_id: current.inspection_id,
+      home_id: options.homeId ?? current.home_id,
+      local_home_id: options.localHomeId ?? current.local_home_id,
+      labor_rate: current.labor_rate || laborRateInputFromCents(contractor?.default_labor_rate_cents),
+    }));
+    setEstimateAssistantText('');
+    setEstimateDraftBuilderTrade('Other');
+    setEstimateDraftBuilderJobType('repair');
+    setEstimateDraftBuilderLaborMode('job_total');
+    setEstimateDraftBuilderLastOutput(null);
+    setEstimateStartMode('draft');
+    setEstimateGuidedBuilderActive(false);
+    setEstimateReferenceToolsExpanded(false);
+    setEstimateAssistantNotice('');
+    setEstimateTemplateStartNotice(estimateTemplateStartNoticeForTemplate(template));
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
     setSavedChargeQuickPickNotice('');
@@ -20447,9 +20496,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderJobType('repair');
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
+      setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
       setEstimateReferenceToolsExpanded(false);
       setEstimateAssistantNotice('');
+      setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
       if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
@@ -20710,9 +20761,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderJobType('repair');
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
+      setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
       setEstimateReferenceToolsExpanded(false);
       setEstimateAssistantNotice('');
+      setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
       setSavedChargeQuickPickNotice('');
@@ -22597,6 +22650,114 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
+  const renderEstimateStartChoice = () => (
+    <div className="rounded-2xl border border-blue-200 bg-white p-4" data-testid="estimate-start-choice">
+      <div className="flex items-center gap-2">
+        <Receipt size={16} className="text-blue-700" />
+        <p className="text-sm font-bold text-slate-950">Start your estimate</p>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-slate-500">Choose how you want to begin.</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => {
+            setEstimateStartMode('template');
+            setEstimateGuidedBuilderActive(false);
+            setEstimateTemplateStartNotice('');
+            setEstimateAssistantNotice('');
+          }}
+          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
+        >
+          <span className="block text-sm font-bold text-slate-950">Build from saved template</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Use one of your reusable estimate templates.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEstimateStartMode('guided');
+            setEstimateGuidedBuilderActive(true);
+            setEstimateTemplateStartNotice('');
+            setEstimateAssistantNotice('');
+          }}
+          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
+        >
+          <span className="block text-sm font-bold text-slate-950">Build with guided draft builder</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Answer a few questions and let ServSync suggest a draft.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEstimateStartMode('draft');
+            setEstimateGuidedBuilderActive(false);
+            setEstimateTemplateStartNotice('');
+            setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
+          }}
+          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
+        >
+          <span className="block text-sm font-bold text-slate-950">Start blank</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Create the estimate manually.</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSavedEstimateTemplateStartPicker = (subjectName: string) => (
+    <div className="rounded-2xl border border-blue-200 bg-white p-4" data-testid="estimate-saved-template-picker">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Receipt size={16} className="text-blue-700" />
+            <p className="text-sm font-bold text-slate-950">Choose a template</p>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Saved Estimate Templates are contractor-owned reusable estimate structures. App-owned draft recipes stay in the guided builder.
+          </p>
+        </div>
+        <button type="button" onClick={() => setEstimateStartMode('choose')} className={buttonClass('secondary')}>
+          Back
+        </button>
+      </div>
+
+      {estimateTemplates.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+          <p className="text-sm font-bold text-slate-950">No saved templates yet</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Create a template from a finished estimate so you can reuse it later.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3">
+          {estimateTemplates.map(template => (
+            <div key={template.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">{template.name}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {template.line_items?.length ?? 0} line item{(template.line_items?.length ?? 0) === 1 ? '' : 's'}
+                    {template.trade ? ` · ${template.trade}` : ''}
+                    {' · '}Updated {formatDateTime(template.updated_at)}
+                  </p>
+                  {template.scope && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{template.scope}</p>}
+                  <p className="mt-2 text-xs font-semibold text-amber-700">
+                    {estimateTemplateStartNoticeForTemplate(template)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => applySavedEstimateTemplateStart(template, subjectName)}
+                  className={buttonClass('primary')}
+                >
+                  <ArrowRight size={15} />
+                  Use template
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderBuildEstimateDraftPanel = (subjectName: string) => {
     const profileTradeOptions = ESTIMATE_DRAFT_BUILDER_TRADES
       .filter(trade => trade !== 'Other' && tradeToolMatchesContractor(trade, contractorDraft.service_categories));
@@ -22779,7 +22940,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <button
               type="button"
               onClick={() => {
+                setEstimateStartMode('draft');
                 setEstimateGuidedBuilderActive(false);
+                setEstimateTemplateStartNotice('');
                 setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
               }}
               className={buttonClass('secondary')}
@@ -22874,9 +23037,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderJobType('repair');
     setEstimateDraftBuilderLaborMode('job_total');
     setEstimateDraftBuilderLastOutput(null);
+    setEstimateStartMode('draft');
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
     setSavedChargeQuickPickNotice('');
+    setEstimateTemplateStartNotice('');
     setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
     setEstimateComposerOpen(true);
   };
@@ -31187,27 +31352,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         type="button"
                                         onClick={() => {
                                           if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                          const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                          const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
-                                          setEditingEstimateId(null);
-                                          setEstimateDraft(createBlankEstimateDraft({
-                                            title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-                                            home_id: workspaceNewRecordHomeId,
-                                            local_home_id: workspaceNewRecordLocalHomeId,
-                                            labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
-                                          }));
-                                          setEstimateAssistantText('');
-                                          setEstimateDraftBuilderTrade(defaultBuilderTrade);
-                                          setEstimateDraftBuilderJobType('replacement');
-                                          setEstimateDraftBuilderLaborMode('job_total');
-                                          setEstimateDraftBuilderLastOutput(null);
-                                          setEstimateGuidedBuilderActive(true);
-                                          setEstimateReferenceToolsExpanded(false);
-                                          setEstimateAssistantNotice('');
-                                          setEstimateHelperNotice('');
-                                          setEstimateHelperExpanded(false);
-                                          setSavedChargeQuickPickNotice('');
-                                          setEstimateComposerOpen(true);
+                                          beginEstimateDraftForCustomer(conn?.display_name || localCustomer?.display_name || 'Customer', {
+                                            homeId: workspaceNewRecordHomeId || undefined,
+                                            localHomeId: workspaceNewRecordLocalHomeId || undefined,
+                                          });
                                         }}
                                         className={buttonClass('primary')}
                                       >
@@ -31239,48 +31387,68 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         Cancel
                                       </button>
                                     </div>
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                      <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
-                                        <input
-                                          aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
-                                          className={inputClass()}
-                                          value={estimateDraft.title}
-                                          onChange={e => setEstimateDraft(d => ({ ...d, title: e.target.value }))}
-                                        />
-                                      </Field>
-                                      {connReqs.length > 0 && (
-                                        <Field label="Attach to request (optional)">
-                                          <select className={inputClass()} value={estimateDraft.service_request_id} onChange={e => {
-                                            const request = connReqs.find(item => item.id === e.target.value);
-                                            setEstimateDraft(d => ({
-                                              ...d,
-                                              service_request_id: e.target.value,
-                                              home_id: request?.home_id || d.home_id,
-                                            }));
-                                          }}>
-                                            <option value="">No service request</option>
-                                            {connReqs.map(request => <option key={request.id} value={request.id}>{request.title}</option>)}
-                                          </select>
+                                    {(isInvoiceWorkspaceTab || (estimateStartMode !== 'choose' && estimateStartMode !== 'template')) && (
+                                      <div className="grid gap-3 md:grid-cols-2">
+                                        <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
+                                          <input
+                                            aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
+                                            className={inputClass()}
+                                            value={estimateDraft.title}
+                                            onChange={e => setEstimateDraft(d => ({ ...d, title: e.target.value }))}
+                                          />
                                         </Field>
-                                      )}
-                                      {fieldWork.length > 0 && (
-                                        <Field label="Attach to job (optional)">
-                                          <select className={inputClass()} value={estimateDraft.inspection_id} onChange={e => {
-                                            const work = fieldWork.find(item => item.id === e.target.value);
-                                            setEstimateDraft(d => ({
-                                              ...d,
-                                              inspection_id: e.target.value,
-                                              home_id: work?.home_id || d.home_id,
-                                              local_home_id: work?.local_home_id || d.local_home_id,
-                                            }));
-                                          }}>
-                                            <option value="">No job</option>
-                                            {fieldWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
-                                          </select>
-                                        </Field>
-                                      )}
-                                    </div>
-                                    {estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
+                                        {connReqs.length > 0 && (
+                                          <Field label="Attach to request (optional)">
+                                            <select className={inputClass()} value={estimateDraft.service_request_id} onChange={e => {
+                                              const request = connReqs.find(item => item.id === e.target.value);
+                                              setEstimateDraft(d => ({
+                                                ...d,
+                                                service_request_id: e.target.value,
+                                                home_id: request?.home_id || d.home_id,
+                                              }));
+                                            }}>
+                                              <option value="">No service request</option>
+                                              {connReqs.map(request => <option key={request.id} value={request.id}>{request.title}</option>)}
+                                            </select>
+                                          </Field>
+                                        )}
+                                        {fieldWork.length > 0 && (
+                                          <Field label="Attach to job (optional)">
+                                            <select className={inputClass()} value={estimateDraft.inspection_id} onChange={e => {
+                                              const work = fieldWork.find(item => item.id === e.target.value);
+                                              setEstimateDraft(d => ({
+                                                ...d,
+                                                inspection_id: e.target.value,
+                                                home_id: work?.home_id || d.home_id,
+                                                local_home_id: work?.local_home_id || d.local_home_id,
+                                              }));
+                                            }}>
+                                              <option value="">No job</option>
+                                              {fieldWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
+                                            </select>
+                                          </Field>
+                                        )}
+                                      </div>
+                                    )}
+                                    {estimateStartMode === 'choose' && !isInvoiceWorkspaceTab ? (
+                                      <>
+                                        <div className="mt-4">
+                                          {renderEstimateStartChoice()}
+                                        </div>
+                                        <div className="mt-4">
+                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        </div>
+                                      </>
+                                    ) : estimateStartMode === 'template' && !isInvoiceWorkspaceTab ? (
+                                      <>
+                                        <div className="mt-4">
+                                          {renderSavedEstimateTemplateStartPicker(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        </div>
+                                        <div className="mt-4">
+                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        </div>
+                                      </>
+                                    ) : estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
                                       <>
                                         <div className="mt-4">
                                           {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
@@ -31295,6 +31463,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div className="mt-4">
                                         {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                       </div>
+                                    )}
+                                    {estimateTemplateStartNotice && !isInvoiceWorkspaceTab && (
+                                      <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
+                                        {estimateTemplateStartNotice}
+                                      </p>
                                     )}
                                     <div className="mt-3">
                                       <Field label="Scope of work">
@@ -31450,9 +31623,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraftBuilderJobType('repair');
                                                   setEstimateDraftBuilderLaborMode('job_total');
                                                   setEstimateDraftBuilderLastOutput(null);
+                                                  setEstimateStartMode('draft');
                                                   setEstimateGuidedBuilderActive(false);
                                                   setEstimateReferenceToolsExpanded(false);
                                                   setEstimateAssistantNotice('');
+                                                  setEstimateTemplateStartNotice('');
                                                   setEstimateHelperNotice('');
                                                   setEstimateHelperExpanded(false);
                                                   setSavedChargeQuickPickNotice('');
@@ -31545,25 +31720,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     onClick={() => {
                                                       if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                                       const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                      setEditingEstimateId(null);
-                                                      setEstimateDraft({
-                                                        ...estimateDraftFromTemplate(template, subjectName),
-                                                        home_id: workspaceNewRecordHomeId,
-                                                        local_home_id: workspaceNewRecordLocalHomeId,
-                                                        labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
+                                                      applySavedEstimateTemplateStart(template, subjectName, {
+                                                        homeId: workspaceNewRecordHomeId,
+                                                        localHomeId: workspaceNewRecordLocalHomeId,
                                                       });
-                                                      setEstimateAssistantText('');
-                                                      setEstimateDraftBuilderTrade('Other');
-                                                      setEstimateDraftBuilderJobType('repair');
-                                                      setEstimateDraftBuilderLaborMode('job_total');
-                                                      setEstimateDraftBuilderLastOutput(null);
-                                                      setEstimateGuidedBuilderActive(false);
-                                                      setEstimateReferenceToolsExpanded(false);
-                                                      setEstimateAssistantNotice('');
-                                                      setEstimateHelperNotice('');
-                                                      setEstimateHelperExpanded(false);
-                                                      setSavedChargeQuickPickNotice('');
-                                                      setEstimateComposerOpen(true);
                                                     }}
                                                     className={buttonClass('primary')}
                                                   >
@@ -31693,9 +31853,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEstimateDraftBuilderJobType('repair');
                                                     setEstimateDraftBuilderLaborMode('job_total');
                                                     setEstimateDraftBuilderLastOutput(null);
+                                                    setEstimateStartMode('draft');
                                                     setEstimateGuidedBuilderActive(false);
                                                     setEstimateReferenceToolsExpanded(false);
                                                     setEstimateAssistantNotice('');
+                                                    setEstimateTemplateStartNotice('');
                                                     setEstimateHelperNotice('');
                                                     setEstimateHelperExpanded(false);
                                                     setSavedChargeQuickPickNotice('');
@@ -32443,34 +32605,54 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </button>
                         </div>
 
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
-                            <input
-                              aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
-                              className={inputClass()}
-                              value={estimateDraft.title}
-                              onChange={event => setEstimateDraft(d => ({ ...d, title: event.target.value }))}
-                            />
-                          </Field>
-                          {selectedJobsCustomerWork.length > 0 && (
-                            <Field label="Attach to job (optional)">
-                              <select className={inputClass()} value={estimateDraft.inspection_id} onChange={event => {
-                                const work = selectedJobsCustomerWork.find(item => item.id === event.target.value);
-                                setEstimateDraft(d => ({
-                                  ...d,
-                                  inspection_id: event.target.value,
-                                  home_id: work?.home_id || d.home_id,
-                                  local_home_id: work?.local_home_id || d.local_home_id,
-                                }));
-                              }}>
-                                <option value="">No job attached</option>
-                                {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
-                              </select>
+                        {estimateStartMode !== 'choose' && estimateStartMode !== 'template' && (
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <Field label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}>
+                              <input
+                                aria-label={`${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes })} title`}
+                                className={inputClass()}
+                                value={estimateDraft.title}
+                                onChange={event => setEstimateDraft(d => ({ ...d, title: event.target.value }))}
+                              />
                             </Field>
-                          )}
-                        </div>
+                            {selectedJobsCustomerWork.length > 0 && (
+                              <Field label="Attach to job (optional)">
+                                <select className={inputClass()} value={estimateDraft.inspection_id} onChange={event => {
+                                  const work = selectedJobsCustomerWork.find(item => item.id === event.target.value);
+                                  setEstimateDraft(d => ({
+                                    ...d,
+                                    inspection_id: event.target.value,
+                                    home_id: work?.home_id || d.home_id,
+                                    local_home_id: work?.local_home_id || d.local_home_id,
+                                  }));
+                                }}>
+                                  <option value="">No job attached</option>
+                                  {selectedJobsCustomerWork.map(work => <option key={work.id} value={work.id}>{work.name}</option>)}
+                                </select>
+                              </Field>
+                            )}
+                          </div>
+                        )}
 
-                        {estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
+                        {estimateStartMode === 'choose' && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
+                          <>
+                            <div className="mt-4">
+                              {renderEstimateStartChoice()}
+                            </div>
+                            <div className="mt-4">
+                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                            </div>
+                          </>
+                        ) : estimateStartMode === 'template' && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
+                          <>
+                            <div className="mt-4">
+                              {renderSavedEstimateTemplateStartPicker(selectedJobsCustomerName || 'Customer')}
+                            </div>
+                            <div className="mt-4">
+                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                            </div>
+                          </>
+                        ) : estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
                           <>
                             <div className="mt-4">
                               {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
@@ -32485,6 +32667,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="mt-4">
                             {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
                           </div>
+                        )}
+                        {estimateTemplateStartNotice && (
+                          <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
+                            {estimateTemplateStartNotice}
+                          </p>
                         )}
 
                         <div className="mt-4">
@@ -33087,9 +33274,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateDraftBuilderJobType('repair');
                                         setEstimateDraftBuilderLaborMode('job_total');
                                         setEstimateDraftBuilderLastOutput(null);
+                                        setEstimateStartMode('draft');
                                         setEstimateGuidedBuilderActive(false);
                                         setEstimateReferenceToolsExpanded(false);
                                         setEstimateAssistantNotice('');
+                                        setEstimateTemplateStartNotice('');
                                         setEstimateHelperNotice('');
                                         setEstimateHelperExpanded(false);
                                         setSavedChargeQuickPickNotice('');
