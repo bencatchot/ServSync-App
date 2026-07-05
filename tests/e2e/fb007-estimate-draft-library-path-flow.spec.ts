@@ -460,12 +460,13 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     const homeownerSource = sourceBetween(app, 'function HomeownerDashboard', 'function ContractorDashboard');
     const pdfSource = pdfDocumentsSource();
     const invoiceComposerSource = sourceBetween(app, 'function createBlankInvoiceDraft', 'function estimateDocumentLabel');
-    const advancedToolsSource = sourceBetween(app, 'const renderAdvancedTradeTools =', 'const applyTradeToolEstimateDraft');
+    const referenceToolsSource = sourceBetween(app, 'const renderEstimateReferenceTools =', 'const startEstimateAssistantSpeech');
 
     expect(homeownerSource).not.toContain('estimateDraftLibrary');
     expect(pdfSource).not.toContain('estimateDraftLibrary');
     expect(invoiceComposerSource).not.toContain('estimateDraftLibrary');
-    expect(advancedToolsSource).not.toContain('estimateDraftLibrary');
+    expect(referenceToolsSource).not.toContain('estimateDraftLibrary');
+    expect(app).not.toContain('const renderAdvancedTradeTools =');
 
     for (const prohibitedPath of [
       'supabase/functions',

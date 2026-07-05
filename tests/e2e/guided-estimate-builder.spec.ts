@@ -14,7 +14,7 @@ function sourceBetween(source: string, start: string, end: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test.describe('Guided Estimate Draft Builder Slice A-C', () => {
+test.describe('Guided Estimate Draft Builder Slice A-E', () => {
   test('new estimate creation opens the estimate start choice for existing customers only', () => {
     const source = appSource();
     const beginSource = sourceBetween(source, 'const beginEstimateDraftForCustomer =', 'const closeActiveInvoiceEditor =');
@@ -82,7 +82,7 @@ test.describe('Guided Estimate Draft Builder Slice A-C', () => {
 
   test('guided builder includes required copy, profile-trade priority, work type, and labor style controls', () => {
     const source = appSource();
-    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderAdvancedTradeTools =');
+    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderEstimateReferenceTools =');
 
     expect(panelSource).toContain('data-testid="guided-estimate-builder"');
     expect(panelSource).toContain('Build an estimate draft');
@@ -109,7 +109,7 @@ test.describe('Guided Estimate Draft Builder Slice A-C', () => {
   test('recipe match preview is deterministic, limited to three, and includes the general fallback', () => {
     const source = appSource();
     const matchSource = sourceBetween(source, 'const ESTIMATE_DRAFT_RECIPE_REFERENCES', 'function resolveEstimateDraftLibraryBundle');
-    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderAdvancedTradeTools =');
+    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderEstimateReferenceTools =');
     const hvacReplacementBundle = findEstimateDraftLibraryBundleForScope({
       trade: 'hvac',
       work_category: 'replace',
@@ -132,7 +132,7 @@ test.describe('Guided Estimate Draft Builder Slice A-C', () => {
   test('confirming a recipe or fallback generates the existing editable draft path', () => {
     const source = appSource();
     const applySource = sourceBetween(source, 'const applyEstimateDraftBuilder =', 'const renderBuildEstimateDraftPanel =');
-    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderAdvancedTradeTools =');
+    const panelSource = sourceBetween(source, 'const renderBuildEstimateDraftPanel =', 'const renderEstimateReferenceTools =');
 
     expect(applySource).toContain('options: { libraryBundle?: EstimateDraftLibraryBundle | null; forceGeneral?: boolean } = {}');
     expect(applySource).toContain('const libraryBundle = resolveEstimateDraftLibraryBundle({');
@@ -148,20 +148,50 @@ test.describe('Guided Estimate Draft Builder Slice A-C', () => {
     expect(panelSource).toContain('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
   });
 
-  test('reference tools are collapsed by default and preserve existing estimating tools', () => {
+  test('reference tools are collapsed by default and keep only the approved estimating references', () => {
     const source = appSource();
     const referenceSource = sourceBetween(source, 'const renderEstimateReferenceTools =', 'const startEstimateAssistantSpeech =');
 
     expect(source).toContain('const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false)');
     expect(referenceSource).toContain('Reference tools');
-    expect(referenceSource).toContain('Saved charges, Price Book, templates, helper suggestions, and advanced calculators are available when you need them.');
+    expect(referenceSource).toContain('Saved charges, Price Book, templates, and helper suggestions are available when you need them.');
     expect(referenceSource).toContain('aria-expanded={estimateReferenceToolsExpanded}');
     expect(referenceSource).toContain('Estimate Templates');
     expect(referenceSource).toContain('Open templates');
     expect(referenceSource).toContain('renderSavedChargeQuickPick()');
     expect(referenceSource).toContain('renderPriceBookQuickPick()');
     expect(referenceSource).toContain('renderEstimateHelperPanel()');
-    expect(referenceSource).toContain('renderAdvancedTradeTools(subjectName)');
+    expect(referenceSource).not.toContain('renderAdvancedTradeTools');
+    expect(referenceSource).not.toContain('Advanced trade tools');
+    expect(referenceSource).not.toContain('advanced calculators');
+    expect(source).not.toContain('TradeToolsPanel');
+    expect(source).not.toContain('TRADE_TOOL_DEFINITIONS');
+    expect(source).not.toContain('Show trade calculators');
+  });
+
+  test('deck dimension fallback preserves review-required price-free material guidance without standalone trade tools', () => {
+    const source = appSource();
+    const deckHelperSource = sourceBetween(source, 'function estimateBuilderDeckDimensionSeed', 'function estimateDraftBuilderSeeds');
+    const seedSource = sourceBetween(source, 'function estimateDraftBuilderSeeds', 'function estimateBuilderDefaultLineDescription');
+    const lineSource = sourceBetween(source, 'function estimateBuilderLineFromSeed', 'function customerFacingRoughScope');
+    const helperSource = sourceBetween(source, 'function buildEstimateHelperSuggestions', 'const KUDOS_OPTIONS =');
+
+    expect(deckHelperSource).toContain("roughScope.match(/(\\d+(?:\\.\\d+)?)\\s*(?:ft|feet|')?\\s*(?:x|by)\\s*(\\d+(?:\\.\\d+)?)");
+    expect(deckHelperSource).toContain('deckBoardFaceWidthInches = 5.5');
+    expect(deckHelperSource).toContain('boardGapInches = 0.125');
+    expect(deckHelperSource).toContain('wasteFactorPercent = 10');
+    expect(deckHelperSource).toContain('defaultBoardLengthFt = 16');
+    expect(deckHelperSource).toContain('Deck boards material allowance');
+    expect(deckHelperSource).toContain('unit: \'boards\'');
+    expect(lineSource).toContain("unit_price: ''");
+    expect(deckHelperSource).toContain('Contractor review required');
+    expect(deckHelperSource).toContain('Verify layout direction, board length, joist direction, picture framing, stairs, railing, local code requirements, and final waste factor before sending.');
+    expect(seedSource).toContain('estimateBuilderDeckDimensionSeed({ trade, roughScope })');
+    expect(seedSource).toContain('compactText(seed.description) !== \'deck boards\'');
+    expect(helperSource).toContain('Permit or inspection coordination');
+    expect(helperSource).toContain('Testing and verification');
+    expect(helperSource).toContain('Access difficulty allowance');
+    expect(helperSource).toContain('Hidden condition allowance');
   });
 
   test('estimate flow can create a new customer without starting a job', () => {
