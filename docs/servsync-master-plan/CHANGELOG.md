@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/saved-work-template-actions-clarity-v1`
+- Starting main SHA: `12d7db20e80d8dc49cd2eea4ef73c3dc40825b4b`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/template-taxonomy.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Clarified Saved Work Template actions so Use for Estimate is the explicit supported action, while Create Invoice Draft and Start Direct Job are surfaced only as future workflow options.
+- Reason for change: Saved Work Templates are currently estimate-backed `estimate_templates`; invoice-draft and direct-job starts need separate workflow guardrails so copied pricing, estimate approval, job lifecycle, and invoice draft semantics do not blur.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes copy/action affordances only. It does not wire Saved Work Templates to direct job creation or invoice draft creation, does not change estimate approval behavior, and does not change template persistence.
+  - Future work remains separately approved: draft-only invoice creation from Saved Work Templates and a direct job start design for mapping template line items into job work items.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the Saved Work Template action-clarity slice and keeps invoice/direct-job starts deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this frontend/test/docs clarity slice supports the existing estimate-backed template direction without changing product scope, data models, backend behavior, pricing, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/jobs-template-taxonomy-cleanup-v1`
 - Starting main SHA: `e4194e03582af3b08bc2c33187c9cf13c91f6006`
 - Files changed:

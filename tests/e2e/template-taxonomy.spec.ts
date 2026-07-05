@@ -35,7 +35,7 @@ test.describe('Jobs template taxonomy', () => {
     );
 
     expect(templatesSource).toContain('Saved Work Templates');
-    expect(templatesSource).toContain('Saved estimate starters for scope, terms, line items, and optional pricing. Direct-job and invoice template starts are future work.');
+    expect(templatesSource).toContain('Saved Work Templates are reusable estimate-backed structures today. Use them to start estimates now. Invoice draft and direct job starts are future workflow options.');
     expect(templatesSource).toContain('Inspection Checklists');
     expect(templatesSource).toContain('Your Inspection Checklists');
     expect(templatesSource).toContain('Home-specific Inspection Checklists');
@@ -44,6 +44,28 @@ test.describe('Jobs template taxonomy', () => {
     expect(templatesSource).not.toContain('Inspection templates');
     expect(templatesSource).not.toContain('Your Templates');
     expect(templatesSource).not.toContain('Home Templates');
+  });
+
+  test('Saved Work Templates expose only estimate starts while invoice and direct-job starts stay future-only', () => {
+    const source = appSource();
+    const estimateTemplateStartSource = sourceBetween(source, 'const renderSavedEstimateTemplateStartPicker =', 'const renderBuildEstimateDraftPanel =');
+    const savedWorkTemplatesSource = sourceBetween(
+      source,
+      "{templateLibraryView === 'estimate' && filteredCustomEstimateTemplates.length > 0 && (",
+      "{templateLibraryView === 'generic' && filteredStarterTemplates.length > 0 && (",
+    );
+
+    expect(estimateTemplateStartSource).toContain('Use for Estimate');
+    expect(savedWorkTemplatesSource).toContain('Use for Estimate');
+    expect(savedWorkTemplatesSource).toContain('Create Invoice Draft - Future');
+    expect(savedWorkTemplatesSource).toContain('Start Direct Job - Future');
+    expect(savedWorkTemplatesSource).toContain('Copied template pricing must be reviewed before sending any estimate.');
+    expect(savedWorkTemplatesSource).toContain('Template prices are not current, recommended, or already approved pricing.');
+    expect(savedWorkTemplatesSource).not.toContain('beginInvoiceDraftForCustomer');
+    expect(savedWorkTemplatesSource).not.toContain('saveInvoiceDraft');
+    expect(savedWorkTemplatesSource).not.toContain('startNewInspection');
+    expect(savedWorkTemplatesSource).not.toContain('beginFieldWorkForHomeowner');
+    expect(savedWorkTemplatesSource).not.toContain('beginFieldWorkForLocalContact');
   });
 
   test('home-scoped inspection checklist UI no longer uses general Home Templates labels', () => {
@@ -82,10 +104,18 @@ test.describe('Jobs template taxonomy', () => {
     const source = appSource();
     const createJobSource = sourceBetween(source, 'const startNewInspection = async () => {', 'const saveTemplate = async () => {');
     const newJobFormSource = sourceBetween(source, "{inspectionView === 'new' && (", "{inspectionView === 'detail' && activeInspection && (() => {");
+    const invoiceStartSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
+    const invoiceSaveSource = sourceBetween(source, 'const saveInvoiceDraft = async', 'const sendInvoiceToHomeowner = async');
 
     expect(createJobSource).toContain("supabase.rpc('servsync_create_field_work'");
     expect(createJobSource).not.toContain('estimate_templates');
     expect(createJobSource).not.toContain('estimateDraftFromTemplate');
+    expect(invoiceStartSource).not.toContain('estimate_templates');
+    expect(invoiceStartSource).not.toContain('estimateTemplates');
+    expect(invoiceStartSource).not.toContain('estimateDraftFromTemplate');
+    expect(invoiceSaveSource).not.toContain('estimate_templates');
+    expect(invoiceSaveSource).not.toContain('estimateTemplates');
+    expect(invoiceSaveSource).not.toContain('estimateDraftFromTemplate');
     expect(newJobFormSource).toContain('Blank Service Job');
     expect(newJobFormSource).toContain('Repair');
     expect(newJobFormSource).toContain('Install');

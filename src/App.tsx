@@ -22432,7 +22432,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   className={buttonClass('primary')}
                 >
                   <ArrowRight size={15} />
-                  Use template
+                  Use for Estimate
                 </button>
               </div>
             </div>
@@ -31342,7 +31342,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     className={buttonClass('primary')}
                                                   >
                                                     <ArrowRight size={15} />
-                                                    Use template
+                                                    Use for Estimate
                                                   </button>
                                                   <button
                                                     type="button"
@@ -34152,7 +34152,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                    <div className="flex items-center justify-between gap-3">
 	                      <div className="min-w-0">
 	                        <p className="break-words text-sm font-bold text-slate-950">Saved Work Templates</p>
-	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Saved estimate starters for scope, terms, line items, and optional pricing. Direct-job and invoice template starts are future work.</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Saved Work Templates are reusable estimate-backed structures today. Use them to start estimates now. Invoice draft and direct job starts are future workflow options.</p>
 	                      </div>
 	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{estimateTemplates.length}</span>
 	                    </div>
@@ -34460,7 +34460,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="space-y-2">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Saved Work Templates</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-500">Saved estimate starters for scope, terms, line items, and optional pricing. Direct-job and invoice template starts are future work.</p>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">Saved Work Templates are reusable estimate-backed structures today. Use them to start estimates now. Invoice draft and direct job starts are future workflow options.</p>
+                              <p className="mt-1 text-xs font-semibold leading-5 text-amber-700">Copied template pricing must be reviewed before sending any estimate. Template prices are not current, recommended, or already approved pricing.</p>
                             </div>
                             {filteredCustomEstimateTemplates.map(template => (
                               <div key={template.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -34472,7 +34473,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       {template.trade ? ` · ${template.trade}` : ''}
                                     </p>
                                   </div>
-                                  <div className="flex shrink-0 items-center gap-2">
+                                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                    <span className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                                      Use for Estimate
+                                    </span>
+                                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                                      Create Invoice Draft - Future
+                                    </span>
+                                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                                      Start Direct Job - Future
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => void renameEstimateTemplate(template)}
