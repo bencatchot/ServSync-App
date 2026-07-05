@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  findEstimateDraftLibraryBundle,
   findEstimateDraftLibraryBundleForScope,
 } from '../../src/data/estimateDraftLibrary';
 
@@ -14,6 +15,29 @@ const hvacBundleSource = () => sourceFile('src/data/estimateDraftLibrary/hvac/re
 const hvacTuneUpBundleSource = () => sourceFile('src/data/estimateDraftLibrary/hvac/service/hvac-seasonal-tune-up.ts');
 const plumbingFaucetBundleSource = () => sourceFile('src/data/estimateDraftLibrary/plumbing/replace/plumbing-faucet-replacement.ts');
 const carpentryTrimBundleSource = () => sourceFile('src/data/estimateDraftLibrary/carpentry/repair/carpentry-trim-baseboard-repair.ts');
+const pressureWashingBundlePaths = [
+  'src/data/estimateDraftLibrary/pressure_washing/service/house-exterior-soft-wash.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/driveway-concrete-cleaning.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/sidewalk-walkway-cleaning.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/patio-pool-deck-cleaning.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/deck-soft-wash.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/fence-washing.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/roof-soft-wash.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/gutter-exterior-brightening.ts',
+  'src/data/estimateDraftLibrary/pressure_washing/service/commercial-flatwork-grease-cleanup.ts',
+];
+const pressureWashingBundleSources = () => pressureWashingBundlePaths.map(path => sourceFile(path));
+const pressureWashingJobBundles = [
+  'house_exterior_soft_wash',
+  'driveway_concrete_cleaning',
+  'sidewalk_walkway_cleaning',
+  'patio_pool_deck_cleaning',
+  'deck_soft_wash',
+  'fence_washing',
+  'roof_soft_wash',
+  'gutter_exterior_brightening',
+  'commercial_flatwork_grease_cleanup',
+] as const;
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -37,13 +61,15 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(indexSource).toContain("import { hvacSeasonalTuneUpBundle } from './hvac/service/hvac-seasonal-tune-up';");
     expect(indexSource).toContain("import { plumbingFaucetReplacementBundle } from './plumbing/replace/plumbing-faucet-replacement';");
     expect(indexSource).toContain("import { carpentryTrimBaseboardRepairBundle } from './carpentry/repair/carpentry-trim-baseboard-repair';");
-    expect(indexSource).toContain('const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [\n  hvacSystemReplacementBundle,\n  hvacSeasonalTuneUpBundle,\n  plumbingFaucetReplacementBundle,\n  carpentryTrimBaseboardRepairBundle,\n] satisfies EstimateDraftLibraryBundle[];');
+    expect(indexSource).toContain("import { houseExteriorSoftWashBundle } from './pressure_washing/service/house-exterior-soft-wash';");
+    expect(indexSource).toContain("import { commercialFlatworkGreaseCleanupBundle } from './pressure_washing/service/commercial-flatwork-grease-cleanup';");
     expect(indexSource).toContain('findEstimateDraftLibraryBundleForScope');
     expect(indexSource).toContain('estimateDraftLibraryTradeFromText');
 
-    expect(typesSource).toContain("export type EstimateDraftLibraryTrade = 'hvac' | 'plumbing' | 'electrical' | 'carpentry' | 'other';");
+    expect(typesSource).toContain("export type EstimateDraftLibraryTrade = 'hvac' | 'plumbing' | 'electrical' | 'carpentry' | 'pressure_washing' | 'other';");
     expect(typesSource).toContain("export type EstimateDraftLibraryWorkCategory = 'install' | 'repair' | 'replace' | 'inspect' | 'service';");
     expect(typesSource).toContain("export type EstimateDraftLibrarySuggestionBehavior =");
+    expect(typesSource).toContain('local_code_sensitive?: boolean;');
 
     expect(bundleSource).toContain("trade: 'hvac'");
     expect(bundleSource).toContain("work_category: 'replace'");
@@ -77,6 +103,15 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(bundleListSource).toContain('hvacSeasonalTuneUpBundle');
     expect(bundleListSource).toContain('plumbingFaucetReplacementBundle');
     expect(bundleListSource).toContain('carpentryTrimBaseboardRepairBundle');
+    expect(bundleListSource).toContain('houseExteriorSoftWashBundle');
+    expect(bundleListSource).toContain('drivewayConcreteCleaningBundle');
+    expect(bundleListSource).toContain('sidewalkWalkwayCleaningBundle');
+    expect(bundleListSource).toContain('patioPoolDeckCleaningBundle');
+    expect(bundleListSource).toContain('deckSoftWashBundle');
+    expect(bundleListSource).toContain('fenceWashingBundle');
+    expect(bundleListSource).toContain('roofSoftWashBundle');
+    expect(bundleListSource).toContain('gutterExteriorBrighteningBundle');
+    expect(bundleListSource).toContain('commercialFlatworkGreaseCleanupBundle');
     expect(bundleListSource).not.toContain('toilet');
     expect(bundleListSource).not.toContain('garbage');
     expect(bundleListSource).not.toContain('electrical');
@@ -196,6 +231,36 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
       work_category: 'service',
       rough_scope: 'Refrigerant leak repair and ductwork replacement',
     });
+    const matchingHouseSoftWashBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'pressure_washing',
+      work_category: 'service',
+      rough_scope: 'Soft wash house exterior siding and soffits',
+    });
+    const matchingDrivewayBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'pressure_washing',
+      work_category: 'service',
+      rough_scope: 'Pressure wash driveway concrete and review oil stains',
+    });
+    const matchingRoofBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'pressure_washing',
+      work_category: 'service',
+      rough_scope: 'Roof soft wash for black streaks and algae',
+    });
+    const matchingCommercialBundle = findEstimateDraftLibraryBundleForScope({
+      trade: 'pressure_washing',
+      work_category: 'service',
+      rough_scope: 'Commercial flatwork grease cleanup around restaurant dumpster pad',
+    });
+    const nonMatchingPressureWashingRepair = findEstimateDraftLibraryBundleForScope({
+      trade: 'pressure_washing',
+      work_category: 'repair',
+      rough_scope: 'Repair pressure washer pump',
+    });
+    const nonMatchingPressureWashingTrade = findEstimateDraftLibraryBundleForScope({
+      trade: 'plumbing',
+      work_category: 'service',
+      rough_scope: 'Roof soft wash for black streaks',
+    });
 
     expect(matchingReplacementBundle?.job_bundle).toBe('hvac_system_replacement');
     expect(matchingReplacementBundle?.trade).toBe('hvac');
@@ -226,6 +291,14 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(nonMatchingTrade).toBeNull();
     expect(nonMatchingReplacementScope).toBeNull();
     expect(nonMatchingServiceScope).toBeNull();
+    expect(matchingHouseSoftWashBundle?.job_bundle).toBe('house_exterior_soft_wash');
+    expect(matchingHouseSoftWashBundle?.trade).toBe('pressure_washing');
+    expect(matchingHouseSoftWashBundle?.work_category).toBe('service');
+    expect(matchingDrivewayBundle?.job_bundle).toBe('driveway_concrete_cleaning');
+    expect(matchingRoofBundle?.job_bundle).toBe('roof_soft_wash');
+    expect(matchingCommercialBundle?.job_bundle).toBe('commercial_flatwork_grease_cleanup');
+    expect(nonMatchingPressureWashingRepair).toBeNull();
+    expect(nonMatchingPressureWashingTrade).toBeNull();
 
     const app = appSource();
     const builderSource = sourceBetween(app, 'const libraryBundle = resolveEstimateDraftLibraryBundle({', 'const mergeMode = chooseEstimateDraftBuilderMergeMode');
@@ -257,6 +330,12 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
     expect(carpentrySource).toContain("suggestion_behavior: 'default_candidate'");
     expect(carpentrySource).toContain("suggestion_behavior: 'optional_candidate'");
     expect(carpentrySource).toContain("suggestion_behavior: 'review_only'");
+    pressureWashingBundleSources().forEach(bundleSource => {
+      expect(bundleSource).toContain("trade: 'pressure_washing'");
+      expect(bundleSource).toContain("work_category: 'service'");
+      expect(bundleSource).toContain("suggestion_behavior: 'default_candidate'");
+      expect(bundleSource).toContain("suggestion_behavior: 'review_only'");
+    });
     expect(builderSource).toContain("return behavior === 'default_candidate' || behavior === 'optional_candidate';");
     expect(builderSource).not.toContain("behavior === 'review_only'");
     expect(seedSource).toContain('line_type: item.line_type');
@@ -270,7 +349,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
   });
 
   test('library bundle remains price-free and avoids pricing/tax/category/assembly behavior', () => {
-    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource(), carpentryTrimBundleSource()];
+    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource(), carpentryTrimBundleSource(), ...pressureWashingBundleSources()];
     const typesSource = libraryTypesSource();
 
     bundleSources.forEach(bundleSource => {
@@ -296,7 +375,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
 
   test('contractor review reminders and rationale remain editor-only', () => {
     const app = appSource();
-    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource(), carpentryTrimBundleSource()];
+    const bundleSources = [hvacBundleSource(), hvacTuneUpBundleSource(), plumbingFaucetBundleSource(), carpentryTrimBundleSource(), ...pressureWashingBundleSources()];
     const editorNoteSource = sourceBetween(app, 'function estimateDraftLibraryItemEditorNote', 'function estimateDraftLibrarySeedFromItem');
     const homeownerSource = sourceBetween(app, 'function HomeownerDashboard', 'function ContractorDashboard');
     const pdfSource = pdfDocumentsSource();
@@ -313,9 +392,67 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
       expect(publicSource).not.toContain('estimateDraftLibrary');
       expect(publicSource).not.toContain('Estimate Draft Library');
       expect(publicSource).not.toContain('contractor_review_reminders');
+      expect(publicSource).not.toContain('local_code_sensitive');
       expect(publicSource).not.toContain('Contractor review required before finalizing this estimate.');
       expect(publicSource).not.toContain('Review flags:');
     }
+  });
+
+  test('pressure washing service bundles are discoverable, unpriced, and keep sensitive metadata contractor-only', () => {
+    const pressureBundles = pressureWashingJobBundles.map(job_bundle => findEstimateDraftLibraryBundle({
+      trade: 'pressure_washing',
+      work_category: 'service',
+      job_bundle,
+    }));
+
+    expect(pressureBundles).toHaveLength(9);
+    pressureBundles.forEach(bundle => {
+      expect(bundle).not.toBeNull();
+      expect(bundle?.trade).toBe('pressure_washing');
+      expect(bundle?.work_category).toBe('service');
+      expect(bundle?.sections.length).toBeGreaterThan(0);
+      expect(bundle?.excluded_items).toContain('pricing');
+      expect(bundle?.sections.flatMap(section => section.items).some(item => item.suggestion_behavior === 'default_candidate')).toBe(true);
+    });
+
+    const allPressureItems = pressureBundles.flatMap(bundle => bundle?.sections.flatMap(section => section.items) ?? []);
+    const generatedPressureItems = allPressureItems.filter(item => {
+      const behavior = item.suggestion_behavior || 'default_candidate';
+      return behavior === 'default_candidate' || behavior === 'optional_candidate';
+    });
+    const sensitivePressureItems = allPressureItems.filter(item =>
+      item.local_code_sensitive
+      || /runoff|wastewater|grease|degreaser|chemical|downspout/i.test(`${item.id} ${item.title} ${item.editor_note || ''}`)
+    );
+    const customerFacingText = [
+      ...allPressureItems.map(item => item.customer_description || ''),
+      ...pressureBundles.flatMap(bundle => bundle?.customer_note_candidates.map(candidate => candidate.text) ?? []),
+      ...pressureBundles.flatMap(bundle => bundle?.terms_candidates.map(candidate => candidate.text) ?? []),
+    ].join('\n');
+    const contractorOnlyText = [
+      ...allPressureItems.map(item => item.editor_note || ''),
+      ...pressureBundles.flatMap(bundle => bundle?.contractor_review_reminders.map(reminder => reminder.detail) ?? []),
+    ].filter(Boolean);
+
+    expect(generatedPressureItems.length).toBeGreaterThan(0);
+    generatedPressureItems.forEach(item => {
+      expect(item).not.toHaveProperty('unit_price');
+      expect(item).not.toHaveProperty('default_unit_price');
+      expect(item).not.toHaveProperty('price_cents');
+      expect(item.title).toBeTruthy();
+      expect(item.unit).toBeTruthy();
+    });
+    expect(sensitivePressureItems.length).toBeGreaterThan(0);
+    sensitivePressureItems.forEach(item => {
+      expect(item.contractor_review_required).toBe(true);
+      expect(item.review_flags?.length).toBeGreaterThan(0);
+    });
+    expect(allPressureItems.filter(item => item.local_code_sensitive).every(item => item.contractor_review_required)).toBe(true);
+    expect(allPressureItems.filter(item => item.local_code_sensitive).every(item => item.review_flags?.some(flag => flag === 'code' || flag === 'regional'))).toBe(true);
+    expect(customerFacingText).not.toMatch(/contractor must verify|silently added|before adding this line|confirm chemical choice/i);
+    contractorOnlyText.forEach(note => {
+      expect(customerFacingText).not.toContain(note);
+    });
   });
 
   test('library internals stay out of homeowner, PDF, invoice quick-pick, AI, and backend surfaces', () => {
@@ -344,6 +481,7 @@ test.describe('FB-007 Estimate Draft Library path-flow foundation', () => {
       expect(hvacTuneUpBundleSource()).not.toContain(prohibitedPath);
       expect(plumbingFaucetBundleSource()).not.toContain(prohibitedPath);
       expect(carpentryTrimBundleSource()).not.toContain(prohibitedPath);
+      pressureWashingBundleSources().forEach(bundleSource => expect(bundleSource).not.toContain(prohibitedPath));
     }
   });
 });

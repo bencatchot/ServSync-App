@@ -6,6 +6,45 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/pressure-washing-estimate-recipes-v1`
+- Starting main SHA: `724f25cac2d88125442f65730987cf5bc7740367`
+- Files changed:
+  - `src/data/estimateDraftLibrary/index.ts`
+  - `src/data/estimateDraftLibrary/types.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/house-exterior-soft-wash.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/driveway-concrete-cleaning.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/sidewalk-walkway-cleaning.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/patio-pool-deck-cleaning.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/deck-soft-wash.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/fence-washing.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/roof-soft-wash.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/gutter-exterior-brightening.ts`
+  - `src/data/estimateDraftLibrary/pressure_washing/service/commercial-flatwork-grease-cleanup.ts`
+  - `tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a pressure washing / exterior cleaning service recipe family to the Estimate Draft Library, including nine price-free app-owned bundles for common residential and small-commercial cleaning scopes.
+- Reason for change: The Guided Estimate Draft Builder can now resolve pressure washing service scopes through the existing local recipe-library matcher without adding pricing recommendations, AI, recipe catalog UX, SQL, or estimate/invoice persistence changes.
+- Tests/checks run:
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Data/test/docs only except the minimal estimate draft library type/index wiring needed to make the new `pressure_washing` trade family discoverable.
+  - Runoff, chemical, grease, and local-code-sensitive candidates remain contractor-reviewed recipe metadata and are not silently auto-added to generated draft lines.
+  - No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, production data mutation, pricing defaults, or estimate/invoice persistence behavior changes are included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first pressure washing / exterior cleaning recipe-family expansion.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice expands app-owned estimate draft recipe data inside the existing estimate workflow direction without changing product scope, pricing, persistence, backend behavior, or native/mobile strategy.
+
 - Branch: `codex/guided-estimate-builder-slice-b-customer-v1`
 - Starting main SHA: `94d75a400b05bbaad66b3171607eff3db242ba00`
 - Files changed:

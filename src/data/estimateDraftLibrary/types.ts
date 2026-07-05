@@ -1,6 +1,6 @@
 import type { EstimateLineSupplyStatus, EstimateLineType } from '../../types';
 
-export type EstimateDraftLibraryTrade = 'hvac' | 'plumbing' | 'electrical' | 'carpentry' | 'other';
+export type EstimateDraftLibraryTrade = 'hvac' | 'plumbing' | 'electrical' | 'carpentry' | 'pressure_washing' | 'other';
 
 export type EstimateDraftLibraryWorkCategory = 'install' | 'repair' | 'replace' | 'inspect' | 'service';
 
@@ -27,6 +27,7 @@ export interface ScopeWordingHelper {
   label: string;
   text: string;
   contractor_review_required?: boolean;
+  local_code_sensitive?: boolean;
   review_flags?: EstimateDraftLibraryReviewFlag[];
 }
 
@@ -34,6 +35,7 @@ export interface NotesTermsCandidate {
   id: string;
   text: string;
   contractor_review_required?: boolean;
+  local_code_sensitive?: boolean;
   review_flags?: EstimateDraftLibraryReviewFlag[];
 }
 
@@ -41,6 +43,7 @@ export interface ContractorReviewReminder {
   id: string;
   label: string;
   detail: string;
+  local_code_sensitive?: boolean;
   review_flags: EstimateDraftLibraryReviewFlag[];
 }
 
@@ -56,6 +59,7 @@ export interface EstimateDraftLibraryItem {
   supply_status?: EstimateLineSupplyStatus;
   match_terms?: string[];
   contractor_review_required?: boolean;
+  local_code_sensitive?: boolean;
   review_flags?: EstimateDraftLibraryReviewFlag[];
   editor_note?: string;
 }

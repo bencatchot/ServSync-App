@@ -2,6 +2,15 @@ import { hvacSystemReplacementBundle } from './hvac/replace/hvac-system-replacem
 import { hvacSeasonalTuneUpBundle } from './hvac/service/hvac-seasonal-tune-up';
 import { plumbingFaucetReplacementBundle } from './plumbing/replace/plumbing-faucet-replacement';
 import { carpentryTrimBaseboardRepairBundle } from './carpentry/repair/carpentry-trim-baseboard-repair';
+import { commercialFlatworkGreaseCleanupBundle } from './pressure_washing/service/commercial-flatwork-grease-cleanup';
+import { deckSoftWashBundle } from './pressure_washing/service/deck-soft-wash';
+import { drivewayConcreteCleaningBundle } from './pressure_washing/service/driveway-concrete-cleaning';
+import { fenceWashingBundle } from './pressure_washing/service/fence-washing';
+import { gutterExteriorBrighteningBundle } from './pressure_washing/service/gutter-exterior-brightening';
+import { houseExteriorSoftWashBundle } from './pressure_washing/service/house-exterior-soft-wash';
+import { patioPoolDeckCleaningBundle } from './pressure_washing/service/patio-pool-deck-cleaning';
+import { roofSoftWashBundle } from './pressure_washing/service/roof-soft-wash';
+import { sidewalkWalkwayCleaningBundle } from './pressure_washing/service/sidewalk-walkway-cleaning';
 import type {
   EstimateDraftLibraryBundle,
   EstimateDraftLibraryTrade,
@@ -24,6 +33,15 @@ const ESTIMATE_DRAFT_LIBRARY_BUNDLES = [
   hvacSeasonalTuneUpBundle,
   plumbingFaucetReplacementBundle,
   carpentryTrimBaseboardRepairBundle,
+  houseExteriorSoftWashBundle,
+  drivewayConcreteCleaningBundle,
+  sidewalkWalkwayCleaningBundle,
+  patioPoolDeckCleaningBundle,
+  deckSoftWashBundle,
+  fenceWashingBundle,
+  roofSoftWashBundle,
+  gutterExteriorBrighteningBundle,
+  commercialFlatworkGreaseCleanupBundle,
 ] satisfies EstimateDraftLibraryBundle[];
 
 function normalizeLibraryKey(value: string) {
@@ -36,6 +54,7 @@ export function estimateDraftLibraryTradeFromText(value: string): EstimateDraftL
   if (normalized === 'plumbing' || normalized === 'plumber') return 'plumbing';
   if (normalized === 'electrical' || normalized === 'electrician') return 'electrical';
   if (normalized === 'carpentry' || normalized === 'carpenter') return 'carpentry';
+  if (normalized === 'pressure_washing' || normalized === 'power_washing' || normalized === 'exterior_cleaning') return 'pressure_washing';
   if (normalized === 'other' || normalized === 'general' || normalized === 'general_maintenance') return 'other';
   return null;
 }

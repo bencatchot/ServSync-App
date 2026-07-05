@@ -1,0 +1,116 @@
+import type { EstimateDraftLibraryBundle } from '../../types';
+
+export const houseExteriorSoftWashBundle = {
+  trade: 'pressure_washing',
+  work_category: 'service',
+  job_bundle: 'house_exterior_soft_wash',
+  display_name: 'House Exterior Soft Wash',
+  aliases: [
+    'house exterior soft wash',
+    'soft wash house',
+    'wash siding',
+    'exterior house cleaning',
+    'siding soft wash',
+  ],
+  scope_summary: 'Soft-wash cleaning for residential siding, trim, soffits, fascia, and exterior surfaces listed by the contractor.',
+  sections: [
+    {
+      id: 'house_exterior_cleaning',
+      title: 'House exterior cleaning',
+      description: 'Capture the base exterior wash scope without implying high-pressure cleaning on delicate surfaces.',
+      items: [
+        {
+          id: 'house_soft_wash_setup',
+          title: 'Site setup, hose routing, and exterior wash preparation',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'flat',
+          customer_description: 'Set up equipment, route hoses, review work areas, and prepare the home exterior for washing.',
+          match_terms: ['setup', 'hose routing', 'preparation'],
+          editor_note: 'Confirm water source, hose access, gates, pets, exterior outlets, and customer prep before work begins.',
+        },
+        {
+          id: 'house_soft_wash_exterior_surfaces',
+          title: 'House exterior soft wash',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'sq_ft',
+          customer_description: 'Low-pressure exterior cleaning of the listed siding and exterior wall surfaces.',
+          match_terms: ['siding', 'exterior', 'house wash', 'soft wash'],
+          editor_note: 'Use soft-wash/low-pressure language. Do not imply high-pressure cleaning on siding or trim.',
+        },
+        {
+          id: 'house_soft_wash_organic_growth_treatment',
+          title: 'Algae, mildew, and organic growth treatment',
+          line_type: 'material',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Apply appropriate cleaning treatment to areas with visible algae, mildew, or organic growth before final rinse.',
+          match_terms: ['algae', 'mildew', 'mold', 'green', 'black streaks', 'organic growth'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'regional'],
+          editor_note: 'Confirm chemical choice, dwell time, nearby landscaping, and rinse/protection needs before adding this line.',
+        },
+        {
+          id: 'house_soft_wash_plant_protection',
+          title: 'Basic plant and surface protection',
+          line_type: 'labor',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Take reasonable precautions around nearby plants, fixtures, and surfaces during the cleaning process.',
+          match_terms: ['plants', 'landscaping', 'garden', 'shrubs', 'flowers'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'regional'],
+          editor_note: 'Do not guarantee plant outcomes. Add more specific protection steps when needed.',
+        },
+        {
+          id: 'house_soft_wash_customer_prep_note',
+          title: 'Customer preparation note',
+          line_type: 'other',
+          suggestion_behavior: 'default_candidate',
+          unit: 'note',
+          customer_description: 'Customer should close windows, move fragile outdoor items, clear vehicles from work areas, and identify any known leaks or damaged exterior surfaces before service.',
+          match_terms: ['customer prep', 'preparation note'],
+          editor_note: 'Keep this as an estimate note, not a priced line unless the contractor chooses otherwise.',
+        },
+      ],
+    },
+  ],
+  scope_wording_helpers: [
+    {
+      id: 'soft_wash_scope',
+      label: 'Soft-wash scope',
+      text: 'Review the listed siding, trim, soffit, fascia, and exterior wall areas and use low-pressure exterior-cleaning methods appropriate for the visible surface condition.',
+      contractor_review_required: true,
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  customer_note_candidates: [
+    {
+      id: 'stain_limitations',
+      text: 'This estimate does not guarantee removal of oxidation, rust, paint, or permanent staining unless specialty treatment is listed separately.',
+    },
+  ],
+  terms_candidates: [
+    {
+      id: 'listed_exterior_surfaces_only',
+      text: 'Service is limited to listed exterior surfaces and accessible work areas.',
+    },
+  ],
+  contractor_review_reminders: [
+    {
+      id: 'siding_condition_review',
+      label: 'Siding and exterior condition review',
+      detail: 'Confirm siding material, loose paint, oxidation, failed caulk, damaged trim, exterior outlets, cameras, and light fixtures before finalizing scope.',
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  excluded_items: [
+    'pricing',
+    'window detailing',
+    'interior cleaning',
+    'oxidation removal unless listed separately',
+    'paint removal',
+    'repairs to siding, trim, caulk, screens, fixtures, or water intrusion issues',
+  ],
+} satisfies EstimateDraftLibraryBundle;
