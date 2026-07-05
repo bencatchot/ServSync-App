@@ -3034,6 +3034,45 @@ function estimateTemplateStartNoticeForTemplate(template: EstimateTemplate) {
     : 'Prices were not saved with this template. Add pricing before sending.';
 }
 
+function invoiceDraftFromTemplate(
+  template: EstimateTemplate,
+  subjectName: string,
+  overrides: Partial<InvoiceDraftForm> = {},
+): InvoiceDraftForm {
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return createBlankInvoiceDraft(subjectName, {
+    title: `Invoice — ${template.name} — ${subjectName || 'Customer'} — ${dateLabel}`,
+    scope: template.scope || 'Completed work performed for the customer.',
+    notes: template.notes || 'Manual invoice draft from a saved work template. Confirm the work was performed and review all prices before sending.',
+    terms: template.terms || createBlankInvoiceDraft(subjectName).terms,
+    line_items: template.line_items?.length
+      ? [...template.line_items]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map(line => createEstimateLineDraft({
+            line_type: normalizeEstimateLineType(line.line_type),
+            description: line.description,
+            line_title: line.line_title || line.description || '',
+            customer_description: line.customer_description || '',
+            model_spec: line.model_spec || '',
+            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
+            quantity: String(line.quantity),
+            unit: line.unit,
+            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
+            labor_hours: laborHoursInputFromValue(line.labor_hours),
+            editor_source_note: `Copied from saved work template: ${template.name}.`,
+          }))
+      : [createEstimateLineDraft()],
+    ...overrides,
+  });
+}
+
+function invoiceTemplateStartNoticeForTemplate(template: EstimateTemplate) {
+  const pricingNotice = estimateTemplateHasCopiedPricing(template)
+    ? 'Pricing copied from saved template. Review all prices before sending. New/current pricing has not been entered for this invoice yet.'
+    : 'Prices were not saved with this template. Add pricing before sending.';
+  return `Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice. ${pricingNotice}`;
+}
+
 function defaultEstimateTemplateName(estimate: Pick<Estimate, 'title'>) {
   return estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template';
 }
@@ -18481,6 +18520,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [estimateTemplateStartNotice, setEstimateTemplateStartNotice] = useState('');
+  const [invoiceTemplateStartNotice, setInvoiceTemplateStartNotice] = useState('');
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
   const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
@@ -19922,6 +19962,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             }))
         : undefined,
     }));
+    setInvoiceTemplateStartNotice('');
     setInvoiceComposerOpen(true);
     setEstimateComposerOpen(false);
     setEstimateGuidedBuilderActive(false);
@@ -19961,6 +20002,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateReferenceToolsExpanded(false);
     setEstimateAssistantNotice('');
     setEstimateTemplateStartNotice('');
+    setInvoiceTemplateStartNotice('');
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
     setSavedChargeQuickPickNotice('');
@@ -20000,6 +20042,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setSavedChargeQuickPickNotice('');
     setEstimateComposerOpen(true);
     setInvoiceComposerOpen(false);
+    setInvoiceTemplateStartNotice('');
+    setHomeownerWorkspaceEstimateView('draft');
+    setContractorJobsView('new_financial');
+    setContractorTab('inspections');
+  };
+
+  const applySavedEstimateTemplateInvoiceDraft = (
+    template: EstimateTemplate,
+    subjectName: string,
+    options: { homeId?: string | null; localHomeId?: string | null } = {},
+  ) => {
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
+      return;
+    }
+    setFocusedEstimateRecordId(null);
+    setEditingInvoiceId(null);
+    setInvoiceDraft(invoiceDraftFromTemplate(template, subjectName || 'Customer', {
+      home_id: options.homeId ?? defaultConnectedHomeId,
+      local_home_id: options.localHomeId ?? defaultLocalHomeId,
+      labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
+    }));
+    setInvoiceTemplateStartNotice(invoiceTemplateStartNoticeForTemplate(template));
+    setEstimateTemplateStartNotice('');
+    setInvoiceComposerOpen(true);
+    setEstimateComposerOpen(false);
+    setEstimateGuidedBuilderActive(false);
     setHomeownerWorkspaceEstimateView('draft');
     setContractorJobsView('new_financial');
     setContractorTab('inspections');
@@ -20010,6 +20079,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInvoiceComposerOpen(false);
     setEditingInvoiceId(null);
     setInvoiceDraft(createBlankInvoiceDraft());
+    setInvoiceTemplateStartNotice('');
     if (linkedJob) {
       openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
       return;
@@ -20283,6 +20353,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setInvoiceComposerOpen(false);
         setEditingInvoiceId(null);
         setInvoiceDraft(createBlankInvoiceDraft());
+        setInvoiceTemplateStartNotice('');
         setEstimateGuidedBuilderActive(false);
         const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
         if (linkedJob) {
@@ -20369,6 +20440,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const openInvoiceRecord = (invoice: Invoice) => {
     setFocusedEstimateRecordId(null);
+    setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -20392,6 +20464,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const openEstimateRecord = (estimate: Estimate) => {
     setFocusedEstimateRecordId(null);
+    setInvoiceTemplateStartNotice('');
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
     const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -31261,8 +31334,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                                       <div className="mb-3">
                                         <div>
-                                          <p className="text-sm font-bold text-slate-950">Saved estimate templates</p>
+                                          <p className="text-sm font-bold text-slate-950">Saved Work Templates</p>
                                           <p className="mt-1 text-xs text-slate-500">Start faster with a reusable scope, terms, and line-item structure.</p>
+                                          <p className="mt-1 text-xs leading-5 text-amber-700">
+                                            Create Manual Invoice Draft uses the selected customer context only. Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice.
+                                          </p>
                                         </div>
                                       </div>
                                       <div className="mb-3 flex items-center justify-between gap-2">
@@ -31343,6 +31419,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   >
                                                     <ArrowRight size={15} />
                                                     Use for Estimate
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
+                                                      applySavedEstimateTemplateInvoiceDraft(template, subjectName, {
+                                                        homeId: workspaceNewRecordHomeId,
+                                                        localHomeId: workspaceNewRecordLocalHomeId,
+                                                      });
+                                                    }}
+                                                    disabled={createInvoiceCapability.disabled}
+                                                    title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
+                                                    className={buttonClass('secondary')}
+                                                  >
+                                                    <Receipt size={15} />
+                                                    Create Manual Invoice Draft
                                                   </button>
                                                   <button
                                                     type="button"
@@ -32378,6 +32471,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Cancel
                           </button>
                         </div>
+
+                        {invoiceTemplateStartNotice && (
+                          <p className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="invoice-template-pricing-notice">
+                            {invoiceTemplateStartNotice}
+                          </p>
+                        )}
 
                         <div className="grid gap-3 md:grid-cols-3">
                           <Field label="Invoice number">

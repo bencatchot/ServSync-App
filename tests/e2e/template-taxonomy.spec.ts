@@ -68,6 +68,58 @@ test.describe('Jobs template taxonomy', () => {
     expect(savedWorkTemplatesSource).not.toContain('beginFieldWorkForLocalContact');
   });
 
+  test('selected customer context can create manual invoice drafts from saved work templates without sending or creating jobs', () => {
+    const source = appSource();
+    const selectedCustomerTemplateSource = sourceBetween(
+      source,
+      'Create Manual Invoice Draft uses the selected customer context only.',
+      '{activeDocumentRecords.length === 0 ? (',
+    );
+    const invoiceTemplateDraftSource = sourceBetween(
+      source,
+      'function invoiceDraftFromTemplate(',
+      'function invoiceTemplateStartNoticeForTemplate',
+    );
+    const applyInvoiceTemplateSource = sourceBetween(
+      source,
+      'const applySavedEstimateTemplateInvoiceDraft =',
+      'const closeActiveInvoiceEditor =',
+    );
+
+    expect(selectedCustomerTemplateSource).toContain('Create Manual Invoice Draft');
+    expect(selectedCustomerTemplateSource).toContain('Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending.');
+    expect(selectedCustomerTemplateSource).toContain('This does not create a job or estimate and does not send the invoice.');
+    expect(selectedCustomerTemplateSource).toContain('applySavedEstimateTemplateInvoiceDraft(template, subjectName');
+    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordHomeId');
+    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordLocalHomeId');
+
+    expect(invoiceTemplateDraftSource).toContain('title: `Invoice — ${template.name}');
+    expect(invoiceTemplateDraftSource).toContain('scope: template.scope');
+    expect(invoiceTemplateDraftSource).toContain('notes: template.notes');
+    expect(invoiceTemplateDraftSource).toContain('terms: template.terms');
+    expect(invoiceTemplateDraftSource).toContain('line_type: normalizeEstimateLineType(line.line_type)');
+    expect(invoiceTemplateDraftSource).toContain('line_title: line.line_title');
+    expect(invoiceTemplateDraftSource).toContain('customer_description: line.customer_description');
+    expect(invoiceTemplateDraftSource).toContain('model_spec: line.model_spec');
+    expect(invoiceTemplateDraftSource).toContain('supply_status: normalizeEstimateLineSupplyStatus(line.supply_status)');
+    expect(invoiceTemplateDraftSource).toContain('quantity: String(line.quantity)');
+    expect(invoiceTemplateDraftSource).toContain('unit: line.unit');
+    expect(invoiceTemplateDraftSource).toContain('unit_price: lineUnitPriceInputFromCents(line.unit_price_cents)');
+    expect(invoiceTemplateDraftSource).toContain('labor_hours: laborHoursInputFromValue(line.labor_hours)');
+
+    expect(applyInvoiceTemplateSource).toContain('setInvoiceDraft(invoiceDraftFromTemplate(template');
+    expect(applyInvoiceTemplateSource).toContain('setInvoiceTemplateStartNotice(invoiceTemplateStartNoticeForTemplate(template))');
+    expect(applyInvoiceTemplateSource).toContain('setInvoiceComposerOpen(true)');
+    expect(applyInvoiceTemplateSource).toContain('setEstimateComposerOpen(false)');
+    expect(applyInvoiceTemplateSource).not.toContain('saveInvoiceDraft');
+    expect(applyInvoiceTemplateSource).not.toContain('sendInvoiceToHomeowner');
+    expect(applyInvoiceTemplateSource).not.toContain('startNewInspection');
+    expect(applyInvoiceTemplateSource).not.toContain('beginFieldWorkForHomeowner');
+    expect(applyInvoiceTemplateSource).not.toContain('beginFieldWorkForLocalContact');
+    expect(applyInvoiceTemplateSource).not.toContain('createInvoiceFromEstimate');
+    expect(applyInvoiceTemplateSource).not.toContain('createInvoiceFromJob');
+  });
+
   test('home-scoped inspection checklist UI no longer uses general Home Templates labels', () => {
     const source = appSource();
     const homeScopedSource = sourceBetween(
