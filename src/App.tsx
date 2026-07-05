@@ -584,6 +584,13 @@ type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry
 type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
 type EstimateDraftBuilderLaborMode = 'job_total' | 'line_specific';
 type EstimateStartMode = 'choose' | 'template' | 'guided' | 'draft';
+type SaveEstimateTemplatePricingMode = 'structure_only' | 'structure_and_pricing';
+type SaveEstimateTemplateModalState = {
+  estimate: Estimate;
+  name: string;
+  pricingMode: SaveEstimateTemplatePricingMode;
+  error: string;
+};
 type EstimateDraftBuilderLineSeed = {
   line_type: EstimateLineType;
   description: string;
@@ -3249,6 +3256,10 @@ function estimateTemplateStartNoticeForTemplate(template: EstimateTemplate) {
   return estimateTemplateHasCopiedPricing(template)
     ? 'Pricing copied from saved template. Review all prices before sending. New/current pricing has not been entered for this estimate yet.'
     : 'Prices were not saved with this template. Add pricing before sending.';
+}
+
+function defaultEstimateTemplateName(estimate: Pick<Estimate, 'title'>) {
+  return estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template';
 }
 
 function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, subjectName: string): EstimateDraft {
@@ -18798,6 +18809,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [creatingInvoiceSourceId, setCreatingInvoiceSourceId] = useState<string | null>(null);
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
+  const [saveEstimateTemplateModal, setSaveEstimateTemplateModal] = useState<SaveEstimateTemplateModalState | null>(null);
   const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
@@ -21299,39 +21311,69 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
-  const saveEstimateAsTemplate = async (estimate: Estimate) => {
-    if (!supabase || !contractor?.id) return;
-    const templateName = window.prompt('Name this estimate template:', estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template');
-    if (!templateName?.trim()) return;
+  const openSaveEstimateTemplateModal = (estimate: Estimate) => {
     setNotice('');
     setError('');
+    setSaveEstimateTemplateModal({
+      estimate,
+      name: defaultEstimateTemplateName(estimate),
+      pricingMode: 'structure_only',
+      error: '',
+    });
+  };
+
+  const closeSaveEstimateTemplateModal = () => {
+    if (saveEstimateTemplateModal && savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id) return;
+    setSaveEstimateTemplateModal(null);
+  };
+
+  const updateSaveEstimateTemplateModal = (updates: Partial<Omit<SaveEstimateTemplateModalState, 'estimate'>>) => {
+    setSaveEstimateTemplateModal(current => current ? { ...current, ...updates } : current);
+  };
+
+  const saveEstimateAsTemplate = async () => {
+    if (!supabase || !contractor?.id || !saveEstimateTemplateModal) return;
+    const estimate = saveEstimateTemplateModal.estimate;
+    const templateName = saveEstimateTemplateModal.name.trim();
+    if (!templateName) {
+      updateSaveEstimateTemplateModal({ error: 'Template name is required.' });
+      return;
+    }
+    const sortedLineItems = [...(estimate.line_items || [])].sort((a, b) => a.sort_order - b.sort_order);
+    if (sortedLineItems.length === 0) {
+      updateSaveEstimateTemplateModal({ error: 'Add at least one line item before saving this estimate as a template.' });
+      return;
+    }
+    const includePricing = saveEstimateTemplateModal.pricingMode === 'structure_and_pricing';
+    setNotice('');
+    setError('');
+    updateSaveEstimateTemplateModal({ error: '' });
     setSavingEstimateTemplateId(estimate.id);
     try {
       const { error: templateError } = await supabase.from('estimate_templates').insert({
         contractor_id: contractor.id,
-        name: templateName.trim(),
+        name: templateName,
         trade: contractorDraft.service_categories[0] || '',
         scope: estimate.scope || '',
         notes: estimate.notes || '',
         terms: estimate.terms || '',
-        line_items: [...(estimate.line_items || [])]
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map((line, index) => ({
-            line_type: normalizeEstimateLineType(line.line_type),
-            description: line.description,
-            line_title: line.line_title || line.description || '',
-            customer_description: line.customer_description || '',
-            model_spec: line.model_spec || '',
-            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status) || null,
-            quantity: line.quantity,
-            unit: line.unit,
-            unit_price_cents: line.unit_price_cents,
-            labor_hours: line.labor_hours ?? null,
-            sort_order: index,
-          })),
+        line_items: sortedLineItems.map((line, index) => ({
+          line_type: normalizeEstimateLineType(line.line_type),
+          description: line.description,
+          line_title: line.line_title || line.description || '',
+          customer_description: line.customer_description || '',
+          model_spec: line.model_spec || '',
+          supply_status: normalizeEstimateLineSupplyStatus(line.supply_status) || null,
+          quantity: line.quantity,
+          unit: line.unit,
+          unit_price_cents: includePricing ? line.unit_price_cents : null,
+          labor_hours: line.labor_hours ?? null,
+          sort_order: index,
+        })),
       });
       if (templateError) throw templateError;
-      setNotice('Estimate template saved.');
+      setNotice('Template saved. You can use it when creating future estimates.');
+      setSaveEstimateTemplateModal(null);
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to save estimate template. Run the estimate templates SQL first.'));
@@ -31834,7 +31876,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </button>
                                             <button
                                               type="button"
-                                              onClick={() => void saveEstimateAsTemplate(estimate)}
+                                              onClick={() => openSaveEstimateTemplateModal(estimate)}
                                               disabled={savingEstimateTemplateId === estimate.id}
                                               className={buttonClass('secondary')}
                                             >
@@ -33257,7 +33299,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <Download size={15} />
                                   Download PDF
                                 </button>
-                                <button type="button" onClick={() => void saveEstimateAsTemplate(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
+                                <button type="button" onClick={() => openSaveEstimateTemplateModal(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
                                   <Receipt size={15} />
                                   {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                 </button>
@@ -37778,6 +37820,114 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 className={buttonClass('primary')}
               >
                 {savingManualWorkItem ? 'Saving...' : editingManualWorkItemId ? 'Save work item' : 'Add work item'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saveEstimateTemplateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="save-estimate-template-title"
+          data-testid="save-estimate-template-modal"
+        >
+          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Estimate template</p>
+                <h2 id="save-estimate-template-title" className="mt-1 text-xl font-bold text-slate-950">Save as template</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">Reuse this estimate structure for future work.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSaveEstimateTemplateModal}
+                disabled={savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Cancel"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <Field label="Template name">
+                <input
+                  className={inputClass()}
+                  value={saveEstimateTemplateModal.name}
+                  onChange={event => updateSaveEstimateTemplateModal({ name: event.target.value, error: '' })}
+                  disabled={savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id}
+                  autoFocus
+                />
+              </Field>
+
+              <div>
+                <p className="text-sm font-bold text-slate-950">What should this template include?</p>
+                <div className="mt-2 grid gap-2">
+                  {([
+                    {
+                      mode: 'structure_only',
+                      title: 'Save structure only',
+                      detail: 'Save scope, notes, terms, quantities, and line items without prices.',
+                    },
+                    {
+                      mode: 'structure_and_pricing',
+                      title: 'Save structure and pricing',
+                      detail: 'Save line items with the current prices so future estimates can start with the same pricing.',
+                    },
+                  ] as Array<{ mode: SaveEstimateTemplatePricingMode; title: string; detail: string }>).map(option => {
+                    const selected = saveEstimateTemplateModal.pricingMode === option.mode;
+                    return (
+                      <label
+                        key={option.mode}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
+                          selected
+                            ? 'border-blue-500 bg-blue-50 text-blue-950'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="save-estimate-template-pricing-mode"
+                          value={option.mode}
+                          checked={selected}
+                          disabled={savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id}
+                          onChange={() => updateSaveEstimateTemplateModal({ pricingMode: option.mode, error: '' })}
+                          className="mt-1 h-4 w-4 border-slate-300 accent-blue-600"
+                        />
+                        <span>
+                          <span className="block text-sm font-bold">{option.title}</span>
+                          <span className={`mt-1 block text-xs leading-5 ${selected ? 'text-blue-800' : 'text-slate-500'}`}>{option.detail}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {saveEstimateTemplateModal.error && (
+                <Notice tone="error" text={saveEstimateTemplateModal.error} />
+              )}
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeSaveEstimateTemplateModal}
+                disabled={savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id}
+                className={buttonClass('secondary')}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEstimateAsTemplate()}
+                disabled={savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id}
+                className={buttonClass('primary')}
+              >
+                {savingEstimateTemplateId === saveEstimateTemplateModal.estimate.id ? 'Saving...' : 'Save template'}
               </button>
             </div>
           </div>
