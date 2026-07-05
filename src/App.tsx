@@ -3074,7 +3074,7 @@ function invoiceTemplateStartNoticeForTemplate(template: EstimateTemplate) {
 }
 
 function manualJobTemplateStartNoticeForTemplate() {
-  return 'Starts the existing direct job form with this template’s name and scope. Use this only when the work is already approved or does not require estimate approval. This creates a job without sending an estimate for homeowner approval. Template line items and pricing are not copied to the job. Review scope and pricing before invoicing. No invoice is created or sent.';
+  return 'Start Manual Job copies this template’s name and scope only. Use this only when the work is already approved or does not require estimate approval. This creates a job without sending an estimate for homeowner approval. Template line items and pricing are not copied to the job. Add job work items after creating the job if you want to track tasks for completion or invoicing. Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing. No invoice is created or sent.';
 }
 
 function defaultEstimateTemplateName(estimate: Pick<Estimate, 'title'>) {
@@ -31388,7 +31388,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             Create Manual Invoice Draft uses the selected customer context only. Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice.
                                           </p>
                                           <p className="mt-1 text-xs leading-5 text-amber-700">
-                                            Start Manual Job uses the selected customer context only. Starts the existing direct job form with this template’s name and scope. Use this only when the work is already approved or does not require estimate approval. Template line items and pricing are not copied to the job.
+                                            Start Manual Job uses the selected customer context only. Start Manual Job copies this template’s name and scope only. Template line items and pricing are not copied to the job. Add job work items after creating the job if you want to track tasks for completion or invoicing. Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing.
                                           </p>
                                         </div>
                                       </div>

@@ -145,9 +145,10 @@ test.describe('Jobs template taxonomy', () => {
 
     expect(selectedCustomerTemplateSource).toContain('Start Manual Job');
     expect(selectedCustomerTemplateSource).toContain('Start Manual Job uses the selected customer context only.');
-    expect(selectedCustomerTemplateSource).toContain('Starts the existing direct job form with this template’s name and scope.');
-    expect(selectedCustomerTemplateSource).toContain('Use this only when the work is already approved or does not require estimate approval.');
+    expect(selectedCustomerTemplateSource).toContain('Start Manual Job copies this template’s name and scope only.');
     expect(selectedCustomerTemplateSource).toContain('Template line items and pricing are not copied to the job.');
+    expect(selectedCustomerTemplateSource).toContain('Add job work items after creating the job if you want to track tasks for completion or invoicing.');
+    expect(selectedCustomerTemplateSource).toContain('Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing.');
     expect(selectedCustomerTemplateSource).toContain('applySavedEstimateTemplateManualJobStart(template, subjectName');
     expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordHomeId');
     expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordLocalHomeId');
@@ -163,9 +164,17 @@ test.describe('Jobs template taxonomy', () => {
     expect(manualJobTemplateStartSource).toContain('beginFieldWorkForLocalContact(options.localContact');
     expect(manualJobTemplateStartSource).not.toContain('line_items');
     expect(manualJobTemplateStartSource).not.toContain('unit_price');
+    expect(manualJobTemplateStartSource).not.toContain('unit_price_cents');
+    expect(manualJobTemplateStartSource).not.toContain('quantity');
     expect(manualJobTemplateStartSource).not.toContain('labor_hours');
+    expect(manualJobTemplateStartSource).not.toContain('terms');
+    expect(manualJobTemplateStartSource).not.toContain('model_spec');
+    expect(manualJobTemplateStartSource).not.toContain('supply_status');
     expect(manualJobTemplateStartSource).not.toContain('startNewInspection');
     expect(manualJobTemplateStartSource).not.toContain('servsync_create_field_work');
+    expect(manualJobTemplateStartSource).not.toContain('servsync_create_job_work_item');
+    expect(manualJobTemplateStartSource).not.toContain('servsync_sync_simple_job_work_items');
+    expect(manualJobTemplateStartSource).not.toContain('saveManualWorkItem');
     expect(manualJobTemplateStartSource).not.toContain('saveInvoiceDraft');
     expect(manualJobTemplateStartSource).not.toContain('sendInvoiceToHomeowner');
     expect(manualJobTemplateStartSource).not.toContain('estimateDraftFromTemplate');
