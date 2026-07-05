@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/guided-estimate-builder-slice-d-save-template-modal-v1`
+- Starting main SHA: `caa1039f1bfb6d9a7cb39f6f157241bf889d4320`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/estimate-template-save-modal.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Guided Estimate Draft Builder Slice D so Save as template now opens a modal with Template name, Save structure only, and Save structure and pricing choices. Structure-only templates clear line-item prices, while structure-and-pricing templates preserve current line prices for future copied-pricing review.
+- Reason for change: The previous save-as-template flow used `window.prompt` and always preserved pricing. Contractors need an explicit, understandable choice when turning an estimate into a reusable contractor-owned template.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment/recipe-library drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-template-save-modal.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, recipe library, notifications, payments, deployment, or production data mutation is included.
+  - This slice replaces the estimate Save as template prompt only. Existing template rename/delete prompts and unrelated job/workflow template prompts remain out of scope.
+  - The modal preserves the existing `estimate_templates` insert shape and does not send estimates, create jobs/invoices/accounts/invites/connections/notifications, add AI, or add pricing recommendations.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Guided Estimate Draft Builder Slice D and the new structure-only versus structure-and-pricing save-template choice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing contractor-owned template and estimate workflow direction without changing backend workflow behavior, pricing recommendations, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/guided-estimate-builder-slice-c-template-start-v1`
 - Starting main SHA: `bcfb92bc3fdf415a1117482236446e9b69ffed11`
 - Files changed:
