@@ -24267,17 +24267,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (insp.homeowner_user_id) {
       const connection = connections.find(candidate => candidate.homeowner_user_id === insp.homeowner_user_id);
       const home = connection ? connectedHomeList(connection).find(candidate => candidate.id === insp.home_id) ?? connectedHomeList(connection)[0] ?? connection.home : null;
-      if (home?.nickname?.trim()) return `${home.nickname.trim()} Home Template`;
-      if (home?.address_line1?.trim()) return `${home.address_line1.trim()} Home Template`;
-      if (connection?.display_name?.trim()) return `${connection.display_name.trim()}'s Home Template`;
-      return 'Home Inspection Template';
+      if (home?.nickname?.trim()) return `${home.nickname.trim()} Inspection Checklist`;
+      if (home?.address_line1?.trim()) return `${home.address_line1.trim()} Inspection Checklist`;
+      if (connection?.display_name?.trim()) return `${connection.display_name.trim()}'s Inspection Checklist`;
+      return 'Home-specific Inspection Checklist';
     }
     const contact = insp.local_contact_id ? localContacts.find(candidate => candidate.id === insp.local_contact_id) : null;
     const localHome = contact?.homes?.find(home => home.id === insp.local_home_id) ?? contact?.homes?.[0] ?? null;
-    if (localHome?.nickname?.trim()) return `${localHome.nickname.trim()} Home Template`;
-    if (localHome?.address_line1?.trim()) return `${localHome.address_line1.trim()} Home Template`;
-    if (contact?.display_name?.trim()) return `${contact.display_name.trim()}'s Home Template`;
-    return 'Home Inspection Template';
+    if (localHome?.nickname?.trim()) return `${localHome.nickname.trim()} Inspection Checklist`;
+    if (localHome?.address_line1?.trim()) return `${localHome.address_line1.trim()} Inspection Checklist`;
+    if (contact?.display_name?.trim()) return `${contact.display_name.trim()}'s Inspection Checklist`;
+    return 'Home-specific Inspection Checklist';
   };
 
   const homeTemplatesForInspection = (insp: Inspection) => {
@@ -24330,7 +24330,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const context = homeTemplateContextForInspection(prompt.inspection);
     const rooms = buildInspectionTemplateRoomsFromLayout();
     if (!context || rooms.length === 0) {
-      setError('Add at least one section before saving this home template.');
+      setError('Add at least one section before saving this home-specific inspection checklist.');
       return;
     }
     const templateName = homeTemplateNameDraft.trim() || prompt.defaultName;
@@ -24338,7 +24338,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     try {
       if (mode === 'update') {
         const templateId = prompt.selectedTemplateId || prompt.existingTemplates[0]?.id;
-        if (!templateId) throw new Error('Select a home template to update.');
+        if (!templateId) throw new Error('Select a home-specific inspection checklist to update.');
         const { data, error: updateError } = await supabase
           .from('inspection_templates')
           .update({
@@ -24351,7 +24351,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .single();
         if (updateError) throw updateError;
         setInspectionTemplates(prev => prev.map(template => template.id === templateId ? data as InspectionTemplate : template));
-        setNotice('Home inspection template updated.');
+        setNotice('Home-specific inspection checklist updated.');
       } else {
         const hasExistingDefault = prompt.existingTemplates.some(template => template.is_default_for_home);
         const { data, error: insertError } = await supabase
@@ -24372,11 +24372,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           .single();
         if (insertError) throw insertError;
         setInspectionTemplates(prev => [data as InspectionTemplate, ...prev]);
-        setNotice('Home inspection template saved.');
+        setNotice('Home-specific inspection checklist saved.');
       }
       await continueHomeTemplatePromptAction(prompt);
     } catch (err) {
-      setError(readableError(err, 'Unable to save this home template.'));
+      setError(readableError(err, 'Unable to save this home-specific inspection checklist.'));
     } finally {
       setSavingHomeTemplateAction(null);
     }
@@ -26236,7 +26236,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Home template</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Home-specific inspection checklist</p>
                 <h3 className="mt-1 text-lg font-bold text-slate-950">Save this inspection layout?</h3>
               </div>
               <button
@@ -26250,7 +26250,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </button>
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              You changed the inspection layout for {homeTemplatePrompt.targetLabel}. Save this layout for future inspections at this home?
+              You changed the inspection layout for {homeTemplatePrompt.targetLabel}. Save this layout as a home-specific inspection checklist for future inspections at this property?
             </p>
             <div className="mt-4 space-y-3">
               <Field label="Template name">
@@ -26258,11 +26258,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   className={inputClass()}
                   value={homeTemplateNameDraft}
                   onChange={event => setHomeTemplateNameDraft(event.target.value)}
-                  placeholder="Home Inspection Template"
+                  placeholder="Home-specific Inspection Checklist"
                 />
               </Field>
               {homeTemplatePrompt.existingTemplates.length > 0 && (
-                <Field label="Existing home template">
+                <Field label="Existing home-specific inspection checklist">
                   <select
                     className={inputClass()}
                     value={homeTemplatePrompt.selectedTemplateId}
@@ -26290,7 +26290,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   disabled={Boolean(savingHomeTemplateAction)}
                   className={buttonClass('primary')}
                 >
-                  {savingHomeTemplateAction === 'update' ? 'Updating...' : 'Update Existing Home Template'}
+                  {savingHomeTemplateAction === 'update' ? 'Updating...' : 'Update Existing Home-specific Inspection Checklist'}
                 </button>
               )}
               <button
@@ -26302,8 +26302,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 {savingHomeTemplateAction === 'insert'
                   ? 'Saving...'
                   : homeTemplatePrompt.existingTemplates.length > 0
-                    ? 'Save as New Home Template'
-                    : 'Save Home Template'}
+                    ? 'Save as New Home-specific Inspection Checklist'
+                    : 'Save Home-specific Inspection Checklist'}
               </button>
               <button
                 type="button"
@@ -31982,7 +31982,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           id: 'templates',
                           label: 'Templates',
                           value: String(contractorScopedInspectionTemplates.length + estimateTemplates.length),
-                          helper: 'Workflow and estimate starters',
+                          helper: 'Saved work templates and inspection checklists',
                           icon: <ClipboardList size={15} />,
                           onClick: () => {
                             setContractorJobsViewAndScroll('templates');
@@ -34074,7 +34074,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <>
               <Card title="Templates" icon={<ClipboardList size={18} />}>
                 <p className="text-sm text-slate-600 mb-4">
-                  Manage the templates your company has created, search ServSync generic templates by trade, or create a new workflow template.
+                  Manage saved estimate starters, inspection checklists, and ServSync starter layouts without changing how those tools work.
                 </p>
                 <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
                   <div>
@@ -34115,8 +34115,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                  >
 	                    <div className="flex items-center justify-between gap-3">
 	                      <div className="min-w-0">
-	                        <p className="break-words text-sm font-bold text-slate-950">Your workflow templates</p>
-	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Jobs, inspections, and checklist-style templates.</p>
+	                        <p className="break-words text-sm font-bold text-slate-950">Inspection Checklists</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Checklist, report, and finding layouts for job documentation.</p>
 	                      </div>
 	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{contractorScopedInspectionTemplates.length}</span>
 	                    </div>
@@ -34133,8 +34133,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                  >
 	                    <div className="flex items-center justify-between gap-3">
 	                      <div className="min-w-0">
-	                        <p className="break-words text-sm font-bold text-slate-950">Home templates</p>
-	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Layouts saved for a specific customer home.</p>
+	                        <p className="break-words text-sm font-bold text-slate-950">Home-specific Inspection Checklists</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Saved inspection/report layouts for a specific property.</p>
 	                      </div>
 	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{homeScopedInspectionTemplates.length}</span>
 	                    </div>
@@ -34151,8 +34151,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                  >
 	                    <div className="flex items-center justify-between gap-3">
 	                      <div className="min-w-0">
-	                        <p className="break-words text-sm font-bold text-slate-950">Your estimate templates</p>
-	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Reusable pricing, scope, and line item templates.</p>
+	                        <p className="break-words text-sm font-bold text-slate-950">Saved Work Templates</p>
+	                        <p className="mt-1 break-words text-xs leading-5 text-slate-500">Saved estimate starters for scope, terms, line items, and optional pricing. Direct-job and invoice template starts are future work.</p>
 	                      </div>
 	                      <span className="shrink-0 text-lg font-bold text-slate-950 sm:text-xl">{estimateTemplates.length}</span>
 	                    </div>
@@ -34220,9 +34220,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         {templateLibraryView === 'workflow'
-                          ? 'Inspection templates'
+                          ? 'Inspection Checklists'
                           : templateLibraryView === 'estimate'
-                            ? 'Your estimate templates'
+                            ? 'Saved Work Templates'
                             : templateSearch.trim()
                               ? 'Generic template search results'
                               : 'Generic template library'}
@@ -34239,7 +34239,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {templateLibraryView === 'generic'
                             ? 'Try a trade like plumbing, electrical, cleaning, HVAC, roofing, concrete, gutters, or deck.'
                             : templateLibraryView === 'workflow'
-                              ? 'Create a template, save a home template from an inspection, or copy a starter template.'
+                              ? 'Create an inspection checklist, save a home-specific checklist from an inspection, or copy a starter checklist.'
                               : 'Create a template or copy one from the generic template search.'}
                         </p>
                       </div>
@@ -34248,7 +34248,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         {templateLibraryView === 'workflow' && (
                           <div className="space-y-5">
                             <section className="space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Starter Templates</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Starter Inspection Checklists</p>
                               {filteredStarterTemplates.length === 0 ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                   <p className="text-sm font-semibold text-slate-950">No starter templates match this search.</p>
@@ -34285,11 +34285,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </section>
 
                             <section className="space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your Templates</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your Inspection Checklists</p>
                               {filteredCustomTemplates.length === 0 ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                  <p className="text-sm font-semibold text-slate-950">No contractor templates yet.</p>
-                                  <p className="mt-1 text-xs text-slate-500">Create a template above or copy one from Starter Templates.</p>
+                                  <p className="text-sm font-semibold text-slate-950">No contractor inspection checklists yet.</p>
+                                  <p className="mt-1 text-xs text-slate-500">Create a checklist above or copy one from starter inspection checklists.</p>
                                 </div>
                               ) : (
                                 <div className="space-y-2">
@@ -34335,10 +34335,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </section>
 
                             <section className="space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Home Templates</p>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Home-specific Inspection Checklists</p>
+                                <p className="mt-1 text-xs leading-5 text-slate-500">Home-specific checklists are saved inspection/report layouts for a property. Full Home Setup Templates and Home Map tools are future work.</p>
+                              </div>
                               {filteredHomeTemplates.length === 0 ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                  <p className="text-sm font-semibold text-slate-950">No home-specific templates yet.</p>
+                                  <p className="text-sm font-semibold text-slate-950">No home-specific inspection checklists yet.</p>
                                   <p className="mt-1 text-xs text-slate-500">Customize an inspection layout for a home and save it before finalizing the report.</p>
                                 </div>
                               ) : (
@@ -34365,7 +34368,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               type="button"
                                               onClick={() => void renameInspectionTemplate(tpl)}
                                               disabled={!canManageInspectionTemplates || busy}
-                                              title={canManageInspectionTemplates ? 'Rename home template' : 'Viewer access cannot rename templates'}
+                                              title={canManageInspectionTemplates ? 'Rename home-specific inspection checklist' : 'Viewer access cannot rename templates'}
                                               className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                                             >
                                               {renamingInspectionTemplateId === tpl.id ? 'Renaming...' : 'Rename'}
@@ -34374,7 +34377,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               type="button"
                                               onClick={() => void archiveInspectionTemplate(tpl)}
                                               disabled={!canManageInspectionTemplates || busy}
-                                              title={canManageInspectionTemplates ? 'Archive home template' : 'Viewer access cannot archive templates'}
+                                              title={canManageInspectionTemplates ? 'Archive home-specific inspection checklist' : 'Viewer access cannot archive templates'}
                                               className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
                                             >
                                               {archivingInspectionTemplateId === tpl.id ? 'Archiving...' : 'Archive'}
@@ -34407,7 +34410,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <p className="text-sm font-semibold text-slate-950">No archived templates found.</p>
                                     <p className="mt-1 text-xs text-slate-500">
-                                      {archivedInspectionTemplates.length > 0 ? 'Try clearing the template search.' : 'Archived contractor and home templates will appear here.'}
+                                      {archivedInspectionTemplates.length > 0 ? 'Try clearing the template search.' : 'Archived contractor and home-specific inspection checklists will appear here.'}
                                     </p>
                                   </div>
                                 ) : (
@@ -34423,7 +34426,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="truncate text-sm font-medium text-slate-950">{tpl.name}</p>
                                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                                                  {isHomeTemplate ? 'Home Template' : 'Your Template'}
+                                                  {isHomeTemplate ? 'Home-specific Inspection Checklist' : 'Your Inspection Checklist'}
                                                 </span>
                                                 {isHomeTemplate && tpl.is_default_for_home && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">Default for home</span>}
                                               </div>
@@ -34455,7 +34458,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                         {templateLibraryView === 'estimate' && filteredCustomEstimateTemplates.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Your estimate templates</p>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Saved Work Templates</p>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">Saved estimate starters for scope, terms, line items, and optional pricing. Direct-job and invoice template starts are future work.</p>
+                            </div>
                             {filteredCustomEstimateTemplates.map(template => (
                               <div key={template.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
@@ -34968,16 +34974,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       }}>
                         <option value="blank">Blank checklist report</option>
                         {inspectionHomeTemplatesForNewJob.length > 0 && (
-                          <optgroup label="This Home's Templates">
+                          <optgroup label="Home-specific Inspection Checklists">
                             {inspectionHomeTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
                           </optgroup>
                         )}
                         {inspectionContractorTemplatesForNewJob.length > 0 && (
-                          <optgroup label="Your Templates">
+                          <optgroup label="Your Inspection Checklists">
                             {inspectionContractorTemplatesForNewJob.map(t => <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>)}
                           </optgroup>
                         )}
-                        <optgroup label="Starter Templates">
+                        <optgroup label="Starter Inspection Checklists">
                           {inspectionStarterTemplatesForNewJob.map(t => (
                             <option key={t.id} value={`starter:${t.id}`}>
                               {starterTemplateRecommendedForContractor(t.trade) ? 'Recommended — ' : ''}{t.name} ({FIELD_WORK_KIND_LABEL[t.kind]})

@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/jobs-template-taxonomy-cleanup-v1`
+- Starting main SHA: `e4194e03582af3b08bc2c33187c9cf13c91f6006`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/template-taxonomy.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Clarified the contractor Jobs/Templates taxonomy so estimate-backed templates are presented as Saved Work Templates, checklist/report templates are presented as Inspection Checklists, and home-scoped checklist layouts are presented as Home-specific Inspection Checklists.
+- Reason for change: The previous copy mixed estimate templates, inspection templates, and home-scoped checklist templates under vague Templates wording, making it unclear which tool backed each workflow.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - This slice changes copy only. `estimate_templates` remains the Saved Work Templates backing data, `inspection_templates` remains the Inspection Checklists backing data, existing starter templates remain available, and create/edit/delete/apply behavior is unchanged.
+  - True Work Template starts for direct jobs/invoices, Home Setup Templates, and Home Map/floor-plan support remain future separately approved work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the Jobs/Templates taxonomy cleanup and future template concepts that remain deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this copy-only cleanup supports the existing estimates/jobs/checklists direction without changing product scope, data models, backend behavior, pricing, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/estimate-builder-cleanup-e-remove-trade-tools-v1`
 - Starting main SHA: `4c8c4fafb446d2921c5649d29de2cf8ed82f9f83`
 - Files changed:
