@@ -1,0 +1,118 @@
+import type { EstimateDraftLibraryBundle } from '../../types';
+
+export const gutterExteriorBrighteningBundle = {
+  trade: 'pressure_washing',
+  work_category: 'service',
+  job_bundle: 'gutter_exterior_brightening',
+  display_name: 'Gutter Exterior Brightening',
+  aliases: [
+    'gutter exterior brightening',
+    'clean gutter exterior',
+    'gutter face cleaning',
+    'gutter tiger stripe treatment',
+    'gutter brightening',
+  ],
+  scope_summary: 'Exterior gutter-face cleaning and brightening for visible dirt, streaking, and oxidation where contractor confirms expectations.',
+  sections: [
+    {
+      id: 'gutter_exterior_brightening',
+      title: 'Gutter exterior brightening',
+      description: 'Capture exterior gutter cleaning without confusing it with gutter cleanout, repair, or replacement.',
+      items: [
+        {
+          id: 'gutter_brightening_setup',
+          title: 'Gutter exterior cleaning setup',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'flat',
+          customer_description: 'Prepare listed gutter exterior areas for cleaning and review access conditions.',
+          match_terms: ['setup', 'gutter access', 'gutter preparation'],
+          editor_note: 'Confirm ladder access, height, stories, landscaping, and whether gutter interiors are excluded.',
+        },
+        {
+          id: 'gutter_exterior_cleaning',
+          title: 'Gutter exterior cleaning',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'linear_ft',
+          customer_description: 'Clean the exterior face of listed gutters where safely accessible.',
+          match_terms: ['gutter exterior', 'gutter face', 'linear footage'],
+          editor_note: 'Use linear footage. Clarify exterior only.',
+        },
+        {
+          id: 'gutter_tiger_stripe_treatment',
+          title: 'Gutter streak or oxidation treatment',
+          line_type: 'material',
+          suggestion_behavior: 'review_only',
+          unit: 'linear_ft',
+          customer_description: 'Apply additional treatment for visible gutter streaking or oxidation. Full restoration is not guaranteed.',
+          match_terms: ['tiger stripes', 'oxidation', 'black streaks', 'streaking', 'brightening'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'manufacturer', 'regional'],
+          editor_note: 'Oxidation removal is not the same as standard washing. Set expectations carefully.',
+        },
+        {
+          id: 'gutter_height_access',
+          title: 'Additional height or access setup',
+          line_type: 'labor',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Additional setup for elevated or difficult-to-access gutter sections.',
+          match_terms: ['two story', 'three story', 'high', 'steep', 'difficult access'],
+          contractor_review_required: true,
+          review_flags: ['safety'],
+          editor_note: 'Confirm ladder/lift safety and access.',
+        },
+        {
+          id: 'gutter_cleanout_exclusion_note',
+          title: 'Gutter cleanout exclusion',
+          line_type: 'other',
+          suggestion_behavior: 'default_candidate',
+          unit: 'note',
+          customer_description: 'This estimate covers exterior gutter surfaces only. Interior gutter cleanout is not included unless listed separately.',
+          match_terms: ['cleanout exclusion', 'exterior only'],
+          editor_note: 'Avoid confusion between exterior brightening and gutter cleanout.',
+        },
+      ],
+    },
+  ],
+  scope_wording_helpers: [
+    {
+      id: 'gutter_expectations',
+      label: 'Gutter brightening expectations',
+      text: 'Confirm exterior cleaning versus interior cleanout, visible oxidation or streaking, height, ladder access, and landscaping restrictions before finalizing.',
+      contractor_review_required: true,
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  customer_note_candidates: [
+    {
+      id: 'exterior_only',
+      text: 'This estimate covers exterior gutter surfaces only. Interior gutter cleanout, repair, downspout repair, painting, or replacement is excluded unless listed separately.',
+    },
+  ],
+  terms_candidates: [
+    {
+      id: 'restoration_not_guaranteed',
+      text: 'Permanent oxidation restoration is not guaranteed unless separately listed and approved.',
+      contractor_review_required: true,
+      review_flags: ['manufacturer'],
+    },
+  ],
+  contractor_review_reminders: [
+    {
+      id: 'gutter_access_review',
+      label: 'Gutter access and expectations review',
+      detail: 'Confirm exterior versus interior scope, oxidation/streaking expectations, height, ladder access, and landscaping restrictions.',
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  excluded_items: [
+    'pricing',
+    'interior gutter cleanout',
+    'gutter repair',
+    'downspout repair',
+    'permanent oxidation restoration',
+    'painting or replacement',
+  ],
+} satisfies EstimateDraftLibraryBundle;

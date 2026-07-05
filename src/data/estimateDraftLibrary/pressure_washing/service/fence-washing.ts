@@ -1,0 +1,117 @@
+import type { EstimateDraftLibraryBundle } from '../../types';
+
+export const fenceWashingBundle = {
+  trade: 'pressure_washing',
+  work_category: 'service',
+  job_bundle: 'fence_washing',
+  display_name: 'Fence Washing',
+  aliases: [
+    'fence washing',
+    'wash fence',
+    'clean fence',
+    'vinyl fence cleaning',
+    'wood fence wash',
+  ],
+  scope_summary: 'Low-pressure cleaning for vinyl, wood, metal, or composite fencing.',
+  sections: [
+    {
+      id: 'fence_washing',
+      title: 'Fence washing',
+      description: 'Capture one-side or confirmed both-side fence cleaning without implying repair or refinishing.',
+      items: [
+        {
+          id: 'fence_setup',
+          title: 'Fence washing setup',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'flat',
+          customer_description: 'Prepare listed fence areas for cleaning and review access along the fence line.',
+          match_terms: ['setup', 'fence preparation'],
+          editor_note: 'Confirm gates, neighbor access, pets, landscaping, slope, and whether one side or both sides are included.',
+        },
+        {
+          id: 'fence_cleaning_one_side',
+          title: 'Fence cleaning - one side',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'linear_ft',
+          customer_description: 'Clean one side of the listed fence sections using an appropriate method for the fence material.',
+          match_terms: ['one side', 'fence', 'linear footage'],
+          editor_note: 'Capture linear footage and fence height.',
+        },
+        {
+          id: 'fence_cleaning_both_sides',
+          title: 'Fence cleaning - both sides',
+          line_type: 'labor',
+          suggestion_behavior: 'review_only',
+          unit: 'linear_ft',
+          customer_description: 'Clean both sides of the listed fence sections using an appropriate method for the fence material.',
+          match_terms: ['both sides', 'inside and outside', 'neighbor side'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'regional'],
+          editor_note: 'Only include both sides if access is confirmed.',
+        },
+        {
+          id: 'fence_organic_growth_treatment',
+          title: 'Fence algae or mildew treatment',
+          line_type: 'material',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Treat visible algae, mildew, or organic growth on listed fence areas before final rinse.',
+          match_terms: ['algae', 'mildew', 'green', 'black', 'organic growth'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'manufacturer', 'regional'],
+          editor_note: 'Confirm surface material and chemical compatibility before adding.',
+        },
+        {
+          id: 'fence_condition_note',
+          title: 'Fence condition limitation',
+          line_type: 'other',
+          suggestion_behavior: 'default_candidate',
+          unit: 'note',
+          customer_description: 'Cleaning may reveal pre-existing fading, oxidation, loose boards, failing paint, or damaged fence sections. Repairs and refinishing are not included unless listed separately.',
+          match_terms: ['condition', 'limitation', 'fence repair'],
+          editor_note: 'Important for wood and older vinyl fences.',
+        },
+      ],
+    },
+  ],
+  scope_wording_helpers: [
+    {
+      id: 'fence_access_review',
+      label: 'Fence access review',
+      text: 'Confirm fence material, height, total linear footage, and one-side versus both-side access before finalizing scope.',
+      contractor_review_required: true,
+      review_flags: ['safety', 'regional'],
+    },
+  ],
+  customer_note_candidates: [
+    {
+      id: 'fence_exclusions',
+      text: 'Fence repair, painting, staining, sealing, and neighbor-side access are excluded unless listed separately.',
+    },
+  ],
+  terms_candidates: [
+    {
+      id: 'fence_condition',
+      text: 'Cleaning may reveal pre-existing fading, oxidation, loose boards, failing paint, or damaged fence sections.',
+    },
+  ],
+  contractor_review_reminders: [
+    {
+      id: 'fence_scope_review',
+      label: 'Fence scope review',
+      detail: 'Confirm material, height, total linear footage, one side versus both sides, and access to all listed fence sections.',
+      review_flags: ['safety', 'regional'],
+    },
+  ],
+  excluded_items: [
+    'pricing',
+    'fence repair',
+    'painting',
+    'staining',
+    'sealing',
+    'neighbor-side access unless approved',
+    'permanent oxidation removal unless listed separately',
+  ],
+} satisfies EstimateDraftLibraryBundle;

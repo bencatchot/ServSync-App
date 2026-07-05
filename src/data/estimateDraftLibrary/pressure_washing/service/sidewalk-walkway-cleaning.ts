@@ -1,0 +1,117 @@
+import type { EstimateDraftLibraryBundle } from '../../types';
+
+export const sidewalkWalkwayCleaningBundle = {
+  trade: 'pressure_washing',
+  work_category: 'service',
+  job_bundle: 'sidewalk_walkway_cleaning',
+  display_name: 'Sidewalk and Walkway Cleaning',
+  aliases: [
+    'sidewalk walkway cleaning',
+    'clean sidewalk',
+    'pressure wash sidewalk',
+    'walkway cleaning',
+    'entry path cleaning',
+  ],
+  scope_summary: 'Cleaning for residential or light-commercial sidewalks, walkways, and entry paths.',
+  sections: [
+    {
+      id: 'sidewalk_walkway_cleaning',
+      title: 'Sidewalk and walkway cleaning',
+      description: 'Capture walkway cleaning while keeping public-access and runoff concerns under contractor review.',
+      items: [
+        {
+          id: 'sidewalk_setup',
+          title: 'Sidewalk and walkway setup',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'flat',
+          customer_description: 'Prepare listed sidewalk and walkway areas for cleaning.',
+          match_terms: ['setup', 'walkway preparation'],
+          editor_note: 'Confirm public sidewalk rules, pedestrian access, and working hours if commercial or HOA property.',
+        },
+        {
+          id: 'sidewalk_surface_cleaning',
+          title: 'Sidewalk and walkway cleaning',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'sq_ft',
+          customer_description: 'Clean listed sidewalk and walkway surfaces using appropriate exterior cleaning equipment.',
+          match_terms: ['sidewalk', 'walkway', 'entry path', 'front walk'],
+          editor_note: 'Use square footage or linear footage depending on contractor preference.',
+        },
+        {
+          id: 'sidewalk_gum_removal',
+          title: 'Gum removal',
+          line_type: 'labor',
+          suggestion_behavior: 'review_only',
+          unit: 'each',
+          customer_description: 'Remove listed gum spots from sidewalk or walkway areas.',
+          match_terms: ['gum', 'chewing gum'],
+          contractor_review_required: true,
+          review_flags: ['regional'],
+          editor_note: 'Commercial areas may need a per-piece count or allowance.',
+        },
+        {
+          id: 'sidewalk_edge_detailing',
+          title: 'Edge and corner detail cleaning',
+          line_type: 'labor',
+          suggestion_behavior: 'optional_candidate',
+          unit: 'flat',
+          customer_description: 'Detail-clean edges, corners, and tight areas not easily reached by surface-cleaning equipment.',
+          match_terms: ['corners', 'edges', 'detail', 'entry', 'front walkway'],
+          editor_note: 'Useful for entry paths, porch steps, and narrow walkways.',
+        },
+        {
+          id: 'sidewalk_runoff_control',
+          title: 'Runoff and drain awareness',
+          line_type: 'labor',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Review drainage path and use basic runoff-control steps where needed for the listed work area.',
+          match_terms: ['storm drain', 'street', 'curb', 'commercial', 'runoff'],
+          contractor_review_required: true,
+          local_code_sensitive: true,
+          review_flags: ['code', 'regional', 'safety'],
+          editor_note: 'Review local discharge requirements, especially for commercial sidewalks.',
+        },
+      ],
+    },
+  ],
+  scope_wording_helpers: [
+    {
+      id: 'access_and_safety',
+      label: 'Access and safety',
+      text: 'Confirm whether listed sidewalk or walkway areas are private, HOA-managed, municipal-facing, or commercial, and review pedestrian access needs.',
+      contractor_review_required: true,
+      review_flags: ['regional', 'safety'],
+    },
+  ],
+  customer_note_candidates: [
+    {
+      id: 'pedestrian_access',
+      text: 'Pedestrian access, public right-of-way requirements, and traffic control are excluded unless listed separately.',
+    },
+  ],
+  terms_candidates: [
+    {
+      id: 'listed_walkways_only',
+      text: 'Concrete repair, permits, and wastewater recovery beyond listed scope are not included unless separately listed.',
+    },
+  ],
+  contractor_review_reminders: [
+    {
+      id: 'public_access_review',
+      label: 'Public access and runoff review',
+      detail: 'Confirm ownership/management of the walkway, pedestrian access, gum count or allowance, and runoff path before finalizing scope.',
+      local_code_sensitive: true,
+      review_flags: ['code', 'regional', 'safety'],
+    },
+  ],
+  excluded_items: [
+    'pricing',
+    'concrete repair',
+    'public right-of-way permits',
+    'traffic or pedestrian control beyond listed scope',
+    'wastewater recovery beyond listed scope',
+  ],
+} satisfies EstimateDraftLibraryBundle;

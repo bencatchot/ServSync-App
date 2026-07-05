@@ -1,0 +1,117 @@
+import type { EstimateDraftLibraryBundle } from '../../types';
+
+export const deckSoftWashBundle = {
+  trade: 'pressure_washing',
+  work_category: 'service',
+  job_bundle: 'deck_soft_wash',
+  display_name: 'Deck Soft Wash',
+  aliases: [
+    'deck soft wash',
+    'clean deck',
+    'wash wood deck',
+    'composite deck cleaning',
+    'deck algae cleaning',
+  ],
+  scope_summary: 'Low-pressure deck cleaning for wood or composite decks where surface condition must be reviewed.',
+  sections: [
+    {
+      id: 'deck_cleaning',
+      title: 'Deck cleaning',
+      description: 'Capture low-pressure deck cleaning without implying repair, sanding, staining, or sealing.',
+      items: [
+        {
+          id: 'deck_setup',
+          title: 'Deck cleaning setup',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'flat',
+          customer_description: 'Prepare the deck area for cleaning and review visible surface condition before work begins.',
+          match_terms: ['setup', 'deck preparation'],
+          editor_note: 'Inspect for rot, loose boards, failing stain, raised nails/screws, loose railing, and damaged composite.',
+        },
+        {
+          id: 'deck_soft_wash_cleaning',
+          title: 'Deck soft wash cleaning',
+          line_type: 'labor',
+          suggestion_behavior: 'default_candidate',
+          unit: 'sq_ft',
+          customer_description: 'Clean listed deck surfaces using a low-pressure method appropriate for the deck material and condition.',
+          match_terms: ['deck', 'soft wash', 'wood deck', 'composite deck'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'manufacturer'],
+          editor_note: 'Do not imply aggressive pressure washing on wood or deteriorated surfaces.',
+        },
+        {
+          id: 'deck_rail_step_cleaning',
+          title: 'Deck rail and stair cleaning',
+          line_type: 'labor',
+          suggestion_behavior: 'optional_candidate',
+          unit: 'linear_ft',
+          customer_description: 'Clean listed deck rails, steps, and related surfaces.',
+          match_terms: ['rail', 'railing', 'stairs', 'steps', 'spindles'],
+          editor_note: 'Railings and stairs are easy to miss; add as separate scope where appropriate.',
+        },
+        {
+          id: 'deck_algae_treatment',
+          title: 'Deck algae or mildew treatment',
+          line_type: 'material',
+          suggestion_behavior: 'review_only',
+          unit: 'flat',
+          customer_description: 'Apply appropriate treatment to listed algae or mildew areas before final rinse.',
+          match_terms: ['algae', 'mildew', 'green', 'slippery', 'organic growth'],
+          contractor_review_required: true,
+          review_flags: ['safety', 'manufacturer', 'regional'],
+          editor_note: 'Confirm chemical compatibility with wood/composite material and nearby landscaping before adding.',
+        },
+        {
+          id: 'deck_surface_condition_note',
+          title: 'Deck condition limitation',
+          line_type: 'other',
+          suggestion_behavior: 'default_candidate',
+          unit: 'note',
+          customer_description: 'Cleaning may reveal pre-existing wear, fading, failing stain, loose boards, or damaged surfaces. Repairs, sanding, staining, and sealing are not included unless listed separately.',
+          match_terms: ['condition', 'limitation', 'deck repair'],
+          editor_note: 'Important customer-facing limitation for deck work.',
+        },
+      ],
+    },
+  ],
+  scope_wording_helpers: [
+    {
+      id: 'deck_material_review',
+      label: 'Deck material review',
+      text: 'Confirm wood versus composite material and visible deck condition before choosing cleaning method or finalizing scope.',
+      contractor_review_required: true,
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  customer_note_candidates: [
+    {
+      id: 'deck_work_exclusions',
+      text: 'Repairs, sanding, staining, sealing, board replacement, and structural corrections are excluded unless listed separately.',
+    },
+  ],
+  terms_candidates: [
+    {
+      id: 'deck_visible_condition',
+      text: 'Cleaning may reveal pre-existing wear, fading, failing stain, loose boards, or damaged surfaces.',
+    },
+  ],
+  contractor_review_reminders: [
+    {
+      id: 'deck_condition_review',
+      label: 'Deck condition review',
+      detail: 'Confirm deck material, rot, loose boards, failing stain, damaged fasteners, and railing condition before finalizing scope.',
+      review_flags: ['safety', 'manufacturer'],
+    },
+  ],
+  excluded_items: [
+    'pricing',
+    'deck repair',
+    'sanding',
+    'staining',
+    'sealing',
+    'board replacement',
+    'structural corrections',
+  ],
+} satisfies EstimateDraftLibraryBundle;
