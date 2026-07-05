@@ -101,7 +101,7 @@ Important guardrails:
 | FB-004 | Contractor Reports | Reports, operations, contractor visibility | Backlog | Medium | Hold until estimate/job/invoice statuses are reliable. |
 | FB-005 | Awards / Contractor Recognition Badges | Contractor profile, recognition, marketplace trust | Later / Future | Low | Revisit after real platform activity exists. |
 | FB-006 | Contractor Auto-Scheduling | Scheduling, appointments, calendar | Later / Future | Medium | Refine after calendar/appointment workflow stabilizes. |
-| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Started / Partial | High | After the bounded carpentry trim/baseboard proof bundle, consider authenticated preview smoke or one separately approved tiny proof-bundle expansion before broader trade library or homeowner pre-visit checklist work. |
+| FB-007 | Trade-Specific Estimate / Pre-Visit Checklists | Estimates, inspections, homeowner intake, templates | Started / Partial | High | Guided Estimate Draft Builder Slice A adds a focused existing-customer estimate builder with trade, work type, labor style, rough scope, top recipe-match preview, general fallback, and collapsed reference tools. Future work should keep inline new-customer creation, broader recipe-library expansion, and homeowner pre-visit checklist work separate. |
 | FB-008 | Discover Engagement Filter / Recently Active Contractors | Discover, contractor visibility | Later / Future | Low | Revisit after Discover has real contractor activity. |
 | FB-009 | Discover Feed Strategy | Discover, marketplace, contractor content | Backlog | Medium | Future audit after core beta workflow confidence improves. |
 | FB-010 | General Homeowner-Contractor Messaging | Messaging, connections, service requests | Later / Future | Medium | Revisit after contextual connection flow is tested. |
@@ -485,10 +485,11 @@ Foundation slice:
 - A second bounded HVAC seasonal tune-up proof bundle adds a price-free service/maintenance path while preserving fallback behavior, contractor review, and homeowner/PDF/invoice boundaries.
 - A first bounded non-HVAC plumbing faucet replacement proof bundle adds a price-free replacement path while keeping faucet repair-only, drain relocation, sink replacement, garbage disposal, toilet, water heater, electrical, and carpentry scopes on fallback behavior unless separately approved.
 - A bounded carpentry trim/baseboard repair proof bundle adds a price-free interior repair path while keeping door repair/replacement, drywall, flooring, painting, rot/water damage, mold remediation, structural/framing work, cabinetry, exterior trim/siding, deck/railing, electrical, plumbing, and HVAC scopes on fallback behavior unless separately approved.
+- Guided Estimate Draft Builder Slice A changes the contractor estimate creation flow for existing connected/local customers only: contractors choose trade, broad work type, labor style, and rough scope, review up to three deterministic app-owned recipe matches with "why this matched" copy, or choose the existing general fallback builder before editing the draft. Saved Charges, Price Book, Estimate Templates, Estimate Helper, and Advanced Trade Tools remain available in a collapsed Reference tools area by default.
 - This does not complete full trade-specific estimate/pre-visit checklist coverage.
 
 Current next step:
-After the bounded carpentry trim/baseboard proof bundle, consider authenticated preview smoke or one separately approved tiny proof-bundle expansion before broader trade library or homeowner pre-visit checklist work.
+Validate the guided existing-customer estimate builder in preview/beta. Keep inline new-customer creation from Estimate Builder as a separate Slice B, and keep broader recipe-library expansion or homeowner pre-visit checklist work separately approved.
 
 ### FB-008 — Discover Engagement Filter / Recently Active Contractors
 
