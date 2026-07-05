@@ -4,6 +4,39 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-05
+
+- Branch: `codex/guided-estimate-builder-slice-a-v1`
+- Starting main SHA: `f0894293fe10576e51960fdec021732a79855bd9`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Guided Estimate Draft Builder Slice A for existing connected/local customers. New estimate creation now starts with a focused builder for trade, work type, labor style, rough scope, deterministic recipe-match preview, and general fallback before the editable draft, while reference tools stay collapsed by default.
+- Reason for change: The previous estimate workspace exposed Advanced Trade Tools, Saved Charges, Price Book, Estimate Templates, and Estimate Helper too early, making initial draft creation feel crowded.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker drift
+  - `npm run typecheck`
+  - `npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `npx playwright test tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts tests/e2e/fb024-price-book-quickpick.spec.ts --project=chromium`
+  - `npx playwright test tests/e2e/fb002-custom-pricing-csv.spec.ts --project=chromium`
+  - `npm run build`
+  - `npm run lint` attempted; blocked by the known pre-existing ESLint 9 / `@typescript-eslint/no-unused-expressions` issue in `playwright.config.ts`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, notifications, payments, deployment, or production data mutation is included.
+  - Inline new-customer creation from the Estimate Builder remains deferred to a separate Slice B. Broader recipe-library expansion and homeowner pre-visit checklist work remain separate approval-gated work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Guided Estimate Draft Builder Slice A and separates future customer creation/recipe expansion work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing estimate workflow direction without changing product scope, backend workflow behavior, or native/mobile strategy.
+
 ## 2026-07-04
 
 - Branch: `codex/fb030-shared-home-boundary-tests-v2`

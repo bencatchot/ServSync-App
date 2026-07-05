@@ -83,10 +83,12 @@ import {
 } from './walkthroughNotesParser';
 import { cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
 import {
+  findEstimateDraftLibraryBundle,
   estimateDraftLibraryTradeFromText,
   findEstimateDraftLibraryBundleForScope,
   type EstimateDraftLibraryBundle,
   type EstimateDraftLibraryItem,
+  type EstimateDraftLibraryTrade,
   type EstimateDraftLibraryWorkCategory,
 } from './data/estimateDraftLibrary';
 import {
@@ -608,6 +610,12 @@ type EstimateDraftBuilderLastOutput = {
   terms?: string;
   builtTrade: EstimateDraftBuilderTrade;
   builtJobType: EstimateDraftBuilderJobType;
+};
+type EstimateDraftRecipeMatch = {
+  bundle: EstimateDraftLibraryBundle;
+  score: number;
+  why: string;
+  libraryPath: string;
 };
 type EstimateDraftBuilderRulePack = {
   trade: EstimateDraftBuilderTrade;
@@ -2566,6 +2574,122 @@ function estimateDraftLibraryWorkCategoryFromJobType(jobType: EstimateDraftBuild
   return null;
 }
 
+const ESTIMATE_DRAFT_RECIPE_REFERENCES: Array<{
+  trade: EstimateDraftLibraryTrade;
+  work_category: EstimateDraftLibraryWorkCategory;
+  job_bundle: string;
+  focusTerms: string[];
+}> = [
+  {
+    trade: 'hvac',
+    work_category: 'replace',
+    job_bundle: 'hvac_system_replacement',
+    focusTerms: ['hvac', 'furnace', 'ac', 'air conditioner', 'condenser', 'heat pump', 'replace', 'replacement', 'changeout', 'system'],
+  },
+  {
+    trade: 'hvac',
+    work_category: 'service',
+    job_bundle: 'hvac_seasonal_tune_up',
+    focusTerms: ['hvac', 'seasonal', 'maintenance', 'tune up', 'tuneup', 'filter', 'service'],
+  },
+  {
+    trade: 'plumbing',
+    work_category: 'replace',
+    job_bundle: 'plumbing_faucet_replacement',
+    focusTerms: ['plumbing', 'faucet', 'sink faucet', 'lavatory faucet', 'replace', 'replacement', 'install'],
+  },
+  {
+    trade: 'carpentry',
+    work_category: 'repair',
+    job_bundle: 'carpentry_trim_baseboard_repair',
+    focusTerms: ['carpentry', 'trim', 'baseboard', 'molding', 'interior trim', 'repair', 'replace section'],
+  },
+];
+
+function estimateDraftRecipeMatchWhy({
+  selectedTrade,
+  selectedWorkCategory,
+  matchedTerms,
+  inferredTrade,
+  inferredJobType,
+}: {
+  selectedTrade: EstimateDraftBuilderTrade;
+  selectedWorkCategory: EstimateDraftLibraryWorkCategory | null;
+  matchedTerms: string[];
+  inferredTrade: EstimateDraftBuilderTrade | null;
+  inferredJobType: EstimateDraftBuilderJobType | null;
+}) {
+  const reasons = [
+    matchedTerms.length > 0 ? `your scope mentions ${matchedTerms.slice(0, 3).join(', ')}` : '',
+    inferredTrade ? `the scope points toward ${inferredTrade}` : '',
+    inferredJobType ? `the work type reads like ${estimateBuilderJobTypeLabel(inferredJobType).toLowerCase()}` : '',
+    selectedTrade !== 'Other' && selectedWorkCategory ? `selected ${selectedTrade} / ${selectedWorkCategory.replace(/_/g, ' ')}` : '',
+  ].filter(Boolean);
+  return reasons.length > 0 ? reasons.slice(0, 2).join('; ') : 'this recipe matches the selected trade and work type.';
+}
+
+function estimateDraftRecipeMatches({
+  selectedTrade,
+  selectedJobType,
+  roughScope,
+}: {
+  selectedTrade: EstimateDraftBuilderTrade;
+  selectedJobType: EstimateDraftBuilderJobType;
+  roughScope: string;
+}): EstimateDraftRecipeMatch[] {
+  const inferredTrade = estimateBuilderScopeLooksLikeKitchenSinkFixtureWork(roughScope)
+    ? 'Plumbing'
+    : inferEstimateBuilderTrade(roughScope);
+  const inferredJobType = inferEstimateBuilderJobType(roughScope);
+  const effectiveTrade = inferredTrade || selectedTrade;
+  const effectiveJobType = inferredJobType || selectedJobType;
+  const selectedLibraryTrade = estimateDraftLibraryTradeFromText(effectiveTrade);
+  const selectedWorkCategory = estimateDraftLibraryWorkCategoryFromJobType(effectiveJobType);
+  const normalizedScope = compactText(roughScope);
+
+  const matches: EstimateDraftRecipeMatch[] = [];
+
+  ESTIMATE_DRAFT_RECIPE_REFERENCES
+    .forEach(reference => {
+      const bundle = findEstimateDraftLibraryBundle({
+        trade: reference.trade,
+        work_category: reference.work_category,
+        job_bundle: reference.job_bundle,
+      });
+      if (!bundle) return;
+
+      const matchedTerms = [...bundle.aliases, ...reference.focusTerms]
+        .map(term => term.trim())
+        .filter(Boolean)
+        .filter(term => normalizedScope.includes(compactText(term)));
+      const aliasMatch = bundle.aliases.some(alias => normalizedScope.includes(compactText(alias)));
+      let score = 0;
+      if (selectedLibraryTrade && reference.trade === selectedLibraryTrade) score += 40;
+      if (selectedWorkCategory && reference.work_category === selectedWorkCategory) score += 30;
+      if (aliasMatch) score += 70;
+      score += Math.min(matchedTerms.length * 8, 40);
+      if (!selectedLibraryTrade || !selectedWorkCategory) score += aliasMatch ? 10 : 0;
+      if (score < 45) return;
+
+      matches.push({
+        bundle,
+        score,
+        why: estimateDraftRecipeMatchWhy({
+          selectedTrade,
+          selectedWorkCategory,
+          matchedTerms: Array.from(new Set(matchedTerms)),
+          inferredTrade,
+          inferredJobType,
+        }),
+        libraryPath: `${bundle.trade}/${bundle.work_category}/${bundle.job_bundle}`,
+      });
+    });
+
+  return matches
+    .sort((a, b) => b.score - a.score || a.bundle.display_name.localeCompare(b.bundle.display_name))
+    .slice(0, 3);
+}
+
 function resolveEstimateDraftLibraryBundle({
   trade,
   jobType,
@@ -3299,12 +3423,12 @@ const ESTIMATE_CHARGE_TYPE_LABELS: Record<EstimateChargeType, string> = {
 };
 const ESTIMATE_DRAFT_BUILDER_TRADES: EstimateDraftBuilderTrade[] = ['HVAC', 'Plumbing', 'Electrical', 'Carpentry', 'Other'];
 const ESTIMATE_DRAFT_BUILDER_JOB_TYPES: { value: EstimateDraftBuilderJobType; label: string }[] = [
-  { value: 'service_diagnostic', label: 'Service / diagnostic' },
+  { value: 'replacement', label: 'Install / Replace' },
   { value: 'repair', label: 'Repair' },
-  { value: 'replacement', label: 'Replacement' },
-  { value: 'install', label: 'Install' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'custom_other', label: 'Custom / other' },
+  { value: 'maintenance', label: 'Service / Maintenance' },
+  { value: 'service_diagnostic', label: 'Inspection / Diagnostic' },
+  { value: 'install', label: 'Remodel / Upgrade' },
+  { value: 'custom_other', label: 'Other' },
 ];
 const ESTIMATE_DRAFT_BUILDER_LABOR_MODES: { value: EstimateDraftBuilderLaborMode; label: string; description: string }[] = [
   {
@@ -18681,6 +18805,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderJobType, setEstimateDraftBuilderJobType] = useState<EstimateDraftBuilderJobType>('repair');
   const [estimateDraftBuilderLaborMode, setEstimateDraftBuilderLaborMode] = useState<EstimateDraftBuilderLaborMode>('job_total');
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
+  const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
+  const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false);
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
@@ -20114,16 +20240,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }));
     setInvoiceComposerOpen(true);
     setEstimateComposerOpen(false);
+    setEstimateGuidedBuilderActive(false);
     setHomeownerWorkspaceEstimateView('draft');
     setContractorJobsView('new_financial');
     setContractorTab('inspections');
   };
+
+  const defaultEstimateDraftBuilderTrade = () => (
+    ESTIMATE_DRAFT_BUILDER_TRADES.find(trade => trade !== 'Other' && tradeToolMatchesContractor(trade, contractorDraft.service_categories))
+    ?? 'Other'
+  );
 
   const beginEstimateDraftForCustomer = (subjectName: string, options: { serviceRequestId?: string; inspectionId?: string; homeId?: string | null; localHomeId?: string | null } = {}) => {
     if (createEstimateCapability.disabled) {
       setError(createEstimateCapability.reason);
       return;
     }
+    const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
     setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
@@ -20135,10 +20268,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
     }));
     setEstimateAssistantText('');
-    setEstimateDraftBuilderTrade('Other');
-    setEstimateDraftBuilderJobType('repair');
+    setEstimateDraftBuilderTrade(defaultBuilderTrade);
+    setEstimateDraftBuilderJobType('replacement');
     setEstimateDraftBuilderLaborMode('job_total');
     setEstimateDraftBuilderLastOutput(null);
+    setEstimateGuidedBuilderActive(true);
+    setEstimateReferenceToolsExpanded(false);
     setEstimateAssistantNotice('');
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
@@ -20218,6 +20353,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInvoiceComposerOpen(false);
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
+      setEstimateGuidedBuilderActive(false);
       setFocusedEstimateRecordId(estimate.id);
       setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
     };
@@ -20294,6 +20430,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderJobType('repair');
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
+      setEstimateGuidedBuilderActive(false);
+      setEstimateReferenceToolsExpanded(false);
       setEstimateAssistantNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
@@ -20423,6 +20561,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setInvoiceComposerOpen(false);
         setEditingInvoiceId(null);
         setInvoiceDraft(createBlankInvoiceDraft());
+        setEstimateGuidedBuilderActive(false);
         const linkedJob = savedInvoice.job_id ? inspections.find(item => item.id === savedInvoice.job_id) ?? null : null;
         if (linkedJob) {
           openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
@@ -20519,6 +20658,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setInvoiceDraft(invoiceDraftFromInvoice(invoice));
       setInvoiceComposerOpen(true);
       setEstimateComposerOpen(false);
+      setEstimateGuidedBuilderActive(false);
       setContractorJobsView('new_financial');
       return;
     }
@@ -20553,6 +20693,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderJobType('repair');
       setEstimateDraftBuilderLaborMode('job_total');
       setEstimateDraftBuilderLastOutput(null);
+      setEstimateGuidedBuilderActive(false);
+      setEstimateReferenceToolsExpanded(false);
       setEstimateAssistantNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
@@ -22334,7 +22476,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return next;
   };
 
-  const applyEstimateDraftBuilder = (subjectName: string) => {
+  const applyEstimateDraftBuilder = (subjectName: string, options: { libraryBundle?: EstimateDraftLibraryBundle | null; forceGeneral?: boolean } = {}) => {
     setEstimateAssistantNotice('');
     if (!estimateAssistantText.trim()) {
       setEstimateAssistantNotice('Add a rough scope first, then build the estimate draft.');
@@ -22351,9 +22493,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       jobType: buildJobType,
       roughScope: estimateAssistantText,
     });
-    const builtDraft = libraryBundle
+    const selectedLibraryBundle = options.forceGeneral ? null : (options.libraryBundle ?? libraryBundle);
+    const builtDraft = selectedLibraryBundle
       ? buildEstimateDraftFromLibraryBundle({
-          bundle: libraryBundle,
+          bundle: selectedLibraryBundle,
           trade: buildTrade,
           jobType: buildJobType,
           laborMode: estimateDraftBuilderLaborMode,
@@ -22411,6 +22554,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       builtTrade: builtDraft.builtTrade,
       builtJobType: builtDraft.builtJobType,
     });
+    setEstimateGuidedBuilderActive(false);
+    setEstimateReferenceToolsExpanded(false);
     const unpricedCount = builtDraft.lines.filter(draftLineIsUnpriced).length;
     const matchedCopy = builtDraft.matchedCount > 0
       ? ` Matched saved-charge pricing for ${builtDraft.matchedCount} line${builtDraft.matchedCount === 1 ? '' : 's'}.`
@@ -22436,16 +22581,43 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const renderBuildEstimateDraftPanel = (subjectName: string) => {
+    const profileTradeOptions = ESTIMATE_DRAFT_BUILDER_TRADES
+      .filter(trade => trade !== 'Other' && tradeToolMatchesContractor(trade, contractorDraft.service_categories));
+    const otherTradeOptions = ESTIMATE_DRAFT_BUILDER_TRADES
+      .filter(trade => !profileTradeOptions.includes(trade));
+    const recipeMatches = estimateAssistantText.trim()
+      ? estimateDraftRecipeMatches({
+          selectedTrade: estimateDraftBuilderTrade,
+          selectedJobType: estimateDraftBuilderJobType,
+          roughScope: estimateAssistantText,
+        })
+      : [];
+    const hasSpecificRecipeMatches = recipeMatches.length > 0;
+    const renderTradeOption = (trade: EstimateDraftBuilderTrade) => (
+      <button
+        key={trade}
+        type="button"
+        onClick={() => setEstimateDraftBuilderTrade(trade)}
+        className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-bold transition ${
+          estimateDraftBuilderTrade === trade
+            ? 'border-blue-500 bg-blue-50 text-blue-950'
+            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+        }`}
+      >
+        {trade}
+      </button>
+    );
+
     return (
-      <div className="rounded-2xl border border-blue-200 bg-white p-4">
+      <div className="rounded-2xl border border-blue-200 bg-white p-4" data-testid="guided-estimate-builder">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-blue-700" />
-              <p className="text-sm font-bold text-slate-950">Build Estimate Draft</p>
+              <p className="text-sm font-bold text-slate-950">Build an estimate draft</p>
             </div>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Choose a trade and job type, add rough scope, then build editable line items. Prices stay blank unless an active saved charge clearly matches.
+              Start with the customer, trade, work type, labor style, and rough scope. ServSync will suggest a draft recipe or a general builder.
             </p>
           </div>
           <button
@@ -22459,32 +22631,53 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           </button>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <Field label="Trade">
-            <select
-              className={inputClass()}
-              value={estimateDraftBuilderTrade}
-              onChange={event => setEstimateDraftBuilderTrade(event.target.value as EstimateDraftBuilderTrade)}
-            >
-              {ESTIMATE_DRAFT_BUILDER_TRADES.map(trade => (
-                <option key={trade} value={trade}>{trade}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Job type">
-            <select
-              className={inputClass()}
-              value={estimateDraftBuilderJobType}
-              onChange={event => setEstimateDraftBuilderJobType(event.target.value as EstimateDraftBuilderJobType)}
-            >
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Trade</p>
+            {profileTradeOptions.length > 0 && (
+              <div className="mt-2">
+                <p className="mb-1 text-xs font-semibold text-slate-600">Your business profile trades</p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {profileTradeOptions.map(renderTradeOption)}
+                </div>
+              </div>
+            )}
+            <div className={profileTradeOptions.length > 0 ? 'mt-3' : 'mt-2'}>
+              <p className="mb-1 text-xs font-semibold text-slate-600">Other supported builder trades</p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {otherTradeOptions.map(renderTradeOption)}
+              </div>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Recipe coverage is still limited. If no app-owned recipe matches this trade, use the general builder.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Work type</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Choose a broad action category, not a specific job.</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {ESTIMATE_DRAFT_BUILDER_JOB_TYPES.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setEstimateDraftBuilderJobType(option.value)}
+                  className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-bold transition ${
+                    estimateDraftBuilderJobType === option.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-950'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
               ))}
-            </select>
-          </Field>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div className="mt-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Labor style</p>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
           {ESTIMATE_DRAFT_BUILDER_LABOR_MODES.map(option => (
             <button
               key={option.value}
@@ -22500,9 +22693,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <span className="mt-1 block text-xs leading-5">{option.description}</span>
             </button>
           ))}
+          </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4">
           <Field label="Rough scope">
             <textarea
               className={`${inputClass()} min-h-[96px] resize-y`}
@@ -22514,11 +22708,71 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           </Field>
         </div>
 
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold text-slate-950">Recommended recipe matches</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                App-owned recipes are price-free starting points. Review every line before saving or sending.
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-500">
+              {recipeMatches.length} / 3 matches
+            </span>
+          </div>
+
+          {hasSpecificRecipeMatches ? (
+            <div className="mt-3 grid gap-2">
+              {recipeMatches.map((match, index) => (
+                <div key={match.libraryPath} className="rounded-xl border border-blue-100 bg-white p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">
+                        Match {index + 1} · {match.bundle.trade} / {match.bundle.work_category}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-950">{match.bundle.display_name}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">
+                        <span className="font-bold">Why this matched:</span> {match.why}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applyEstimateDraftBuilder(subjectName, { libraryBundle: match.bundle })}
+                      className={buttonClass(index === 0 ? 'primary' : 'secondary')}
+                      aria-label={`Use this recipe ${match.bundle.display_name}`}
+                    >
+                      <Sparkles size={14} />
+                      Use this recipe
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
+              No specific recipe found yet. Use the general builder to create a clean editable draft from your scope.
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => applyEstimateDraftBuilder(subjectName, { forceGeneral: true })} className={buttonClass('secondary')}>
+              <Sparkles size={14} />
+              Use general builder
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEstimateGuidedBuilderActive(false);
+                setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
+              }}
+              className={buttonClass('secondary')}
+            >
+              Start blank estimate
+            </button>
+          </div>
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => applyEstimateDraftBuilder(subjectName)} className={buttonClass('primary')}>
-            <Sparkles size={14} />
-            Build Estimate Draft
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -22531,7 +22785,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             Clear
           </button>
           <p className="text-xs leading-5 text-slate-500">
-            Rough-scope prices are ignored. Review Price Required lines before sending.
+            Rough-scope prices are ignored. This does not add AI or pricing recommendations.
           </p>
         </div>
         {estimateAssistantNotice && (
@@ -22609,6 +22863,53 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
     setEstimateComposerOpen(true);
   };
+
+  const renderEstimateReferenceTools = (subjectName: string) => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="estimate-reference-tools">
+      <button
+        type="button"
+        onClick={() => setEstimateReferenceToolsExpanded(value => !value)}
+        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+        aria-expanded={estimateReferenceToolsExpanded}
+      >
+        <span>
+          <span className="block text-sm font-bold text-slate-950">Reference tools</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">
+            Saved charges, Price Book, templates, helper suggestions, and advanced calculators are available when you need them.
+          </span>
+        </span>
+        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+          {estimateReferenceToolsExpanded ? 'Hide reference tools' : 'Show reference tools'}
+        </span>
+      </button>
+
+      {estimateReferenceToolsExpanded && (
+        <div className="mt-3 space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-slate-950">Estimate Templates</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Contractor-owned templates stay separate from app-owned draft recipes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setContractorJobsViewAndScroll('templates')}
+                className={buttonClass('secondary')}
+              >
+                Open templates
+              </button>
+            </div>
+          </div>
+          {renderSavedChargeQuickPick()}
+          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
+          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
+          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderAdvancedTradeTools(subjectName)}
+        </div>
+      )}
+    </div>
+  );
 
   const startEstimateAssistantSpeech = () => {
     setEstimateAssistantNotice('');
@@ -30845,6 +31146,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         onClick={() => {
                                           if (localCustomer && requireLocalPropertyForNewRecord()) return;
                                           const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
+                                          const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
                                           setEditingEstimateId(null);
                                           setEstimateDraft(createBlankEstimateDraft({
                                             title: `Estimate — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
@@ -30853,10 +31155,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                           }));
                                           setEstimateAssistantText('');
-                                          setEstimateDraftBuilderTrade('Other');
-                                          setEstimateDraftBuilderJobType('repair');
+                                          setEstimateDraftBuilderTrade(defaultBuilderTrade);
+                                          setEstimateDraftBuilderJobType('replacement');
                                           setEstimateDraftBuilderLaborMode('job_total');
                                           setEstimateDraftBuilderLastOutput(null);
+                                          setEstimateGuidedBuilderActive(true);
+                                          setEstimateReferenceToolsExpanded(false);
                                           setEstimateAssistantNotice('');
                                           setEstimateHelperNotice('');
                                           setEstimateHelperExpanded(false);
@@ -30934,14 +31238,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         </Field>
                                       )}
                                     </div>
+                                    {estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
+                                      <>
+                                        <div className="mt-4">
+                                          {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        </div>
+                                        <div className="mt-4">
+                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
                                     {!isInvoiceWorkspaceTab && (
                                       <div className="mt-4">
-                                        {renderAdvancedTradeTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                       </div>
                                     )}
-                                    <div className="mt-4">
-                                      {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
-                                    </div>
                                     <div className="mt-3">
                                       <Field label="Scope of work">
                                         <textarea
@@ -31021,6 +31333,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         Cancel
                                       </button>
                                     </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
 
@@ -31094,6 +31408,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraftBuilderJobType('repair');
                                                   setEstimateDraftBuilderLaborMode('job_total');
                                                   setEstimateDraftBuilderLastOutput(null);
+                                                  setEstimateGuidedBuilderActive(false);
+                                                  setEstimateReferenceToolsExpanded(false);
                                                   setEstimateAssistantNotice('');
                                                   setEstimateHelperNotice('');
                                                   setEstimateHelperExpanded(false);
@@ -31199,6 +31515,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                       setEstimateDraftBuilderJobType('repair');
                                                       setEstimateDraftBuilderLaborMode('job_total');
                                                       setEstimateDraftBuilderLastOutput(null);
+                                                      setEstimateGuidedBuilderActive(false);
+                                                      setEstimateReferenceToolsExpanded(false);
                                                       setEstimateAssistantNotice('');
                                                       setEstimateHelperNotice('');
                                                       setEstimateHelperExpanded(false);
@@ -31333,6 +31651,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEstimateDraftBuilderJobType('repair');
                                                     setEstimateDraftBuilderLaborMode('job_total');
                                                     setEstimateDraftBuilderLastOutput(null);
+                                                    setEstimateGuidedBuilderActive(false);
+                                                    setEstimateReferenceToolsExpanded(false);
                                                     setEstimateAssistantNotice('');
                                                     setEstimateHelperNotice('');
                                                     setEstimateHelperExpanded(false);
@@ -32013,15 +32333,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           )}
                         </div>
 
+                        {estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
+                          <>
+                            <div className="mt-4">
+                              {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
+                            </div>
+                            <div className="mt-4">
+                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                            </div>
+                          </>
+                        ) : (
+                          <>
                         {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && (
                           <div className="mt-4">
-                            {renderAdvancedTradeTools(selectedJobsCustomerName || 'Customer')}
+                            {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
                           </div>
                         )}
-
-                        <div className="mt-4">
-                          {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
-                        </div>
 
                         <div className="mt-4">
                           <Field label="Scope of work">
@@ -32090,6 +32417,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Cancel
                           </button>
                         </div>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -32621,6 +32950,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateDraftBuilderJobType('repair');
                                         setEstimateDraftBuilderLaborMode('job_total');
                                         setEstimateDraftBuilderLastOutput(null);
+                                        setEstimateGuidedBuilderActive(false);
+                                        setEstimateReferenceToolsExpanded(false);
                                         setEstimateAssistantNotice('');
                                         setEstimateHelperNotice('');
                                         setEstimateHelperExpanded(false);
