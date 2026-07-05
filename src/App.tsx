@@ -919,25 +919,6 @@ type InvoiceDraftForm = {
   job_labor_hours: string;
   line_items: EstimateLineDraft[];
 };
-type TradeToolInputType = 'number' | 'text' | 'select';
-type TradeToolInput = {
-  id: string;
-  label: string;
-  type: TradeToolInputType;
-  unit?: string;
-  options?: string[];
-  placeholder?: string;
-  defaultValue: string;
-};
-type TradeToolDefinition = {
-  id: string;
-  name: string;
-  trade: string;
-  helper: string;
-  searchTerms: string[];
-  inputs: TradeToolInput[];
-  buildDraft: (inputValues: Record<string, string>, subjectName: string) => EstimateDraft;
-};
 type LocalCustomerClaimPreview = {
   invite_id: string;
   status: LocalCustomerClaimInviteStatus;
@@ -2447,6 +2428,44 @@ function contextualEstimateBuilderSeeds({
   return [...materialSeeds, ...feeSeeds];
 }
 
+function estimateBuilderDeckDimensionSeed({
+  trade,
+  roughScope,
+}: {
+  trade: EstimateDraftBuilderTrade;
+  roughScope: string;
+}): EstimateDraftBuilderLineSeed | null {
+  const normalized = compactText(roughScope);
+  if (trade !== 'Carpentry' || !textIncludesAny(normalized, ['deck', 'decking', 'deck board', 'deck boards'])) return null;
+
+  const dimensionMatch = roughScope.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|')?\s*(?:x|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|')?/i);
+  if (!dimensionMatch) return null;
+
+  const lengthFt = Number.parseFloat(dimensionMatch[1]);
+  const widthFt = Number.parseFloat(dimensionMatch[2]);
+  if (!Number.isFinite(lengthFt) || !Number.isFinite(widthFt) || lengthFt <= 0 || widthFt <= 0) return null;
+
+  const deckBoardFaceWidthInches = 5.5;
+  const boardGapInches = 0.125;
+  const wasteFactorPercent = 10;
+  const defaultBoardLengthFt = 16;
+  const deckAreaSqFt = lengthFt * widthFt;
+  const boardCoverageWidthFt = (deckBoardFaceWidthInches + boardGapInches) / 12;
+  const boardLinearFt = Math.ceil((deckAreaSqFt / boardCoverageWidthFt) * (1 + wasteFactorPercent / 100));
+  const estimatedBoardCount = Math.max(1, Math.ceil(boardLinearFt / defaultBoardLengthFt));
+  const dimensionLabel = `${Number.isInteger(lengthFt) ? String(lengthFt) : lengthFt.toFixed(1)} ft by ${Number.isInteger(widthFt) ? String(widthFt) : widthFt.toFixed(1)} ft`;
+
+  return {
+    line_type: 'material',
+    description: 'Deck boards material allowance',
+    customer_description: `Editable deck board material allowance based on rough ${dimensionLabel} dimensions. Contractor should verify final quantities before sending.`,
+    editor_source_note: `Contractor review required: estimated from rough ${dimensionLabel} deck dimensions using ${deckBoardFaceWidthInches} inch actual board face width, ${boardGapInches} inch board gap, ${wasteFactorPercent}% waste factor, and ${defaultBoardLengthFt} ft default board length. Verify layout direction, board length, joist direction, picture framing, stairs, railing, local code requirements, and final waste factor before sending.`,
+    quantity: String(estimatedBoardCount),
+    unit: 'boards',
+    keywords: ['deck', 'deck boards', 'decking', 'material allowance', 'waste factor'],
+  };
+}
+
 function estimateDraftBuilderSeeds({
   trade,
   roughScope,
@@ -2461,13 +2480,15 @@ function estimateDraftBuilderSeeds({
   const safeSeeds = rulePack.lines
     .filter(estimateDraftBuilderSeedIsCustomerSafe)
     .filter(seed => estimateDraftBuilderFeeIsRelevant(seed, roughScope));
-  const materialAliasSeeds = detectEstimateBuilderMaterialSeeds({ trade, roughScope });
+  const deckDimensionSeed = estimateBuilderDeckDimensionSeed({ trade, roughScope });
+  const materialAliasSeeds = detectEstimateBuilderMaterialSeeds({ trade, roughScope })
+    .filter(seed => !deckDimensionSeed || compactText(seed.description) !== 'deck boards');
   const nonLaborSeeds = safeSeeds.filter(seed => {
     if (seed.line_type === 'labor') return false;
-    if (materialAliasSeeds.length > 0 && estimateDraftBuilderSeedIsGenericMaterialFallback(seed)) return false;
+    if ((deckDimensionSeed || materialAliasSeeds.length > 0) && estimateDraftBuilderSeedIsGenericMaterialFallback(seed)) return false;
     return true;
   });
-  return orderEstimateDraftBuilderSeeds([...materialAliasSeeds, ...nonLaborSeeds]);
+  return orderEstimateDraftBuilderSeeds([...(deckDimensionSeed ? [deckDimensionSeed] : []), ...materialAliasSeeds, ...nonLaborSeeds]);
 }
 
 function estimateBuilderDefaultLineDescription(seed: EstimateDraftBuilderLineSeed, jobType: EstimateDraftBuilderJobType) {
@@ -2880,244 +2901,6 @@ function estimateDraftTitleLooksDefault(title: string) {
   return !normalized || normalized.startsWith('estimate - ') || normalized.startsWith('estimate — ');
 }
 
-function tradeToolNumber(values: Record<string, string>, key: string, fallback = 0) {
-  const value = Number(String(values[key] ?? '').replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function tradeToolMoneyValue(value: number) {
-  return Number.isFinite(value) && value > 0 ? String(Math.round(value * 100) / 100) : '';
-}
-
-function tradeToolLine(overrides: Partial<EstimateLineDraft>) {
-  return createEstimateLineDraft(overrides);
-}
-
-function tradeToolTitle(label: string, subjectName: string) {
-  return `Estimate — ${label} — ${subjectName || 'Customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-}
-
-function defaultTradeToolInputValues(tool: TradeToolDefinition) {
-  return Object.fromEntries(tool.inputs.map(input => [input.id, input.defaultValue]));
-}
-
-const TRADE_TOOL_DEFINITIONS: TradeToolDefinition[] = [
-  {
-    id: 'deck-builder',
-    name: 'Deck Builder Material & Labor Builder',
-    trade: 'Decks',
-    helper: 'Calculates deck area, material allowance, railing, stairs, demo, disposal, and labor lines.',
-    searchTerms: ['deck', 'decks', 'decking', 'porch', 'patio', 'railing', 'stairs', 'framing', 'carpentry', 'handyman'],
-    inputs: [
-      { id: 'length', label: 'Deck length', type: 'number', unit: 'ft', defaultValue: '20' },
-      { id: 'width', label: 'Deck width', type: 'number', unit: 'ft', defaultValue: '12' },
-      { id: 'waste', label: 'Material waste factor', type: 'number', unit: '%', defaultValue: '10' },
-      { id: 'materialSqftPrice', label: 'Deck/framing material allowance', type: 'number', unit: '$/sq ft', defaultValue: '' },
-      { id: 'railingLf', label: 'Railing length', type: 'number', unit: 'linear ft', defaultValue: '0' },
-      { id: 'railingLfPrice', label: 'Railing allowance', type: 'number', unit: '$/linear ft', defaultValue: '' },
-      { id: 'stairRuns', label: 'Stair runs', type: 'number', unit: 'sets', defaultValue: '0' },
-      { id: 'stairPrice', label: 'Stair allowance', type: 'number', unit: '$/set', defaultValue: '' },
-      { id: 'laborHours', label: 'Labor hours', type: 'number', unit: 'hrs', defaultValue: '' },
-      { id: 'laborRate', label: 'Labor rate', type: 'number', unit: '$/hr', defaultValue: '' },
-      { id: 'demoPrice', label: 'Demo/removal', type: 'number', unit: '$', defaultValue: '' },
-      { id: 'disposalPrice', label: 'Debris disposal', type: 'number', unit: '$', defaultValue: '' },
-    ],
-    buildDraft: (values, subjectName) => {
-      const length = tradeToolNumber(values, 'length');
-      const width = tradeToolNumber(values, 'width');
-      const area = Math.max(0, length * width);
-      const waste = tradeToolNumber(values, 'waste', 10);
-      const materialArea = area > 0 ? Math.ceil(area * (1 + Math.max(0, waste) / 100)) : 0;
-      const railingLf = tradeToolNumber(values, 'railingLf');
-      const stairRuns = tradeToolNumber(values, 'stairRuns');
-      const laborHours = tradeToolNumber(values, 'laborHours');
-      const lines = [
-        laborHours > 0 && tradeToolLine({
-          line_type: 'labor',
-          description: 'Deck construction labor',
-          quantity: String(laborHours),
-          unit: 'hour',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'laborRate')),
-        }),
-        materialArea > 0 && tradeToolLine({
-          line_type: 'material',
-          description: `Decking, framing, fasteners, and hardware material allowance (${area.toLocaleString()} sq ft plus ${waste || 0}% waste)`,
-          quantity: String(materialArea),
-          unit: 'sq ft',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'materialSqftPrice')),
-        }),
-        railingLf > 0 && tradeToolLine({
-          line_type: 'material',
-          description: 'Railing materials and installation allowance',
-          quantity: String(railingLf),
-          unit: 'linear ft',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'railingLfPrice')),
-        }),
-        stairRuns > 0 && tradeToolLine({
-          line_type: 'labor',
-          description: 'Stair framing and installation allowance',
-          quantity: String(stairRuns),
-          unit: 'set',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'stairPrice')),
-        }),
-        tradeToolNumber(values, 'demoPrice') > 0 && tradeToolLine({
-          line_type: 'labor',
-          description: 'Demolition and removal of existing deck structure',
-          quantity: '1',
-          unit: 'job',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'demoPrice')),
-        }),
-        tradeToolNumber(values, 'disposalPrice') > 0 && tradeToolLine({
-          line_type: 'fee',
-          description: 'Debris disposal / haul-off',
-          quantity: '1',
-          unit: 'job',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'disposalPrice')),
-        }),
-      ].filter(Boolean) as EstimateLineDraft[];
-      return createBlankEstimateDraft({
-        title: tradeToolTitle('Deck construction', subjectName),
-        scope: `Construct a ${length || 0} ft by ${width || 0} ft deck${railingLf > 0 ? ` with approximately ${railingLf} linear ft of railing` : ''}${stairRuns > 0 ? ` and ${stairRuns} stair set${stairRuns === 1 ? '' : 's'}` : ''}. Estimate includes contractor-reviewed labor, material allowance, jobsite cleanup, and homeowner documentation. Final quantities should be verified on site before sending.`,
-        notes: 'Excludes permits, engineering, hidden structural repairs, utility relocation, finish upgrades, and changes requested after approval unless added in writing.',
-        line_items: lines.length ? lines : [createEstimateLineDraft({ description: 'Deck construction scope', unit: 'job' })],
-      });
-    },
-  },
-  {
-    id: 'plumbing-service',
-    name: 'Plumbing Repair Estimate Builder',
-    trade: 'Plumbing',
-    helper: 'Builds service call, labor, parts, access, cleanup, and testing lines for fixture, drain, and leak repairs.',
-    searchTerms: ['plumbing', 'plumber', 'leak', 'pipe', 'drain', 'toilet', 'faucet', 'valve', 'fixture', 'water heater'],
-    inputs: [
-      { id: 'repairType', label: 'Repair type', type: 'select', defaultValue: 'Leak repair', options: ['Leak repair', 'Fixture replacement', 'Drain service', 'Valve replacement', 'Water heater service', 'Diagnostic only'] },
-      { id: 'fixture', label: 'Fixture / location', type: 'text', defaultValue: '', placeholder: 'e.g. kitchen sink, toilet, water heater' },
-      { id: 'laborHours', label: 'Labor hours', type: 'number', unit: 'hrs', defaultValue: '' },
-      { id: 'laborRate', label: 'Labor rate', type: 'number', unit: '$/hr', defaultValue: '' },
-      { id: 'partsAllowance', label: 'Parts/materials allowance', type: 'number', unit: '$', defaultValue: '' },
-      { id: 'diagnosticFee', label: 'Service call / diagnostic', type: 'number', unit: '$', defaultValue: '' },
-      { id: 'accessDifficulty', label: 'Access difficulty', type: 'select', defaultValue: 'Standard access', options: ['Standard access', 'Tight access', 'Wall/cabinet opening needed', 'Crawlspace or attic access'] },
-      { id: 'cleanupFee', label: 'Cleanup/disposal allowance', type: 'number', unit: '$', defaultValue: '' },
-    ],
-    buildDraft: (values, subjectName) => {
-      const repairType = values.repairType || 'Plumbing repair';
-      const fixture = values.fixture?.trim() || 'affected fixture or plumbing area';
-      const laborHours = tradeToolNumber(values, 'laborHours');
-      const accessDifficulty = values.accessDifficulty || 'Standard access';
-      const lines = [
-        tradeToolNumber(values, 'diagnosticFee') > 0 && tradeToolLine({
-          line_type: 'fee',
-          description: 'Service call / plumbing diagnostic',
-          quantity: '1',
-          unit: 'visit',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'diagnosticFee')),
-        }),
-        laborHours > 0 && tradeToolLine({
-          line_type: 'labor',
-          description: `${repairType} labor`,
-          quantity: String(laborHours),
-          unit: 'hour',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'laborRate')),
-        }),
-        tradeToolNumber(values, 'partsAllowance') > 0 && tradeToolLine({
-          line_type: 'material',
-          description: 'Pipe, fittings, valves, fixture parts, and plumbing materials allowance',
-          quantity: '1',
-          unit: 'allowance',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'partsAllowance')),
-        }),
-        accessDifficulty !== 'Standard access' && tradeToolLine({
-          line_type: 'labor',
-          description: `Additional access labor: ${accessDifficulty.toLowerCase()}`,
-          quantity: '1',
-          unit: 'allowance',
-          unit_price: '',
-        }),
-        tradeToolNumber(values, 'cleanupFee') > 0 && tradeToolLine({
-          line_type: 'fee',
-          description: 'Cleanup, disposal, and work area protection',
-          quantity: '1',
-          unit: 'job',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'cleanupFee')),
-        }),
-      ].filter(Boolean) as EstimateLineDraft[];
-      return createBlankEstimateDraft({
-        title: tradeToolTitle(repairType, subjectName),
-        scope: `Perform ${repairType.toLowerCase()} for the ${fixture}. Scope includes diagnosis confirmation, repair or replacement work, system testing after completion, cleanup of the work area, and homeowner documentation. Access condition: ${accessDifficulty}.`,
-        notes: 'Excludes hidden damage, code upgrades, wall/cabinet restoration, permit fees, mold remediation, and additional repairs discovered after opening the affected area unless approved separately.',
-        line_items: lines.length ? lines : [createEstimateLineDraft({ description: `${repairType} for ${fixture}`, unit: 'job' })],
-      });
-    },
-  },
-  {
-    id: 'electrical-work',
-    name: 'Electrical Work Estimate Builder',
-    trade: 'Electrical',
-    helper: 'Builds diagnostic, labor, device/material, wire run, and permit lines for common residential electrical work.',
-    searchTerms: ['electrical', 'electrician', 'outlet', 'switch', 'fixture', 'breaker', 'panel', 'wire', 'circuit', 'gfci'],
-    inputs: [
-      { id: 'workType', label: 'Work type', type: 'select', defaultValue: 'Outlet / switch work', options: ['Outlet / switch work', 'Light fixture install', 'Ceiling fan install', 'Dedicated circuit', 'Breaker / panel repair', 'Electrical diagnostic'] },
-      { id: 'quantity', label: 'Device / fixture quantity', type: 'number', unit: 'each', defaultValue: '1' },
-      { id: 'materialEach', label: 'Device/material allowance', type: 'number', unit: '$/each', defaultValue: '' },
-      { id: 'wireRun', label: 'Wire/conduit run', type: 'number', unit: 'linear ft', defaultValue: '0' },
-      { id: 'wireLfPrice', label: 'Wire/conduit allowance', type: 'number', unit: '$/linear ft', defaultValue: '' },
-      { id: 'laborHours', label: 'Labor hours', type: 'number', unit: 'hrs', defaultValue: '' },
-      { id: 'laborRate', label: 'Labor rate', type: 'number', unit: '$/hr', defaultValue: '' },
-      { id: 'diagnosticFee', label: 'Service call / diagnostic', type: 'number', unit: '$', defaultValue: '' },
-      { id: 'permitFee', label: 'Permit / inspection fee', type: 'number', unit: '$', defaultValue: '' },
-    ],
-    buildDraft: (values, subjectName) => {
-      const workType = values.workType || 'Electrical work';
-      const quantity = tradeToolNumber(values, 'quantity', 1);
-      const wireRun = tradeToolNumber(values, 'wireRun');
-      const laborHours = tradeToolNumber(values, 'laborHours');
-      const lines = [
-        tradeToolNumber(values, 'diagnosticFee') > 0 && tradeToolLine({
-          line_type: 'fee',
-          description: 'Electrical service call / diagnostic',
-          quantity: '1',
-          unit: 'visit',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'diagnosticFee')),
-        }),
-        laborHours > 0 && tradeToolLine({
-          line_type: 'labor',
-          description: `${workType} labor`,
-          quantity: String(laborHours),
-          unit: 'hour',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'laborRate')),
-        }),
-        quantity > 0 && tradeToolLine({
-          line_type: 'material',
-          description: 'Devices, boxes, covers, connectors, breakers, fixtures, and electrical materials allowance',
-          quantity: String(quantity),
-          unit: 'each',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'materialEach')),
-        }),
-        wireRun > 0 && tradeToolLine({
-          line_type: 'material',
-          description: 'Wire, conduit, fittings, and routing materials allowance',
-          quantity: String(wireRun),
-          unit: 'linear ft',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'wireLfPrice')),
-        }),
-        tradeToolNumber(values, 'permitFee') > 0 && tradeToolLine({
-          line_type: 'fee',
-          description: 'Permit / inspection fee',
-          quantity: '1',
-          unit: 'allowance',
-          unit_price: tradeToolMoneyValue(tradeToolNumber(values, 'permitFee')),
-        }),
-      ].filter(Boolean) as EstimateLineDraft[];
-      return createBlankEstimateDraft({
-        title: tradeToolTitle(workType, subjectName),
-        scope: `Perform ${workType.toLowerCase()} for the customer. Scope includes confirmation of the electrical concern, safe installation or repair work, testing after completion, cleanup, and homeowner documentation. Final scope should be verified against site conditions and applicable code requirements before sending.`,
-        notes: 'Excludes hidden wiring issues, drywall/paint repair, utility company work, panel/service upgrades, permit costs not listed, and additional code-required repairs unless approved separately.',
-        line_items: lines.length ? lines : [createEstimateLineDraft({ description: workType, unit: 'job' })],
-      });
-    },
-  },
-];
-
 function tradeToolMatchesContractor(toolTrade: string, serviceCategories: string[]) {
   const normalizedTrade = normalizeText(toolTrade);
   return serviceCategories.some(category => {
@@ -3128,13 +2911,6 @@ function tradeToolMatchesContractor(toolTrade: string, serviceCategories: string
     if (normalizedTrade === 'electrical') return normalizedCategory.includes('electric');
     return false;
   });
-}
-
-function tradeToolSearchMatches(tool: TradeToolDefinition, search: string) {
-  const terms = normalizeText(search).split(' ').filter(Boolean);
-  if (terms.length === 0) return true;
-  const haystack = normalizeText([tool.name, tool.trade, tool.helper, ...tool.searchTerms].join(' '));
-  return terms.every(term => haystack.includes(term));
 }
 
 function estimateDraftFromEstimate(estimate: Estimate): EstimateDraft {
@@ -7271,136 +7047,6 @@ function RoleWalkthroughCard({
         )}
       </div>
     </section>
-  );
-}
-
-function TradeToolsPanel({
-  serviceCategories,
-  search,
-  onSearchChange,
-  activeToolId,
-  onActiveToolIdChange,
-  inputValues,
-  onInputChange,
-  onApply,
-}: {
-  serviceCategories: string[];
-  search: string;
-  onSearchChange: (value: string) => void;
-  activeToolId: string | null;
-  onActiveToolIdChange: (toolId: string) => void;
-  inputValues: Record<string, Record<string, string>>;
-  onInputChange: (toolId: string, inputId: string, value: string) => void;
-  onApply: (tool: TradeToolDefinition, values: Record<string, string>) => void;
-}) {
-  const normalizedSearch = search.trim();
-  const recommendedTools = TRADE_TOOL_DEFINITIONS.filter(tool => tradeToolMatchesContractor(tool.trade, serviceCategories));
-  const defaultTools = recommendedTools.length > 0 ? recommendedTools : TRADE_TOOL_DEFINITIONS;
-  const visibleTools = (normalizedSearch ? TRADE_TOOL_DEFINITIONS : defaultTools).filter(tool => tradeToolSearchMatches(tool, search));
-  const activeTool = visibleTools.find(tool => tool.id === activeToolId) ?? visibleTools[0] ?? null;
-  const toolValues = activeTool ? { ...defaultTradeToolInputValues(activeTool), ...(inputValues[activeTool.id] ?? {}) } : {};
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-blue-700" />
-            <p className="text-sm font-bold text-slate-950">Trade Tools</p>
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Use a trade-specific builder to create scope, materials, labor, and fees. Matching tools show first based on your Business Profile.
-          </p>
-        </div>
-        <div className="w-full sm:w-64">
-          <input
-            className={inputClass()}
-            value={search}
-            onChange={event => onSearchChange(event.target.value)}
-            placeholder="Search deck, plumbing, electrical..."
-          />
-        </div>
-      </div>
-
-      {visibleTools.length === 0 ? (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-sm font-semibold text-slate-950">No Trade Tools found.</p>
-          <p className="mt-1 text-xs text-slate-500">Try searching deck, plumbing, electrical, outlet, pipe, railing, or fixture.</p>
-        </div>
-      ) : (
-        <>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {visibleTools.map(tool => {
-              const recommended = tradeToolMatchesContractor(tool.trade, serviceCategories);
-              const active = activeTool?.id === tool.id;
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => onActiveToolIdChange(tool.id)}
-                  className={`rounded-xl border px-3 py-2 text-left transition ${
-                    active
-                      ? 'border-blue-600 bg-blue-50 text-blue-950'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
-                >
-                  <span className="block text-xs font-bold">{tool.name}</span>
-                  <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
-                    {recommended ? 'Recommended' : tool.trade}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {activeTool && (
-            <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-3">
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-slate-950">{activeTool.name}</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{activeTool.helper}</p>
-                </div>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 shadow-sm">{activeTool.trade}</span>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {activeTool.inputs.map(input => (
-                  <Field key={input.id} label={`${input.label}${input.unit ? ` (${input.unit})` : ''}`}>
-                    {input.type === 'select' ? (
-                      <select
-                        className={inputClass()}
-                        value={toolValues[input.id] ?? input.defaultValue}
-                        onChange={event => onInputChange(activeTool.id, input.id, event.target.value)}
-                      >
-                        {(input.options ?? []).map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    ) : (
-                      <input
-                        className={inputClass()}
-                        type={input.type === 'number' ? 'number' : 'text'}
-                        min={input.type === 'number' ? '0' : undefined}
-                        step={input.type === 'number' ? '0.01' : undefined}
-                        value={toolValues[input.id] ?? input.defaultValue}
-                        onChange={event => onInputChange(activeTool.id, input.id, event.target.value)}
-                        placeholder={input.placeholder}
-                      />
-                    )}
-                  </Field>
-                ))}
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => onApply(activeTool, toolValues)} className={buttonClass('primary')}>
-                  <Sparkles size={14} />
-                  Build estimate draft
-                </button>
-                <p className="text-xs text-slate-500">The generated scope and all line items remain editable.</p>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
   );
 }
 
@@ -18840,10 +18486,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
   const [estimatePriceBookQuickPickSearch, setEstimatePriceBookQuickPickSearch] = useState('');
   const [estimatePriceBookQuickPickNotice, setEstimatePriceBookQuickPickNotice] = useState('');
-  const [tradeToolsExpanded, setTradeToolsExpanded] = useState(false);
-  const [tradeToolSearch, setTradeToolSearch] = useState('');
-  const [activeTradeToolId, setActiveTradeToolId] = useState<string | null>(null);
-  const [tradeToolInputs, setTradeToolInputs] = useState<Record<string, Record<string, string>>>({});
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [contractorResponseDrafts, setContractorResponseDrafts] = useState<Record<string, string>>({});
   const [contractorQuoteDrafts, setContractorQuoteDrafts] = useState<Record<string, { enabled: boolean; amount: string; scope: string }>>({});
@@ -23019,76 +22661,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
-  const renderAdvancedTradeTools = (subjectName: string) => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-      <button
-        type="button"
-        onClick={() => setTradeToolsExpanded(value => !value)}
-        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
-        aria-expanded={tradeToolsExpanded}
-      >
-        <span>
-          <span className="block text-sm font-bold text-slate-950">Advanced trade tools</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
-            Show trade calculators when you need structured calculators for decks, plumbing, electrical, or other specific work.
-          </span>
-        </span>
-        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
-          {tradeToolsExpanded ? 'Hide calculators' : 'Show trade calculators'}
-        </span>
-      </button>
-      {tradeToolsExpanded && (
-        <div className="mt-3">
-          <TradeToolsPanel
-            serviceCategories={contractorDraft.service_categories}
-            search={tradeToolSearch}
-            onSearchChange={setTradeToolSearch}
-            activeToolId={activeTradeToolId}
-            onActiveToolIdChange={setActiveTradeToolId}
-            inputValues={tradeToolInputs}
-            onInputChange={updateTradeToolInput}
-            onApply={(tool, values) => applyTradeToolEstimateDraft(tool, values, subjectName)}
-          />
-        </div>
-      )}
-    </div>
-  );
-
-  const updateTradeToolInput = (toolId: string, inputId: string, value: string) => {
-    setTradeToolInputs(prev => ({
-      ...prev,
-      [toolId]: {
-        ...(prev[toolId] ?? {}),
-        [inputId]: value,
-      },
-    }));
-  };
-
-  const applyTradeToolEstimateDraft = (tool: TradeToolDefinition, values: Record<string, string>, subjectName: string) => {
-    const builtDraft = tool.buildDraft(values, subjectName || 'Customer');
-    setEstimateDraft(current => ({
-      ...builtDraft,
-      service_request_id: current.service_request_id,
-      inspection_id: current.inspection_id,
-      home_id: current.home_id,
-      local_home_id: current.local_home_id,
-      labor_rate: builtDraft.labor_rate || current.labor_rate || laborRateInputFromCents(contractor?.default_labor_rate_cents),
-    }));
-    setEstimateAssistantText('');
-    setEstimateDraftBuilderTrade('Other');
-    setEstimateDraftBuilderJobType('repair');
-    setEstimateDraftBuilderLaborMode('job_total');
-    setEstimateDraftBuilderLastOutput(null);
-    setEstimateStartMode('draft');
-    setEstimateHelperNotice('');
-    setEstimateHelperExpanded(false);
-    setSavedChargeQuickPickNotice('');
-    setEstimateTemplateStartNotice('');
-    setEstimateAssistantNotice(`${tool.name} created a structured estimate draft. Review quantities, pricing, exclusions, and terms before sending.`);
-    setEstimateComposerOpen(true);
-  };
-
-  const renderEstimateReferenceTools = (subjectName: string) => (
+  const renderEstimateReferenceTools = () => (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="estimate-reference-tools">
       <button
         type="button"
@@ -23099,7 +22672,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <span>
           <span className="block text-sm font-bold text-slate-950">Reference tools</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">
-            Saved charges, Price Book, templates, helper suggestions, and advanced calculators are available when you need them.
+            Saved charges, Price Book, templates, and helper suggestions are available when you need them.
           </span>
         </span>
         <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
@@ -23129,7 +22702,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {renderSavedChargeQuickPick()}
           {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
           {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
-          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderAdvancedTradeTools(subjectName)}
         </div>
       )}
     </div>
@@ -31478,7 +31050,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {renderEstimateStartChoice()}
                                         </div>
                                         <div className="mt-4">
-                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                          {renderEstimateReferenceTools()}
                                         </div>
                                       </>
                                     ) : estimateStartMode === 'template' && !isInvoiceWorkspaceTab ? (
@@ -31487,7 +31059,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {renderSavedEstimateTemplateStartPicker(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                         </div>
                                         <div className="mt-4">
-                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                          {renderEstimateReferenceTools()}
                                         </div>
                                       </>
                                     ) : estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
@@ -31496,14 +31068,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                         </div>
                                         <div className="mt-4">
-                                          {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                          {renderEstimateReferenceTools()}
                                         </div>
                                       </>
                                     ) : (
                                       <>
                                     {!isInvoiceWorkspaceTab && (
                                       <div className="mt-4">
-                                        {renderEstimateReferenceTools(conn?.display_name || localCustomer?.display_name || 'Customer')}
+                                        {renderEstimateReferenceTools()}
                                       </div>
                                     )}
                                     {estimateTemplateStartNotice && !isInvoiceWorkspaceTab && (
@@ -32682,7 +32254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {renderEstimateStartChoice()}
                             </div>
                             <div className="mt-4">
-                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                              {renderEstimateReferenceTools()}
                             </div>
                           </>
                         ) : estimateStartMode === 'template' && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
@@ -32691,7 +32263,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {renderSavedEstimateTemplateStartPicker(selectedJobsCustomerName || 'Customer')}
                             </div>
                             <div className="mt-4">
-                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                              {renderEstimateReferenceTools()}
                             </div>
                           </>
                         ) : estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
@@ -32700,14 +32272,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
                             </div>
                             <div className="mt-4">
-                              {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                              {renderEstimateReferenceTools()}
                             </div>
                           </>
                         ) : (
                           <>
                         {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && (
                           <div className="mt-4">
-                            {renderEstimateReferenceTools(selectedJobsCustomerName || 'Customer')}
+                            {renderEstimateReferenceTools()}
                           </div>
                         )}
                         {estimateTemplateStartNotice && (

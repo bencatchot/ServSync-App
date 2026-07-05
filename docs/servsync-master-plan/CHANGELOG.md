@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-05
 
+- Branch: `codex/estimate-builder-cleanup-e-remove-trade-tools-v1`
+- Starting main SHA: `4c8c4fafb446d2921c5649d29de2cf8ed82f9f83`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Estimate Builder Cleanup E to remove visible standalone Advanced Trade Tools from the estimate Reference tools area while preserving useful deck/plumbing/electrical guidance inside the guided builder fallback/helper path. The fallback builder now includes a deterministic, price-free deck board material allowance helper for rough deck scopes with dimensions such as `10x10`.
+- Reason for change: Guided builder, saved templates, blank estimates, Estimate Helper, Saved Charges, and Price Book now cover the intended estimate workflow, so standalone deck/plumbing/electrical calculators created a competing estimate path.
+- Tests/checks run:
+  - `npm ci`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan for SQL/RLS/RPC/Supabase/env/package/Vercel/auth/billing/native/service-worker/deployment/recipe-library drift
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb007-estimate-draft-library-path-flow.spec.ts --project=chromium`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, auth/link helper, entitlement/billing, backend behavior, native projects, service worker/offline sync, recipe library expansion, notifications, payments, deployment, or production data mutation is included.
+  - Deck board counts are rough, editable, and contractor-review-required. They use explicit assumptions for board face width, gap, waste factor, and default board length, and must not be treated as guaranteed quantities or pricing recommendations.
+  - This slice removes only the standalone Advanced Trade Tools UI/apply path. Saved-template start, guided builder, blank estimate, Save as template, estimate sending, and pricing behavior remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Estimate Builder Cleanup E and the removal of standalone Advanced Trade Tools from the estimate Reference tools area.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports the existing estimate workflow direction without changing product scope, backend workflow behavior, pricing recommendations, auth, billing, or native/mobile strategy.
+
 - Branch: `codex/guided-estimate-builder-slice-d-save-template-modal-v1`
 - Starting main SHA: `caa1039f1bfb6d9a7cb39f6f157241bf889d4320`
 - Files changed:
