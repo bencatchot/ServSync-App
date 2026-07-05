@@ -3073,6 +3073,10 @@ function invoiceTemplateStartNoticeForTemplate(template: EstimateTemplate) {
   return `Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice. ${pricingNotice}`;
 }
 
+function manualJobTemplateStartNoticeForTemplate() {
+  return 'Starts the existing direct job form with this template’s name and scope. Use this only when the work is already approved or does not require estimate approval. This creates a job without sending an estimate for homeowner approval. Template line items and pricing are not copied to the job. Review scope and pricing before invoicing. No invoice is created or sent.';
+}
+
 function defaultEstimateTemplateName(estimate: Pick<Estimate, 'title'>) {
   return estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template';
 }
@@ -18521,6 +18525,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [estimateTemplateStartNotice, setEstimateTemplateStartNotice] = useState('');
   const [invoiceTemplateStartNotice, setInvoiceTemplateStartNotice] = useState('');
+  const [manualJobTemplateStartNotice, setManualJobTemplateStartNotice] = useState('');
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
   const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
   const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
@@ -20072,6 +20077,47 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setHomeownerWorkspaceEstimateView('draft');
     setContractorJobsView('new_financial');
     setContractorTab('inspections');
+  };
+
+  const applySavedEstimateTemplateManualJobStart = (
+    template: EstimateTemplate,
+    subjectName: string,
+    options: {
+      connection?: ContractorConnectedHomeowner | null;
+      localContact?: ContractorLocalContact | null;
+      homeId?: string | null;
+      localHomeId?: string | null;
+    } = {},
+  ) => {
+    const safeSubjectName = subjectName || 'Customer';
+    const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const jobName = `${template.name} — ${safeSubjectName} — ${dateLabel}`;
+    const jobOptions = {
+      name: jobName,
+      scope: template.scope || '',
+      workflowKind: 'work_order' as FieldWorkflowKind,
+      templateSource: 'blank' as FieldWorkTemplateSource,
+      manualJobTemplateStartNotice: manualJobTemplateStartNoticeForTemplate(),
+    };
+
+    setEstimateComposerOpen(false);
+    setInvoiceComposerOpen(false);
+    setEstimateTemplateStartNotice('');
+    setInvoiceTemplateStartNotice('');
+
+    if (options.connection) {
+      beginFieldWorkForHomeowner(options.connection, {
+        ...jobOptions,
+        homeId: options.homeId,
+      });
+      return;
+    }
+    if (options.localContact) {
+      beginFieldWorkForLocalContact(options.localContact, {
+        ...jobOptions,
+        localHomeId: options.localHomeId,
+      });
+    }
   };
 
   const closeActiveInvoiceEditor = () => {
@@ -24145,7 +24191,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
-  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; serviceRequestId?: string; homeId?: string | null; localHomeId?: string | null };
+  type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; scope?: string; serviceRequestId?: string; homeId?: string | null; localHomeId?: string | null; manualJobTemplateStartNotice?: string };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
     const templateSource: FieldWorkTemplateSource = options?.templateSource ?? (options?.templateId ? 'custom' : options?.starterTemplateId ? 'starter' : 'blank');
     const starterTemplateId = options?.starterTemplateId ?? sortedServSyncFieldWorkTemplates[0]?.id ?? 'starter-general-maintenance-field-work';
@@ -24168,7 +24214,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: '',
       service_request_id: options?.serviceRequestId ?? '',
       name: options?.name ?? buildFieldWorkName(connection, starterTemplateId, workflowKind, templateSource),
-      scope: '',
+      scope: options?.scope ?? '',
       job_mode: jobMode,
       job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
       template_id: options?.templateId ?? '',
@@ -24180,6 +24226,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       schedule_notes: '',
       share_with_homeowner: false,
     });
+    setManualJobTemplateStartNotice(options?.manualJobTemplateStartNotice ?? '');
     setInspectionView('new');
     setContractorJobsView('new_jobs');
     setContractorTab('inspections');
@@ -24198,7 +24245,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: selectedLocalHomeId,
       service_request_id: '',
       name: options?.name ?? buildLocalFieldWorkName(currentContact, starterTemplateId, workflowKind, templateSource),
-      scope: '',
+      scope: options?.scope ?? '',
       job_mode: jobMode,
       job_type: jobTypeFromWorkflowKind(workflowKind, jobMode) as SimpleServiceJobType | 'inspection' | 'maintenance_visit',
       template_id: options?.templateId ?? '',
@@ -24210,6 +24257,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       schedule_notes: '',
       share_with_homeowner: false,
     });
+    setManualJobTemplateStartNotice(options?.manualJobTemplateStartNotice ?? '');
     setInspectionView('new');
     setContractorJobsView('new_jobs');
     setContractorTab('inspections');
@@ -31339,6 +31387,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <p className="mt-1 text-xs leading-5 text-amber-700">
                                             Create Manual Invoice Draft uses the selected customer context only. Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice.
                                           </p>
+                                          <p className="mt-1 text-xs leading-5 text-amber-700">
+                                            Start Manual Job uses the selected customer context only. Starts the existing direct job form with this template’s name and scope. Use this only when the work is already approved or does not require estimate approval. Template line items and pricing are not copied to the job.
+                                          </p>
                                         </div>
                                       </div>
                                       <div className="mb-3 flex items-center justify-between gap-2">
@@ -31436,6 +31487,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   >
                                                     <Receipt size={15} />
                                                     Create Manual Invoice Draft
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
+                                                      applySavedEstimateTemplateManualJobStart(template, subjectName, {
+                                                        connection: conn,
+                                                        localContact: localCustomer,
+                                                        homeId: workspaceNewRecordHomeId,
+                                                        localHomeId: workspaceNewRecordLocalHomeId,
+                                                      });
+                                                    }}
+                                                    className={buttonClass('secondary')}
+                                                  >
+                                                    <ClipboardCheck size={15} />
+                                                    Start Manual Job
                                                   </button>
                                                   <button
                                                     type="button"
@@ -35023,6 +35091,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <button type="button" onClick={() => setShowLocalContactForm(false)} className={buttonClass('secondary')}>Cancel</button>
                     </div>
                   </div>
+                )}
+                {manualJobTemplateStartNotice && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900">
+                    {manualJobTemplateStartNotice}
+                  </p>
                 )}
                 {inspectionNewDraft.job_mode === 'simple' ? (
                   <>
