@@ -214,6 +214,7 @@ import type {
   ContractorSubscriptionStatus,
   ContractorInvite,
   HomeProfile,
+  HomeRoom,
   HomeownerConnection,
   HomeownerProfile,
   InvitePreview,
@@ -471,6 +472,15 @@ type HomeReminderDraft = {
   title: string;
   notes: string;
   due_on: string;
+};
+type HomeRoomDraft = {
+  id: string | null;
+  home_id: string;
+  name: string;
+  room_type: string;
+  floor_label: string;
+  area_label: string;
+  notes: string;
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
 type FieldWorkTemplateSource = 'blank' | 'starter' | 'custom';
@@ -9721,6 +9731,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homePhotoUrl, setHomePhotoUrl] = useState('');
   const [uploadingHomeownerProfilePhoto, setUploadingHomeownerProfilePhoto] = useState(false);
   const [uploadingHomePhoto, setUploadingHomePhoto] = useState(false);
+  const [homeRoomsByHomeId, setHomeRoomsByHomeId] = useState<Record<string, HomeRoom[]>>({});
+  const [loadingHomeRooms, setLoadingHomeRooms] = useState(false);
+  const [savingHomeRoom, setSavingHomeRoom] = useState(false);
+  const [homeRoomDraft, setHomeRoomDraft] = useState<HomeRoomDraft | null>(null);
+  const [archivingHomeRoomId, setArchivingHomeRoomId] = useState<string | null>(null);
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [homeownerPropertyProposalsByConnectionId, setHomeownerPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
@@ -9973,6 +9988,156 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const selectedHome = homes.find(candidate => candidate.id === selectedHomeId) ?? (home?.id ? home : null);
   const homeDraft = home || createEmptyHomeDraft();
+  const knownHomeRoomIds = Array.from(new Set([
+    ...homes.map(candidate => candidate.id).filter(Boolean),
+    ...sharedHomeShells.map(shell => shell.home_id).filter(Boolean),
+  ]));
+  const knownHomeRoomIdKey = knownHomeRoomIds.join('|');
+  const selectedHomeRooms = selectedHome?.id ? (homeRoomsByHomeId[selectedHome.id] || []) : [];
+
+  const cleanRoomOptionalText = (value: string) => {
+    const trimmed = cleanHumanWrittenText(value).trim();
+    return trimmed || null;
+  };
+
+  const emptyHomeRoomDraft = (homeId: string): HomeRoomDraft => ({
+    id: null,
+    home_id: homeId,
+    name: '',
+    room_type: '',
+    floor_label: '',
+    area_label: '',
+    notes: '',
+  });
+
+  const loadHomeRooms = useCallback(async () => {
+    if (!supabase) return;
+    const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
+    if (homeIds.length === 0) {
+      setHomeRoomsByHomeId({});
+      return;
+    }
+
+    setLoadingHomeRooms(true);
+    try {
+      const { data, error: roomsError } = await supabase
+        .from('home_rooms')
+        .select('id, home_id, name, room_type, floor_label, area_label, sort_order, notes, archived_at, created_by, created_at, updated_at')
+        .in('home_id', homeIds)
+        .is('archived_at', null)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+      if (roomsError) throw roomsError;
+
+      const grouped = (data || []).reduce<Record<string, HomeRoom[]>>((groups, room) => {
+        const typedRoom = room as HomeRoom;
+        groups[typedRoom.home_id] = [...(groups[typedRoom.home_id] || []), typedRoom];
+        return groups;
+      }, {});
+      setHomeRoomsByHomeId(grouped);
+    } catch (err) {
+      setError(readableError(err, 'Unable to load rooms.'));
+    } finally {
+      setLoadingHomeRooms(false);
+    }
+  }, [knownHomeRoomIdKey]);
+
+  useEffect(() => {
+    void loadHomeRooms();
+  }, [loadHomeRooms]);
+
+  const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
+    setError('');
+    setNotice('');
+    setHomeRoomDraft(room
+      ? {
+          id: room.id,
+          home_id: room.home_id,
+          name: room.name,
+          room_type: room.room_type || '',
+          floor_label: room.floor_label || '',
+          area_label: room.area_label || '',
+          notes: room.notes || '',
+        }
+      : emptyHomeRoomDraft(homeId));
+  };
+
+  const closeHomeRoomForm = () => {
+    setHomeRoomDraft(null);
+  };
+
+  const saveHomeRoom = async () => {
+    if (!supabase || !homeRoomDraft) return;
+    const name = cleanHumanWrittenText(homeRoomDraft.name).trim();
+    if (!name) {
+      setError('Room name is required.');
+      return;
+    }
+
+    setSavingHomeRoom(true);
+    setError('');
+    setNotice('');
+    try {
+      if (homeRoomDraft.id) {
+        const { error: updateError } = await supabase
+          .from('home_rooms')
+          .update({
+            name,
+            room_type: cleanRoomOptionalText(homeRoomDraft.room_type),
+            floor_label: cleanRoomOptionalText(homeRoomDraft.floor_label),
+            area_label: cleanRoomOptionalText(homeRoomDraft.area_label),
+            notes: cleanRoomOptionalText(homeRoomDraft.notes),
+          })
+          .eq('id', homeRoomDraft.id);
+        if (updateError) throw updateError;
+        setNotice('Room updated.');
+      } else {
+        const existingRooms = homeRoomsByHomeId[homeRoomDraft.home_id] || [];
+        const sortOrder = existingRooms.reduce((max, room) => Math.max(max, room.sort_order || 0), 0) + 10;
+        const { error: insertError } = await supabase
+          .from('home_rooms')
+          .insert({
+            home_id: homeRoomDraft.home_id,
+            created_by: profile.id,
+            name,
+            room_type: cleanRoomOptionalText(homeRoomDraft.room_type),
+            floor_label: cleanRoomOptionalText(homeRoomDraft.floor_label),
+            area_label: cleanRoomOptionalText(homeRoomDraft.area_label),
+            notes: cleanRoomOptionalText(homeRoomDraft.notes),
+            sort_order: sortOrder,
+          });
+        if (insertError) throw insertError;
+        setNotice('Room added.');
+      }
+      setHomeRoomDraft(null);
+      await loadHomeRooms();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save room.'));
+    } finally {
+      setSavingHomeRoom(false);
+    }
+  };
+
+  const archiveHomeRoom = async (room: HomeRoom) => {
+    if (!supabase) return;
+    setArchivingHomeRoomId(room.id);
+    setError('');
+    setNotice('');
+    try {
+      const { error: archiveError } = await supabase
+        .from('home_rooms')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', room.id);
+      if (archiveError) throw archiveError;
+      setNotice('Room archived.');
+      if (homeRoomDraft?.id === room.id) setHomeRoomDraft(null);
+      await loadHomeRooms();
+    } catch (err) {
+      setError(readableError(err, 'Unable to archive room.'));
+    } finally {
+      setArchivingHomeRoomId(null);
+    }
+  };
 
   useEffect(() => {
     if (!selectedHomeId) return;
@@ -12328,6 +12493,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       helper: 'Keep practical property notes in the existing home notes field.',
       complete: Boolean(homeDraft.notes.trim()),
     },
+    {
+      label: 'Add rooms',
+      helper: 'Organize this property with durable room basics.',
+      complete: selectedHomeRooms.length > 0,
+    },
   ];
   const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
   const showHomeownerWalkthrough = !loading && !showInitialHomeSetupPrompt && !homeownerWalkthroughSkipped;
@@ -13935,15 +14105,180 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (role === 'member') return 'bg-emerald-50 text-emerald-700';
     return 'bg-slate-100 text-slate-600';
   };
+  const roomDetailParts = (room: HomeRoom) => [
+    room.room_type ? `Type: ${room.room_type}` : '',
+    room.floor_label ? `Floor: ${room.floor_label}` : '',
+    room.area_label ? `Area: ${room.area_label}` : '',
+  ].filter(Boolean);
+  const renderHomeRoomForm = (homeId: string) => {
+    if (!homeRoomDraft || homeRoomDraft.home_id !== homeId) return null;
+
+    return (
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4" data-testid="home-room-form">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-950">{homeRoomDraft.id ? 'Edit room' : 'Add room'}</p>
+            <p className="mt-1 text-xs leading-5 text-blue-900">
+              Do not store lockbox codes, gate codes, alarm details, hidden-key details, or sensitive access instructions in room notes.
+            </p>
+          </div>
+          <button type="button" className={buttonClass('secondary')} onClick={closeHomeRoomForm} disabled={savingHomeRoom}>
+            Cancel
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <Field label="Room name">
+            <input
+              className={inputClass()}
+              value={homeRoomDraft.name}
+              onChange={event => setHomeRoomDraft(current => current ? { ...current, name: event.target.value } : current)}
+              placeholder="Kitchen"
+            />
+          </Field>
+          <Field label="Room type">
+            <input
+              className={inputClass()}
+              value={homeRoomDraft.room_type}
+              onChange={event => setHomeRoomDraft(current => current ? { ...current, room_type: event.target.value } : current)}
+              placeholder="Kitchen, bedroom, exterior..."
+            />
+          </Field>
+          <Field label="Floor">
+            <input
+              className={inputClass()}
+              value={homeRoomDraft.floor_label}
+              onChange={event => setHomeRoomDraft(current => current ? { ...current, floor_label: event.target.value } : current)}
+              placeholder="Main, upstairs, basement..."
+            />
+          </Field>
+          <Field label="Area">
+            <input
+              className={inputClass()}
+              value={homeRoomDraft.area_label}
+              onChange={event => setHomeRoomDraft(current => current ? { ...current, area_label: event.target.value } : current)}
+              placeholder="North wing, exterior, guest area..."
+            />
+          </Field>
+          <Field label="Notes">
+            <textarea
+              className={inputClass()}
+              rows={3}
+              value={homeRoomDraft.notes}
+              onChange={event => setHomeRoomDraft(current => current ? { ...current, notes: event.target.value } : current)}
+              placeholder="General room notes only."
+            />
+          </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={buttonClass('primary')} onClick={() => void saveHomeRoom()} disabled={savingHomeRoom}>
+            <CheckCircle2 size={16} />
+            {savingHomeRoom ? 'Saving...' : 'Save room'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+  const renderHomeRoomsList = (rooms: HomeRoom[], canManage: boolean, showNotes: boolean) => (
+    <div className="space-y-2" data-testid="home-rooms-list">
+      {rooms.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+          No active rooms yet.
+        </p>
+      ) : (
+        rooms.map(room => {
+          const details = roomDetailParts(room);
+          return (
+            <div key={room.id} className="rounded-xl border border-slate-200 bg-white p-3" data-testid="home-room-card">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-bold text-slate-950">{room.name}</p>
+                  {details.length > 0 ? (
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{details.join(' • ')}</p>
+                  ) : (
+                    <p className="mt-1 text-xs leading-5 text-slate-400">Room basics only</p>
+                  )}
+                  {showNotes && room.notes && (
+                    <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs leading-5 text-slate-600">{room.notes}</p>
+                  )}
+                </div>
+                {canManage && (
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomForm(room.home_id, room)}>
+                      <Pencil size={14} />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonClass('secondary')}
+                      disabled={archivingHomeRoomId === room.id}
+                      onClick={() => void archiveHomeRoom(room)}
+                    >
+                      <X size={14} />
+                      {archivingHomeRoomId === room.id ? 'Archiving...' : 'Archive'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+  const renderHomeRoomsSection = ({
+    homeId,
+    label,
+    canManage,
+    showNotes,
+    compact = false,
+  }: {
+    homeId: string;
+    label: string;
+    canManage: boolean;
+    showNotes: boolean;
+    compact?: boolean;
+  }) => {
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    return (
+      <div className={compact ? 'rounded-lg border border-emerald-100 bg-emerald-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-rooms-section' : 'home-rooms-section'}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-emerald-700' : 'text-sm font-bold text-slate-950'}>Rooms</p>
+            <p className={compact ? 'mt-1 text-xs leading-5 text-emerald-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
+              {canManage
+                ? `Manage active room basics for ${label}. Archived rooms are hidden by default.`
+                : 'Read-only non-sensitive room basics shared with this home.'}
+            </p>
+          </div>
+          {canManage ? (
+            <button type="button" className={buttonClass('primary')} onClick={() => openHomeRoomForm(homeId)} disabled={Boolean(homeRoomDraft)}>
+              <Plus size={16} />
+              Add room
+            </button>
+          ) : (
+            <span className="inline-flex w-fit rounded-full bg-white px-2 py-0.5 text-xs font-bold text-emerald-700">
+              Read-only
+            </span>
+          )}
+        </div>
+        {renderHomeRoomForm(homeId)}
+        {loadingHomeRooms && rooms.length === 0 ? (
+          <p className="text-xs font-semibold text-blue-700">Refreshing rooms...</p>
+        ) : (
+          renderHomeRoomsList(rooms, canManage, showNotes)
+        )}
+      </div>
+    );
+  };
   const renderSharedHomeShellsPanel = () => (
     <Card title="Homes shared with me" icon={<Home size={18} />}>
       <div className="space-y-4" data-testid="shared-home-shells-panel">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-950">Read-only shared home shell</p>
+              <p className="text-sm font-bold text-slate-950">Limited shared home shell</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                Shared home records are limited. Requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded. Open reminder shells may appear below as read-only titles and due dates; notes and linked records are not shared.
+                Shared home records are limited. Room basics may appear below; shared admins can manage rooms, while member and viewer roles are read-only. Requests, estimates, invoices, jobs, documents, messages, notifications, storage, contractor connections, and Home History remain private until sharing is expanded. Open reminder shells may appear below as read-only titles and due dates; notes and linked records are not shared.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">
@@ -13963,6 +14298,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {sharedHomeShells.map(shell => {
               const label = shell.display_label || shell.nickname || [shell.city, shell.state].filter(Boolean).join(', ') || 'Shared home';
               const sharedRemindersForHome = sharedHomeReminderShells.filter(reminder => reminder.home_id === shell.home_id);
+              const canManageSharedRooms = shell.role === 'admin';
               const streetLine1 = shell.address_line1?.trim() || '';
               const streetLine2 = shell.address_line2?.trim() || '';
               const cityStateZip = [
@@ -13991,6 +14327,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <p className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-800">
                       This shared home cannot be selected for owner dashboard records yet.
                     </p>
+                    {renderHomeRoomsSection({
+                      homeId: shell.home_id,
+                      label,
+                      canManage: canManageSharedRooms,
+                      showNotes: canManageSharedRooms,
+                      compact: true,
+                    })}
                     <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3" data-testid="shared-home-reminders-section">
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                         <div>
@@ -15155,13 +15498,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div className="space-y-4" data-testid="home-setup-guide">
               <div>
                 <p className="text-sm font-semibold text-slate-950">
-                  Start with the basics: property details, photos, documents, reminders, and notes.
+                  Start with the basics: property details, rooms, photos, documents, reminders, and notes.
                 </p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Home Setup Templates, Rooms &amp; Systems, Key Home Locations, and Home Map are future tools.
+                  Rooms are available now for basic home organization. Systems &amp; Assets, Key Home Locations, Home Map, and true Home Setup Templates remain future tools.
                 </p>
               </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {homeSetupGuideItems.map(item => (
                   <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="flex items-start gap-2">
@@ -15180,7 +15523,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
                   <p className="text-sm font-bold text-blue-950">Future Home Map</p>
                   <p className="mt-1 text-xs leading-5 text-blue-800">
-                    Home Map will start as a simple not-to-scale room and system map, not a measured floor plan.
+                    Home Map will start as a simple not-to-scale room and system map, not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
                   </p>
                 </div>
                 <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
@@ -15192,6 +15535,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </div>
           </Card>
+          {selectedHome?.id ? (
+            <Card title="Rooms" icon={<Home size={18} />}>
+              {renderHomeRoomsSection({
+                homeId: selectedHome.id,
+                label: homeProfileDisplayLabel(selectedHome),
+                canManage: true,
+                showNotes: true,
+              })}
+            </Card>
+          ) : (
+            <Card title="Rooms" icon={<Home size={18} />}>
+              <p className="text-sm text-slate-500">Save a property before adding rooms.</p>
+            </Card>
+          )}
           {renderSharedHomeShellsPanel()}
           {renderHomeAccessPanel()}
         </div>

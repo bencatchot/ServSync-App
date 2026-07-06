@@ -441,6 +441,21 @@ export interface HomeProfile {
   updated_at: string;
 }
 
+export interface HomeRoom {
+  id: string;
+  home_id: string;
+  name: string;
+  room_type: string | null;
+  floor_label: string | null;
+  area_label: string | null;
+  sort_order: number;
+  notes: string | null;
+  archived_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ContractorProfile {
   id: string;
   owner_user_id: string;
