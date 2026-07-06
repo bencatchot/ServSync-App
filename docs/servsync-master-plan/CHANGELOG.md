@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/homeowner-room-detail-panel-v1`
+- Starting main SHA: `598f8aa953508d1d18169ab2d28f51caf1f1ef85`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-room-detail-ui.spec.ts`
+  - `tests/e2e/home-document-room-ui.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/home-rooms-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the first homeowner-owned Room Detail panel inside the existing Rooms card. Owner/admin homeowners can open active room details to see room basics, manager-visible room notes, linked reminder counts/lists, and linked document counts/lists using already-loaded room, reminder, and document state.
+- Reason for change: The room, reminder-room, and document-room foundations are production-verified, and the safest next Home Setup step is a local room organization view rather than Home Map, assets/systems, key locations, shared-home record expansion, contractor visibility, or backend work.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-room-detail-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, native/service-worker/deployment, manual deploy, production data, storage bucket changes, storage policy changes, shared-home Room Detail, contractor Room Detail, document edit-room assignment, document filters, reminder edit-room behavior, reminder delivery/status changes, document download/delete behavior changes, photo/report-job media tags, inspection/job/estimate/invoice links, Home Map, assets/systems, key locations, or service agreement changes are included.
+  - Room Detail is a simple organization panel and not a map/layout/floor-plan feature. Existing shared-home and contractor visibility boundaries remain unchanged.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first homeowner-owned Room Detail panel while keeping Home Map, assets/systems, key locations, shared/contractor visibility, edit assignment, filters, media, and workflow links deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records Room Detail as a stepping stone toward future Home Map while preserving the requirement that Home Map waits for assets/systems, key-location, and permission design maturity.
+
 - Branch: `codex/document-room-picker-v1`
 - Starting main SHA: `f51cb1e683b2c83d54ef0e2ed419555087e86a9f`
 - Files changed:
