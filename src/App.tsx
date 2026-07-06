@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import {
@@ -213,8 +213,10 @@ import type {
   ContractorTeamRole,
   ContractorSubscriptionStatus,
   ContractorInvite,
+  HomeAsset,
   HomeProfile,
   HomeRoom,
+  HomeRoomLayout,
   HomeownerConnection,
   HomeownerProfile,
   InvitePreview,
@@ -481,6 +483,35 @@ type HomeRoomDraft = {
   room_type: string;
   floor_label: string;
   area_label: string;
+  notes: string;
+};
+type HomeRoomLayoutDraft = {
+  id: string | null;
+  home_id: string;
+  home_room_id: string;
+  create_new_room: boolean;
+  new_room_name: string;
+  new_room_type: string;
+  floor_label: string;
+  layout_x: string;
+  layout_y: string;
+  layout_width: string;
+  layout_height: string;
+  measured_width: string;
+  measured_depth: string;
+  measurement_unit: 'ft' | 'm';
+};
+type HomeAssetDraft = {
+  id: string | null;
+  home_id: string;
+  home_room_id: string;
+  asset_category: string;
+  asset_type: string;
+  name: string;
+  manufacturer: string;
+  model: string;
+  install_date: string;
+  warranty_expires_on: string;
   notes: string;
 };
 type FieldWorkflowKind = 'inspection' | 'work_order' | 'maintenance' | 'assessment';
@@ -1833,6 +1864,13 @@ function isMissingSimpleJobWorkItemSyncRpcError(error: unknown) {
   const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`;
   return err?.code === 'PGRST202'
     || /servsync_sync_simple_job_work_items/i.test(text) && /function|schema cache|could not find|does not exist/i.test(text);
+}
+
+function isMissingHomeMapSchemaError(error: unknown) {
+  const err = error as { code?: string; message?: string; details?: string; hint?: string } | null | undefined;
+  const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`;
+  return /home_room_layouts|home_assets/i.test(text)
+    && /schema cache|could not find|does not exist|relation/i.test(text);
 }
 
 function roomDisplayLabel(room?: Partial<RoomIdentitySource> | null) {
@@ -6912,6 +6950,9 @@ const MANUAL_HOME_DOCUMENT_HOME_MAX_BYTES = 100 * 1024 * 1024;
 const MANUAL_HOME_DOCUMENT_MONTHLY_MAX_BYTES = 100 * 1024 * 1024;
 const MANUAL_HOME_DOCUMENT_MAX_COUNT = 50;
 const MANUAL_HOME_DOCUMENT_UPLOAD_SOURCE = 'manual_documents_tab';
+const HOME_MAP_GRID_COLUMNS = 12;
+const HOME_MAP_GRID_ROWS = 10;
+const HOME_ASSET_CATEGORIES = ['HVAC', 'Plumbing', 'Electrical', 'Appliance', 'Roof', 'Exterior', 'Garage', 'Safety', 'Other'];
 
 type ManualHomeDocumentPrepareResponse = {
   reservation_id?: string;
@@ -9738,6 +9779,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeRoomDraft, setHomeRoomDraft] = useState<HomeRoomDraft | null>(null);
   const [archivingHomeRoomId, setArchivingHomeRoomId] = useState<string | null>(null);
   const [selectedHomeRoomDetailId, setSelectedHomeRoomDetailId] = useState<string | null>(null);
+  const [homeRoomLayoutsByHomeId, setHomeRoomLayoutsByHomeId] = useState<Record<string, HomeRoomLayout[]>>({});
+  const [loadingHomeRoomLayouts, setLoadingHomeRoomLayouts] = useState(false);
+  const [homeRoomLayoutDraft, setHomeRoomLayoutDraft] = useState<HomeRoomLayoutDraft | null>(null);
+  const [savingHomeRoomLayout, setSavingHomeRoomLayout] = useState(false);
+  const [homeMapDrag, setHomeMapDrag] = useState<{ layoutId: string; mode: 'move' | 'resize'; startX: number; startY: number; originX: number; originY: number; originWidth: number; originHeight: number } | null>(null);
+  const [homeAssetsByHomeId, setHomeAssetsByHomeId] = useState<Record<string, HomeAsset[]>>({});
+  const [loadingHomeAssets, setLoadingHomeAssets] = useState(false);
+  const [homeAssetDraft, setHomeAssetDraft] = useState<HomeAssetDraft | null>(null);
+  const [savingHomeAsset, setSavingHomeAsset] = useState(false);
+  const [archivingHomeAssetId, setArchivingHomeAssetId] = useState<string | null>(null);
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [homeownerPropertyProposalsByConnectionId, setHomeownerPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
@@ -9999,6 +10050,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ]));
   const knownHomeRoomIdKey = knownHomeRoomIds.join('|');
   const selectedHomeRooms = selectedHome?.id ? (homeRoomsByHomeId[selectedHome.id] || []) : [];
+  const selectedHomeRoomLayouts = selectedHome?.id ? (homeRoomLayoutsByHomeId[selectedHome.id] || []) : [];
+  const selectedHomeAssets = selectedHome?.id ? (homeAssetsByHomeId[selectedHome.id] || []) : [];
 
   const cleanRoomOptionalText = (value: string) => {
     const trimmed = cleanHumanWrittenText(value).trim();
@@ -10014,6 +10067,53 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     area_label: '',
     notes: '',
   });
+
+  const emptyHomeRoomLayoutDraft = (homeId: string, rooms: HomeRoom[] = []): HomeRoomLayoutDraft => ({
+    id: null,
+    home_id: homeId,
+    home_room_id: rooms[0]?.id || '',
+    create_new_room: rooms.length === 0,
+    new_room_name: '',
+    new_room_type: '',
+    floor_label: rooms[0]?.floor_label || '',
+    layout_x: '0',
+    layout_y: '0',
+    layout_width: '4',
+    layout_height: '3',
+    measured_width: '',
+    measured_depth: '',
+    measurement_unit: 'ft',
+  });
+
+  const emptyHomeAssetDraft = (homeId: string): HomeAssetDraft => ({
+    id: null,
+    home_id: homeId,
+    home_room_id: '',
+    asset_category: HOME_ASSET_CATEGORIES[0],
+    asset_type: '',
+    name: '',
+    manufacturer: '',
+    model: '',
+    install_date: '',
+    warranty_expires_on: '',
+    notes: '',
+  });
+
+  const cleanHomeMapOptionalText = (value: string) => {
+    const trimmed = cleanHumanWrittenText(value).trim();
+    return trimmed || null;
+  };
+
+  const parseHomeMapNumber = (value: string, fallback: number, min: number, max: number) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const parseOptionalMeasurement = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
 
   const loadHomeRooms = useCallback(async () => {
     if (!supabase) return;
@@ -10051,6 +10151,86 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void loadHomeRooms();
   }, [loadHomeRooms]);
 
+  const loadHomeRoomLayouts = useCallback(async () => {
+    if (!supabase) return;
+    const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
+    if (homeIds.length === 0) {
+      setHomeRoomLayoutsByHomeId({});
+      return;
+    }
+
+    setLoadingHomeRoomLayouts(true);
+    try {
+      const { data, error: layoutsError } = await supabase
+        .from('home_room_layouts')
+        .select('id, home_id, home_room_id, floor_label, layout_x, layout_y, layout_width, layout_height, measured_width, measured_depth, measurement_unit, sort_order, archived_at, created_by, created_at, updated_at')
+        .in('home_id', homeIds)
+        .is('archived_at', null)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (layoutsError) throw layoutsError;
+
+      const grouped = (data || []).reduce<Record<string, HomeRoomLayout[]>>((groups, layout) => {
+        const typedLayout = layout as HomeRoomLayout;
+        groups[typedLayout.home_id] = [...(groups[typedLayout.home_id] || []), typedLayout];
+        return groups;
+      }, {});
+      setHomeRoomLayoutsByHomeId(grouped);
+    } catch (err) {
+      if (isMissingHomeMapSchemaError(err)) {
+        setHomeRoomLayoutsByHomeId({});
+      } else {
+        setError(readableError(err, 'Unable to load Home Map.'));
+      }
+    } finally {
+      setLoadingHomeRoomLayouts(false);
+    }
+  }, [knownHomeRoomIdKey]);
+
+  useEffect(() => {
+    void loadHomeRoomLayouts();
+  }, [loadHomeRoomLayouts]);
+
+  const loadHomeAssets = useCallback(async () => {
+    if (!supabase) return;
+    const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
+    if (homeIds.length === 0) {
+      setHomeAssetsByHomeId({});
+      return;
+    }
+
+    setLoadingHomeAssets(true);
+    try {
+      const { data, error: assetsError } = await supabase
+        .from('home_assets')
+        .select('id, home_id, home_room_id, asset_category, asset_type, name, manufacturer, model, install_date, warranty_expires_on, notes, archived_at, created_by, created_at, updated_at')
+        .in('home_id', homeIds)
+        .is('archived_at', null)
+        .order('asset_category', { ascending: true })
+        .order('name', { ascending: true });
+      if (assetsError) throw assetsError;
+
+      const grouped = (data || []).reduce<Record<string, HomeAsset[]>>((groups, asset) => {
+        const typedAsset = asset as HomeAsset;
+        groups[typedAsset.home_id] = [...(groups[typedAsset.home_id] || []), typedAsset];
+        return groups;
+      }, {});
+      setHomeAssetsByHomeId(grouped);
+    } catch (err) {
+      if (isMissingHomeMapSchemaError(err)) {
+        setHomeAssetsByHomeId({});
+      } else {
+        setError(readableError(err, 'Unable to load Assets & Systems.'));
+      }
+    } finally {
+      setLoadingHomeAssets(false);
+    }
+  }, [knownHomeRoomIdKey]);
+
+  useEffect(() => {
+    void loadHomeAssets();
+  }, [loadHomeAssets]);
+
   useEffect(() => {
     setHomeownerReminderRoomFilter('all');
   }, [selectedHomeId, homeownerMaintenancePropertyScope]);
@@ -10061,6 +10241,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   useEffect(() => {
     setSelectedHomeRoomDetailId(null);
+    setHomeRoomLayoutDraft(null);
+    setHomeAssetDraft(null);
+    setHomeMapDrag(null);
   }, [selectedHomeId]);
 
   const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
@@ -10154,6 +10337,242 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setError(readableError(err, 'Unable to archive room.'));
     } finally {
       setArchivingHomeRoomId(null);
+    }
+  };
+
+  const updateHomeRoomLayoutLocal = (layoutId: string, updates: Partial<HomeRoomLayout>) => {
+    setHomeRoomLayoutsByHomeId(current => {
+      const next: Record<string, HomeRoomLayout[]> = {};
+      for (const [homeId, layouts] of Object.entries(current)) {
+        next[homeId] = layouts.map(layout => layout.id === layoutId ? { ...layout, ...updates } : layout);
+      }
+      return next;
+    });
+  };
+
+  const openHomeRoomLayoutForm = (homeId: string, layout?: HomeRoomLayout) => {
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    setError('');
+    setNotice('');
+    setHomeRoomLayoutDraft(layout
+      ? {
+          id: layout.id,
+          home_id: layout.home_id,
+          home_room_id: layout.home_room_id,
+          create_new_room: false,
+          new_room_name: '',
+          new_room_type: '',
+          floor_label: layout.floor_label || '',
+          layout_x: String(layout.layout_x),
+          layout_y: String(layout.layout_y),
+          layout_width: String(layout.layout_width),
+          layout_height: String(layout.layout_height),
+          measured_width: layout.measured_width ? String(layout.measured_width) : '',
+          measured_depth: layout.measured_depth ? String(layout.measured_depth) : '',
+          measurement_unit: (layout.measurement_unit === 'm' ? 'm' : 'ft'),
+        }
+      : emptyHomeRoomLayoutDraft(homeId, rooms));
+  };
+
+  const saveHomeRoomLayoutDraft = async () => {
+    if (!supabase || !homeRoomLayoutDraft) return;
+    setSavingHomeRoomLayout(true);
+    setError('');
+    setNotice('');
+    try {
+      let roomId = homeRoomLayoutDraft.home_room_id;
+      const rooms = homeRoomsByHomeId[homeRoomLayoutDraft.home_id] || [];
+      if (!homeRoomLayoutDraft.id && homeRoomLayoutDraft.create_new_room) {
+        const roomName = cleanHumanWrittenText(homeRoomLayoutDraft.new_room_name).trim();
+        if (!roomName) throw new Error('Room name is required before adding it to the Home Map.');
+        const sortOrder = rooms.reduce((max, room) => Math.max(max, room.sort_order || 0), 0) + 10;
+        const { data: createdRoom, error: roomError } = await supabase
+          .from('home_rooms')
+          .insert({
+            home_id: homeRoomLayoutDraft.home_id,
+            created_by: profile.id,
+            name: roomName,
+            room_type: cleanHomeMapOptionalText(homeRoomLayoutDraft.new_room_type),
+            floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
+            area_label: null,
+            notes: null,
+            sort_order: sortOrder,
+          })
+          .select('id, home_id, name, room_type, floor_label, area_label, sort_order, notes, archived_at, created_by, created_at, updated_at')
+          .single();
+        if (roomError) throw roomError;
+        roomId = (createdRoom as HomeRoom).id;
+      }
+
+      if (!roomId) throw new Error('Choose a room before saving this Home Map box.');
+      const existingLayouts = homeRoomLayoutsByHomeId[homeRoomLayoutDraft.home_id] || [];
+      const layoutPayload = {
+        floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
+        layout_x: parseHomeMapNumber(homeRoomLayoutDraft.layout_x, 0, 0, HOME_MAP_GRID_COLUMNS - 1),
+        layout_y: parseHomeMapNumber(homeRoomLayoutDraft.layout_y, 0, 0, HOME_MAP_GRID_ROWS - 1),
+        layout_width: parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS),
+        layout_height: parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS),
+        measured_width: parseOptionalMeasurement(homeRoomLayoutDraft.measured_width),
+        measured_depth: parseOptionalMeasurement(homeRoomLayoutDraft.measured_depth),
+        measurement_unit: homeRoomLayoutDraft.measured_width || homeRoomLayoutDraft.measured_depth ? homeRoomLayoutDraft.measurement_unit : null,
+      };
+
+      if (homeRoomLayoutDraft.id) {
+        const { error: updateError } = await supabase
+          .from('home_room_layouts')
+          .update(layoutPayload)
+          .eq('id', homeRoomLayoutDraft.id);
+        if (updateError) throw updateError;
+      } else {
+        const sortOrder = existingLayouts.reduce((max, layout) => Math.max(max, layout.sort_order || 0), 0) + 10;
+        const { error: insertError } = await supabase
+          .from('home_room_layouts')
+          .insert({
+            home_id: homeRoomLayoutDraft.home_id,
+            home_room_id: roomId,
+            created_by: profile.id,
+            sort_order: sortOrder,
+            ...layoutPayload,
+          });
+        if (insertError) throw insertError;
+      }
+
+      setHomeRoomLayoutDraft(null);
+      setNotice('Home Map layout saved.');
+      await Promise.all([loadHomeRooms(), loadHomeRoomLayouts()]);
+    } catch (err) {
+      setError(readableError(err, 'Unable to save Home Map layout.'));
+    } finally {
+      setSavingHomeRoomLayout(false);
+    }
+  };
+
+  const saveHomeMapLayout = async (homeId: string) => {
+    if (!supabase) return;
+    const layouts = homeRoomLayoutsByHomeId[homeId] || [];
+    setSavingHomeRoomLayout(true);
+    setError('');
+    setNotice('');
+    try {
+      for (const layout of layouts) {
+        const { error: updateError } = await supabase
+          .from('home_room_layouts')
+          .update({
+            floor_label: layout.floor_label,
+            layout_x: layout.layout_x,
+            layout_y: layout.layout_y,
+            layout_width: layout.layout_width,
+            layout_height: layout.layout_height,
+            measured_width: layout.measured_width,
+            measured_depth: layout.measured_depth,
+            measurement_unit: layout.measurement_unit,
+          })
+          .eq('id', layout.id);
+        if (updateError) throw updateError;
+      }
+      setNotice('Home Map saved.');
+      await loadHomeRoomLayouts();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save Home Map.'));
+    } finally {
+      setSavingHomeRoomLayout(false);
+    }
+  };
+
+  const openHomeAssetForm = (homeId: string, asset?: HomeAsset) => {
+    setError('');
+    setNotice('');
+    setHomeAssetDraft(asset
+      ? {
+          id: asset.id,
+          home_id: asset.home_id,
+          home_room_id: asset.home_room_id || '',
+          asset_category: asset.asset_category,
+          asset_type: asset.asset_type || '',
+          name: asset.name,
+          manufacturer: asset.manufacturer || '',
+          model: asset.model || '',
+          install_date: asset.install_date || '',
+          warranty_expires_on: asset.warranty_expires_on || '',
+          notes: asset.notes || '',
+        }
+      : emptyHomeAssetDraft(homeId));
+  };
+
+  const saveHomeAsset = async () => {
+    if (!supabase || !homeAssetDraft) return;
+    const name = cleanHumanWrittenText(homeAssetDraft.name).trim();
+    const assetCategory = cleanHumanWrittenText(homeAssetDraft.asset_category).trim();
+    if (!name) {
+      setError('Asset name is required.');
+      return;
+    }
+    if (!assetCategory) {
+      setError('Asset category is required.');
+      return;
+    }
+
+    setSavingHomeAsset(true);
+    setError('');
+    setNotice('');
+    try {
+      const assetPayload = {
+        home_room_id: homeAssetDraft.home_room_id || null,
+        asset_category: assetCategory,
+        asset_type: cleanHomeMapOptionalText(homeAssetDraft.asset_type),
+        name,
+        manufacturer: cleanHomeMapOptionalText(homeAssetDraft.manufacturer),
+        model: cleanHomeMapOptionalText(homeAssetDraft.model),
+        install_date: homeAssetDraft.install_date || null,
+        warranty_expires_on: homeAssetDraft.warranty_expires_on || null,
+        notes: cleanHomeMapOptionalText(homeAssetDraft.notes),
+      };
+
+      if (homeAssetDraft.id) {
+        const { error: updateError } = await supabase
+          .from('home_assets')
+          .update(assetPayload)
+          .eq('id', homeAssetDraft.id);
+        if (updateError) throw updateError;
+        setNotice('Asset updated.');
+      } else {
+        const { error: insertError } = await supabase
+          .from('home_assets')
+          .insert({
+            home_id: homeAssetDraft.home_id,
+            created_by: profile.id,
+            ...assetPayload,
+          });
+        if (insertError) throw insertError;
+        setNotice('Asset added.');
+      }
+      setHomeAssetDraft(null);
+      await loadHomeAssets();
+    } catch (err) {
+      setError(readableError(err, 'Unable to save asset.'));
+    } finally {
+      setSavingHomeAsset(false);
+    }
+  };
+
+  const archiveHomeAsset = async (asset: HomeAsset) => {
+    if (!supabase) return;
+    setArchivingHomeAssetId(asset.id);
+    setError('');
+    setNotice('');
+    try {
+      const { error: archiveError } = await supabase
+        .from('home_assets')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', asset.id);
+      if (archiveError) throw archiveError;
+      if (homeAssetDraft?.id === asset.id) setHomeAssetDraft(null);
+      setNotice('Asset archived.');
+      await loadHomeAssets();
+    } catch (err) {
+      setError(readableError(err, 'Unable to archive asset.'));
+    } finally {
+      setArchivingHomeAssetId(null);
     }
   };
 
@@ -12530,6 +12949,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       helper: 'Organize this property with durable room basics.',
       complete: selectedHomeRooms.length > 0,
     },
+    {
+      label: 'Add assets & systems',
+      helper: 'Track safe asset/system basics like HVAC, plumbing, appliances, roof, and exterior items.',
+      complete: selectedHomeAssets.length > 0,
+    },
+    {
+      label: 'Start a Home Map',
+      helper: 'Arrange simple not-to-scale room boxes for this property.',
+      complete: selectedHomeRoomLayouts.length > 0,
+    },
   ];
   const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
   const showHomeownerWalkthrough = !loading && !showInitialHomeSetupPrompt && !homeownerWalkthroughSkipped;
@@ -14155,6 +14584,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!doc.home_id || !doc.home_room_id) return null;
     return (homeRoomsByHomeId[doc.home_id] || []).find(room => room.id === doc.home_room_id) ?? null;
   };
+  const roomForAsset = (asset: Pick<HomeAsset, 'home_id' | 'home_room_id'>) => {
+    if (!asset.home_id || !asset.home_room_id) return null;
+    return (homeRoomsByHomeId[asset.home_id] || []).find(room => room.id === asset.home_room_id) ?? null;
+  };
+  const homeAssetDetailParts = (asset: HomeAsset) => [
+    asset.asset_type,
+    asset.manufacturer,
+    asset.model,
+  ].filter(Boolean);
+  const homeAssetDateLabel = (value?: string | null) => value
+    ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
   const renderReminderRoomChip = (reminder: HomeReminder) => {
     const room = roomForReminder(reminder);
     if (!room) return null;
@@ -14170,6 +14611,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return (
       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
         Room: {roomDocumentLabel(room)}
+      </span>
+    );
+  };
+  const renderAssetRoomChip = (asset: HomeAsset) => {
+    const room = roomForAsset(asset);
+    if (!room) return null;
+    return (
+      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+        Room: {roomReminderLabel(room)}
       </span>
     );
   };
@@ -14198,6 +14648,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       .filter(doc => doc.home_id === room.home_id && doc.home_room_id === room.id)
       .slice()
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const linkedAssets = (homeAssetsByHomeId[room.home_id] || [])
+      .filter(asset => asset.home_room_id === room.id)
+      .slice()
+      .sort((a, b) => a.asset_category.localeCompare(b.asset_category) || a.name.localeCompare(b.name));
 
     return (
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4" data-testid="home-room-detail-panel">
@@ -14223,7 +14677,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="mt-4 grid gap-3 xl:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-bold text-slate-950">Linked reminders</p>
@@ -14284,11 +14738,45 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             )}
           </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-950">Linked assets</p>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                {linkedAssets.length} asset{linkedAssets.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            {linkedAssets.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                No assets are assigned to this room.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {linkedAssets.slice(0, 5).map(asset => {
+                  const details = homeAssetDetailParts(asset);
+                  return (
+                    <div key={asset.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="min-w-0 flex-1 break-words text-sm font-semibold text-slate-900">{asset.name}</p>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{asset.asset_category}</span>
+                      </div>
+                      {details.length > 0 && (
+                        <p className="mt-1 text-xs text-slate-500">{details.join(' • ')}</p>
+                      )}
+                      {showNotes && asset.notes && (
+                        <p className="mt-1 text-xs text-slate-500">{asset.notes}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {linkedReminders.length === 0 && linkedDocuments.length === 0 && (
+        {linkedReminders.length === 0 && linkedDocuments.length === 0 && linkedAssets.length === 0 && (
           <p className="mt-3 rounded-xl border border-dashed border-emerald-200 bg-white px-3 py-2 text-xs leading-5 text-emerald-800">
-            No reminders or documents are linked to this room yet. Room links are optional and help organize home records.
+            No reminders, documents, or assets are linked to this room yet. Room links are optional and help organize home records.
           </p>
         )}
       </div>
@@ -14468,6 +14956,464 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     );
   };
+  const renderHomeRoomLayoutForm = (homeId: string) => {
+    if (!homeRoomLayoutDraft || homeRoomLayoutDraft.home_id !== homeId) return null;
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const mappedRoomIds = new Set((homeRoomLayoutsByHomeId[homeId] || [])
+      .filter(layout => layout.id !== homeRoomLayoutDraft.id)
+      .map(layout => layout.home_room_id));
+    const availableRooms = rooms.filter(room => !mappedRoomIds.has(room.id));
+
+    return (
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4" data-testid="home-map-layout-form">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-950">{homeRoomLayoutDraft.id ? 'Edit map box' : 'Add room box'}</p>
+            <p className="mt-1 text-xs leading-5 text-blue-900">
+              Home Map is a simple not-to-scale organizer. It is not CAD, a measured floor plan, LiDAR, scanning, or 3D.
+            </p>
+          </div>
+          <button type="button" className={buttonClass('secondary')} onClick={() => setHomeRoomLayoutDraft(null)} disabled={savingHomeRoomLayout}>
+            Cancel
+          </button>
+        </div>
+        {!homeRoomLayoutDraft.id && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={buttonClass(!homeRoomLayoutDraft.create_new_room ? 'primary' : 'secondary')}
+              onClick={() => setHomeRoomLayoutDraft(current => current ? { ...current, create_new_room: false, home_room_id: availableRooms[0]?.id || '' } : current)}
+              disabled={availableRooms.length === 0}
+            >
+              Link existing room
+            </button>
+            <button
+              type="button"
+              className={buttonClass(homeRoomLayoutDraft.create_new_room ? 'primary' : 'secondary')}
+              onClick={() => setHomeRoomLayoutDraft(current => current ? { ...current, create_new_room: true, home_room_id: '' } : current)}
+            >
+              Create room box
+            </button>
+          </div>
+        )}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {!homeRoomLayoutDraft.id && !homeRoomLayoutDraft.create_new_room && (
+            <Field label="Room">
+              <select
+                className={inputClass()}
+                value={homeRoomLayoutDraft.home_room_id}
+                onChange={event => {
+                  const selectedRoom = rooms.find(room => room.id === event.target.value);
+                  setHomeRoomLayoutDraft(current => current ? {
+                    ...current,
+                    home_room_id: event.target.value,
+                    floor_label: selectedRoom?.floor_label || current.floor_label,
+                  } : current);
+                }}
+              >
+                <option value="">Choose a room</option>
+                {availableRooms.map(room => (
+                  <option key={room.id} value={room.id}>{roomReminderLabel(room)}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {!homeRoomLayoutDraft.id && homeRoomLayoutDraft.create_new_room && (
+            <>
+              <Field label="Room name">
+                <input
+                  className={inputClass()}
+                  value={homeRoomLayoutDraft.new_room_name}
+                  onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, new_room_name: event.target.value } : current)}
+                  placeholder="Laundry room"
+                />
+              </Field>
+              <Field label="Room type">
+                <input
+                  className={inputClass()}
+                  value={homeRoomLayoutDraft.new_room_type}
+                  onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, new_room_type: event.target.value } : current)}
+                  placeholder="Utility, bedroom, exterior..."
+                />
+              </Field>
+            </>
+          )}
+          <Field label="Floor">
+            <input
+              className={inputClass()}
+              value={homeRoomLayoutDraft.floor_label}
+              onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, floor_label: event.target.value } : current)}
+              placeholder="Main, upstairs, basement..."
+            />
+          </Field>
+          <Field label="X">
+            <input className={inputClass()} type="number" min="0" max={HOME_MAP_GRID_COLUMNS - 1} value={homeRoomLayoutDraft.layout_x} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_x: event.target.value } : current)} />
+          </Field>
+          <Field label="Y">
+            <input className={inputClass()} type="number" min="0" max={HOME_MAP_GRID_ROWS - 1} value={homeRoomLayoutDraft.layout_y} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_y: event.target.value } : current)} />
+          </Field>
+          <Field label="Width">
+            <input className={inputClass()} type="number" min="1" max={HOME_MAP_GRID_COLUMNS} value={homeRoomLayoutDraft.layout_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_width: event.target.value } : current)} />
+          </Field>
+          <Field label="Depth">
+            <input className={inputClass()} type="number" min="1" max={HOME_MAP_GRID_ROWS} value={homeRoomLayoutDraft.layout_height} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_height: event.target.value } : current)} />
+          </Field>
+          <Field label="Approx. measured width">
+            <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_width: event.target.value } : current)} placeholder="Optional" />
+          </Field>
+          <Field label="Approx. measured depth">
+            <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_depth} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_depth: event.target.value } : current)} placeholder="Optional" />
+          </Field>
+          <Field label="Unit">
+            <select className={inputClass()} value={homeRoomLayoutDraft.measurement_unit} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measurement_unit: event.target.value as 'ft' | 'm' } : current)}>
+              <option value="ft">Feet</option>
+              <option value="m">Meters</option>
+            </select>
+          </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={buttonClass('primary')} onClick={() => void saveHomeRoomLayoutDraft()} disabled={savingHomeRoomLayout}>
+            <CheckCircle2 size={16} />
+            {savingHomeRoomLayout ? 'Saving...' : 'Save room box'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHomeMapSection = ({
+    homeId,
+    label,
+    canManage,
+    canShowPrivateCounts,
+    compact = false,
+  }: {
+    homeId: string;
+    label: string;
+    canManage: boolean;
+    canShowPrivateCounts: boolean;
+    compact?: boolean;
+  }) => {
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const layouts = (homeRoomLayoutsByHomeId[homeId] || []).filter(layout => rooms.some(room => room.id === layout.home_room_id));
+    const assets = homeAssetsByHomeId[homeId] || [];
+    const roomById = new Map(rooms.map(room => [room.id, room]));
+    const usedRoomIds = new Set(layouts.map(layout => layout.home_room_id));
+    const unmappedRooms = rooms.filter(room => !usedRoomIds.has(room.id));
+    const canAddMapBox = canManage && !compact;
+
+    const pointerMoveForLayout = (layout: HomeRoomLayout, event: PointerEvent<HTMLButtonElement>) => {
+      if (!homeMapDrag || homeMapDrag.layoutId !== layout.id) return;
+      const deltaX = Math.round((event.clientX - homeMapDrag.startX) / 36);
+      const deltaY = Math.round((event.clientY - homeMapDrag.startY) / 36);
+      if (homeMapDrag.mode === 'move') {
+        const nextX = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_width, Math.max(0, homeMapDrag.originX + deltaX));
+        const nextY = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, homeMapDrag.originY + deltaY));
+        updateHomeRoomLayoutLocal(layout.id, { layout_x: nextX, layout_y: nextY });
+      } else {
+        const nextWidth = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(1, homeMapDrag.originWidth + deltaX));
+        const nextHeight = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(1, homeMapDrag.originHeight + deltaY));
+        updateHomeRoomLayoutLocal(layout.id, { layout_width: nextWidth, layout_height: nextHeight });
+      }
+    };
+
+    return (
+      <div className={compact ? 'rounded-lg border border-indigo-100 bg-indigo-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-map-section' : 'home-map-section'}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-indigo-700' : 'text-sm font-bold text-slate-950'}>Home Map</p>
+            <p className={compact ? 'mt-1 text-xs leading-5 text-indigo-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
+              {canManage
+                ? `Arrange simple not-to-scale room boxes with optional display-only measurements for ${label}. This is not a CAD, floor-plan, LiDAR, scanning, or 3D tool.`
+                : 'Read-only simple room map. Map boxes are for organization only.'}
+            </p>
+          </div>
+          {canAddMapBox ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass('secondary')} onClick={() => void saveHomeMapLayout(homeId)} disabled={savingHomeRoomLayout || layouts.length === 0}>
+                <CheckCircle2 size={16} />
+                {savingHomeRoomLayout ? 'Saving...' : 'Save map layout'}
+              </button>
+              <button type="button" className={buttonClass('primary')} onClick={() => openHomeRoomLayoutForm(homeId)} disabled={Boolean(homeRoomLayoutDraft)}>
+                <Plus size={16} />
+                Add room box
+              </button>
+            </div>
+          ) : (
+            <span className="inline-flex w-fit rounded-full bg-white px-2 py-0.5 text-xs font-bold text-indigo-700">
+              Read-only
+            </span>
+          )}
+        </div>
+        {canAddMapBox && unmappedRooms.length > 0 && (
+          <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+            {unmappedRooms.length} active room{unmappedRooms.length === 1 ? '' : 's'} can still be added to the map.
+          </p>
+        )}
+        {renderHomeRoomLayoutForm(homeId)}
+        {loadingHomeRoomLayouts && layouts.length === 0 ? (
+          <p className="text-xs font-semibold text-blue-700">Refreshing Home Map...</p>
+        ) : layouts.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+            No room boxes yet. Start with rooms you already added, or create a new room box.
+          </p>
+        ) : (
+          <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3" data-testid="home-map-canvas">
+            <div
+              className="absolute inset-0 opacity-60"
+              style={{
+                backgroundImage: 'linear-gradient(to right, rgba(148, 163, 184, 0.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.22) 1px, transparent 1px)',
+                backgroundSize: `${100 / HOME_MAP_GRID_COLUMNS}% ${100 / HOME_MAP_GRID_ROWS}%`,
+              }}
+            />
+            {layouts.map(layout => {
+              const room = roomById.get(layout.home_room_id);
+              if (!room) return null;
+              const reminderCount = canShowPrivateCounts ? homeReminders.filter(reminder => reminder.home_id === homeId && reminder.home_room_id === room.id).length : 0;
+              const documentCount = canShowPrivateCounts ? homeDocuments.filter(doc => doc.home_id === homeId && doc.home_room_id === room.id).length : 0;
+              const assetCount = assets.filter(asset => asset.home_room_id === room.id).length;
+              const measurements = layout.measured_width && layout.measured_depth
+                ? `${layout.measured_width} x ${layout.measured_depth} ${layout.measurement_unit || 'ft'}`
+                : '';
+              return (
+                <button
+                  key={layout.id}
+                  type="button"
+                  data-testid="home-map-room-box"
+                  className="absolute z-10 flex flex-col items-start justify-between rounded-xl border border-blue-200 bg-white/95 p-2 text-left shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  style={{
+                    left: `${(layout.layout_x / HOME_MAP_GRID_COLUMNS) * 100}%`,
+                    top: `${(layout.layout_y / HOME_MAP_GRID_ROWS) * 100}%`,
+                    width: `${(layout.layout_width / HOME_MAP_GRID_COLUMNS) * 100}%`,
+                    height: `${(layout.layout_height / HOME_MAP_GRID_ROWS) * 100}%`,
+                    minWidth: '92px',
+                    minHeight: '84px',
+                  }}
+                  onClick={() => setSelectedHomeRoomDetailId(room.id)}
+                  onPointerDown={event => {
+                    if (!canManage) return;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    setHomeMapDrag({
+                      layoutId: layout.id,
+                      mode: 'move',
+                      startX: event.clientX,
+                      startY: event.clientY,
+                      originX: layout.layout_x,
+                      originY: layout.layout_y,
+                      originWidth: layout.layout_width,
+                      originHeight: layout.layout_height,
+                    });
+                  }}
+                  onPointerMove={event => pointerMoveForLayout(layout, event)}
+                  onPointerUp={() => setHomeMapDrag(null)}
+                  onPointerCancel={() => setHomeMapDrag(null)}
+                >
+                  <span className="min-w-0">
+                    <span className="block break-words text-sm font-bold text-slate-950">{room.name}</span>
+                    <span className="mt-1 block text-xs leading-4 text-slate-500">{[room.room_type, layout.floor_label || room.floor_label, room.area_label].filter(Boolean).join(' • ') || 'Room box'}</span>
+                    {measurements && <span className="mt-1 block text-xs font-semibold text-blue-700">{measurements}</span>}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1">
+                    {canShowPrivateCounts && <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">{reminderCount} rem</span>}
+                    {canShowPrivateCounts && <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700">{documentCount} docs</span>}
+                    <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">{assetCount} assets</span>
+                  </span>
+                  {canManage && (
+                    <span className="mt-2 flex flex-wrap gap-1">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600"
+                        onClick={event => {
+                          event.stopPropagation();
+                          openHomeRoomLayoutForm(homeId, layout);
+                        }}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openHomeRoomLayoutForm(homeId, layout);
+                          }
+                        }}
+                      >
+                        Edit
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600"
+                        onPointerDown={event => {
+                          event.stopPropagation();
+                          setHomeMapDrag({
+                            layoutId: layout.id,
+                            mode: 'resize',
+                            startX: event.clientX,
+                            startY: event.clientY,
+                            originX: layout.layout_x,
+                            originY: layout.layout_y,
+                            originWidth: layout.layout_width,
+                            originHeight: layout.layout_height,
+                          });
+                        }}
+                      >
+                        Resize
+                      </span>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderHomeAssetForm = (homeId: string) => {
+    if (!homeAssetDraft || homeAssetDraft.home_id !== homeId) return null;
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    return (
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4" data-testid="home-asset-form">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-950">{homeAssetDraft.id ? 'Edit asset/system' : 'Add asset/system'}</p>
+            <p className="mt-1 text-xs leading-5 text-blue-900">
+              Store safe asset basics only. Do not add lockbox, gate, alarm, hidden-key, security-system secret, or sensitive access instructions.
+            </p>
+          </div>
+          <button type="button" className={buttonClass('secondary')} onClick={() => setHomeAssetDraft(null)} disabled={savingHomeAsset}>
+            Cancel
+          </button>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <Field label="Name">
+            <input className={inputClass()} value={homeAssetDraft.name} onChange={event => setHomeAssetDraft(current => current ? { ...current, name: event.target.value } : current)} placeholder="Main furnace" />
+          </Field>
+          <Field label="Asset category">
+            <select className={inputClass()} value={homeAssetDraft.asset_category} onChange={event => setHomeAssetDraft(current => current ? { ...current, asset_category: event.target.value } : current)}>
+              {HOME_ASSET_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </Field>
+          <Field label="Asset type">
+            <input className={inputClass()} value={homeAssetDraft.asset_type} onChange={event => setHomeAssetDraft(current => current ? { ...current, asset_type: event.target.value } : current)} placeholder="Furnace, water heater, roof..." />
+          </Field>
+          <Field label="Room optional">
+            <select className={inputClass()} value={homeAssetDraft.home_room_id} onChange={event => setHomeAssetDraft(current => current ? { ...current, home_room_id: event.target.value } : current)}>
+              <option value="">No room</option>
+              {rooms.map(room => <option key={room.id} value={room.id}>{roomReminderLabel(room)}</option>)}
+            </select>
+          </Field>
+          <Field label="Manufacturer">
+            <input className={inputClass()} value={homeAssetDraft.manufacturer} onChange={event => setHomeAssetDraft(current => current ? { ...current, manufacturer: event.target.value } : current)} placeholder="Optional" />
+          </Field>
+          <Field label="Model">
+            <input className={inputClass()} value={homeAssetDraft.model} onChange={event => setHomeAssetDraft(current => current ? { ...current, model: event.target.value } : current)} placeholder="Optional; no serial numbers" />
+          </Field>
+          <Field label="Install date">
+            <input className={inputClass()} type="date" value={homeAssetDraft.install_date} onChange={event => setHomeAssetDraft(current => current ? { ...current, install_date: event.target.value } : current)} />
+          </Field>
+          <Field label="Warranty expires">
+            <input className={inputClass()} type="date" value={homeAssetDraft.warranty_expires_on} onChange={event => setHomeAssetDraft(current => current ? { ...current, warranty_expires_on: event.target.value } : current)} />
+          </Field>
+          <Field label="Notes">
+            <textarea className={inputClass()} rows={3} value={homeAssetDraft.notes} onChange={event => setHomeAssetDraft(current => current ? { ...current, notes: event.target.value } : current)} placeholder="General asset notes only." />
+          </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" className={buttonClass('primary')} onClick={() => void saveHomeAsset()} disabled={savingHomeAsset}>
+            <CheckCircle2 size={16} />
+            {savingHomeAsset ? 'Saving...' : 'Save asset'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHomeAssetsSection = ({
+    homeId,
+    label,
+    canManage,
+    showNotes,
+    compact = false,
+  }: {
+    homeId: string;
+    label: string;
+    canManage: boolean;
+    showNotes: boolean;
+    compact?: boolean;
+  }) => {
+    const assets = homeAssetsByHomeId[homeId] || [];
+    return (
+      <div className={compact ? 'rounded-lg border border-cyan-100 bg-cyan-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-assets-section' : 'home-assets-section'}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-cyan-700' : 'text-sm font-bold text-slate-950'}>Assets &amp; Systems</p>
+            <p className={compact ? 'mt-1 text-xs leading-5 text-cyan-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
+              {canManage
+                ? `Track safe asset/system basics for ${label}. Archived assets are hidden by default.`
+                : 'Asset browsing is limited to home managers in this version.'}
+            </p>
+          </div>
+          {canManage ? (
+            <button type="button" className={buttonClass('primary')} onClick={() => openHomeAssetForm(homeId)} disabled={Boolean(homeAssetDraft)}>
+              <Plus size={16} />
+              Add asset
+            </button>
+          ) : (
+            <span className="inline-flex w-fit rounded-full bg-white px-2 py-0.5 text-xs font-bold text-cyan-700">
+              Read-only
+            </span>
+          )}
+        </div>
+        {renderHomeAssetForm(homeId)}
+        {loadingHomeAssets && assets.length === 0 ? (
+          <p className="text-xs font-semibold text-blue-700">Refreshing assets...</p>
+        ) : assets.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+            No active assets or systems yet.
+          </p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2" data-testid="home-assets-list">
+            {assets.map(asset => {
+              const details = homeAssetDetailParts(asset);
+              return (
+                <div key={asset.id} className="rounded-xl border border-slate-200 bg-white p-3" data-testid="home-asset-card">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words text-sm font-bold text-slate-950">{asset.name}</p>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{asset.asset_category}</span>
+                        {renderAssetRoomChip(asset)}
+                      </div>
+                      {details.length > 0 && <p className="mt-1 text-xs leading-5 text-slate-500">{details.join(' • ')}</p>}
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {asset.install_date ? `Installed ${homeAssetDateLabel(asset.install_date)}` : 'Install date not set'}
+                        {asset.warranty_expires_on ? ` • Warranty ${homeAssetDateLabel(asset.warranty_expires_on)}` : ''}
+                      </p>
+                      {showNotes && asset.notes && (
+                        <p className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs leading-5 text-slate-600">{asset.notes}</p>
+                      )}
+                    </div>
+                    {canManage && (
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button type="button" className={buttonClass('secondary')} onClick={() => openHomeAssetForm(homeId, asset)}>
+                          <Pencil size={14} />
+                          Edit
+                        </button>
+                        <button type="button" className={buttonClass('secondary')} disabled={archivingHomeAssetId === asset.id} onClick={() => void archiveHomeAsset(asset)}>
+                          <X size={14} />
+                          {archivingHomeAssetId === asset.id ? 'Archiving...' : 'Archive'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
   const renderSharedHomeShellsPanel = () => (
     <Card title="Homes shared with me" icon={<Home size={18} />}>
       <div className="space-y-4" data-testid="shared-home-shells-panel">
@@ -14530,6 +15476,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       label,
                       canManage: canManageSharedRooms,
                       showNotes: canManageSharedRooms,
+                      compact: true,
+                    })}
+                    {renderHomeMapSection({
+                      homeId: shell.home_id,
+                      label,
+                      canManage: canManageSharedRooms,
+                      canShowPrivateCounts: false,
+                      compact: true,
+                    })}
+                    {canManageSharedRooms && renderHomeAssetsSection({
+                      homeId: shell.home_id,
+                      label,
+                      canManage: true,
+                      showNotes: true,
                       compact: true,
                     })}
                     <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3" data-testid="shared-home-reminders-section">
@@ -15702,10 +16662,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <div className="space-y-4" data-testid="home-setup-guide">
               <div>
                 <p className="text-sm font-semibold text-slate-950">
-                  Start with the basics: property details, rooms, photos, documents, reminders, and notes.
+                  Start with the basics: property details, rooms, assets, photos, documents, reminders, and notes.
                 </p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Rooms are available now for basic home organization. Systems &amp; Assets, Key Home Locations, Home Map, and true Home Setup Templates remain future tools.
+                  Rooms, Assets &amp; Systems, and a simple Home Map preview are available now for basic home organization. Key Home Locations and true Home Setup Templates remain future tools.
                 </p>
               </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -15725,9 +16685,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-sm font-bold text-blue-950">Future Home Map</p>
+                  <p className="text-sm font-bold text-blue-950">Home Map preview</p>
                   <p className="mt-1 text-xs leading-5 text-blue-800">
-                    Home Map will start as a simple not-to-scale room and system map, not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
+                    Home Map starts as simple not-to-scale room boxes with optional display-only measurements. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
                   </p>
                 </div>
                 <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
@@ -15751,6 +16711,34 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           ) : (
             <Card title="Rooms" icon={<Home size={18} />}>
               <p className="text-sm text-slate-500">Save a property before adding rooms.</p>
+            </Card>
+          )}
+          {selectedHome?.id ? (
+            <Card title="Home Map" icon={<MapPin size={18} />}>
+              {renderHomeMapSection({
+                homeId: selectedHome.id,
+                label: homeProfileDisplayLabel(selectedHome),
+                canManage: true,
+                canShowPrivateCounts: true,
+              })}
+            </Card>
+          ) : (
+            <Card title="Home Map" icon={<MapPin size={18} />}>
+              <p className="text-sm text-slate-500">Save a property before creating a Home Map.</p>
+            </Card>
+          )}
+          {selectedHome?.id ? (
+            <Card title="Assets & Systems" icon={<ClipboardList size={18} />}>
+              {renderHomeAssetsSection({
+                homeId: selectedHome.id,
+                label: homeProfileDisplayLabel(selectedHome),
+                canManage: true,
+                showNotes: true,
+              })}
+            </Card>
+          ) : (
+            <Card title="Assets & Systems" icon={<ClipboardList size={18} />}>
+              <p className="text-sm text-slate-500">Save a property before adding assets or systems.</p>
             </Card>
           )}
           {renderSharedHomeShellsPanel()}

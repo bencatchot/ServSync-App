@@ -176,10 +176,16 @@ test.describe('home reminder room picker UI', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/types.ts',
+      'servsync-home-map-layout-foundation.sql',
+      'tests/e2e/home-assets-foundation.spec.ts',
+      'tests/e2e/home-map-layout-foundation.spec.ts',
+      'tests/e2e/home-map-ui.spec.ts',
+      'tests/e2e/home-assets-ui.spec.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
+      'tests/e2e/security-catalog.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
@@ -189,7 +195,7 @@ test.describe('home reminder room picker UI', () => {
     for (const file of files) {
       expect(allowedFiles.has(file), `${file} should be an approved reminder-room UI file`).toBe(true);
     }
-    expect(files.some(file => file.endsWith('.sql'))).toBe(false);
+    expect(files.some(file => file.endsWith('.sql') && file !== 'servsync-home-map-layout-foundation.sql')).toBe(false);
     expect(files.some(file => file.includes('supabase/functions/'))).toBe(false);
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);

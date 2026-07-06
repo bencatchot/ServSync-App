@@ -108,13 +108,16 @@ test.describe('homeowner rooms UI', () => {
 
     expect(homeSetupDataSource).toContain('Add rooms');
     expect(homeSetupDataSource).toContain('selectedHomeRooms.length > 0');
-    expect(homeSetupUiSource).toContain('Rooms are available now for basic home organization.');
-    expect(homeSetupUiSource).toContain('Systems &amp; Assets, Key Home Locations, Home Map, and true Home Setup Templates remain future tools.');
-    expect(homeSetupUiSource).toContain('Home Map will start as a simple not-to-scale room and system map, not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
+    expect(homeSetupDataSource).toContain('Add assets & systems');
+    expect(homeSetupDataSource).toContain('Start a Home Map');
+    expect(homeSetupUiSource).toContain('Rooms, Assets &amp; Systems, and a simple Home Map preview are available now for basic home organization.');
+    expect(homeSetupUiSource).toContain('Key Home Locations and true Home Setup Templates remain future tools.');
+    expect(homeSetupUiSource).toContain('Home Map starts as simple not-to-scale room boxes with optional display-only measurements.');
+    expect(homeSetupUiSource).toContain('It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
     expect(homeSetupUiSource).toContain('Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.');
   });
 
-  test('room UI does not introduce contractor, map, asset, system, key-location, or SQL scope', () => {
+  test('room UI still avoids contractor, key-location, storage, and workflow scope', () => {
     const source = appSource();
     const contractorSource = sourceBetween(
       source,
@@ -125,27 +128,33 @@ test.describe('homeowner rooms UI', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/types.ts',
+      'servsync-home-map-layout-foundation.sql',
+      'tests/e2e/home-assets-foundation.spec.ts',
+      'tests/e2e/home-map-layout-foundation.spec.ts',
+      'tests/e2e/home-map-ui.spec.ts',
+      'tests/e2e/home-assets-ui.spec.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-setup-clarity.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
+      'tests/e2e/security-catalog.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
     ]);
 
     expect(contractorSource).not.toContain('home_rooms');
+    expect(contractorSource).not.toContain('home_assets');
+    expect(contractorSource).not.toContain('home_room_layouts');
     expect(source).not.toContain('home_systems');
-    expect(source).not.toContain('home_assets');
     expect(source).not.toContain('key_locations');
-    expect(source).not.toContain('home_map');
     expect(source).not.toContain('floor_plan');
 
     for (const file of files) {
       expect(allowedFiles.has(file), `${file} should be an approved homeowner rooms UI file`).toBe(true);
     }
-    expect(files.some(file => file.endsWith('.sql'))).toBe(false);
+    expect(files.some(file => file.endsWith('.sql') && file !== 'servsync-home-map-layout-foundation.sql')).toBe(false);
     expect(files.some(file => file.includes('supabase/functions/'))).toBe(false);
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);

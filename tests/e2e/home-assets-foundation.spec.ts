@@ -211,7 +211,7 @@ test.describe('home_assets foundation SQL', () => {
     }
   });
 
-  test('does not expand UI, shared shells, contractor surfaces, storage, or workflow behavior', () => {
+  test('does not expand SQL shells, contractor surfaces, storage, or workflow behavior', () => {
     const appSource = sourceFile('src/App.tsx');
     const sharedHomeShellSource = sourceFile('servsync-shared-home-shell.sql');
     const sharedReminderShellSource = sourceFile('servsync-shared-home-reminders-shell.sql');
@@ -220,9 +220,8 @@ test.describe('home_assets foundation SQL', () => {
       appSource.indexOf('function PlatformAdminDashboard({ onSignOut }'),
     );
 
-    expect(appSource).not.toContain('home_assets');
-    expect(appSource).not.toContain('Home assets');
-    expect(appSource).not.toContain('Asset detail');
+    expect(appSource).toContain(".from('home_assets')");
+    expect(appSource).toContain('Assets &amp; Systems');
     expect(sharedHomeShellSource).not.toContain('home_assets');
     expect(sharedReminderShellSource).not.toContain('home_assets');
     expect(contractorSource).not.toContain('home_assets');
@@ -233,7 +232,17 @@ test.describe('home_assets foundation SQL', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'servsync-home-assets-foundation.sql',
+      'servsync-home-map-layout-foundation.sql',
+      'src/App.tsx',
+      'src/types.ts',
       'tests/e2e/home-assets-foundation.spec.ts',
+      'tests/e2e/home-assets-ui.spec.ts',
+      'tests/e2e/home-document-room-ui.spec.ts',
+      'tests/e2e/home-map-layout-foundation.spec.ts',
+      'tests/e2e/home-map-ui.spec.ts',
+      'tests/e2e/home-reminder-room-ui.spec.ts',
+      'tests/e2e/home-room-detail-ui.spec.ts',
+      'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/security-catalog.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
@@ -245,9 +254,7 @@ test.describe('home_assets foundation SQL', () => {
       expect(allowedFiles.has(file), `${file} should be an approved home_assets foundation file`).toBe(true);
     }
 
-    expect(files).not.toContain('src/App.tsx');
-    expect(files).not.toContain('src/types.ts');
-    expect(files.some(file => file.endsWith('.sql') && file !== 'servsync-home-assets-foundation.sql')).toBe(false);
+    expect(files.some(file => file.endsWith('.sql') && !['servsync-home-assets-foundation.sql', 'servsync-home-map-layout-foundation.sql'].includes(file))).toBe(false);
     expect(files.some(file => file.includes('supabase/functions/'))).toBe(false);
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);

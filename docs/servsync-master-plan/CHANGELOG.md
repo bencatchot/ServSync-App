@@ -6,6 +6,49 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/home-map-v1-rooms-systems-builder`
+- Starting main SHA: `eca0b42b7443d619098e8b04c9cf25d93d4ae12d`
+- Files changed:
+  - `servsync-home-map-layout-foundation.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/home-assets-foundation.spec.ts`
+  - `tests/e2e/home-assets-ui.spec.ts`
+  - `tests/e2e/home-document-room-ui.spec.ts`
+  - `tests/e2e/home-map-layout-foundation.spec.ts`
+  - `tests/e2e/home-map-ui.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/home-room-detail-ui.spec.ts`
+  - `tests/e2e/home-rooms-ui.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Home Map v1 and Assets & Systems v1. The SQL foundation creates `home_room_layouts` for simple not-to-scale room boxes with optional display-only measurements and keeps `home_assets` direct table reads manager-only so member/viewer shared-home roles cannot query asset notes. The homeowner Properties/Home UI now includes a Home Map card for owner/admin room-box creation/linking, moving/resizing, saving, and Room Detail opening, plus an Assets & Systems card for owner/admin add/edit/soft-archive asset basics with optional room links. Room Detail now shows linked assets alongside linked reminders/documents.
+- Reason for change: Durable rooms, room-linked reminders/documents, Room Detail, and the `home_assets` foundation are in place, so the approved Builder Mode pass can deliver the first usable Home Map and Rooms & Systems experience without contractor access, key locations, storage changes, or workflow links.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-layout-foundation.spec.ts tests/e2e/home-map-ui.spec.ts tests/e2e/home-assets-ui.spec.ts tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts --project=chromium` (31 passed, 1 skipped pre-existing credential-gated sandbox room-management test)
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-layout-foundation.spec.ts tests/e2e/home-assets-ui.spec.ts tests/e2e/home-map-ui.spec.ts tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-assets-foundation.spec.ts --project=chromium` (20 passed after the manager-only asset RLS fix)
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium` attempted; blocked because the local Supabase CLI connection requires `SUPABASE_DB_PASSWORD` / login-role access, so sandbox SQL application and live catalog validation remain pending follow-up.
+  - `npm run typecheck`
+  - `npm run build` (passed with existing Browserslist/chunk-size warnings)
+- Known risks or follow-ups:
+  - High-risk SQL/RLS + UI Builder Mode pass. Sandbox SQL application could not be completed from this environment because Supabase CLI required `SUPABASE_DB_PASSWORD`; production SQL is not applied in this PR and requires separate approval after merge.
+  - Home Map v1 is a simple box layout only. It does not add CAD, wall drawing, measured floor-plan generation, LiDAR/scanning, 3D, doors/windows, floor-plan upload/parsing, or permit/code drawings.
+  - No contractor Home Map/asset visibility, contractor map permissions/proposals, Key Home Locations, sensitive access fields, serial numbers, storage bucket/policy changes, paid storage/entitlement changes, document edit assignment, photo/report-job media room tags, migrations/backfills, or inspection/job/estimate/invoice/service-agreement map links are included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Home Map v1 and Assets & Systems v1 as live homeowner and shared-admin organization surfaces while preserving future boundaries for contractors, key locations, sensitive access data, storage/media, workflow links, and CAD/floor-plan/LiDAR/3D scope.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records Home Map v1 and Assets & Systems v1 as structured homeowner organization features and clarifies that contractor permissions/proposals, Key Home Locations, and advanced map/floor-plan tooling remain future work.
+
 - Branch: `codex/home-assets-foundation-v1`
 - Starting main SHA: `53bd21d74083ad0aaad66b6bdcc8d92c1fdabcb2`
 - Files changed:
