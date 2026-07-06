@@ -127,6 +127,7 @@ test.describe('homeowner rooms UI', () => {
       'src/types.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-setup-clarity.spec.ts',
+      'tests/e2e/home-reminder-room-ui.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
