@@ -9818,6 +9818,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeDocuments, setHomeDocuments] = useState<HomeDocument[]>([]);
   const [docUploadType, setDocUploadType] = useState<HomeDocumentType>('other');
   const [docUploadNotes, setDocUploadNotes] = useState('');
+  const [docUploadRoomId, setDocUploadRoomId] = useState<string | null>(null);
   const [docUploading, setDocUploading] = useState(false);
   const [docDeletingId, setDocDeletingId] = useState<string | null>(null);
   const [docPendingDelete, setDocPendingDelete] = useState<HomeDocument | null>(null);
@@ -10052,6 +10053,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     setHomeownerReminderRoomFilter('all');
   }, [selectedHomeId, homeownerMaintenancePropertyScope]);
+
+  useEffect(() => {
+    setDocUploadRoomId(null);
+  }, [selectedHomeId]);
 
   const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
     setError('');
@@ -10874,6 +10879,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         p_file_size_bytes: file.size,
         p_document_type: docUploadType,
         p_notes: cleanHumanWrittenText(docUploadNotes),
+        p_home_room_id: docUploadRoomId || null,
       });
       if (prepareError) throw prepareError;
 
@@ -10902,6 +10908,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       }
       setDocUploadNotes('');
       setDocUploadType('other');
+      setDocUploadRoomId(null);
       setNotice('Document uploaded. Beta document limits apply only to manual Documents-tab uploads.');
       await loadHomeowner();
     } catch (err) {
@@ -14133,9 +14140,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     room.name,
     [room.floor_label, room.area_label].filter(Boolean).join(' / '),
   ].filter(Boolean).join(' - ');
+  const roomDocumentLabel = roomReminderLabel;
   const roomForReminder = (reminder: Pick<HomeReminder, 'home_id' | 'home_room_id'>) => {
     if (!reminder.home_id || !reminder.home_room_id) return null;
     return (homeRoomsByHomeId[reminder.home_id] || []).find(room => room.id === reminder.home_room_id) ?? null;
+  };
+  const roomForDocument = (doc: Pick<HomeDocument, 'home_id' | 'home_room_id'>) => {
+    if (!doc.home_id || !doc.home_room_id) return null;
+    return (homeRoomsByHomeId[doc.home_id] || []).find(room => room.id === doc.home_room_id) ?? null;
   };
   const renderReminderRoomChip = (reminder: HomeReminder) => {
     const room = roomForReminder(reminder);
@@ -14143,6 +14155,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return (
       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
         Room: {roomReminderLabel(room)}
+      </span>
+    );
+  };
+  const renderDocumentRoomChip = (doc: HomeDocument) => {
+    const room = roomForDocument(doc);
+    if (!room) return null;
+    return (
+      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+        Room: {roomDocumentLabel(room)}
       </span>
     );
   };
@@ -15463,12 +15484,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 {recentDocuments.length === 0 ? (
                   <EmptyState text="No documents uploaded yet." />
                 ) : (
-                  recentDocuments.map(doc => (
-                    <div key={doc.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <p className="truncate text-sm font-semibold text-slate-800">{doc.file_name}</p>
-                      <p className="mt-1 text-xs capitalize text-slate-500">{doc.document_type}</p>
-                    </div>
-                  ))
+                  recentDocuments.map(doc => {
+                    const roomChip = renderDocumentRoomChip(doc);
+                    return (
+                      <div key={doc.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="truncate text-sm font-semibold text-slate-800">{doc.file_name}</p>
+                        <p className="mt-1 text-xs capitalize text-slate-500">{doc.document_type}</p>
+                        {roomChip && <div className="mt-2 flex flex-wrap gap-2">{roomChip}</div>}
+                      </div>
+                    );
+                  })
                 )}
                 <button type="button" onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                   Open documents
@@ -18518,6 +18543,32 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   />
                 </Field>
               </div>
+              {selectedHome?.id && (
+                <div className="mt-3">
+                  {selectedHomeRooms.length === 0 ? (
+                    <p className="rounded-xl border border-emerald-100 bg-white px-3 py-2 text-xs leading-5 text-emerald-800">
+                      Add rooms in Properties before tagging documents to rooms.
+                    </p>
+                  ) : (
+                    <Field label="Room optional">
+                      <select
+                        className={inputClass()}
+                        value={docUploadRoomId || ''}
+                        onChange={event => setDocUploadRoomId(event.target.value || null)}
+                        disabled={docUploading}
+                      >
+                        <option value="">No room</option>
+                        {selectedHomeRooms.map(room => (
+                          <option key={room.id} value={room.id}>{roomDocumentLabel(room)}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+                  <p className="mt-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs leading-5 text-blue-800">
+                    Tag this document to a room for homeowner organization. Room tags do not change sharing, contractor access, or document visibility. Room notes are not shown with documents.
+                  </p>
+                </div>
+              )}
               <label className={`${buttonClass('primary')} mt-3 cursor-pointer inline-flex ${docUploading || manualHomeDocumentLocalQuotaFull ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={16} />
                 {docUploading ? 'Uploading...' : 'Choose file to upload'}
@@ -18537,6 +18588,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <p className="mt-1 text-xs text-slate-500">ZIP files, videos, executables, archives, Word documents, and unsupported file types are blocked for manual uploads.</p>
               <p className="mt-1 text-xs leading-5 text-amber-700">
                 Private document storage. Files saved here are visible only to you and cannot be shared from this tab. You can upload, download, or delete your own home records here.
+              </p>
+              <p className="mt-1 text-xs leading-5 text-amber-700">
+                Do not upload lockbox codes, alarm details, gate codes, hidden-key details, or sensitive access instructions unless explicit visibility controls are supported.
               </p>
             </div>
 
@@ -18571,6 +18625,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                             {typeLabels[doc.document_type] ?? doc.document_type}
                           </span>
+                          {renderDocumentRoomChip(doc)}
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
                           {new Date(doc.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
