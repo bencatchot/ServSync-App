@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/home-reminder-room-foundation-v1`
+- Starting main SHA: `f3a381c6e70864f42e237ecb0c9016350d679b0f`
+- Files changed:
+  - `servsync-home-reminder-room-foundation.sql`
+  - `tests/e2e/home-reminder-room-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the backend foundation for optional room-linked Home Reminders by introducing `home_reminders.home_room_id`, room lookup indexes, and same-home validation so a reminder can only reference a `home_rooms` row for the same property.
+- Reason for change: Follow-up audit found reminders are the safest first workflow connection for durable homeowner rooms because they are homeowner-owned, home-scoped, non-financial, and do not affect approval, billing, invoiceability, job lifecycle, or contractor visibility.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium` attempted; blocked because this fresh worktree is not linked to sandbox ref `zpzdkoaubyjtsomccxya`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/test/docs-only. No UI, reminder room picker/chips/filters, shared reminder shell expansion, contractor visibility expansion, documents/photos, jobs, estimates, invoices, inspections, Home Map, assets/systems, key locations, storage changes, manual deployment, production SQL application, or production data mutation is included.
+  - The linked sandbox will need separately approved SQL application before live metadata/RLS validation can prove the new column, FK, indexes, and trigger exist outside source-static tests.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records optional room-linked Home Reminder backend foundation as the first low-risk workflow connection for `home_rooms` while keeping UI and higher-risk workflow links deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records room-linked reminders as backend-only foundation and preserves Home Map/assets/systems/key-location sequencing.
+
 - Branch: `codex/homeowner-rooms-ui-v1`
 - Starting main SHA: `7032a7ce94b1d4358c5a274b887c84df4c3885c3`
 - Files changed:
