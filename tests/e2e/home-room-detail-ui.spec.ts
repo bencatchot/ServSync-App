@@ -61,7 +61,7 @@ test.describe('homeowner room detail panel', () => {
     expect(detailPanel).toContain('doc.home_id === room.home_id && doc.home_room_id === room.id');
     expect(detailPanel).toContain('Linked reminders');
     expect(detailPanel).toContain('Linked documents');
-    expect(detailPanel).toContain('No reminders or documents are linked to this room yet.');
+    expect(detailPanel).toContain('No reminders, documents, or assets are linked to this room yet.');
     expect(detailPanel).toContain('No reminders are tagged to this room.');
     expect(detailPanel).toContain('No documents are tagged to this room.');
     expect(detailPanel).toContain('Room links are optional and help organize home records.');
@@ -97,24 +97,31 @@ test.describe('homeowner room detail panel', () => {
     expect(contractorSource).not.toContain('home_room_id');
   });
 
-  test('room detail avoids Home Map, asset, system, key-location, storage, and SQL scope', () => {
+  test('room detail includes linked assets without key-location, storage, contractor, or workflow scope', () => {
     const app = appSource();
     const detailPanel = sourceBetween(app, 'const renderHomeRoomDetailPanel =', 'const renderHomeRoomForm =');
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/types.ts',
+      'servsync-home-map-layout-foundation.sql',
+      'tests/e2e/home-assets-foundation.spec.ts',
+      'tests/e2e/home-map-layout-foundation.spec.ts',
+      'tests/e2e/home-map-ui.spec.ts',
+      'tests/e2e/home-assets-ui.spec.ts',
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
+      'tests/e2e/security-catalog.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
     ]);
 
-    expect(detailPanel).not.toContain('home_map');
-    expect(detailPanel).not.toContain('Home Map');
-    expect(detailPanel).not.toContain('home_assets');
+    expect(detailPanel).toContain('linkedAssets');
+    expect(detailPanel).toContain('Linked assets');
+    expect(detailPanel).toContain('No assets are assigned to this room.');
     expect(detailPanel).not.toContain('home_systems');
     expect(detailPanel).not.toContain('key_locations');
     expect(detailPanel).not.toContain('floor_plan');
@@ -122,8 +129,7 @@ test.describe('homeowner room detail panel', () => {
     for (const file of files) {
       expect(allowedFiles.has(file), `${file} should be an approved homeowner Room Detail file`).toBe(true);
     }
-    expect(files).not.toContain('src/types.ts');
-    expect(files.some(file => file.endsWith('.sql'))).toBe(false);
+    expect(files.some(file => file.endsWith('.sql') && file !== 'servsync-home-map-layout-foundation.sql')).toBe(false);
     expect(files.some(file => file.includes('supabase/functions/'))).toBe(false);
     expect(files.some(file => file.includes('.env'))).toBe(false);
     expect(files.some(file => file.includes('package'))).toBe(false);

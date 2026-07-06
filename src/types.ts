@@ -456,6 +456,43 @@ export interface HomeRoom {
   updated_at: string;
 }
 
+export interface HomeRoomLayout {
+  id: string;
+  home_id: string;
+  home_room_id: string;
+  floor_label: string | null;
+  layout_x: number;
+  layout_y: number;
+  layout_width: number;
+  layout_height: number;
+  measured_width: number | null;
+  measured_depth: number | null;
+  measurement_unit: string | null;
+  sort_order: number;
+  archived_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HomeAsset {
+  id: string;
+  home_id: string;
+  home_room_id: string | null;
+  asset_category: string;
+  asset_type: string | null;
+  name: string;
+  manufacturer: string | null;
+  model: string | null;
+  install_date: string | null;
+  warranty_expires_on: string | null;
+  notes: string | null;
+  archived_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ContractorProfile {
   id: string;
   owner_user_id: string;

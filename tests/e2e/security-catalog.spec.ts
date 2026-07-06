@@ -97,6 +97,7 @@ const CORE_PRIVATE_TABLES = [
   'homeowner_profiles',
   'homes',
   'home_rooms',
+  'home_room_layouts',
   'home_assets',
   'home_memberships',
   'home_membership_audit_events',
@@ -459,10 +460,10 @@ order by e.table_name;
     expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
   });
 
-  test('home assets grant only scoped owner/admin browser read/write privileges with no delete', () => {
+  test('home assets and home room layouts grant scoped browser privileges with no delete', () => {
     const rows = runCatalogQuery<TablePrivilegeRow>(`
 with expected(table_name) as (
-  values ('home_assets')
+  values ('home_assets'), ('home_room_layouts')
 )
 select
   e.table_name,
@@ -487,21 +488,22 @@ left join pg_class c
 order by e.table_name;
     `);
 
-    expect(rows, 'Home assets privilege rows should match expected table count').toHaveLength(1);
-    const row = rows[0];
-    expect(row.exists, `${row.table_name} should exist`).toBe(true);
-    expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
-    expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
-    expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
-    expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
-    expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
-    expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
-    expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
-    expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
-    expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind owner/admin RLS`).toBe(true);
-    expect(row.authenticated_insert, `${row.table_name} should grant INSERT to authenticated behind owner/admin RLS`).toBe(true);
-    expect(row.authenticated_update, `${row.table_name} should grant UPDATE to authenticated behind owner/admin RLS`).toBe(true);
-    expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    expect(rows, 'Home assets/layout privilege rows should match expected table count').toHaveLength(2);
+    for (const row of rows) {
+      expect(row.exists, `${row.table_name} should exist`).toBe(true);
+      expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+      expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+      expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+      expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+      expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+      expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+      expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+      expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+      expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind home-scoped RLS`).toBe(true);
+      expect(row.authenticated_insert, `${row.table_name} should grant INSERT to authenticated behind owner/admin RLS`).toBe(true);
+      expect(row.authenticated_update, `${row.table_name} should grant UPDATE to authenticated behind owner/admin RLS`).toBe(true);
+      expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    }
   });
 
   test('runtime settings table remains unavailable to browser roles', () => {
