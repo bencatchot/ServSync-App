@@ -175,6 +175,9 @@ test.describe('home reminder room picker UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/types.ts',
+      'tests/e2e/home-document-room-ui.spec.ts',
+      'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',

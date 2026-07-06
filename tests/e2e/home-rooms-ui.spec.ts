@@ -125,6 +125,7 @@ test.describe('homeowner rooms UI', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/types.ts',
+      'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-setup-clarity.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',

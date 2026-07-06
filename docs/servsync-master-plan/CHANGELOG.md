@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/document-room-picker-v1`
+- Starting main SHA: `f51cb1e683b2c83d54ef0e2ed419555087e86a9f`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/home-document-room-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the first homeowner document-room UI by letting manual document uploads optionally carry an active room selection into the existing prepare/register upload flow and by showing non-sensitive room chips on homeowner-owned document cards when the linked room is active and resolvable.
+- Reason for change: The document-room metadata and upload-registration foundations are production-verified, so the safest first UI slice is upload-time organization only without edit-room assignment, filters, shared-home document expansion, contractor visibility, storage policy changes, or photo/media/Home Map scope.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-document-room-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-document-room-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, native/service-worker/deployment, manual deploy, production data, storage bucket changes, storage policy changes, shared-home document expansion, contractor visibility, document edit-room assignment, document filters, home/profile/photo tags, report/job media tags, floor-plan behavior, Home Map, assets/systems, key locations, reminders, estimates, jobs, invoices, or service agreements are included.
+  - Existing documents are not backfilled or edited; room tags apply when homeowners upload new manual Documents-tab files.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first homeowner document room picker/chip UI while keeping edit assignment, filters, shared/contractor visibility, storage/media, Home Map, assets/systems, and key-location work deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records that document-room tagging has a first homeowner UI on top of the production-verified metadata and upload-registration foundations.
+
 - Branch: `codex/document-upload-room-registration-v1`
 - Starting main SHA: `8b0706e8232260d52844824b399a010029c72223`
 - Files changed:
