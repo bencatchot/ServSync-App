@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/document-room-link-foundation-v1`
+- Starting main SHA: `095624a96a350404439394ef34eb0d539708ed8f`
+- Files changed:
+  - `servsync-home-document-room-foundation.sql`
+  - `tests/e2e/home-document-room-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the backend foundation for optional room-linked homeowner documents by introducing `home_documents.home_room_id`, room lookup indexes, and same-home validation so a document can only reference a `home_rooms` row for the same assigned property.
+- Reason for change: Follow-up audit found homeowner documents are the safest next room-link candidate because they already have durable metadata, while home photos lack per-photo metadata and report/job media has workflow-specific context that should remain separate.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-document-room-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/test/docs only. The SQL is checked in but not applied; sandbox SQL application and validation require separate approval, and production SQL application requires separate approval after merge.
+  - No UI, storage bucket changes, storage policy changes, shared-home document expansion, contractor visibility expansion, photo tagging, report/job media tagging, floor-plan behavior, Home Map, assets/systems, key locations, reminders, estimates, jobs, invoices, service agreements, production data, manual deployment, or production SQL application are included.
+  - Existing `home_documents` browser grants do not include update; this slice preserves that boundary. Future document room picker/chip UI will need a separately approved update/RPC/reservation design.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first document-to-room backend foundation while keeping document UI, photo tags, report/job media tags, shared/contractor visibility, and Home Map/assets/key-location work deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records document-to-room as a backend foundation only and keeps photo/report media and broader Home Map/media work future-scoped.
+
 - Branch: `codex/filter-reminders-by-room-v1`
 - Starting main SHA: `4f7102727ad48efa4ecca20e284ab108c8b17e3d`
 - Files changed:
