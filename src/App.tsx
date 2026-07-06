@@ -9829,6 +9829,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [logInvoiceFile, setLogInvoiceFile] = useState<File | null>(null);
   const [logInvoiceNotice, setLogInvoiceNotice] = useState('');
   const [homeownerMaintenancePropertyScope, setHomeownerMaintenancePropertyScope] = useState<HomeownerMaintenancePropertyScope>('selected');
+  const [homeownerReminderRoomFilter, setHomeownerReminderRoomFilter] = useState('all');
   const [reminderFormOpen, setReminderFormOpen] = useState(false);
   const [homeReminderDraft, setHomeReminderDraft] = useState<HomeReminderDraft>({
     home_id: selectedHomeId,
@@ -10047,6 +10048,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     void loadHomeRooms();
   }, [loadHomeRooms]);
+
+  useEffect(() => {
+    setHomeownerReminderRoomFilter('all');
+  }, [selectedHomeId, homeownerMaintenancePropertyScope]);
 
   const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
     setError('');
@@ -12344,6 +12349,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (homeownerMaintenancePropertyScope === 'all') return true;
     if (homeownerMaintenancePropertyScope === 'unassigned') return !reminder.home_id;
     return selectedHomeId ? reminder.home_id === selectedHomeId : !reminder.home_id;
+  });
+  const selectedHomeReminderRooms = selectedHomeId ? (homeRoomsByHomeId[selectedHomeId] || []) : [];
+  const selectedHomeReminderRoomIds = new Set(selectedHomeReminderRooms.map(room => room.id));
+  const canFilterHomeRemindersByRoom = homeownerMaintenancePropertyScope === 'selected' && Boolean(selectedHomeId);
+  const roomFilteredHomeReminders = propertyScopedHomeReminders.filter(reminder => {
+    if (!canFilterHomeRemindersByRoom || homeownerReminderRoomFilter === 'all') return true;
+    const activeRoomId = reminder.home_room_id && selectedHomeReminderRoomIds.has(reminder.home_room_id)
+      ? reminder.home_room_id
+      : 'none';
+    return homeownerReminderRoomFilter === activeRoomId;
   });
   const homeownerMaintenanceScopeLabel = homeownerMaintenancePropertyScope === 'all'
     ? 'all properties'
@@ -18100,8 +18115,42 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <Bell size={15} />Add reminder
                   </button>
                 </div>
+                {canFilterHomeRemindersByRoom && (
+                  <div className="mt-3 rounded-xl border border-emerald-100 bg-white px-3 py-2">
+                    {selectedHomeReminderRooms.length > 0 ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <Field label="Filter by room">
+                            <select
+                              className={`${inputClass()} bg-white`}
+                              value={homeownerReminderRoomFilter}
+                              onChange={event => setHomeownerReminderRoomFilter(event.target.value)}
+                            >
+                              <option value="all">All rooms</option>
+                              {selectedHomeReminderRooms.map(room => (
+                                <option key={room.id} value={room.id}>{roomReminderLabel(room)}</option>
+                              ))}
+                              <option value="none">No room</option>
+                            </select>
+                          </Field>
+                        </div>
+                        <p className="max-w-xl text-xs leading-5 text-emerald-800">
+                          Filter reminders by the room they are tagged to. Rooms are for organization only and do not change reminder delivery or sharing.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs leading-5 text-emerald-800">
+                        Add rooms in Properties before filtering reminders by room.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="mt-3 space-y-2">
-                  {propertyScopedHomeReminders
+                  {roomFilteredHomeReminders.length === 0 ? (
+                    <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
+                      No Home Reminders match this room filter.
+                    </p>
+                  ) : roomFilteredHomeReminders
                     .slice()
                     .sort((a, b) => {
                       if (a.status === b.status) return a.due_on.localeCompare(b.due_on);

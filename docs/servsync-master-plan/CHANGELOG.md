@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/filter-reminders-by-room-v1`
+- Starting main SHA: `4f7102727ad48efa4ecca20e284ab108c8b17e3d`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a local homeowner-only room filter for the selected-property Home History reminder list, with All rooms, active room, and No room options based on existing active `home_rooms` data.
+- Reason for change: Home Reminders can now be tagged to rooms, and the safest next step is local organization in the homeowner-owned reminder list without backend changes, shared reminder shell expansion, contractor visibility, grouping, or edit-reminder behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts tests/e2e/home-setup-clarity.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, env/config/package, native/service-worker/deployment, manual deploy, production data, shared reminder shell expansion, contractor visibility, reminder edit flow, grouping, dashboard filtering, document/photo room tags, inspection room links, job/work-item room tags, estimate/invoice room tags, Home Map, assets/systems, key locations, approval/billing/job lifecycle, or storage changes are included.
+  - Filtering is local to the selected-property Home History reminder list and does not change reminder delivery, reminder status updates, or reminder queries.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records selected-property local room filtering for homeowner-owned Home Reminders while keeping grouping, edit-room assignment, shared shells, contractor visibility, and higher-risk workflow links deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records that reminder-room filtering has a first local homeowner UI while preserving shared-shell, contractor visibility, and Home Map/assets/key-location boundaries.
+
 - Branch: `codex/reminder-room-picker-v1`
 - Starting main SHA: `3f86e420dde9e8e437875ba0564fa5ab229c5f3b`
 - Files changed:
