@@ -92,7 +92,7 @@ test.describe('home document room picker UI', () => {
     const app = appSource();
     const roomLoading = sourceBetween(app, 'const loadHomeRooms = useCallback(async () => {', 'const openHomeRoomForm =');
     const labelSource = sourceBetween(app, 'const roomReminderLabel = (room: HomeRoom) =>', 'const roomDocumentLabel = roomReminderLabel;');
-    const chipSource = sourceBetween(app, 'const roomDocumentLabel = roomReminderLabel;', 'const renderHomeRoomForm =');
+    const chipSource = sourceBetween(app, 'const roomDocumentLabel = roomReminderLabel;', 'const homeDocumentTypeLabel =');
     const documentList = sourceBetween(app, '{propertyScopedHomeDocuments.map(doc => {', '{docPendingDelete && (');
     const dashboardDocuments = sourceBetween(
       app,
@@ -149,6 +149,7 @@ test.describe('home document room picker UI', () => {
       'src/App.tsx',
       'src/types.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
+      'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',

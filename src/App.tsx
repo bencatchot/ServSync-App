@@ -9737,6 +9737,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [savingHomeRoom, setSavingHomeRoom] = useState(false);
   const [homeRoomDraft, setHomeRoomDraft] = useState<HomeRoomDraft | null>(null);
   const [archivingHomeRoomId, setArchivingHomeRoomId] = useState<string | null>(null);
+  const [selectedHomeRoomDetailId, setSelectedHomeRoomDetailId] = useState<string | null>(null);
   const [connections, setConnections] = useState<HomeownerConnection[]>([]);
   const [homeownerPropertyProposalsByConnectionId, setHomeownerPropertyProposalsByConnectionId] = useState<Record<string, ConnectedPropertyProposal[]>>({});
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestSummary[]>([]);
@@ -10058,6 +10059,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setDocUploadRoomId(null);
   }, [selectedHomeId]);
 
+  useEffect(() => {
+    setSelectedHomeRoomDetailId(null);
+  }, [selectedHomeId]);
+
   const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
     setError('');
     setNotice('');
@@ -10143,6 +10148,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       if (archiveError) throw archiveError;
       setNotice('Room archived.');
       if (homeRoomDraft?.id === room.id) setHomeRoomDraft(null);
+      if (selectedHomeRoomDetailId === room.id) setSelectedHomeRoomDetailId(null);
       await loadHomeRooms();
     } catch (err) {
       setError(readableError(err, 'Unable to archive room.'));
@@ -14167,6 +14173,127 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </span>
     );
   };
+  const homeDocumentTypeLabel = (documentType: string) => {
+    const typeLabels: Record<string, string> = {
+      warranty: 'Warranty',
+      manual: 'Manual',
+      inspection: 'Job report',
+      insurance: 'Insurance',
+      permit: 'Permit',
+      receipt: 'Receipt / Invoice',
+      other: 'Other',
+    };
+    return typeLabels[documentType] ?? documentType;
+  };
+  const renderHomeRoomDetailPanel = (room: HomeRoom, showNotes: boolean) => {
+    const details = roomDetailParts(room);
+    const linkedReminders = homeReminders
+      .filter(reminder => reminder.home_id === room.home_id && reminder.home_room_id === room.id)
+      .slice()
+      .sort((a, b) => {
+        if (a.status === b.status) return a.due_on.localeCompare(b.due_on);
+        return a.status === 'open' ? -1 : 1;
+      });
+    const linkedDocuments = homeDocuments
+      .filter(doc => doc.home_id === room.home_id && doc.home_room_id === room.id)
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    return (
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4" data-testid="home-room-detail-panel">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Room detail</p>
+            <h3 className="mt-1 break-words text-lg font-bold text-slate-950">{room.name}</h3>
+            {details.length > 0 ? (
+              <p className="mt-1 text-sm leading-6 text-slate-600">{details.join(' • ')}</p>
+            ) : (
+              <p className="mt-1 text-sm leading-6 text-slate-500">Room basics only.</p>
+            )}
+          </div>
+          <button type="button" className={buttonClass('secondary')} onClick={() => setSelectedHomeRoomDetailId(null)}>
+            Close details
+          </button>
+        </div>
+
+        {showNotes && room.notes && (
+          <div className="mt-3 rounded-xl border border-white bg-white/80 px-3 py-2">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Manager notes</p>
+            <p className="mt-1 text-sm leading-6 text-slate-700">{room.notes}</p>
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-950">Linked reminders</p>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                {linkedReminders.length} reminder{linkedReminders.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            {linkedReminders.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                No reminders are tagged to this room.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {linkedReminders.slice(0, 5).map(reminder => {
+                  const dueState = reminderDueState(reminder);
+                  return (
+                    <div key={reminder.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="min-w-0 flex-1 break-words text-sm font-semibold text-slate-900">{reminder.title}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Due {reminder.due_on ? new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'not set'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-950">Linked documents</p>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                {linkedDocuments.length} document{linkedDocuments.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            {linkedDocuments.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                No documents are tagged to this room.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {linkedDocuments.slice(0, 5).map(doc => {
+                  const sizeLabel = doc.file_size_bytes ? storageSizeLabel(doc.file_size_bytes) : '';
+                  return (
+                    <div key={doc.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="break-words text-sm font-semibold text-slate-900">{doc.file_name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {homeDocumentTypeLabel(doc.document_type)}
+                        {doc.created_at ? ` • ${new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                        {sizeLabel ? ` • ${sizeLabel}` : ''}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {linkedReminders.length === 0 && linkedDocuments.length === 0 && (
+          <p className="mt-3 rounded-xl border border-dashed border-emerald-200 bg-white px-3 py-2 text-xs leading-5 text-emerald-800">
+            No reminders or documents are linked to this room yet. Room links are optional and help organize home records.
+          </p>
+        )}
+      </div>
+    );
+  };
   const renderHomeRoomForm = (homeId: string) => {
     if (!homeRoomDraft || homeRoomDraft.home_id !== homeId) return null;
 
@@ -14235,7 +14362,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       </div>
     );
   };
-  const renderHomeRoomsList = (rooms: HomeRoom[], canManage: boolean, showNotes: boolean) => (
+  const renderHomeRoomsList = (rooms: HomeRoom[], canManage: boolean, showNotes: boolean, allowDetail = false) => (
     <div className="space-y-2" data-testid="home-rooms-list">
       {rooms.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
@@ -14260,6 +14387,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    {allowDetail && (
+                      <button
+                        type="button"
+                        className={buttonClass(selectedHomeRoomDetailId === room.id ? 'primary' : 'secondary')}
+                        onClick={() => setSelectedHomeRoomDetailId(current => current === room.id ? null : room.id)}
+                      >
+                        <ClipboardList size={14} />
+                        {selectedHomeRoomDetailId === room.id ? 'Close details' : 'View details'}
+                      </button>
+                    )}
                     <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomForm(room.home_id, room)}>
                       <Pencil size={14} />
                       Edit
@@ -14296,6 +14433,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     compact?: boolean;
   }) => {
     const rooms = homeRoomsByHomeId[homeId] || [];
+    const detailRoom = !compact && canManage
+      ? rooms.find(room => room.id === selectedHomeRoomDetailId) ?? null
+      : null;
     return (
       <div className={compact ? 'rounded-lg border border-emerald-100 bg-emerald-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-rooms-section' : 'home-rooms-section'}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -14322,8 +14462,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         {loadingHomeRooms && rooms.length === 0 ? (
           <p className="text-xs font-semibold text-blue-700">Refreshing rooms...</p>
         ) : (
-          renderHomeRoomsList(rooms, canManage, showNotes)
+          renderHomeRoomsList(rooms, canManage, showNotes, Boolean(!compact && canManage))
         )}
+        {detailRoom && renderHomeRoomDetailPanel(detailRoom, showNotes)}
       </div>
     );
   };

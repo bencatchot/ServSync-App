@@ -84,7 +84,7 @@ test.describe('home reminder room picker UI', () => {
   test('room chips resolve active room basics only and omit notes', () => {
     const app = appSource();
     const roomLoading = sourceBetween(app, 'const loadHomeRooms = useCallback(async () => {', 'const openHomeRoomForm =');
-    const chipSource = sourceBetween(app, 'const roomReminderLabel = (room: HomeRoom) =>', 'const renderHomeRoomForm =');
+    const chipSource = sourceBetween(app, 'const roomReminderLabel = (room: HomeRoom) =>', 'const homeDocumentTypeLabel =');
 
     expect(roomLoading).toContain(".from('home_rooms')");
     expect(roomLoading).toContain(".is('archived_at', null)");
@@ -177,6 +177,7 @@ test.describe('home reminder room picker UI', () => {
       'src/App.tsx',
       'src/types.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
+      'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
