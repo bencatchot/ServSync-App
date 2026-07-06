@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/homeowner-rooms-ui-v1`
+- Starting main SHA: `7032a7ce94b1d4358c5a274b887c84df4c3885c3`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/home-rooms-ui.spec.ts`
+  - `tests/e2e/home-setup-clarity.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the first homeowner Rooms UI on top of the existing production-verified `home_rooms` table. Homeowner owner/admin home managers can view active rooms, add room basics, edit room basics, and soft-archive rooms; shared member/viewer roles see read-only non-sensitive room basics where surfaced; room notes are shown only to managers; archived rooms are hidden by default; and the Home Setup guide now treats Rooms as available while keeping Systems & Assets, Key Home Locations, Home Map, and true Home Setup Templates future-only.
+- Reason for change: Follow-up audit found the `home_rooms` foundation was ready for a narrow frontend/test/docs room-basics UI, while Home Map, systems/assets, key locations, contractor room visibility, and inspection-room migration should remain separate future work.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-rooms-ui.spec.ts tests/e2e/home-setup-clarity.spec.ts --project=chromium` (8 passed, 1 skipped because sandbox homeowner credentials were not loaded in this environment)
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase function, storage bucket, env/config/package/Vercel/native/service-worker/deployment, manual production deploy, or production data changes are included.
+  - No Home Map, map coordinates, CAD/floor-plan upload, LiDAR/scanning, 3D, systems/assets, key locations, sensitive access fields, contractor room visibility, contractor local property rooms, inspection-room migration, estimate/job/invoice, or service agreement behavior is included.
+  - The live owner add/edit/archive UI test path is present but skipped locally unless sandbox homeowner credentials are loaded; source/static guardrails passed in the focused room UI test.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first homeowner Rooms UI as live on top of the `home_rooms` foundation while keeping Systems & Assets, Key Home Locations, Home Map, true Home Setup Templates, and contractor room visibility future-only.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records that durable room basics have a first homeowner UI while preserving the room-first, non-CAD Home Setup/Home Map roadmap boundary.
+
 - Branch: `codex/home-rooms-foundation-v1`
 - Starting main SHA: `f637625befb9221d740eeddc1aa6177652da452d`
 - Files changed:

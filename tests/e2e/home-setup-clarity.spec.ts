@@ -28,13 +28,15 @@ test.describe('Home Setup clarity shell', () => {
     );
 
     expect(homeSetupUiSource).toContain('Home Setup');
-    expect(homeSetupUiSource).toContain('Start with the basics: property details, photos, documents, reminders, and notes.');
+    expect(homeSetupUiSource).toContain('Start with the basics: property details, rooms, photos, documents, reminders, and notes.');
     expect(homeSetupDataSource).toContain('Complete property details');
+    expect(homeSetupDataSource).toContain('Add rooms');
     expect(homeSetupDataSource).toContain('Add a home photo');
     expect(homeSetupDataSource).toContain('Upload important documents');
     expect(homeSetupDataSource).toContain('Create maintenance reminders');
     expect(homeSetupDataSource).toContain('Add useful notes');
     expect(homeSetupDataSource).toContain('homeProfileScore === 100');
+    expect(homeSetupDataSource).toContain('selectedHomeRooms.length > 0');
     expect(homeSetupDataSource).toContain('homeDraft.home_photo_path');
     expect(homeSetupDataSource).toContain('selectedHomeManualDocuments.length > 0');
     expect(homeSetupDataSource).toContain('propertyScopedHomeReminders.filter');
@@ -49,18 +51,16 @@ test.describe('Home Setup clarity shell', () => {
       '{renderSharedHomeShellsPanel()}',
     );
 
-    expect(homeSetupSource).toContain('Home Setup Templates, Rooms &amp; Systems, Key Home Locations, and Home Map are future tools.');
-    expect(homeSetupSource).toContain('Home Map will start as a simple not-to-scale room and system map, not a measured floor plan.');
+    expect(homeSetupSource).toContain('Rooms are available now for basic home organization.');
+    expect(homeSetupSource).toContain('Systems &amp; Assets, Key Home Locations, Home Map, and true Home Setup Templates remain future tools.');
+    expect(homeSetupSource).toContain('Home Map will start as a simple not-to-scale room and system map, not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
     expect(homeSetupSource).toContain('Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.');
     expect(homeSetupSource).not.toContain('Home Templates');
-    expect(homeSetupSource).not.toContain('CAD');
-    expect(homeSetupSource).not.toContain('LiDAR');
-    expect(homeSetupSource).not.toContain('3D model');
     expect(homeSetupSource).not.toContain('floor-plan creator');
     expect(homeSetupSource).not.toContain('measured layouts');
   });
 
-  test('setup shell does not add room, system, key-location, map, or checklist persistence paths', () => {
+  test('setup shell does not add system, key-location, map, or checklist persistence paths', () => {
     const source = appSource();
     const homeSetupDataSource = sourceBetween(
       source,
@@ -77,15 +77,12 @@ test.describe('Home Setup clarity shell', () => {
     expect(homeSetupSource).not.toContain('supabase.');
     expect(homeSetupSource).not.toContain(".from('inspection_templates')");
     expect(homeSetupSource).not.toContain('inspection_templates');
-    expect(homeSetupSource).not.toContain('home_rooms');
     expect(homeSetupSource).not.toContain('home_systems');
     expect(homeSetupSource).not.toContain('home_assets');
     expect(homeSetupSource).not.toContain('key_locations');
     expect(homeSetupSource).not.toContain('home_map');
     expect(homeSetupSource).not.toContain('floor_plan');
     expect(homeSetupSource).not.toContain('storage.from');
-
-    expect(source).not.toContain('home_rooms');
     expect(source).not.toContain('home_systems');
     expect(source).not.toContain('home_assets');
     expect(source).not.toContain('key_locations');
