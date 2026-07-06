@@ -466,6 +466,7 @@ type HomeownerContractorInviteDraft = {
 };
 type HomeReminderDraft = {
   home_id: string;
+  home_room_id: string | null;
   maintenance_log_id: string | null;
   service_request_id: string | null;
   invoice_id: string | null;
@@ -9831,6 +9832,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [reminderFormOpen, setReminderFormOpen] = useState(false);
   const [homeReminderDraft, setHomeReminderDraft] = useState<HomeReminderDraft>({
     home_id: selectedHomeId,
+    home_room_id: null,
     maintenance_log_id: null,
     service_request_id: null,
     invoice_id: null,
@@ -10612,6 +10614,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   };
   const emptyHomeReminderDraft = (): HomeReminderDraft => ({
     home_id: selectedHome?.id || selectedHomeId || '',
+    home_room_id: null,
     maintenance_log_id: null,
     service_request_id: null,
     invoice_id: null,
@@ -10798,6 +10801,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: insertError } = await supabase.from('home_reminders').insert({
         homeowner_user_id: profile.id,
         home_id: homeReminderDraft.home_id || null,
+        home_room_id: homeReminderDraft.home_room_id || null,
         maintenance_log_id: homeReminderDraft.maintenance_log_id,
         service_request_id: homeReminderDraft.service_request_id,
         invoice_id: homeReminderDraft.invoice_id,
@@ -14110,6 +14114,23 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     room.floor_label ? `Floor: ${room.floor_label}` : '',
     room.area_label ? `Area: ${room.area_label}` : '',
   ].filter(Boolean);
+  const roomReminderLabel = (room: HomeRoom) => [
+    room.name,
+    [room.floor_label, room.area_label].filter(Boolean).join(' / '),
+  ].filter(Boolean).join(' - ');
+  const roomForReminder = (reminder: Pick<HomeReminder, 'home_id' | 'home_room_id'>) => {
+    if (!reminder.home_id || !reminder.home_room_id) return null;
+    return (homeRoomsByHomeId[reminder.home_id] || []).find(room => room.id === reminder.home_room_id) ?? null;
+  };
+  const renderReminderRoomChip = (reminder: HomeReminder) => {
+    const room = roomForReminder(reminder);
+    if (!room) return null;
+    return (
+      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+        Room: {roomReminderLabel(room)}
+      </span>
+    );
+  };
   const renderHomeRoomForm = (homeId: string) => {
     if (!homeRoomDraft || homeRoomDraft.home_id !== homeId) return null;
 
@@ -15396,6 +15417,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 ) : (
                   openDashboardHomeReminders.map(reminder => {
                     const dueState = reminderDueState(reminder);
+                    const roomChip = renderReminderRoomChip(reminder);
                     return (
                       <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -15405,6 +15427,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <p className="mt-1 text-xs text-slate-500">
                           Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
+                        {roomChip && <div className="mt-2 flex flex-wrap gap-2">{roomChip}</div>}
                       </div>
                     );
                   })
@@ -17991,7 +18014,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <select
                         className={inputClass()}
                         value={homeReminderDraft.home_id}
-                        onChange={event => setHomeReminderDraft(current => ({ ...current, home_id: event.target.value }))}
+                        onChange={event => setHomeReminderDraft(current => ({ ...current, home_id: event.target.value, home_room_id: null }))}
                       >
                         <option value="">No property selected</option>
                         {homes.map(candidate => (
@@ -18000,7 +18023,36 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       </select>
                     </Field>
                   )}
+                  {homeReminderDraft.home_id && (() => {
+                    const reminderRooms = homeRoomsByHomeId[homeReminderDraft.home_id] || [];
+                    if (reminderRooms.length === 0) {
+                      return (
+                        <p className="sm:col-span-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-xs leading-5 text-emerald-800">
+                          Add rooms in Properties before tagging reminders to rooms.
+                        </p>
+                      );
+                    }
+                    return (
+                      <Field label="Room optional">
+                        <select
+                          className={inputClass()}
+                          value={homeReminderDraft.home_room_id || ''}
+                          onChange={event => setHomeReminderDraft(current => ({ ...current, home_room_id: event.target.value || null }))}
+                        >
+                          <option value="">No room</option>
+                          {reminderRooms.map(room => (
+                            <option key={room.id} value={room.id}>{roomReminderLabel(room)}</option>
+                          ))}
+                        </select>
+                      </Field>
+                    );
+                  })()}
                 </div>
+                {homeReminderDraft.home_id && (
+                  <p className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs leading-5 text-blue-800">
+                    Tag this reminder to a room for home organization. Room links are for organization only and do not change sharing, contractor access, or reminder delivery. Room notes are not shown on reminders.
+                  </p>
+                )}
                 {homeReminderDraft.maintenance_log_id && (
                   <p className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-800">
                     Linked to this Home History record.
@@ -18066,6 +18118,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 <p className="text-sm font-semibold text-slate-950">{reminder.title}</p>
                                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
                                 {linkedEntry && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Linked to Home History</span>}
+                                {renderReminderRoomChip(reminder)}
                               </div>
                               <p className="mt-1 text-xs text-slate-500">
                                 Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -18174,6 +18227,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                     <div className="flex flex-wrap items-center gap-2">
                                       <p className="text-sm font-semibold text-slate-900">{reminder.title}</p>
                                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                      {renderReminderRoomChip(reminder)}
                                     </div>
                                     <p className="mt-0.5 text-xs text-slate-500">
                                       Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

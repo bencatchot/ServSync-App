@@ -901,6 +901,7 @@ export interface HomeReminder {
   id: string;
   homeowner_user_id: string;
   home_id: string | null;
+  home_room_id: string | null;
   maintenance_log_id: string | null;
   service_request_id: string | null;
   invoice_id: string | null;
