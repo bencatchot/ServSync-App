@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/document-upload-room-registration-v1`
+- Starting main SHA: `8b0706e8232260d52844824b399a010029c72223`
+- Files changed:
+  - `servsync-home-document-upload-room-registration.sql`
+  - `tests/e2e/home-document-room-upload-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the SQL/RPC foundation for optional room-linked manual homeowner document uploads by letting `home_document_upload_reservations` carry `home_room_id`, extending `servsync_prepare_manual_home_document_upload` with optional `p_home_room_id`, and carrying the reservation room link into `home_documents.home_room_id` during registration.
+- Reason for change: The document-room backend foundation is production-verified, but the existing reservation/register upload path could not accept room metadata. This slice prepares the backend path for a later document room picker/chip UI without adding UI or broad document update grants.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-document-room-upload-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RPC/test/docs only. The SQL is checked in but not applied; sandbox SQL application and validation require separate approval, and production SQL application requires separate approval after merge.
+  - No UI, document room picker/chips/filtering, document edit/update room assignment, broad `home_documents` update grants, storage bucket changes, storage policy changes, shared-home document expansion, contractor visibility expansion, photo tagging, report/job media tagging, floor-plan behavior, Home Map, assets/systems, key locations, reminders, estimates, jobs, invoices, service agreements, production data, manual deployment, or production SQL application are included.
+  - Future document room picker/chip UI should wait until this upload registration SQL/RPC foundation is sandbox- and production-validated.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the manual document upload room-registration foundation while keeping picker/chip UI, edit-room assignment, shared/contractor visibility, storage/media, Home Map, assets/systems, and key-location work deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records document upload room-registration as the backend/RPC bridge between the existing document-room metadata foundation and later homeowner document room UI.
+
 - Branch: `codex/document-room-link-foundation-v1`
 - Starting main SHA: `095624a96a350404439394ef34eb0d539708ed8f`
 - Files changed:
