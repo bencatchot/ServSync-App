@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-06
 
+- Branch: `codex/home-assets-foundation-v1`
+- Starting main SHA: `53bd21d74083ad0aaad66b6bdcc8d92c1fdabcb2`
+- Files changed:
+  - `servsync-home-assets-foundation.sql`
+  - `tests/e2e/home-assets-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the `home_assets` SQL/RLS/test/docs foundation for durable homeowner-owned home assets and systems. Assets can optionally link to `home_rooms` with same-home validation, include safe baseline metadata such as category, type, name, manufacturer, model, install date, warranty date, and manager notes, and use soft archive instead of normal browser hard delete.
+- Reason for change: The next safest Home Map foundation after durable rooms, room-linked reminders/documents, and Room Detail is structured asset/system data before any map visual, key-location model, contractor visibility, or shared member/viewer asset browsing.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-assets-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium` attempted; it refused to run because this isolated worktree is not linked to sandbox ref `zpzdkoaubyjtsomccxya`, so live catalog verification remains pending until separately approved sandbox SQL validation.
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/test/docs-only. No UI, `src/App.tsx`, RPC, storage bucket/policy, Home Map, key locations, CAD/floor-plan/LiDAR/scanning/3D, contractor visibility, shared member/viewer asset browsing, sensitive access fields, serial numbers, asset media/document linking, document/reminder/job/inspection migration, estimate/job/invoice/service agreement behavior, manual deployment, production data, or production SQL application is included.
+  - Shared member/viewer browsing is intentionally deferred in v1; `home_assets` uses owner/admin manage semantics for read/write while retaining platform-admin compatibility.
+  - Key Home Locations still require a separate privacy design before implementation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records `home_assets` as the first assets/systems backend foundation after rooms and Room Detail while keeping UI, Home Map, key locations, shared member/viewer browsing, contractor visibility, and workflow/media migrations deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records assets/systems as the next structured-data foundation after rooms while preserving the requirement that Home Map waits for assets/systems, key-location, and permission design maturity.
+
 - Branch: `codex/homeowner-room-detail-panel-v1`
 - Starting main SHA: `598f8aa953508d1d18169ab2d28f51caf1f1ef85`
 - Files changed:
