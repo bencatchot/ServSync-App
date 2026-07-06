@@ -91,12 +91,14 @@ test.describe('home_room_layouts foundation SQL', () => {
     expect(source).toContain('revoke all on function public.home_room_layouts_protect_identity() from authenticated');
   });
 
-  test('updates assets to shared household read-only without adding asset mutation or contractor visibility', () => {
+  test('keeps assets manager-only so shared member/viewer roles cannot query notes', () => {
     const source = sqlSource();
 
     expect(source).toContain('drop policy if exists "Home assets: owner admin read" on public.home_assets');
-    expect(source).toContain('Home assets: active shared roles read');
-    expect(source).toContain('public.current_user_can_access_home(home_id)');
+    expect(source).toContain('drop policy if exists "Home assets: active shared roles read" on public.home_assets');
+    expect(source).toContain('Home assets: owner admin read');
+    expect(source).toContain('public.current_user_can_manage_home(home_id)');
+    expect(source).not.toMatch(/create policy "Home assets: active shared roles read"[\s\S]*public\.current_user_can_access_home\(home_id\)/);
     expect(source).not.toMatch(/create policy[\s\S]*Home assets[\s\S]*contractor/i);
     expect(source).not.toMatch(/grant[\s\S]*delete[\s\S]*on table public\.home_assets/i);
     expect(source).not.toContain('storage.objects');

@@ -1,6 +1,6 @@
 -- ServSync Home Map v1 / Rooms & Systems v1 foundation.
--- Adds simple not-to-scale room layout rectangles and narrows the asset RLS
--- update needed for shared household read-only asset browsing.
+-- Adds simple not-to-scale room layout rectangles and keeps asset RLS
+-- manager-only so member/viewer shared-home roles cannot query asset notes.
 -- This patch does not add contractor visibility, key locations, storage/media
 -- behavior, CAD/floor-plan/LiDAR/scanning/3D, workflow links, or migrations.
 
@@ -222,10 +222,10 @@ grant select, insert, update on table public.home_room_layouts to authenticated;
 
 drop policy if exists "Home assets: owner admin read" on public.home_assets;
 drop policy if exists "Home assets: active shared roles read" on public.home_assets;
-create policy "Home assets: active shared roles read"
+create policy "Home assets: owner admin read"
   on public.home_assets for select to authenticated
   using (
-    public.current_user_can_access_home(home_id)
+    public.current_user_can_manage_home(home_id)
     or public.current_user_is_platform_admin()
   );
 

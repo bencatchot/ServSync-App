@@ -15350,7 +15350,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <p className={compact ? 'mt-1 text-xs leading-5 text-cyan-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
               {canManage
                 ? `Track safe asset/system basics for ${label}. Archived assets are hidden by default.`
-                : 'Read-only basic assets and systems shared with this home. Manager notes are hidden.'}
+                : 'Asset browsing is limited to home managers in this version.'}
             </p>
           </div>
           {canManage ? (
@@ -15485,11 +15485,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       canShowPrivateCounts: false,
                       compact: true,
                     })}
-                    {renderHomeAssetsSection({
+                    {canManageSharedRooms && renderHomeAssetsSection({
                       homeId: shell.home_id,
                       label,
-                      canManage: canManageSharedRooms,
-                      showNotes: canManageSharedRooms,
+                      canManage: true,
+                      showNotes: true,
                       compact: true,
                     })}
                     <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3" data-testid="shared-home-reminders-section">

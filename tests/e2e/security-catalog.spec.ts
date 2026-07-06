@@ -55,6 +55,13 @@ type TablePrivilegeRow = {
   authenticated_delete: boolean | null;
 };
 
+type PolicyDefinitionRow = {
+  policyname: string;
+  cmd: string | null;
+  qual: string | null;
+  with_check: string | null;
+};
+
 type PriceBookGrantRow = TablePrivilegeRow & {
   authenticated_insert_table_grant: boolean | null;
   authenticated_update_table_grant: boolean | null;
@@ -499,11 +506,27 @@ order by e.table_name;
       expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
       expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
       expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
-      expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind home-scoped RLS`).toBe(true);
+      expect(row.authenticated_select, `${row.table_name} should grant SELECT to authenticated behind scoped RLS`).toBe(true);
       expect(row.authenticated_insert, `${row.table_name} should grant INSERT to authenticated behind owner/admin RLS`).toBe(true);
       expect(row.authenticated_update, `${row.table_name} should grant UPDATE to authenticated behind owner/admin RLS`).toBe(true);
       expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
     }
+  });
+
+  test('home assets select policy stays manager-only so shared member viewer roles cannot read notes', () => {
+    const rows = runCatalogQuery<PolicyDefinitionRow>(`
+select policyname, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename = 'home_assets'
+  and cmd = 'SELECT'
+order by policyname;
+    `);
+
+    const policyText = rows.map(row => `${row.policyname} ${row.qual || ''} ${row.with_check || ''}`).join('\n');
+    expect(policyText).toContain('current_user_can_manage_home(home_id)');
+    expect(policyText).not.toContain('current_user_can_access_home(home_id)');
+    expect(policyText).not.toContain('active shared roles read');
   });
 
   test('runtime settings table remains unavailable to browser roles', () => {

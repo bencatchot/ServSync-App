@@ -55,7 +55,7 @@ test.describe('Assets & Systems v1 UI', () => {
     expect(assetSource).not.toContain('key_locations');
   });
 
-  test('shared shells can show basic read-only assets while contractor code remains untouched', () => {
+  test('shared member/viewer shells do not browse assets while shared admin and contractor boundaries stay narrow', () => {
     const app = appSource();
     const sharedSource = sourceBetween(
       app,
@@ -69,10 +69,12 @@ test.describe('Assets & Systems v1 UI', () => {
       'function PlatformAdminDashboard({ onSignOut }',
     );
 
-    expect(sharedSource).toContain('renderHomeAssetsSection');
+    expect(sharedSource).toContain('canManageSharedRooms && renderHomeAssetsSection');
     expect(assetSource).toContain('shared-home-assets-section');
-    expect(sharedSource).toContain('showNotes: canManageSharedRooms');
-    expect(assetSource).toContain('Read-only basic assets and systems shared with this home. Manager notes are hidden.');
+    expect(sharedSource).toContain('showNotes: true');
+    expect(assetSource).toContain('Track safe asset/system basics');
+    expect(assetSource).toContain('showNotes && asset.notes');
+    expect(assetSource).not.toContain('Read-only basic assets and systems shared with this home. Manager notes are hidden.');
     expect(contractorSource).not.toContain('home_assets');
     expect(contractorSource).not.toContain('home_room_layouts');
     expect(contractorSource).not.toContain('Assets & Systems');
