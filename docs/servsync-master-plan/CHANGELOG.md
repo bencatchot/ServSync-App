@@ -4,6 +4,42 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-06
+
+- Branch: `codex/home-rooms-foundation-v1`
+- Starting main SHA: `f637625befb9221d740eeddc1aa6177652da452d`
+- Files changed:
+  - `servsync-home-rooms-foundation.sql`
+  - `tests/e2e/home-rooms-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the `home_rooms` SQL/RLS/test/docs foundation for durable homeowner-owned room records. The foundation creates non-sensitive property-scoped room basics with owner/admin create/update/archive access, active shared-role read access, platform-admin compatibility, identity protection, soft-archive support, and no normal browser hard-delete grant or policy.
+- Reason for change: Follow-up Home Setup data-model audit found that future Rooms & Systems, Key Home Locations, Home Map, and Home Setup Templates need durable home-level rooms before assets, sensitive key locations, or map/layout concepts can be safely added.
+- Tests/checks run:
+  - `git diff --check`
+  - `git diff --cached --check`
+  - changed-file scope guard
+  - changed-line credential-shaped scan
+  - forbidden-scope scan for UI/App, Supabase functions, env/config/package/Vercel/native/service-worker/deployment drift
+  - SQL static security guardrails in `tests/e2e/home-rooms-foundation.spec.ts`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-rooms-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/security-catalog.spec.ts --project=chromium` attempted; existing catalog checks passed except the two new `home_rooms` assertions, which are expected to fail until this SQL is applied to sandbox.
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/test/docs-only. No UI, `src/App.tsx`, Home Map, assets/systems, key locations, floor-plan/CAD/layout metadata, storage bucket, contractor local property rooms, inspection-room migration, estimate/job/invoice/service agreement behavior, manual deployment, production data, or SQL application is included.
+  - Contractor connected-home room visibility is not expanded. Future contractor room access should be designed separately through explicit permission/RPC work.
+  - Active shared owner/admin/member/viewer roles can read non-sensitive room basics through the existing shared-home access helper; only owner/admin home managers can create/update/archive rooms.
+  - Live sandbox catalog/RLS validation requires this SQL to be applied to sandbox first; this PR does not apply SQL.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the `home_rooms` foundation as the first backend/data-model step toward future Rooms & Systems / Home Map while keeping assets, key locations, map layout, contractor visibility expansion, and Home Setup Templates deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the room-first Home Setup/Home Map roadmap direction while preserving the guardrail that Home Map should start as a simple not-to-scale room/system map, not CAD, LiDAR, measured floor-plan, or 3D tooling.
+
 ## 2026-07-05
 
 - Branch: `codex/home-setup-guide-shell-v1`
