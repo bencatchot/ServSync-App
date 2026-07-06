@@ -97,6 +97,55 @@ test.describe('home reminder room picker UI', () => {
     expect(chipSource).not.toContain('room.notes');
   });
 
+  test('selected-property Home History reminders can be filtered locally by active room basics', () => {
+    const app = appSource();
+    const filterState = sourceBetween(app, "const [homeownerMaintenancePropertyScope", "const [reminderFormOpen");
+    const resetEffect = sourceBetween(
+      app,
+      "useEffect(() => {\n    setHomeownerReminderRoomFilter('all');",
+      'const openHomeRoomForm =',
+    );
+    const reminderFiltering = sourceBetween(
+      app,
+      'const propertyScopedHomeReminders = homeReminders.filter(reminder => {',
+      'const homeownerMaintenanceScopeLabel',
+    );
+    const reminderList = sourceBetween(
+      app,
+      '{propertyScopedHomeReminders.length > 0 && (',
+      '{/* Log list */}',
+    );
+    const dashboardReminderPreview = sourceBetween(
+      app,
+      '<Card title="Upcoming reminders" icon={<Bell size={18} />}>',
+      '<Card title="Documents" icon={<FolderOpen size={18} />}>',
+    );
+
+    expect(filterState).toContain("useState('all')");
+    expect(resetEffect).toContain("setHomeownerReminderRoomFilter('all')");
+    expect(resetEffect).toContain('[selectedHomeId, homeownerMaintenancePropertyScope]');
+    expect(reminderFiltering).toContain("homeownerMaintenancePropertyScope === 'selected'");
+    expect(reminderFiltering).toContain('selectedHomeReminderRooms.map(room => room.id)');
+    expect(reminderFiltering).toContain("homeownerReminderRoomFilter === 'all'");
+    expect(reminderFiltering).toContain("homeownerReminderRoomFilter === activeRoomId");
+    expect(reminderFiltering).toContain("reminder.home_room_id && selectedHomeReminderRoomIds.has(reminder.home_room_id)");
+    expect(reminderFiltering).toContain(": 'none'");
+
+    expect(reminderList).toContain('Filter by room');
+    expect(reminderList).toContain('<option value="all">All rooms</option>');
+    expect(reminderList).toContain('selectedHomeReminderRooms.map(room =>');
+    expect(reminderList).toContain('roomReminderLabel(room)');
+    expect(reminderList).toContain('<option value="none">No room</option>');
+    expect(reminderList).toContain('Filter reminders by the room they are tagged to. Rooms are for organization only and do not change reminder delivery or sharing.');
+    expect(reminderList).toContain('Add rooms in Properties before filtering reminders by room.');
+    expect(reminderList).toContain('roomFilteredHomeReminders.length === 0');
+    expect(reminderList).toContain('No Home Reminders match this room filter.');
+    expect(reminderList).toContain('roomFilteredHomeReminders');
+
+    expect(dashboardReminderPreview).not.toContain('Filter by room');
+    expect(dashboardReminderPreview).not.toContain('homeownerReminderRoomFilter');
+  });
+
   test('shared reminder shell and contractor code do not gain reminder-room visibility', () => {
     const app = appSource();
     const sharedShellSql = sourceFile('servsync-shared-home-reminders-shell.sql');
@@ -126,8 +175,6 @@ test.describe('home reminder room picker UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
-      'src/types.ts',
-      'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
