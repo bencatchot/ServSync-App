@@ -93,9 +93,9 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(map).toContain('data-testid="home-map-resize-handle"');
     expect(map).toContain("mode: 'move'");
     expect(map).toContain("mode: 'resize'");
-    expect(detail).toContain('data-testid="home-map-room-controls"');
-    expect(detail).toContain('Move up');
-    expect(detail).toContain('Wider');
+    expect(detail).toContain('data-testid="home-map-fine-tune-controls"');
+    expect(detail).toContain('Fine tune position');
+    expect(detail).toContain('Fallback map controls');
   });
 
   test('selected room panel keeps assets documents reminders and notes in room context only', () => {
