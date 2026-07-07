@@ -167,6 +167,7 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(constants).toContain('const HOME_MAP_MAJOR_GRID_EVERY_FEET = 5');
     expect(constants).toContain('const HOME_MAP_GRID_COLUMNS = 60');
     expect(constants).toContain('const HOME_MAP_GRID_ROWS = 40');
+    expect(constants).toContain('const HOME_MAP_MIN_ROOM_GRID_UNITS = 1');
     expect(constants).toContain('HOME_MAP_WORKSPACE_WIDTH = HOME_MAP_GRID_COLUMNS * HOME_MAP_PIXELS_PER_FOOT');
     expect(constants).toContain('HOME_MAP_WORKSPACE_HEIGHT = HOME_MAP_GRID_ROWS * HOME_MAP_PIXELS_PER_FOOT');
     expect(sizingHelper).toContain('measurementWidthFeet = unit === \'m\' ? measuredWidth * 3.28084 : measuredWidth');
@@ -199,6 +200,33 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('layout.layout_y * canvasCellHeight');
     expect(map).toContain('layout.layout_width * canvasCellWidth');
     expect(map).toContain('layout.layout_height * canvasCellHeight');
+  });
+
+  test('mobile room tiles suppress text selection while measured footprints stay exact', () => {
+    const app = appSource();
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+
+    expect(map).toContain('data-testid="home-map-room-box"');
+    expect(map).toContain('select-none');
+    expect(map).toContain('[touch-action:none]');
+    expect(map).toContain('[-webkit-touch-callout:none]');
+    expect(map).toContain('[-webkit-user-select:none]');
+    expect(map).toContain('onContextMenu={event => event.preventDefault()}');
+    expect(map).toContain('onDragStart={event => event.preventDefault()}');
+    expect(map).toContain('event.preventDefault();');
+    expect(map).toContain('event.currentTarget.setPointerCapture(event.pointerId)');
+    expect(map).toContain('event.currentTarget.releasePointerCapture(event.pointerId)');
+    expect(map).toContain('const endPointerInteraction = (event: PointerEvent<HTMLElement>) => {');
+    expect(map).toContain('width: `${layout.layout_width * canvasCellWidth}px`');
+    expect(map).toContain('height: `${layout.layout_height * canvasCellHeight}px`');
+    expect(map).not.toContain('minWidth: builderMode');
+    expect(map).not.toContain('minHeight: builderMode');
+    expect(map).toContain('data-testid="home-map-room-touch-target"');
+    expect(map).toContain('absolute -inset-2 rounded-xl');
+    expect(map).toContain('pointer-events-none absolute left-1 top-1');
+    expect(map).toContain('absolute left-0 top-full z-20 mt-1');
+    expect(map).toContain('data-testid="home-map-resize-handle"');
+    expect(map).toContain('absolute -bottom-3 -right-3 z-20 inline-flex h-9 w-9');
   });
 
   test('unmapped rooms can be added without creating duplicate rooms', () => {

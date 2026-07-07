@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-mobile-touch-footprint-v1`
+- Starting main SHA: `de64fc6e1b3b2dd0ed53f64d7e2ec7f688378450`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Made Home Map Builder room boxes behave more like touch canvas tiles on mobile by suppressing native text selection/callouts during move and resize interactions, while keeping measured room footprints tied directly to the 1-ft grid instead of fake-enlarging small rooms with large minimum widths/heights.
+- Reason for change: iPhone smoke testing showed that dragging/resizing could trigger copy/paste selection controls, and very small room dimensions could appear visually unchanged because minimum hit-area styling overrode the measured grid footprint.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted mobile Home Map Builder touch tests
+  - targeted measured-grid footprint tests
+  - targeted Home Map Builder interaction tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, L-shaped/multi-section rooms, floor-plan upload/parsing, ceiling-height schema, document/reminder behavior changes, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Very small rooms now preserve their measured grid footprint; labels and controls may float outside the footprint for tap usability.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records touch-safe mobile room boxes and measured small-room footprints.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend usability polish within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-builder-mobile-layout-v1`
 - Starting main SHA: `780a00cb23b046920215b08a1cff975e33753e7c`
 - Files changed:
