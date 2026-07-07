@@ -39,6 +39,7 @@ test.describe('Home Map Builder dedicated view', () => {
     const app = appSource();
     const entry = sourceBetween(app, 'const renderHomeMapEntryCard =', 'const renderHomeMapBuilderView =');
     const properties = sourceBetween(app, "homeownerTab === 'home' && selectedHome?.id && homeMapBuilderHomeId", '{renderSharedHomeShellsPanel()}');
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
     expect(entry).toContain('data-testid="home-map-entry-card"');
     expect(entry).toContain('data-testid="home-map-entry-open"');
@@ -46,6 +47,9 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(properties).toContain('renderHomeMapBuilderView(selectedHome.id');
     expect(properties).toContain('renderHomeMapEntryCard(selectedHome.id');
     expect(properties).not.toContain('renderHomeMapSystemsSection(selectedHome.id');
+    expect(builder).toContain('data-testid="home-map-builder-workspace"');
+    expect(builder).toContain('fixed inset-0');
+    expect(builder).not.toContain('<Card title="Home Map Builder"');
   });
 
   test('Add Room creates a room and matching layout with default rough square dimensions', () => {
@@ -89,6 +93,7 @@ test.describe('Home Map Builder dedicated view', () => {
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
     expect(builder).toContain('data-testid="home-map-builder-add-existing"');
+    expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
     expect(builder).toContain('Rooms not on map');
     expect(builder).toContain('Add {room.name} to map');
     expect(addExisting).toContain(".from('home_room_layouts')");
@@ -103,9 +108,11 @@ test.describe('Home Map Builder dedicated view', () => {
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
     const detail = sourceBetween(app, 'const renderHomeRoomDetailPanel =', 'const renderHomeRoomForm =');
 
-    expect(builder).toContain('lg:grid-cols-[minmax(0,1fr)_360px]');
+    expect(builder).toContain('data-testid="home-map-builder-side-panel"');
     expect(builder).toContain('data-testid="home-map-builder-selected-panel"');
-    expect(builder).toContain('lg:sticky lg:top-4');
+    expect(builder).toContain('setHomeMapDetailPanelOpen(current => !current)');
+    expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
+    expect(builder).toContain('Collapse');
     expect(detail).toContain('Room detail');
     expect(detail).toContain('Linked assets');
     expect(detail).toContain('Linked documents');
@@ -157,8 +164,13 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-zoom-out"');
     expect(builder).toContain('data-testid="home-map-fit-view"');
     expect(builder).toContain('data-testid="home-map-zoom-in"');
+    expect(builder).toContain('data-testid="home-map-builder-workspace"');
+    expect(builder).toContain('flex flex-col bg-slate-950');
+    expect(builder).toContain('data-testid="home-map-builder-canvas"');
+    expect(builder).toContain('Canvas-first workspace');
     expect(map).toContain('data-testid="home-map-canvas-scroll"');
-    expect(map).toContain('max-h-[68vh] overflow-auto');
+    expect(map).toContain('h-[62vh] min-h-[420px] overflow-auto');
+    expect(map).toContain('xl:h-[calc(100vh-190px)]');
     expect(map).toContain('canvasCellWidth');
     expect(map).toContain('canvasCellHeight');
     expect(map).toContain('layout.layout_x * canvasCellWidth');

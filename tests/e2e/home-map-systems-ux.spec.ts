@@ -60,7 +60,8 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     const app = appSource();
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
-    expect(builder).toContain('data-testid="home-map-builder-view"');
+    expect(builder).toContain('data-testid="home-map-builder-workspace"');
+    expect(builder).toContain('fixed inset-0');
     expect(builder).toContain('Home Map Builder');
     expect(builder).toContain('The map is how you create and manage rooms.');
     expect(builder).toContain('data-testid="home-map-builder-toolbar"');
@@ -68,6 +69,9 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(builder).toContain('Drag to move. Use the corner handle to resize.');
     expect(builder).toContain('data-testid="home-map-builder-selected-panel"');
     expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
+    expect(builder).toContain('data-testid="home-map-builder-side-panel"');
+    expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
+    expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
     expect(builder).toContain('Rooms on this map');
     expect(builder).toContain('Rooms not on map');
     expect(builder).toContain('All systems/assets');
@@ -120,9 +124,9 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(detail).not.toContain('updateHomeReminderStatus');
     expect(detail).not.toContain('downloadDocument');
     expect(detail).not.toContain('deleteDocument');
-    expect(sharedHomesSource).not.toContain('home-map-builder-view');
+    expect(sharedHomesSource).not.toContain('home-map-builder-workspace');
     expect(sharedHomesSource).not.toContain('home-map-builder-selected-panel');
-    expect(contractorSource).not.toContain('home-map-builder-view');
+    expect(contractorSource).not.toContain('home-map-builder-workspace');
     expect(contractorSource).not.toContain('home_assets');
     expect(contractorSource).not.toContain('home_room_layouts');
   });
