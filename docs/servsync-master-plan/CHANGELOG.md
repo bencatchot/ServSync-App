@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-full-page-v1`
+- Starting main SHA: `18e3a687e17e02fadcf5946e15e3ad86dd5f454d`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Moved the dedicated homeowner Home Map Builder into a full-page, canvas-first workspace with toolbar actions, a larger scrollable canvas, zoom/fit controls, and collapsible secondary panels for selected room details and room lists.
+- Reason for change: The dedicated builder still felt constrained inside the Properties page. The full-page workspace gives homeowners enough room to build and adjust the map while keeping room records, assets, documents, reminders, and notes available without making those panels compete with the canvas.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder UI tests
+  - targeted Home Map & Systems tests
+  - targeted Home Map / Assets / Room Detail tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - The full-page builder still uses existing room/layout/assets/documents/reminders state and existing owner/admin save paths; it does not add a new persistence model.
+  - Future floor-plan upload/recreation, `home_map_objects`, ceiling height, contractor map access, and shared document/asset expansion still require separate design and approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the full-page canvas-first builder workspace and collapsible secondary panels.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the full-page Home Map Builder workspace while preserving future boundaries for backend, storage, contractor, key-location, sensitive-access, and advanced map work.
+
 - Branch: `codex/home-map-builder-autosave-canvas-v1`
 - Starting main SHA: `2d3b2a554cc4bd8c1194ec59a8db242a57cf4bce`
 - Files changed:
