@@ -15537,6 +15537,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
     const pointerMoveForLayout = (layout: HomeRoomLayout, event: PointerEvent<HTMLElement>) => {
       if (!homeMapDrag || homeMapDrag.layoutId !== layout.id) return;
+      event.preventDefault();
       const deltaX = Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth);
       const deltaY = Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight);
       if (homeMapDrag.mode === 'move') {
@@ -15548,6 +15549,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         const nextHeight = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originHeight + deltaY));
         updateHomeRoomLayoutLocal(layout.id, { layout_width: nextWidth, layout_height: nextHeight });
       }
+    };
+    const endPointerInteraction = (event: PointerEvent<HTMLElement>) => {
+      event.preventDefault();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      setHomeMapDrag(null);
     };
 
     return (
@@ -15622,7 +15630,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     role="button"
                     tabIndex={0}
                     data-testid="home-map-room-box"
-                    className={`absolute z-10 flex cursor-grab flex-col items-start justify-between overflow-hidden rounded-xl border bg-white/95 p-2 text-left shadow-sm transition active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    className={`absolute z-10 cursor-grab select-none rounded-xl border bg-white/80 text-left shadow-sm transition [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none] active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-300 ${
                       isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-200 hover:border-blue-300'
                     }`}
                     style={{
@@ -15630,9 +15638,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       top: `${layout.layout_y * canvasCellHeight}px`,
                       width: `${layout.layout_width * canvasCellWidth}px`,
                       height: `${layout.layout_height * canvasCellHeight}px`,
-                      minWidth: builderMode ? '104px' : '92px',
-                      minHeight: builderMode ? '90px' : '84px',
                     }}
+                    onContextMenu={event => event.preventDefault()}
+                    onDragStart={event => event.preventDefault()}
                     onClick={() => {
                       setSelectedHomeRoomDetailId(room.id);
                     }}
@@ -15644,6 +15652,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     }}
                     onPointerDown={event => {
                       if (!canManage) return;
+                      event.preventDefault();
                       event.currentTarget.setPointerCapture(event.pointerId);
                       setSelectedHomeRoomDetailId(room.id);
                       setHomeMapDrag({
@@ -15658,10 +15667,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       });
                     }}
                     onPointerMove={event => pointerMoveForLayout(layout, event)}
-                    onPointerUp={() => setHomeMapDrag(null)}
-                    onPointerCancel={() => setHomeMapDrag(null)}
+                    onPointerUp={event => endPointerInteraction(event)}
+                    onPointerCancel={event => endPointerInteraction(event)}
                   >
-                    <span className="min-w-0">
+                    <span aria-hidden="true" className="absolute -inset-2 rounded-xl" data-testid="home-map-room-touch-target" />
+                    <span className="pointer-events-none absolute left-1 top-1 max-w-[150px] select-none rounded-lg bg-white/95 px-2 py-1 shadow-sm [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none]">
                       <span className="flex items-start gap-1">
                         {canManage && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
                         <span className="block break-words text-sm font-bold text-slate-950">{room.name}</span>
@@ -15672,7 +15682,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     {canManage && builderMode && (
                       <button
                         type="button"
-                        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 shadow-sm hover:bg-blue-100"
+                        className="absolute left-0 top-full z-20 mt-1 inline-flex select-none items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 shadow-sm [touch-action:manipulation] [-webkit-touch-callout:none] [-webkit-user-select:none] hover:bg-blue-100"
                         data-testid="home-map-room-edit"
                         onPointerDown={event => event.stopPropagation()}
                         onClick={event => {
@@ -15690,8 +15700,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         tabIndex={0}
                         aria-label={`Resize ${room.name}`}
                         data-testid="home-map-resize-handle"
-                        className="absolute bottom-1.5 right-1.5 inline-flex h-7 w-7 cursor-nwse-resize items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
+                        className="absolute -bottom-3 -right-3 z-20 inline-flex h-9 w-9 cursor-nwse-resize select-none items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 shadow-sm [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none]"
                       onPointerDown={event => {
+                        event.preventDefault();
                         event.stopPropagation();
                         event.currentTarget.setPointerCapture(event.pointerId);
                           setSelectedHomeRoomDetailId(room.id);
@@ -15708,8 +15719,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         });
                       }}
                       onPointerMove={event => pointerMoveForLayout(layout, event)}
-                      onPointerUp={() => setHomeMapDrag(null)}
-                      onPointerCancel={() => setHomeMapDrag(null)}
+                      onPointerUp={event => endPointerInteraction(event)}
+                      onPointerCancel={event => endPointerInteraction(event)}
+                      onContextMenu={event => event.preventDefault()}
+                      onDragStart={event => event.preventDefault()}
                     >
                         <Maximize2 size={14} />
                       </span>

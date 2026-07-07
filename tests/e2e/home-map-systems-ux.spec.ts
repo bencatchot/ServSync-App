@@ -121,6 +121,15 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(map).toContain('data-testid="home-map-resize-handle"');
     expect(map).toContain("mode: 'move'");
     expect(map).toContain("mode: 'resize'");
+    expect(map).toContain('select-none');
+    expect(map).toContain('[touch-action:none]');
+    expect(map).toContain('[-webkit-touch-callout:none]');
+    expect(map).toContain('event.preventDefault();');
+    expect(map).toContain('event.currentTarget.releasePointerCapture(event.pointerId)');
+    expect(map).toContain('width: `${layout.layout_width * canvasCellWidth}px`');
+    expect(map).toContain('height: `${layout.layout_height * canvasCellHeight}px`');
+    expect(map).not.toContain('minWidth: builderMode');
+    expect(map).not.toContain('minHeight: builderMode');
     expect(detail).toContain('data-testid="home-map-room-basics-editor"');
     expect(detail).toContain('Edit room basics');
     expect(detail).toContain('Edit rough dimensions');
