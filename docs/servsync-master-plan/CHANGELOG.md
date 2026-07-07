@@ -6,6 +6,41 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-layout-polish-v1`
+- Starting main SHA: `7df82d641b5d0aafa8f9ab4a772612c82e08e368`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `tests/e2e/home-map-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Polished the dedicated homeowner Home Map Builder so the canvas stays dominant: the top header is minimal, builder actions moved into a side toolbar, selected room details open in a drawer/bottom sheet instead of a persistent canvas-crowding panel, room lists are secondary collapsible overlays, and room boxes show essential map labels only.
+- Reason for change: The full-page builder had the right overall direction, but the large header/actions, permanent detail panel, and busy room boxes still made the canvas feel secondary. This pass keeps room records available while making map editing feel more direct.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder UI tests
+  - targeted Home Map & Systems tests
+  - targeted Home Map UI tests
+  - targeted Home Map / Assets / Room Detail tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - L-shaped or other multi-section rooms remain future work. The current `home_room_layouts` model is treated as one active layout row per room in this UI; multi-section room shapes need a separately approved SQL/RLS foundation such as room layout sections before implementation.
+  - Future floor-plan upload/recreation, persistent map objects, ceiling height, contractor map access, and shared document/asset expansion still require separate design and approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the canvas-dominant builder layout, side toolbar, room detail drawer, simplified room boxes, and future boundary for multi-section room shapes.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the polished Home Map Builder layout while preserving future boundaries for backend, storage, contractor, key-location, sensitive-access, advanced map-object, and multi-section room work.
+
 - Branch: `codex/home-map-builder-full-page-v1`
 - Starting main SHA: `18e3a687e17e02fadcf5946e15e3ad86dd5f454d`
 - Files changed:
