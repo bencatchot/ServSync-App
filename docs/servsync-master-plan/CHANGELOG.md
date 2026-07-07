@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-room-unification-scale-v1`
+- Starting main SHA: `6ff63654307b9907e7c381b6355264301ae92c7a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `tests/e2e/home-map-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Polished the Home Map & Systems consolidation so the room is more clearly the map object. Room boxes now use the entered rough length x width to create proportionally wider, taller, larger, or hallway-like boxes while preserving manual drag/resize behavior. The homeowner copy now treats hallways as normal room/map spaces and clarifies that future floor-plan uploads and basic map objects require separate design, storage, privacy, and permission review.
+- Reason for change: The first consolidated Home Map & Systems experience worked, but room creation still needed clearer room/map unity, better rough-size behavior, and an explicit hallway path without adding backend concepts or advanced floor-plan tooling.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-systems-ux.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-systems-ux.spec.ts tests/e2e/home-map-ui.spec.ts tests/e2e/home-assets-ui.spec.ts tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Room boxes remain rough organization rectangles and are not scale, permit, CAD, or floor-plan data.
+  - Ceiling height, floor-plan uploads, and map objects such as doors/windows/stairs/counters/islands/cabinets/closets/appliance markers/utility markers remain future work requiring separate design and approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records rough proportional room boxes, hallway-as-room support, and future boundaries for floor-plan uploads/map objects.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the room-as-map-object UX polish while preserving future-scope boundaries for ceiling height, floor-plan uploads, map objects, key locations, contractor visibility, and advanced map tooling.
+
 - Branch: `codex/home-map-systems-ux-consolidation-v1`
 - Starting main SHA: `f07c7d8a2cee431b7c603279cd933649af5ca392`
 - Files changed:

@@ -35,6 +35,16 @@ function changedFiles() {
     .filter(Boolean)));
 }
 
+function expectedRoughHomeMapGridSize(length: number | null, width: number | null, unit: 'ft' | 'm' = 'ft') {
+  if (!length || !width) return { layoutWidth: 4, layoutHeight: 3 };
+  const roughGridUnit = unit === 'm' ? 1.1 : 3.5;
+  const clampSpan = (span: number, max: number) => Math.min(max, Math.max(1, Math.round(span)));
+  return {
+    layoutWidth: clampSpan(length / roughGridUnit, 12),
+    layoutHeight: clampSpan(width / roughGridUnit, 8),
+  };
+}
+
 test.describe('Home Map & Systems UX consolidation', () => {
   test('Properties uses one primary Home Map & Systems surface with map first', () => {
     const app = appSource();
@@ -53,7 +63,8 @@ test.describe('Home Map & Systems UX consolidation', () => {
     expect(unified).toContain('data-testid="home-map-systems-map"');
     expect(unified.indexOf('data-testid="home-map-systems-map"')).toBeLessThan(unified.indexOf('data-testid="home-map-systems-room-detail"'));
     expect(unified.indexOf('data-testid="home-map-systems-map"')).toBeLessThan(unified.indexOf('data-testid="home-map-systems-rooms-list"'));
-    expect(unified).toContain('Map your rooms, organize systems, and keep related documents and reminders together.');
+    expect(unified).toContain('Map rooms and hallways, organize systems, and keep related documents and reminders together.');
+    expect(unified).toContain('Rooms are the organizing backbone for this home.');
   });
 
   test('map room form exposes rough dimensions instead of implementation coordinates', () => {
@@ -65,6 +76,7 @@ test.describe('Home Map & Systems UX consolidation', () => {
     expect(form).toContain('Length');
     expect(form).toContain('Width');
     expect(form).toContain('Enter rough dimensions like 10 x 14.');
+    expect(form).toContain('Longer spaces, such as hallways, create longer room boxes.');
     expect(form).toContain('measured_width');
     expect(form).toContain('measured_depth');
     expect(form).not.toContain('<Field label="X">');
@@ -72,11 +84,52 @@ test.describe('Home Map & Systems UX consolidation', () => {
     expect(form).not.toContain('layout_width');
     expect(form).not.toContain('layout_height');
     expect(form).not.toContain('ceiling');
-    expect(saveLogic).toContain('roughHomeMapGridSpan');
-    expect(saveLogic).toContain('layout_x: parseHomeMapNumber');
-    expect(saveLogic).toContain('layout_y: parseHomeMapNumber');
+    expect(saveLogic).toContain('roughHomeMapGridSize');
+    expect(saveLogic).toContain('dimensionsChanged');
+    expect(saveLogic).toContain('shouldApplyRoughDimensions');
+    expect(saveLogic).toContain('const layoutX = parseHomeMapNumber');
+    expect(saveLogic).toContain('const layoutY = parseHomeMapNumber');
+    expect(saveLogic).toContain('layout_width: Math.min(HOME_MAP_GRID_COLUMNS - layoutX');
     expect(saveLogic).toContain('measured_width: measuredWidth');
     expect(saveLogic).toContain('measured_depth: measuredDepth');
+  });
+
+  test('rough room dimensions preserve useful room and hallway proportions', () => {
+    const app = appSource();
+    const sizing = sourceBetween(app, 'const roughHomeMapGridSize =', 'const loadHomeRooms =');
+
+    expect(sizing).toContain("const roughGridUnit = unit === 'm' ? 1.1 : 3.5");
+    expect(sizing).toContain('layoutWidth: clampSpan(measuredWidth / roughGridUnit, HOME_MAP_GRID_COLUMNS)');
+    expect(sizing).toContain('layoutHeight: clampSpan(measuredDepth / roughGridUnit, HOME_MAP_GRID_ROWS)');
+
+    const square = expectedRoughHomeMapGridSize(10, 10);
+    const wide = expectedRoughHomeMapGridSize(10, 5);
+    const tall = expectedRoughHomeMapGridSize(5, 10);
+    const largerWide = expectedRoughHomeMapGridSize(14, 10);
+    const hallway = expectedRoughHomeMapGridSize(4, 18);
+
+    expect(square.layoutWidth).toBe(square.layoutHeight);
+    expect(wide.layoutWidth).toBeGreaterThan(wide.layoutHeight);
+    expect(tall.layoutHeight).toBeGreaterThan(tall.layoutWidth);
+    expect(largerWide.layoutWidth).toBeGreaterThan(square.layoutWidth);
+    expect(largerWide.layoutHeight).toBeGreaterThanOrEqual(square.layoutHeight);
+    expect(hallway.layoutHeight).toBeGreaterThan(hallway.layoutWidth);
+    expect(hallway.layoutWidth).toBeGreaterThanOrEqual(1);
+  });
+
+  test('hallways are supported as normal room spaces without a separate data model', () => {
+    const app = appSource();
+    const form = sourceBetween(app, 'const renderHomeRoomLayoutForm =', 'const renderHomeMapSection =');
+    const roomForm = sourceBetween(app, 'const renderHomeRoomForm =', 'const renderHomeRoomsList =');
+    const docs = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
+
+    expect(form).toContain('Laundry room or hallway');
+    expect(form).toContain('Utility, hallway, bedroom, exterior...');
+    expect(roomForm).toContain('Kitchen, hallway, bedroom, exterior...');
+    expect(form).toContain('Longer spaces, such as hallways, create longer room boxes.');
+    expect(docs).toContain('Hallways are treated as normal room/map spaces');
+    expect(app).not.toContain('home_hallways');
+    expect(app).not.toContain('hallway_layouts');
   });
 
   test('map boxes have selected state, direct drag, visible resize handle, and fallback controls', () => {
@@ -88,6 +141,7 @@ test.describe('Home Map & Systems UX consolidation', () => {
     expect(map).toContain('cursor-grab');
     expect(map).toContain('active:cursor-grabbing');
     expect(map).toContain('Drag to move');
+    expect(map).toContain('drag or resize each box until the map feels useful');
     expect(map).toContain('data-testid="home-map-resize-handle"');
     expect(map).toContain('<Maximize2 size={14} />');
     expect(map).toContain("mode: 'move'");
@@ -113,6 +167,20 @@ test.describe('Home Map & Systems UX consolidation', () => {
     expect(detail).not.toContain('updateHomeReminderStatus');
     expect(detail).not.toContain('downloadDocument');
     expect(detail).not.toContain('deleteDocument');
+  });
+
+  test('advanced floor plan objects and uploads remain future-scoped', () => {
+    const app = appSource();
+    const docs = `${sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md')}\n${sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md')}`;
+    const unified = sourceBetween(app, 'const renderHomeMapSystemsSection =', 'const renderSharedHomeShellsPanel =');
+
+    expect(unified).toContain('Future floor-plan uploads and map objects like doors, windows, stairs, counters, and utility markers need separate design, storage, and permission review.');
+    expect(docs).toContain('floor-plan uploads and basic map objects such as doors, windows, stairs, counters, islands, cabinets, closets, appliance markers, and utility markers');
+    expect(app).not.toContain('floor_plan_upload');
+    expect(app).not.toContain('home_map_objects');
+    expect(app).not.toContain('doorway_marker');
+    expect(app).not.toContain('window_marker');
+    expect(app).not.toContain('stairs_marker');
   });
 
   test('label cleanup prevents trailing periods on user-entered names while prose cleanup remains', () => {
