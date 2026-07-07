@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-edit-flow-v1`
+- Starting main SHA: `41bc0b12688b368bb8c8197c4fbf7e2509cc9dca`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Polished Home Map Builder room interaction so clicking a room selects/highlights it, dragging moves it, resizing stays on the resize handle, and the room detail drawer opens only from an explicit Edit button on the room box. The drawer now prioritizes editable room basics and rough dimensions before linked reminders, documents, and assets. Side toolbar buttons now show visible labels instead of relying on hover-only or screen-reader-only text.
+- Reason for change: Room editing still felt clunky after the canvas-first layout pass. Homeowners needed clearer selection versus editing behavior, fewer clicks to reach room name/type/floor/dimensions, and readable builder actions.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder interaction tests
+  - targeted Home Map & Systems tests
+  - targeted Home Map / Assets / Room Detail tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, L-shaped/multi-section rooms, floor-plan upload/parsing, ceiling-height schema, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - The drawer reuses existing room and layout edit/save paths; it does not add a new persistence model.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records explicit room selection/edit behavior, editable basics-first room details, and visible Home Map Builder toolbar labels.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a frontend usability polish of the already-approved Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-builder-layout-polish-v1`
 - Starting main SHA: `7df82d641b5d0aafa8f9ab4a772612c82e08e368`
 - Files changed:
