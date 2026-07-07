@@ -59,6 +59,7 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(createFlow).toContain("const measuredDepth = isHallway ? 16 : 10");
     expect(createFlow).toContain("const roomName = isHallway ? 'New hallway' : 'New room'");
     expect(createFlow).toContain("const roomType = isHallway ? 'Hallway' : null");
+    expect(createFlow).toContain('const flushed = await flushHomeMapPendingSaves(homeId)');
     expect(createFlow).toContain(".from('home_rooms')");
     expect(createFlow).toContain(".from('home_room_layouts')");
     expect(createFlow).toContain('roughHomeMapGridSize(measuredWidth, measuredDepth, \'ft\', 4, 3)');
@@ -73,6 +74,7 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-builder-add-hallway"');
     expect(builder).toContain("createHomeMapRoomBox(homeId, 'hallway')");
     expect(createFlow).toContain("const isHallway = kind === 'hallway'");
+    expect(createFlow).toContain('const flushed = await flushHomeMapPendingSaves(homeId)');
     expect(createFlow).toContain("const measuredWidth = isHallway ? 4 : 10");
     expect(createFlow).toContain("const measuredDepth = isHallway ? 16 : 10");
     expect(createFlow).toContain("room_type: roomType");
@@ -90,6 +92,7 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('Rooms not on map');
     expect(builder).toContain('Add {room.name} to map');
     expect(addExisting).toContain(".from('home_room_layouts')");
+    expect(addExisting).toContain('const flushed = await flushHomeMapPendingSaves(homeId)');
     expect(addExisting).toContain('home_room_id: room.id');
     expect(addExisting).toContain('setSelectedHomeRoomDetailId(room.id)');
     expect(addExisting).not.toContain(".from('home_rooms')");
@@ -108,10 +111,60 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(detail).toContain('Linked documents');
     expect(detail).toContain('Linked reminders');
     expect(detail).toContain('Manager notes');
+    expect(detail).toContain('data-testid="home-map-fine-tune-controls"');
+    expect(detail).toContain('Fine tune position');
     expect(detail).toContain('renderHomeAssetForm(room.home_id)');
     expect(detail).not.toContain('downloadDocument');
     expect(detail).not.toContain('deleteDocument');
     expect(detail).not.toContain('updateHomeReminderStatus');
+  });
+
+  test('builder autosaves dirty room layouts and flushes before leaving or reloading map data', () => {
+    const app = appSource();
+    const stateSource = sourceBetween(app, 'const [homeRoomLayoutsByHomeId, setHomeRoomLayoutsByHomeId]', 'const [homeAssetsByHomeId, setHomeAssetsByHomeId]');
+    const autosaveSource = sourceBetween(app, 'const markHomeMapLayoutDirty =', 'const openHomeRoomForm =');
+    const selectionSource = sourceBetween(app, 'const selectHome = async', 'const openContextualConnectionRequest =');
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+
+    expect(stateSource).toContain('homeMapDirtyLayoutIds');
+    expect(stateSource).toContain('homeMapSaveStatus');
+    expect(stateSource).toContain('homeMapAutosaveTimerRef');
+    expect(stateSource).toContain('homeMapSaveInFlightRef');
+    expect(autosaveSource).toContain('next.add(layoutId)');
+    expect(autosaveSource).toContain('flushHomeMapPendingSaves');
+    expect(autosaveSource).toContain("setHomeMapSaveStatus('dirty')");
+    expect(autosaveSource).toContain("setHomeMapSaveStatus('saving')");
+    expect(autosaveSource).toContain("setHomeMapSaveStatus('saved')");
+    expect(autosaveSource).toContain("setHomeMapSaveStatus('error')");
+    expect(autosaveSource).toContain('window.setTimeout');
+    expect(autosaveSource).toContain('closeHomeMapBuilder');
+    expect(selectionSource).toContain('await flushHomeMapPendingSaves(selectedHomeId || homeMapBuilderHomeId)');
+    expect(builder).toContain('data-testid="home-map-save-status"');
+    expect(builder).toContain("saveStatusLabel");
+    expect(builder).toContain('closeHomeMapBuilder(homeId)');
+  });
+
+  test('builder canvas is scrollable and zoomable without adding a map dependency', () => {
+    const app = appSource();
+    const constants = sourceBetween(app, 'const HOME_MAP_GRID_COLUMNS =', 'const HOME_ASSET_CATEGORIES =');
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+
+    expect(constants).toContain('HOME_MAP_WORKSPACE_WIDTH');
+    expect(constants).toContain('HOME_MAP_WORKSPACE_HEIGHT');
+    expect(constants).toContain('HOME_MAP_ZOOM_MIN');
+    expect(constants).toContain('HOME_MAP_ZOOM_MAX');
+    expect(builder).toContain('data-testid="home-map-zoom-out"');
+    expect(builder).toContain('data-testid="home-map-fit-view"');
+    expect(builder).toContain('data-testid="home-map-zoom-in"');
+    expect(map).toContain('data-testid="home-map-canvas-scroll"');
+    expect(map).toContain('max-h-[68vh] overflow-auto');
+    expect(map).toContain('canvasCellWidth');
+    expect(map).toContain('canvasCellHeight');
+    expect(map).toContain('layout.layout_x * canvasCellWidth');
+    expect(map).toContain('layout.layout_width * canvasCellWidth');
+    expect(app).not.toContain('react-rnd');
+    expect(app).not.toContain('interactjs');
   });
 
   test('future floor-plan objects and upload remain documented-only, not live behavior', () => {

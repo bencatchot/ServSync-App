@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-autosave-canvas-v1`
+- Starting main SHA: `2d3b2a554cc4bd8c1194ec59a8db242a57cf4bce`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Polished the dedicated homeowner Home Map Builder with a dirty-layout autosave path, save status, pending-save flushes before layout-reload actions, a larger scrollable canvas, zoom/fit controls, and a collapsed Fine tune position fallback for manual move/resize buttons.
+- Reason for change: Homeowners could move or resize room boxes and then lose the visible change when another action reloaded layout rows. The builder also needed more working room so a real home map does not feel cramped.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder UI tests
+  - targeted Home Map / Home Map & Systems / Room Detail tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Autosave persists existing layout rows only; creating rooms/layouts still uses the existing owner/admin insert paths.
+  - Future floor-plan upload/recreation, `home_map_objects`, ceiling height, contractor map access, and shared document/asset expansion still require separate design and approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records autosave/no-lost-work behavior, scalable canvas controls, and selected-panel cleanup for the dedicated Home Map Builder.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the dedicated builder autosave and scalable canvas behavior while preserving future boundaries for backend, storage, contractor, key-location, sensitive-access, and advanced map work.
+
 - Branch: `codex/home-map-builder-dedicated-view-v1`
 - Starting main SHA: `eb6e959669705a3601dfbae7fe8d11f3b3fe6f6a`
 - Files changed:
