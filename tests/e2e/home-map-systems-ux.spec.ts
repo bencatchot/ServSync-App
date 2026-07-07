@@ -70,6 +70,11 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(builder).toContain('Drag to move. Use the corner handle to resize.');
     expect(builder).toContain('data-testid="home-map-room-detail-drawer"');
     expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
+    expect(builder).toContain('<span>Add Room</span>');
+    expect(builder).toContain('<span>Add Hallway</span>');
+    expect(builder).toContain('<span>Zoom Out</span>');
+    expect(builder).toContain('Fit View');
+    expect(builder).toContain('<span>Zoom In</span>');
     expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
     expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
     expect(builder).toContain('Rooms on this map');
@@ -95,9 +100,15 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(form).not.toContain('ceiling');
     expect(map).toContain('const isSelected = selectedHomeRoomDetailId === room.id');
     expect(map).toContain('cursor-grab');
+    expect(map).toContain('data-testid="home-map-room-edit"');
+    expect(map).toContain('openHomeMapRoomEditor(room, layout)');
+    expect(map).not.toContain('setHomeMapDetailPanelOpen(true)');
     expect(map).toContain('data-testid="home-map-resize-handle"');
     expect(map).toContain("mode: 'move'");
     expect(map).toContain("mode: 'resize'");
+    expect(detail).toContain('data-testid="home-map-room-basics-editor"');
+    expect(detail).toContain('Edit room basics');
+    expect(detail).toContain('Edit rough dimensions');
     expect(detail).toContain('data-testid="home-map-fine-tune-controls"');
     expect(detail).toContain('Fine tune position');
     expect(detail).toContain('Fallback map controls');

@@ -10640,6 +10640,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       : emptyHomeRoomLayoutDraft(homeId, rooms));
   };
 
+  const openHomeMapRoomEditor = (room: HomeRoom, layout?: HomeRoomLayout | null) => {
+    setSelectedHomeRoomDetailId(room.id);
+    openHomeRoomForm(room.home_id, room);
+    if (layout) {
+      openHomeRoomLayoutForm(room.home_id, layout);
+    } else {
+      setHomeRoomLayoutDraft(null);
+    }
+    setHomeMapDetailPanelOpen(true);
+  };
+
   const saveHomeRoomLayoutDraft = async () => {
     if (!supabase || !homeRoomLayoutDraft) return;
     setSavingHomeRoomLayout(true);
@@ -14944,6 +14955,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const dimensionLabel = selectedLayout?.measured_width && selectedLayout.measured_depth
       ? `${selectedLayout.measured_width} x ${selectedLayout.measured_depth} ${selectedLayout.measurement_unit || 'ft'}`
       : '';
+    const showEditableBasics = Boolean(canManage && homeMapBuilderHomeId === room.home_id && homeMapDetailPanelOpen);
     const linkedReminders = homeReminders
       .filter(reminder => reminder.home_id === room.home_id && reminder.home_room_id === room.id)
       .slice()
@@ -14976,19 +14988,67 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            {canManage && (
+            {canManage && !showEditableBasics && (
               <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomForm(room.home_id, room)}>
                 <Pencil size={14} />
                 Edit details
               </button>
             )}
-            <button type="button" className={buttonClass('secondary')} onClick={() => setSelectedHomeRoomDetailId(null)}>
+            <button type="button" className={buttonClass('secondary')} onClick={() => {
+              setSelectedHomeRoomDetailId(null);
+              setHomeMapDetailPanelOpen(false);
+            }}>
               Close details
             </button>
           </div>
         </div>
 
-        {canManage && homeRoomDraft?.id === room.id && (
+        {canManage && showEditableBasics && (
+          <div className="mt-3 space-y-3" data-testid="home-map-room-basics-editor">
+            <div className="rounded-xl border border-blue-100 bg-white p-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Edit room basics</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Room name, room type, and floor stay at the top so map edits are quick.</p>
+                </div>
+                {homeRoomDraft?.id !== room.id && (
+                  <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomForm(room.home_id, room)}>
+                    <Pencil size={14} />
+                    Edit basics
+                  </button>
+                )}
+              </div>
+              {homeRoomDraft?.id === room.id ? (
+                renderHomeRoomForm(room.home_id)
+              ) : (
+                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">Use Edit basics to change the room name, type, floor, or notes.</p>
+              )}
+            </div>
+            {selectedLayout && (
+              <div className="rounded-xl border border-blue-100 bg-white p-3">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Edit rough dimensions</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Length x width controls the rough room-box shape. This is not CAD or permit data.</p>
+                  </div>
+                  {homeRoomLayoutDraft?.id !== selectedLayout.id && (
+                    <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomLayoutForm(room.home_id, selectedLayout)}>
+                      <Pencil size={14} />
+                      Edit dimensions
+                    </button>
+                  )}
+                </div>
+                {homeRoomLayoutDraft?.id === selectedLayout.id ? (
+                  renderHomeRoomLayoutForm(room.home_id)
+                ) : (
+                  <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">Use Edit dimensions to adjust the rough length x width for this room box.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {canManage && !showEditableBasics && homeRoomDraft?.id === room.id && (
           <div className="mt-3">
             {renderHomeRoomForm(room.home_id)}
           </div>
@@ -15520,7 +15580,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             {unmappedRooms.length} active room{unmappedRooms.length === 1 ? '' : 's'} can still be added to the map.
           </p>
         )}
-        {renderHomeRoomLayoutForm(homeId)}
+        {!builderMode && renderHomeRoomLayoutForm(homeId)}
         {loadingHomeRoomLayouts && layouts.length === 0 ? (
           <p className="text-xs font-semibold text-blue-700">Refreshing Home Map...</p>
         ) : layouts.length === 0 ? (
@@ -15549,9 +15609,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   : '';
                 const isSelected = selectedHomeRoomDetailId === room.id;
                 return (
-                  <button
+                  <div
                     key={layout.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     data-testid="home-map-room-box"
                     className={`absolute z-10 flex cursor-grab flex-col items-start justify-between overflow-hidden rounded-xl border bg-white/95 p-2 text-left shadow-sm transition active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-300 ${
                       isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-200 hover:border-blue-300'
@@ -15566,7 +15627,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     }}
                     onClick={() => {
                       setSelectedHomeRoomDetailId(room.id);
-                      if (builderMode) setHomeMapDetailPanelOpen(true);
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedHomeRoomDetailId(room.id);
+                      }
                     }}
                     onPointerDown={event => {
                       if (!canManage) return;
@@ -15595,6 +15661,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <span className="mt-1 block text-xs leading-4 text-slate-500">{[room.room_type, layout.floor_label || room.floor_label].filter(Boolean).join(' • ') || 'Room box'}</span>
                       {measurements && <span className="mt-1 block text-xs font-semibold text-blue-700">{measurements}</span>}
                     </span>
+                    {canManage && builderMode && (
+                      <button
+                        type="button"
+                        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 shadow-sm hover:bg-blue-100"
+                        data-testid="home-map-room-edit"
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={event => {
+                          event.stopPropagation();
+                          openHomeMapRoomEditor(room, layout);
+                        }}
+                      >
+                        <Pencil size={13} />
+                        Edit
+                      </button>
+                    )}
                     {canManage && (
                       <span
                         role="button"
@@ -15625,7 +15706,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <Maximize2 size={14} />
                       </span>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -15856,19 +15937,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[104px_minmax(0,1fr)] gap-3 overflow-hidden bg-slate-100 p-3" data-testid="home-map-builder-shell">
+        <div className="grid min-h-0 flex-1 grid-cols-[144px_minmax(0,1fr)] gap-3 overflow-hidden bg-slate-100 p-3" data-testid="home-map-builder-shell">
           <aside className="flex min-h-0 flex-col items-stretch gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-xl" data-testid="home-map-builder-side-toolbar">
             <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'room')} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-room" title="Add Room">
               <Plus size={16} />
-              <span className="sr-only">Add Room</span>
+              <span>Add Room</span>
             </button>
             <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'hallway')} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-hallway" title="Add Hallway">
               <Plus size={16} />
-              <span className="sr-only">Add Hallway</span>
+              <span>Add Hallway</span>
             </button>
             <button type="button" className={buttonClass('secondary')} onClick={() => void saveHomeMapLayout(homeId)} disabled={savingHomeRoomLayout || layouts.length === 0} data-testid="home-map-save-now" title="Save now">
               <CheckCircle2 size={16} />
-              <span className="sr-only">{savingHomeRoomLayout ? 'Saving' : 'Save now'}</span>
+              <span>{savingHomeRoomLayout ? 'Saving' : 'Save'}</span>
             </button>
             <button
               type="button"
@@ -15878,7 +15959,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               title="Zoom out"
             >
               <span aria-hidden="true">-</span>
-              <span className="sr-only">Zoom out</span>
+              <span>Zoom Out</span>
             </button>
             <button
               type="button"
@@ -15887,7 +15968,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               data-testid="home-map-fit-view"
               title="Fit view"
             >
-              Fit
+              Fit View
             </button>
             <button
               type="button"
@@ -15897,7 +15978,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               title="Zoom in"
             >
               <span aria-hidden="true">+</span>
-              <span className="sr-only">Zoom in</span>
+              <span>Zoom In</span>
             </button>
             <button type="button" className={buttonClass(homeMapRoomsPanelOpen ? 'primary' : 'secondary')} onClick={() => setHomeMapRoomsPanelOpen(current => !current)} data-testid="home-map-builder-toggle-rooms" title="Room lists">
               Rooms
@@ -15942,7 +16023,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         className={`w-full rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${selectedHomeRoomDetailId === room.id ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-800 hover:border-blue-200'}`}
                         onClick={() => {
                           setSelectedHomeRoomDetailId(room.id);
-                          setHomeMapDetailPanelOpen(true);
                         }}
                       >
                         {room.name}
