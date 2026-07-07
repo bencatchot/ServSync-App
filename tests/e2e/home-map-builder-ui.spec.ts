@@ -52,6 +52,29 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).not.toContain('<Card title="Home Map Builder"');
   });
 
+  test('top header is minimal and builder actions live in the side toolbar', () => {
+    const app = appSource();
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+    const header = sourceBetween(builder, 'data-testid="home-map-builder-header"', 'data-testid="home-map-builder-shell"');
+    const toolbar = sourceBetween(builder, 'data-testid="home-map-builder-side-toolbar"', '<section className="relative flex min-h-0 flex-col');
+
+    expect(header).toContain('Home Map Builder');
+    expect(header).toContain('{label}');
+    expect(header).toContain('data-testid="home-map-save-status"');
+    expect(header).not.toContain('data-testid="home-map-builder-add-room"');
+    expect(header).not.toContain('data-testid="home-map-builder-add-hallway"');
+    expect(header).not.toContain('data-testid="home-map-zoom-in"');
+    expect(header).not.toContain('Done');
+    expect(toolbar).toContain('data-testid="home-map-builder-add-room"');
+    expect(toolbar).toContain('data-testid="home-map-builder-add-hallway"');
+    expect(toolbar).toContain('data-testid="home-map-save-now"');
+    expect(toolbar).toContain('data-testid="home-map-zoom-out"');
+    expect(toolbar).toContain('data-testid="home-map-fit-view"');
+    expect(toolbar).toContain('data-testid="home-map-zoom-in"');
+    expect(toolbar).toContain('data-testid="home-map-builder-toggle-rooms"');
+    expect(toolbar).toContain('closeHomeMapBuilder(homeId)');
+  });
+
   test('Add Room creates a room and matching layout with default rough square dimensions', () => {
     const app = appSource();
     const createFlow = sourceBetween(app, "const createHomeMapRoomBox = async (homeId: string, kind: 'room' | 'hallway') => {", 'const openHomeRoomLayoutForm =');
@@ -108,9 +131,10 @@ test.describe('Home Map Builder dedicated view', () => {
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
     const detail = sourceBetween(app, 'const renderHomeRoomDetailPanel =', 'const renderHomeRoomForm =');
 
-    expect(builder).toContain('data-testid="home-map-builder-side-panel"');
-    expect(builder).toContain('data-testid="home-map-builder-selected-panel"');
-    expect(builder).toContain('setHomeMapDetailPanelOpen(current => !current)');
+    expect(builder).toContain('data-testid="home-map-room-detail-drawer"');
+    expect(builder).toContain('lg:justify-end');
+    expect(builder).toContain('max-h-[88vh]');
+    expect(builder).toContain('Close');
     expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
     expect(builder).toContain('Collapse');
     expect(detail).toContain('Room detail');
@@ -124,6 +148,25 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(detail).not.toContain('downloadDocument');
     expect(detail).not.toContain('deleteDocument');
     expect(detail).not.toContain('updateHomeReminderStatus');
+  });
+
+  test('room boxes stay simple and keep linked-record clutter in the detail drawer', () => {
+    const app = appSource();
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+
+    expect(map).toContain('data-testid="home-map-room-box"');
+    expect(map).toContain('{room.name}');
+    expect(map).toContain('measurements');
+    expect(map).toContain('data-testid="home-map-resize-handle"');
+    expect(map).not.toContain('reminderCount');
+    expect(map).not.toContain('documentCount');
+    expect(map).not.toContain('assetCount');
+    expect(map).not.toContain('{reminderCount} rem');
+    expect(map).not.toContain('{documentCount} docs');
+    expect(map).not.toContain('{assetCount} assets');
+    expect(map).not.toContain('openHomeRoomLayoutForm(homeId, layout)');
+    expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
   });
 
   test('builder autosaves dirty room layouts and flushes before leaving or reloading map data', () => {
@@ -166,8 +209,11 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-zoom-in"');
     expect(builder).toContain('data-testid="home-map-builder-workspace"');
     expect(builder).toContain('flex flex-col bg-slate-950');
+    expect(builder).toContain('data-testid="home-map-builder-shell"');
+    expect(builder).toContain('grid-cols-[104px_minmax(0,1fr)]');
     expect(builder).toContain('data-testid="home-map-builder-canvas"');
     expect(builder).toContain('Canvas-first workspace');
+    expect(builder).not.toContain('xl:grid-cols-[minmax(0,1fr)_390px]');
     expect(map).toContain('data-testid="home-map-canvas-scroll"');
     expect(map).toContain('h-[62vh] min-h-[420px] overflow-auto');
     expect(map).toContain('xl:h-[calc(100vh-190px)]');

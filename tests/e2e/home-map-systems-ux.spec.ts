@@ -63,18 +63,19 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(builder).toContain('data-testid="home-map-builder-workspace"');
     expect(builder).toContain('fixed inset-0');
     expect(builder).toContain('Home Map Builder');
-    expect(builder).toContain('The map is how you create and manage rooms.');
-    expect(builder).toContain('data-testid="home-map-builder-toolbar"');
+    expect(builder).toContain('data-testid="home-map-builder-header"');
+    expect(builder).toContain('data-testid="home-map-builder-side-toolbar"');
+    expect(builder).toContain('data-testid="home-map-builder-shell"');
     expect(builder).toContain('data-testid="home-map-builder-canvas"');
     expect(builder).toContain('Drag to move. Use the corner handle to resize.');
-    expect(builder).toContain('data-testid="home-map-builder-selected-panel"');
+    expect(builder).toContain('data-testid="home-map-room-detail-drawer"');
     expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
-    expect(builder).toContain('data-testid="home-map-builder-side-panel"');
     expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
     expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
     expect(builder).toContain('Rooms on this map');
     expect(builder).toContain('Rooms not on map');
-    expect(builder).toContain('All systems/assets');
+    expect(builder).not.toContain('data-testid="home-map-builder-side-panel"');
+    expect(builder).not.toContain('data-testid="home-map-builder-selected-panel"');
   });
 
   test('rough dimensions and direct map controls remain simple organizer behavior', () => {
@@ -125,7 +126,7 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(detail).not.toContain('downloadDocument');
     expect(detail).not.toContain('deleteDocument');
     expect(sharedHomesSource).not.toContain('home-map-builder-workspace');
-    expect(sharedHomesSource).not.toContain('home-map-builder-selected-panel');
+    expect(sharedHomesSource).not.toContain('home-map-room-detail-drawer');
     expect(contractorSource).not.toContain('home-map-builder-workspace');
     expect(contractorSource).not.toContain('home_assets');
     expect(contractorSource).not.toContain('home_room_layouts');

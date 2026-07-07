@@ -79,9 +79,10 @@ test.describe('Home Map v1 UI', () => {
 
     expect(sharedSource).toContain('renderHomeMapSection');
     expect(mapSource).toContain('shared-home-map-section');
-    expect(sharedSource).toContain('canShowPrivateCounts: false');
-    expect(mapSource).toContain('canShowPrivateCounts ? homeReminders');
-    expect(mapSource).toContain('canShowPrivateCounts ? homeDocuments');
+    expect(sharedSource).not.toContain('home-map-room-detail-drawer');
+    expect(mapSource).not.toContain('reminderCount');
+    expect(mapSource).not.toContain('documentCount');
+    expect(mapSource).not.toContain('assetCount');
     expect(sharedSource).not.toContain('downloadDocument');
     expect(sharedSource).not.toContain('homeDocuments.filter');
   });
