@@ -145,8 +145,16 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(saveLayout).toContain('rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight');
     expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
     expect(map).toContain('data-testid="home-map-grid-measurement-copy"');
-    expect(map).toContain('canvasCellWidth = canvasWidth / HOME_MAP_GRID_COLUMNS');
-    expect(map).toContain('canvasCellHeight = canvasHeight / HOME_MAP_GRID_ROWS');
+    expect(map).toContain('const canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom');
+    expect(map).toContain('const canvasCellWidth = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(map).toContain('const canvasCellHeight = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(map).toContain('const canvasMajorGridSize = canvasPixelsPerFoot * HOME_MAP_MAJOR_GRID_EVERY_FEET');
+    expect(map).toContain('HOME_MAP_WORKSPACE_WIDTH * mapZoom');
+    expect(map).toContain('HOME_MAP_WORKSPACE_HEIGHT * mapZoom');
+    expect(map).toContain('repeating-linear-gradient(to right');
+    expect(map).toContain('transparent ${canvasCellWidth}px');
+    expect(map).toContain('transparent ${canvasCellHeight}px');
+    expect(map).toContain('transparent ${canvasMajorGridSize}px');
     expect(map).toContain('Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth)');
     expect(map).toContain('Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight)');
     expect(map).toContain('HOME_MAP_MAJOR_GRID_EVERY_FEET');
