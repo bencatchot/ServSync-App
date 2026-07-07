@@ -6952,10 +6952,14 @@ const MANUAL_HOME_DOCUMENT_HOME_MAX_BYTES = 100 * 1024 * 1024;
 const MANUAL_HOME_DOCUMENT_MONTHLY_MAX_BYTES = 100 * 1024 * 1024;
 const MANUAL_HOME_DOCUMENT_MAX_COUNT = 50;
 const MANUAL_HOME_DOCUMENT_UPLOAD_SOURCE = 'manual_documents_tab';
-const HOME_MAP_GRID_COLUMNS = 12;
-const HOME_MAP_GRID_ROWS = 10;
-const HOME_MAP_WORKSPACE_WIDTH = 1280;
-const HOME_MAP_WORKSPACE_HEIGHT = 900;
+const HOME_MAP_FEET_PER_GRID_UNIT = 1;
+const HOME_MAP_PIXELS_PER_FOOT = 28;
+const HOME_MAP_MAJOR_GRID_EVERY_FEET = 5;
+const HOME_MAP_GRID_COLUMNS = 60;
+const HOME_MAP_GRID_ROWS = 40;
+const HOME_MAP_MIN_ROOM_GRID_UNITS = 1;
+const HOME_MAP_WORKSPACE_WIDTH = HOME_MAP_GRID_COLUMNS * HOME_MAP_PIXELS_PER_FOOT;
+const HOME_MAP_WORKSPACE_HEIGHT = HOME_MAP_GRID_ROWS * HOME_MAP_PIXELS_PER_FOOT;
 const HOME_MAP_ZOOM_MIN = 0.7;
 const HOME_MAP_ZOOM_MAX = 1.4;
 const HOME_ASSET_CATEGORIES = ['HVAC', 'Plumbing', 'Electrical', 'Appliance', 'Roof', 'Exterior', 'Garage', 'Safety', 'Other'];
@@ -10149,11 +10153,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (!measuredWidth || !measuredDepth) {
       return { layoutWidth: fallbackWidth, layoutHeight: fallbackHeight };
     }
-    const roughGridUnit = unit === 'm' ? 1.1 : 3.5;
-    const clampSpan = (span: number, max: number) => Math.min(max, Math.max(1, Math.round(span)));
+    const measurementWidthFeet = unit === 'm' ? measuredWidth * 3.28084 : measuredWidth;
+    const measurementDepthFeet = unit === 'm' ? measuredDepth * 3.28084 : measuredDepth;
+    const clampSpan = (span: number, max: number) => Math.min(max, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, Math.round(span)));
     return {
-      layoutWidth: clampSpan(measuredWidth / roughGridUnit, HOME_MAP_GRID_COLUMNS),
-      layoutHeight: clampSpan(measuredDepth / roughGridUnit, HOME_MAP_GRID_ROWS),
+      layoutWidth: clampSpan(measurementWidthFeet / HOME_MAP_FEET_PER_GRID_UNIT, HOME_MAP_GRID_COLUMNS),
+      layoutHeight: clampSpan(measurementDepthFeet / HOME_MAP_FEET_PER_GRID_UNIT, HOME_MAP_GRID_ROWS),
     };
   };
 
@@ -10501,8 +10506,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const next: Partial<HomeRoomLayout> = {};
     if (updates.layout_x !== undefined) next.layout_x = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_width, Math.max(0, updates.layout_x));
     if (updates.layout_y !== undefined) next.layout_y = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, updates.layout_y));
-    if (updates.layout_width !== undefined) next.layout_width = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(1, updates.layout_width));
-    if (updates.layout_height !== undefined) next.layout_height = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(1, updates.layout_height));
+    if (updates.layout_width !== undefined) next.layout_width = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, updates.layout_width));
+    if (updates.layout_height !== undefined) next.layout_height = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, updates.layout_height));
     updateHomeRoomLayoutLocal(layout.id, next);
   };
 
@@ -10712,8 +10717,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
         layout_x: layoutX,
         layout_y: layoutY,
-        layout_width: Math.min(HOME_MAP_GRID_COLUMNS - layoutX, Math.max(1, rawLayoutWidth)),
-        layout_height: Math.min(HOME_MAP_GRID_ROWS - layoutY, Math.max(1, rawLayoutHeight)),
+        layout_width: Math.min(HOME_MAP_GRID_COLUMNS - layoutX, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, rawLayoutWidth)),
+        layout_height: Math.min(HOME_MAP_GRID_ROWS - layoutY, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, rawLayoutHeight)),
         measured_width: measuredWidth,
         measured_depth: measuredDepth,
         measurement_unit: nextMeasurementUnit,
@@ -15539,8 +15544,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         const nextY = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, homeMapDrag.originY + deltaY));
         updateHomeRoomLayoutLocal(layout.id, { layout_x: nextX, layout_y: nextY });
       } else {
-        const nextWidth = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(1, homeMapDrag.originWidth + deltaX));
-        const nextHeight = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(1, homeMapDrag.originHeight + deltaY));
+        const nextWidth = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originWidth + deltaX));
+        const nextHeight = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originHeight + deltaY));
         updateHomeRoomLayoutLocal(layout.id, { layout_width: nextWidth, layout_height: nextHeight });
       }
     };
@@ -15581,6 +15586,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </p>
         )}
         {!builderMode && renderHomeRoomLayoutForm(homeId)}
+        <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600" data-testid="home-map-grid-measurement-copy">
+          Each grid line represents roughly 1 ft. Measurements are approximate.
+        </p>
         {loadingHomeRoomLayouts && layouts.length === 0 ? (
           <p className="text-xs font-semibold text-blue-700">Refreshing Home Map...</p>
         ) : layouts.length === 0 ? (
@@ -15597,8 +15605,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 height: `${canvasHeight}px`,
                 minWidth: `${canvasWidth}px`,
                 minHeight: `${canvasHeight}px`,
-                backgroundImage: 'linear-gradient(to right, rgba(148, 163, 184, 0.22) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.22) 1px, transparent 1px)',
-                backgroundSize: `${canvasCellWidth}px ${canvasCellHeight}px`,
+                backgroundImage: 'linear-gradient(to right, rgba(148, 163, 184, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.2) 1px, transparent 1px), linear-gradient(to right, rgba(71, 85, 105, 0.28) 1px, transparent 1px), linear-gradient(to bottom, rgba(71, 85, 105, 0.28) 1px, transparent 1px)',
+                backgroundSize: `${canvasCellWidth}px ${canvasCellHeight}px, ${canvasCellWidth}px ${canvasCellHeight}px, ${canvasCellWidth * HOME_MAP_MAJOR_GRID_EVERY_FEET}px ${canvasCellHeight * HOME_MAP_MAJOR_GRID_EVERY_FEET}px, ${canvasCellWidth * HOME_MAP_MAJOR_GRID_EVERY_FEET}px ${canvasCellHeight * HOME_MAP_MAJOR_GRID_EVERY_FEET}px`,
               }}
             >
               {layouts.map(layout => {

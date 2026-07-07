@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-measured-grid-v1`
+- Starting main SHA: `6bead7fc66fb1e636b246f5f6d11523def335bef`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Polished the dedicated homeowner Home Map Builder so the canvas grid is measurement-aware: each minor grid line represents roughly 1 ft, stronger major grid lines appear every 5 ft, room/hallway move and resize behavior snaps to the grid, and entered length x width dimensions drive grid-aligned room-box sizing.
+- Reason for change: The builder grid was still mostly visual, so hallway boxes and edited room dimensions could feel disconnected from the grid. This pass makes the map behave like a rough organizer scale while staying out of CAD, permit, floor-plan, or architectural territory.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder grid/snap tests
+  - targeted Home Map Builder interaction tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - The grid is still approximate organization data, not a precision floor-plan system.
+  - L-shaped or other multi-section rooms remain future work requiring separately approved SQL/RLS, likely room layout sections.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the 1-ft rough measurement grid, 5-ft major grid lines, snap-to-grid move/resize behavior, and dimension-driven grid sizing.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend polish of the already-approved dedicated Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-builder-edit-flow-v1`
 - Starting main SHA: `41bc0b12688b368bb8c8197c4fbf7e2509cc9dca`
 - Files changed:
