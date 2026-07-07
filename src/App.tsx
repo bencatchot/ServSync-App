@@ -10127,10 +10127,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   };
 
-  const roughHomeMapGridSpan = (measurement: number | null, unit: 'ft' | 'm', fallback: number, max: number) => {
-    if (!measurement) return fallback;
-    const roughDivisor = unit === 'm' ? 1.2 : 4;
-    return Math.min(max, Math.max(2, Math.round(measurement / roughDivisor)));
+  const roughHomeMapGridSize = (
+    measuredWidth: number | null,
+    measuredDepth: number | null,
+    unit: 'ft' | 'm',
+    fallbackWidth: number,
+    fallbackHeight: number,
+  ) => {
+    if (!measuredWidth || !measuredDepth) {
+      return { layoutWidth: fallbackWidth, layoutHeight: fallbackHeight };
+    }
+    const roughGridUnit = unit === 'm' ? 1.1 : 3.5;
+    const clampSpan = (span: number, max: number) => Math.min(max, Math.max(1, Math.round(span)));
+    return {
+      layoutWidth: clampSpan(measuredWidth / roughGridUnit, HOME_MAP_GRID_COLUMNS),
+      layoutHeight: clampSpan(measuredDepth / roughGridUnit, HOME_MAP_GRID_ROWS),
+    };
   };
 
   const loadHomeRooms = useCallback(async () => {
@@ -10435,27 +10447,38 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const existingLayouts = homeRoomLayoutsByHomeId[homeRoomLayoutDraft.home_id] || [];
       const measuredWidth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_width);
       const measuredDepth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_depth);
-      const roughLayoutWidth = roughHomeMapGridSpan(
+      const existingLayout = homeRoomLayoutDraft.id
+        ? existingLayouts.find(layout => layout.id === homeRoomLayoutDraft.id) ?? null
+        : null;
+      const fallbackLayoutWidth = parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS);
+      const fallbackLayoutHeight = parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS);
+      const roughLayoutSize = roughHomeMapGridSize(
         measuredWidth,
-        homeRoomLayoutDraft.measurement_unit,
-        parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS),
-        HOME_MAP_GRID_COLUMNS,
-      );
-      const roughLayoutHeight = roughHomeMapGridSpan(
         measuredDepth,
         homeRoomLayoutDraft.measurement_unit,
-        parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS),
-        HOME_MAP_GRID_ROWS,
+        fallbackLayoutWidth,
+        fallbackLayoutHeight,
       );
+      const nextMeasurementUnit = measuredWidth || measuredDepth ? homeRoomLayoutDraft.measurement_unit : null;
+      const dimensionsChanged = Boolean(existingLayout && (
+        (existingLayout.measured_width ?? null) !== measuredWidth ||
+        (existingLayout.measured_depth ?? null) !== measuredDepth ||
+        (existingLayout.measurement_unit ?? null) !== nextMeasurementUnit
+      ));
+      const shouldApplyRoughDimensions = !homeRoomLayoutDraft.id || dimensionsChanged;
+      const layoutX = parseHomeMapNumber(homeRoomLayoutDraft.layout_x, 0, 0, HOME_MAP_GRID_COLUMNS - 1);
+      const layoutY = parseHomeMapNumber(homeRoomLayoutDraft.layout_y, 0, 0, HOME_MAP_GRID_ROWS - 1);
+      const rawLayoutWidth = shouldApplyRoughDimensions ? roughLayoutSize.layoutWidth : fallbackLayoutWidth;
+      const rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight;
       const layoutPayload = {
         floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
-        layout_x: parseHomeMapNumber(homeRoomLayoutDraft.layout_x, 0, 0, HOME_MAP_GRID_COLUMNS - 1),
-        layout_y: parseHomeMapNumber(homeRoomLayoutDraft.layout_y, 0, 0, HOME_MAP_GRID_ROWS - 1),
-        layout_width: homeRoomLayoutDraft.id ? parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS) : roughLayoutWidth,
-        layout_height: homeRoomLayoutDraft.id ? parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS) : roughLayoutHeight,
+        layout_x: layoutX,
+        layout_y: layoutY,
+        layout_width: Math.min(HOME_MAP_GRID_COLUMNS - layoutX, Math.max(1, rawLayoutWidth)),
+        layout_height: Math.min(HOME_MAP_GRID_ROWS - layoutY, Math.max(1, rawLayoutHeight)),
         measured_width: measuredWidth,
         measured_depth: measuredDepth,
-        measurement_unit: homeRoomLayoutDraft.measured_width || homeRoomLayoutDraft.measured_depth ? homeRoomLayoutDraft.measurement_unit : null,
+        measurement_unit: nextMeasurementUnit,
       };
 
       if (homeRoomLayoutDraft.id) {
@@ -14893,7 +14916,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               className={inputClass()}
               value={homeRoomDraft.room_type}
               onChange={event => setHomeRoomDraft(current => current ? { ...current, room_type: event.target.value } : current)}
-              placeholder="Kitchen, bedroom, exterior..."
+              placeholder="Kitchen, hallway, bedroom, exterior..."
             />
           </Field>
           <Field label="Floor">
@@ -15011,10 +15034,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       <div className={compact ? 'rounded-lg border border-emerald-100 bg-emerald-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-rooms-section' : 'home-rooms-section'}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-emerald-700' : 'text-sm font-bold text-slate-950'}>Rooms</p>
+            <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-emerald-700' : 'text-sm font-bold text-slate-950'}>{compact ? 'Rooms' : 'Rooms in this home'}</p>
             <p className={compact ? 'mt-1 text-xs leading-5 text-emerald-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
               {canManage
-                ? `Manage active room basics for ${label}. Archived rooms are hidden by default.`
+                ? `Use rooms and spaces as the backbone for ${label}. Hallways, utility areas, and exterior spaces can be added like any other room.`
                 : 'Read-only non-sensitive room basics shared with this home.'}
             </p>
           </div>
@@ -15053,7 +15076,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div>
             <p className="text-sm font-bold text-slate-950">{homeRoomLayoutDraft.id ? 'Edit map box' : 'Add room box'}</p>
             <p className="mt-1 text-xs leading-5 text-blue-900">
-              Home Map is a simple not-to-scale organizer. It is not CAD, a measured floor plan, LiDAR, scanning, or 3D.
+              Add a room or hallway to the map with rough dimensions. This is a simple organizer, not CAD, a measured floor plan, LiDAR, scanning, or 3D.
             </p>
           </div>
           <button type="button" className={buttonClass('secondary')} onClick={() => setHomeRoomLayoutDraft(null)} disabled={savingHomeRoomLayout}>
@@ -15108,7 +15131,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   className={inputClass()}
                   value={homeRoomLayoutDraft.new_room_name}
                   onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, new_room_name: event.target.value } : current)}
-                  placeholder="Laundry room"
+                  placeholder="Laundry room or hallway"
                 />
               </Field>
               <Field label="Room type">
@@ -15116,7 +15139,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   className={inputClass()}
                   value={homeRoomLayoutDraft.new_room_type}
                   onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, new_room_type: event.target.value } : current)}
-                  placeholder="Utility, bedroom, exterior..."
+                  placeholder="Utility, hallway, bedroom, exterior..."
                 />
               </Field>
             </>
@@ -15132,7 +15155,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="rounded-xl border border-blue-100 bg-white p-3 md:col-span-2" data-testid="home-map-room-dimensions">
             <p className="text-sm font-bold text-slate-950">Room dimensions</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Enter rough dimensions like 10 x 14. The map box is an organizer only and can be moved or resized after it is added.
+              Enter rough dimensions like 10 x 14. Longer spaces, such as hallways, create longer room boxes. Boxes can still be moved or resized after they are added.
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_1fr_120px] md:items-end">
               <Field label="Length">
@@ -15204,7 +15227,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-indigo-700' : 'text-sm font-bold text-slate-950'}>Home Map</p>
             <p className={compact ? 'mt-1 text-xs leading-5 text-indigo-900' : 'mt-1 max-w-3xl text-sm leading-6 text-slate-500'}>
               {canManage
-                ? `Arrange simple not-to-scale room boxes with optional display-only measurements for ${label}. This is not a CAD, floor-plan, LiDAR, scanning, or 3D tool.`
+                ? `Add rooms and hallways to ${label}, then drag or resize each box until the map feels useful. Dimensions are rough organizer data, not CAD or floor-plan measurements.`
                 : 'Read-only simple room map. Map boxes are for organization only.'}
             </p>
           </div>
@@ -15235,7 +15258,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <p className="text-xs font-semibold text-blue-700">Refreshing Home Map...</p>
         ) : layouts.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
-            No room boxes yet. Start with rooms you already added, or create a new room box.
+            No room boxes yet. Start with rooms or hallways you already added, or create a new room box.
           </p>
         ) : (
           <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3" data-testid="home-map-canvas">
@@ -15517,9 +15540,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-sm font-bold text-blue-950">Map your rooms first</p>
+              <p className="text-sm font-bold text-blue-950">Home Map &amp; Systems starts with rooms</p>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                Map your rooms, organize systems, and keep related documents and reminders together. Rooms are the organizing backbone for this home.
+                Map rooms and hallways, organize systems, and keep related documents and reminders together. Rooms are the organizing backbone for this home.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">
@@ -15527,7 +15550,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </span>
           </div>
           <p className="mt-3 text-xs leading-5 text-blue-800">
-            Home Map remains a rough, not-to-scale layout. It is not CAD, a measured floor plan, LiDAR, scanning, floor-plan generation, or 3D.
+            Home Map remains a rough, not-to-scale layout. Future floor-plan uploads and map objects like doors, windows, stairs, counters, and utility markers need separate design, storage, and permission review.
           </p>
         </div>
 

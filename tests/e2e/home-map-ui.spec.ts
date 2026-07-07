@@ -42,19 +42,23 @@ test.describe('Home Map v1 UI', () => {
     expect(mapSource).not.toContain('deleteDocument');
   });
 
-  test('keeps Home Map not-to-scale and excludes CAD, floor-plan, storage, key locations, and contractor access', () => {
+  test('keeps Home Map rough-only and excludes CAD, floor-plan, storage, key locations, and contractor access', () => {
     const app = appSource();
+    const formSource = sourceBetween(app, 'const renderHomeRoomLayoutForm =', 'const renderHomeMapSection =');
     const mapSource = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+    const unifiedSource = sourceBetween(app, 'const renderHomeMapSystemsSection =', 'const renderSharedHomeShellsPanel =');
     const contractorSource = sourceBetween(
       app,
       'function ContractorDashboard({ profile, onSignOut }',
       'function PlatformAdminDashboard({ onSignOut }',
     );
 
-    expect(mapSource).toContain('not-to-scale');
-    expect(mapSource).toContain('not a CAD, floor-plan, LiDAR, scanning, or 3D tool');
-    expect(mapSource).toContain('optional display-only measurements');
-    expect(mapSource).not.toContain('storage');
+    expect(mapSource).toContain('Dimensions are rough organizer data, not CAD or floor-plan measurements.');
+    expect(unifiedSource).toContain('Future floor-plan uploads and map objects like doors, windows, stairs, counters, and utility markers need separate design, storage, and permission review.');
+    expect(formSource).toContain('Longer spaces, such as hallways, create longer room boxes.');
+    expect(mapSource).not.toContain('supabase.storage');
+    expect(mapSource).not.toContain(".storage.from(");
+    expect(mapSource).not.toContain('storage_path');
     expect(mapSource).not.toContain('key_locations');
     expect(mapSource).not.toContain('access instructions');
     expect(contractorSource).not.toContain('home_room_layouts');
