@@ -56,7 +56,7 @@ test.describe('Home Map Builder dedicated view', () => {
     const app = appSource();
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
     const header = sourceBetween(builder, 'data-testid="home-map-builder-header"', 'data-testid="home-map-builder-shell"');
-    const toolbar = sourceBetween(builder, 'data-testid="home-map-builder-side-toolbar"', '<section className="relative flex min-h-0 flex-col');
+    const toolbar = sourceBetween(builder, 'data-testid="home-map-builder-side-toolbar"', '<section className="relative flex min-h-0 flex-1 flex-col');
 
     expect(header).toContain('Home Map Builder');
     expect(header).toContain('{label}');
@@ -80,6 +80,40 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(toolbar).toContain('Fit View');
     expect(toolbar).toContain('<span>Zoom In</span>');
     expect(toolbar).not.toContain('sr-only');
+  });
+
+  test('mobile builder uses full-width canvas with bottom toolbar and sheet surfaces', () => {
+    const app = appSource();
+    const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
+    const shell = sourceBetween(builder, 'data-testid="home-map-builder-shell"', 'data-testid="home-map-room-detail-drawer"');
+    const toolbar = sourceBetween(builder, 'data-testid="home-map-builder-mobile-toolbar"', 'data-testid="home-map-room-detail-drawer"');
+
+    expect(builder).toContain('flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-100 p-2 pb-20');
+    expect(builder).toContain('lg:grid lg:grid-cols-[144px_minmax(0,1fr)]');
+    expect(shell).toContain('data-testid="home-map-builder-side-toolbar"');
+    expect(shell).toContain('hidden min-h-0 flex-col');
+    expect(shell).toContain('lg:flex');
+    expect(shell).toContain('data-testid="home-map-builder-canvas"');
+    expect(shell).toContain('flex-1 flex-col');
+    expect(shell).toContain('fixed inset-x-0 bottom-0 z-40');
+    expect(shell).toContain('max-h-[78vh]');
+    expect(shell).toContain('lg:absolute lg:inset-auto');
+    expect(builder).toContain('fixed inset-x-0 bottom-0 z-50');
+    expect(builder).toContain('lg:hidden');
+    expect(toolbar).toContain('overflow-x-auto');
+    expect(toolbar).toContain('data-testid="home-map-mobile-add-room"');
+    expect(toolbar).toContain("createHomeMapRoomBox(homeId, 'room')");
+    expect(toolbar).toContain('data-testid="home-map-mobile-add-hallway"');
+    expect(toolbar).toContain("createHomeMapRoomBox(homeId, 'hallway')");
+    expect(toolbar).toContain('data-testid="home-map-mobile-save-now"');
+    expect(toolbar).toContain('data-testid="home-map-mobile-zoom-out"');
+    expect(toolbar).toContain('data-testid="home-map-mobile-fit-view"');
+    expect(toolbar).toContain('data-testid="home-map-mobile-zoom-in"');
+    expect(toolbar).toContain('data-testid="home-map-mobile-toggle-rooms"');
+    expect(toolbar).toContain('data-testid="home-map-mobile-done"');
+    expect(builder).toContain('items-end bg-slate-950/40 p-0 lg:items-stretch');
+    expect(builder).toContain('rounded-t-3xl');
+    expect(builder).toContain('lg:w-[440px]');
   });
 
   test('Add Room creates a room and matching layout with default rough square dimensions', () => {
@@ -144,6 +178,9 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(saveLayout).toContain('rawLayoutWidth = shouldApplyRoughDimensions ? roughLayoutSize.layoutWidth : fallbackLayoutWidth');
     expect(saveLayout).toContain('rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight');
     expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
+    expect(map).toContain('Grid: ~1 ft. Approximate.');
+    expect(map).toContain('sm:hidden');
+    expect(map).toContain('hidden sm:inline');
     expect(map).toContain('data-testid="home-map-grid-measurement-copy"');
     expect(map).toContain('const canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom');
     expect(map).toContain('const canvasCellWidth = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT');
@@ -296,9 +333,10 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-builder-workspace"');
     expect(builder).toContain('flex flex-col bg-slate-950');
     expect(builder).toContain('data-testid="home-map-builder-shell"');
-    expect(builder).toContain('grid-cols-[144px_minmax(0,1fr)]');
+    expect(builder).toContain('lg:grid-cols-[144px_minmax(0,1fr)]');
+    expect(builder).toContain('data-testid="home-map-builder-mobile-toolbar"');
     expect(builder).toContain('data-testid="home-map-builder-canvas"');
-    expect(builder).toContain('Canvas-first workspace');
+    expect(builder).toContain('Rough organizer');
     expect(builder).not.toContain('xl:grid-cols-[minmax(0,1fr)_390px]');
     expect(map).toContain('data-testid="home-map-canvas-scroll"');
     expect(map).toContain('h-[62vh] min-h-[420px] overflow-auto');

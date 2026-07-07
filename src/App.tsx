@@ -15587,7 +15587,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         )}
         {!builderMode && renderHomeRoomLayoutForm(homeId)}
         <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600" data-testid="home-map-grid-measurement-copy">
-          Each grid line represents roughly 1 ft. Measurements are approximate.
+          <span className="sm:hidden">Grid: ~1 ft. Approximate.</span>
+          <span className="hidden sm:inline">Each grid line represents roughly 1 ft. Measurements are approximate.</span>
         </p>
         {loadingHomeRoomLayouts && layouts.length === 0 ? (
           <p className="text-xs font-semibold text-blue-700">Refreshing Home Map...</p>
@@ -15944,8 +15945,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[144px_minmax(0,1fr)] gap-3 overflow-hidden bg-slate-100 p-3" data-testid="home-map-builder-shell">
-          <aside className="flex min-h-0 flex-col items-stretch gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-xl" data-testid="home-map-builder-side-toolbar">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-100 p-2 pb-20 lg:grid lg:grid-cols-[144px_minmax(0,1fr)] lg:gap-3 lg:p-3" data-testid="home-map-builder-shell">
+          <aside className="hidden min-h-0 flex-col items-stretch gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-xl lg:flex" data-testid="home-map-builder-side-toolbar">
             <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'room')} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-room" title="Add Room">
               <Plus size={16} />
               <span>Add Room</span>
@@ -15997,18 +15998,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </aside>
 
-          <section className="relative flex min-h-0 flex-col rounded-2xl border border-slate-300 bg-white p-3 shadow-xl" data-testid="home-map-builder-canvas">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <section className="relative flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-300 bg-white p-2 shadow-xl sm:p-3" data-testid="home-map-builder-canvas">
+            <div className="mb-2 flex flex-col gap-1 sm:mb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <div>
                 <p className="text-sm font-bold text-slate-950">Map canvas</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Rough organizer shapes, not CAD. Drag to move. Use the corner handle to resize.</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500 sm:mt-1">Drag to move. Use the corner handle to resize.</p>
               </div>
-              <span className="inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                Canvas-first workspace
+              <span className="hidden w-fit rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 sm:inline-flex">
+                Rough organizer
               </span>
             </div>
             {homeMapRoomsPanelOpen && (
-              <div className="absolute right-4 top-16 z-30 w-[min(340px,calc(100%-2rem))] space-y-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl" data-testid="home-map-builder-room-list-panel">
+              <div className="fixed inset-x-0 bottom-0 z-40 max-h-[78vh] space-y-3 overflow-auto rounded-t-3xl border border-slate-200 bg-white p-3 shadow-2xl lg:absolute lg:inset-auto lg:right-4 lg:top-16 lg:w-[min(340px,calc(100%-2rem))] lg:rounded-2xl lg:bg-white/95" data-testid="home-map-builder-room-list-panel">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-bold text-slate-950">Room lists</p>
@@ -16067,6 +16068,58 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               builderMode: true,
             })}
           </section>
+        </div>
+
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-300 bg-white/95 px-2 py-2 shadow-2xl lg:hidden" data-testid="home-map-builder-mobile-toolbar">
+          <div className="flex gap-2 overflow-x-auto pb-[env(safe-area-inset-bottom)]">
+            <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'room')} disabled={savingHomeRoomLayout} data-testid="home-map-mobile-add-room" title="Add Room">
+              <Plus size={15} />
+              <span>Add Room</span>
+            </button>
+            <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'hallway')} disabled={savingHomeRoomLayout} data-testid="home-map-mobile-add-hallway" title="Add Hallway">
+              <Plus size={15} />
+              <span>Add Hallway</span>
+            </button>
+            <button type="button" className={buttonClass('secondary')} onClick={() => void saveHomeMapLayout(homeId)} disabled={savingHomeRoomLayout || layouts.length === 0} data-testid="home-map-mobile-save-now" title="Save now">
+              <CheckCircle2 size={15} />
+              <span>{savingHomeRoomLayout ? 'Saving' : 'Save'}</span>
+            </button>
+            <button
+              type="button"
+              className={buttonClass('secondary')}
+              onClick={() => setHomeMapZoom(current => Math.max(HOME_MAP_ZOOM_MIN, Number((current - 0.1).toFixed(2))))}
+              data-testid="home-map-mobile-zoom-out"
+              title="Zoom out"
+            >
+              <span aria-hidden="true">-</span>
+              <span>Zoom Out</span>
+            </button>
+            <button
+              type="button"
+              className={buttonClass('secondary')}
+              onClick={() => setHomeMapZoom(0.85)}
+              data-testid="home-map-mobile-fit-view"
+              title="Fit view"
+            >
+              Fit View
+            </button>
+            <button
+              type="button"
+              className={buttonClass('secondary')}
+              onClick={() => setHomeMapZoom(current => Math.min(HOME_MAP_ZOOM_MAX, Number((current + 0.1).toFixed(2))))}
+              data-testid="home-map-mobile-zoom-in"
+              title="Zoom in"
+            >
+              <span aria-hidden="true">+</span>
+              <span>Zoom In</span>
+            </button>
+            <button type="button" className={buttonClass(homeMapRoomsPanelOpen ? 'primary' : 'secondary')} onClick={() => setHomeMapRoomsPanelOpen(current => !current)} data-testid="home-map-mobile-toggle-rooms" title="Room lists">
+              Rooms
+            </button>
+            <button type="button" className={buttonClass('secondary')} onClick={() => void closeHomeMapBuilder(homeId)} data-testid="home-map-mobile-done" title="Done">
+              Done
+            </button>
+          </div>
         </div>
 
         {homeMapDetailPanelOpen && selectedRoom && (
