@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-dedicated-view-v1`
+- Starting main SHA: `eb6e959669705a3601dfbae7fe8d11f3b3fe6f6a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `tests/e2e/home-map-ui.spec.ts`
+  - `tests/e2e/home-document-room-ui.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/home-room-detail-ui.spec.ts`
+  - `tests/e2e/home-rooms-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Replaced the embedded Properties Home Map & Systems surface with a clean Home Map entry card that opens a dedicated Home Map Builder. The builder provides Add Room and Add Hallway actions that create a visual map box immediately, lets existing unmapped rooms be added to the map without creating duplicate room records, keeps rough length x width dimensions driving box proportions, and uses a selected-room panel for room details, manager notes, linked assets/systems, linked documents, and linked reminders where already permitted.
+- Reason for change: The previous consolidated Properties experience still felt like a collection of Rooms, Home Map, and Assets sections. The dedicated builder makes the map the primary room-management surface while keeping room-linked records in one selected-room context.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-builder-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-builder-ui.spec.ts tests/e2e/home-map-systems-ux.spec.ts tests/e2e/home-map-ui.spec.ts tests/e2e/home-assets-ui.spec.ts tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Add Room/Add Hallway creates durable room and layout rows immediately through existing owner/admin browser paths; there is no draft-only map object concept in this slice.
+  - Future floor-plan upload/recreation, `home_map_objects`, door/window/stair/counter/island/cabinet/closet/appliance/utility markers, ceiling height, contractor map access, and shared document/asset expansion still require separate design and approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Home Map Builder as the primary room-management experience and keeps future floor-plan/map-object/storage/permission work separate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the dedicated builder as the homeowner room-management direction while preserving future boundaries for advanced map objects, storage, contractors, key locations, and sensitive access data.
+
 - Branch: `codex/home-map-room-unification-scale-v1`
 - Starting main SHA: `6ff63654307b9907e7c381b6355264301ae92c7a`
 - Files changed:

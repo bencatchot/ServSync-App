@@ -107,6 +107,7 @@ test.describe('homeowner room detail panel', () => {
       'src/App.tsx',
       'src/textCleanup.ts',
       'src/types.ts',
+      'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'servsync-home-map-layout-foundation.sql',
       'tests/e2e/home-assets-foundation.spec.ts',

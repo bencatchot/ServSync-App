@@ -46,7 +46,7 @@ test.describe('Home Map v1 UI', () => {
     const app = appSource();
     const formSource = sourceBetween(app, 'const renderHomeRoomLayoutForm =', 'const renderHomeMapSection =');
     const mapSource = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
-    const unifiedSource = sourceBetween(app, 'const renderHomeMapSystemsSection =', 'const renderSharedHomeShellsPanel =');
+    const builderSource = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
     const contractorSource = sourceBetween(
       app,
       'function ContractorDashboard({ profile, onSignOut }',
@@ -54,8 +54,9 @@ test.describe('Home Map v1 UI', () => {
     );
 
     expect(mapSource).toContain('Dimensions are rough organizer data, not CAD or floor-plan measurements.');
-    expect(unifiedSource).toContain('Future floor-plan uploads and map objects like doors, windows, stairs, counters, and utility markers need separate design, storage, and permission review.');
+    expect(builderSource).toContain('Rough organizer');
     expect(formSource).toContain('Longer spaces, such as hallways, create longer room boxes.');
+    expect(builderSource).toContain('Drag to move. Use the corner handle to resize.');
     expect(mapSource).not.toContain('supabase.storage');
     expect(mapSource).not.toContain(".storage.from(");
     expect(mapSource).not.toContain('storage_path');
