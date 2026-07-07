@@ -9785,6 +9785,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [loadingHomeRoomLayouts, setLoadingHomeRoomLayouts] = useState(false);
   const [homeRoomLayoutDraft, setHomeRoomLayoutDraft] = useState<HomeRoomLayoutDraft | null>(null);
   const [savingHomeRoomLayout, setSavingHomeRoomLayout] = useState(false);
+  const [homeMapBuilderHomeId, setHomeMapBuilderHomeId] = useState<string | null>(null);
   const [homeMapDrag, setHomeMapDrag] = useState<{ layoutId: string; mode: 'move' | 'resize'; startX: number; startY: number; originX: number; originY: number; originWidth: number; originHeight: number } | null>(null);
   const [homeAssetsByHomeId, setHomeAssetsByHomeId] = useState<Record<string, HomeAsset[]>>({});
   const [loadingHomeAssets, setLoadingHomeAssets] = useState(false);
@@ -10272,9 +10273,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   useEffect(() => {
     setSelectedHomeRoomDetailId(null);
     setHomeRoomLayoutDraft(null);
+    setHomeMapBuilderHomeId(null);
     setHomeAssetDraft(null);
     setHomeMapDrag(null);
   }, [selectedHomeId]);
+
+  useEffect(() => {
+    if (!homeMapBuilderHomeId || selectedHomeRoomDetailId) return;
+    const firstMappedRoomId = (homeRoomLayoutsByHomeId[homeMapBuilderHomeId] || [])[0]?.home_room_id;
+    if (firstMappedRoomId) setSelectedHomeRoomDetailId(firstMappedRoomId);
+  }, [homeMapBuilderHomeId, homeRoomLayoutsByHomeId, selectedHomeRoomDetailId]);
 
   const openHomeRoomForm = (homeId: string, room?: HomeRoom) => {
     setError('');
@@ -10387,6 +10395,112 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (updates.layout_width !== undefined) next.layout_width = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(1, updates.layout_width));
     if (updates.layout_height !== undefined) next.layout_height = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(1, updates.layout_height));
     updateHomeRoomLayoutLocal(layout.id, next);
+  };
+
+  const nextHomeMapPosition = (homeId: string, layoutWidth: number, layoutHeight: number) => {
+    const layouts = homeRoomLayoutsByHomeId[homeId] || [];
+    const index = layouts.length;
+    const layout_x = Math.min(HOME_MAP_GRID_COLUMNS - layoutWidth, Math.max(0, (index * 2) % HOME_MAP_GRID_COLUMNS));
+    const layout_y = Math.min(HOME_MAP_GRID_ROWS - layoutHeight, Math.max(0, Math.floor((index * 2) / HOME_MAP_GRID_COLUMNS) * 2));
+    return { layout_x, layout_y };
+  };
+
+  const addExistingRoomToHomeMap = async (homeId: string, room: HomeRoom) => {
+    if (!supabase) return;
+    const isHallway = /hallway/i.test([room.name, room.room_type].filter(Boolean).join(' '));
+    const measuredWidth = isHallway ? 4 : 10;
+    const measuredDepth = isHallway ? 16 : 10;
+    const roughSize = roughHomeMapGridSize(measuredWidth, measuredDepth, 'ft', 4, 3);
+    const position = nextHomeMapPosition(homeId, roughSize.layoutWidth, roughSize.layoutHeight);
+    setSavingHomeRoomLayout(true);
+    setError('');
+    setNotice('');
+    try {
+      const existingLayouts = homeRoomLayoutsByHomeId[homeId] || [];
+      const sortOrder = existingLayouts.reduce((max, layout) => Math.max(max, layout.sort_order || 0), 0) + 10;
+      const { error: insertError } = await supabase
+        .from('home_room_layouts')
+        .insert({
+          home_id: homeId,
+          home_room_id: room.id,
+          created_by: profile.id,
+          floor_label: room.floor_label || null,
+          layout_width: roughSize.layoutWidth,
+          layout_height: roughSize.layoutHeight,
+          measured_width: measuredWidth,
+          measured_depth: measuredDepth,
+          measurement_unit: 'ft',
+          sort_order: sortOrder,
+          ...position,
+        });
+      if (insertError) throw insertError;
+      setSelectedHomeRoomDetailId(room.id);
+      setNotice(`${room.name} added to the Home Map.`);
+      await loadHomeRoomLayouts();
+    } catch (err) {
+      setError(readableError(err, 'Unable to add this room to the Home Map.'));
+    } finally {
+      setSavingHomeRoomLayout(false);
+    }
+  };
+
+  const createHomeMapRoomBox = async (homeId: string, kind: 'room' | 'hallway') => {
+    if (!supabase) return;
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const existingLayouts = homeRoomLayoutsByHomeId[homeId] || [];
+    const isHallway = kind === 'hallway';
+    const measuredWidth = isHallway ? 4 : 10;
+    const measuredDepth = isHallway ? 16 : 10;
+    const roughSize = roughHomeMapGridSize(measuredWidth, measuredDepth, 'ft', 4, 3);
+    const position = nextHomeMapPosition(homeId, roughSize.layoutWidth, roughSize.layoutHeight);
+    const roomName = isHallway ? 'New hallway' : 'New room';
+    const roomType = isHallway ? 'Hallway' : null;
+    setSavingHomeRoomLayout(true);
+    setError('');
+    setNotice('');
+    try {
+      const roomSortOrder = rooms.reduce((max, room) => Math.max(max, room.sort_order || 0), 0) + 10;
+      const { data: createdRoom, error: roomError } = await supabase
+        .from('home_rooms')
+        .insert({
+          home_id: homeId,
+          created_by: profile.id,
+          name: roomName,
+          room_type: roomType,
+          floor_label: null,
+          area_label: null,
+          notes: null,
+          sort_order: roomSortOrder,
+        })
+        .select('id, home_id, name, room_type, floor_label, area_label, sort_order, notes, archived_at, created_by, created_at, updated_at')
+        .single();
+      if (roomError) throw roomError;
+      const typedRoom = createdRoom as HomeRoom;
+      const layoutSortOrder = existingLayouts.reduce((max, layout) => Math.max(max, layout.sort_order || 0), 0) + 10;
+      const { error: layoutError } = await supabase
+        .from('home_room_layouts')
+        .insert({
+          home_id: homeId,
+          home_room_id: typedRoom.id,
+          created_by: profile.id,
+          floor_label: null,
+          layout_width: roughSize.layoutWidth,
+          layout_height: roughSize.layoutHeight,
+          measured_width: measuredWidth,
+          measured_depth: measuredDepth,
+          measurement_unit: 'ft',
+          sort_order: layoutSortOrder,
+          ...position,
+        });
+      if (layoutError) throw layoutError;
+      setSelectedHomeRoomDetailId(typedRoom.id);
+      setNotice(isHallway ? 'Hallway added to the Home Map.' : 'Room added to the Home Map.');
+      await Promise.all([loadHomeRooms(), loadHomeRoomLayouts()]);
+    } catch (err) {
+      setError(readableError(err, 'Unable to add a room to the Home Map.'));
+    } finally {
+      setSavingHomeRoomLayout(false);
+    }
   };
 
   const openHomeRoomLayoutForm = (homeId: string, layout?: HomeRoomLayout) => {
@@ -13020,7 +13134,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
     {
       label: 'Start a Home Map',
-      helper: 'Arrange simple not-to-scale room boxes for this property.',
+      helper: 'Open the builder and arrange rough room and hallway boxes for this property.',
       complete: selectedHomeRoomLayouts.length > 0,
     },
   ];
@@ -14736,10 +14850,24 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <p className="mt-1 text-sm font-semibold text-blue-700">Rough dimensions: {dimensionLabel}</p>
             )}
           </div>
-          <button type="button" className={buttonClass('secondary')} onClick={() => setSelectedHomeRoomDetailId(null)}>
-            Close details
-          </button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {canManage && (
+              <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomForm(room.home_id, room)}>
+                <Pencil size={14} />
+                Edit details
+              </button>
+            )}
+            <button type="button" className={buttonClass('secondary')} onClick={() => setSelectedHomeRoomDetailId(null)}>
+              Close details
+            </button>
+          </div>
         </div>
+
+        {canManage && homeRoomDraft?.id === room.id && (
+          <div className="mt-3">
+            {renderHomeRoomForm(room.home_id)}
+          </div>
+        )}
 
         {showNotes && room.notes && (
           <div className="mt-3 rounded-xl border border-white bg-white/80 px-3 py-2">
@@ -14873,6 +15001,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {canManage && homeAssetDraft?.home_id === room.home_id && homeAssetDraft.home_room_id === room.id && (
+              <div className="mt-3">
+                {renderHomeAssetForm(room.home_id)}
               </div>
             )}
           </div>
@@ -15190,12 +15323,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     canManage,
     canShowPrivateCounts,
     compact = false,
+    builderMode = false,
   }: {
     homeId: string;
     label: string;
     canManage: boolean;
     canShowPrivateCounts: boolean;
     compact?: boolean;
+    builderMode?: boolean;
   }) => {
     const rooms = homeRoomsByHomeId[homeId] || [];
     const layouts = (homeRoomLayoutsByHomeId[homeId] || []).filter(layout => rooms.some(room => room.id === layout.home_room_id));
@@ -15222,6 +15357,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
     return (
       <div className={compact ? 'rounded-lg border border-indigo-100 bg-indigo-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-map-section' : 'home-map-section'}>
+        {!builderMode && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className={compact ? 'text-xs font-bold uppercase tracking-[0.14em] text-indigo-700' : 'text-sm font-bold text-slate-950'}>Home Map</p>
@@ -15248,7 +15384,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </span>
           )}
         </div>
-        {canAddMapBox && unmappedRooms.length > 0 && (
+        )}
+        {!builderMode && canAddMapBox && unmappedRooms.length > 0 && (
           <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
             {unmappedRooms.length} active room{unmappedRooms.length === 1 ? '' : 's'} can still be added to the map.
           </p>
@@ -15532,66 +15669,190 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     );
   };
 
-  const renderHomeMapSystemsSection = (homeId: string, label: string) => {
-    const rooms = homeRoomsByHomeId[homeId] || [];
-    const selectedRoom = rooms.find(room => room.id === selectedHomeRoomDetailId) ?? null;
+  const renderHomeMapEntryCard = (homeId: string, label: string) => {
+    const layouts = (homeRoomLayoutsByHomeId[homeId] || []).filter(layout => !layout.archived_at);
+    const hasMap = layouts.length > 0;
     return (
-      <div className="space-y-5" data-testid="home-map-systems-section">
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+      <Card title="Home Map" icon={<MapPin size={18} />}>
+        <div className="space-y-4" data-testid="home-map-entry-card">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-sm font-bold text-blue-950">Home Map &amp; Systems starts with rooms</p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                Map rooms and hallways, organize systems, and keep related documents and reminders together. Rooms are the organizing backbone for this home.
+              <p className="text-sm font-semibold text-slate-950">Build a simple map of your home, then attach rooms, systems, documents, and reminders.</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                Rooms and hallways are the map objects. Use the builder to add spaces, drag or resize boxes, and manage each room from one selected-room panel.
               </p>
             </div>
-            <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">
-              Simple organizer
-            </span>
+            <button type="button" className={buttonClass('primary')} onClick={() => setHomeMapBuilderHomeId(homeId)} data-testid="home-map-entry-open">
+              <MapPin size={16} />
+              {hasMap ? 'Open Home Map' : 'Build Home Map'}
+            </button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-blue-800">
-            Home Map remains a rough, not-to-scale layout. Future floor-plan uploads and map objects like doors, windows, stairs, counters, and utility markers need separate design, storage, and permission review.
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Rooms</p>
+              <p className="mt-1 text-xs leading-5 text-blue-900">Create and manage rooms directly on the map.</p>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Systems</p>
+              <p className="mt-1 text-xs leading-5 text-emerald-900">Keep assets and systems tied to the room they belong in.</p>
+            </div>
+            <div className="rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-700">Records</p>
+              <p className="mt-1 text-xs leading-5 text-violet-900">See room-linked documents and reminders where already permitted.</p>
+            </div>
+          </div>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+            This is a rough organizer, not CAD, a permit drawing, a floor-plan upload, LiDAR, scanning, AI floor-plan recreation, or 3D.
           </p>
         </div>
+      </Card>
+    );
+  };
 
-        <section aria-label="Map" data-testid="home-map-systems-map">
-          {renderHomeMapSection({
-            homeId,
-            label,
-            canManage: true,
-            canShowPrivateCounts: true,
-          })}
-        </section>
+  const renderHomeMapBuilderView = (homeId: string, label: string) => {
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const layouts = (homeRoomLayoutsByHomeId[homeId] || []).filter(layout => rooms.some(room => room.id === layout.home_room_id));
+    const mappedRoomIds = new Set(layouts.map(layout => layout.home_room_id));
+    const mappedRooms = rooms.filter(room => mappedRoomIds.has(room.id));
+    const unmappedRooms = rooms.filter(room => !mappedRoomIds.has(room.id));
+    const selectedRoom = rooms.find(room => room.id === selectedHomeRoomDetailId) ?? mappedRooms[0] ?? null;
 
-        {selectedRoom ? (
-          <section aria-label="Selected room detail" data-testid="home-map-systems-room-detail">
-            {renderHomeRoomDetailPanel(selectedRoom, true, true)}
-          </section>
-        ) : (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
-            Select a room on the map or in the room list to manage details, assets, documents, reminders, and notes.
-          </p>
-        )}
+    return (
+      <div className="space-y-4" data-testid="home-map-builder-view">
+        <Card title="Home Map Builder" icon={<MapPin size={18} />}>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-950">{label}</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                  The map is how you create and manage rooms. Rooms and hallways organize systems, documents, reminders, and notes.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass('secondary')} onClick={() => setHomeMapBuilderHomeId(null)}>
+                  Done
+                </button>
+                <button type="button" className={buttonClass('secondary')} onClick={() => void saveHomeMapLayout(homeId)} disabled={savingHomeRoomLayout || layouts.length === 0}>
+                  <CheckCircle2 size={16} />
+                  {savingHomeRoomLayout ? 'Saving...' : 'Save map'}
+                </button>
+              </div>
+            </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4" aria-label="Rooms list" data-testid="home-map-systems-rooms-list">
-            {renderHomeRoomsSection({
-              homeId,
-              label,
-              canManage: true,
-              showNotes: true,
-              showDetailPanel: false,
-            })}
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4" aria-label="All systems and assets" data-testid="home-map-systems-assets-list">
-            {renderHomeAssetsSection({
-              homeId,
-              label,
-              canManage: true,
-              showNotes: true,
-            })}
-          </section>
-        </div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3" data-testid="home-map-builder-toolbar">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Builder actions</p>
+                  <p className="mt-1 text-xs leading-5 text-blue-900">Add a room or hallway and it appears on the map immediately.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'room')} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-room">
+                    <Plus size={16} />
+                    Add Room
+                  </button>
+                  <button type="button" className={buttonClass('primary')} onClick={() => void createHomeMapRoomBox(homeId, 'hallway')} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-hallway">
+                    <Plus size={16} />
+                    Add Hallway
+                  </button>
+                  {unmappedRooms.length > 0 && (
+                    <button type="button" className={buttonClass('secondary')} onClick={() => void addExistingRoomToHomeMap(homeId, unmappedRooms[0])} disabled={savingHomeRoomLayout} data-testid="home-map-builder-add-existing">
+                      <Plus size={16} />
+                      Add existing room
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3" data-testid="home-map-builder-canvas">
+                  <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">Map canvas</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">Drag to move. Use the corner handle to resize.</p>
+                    </div>
+                    <span className="inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                      Rough organizer
+                    </span>
+                  </div>
+                  {renderHomeMapSection({
+                    homeId,
+                    label,
+                    canManage: true,
+                    canShowPrivateCounts: true,
+                    builderMode: true,
+                  })}
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3" data-testid="home-map-builder-mapped-rooms">
+                    <p className="text-sm font-bold text-slate-950">Rooms on this map</p>
+                    <div className="mt-3 space-y-2">
+                      {mappedRooms.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-3 text-xs leading-5 text-slate-500">No rooms are on the map yet.</p>
+                      ) : mappedRooms.map(room => (
+                        <button
+                          key={room.id}
+                          type="button"
+                          className={`w-full rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${selectedHomeRoomDetailId === room.id ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-800 hover:border-blue-200'}`}
+                          onClick={() => setSelectedHomeRoomDetailId(room.id)}
+                        >
+                          {room.name}
+                          {room.room_type ? <span className="ml-2 text-xs font-medium text-slate-500">{room.room_type}</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3" data-testid="home-map-builder-unmapped-rooms">
+                    <p className="text-sm font-bold text-slate-950">Rooms not on map</p>
+                    <div className="mt-3 space-y-2">
+                      {unmappedRooms.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-3 text-xs leading-5 text-slate-500">Every active room is on the map.</p>
+                      ) : unmappedRooms.map(room => (
+                        <button
+                          key={room.id}
+                          type="button"
+                          className={buttonClass('secondary')}
+                          onClick={() => void addExistingRoomToHomeMap(homeId, room)}
+                          disabled={savingHomeRoomLayout}
+                        >
+                          <Plus size={14} />
+                          Add {room.name} to map
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:sticky lg:top-4 lg:self-start" data-testid="home-map-builder-selected-panel">
+                {selectedRoom ? (
+                  renderHomeRoomDetailPanel(selectedRoom, true, true)
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4">
+                    <p className="text-sm font-semibold text-slate-800">Select a room</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">Add a room or hallway to start managing details, systems, documents, reminders, and notes.</p>
+                  </div>
+                )}
+              </aside>
+            </div>
+
+            <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3" data-testid="home-map-builder-all-assets">
+              <summary className="cursor-pointer text-sm font-bold text-slate-950">All systems/assets</summary>
+              <div className="mt-3">
+                {renderHomeAssetsSection({
+                  homeId,
+                  label,
+                  canManage: true,
+                  showNotes: true,
+                })}
+              </div>
+            </details>
+          </div>
+        </Card>
       </div>
     );
   };
@@ -16786,7 +17047,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
       )}
 
-      {homeownerTab === 'home' && (
+      {homeownerTab === 'home' && selectedHome?.id && homeMapBuilderHomeId === selectedHome.id ? (
+        <div className="min-w-0 max-w-full">
+          {renderHomeMapBuilderView(selectedHome.id, homeProfileDisplayLabel(selectedHome))}
+        </div>
+      ) : homeownerTab === 'home' && (
         <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="min-w-0 max-w-full space-y-4 lg:col-span-2">
           <Card title="Home / Properties" icon={<Home size={18} />}>
@@ -16846,7 +17111,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   Start with the basics: property details, rooms, assets, photos, documents, reminders, and notes.
                 </p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Home Map &amp; Systems is available now as one room-centered place to map rooms, organize systems, and keep related documents and reminders together. Key Home Locations and true Home Setup Templates remain future tools.
+                  Home Map Builder is available now as one room-centered place to map rooms and hallways, organize systems, and keep related documents and reminders together. Key Home Locations and true Home Setup Templates remain future tools.
                 </p>
               </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -16866,9 +17131,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-sm font-bold text-blue-950">Home Map &amp; Systems</p>
+                  <p className="text-sm font-bold text-blue-950">Home Map Builder</p>
                   <p className="mt-1 text-xs leading-5 text-blue-800">
-                    Home Map &amp; Systems uses simple not-to-scale room boxes and room-linked assets, documents, and reminders. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
+                    The builder uses simple not-to-scale room and hallway boxes plus room-linked assets, documents, and reminders. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
                   </p>
                 </div>
                 <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
@@ -16881,11 +17146,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </Card>
           {selectedHome?.id ? (
-            <Card title="Home Map & Systems" icon={<MapPin size={18} />}>
-              {renderHomeMapSystemsSection(selectedHome.id, homeProfileDisplayLabel(selectedHome))}
-            </Card>
+            renderHomeMapEntryCard(selectedHome.id, homeProfileDisplayLabel(selectedHome))
           ) : (
-            <Card title="Home Map & Systems" icon={<MapPin size={18} />}>
+            <Card title="Home Map" icon={<MapPin size={18} />}>
               <p className="text-sm text-slate-500">Save a property before mapping rooms or adding assets and systems.</p>
             </Card>
           )}

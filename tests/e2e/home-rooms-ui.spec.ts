@@ -110,9 +110,9 @@ test.describe('homeowner rooms UI', () => {
     expect(homeSetupDataSource).toContain('selectedHomeRooms.length > 0');
     expect(homeSetupDataSource).toContain('Add assets & systems');
     expect(homeSetupDataSource).toContain('Start a Home Map');
-    expect(homeSetupUiSource).toContain('Home Map &amp; Systems is available now as one room-centered place to map rooms, organize systems, and keep related documents and reminders together.');
+    expect(homeSetupUiSource).toContain('Home Map Builder is available now as one room-centered place to map rooms and hallways, organize systems, and keep related documents and reminders together.');
     expect(homeSetupUiSource).toContain('Key Home Locations and true Home Setup Templates remain future tools.');
-    expect(homeSetupUiSource).toContain('Home Map &amp; Systems uses simple not-to-scale room boxes and room-linked assets, documents, and reminders.');
+    expect(homeSetupUiSource).toContain('The builder uses simple not-to-scale room and hallway boxes plus room-linked assets, documents, and reminders.');
     expect(homeSetupUiSource).toContain('It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
     expect(homeSetupUiSource).toContain('Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.');
   });
@@ -128,6 +128,7 @@ test.describe('homeowner rooms UI', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/textCleanup.ts',
+      'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'src/types.ts',
       'servsync-home-map-layout-foundation.sql',
