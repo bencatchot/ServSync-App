@@ -85,6 +85,7 @@ test.describe('Home Map Builder dedicated view', () => {
   test('Add Room creates a room and matching layout with default rough square dimensions', () => {
     const app = appSource();
     const createFlow = sourceBetween(app, "const createHomeMapRoomBox = async (homeId: string, kind: 'room' | 'hallway') => {", 'const openHomeRoomLayoutForm =');
+    const sizingHelper = sourceBetween(app, 'const roughHomeMapGridSize =', 'const loadHomeRooms =');
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
     expect(builder).toContain('data-testid="home-map-builder-add-room"');
@@ -97,6 +98,8 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(createFlow).toContain(".from('home_rooms')");
     expect(createFlow).toContain(".from('home_room_layouts')");
     expect(createFlow).toContain('roughHomeMapGridSize(measuredWidth, measuredDepth, \'ft\', 4, 3)');
+    expect(sizingHelper).toContain('measurementWidthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(sizingHelper).toContain('measurementDepthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
     expect(createFlow).toContain('setSelectedHomeRoomDetailId(typedRoom.id)');
   });
 
@@ -111,10 +114,46 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(createFlow).toContain('const flushed = await flushHomeMapPendingSaves(homeId)');
     expect(createFlow).toContain("const measuredWidth = isHallway ? 4 : 10");
     expect(createFlow).toContain("const measuredDepth = isHallway ? 16 : 10");
+    expect(createFlow).toContain('roughHomeMapGridSize(measuredWidth, measuredDepth, \'ft\', 4, 3)');
     expect(createFlow).toContain("room_type: roomType");
     expect(createFlow).toContain("measurement_unit: 'ft'");
     expect(app).not.toContain('home_hallways');
     expect(app).not.toContain('hallway_layouts');
+  });
+
+  test('builder grid is measurement-aware and snaps rooms to rough one-foot increments', () => {
+    const app = appSource();
+    const constants = sourceBetween(app, 'const HOME_MAP_FEET_PER_GRID_UNIT =', 'const HOME_ASSET_CATEGORIES =');
+    const sizingHelper = sourceBetween(app, 'const roughHomeMapGridSize =', 'const loadHomeRooms =');
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+    const saveLayout = sourceBetween(app, 'const saveHomeRoomLayoutDraft = async () => {', 'const saveHomeMapLayout = async');
+
+    expect(constants).toContain('const HOME_MAP_FEET_PER_GRID_UNIT = 1');
+    expect(constants).toContain('const HOME_MAP_PIXELS_PER_FOOT = 28');
+    expect(constants).toContain('const HOME_MAP_MAJOR_GRID_EVERY_FEET = 5');
+    expect(constants).toContain('const HOME_MAP_GRID_COLUMNS = 60');
+    expect(constants).toContain('const HOME_MAP_GRID_ROWS = 40');
+    expect(constants).toContain('HOME_MAP_WORKSPACE_WIDTH = HOME_MAP_GRID_COLUMNS * HOME_MAP_PIXELS_PER_FOOT');
+    expect(constants).toContain('HOME_MAP_WORKSPACE_HEIGHT = HOME_MAP_GRID_ROWS * HOME_MAP_PIXELS_PER_FOOT');
+    expect(sizingHelper).toContain('measurementWidthFeet = unit === \'m\' ? measuredWidth * 3.28084 : measuredWidth');
+    expect(sizingHelper).toContain('measurementDepthFeet = unit === \'m\' ? measuredDepth * 3.28084 : measuredDepth');
+    expect(sizingHelper).toContain('Math.round(span)');
+    expect(sizingHelper).toContain('measurementWidthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(sizingHelper).toContain('measurementDepthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(saveLayout).toContain('const shouldApplyRoughDimensions = !homeRoomLayoutDraft.id || dimensionsChanged');
+    expect(saveLayout).toContain('rawLayoutWidth = shouldApplyRoughDimensions ? roughLayoutSize.layoutWidth : fallbackLayoutWidth');
+    expect(saveLayout).toContain('rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight');
+    expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
+    expect(map).toContain('data-testid="home-map-grid-measurement-copy"');
+    expect(map).toContain('canvasCellWidth = canvasWidth / HOME_MAP_GRID_COLUMNS');
+    expect(map).toContain('canvasCellHeight = canvasHeight / HOME_MAP_GRID_ROWS');
+    expect(map).toContain('Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth)');
+    expect(map).toContain('Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight)');
+    expect(map).toContain('HOME_MAP_MAJOR_GRID_EVERY_FEET');
+    expect(map).toContain('layout.layout_x * canvasCellWidth');
+    expect(map).toContain('layout.layout_y * canvasCellHeight');
+    expect(map).toContain('layout.layout_width * canvasCellWidth');
+    expect(map).toContain('layout.layout_height * canvasCellHeight');
   });
 
   test('unmapped rooms can be added without creating duplicate rooms', () => {
@@ -232,10 +271,13 @@ test.describe('Home Map Builder dedicated view', () => {
 
   test('builder canvas is scrollable and zoomable without adding a map dependency', () => {
     const app = appSource();
-    const constants = sourceBetween(app, 'const HOME_MAP_GRID_COLUMNS =', 'const HOME_ASSET_CATEGORIES =');
+    const constants = sourceBetween(app, 'const HOME_MAP_FEET_PER_GRID_UNIT =', 'const HOME_ASSET_CATEGORIES =');
     const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');
 
+    expect(constants).toContain('HOME_MAP_FEET_PER_GRID_UNIT');
+    expect(constants).toContain('HOME_MAP_PIXELS_PER_FOOT');
+    expect(constants).toContain('HOME_MAP_MAJOR_GRID_EVERY_FEET');
     expect(constants).toContain('HOME_MAP_WORKSPACE_WIDTH');
     expect(constants).toContain('HOME_MAP_WORKSPACE_HEIGHT');
     expect(constants).toContain('HOME_MAP_ZOOM_MIN');
