@@ -57,7 +57,7 @@ test.describe('homeowner rooms UI', () => {
     expect(roomDataSource).toContain('room_type: cleanRoomOptionalText');
     expect(roomDataSource).toContain('floor_label: cleanRoomOptionalText');
     expect(roomDataSource).toContain('area_label: cleanRoomOptionalText');
-    expect(roomDataSource).toContain('notes: cleanRoomOptionalText');
+    expect(roomDataSource).toContain('notes: cleanRoomNoteText');
     expect(roomDataSource).toContain('archived_at: new Date().toISOString()');
     expect(roomDataSource).toContain('Room name is required.');
     expect(roomDataSource).not.toContain('.delete()');
@@ -110,9 +110,9 @@ test.describe('homeowner rooms UI', () => {
     expect(homeSetupDataSource).toContain('selectedHomeRooms.length > 0');
     expect(homeSetupDataSource).toContain('Add assets & systems');
     expect(homeSetupDataSource).toContain('Start a Home Map');
-    expect(homeSetupUiSource).toContain('Rooms, Assets &amp; Systems, and a simple Home Map preview are available now for basic home organization.');
+    expect(homeSetupUiSource).toContain('Home Map &amp; Systems is available now as one room-centered place to map rooms, organize systems, and keep related documents and reminders together.');
     expect(homeSetupUiSource).toContain('Key Home Locations and true Home Setup Templates remain future tools.');
-    expect(homeSetupUiSource).toContain('Home Map starts as simple not-to-scale room boxes with optional display-only measurements.');
+    expect(homeSetupUiSource).toContain('Home Map &amp; Systems uses simple not-to-scale room boxes and room-linked assets, documents, and reminders.');
     expect(homeSetupUiSource).toContain('It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.');
     expect(homeSetupUiSource).toContain('Home-specific Inspection Checklists are for inspections and reports. They are separate from future Home Setup Templates.');
   });
@@ -127,6 +127,8 @@ test.describe('homeowner rooms UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/textCleanup.ts',
+      'tests/e2e/home-map-systems-ux.spec.ts',
       'src/types.ts',
       'servsync-home-map-layout-foundation.sql',
       'tests/e2e/home-assets-foundation.spec.ts',

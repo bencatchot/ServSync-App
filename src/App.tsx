@@ -29,9 +29,11 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Maximize2,
   Menu,
   MessageSquare,
   Mic,
+  Move,
   Paperclip,
   Plus,
   Receipt,
@@ -81,7 +83,7 @@ import {
   suggestedChecklistItemFromNote,
   uniqueWalkthroughChecklistItemLabel,
 } from './walkthroughNotesParser';
-import { cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
+import { cleanHumanLabelText, cleanHumanTextInputOnBlur, cleanHumanTextInputOnKeyUp, cleanHumanWrittenText } from './textCleanup';
 import {
   findEstimateDraftLibraryBundle,
   estimateDraftLibraryTradeFromText,
@@ -10054,6 +10056,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedHomeAssets = selectedHome?.id ? (homeAssetsByHomeId[selectedHome.id] || []) : [];
 
   const cleanRoomOptionalText = (value: string) => {
+    const trimmed = cleanHumanLabelText(value).trim();
+    return trimmed || null;
+  };
+
+  const cleanRoomNoteText = (value: string) => {
     const trimmed = cleanHumanWrittenText(value).trim();
     return trimmed || null;
   };
@@ -10100,6 +10107,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   });
 
   const cleanHomeMapOptionalText = (value: string) => {
+    const trimmed = cleanHumanLabelText(value).trim();
+    return trimmed || null;
+  };
+
+  const cleanHomeMapNoteText = (value: string) => {
     const trimmed = cleanHumanWrittenText(value).trim();
     return trimmed || null;
   };
@@ -10113,6 +10125,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const parseOptionalMeasurement = (value: string) => {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const roughHomeMapGridSpan = (measurement: number | null, unit: 'ft' | 'm', fallback: number, max: number) => {
+    if (!measurement) return fallback;
+    const roughDivisor = unit === 'm' ? 1.2 : 4;
+    return Math.min(max, Math.max(2, Math.round(measurement / roughDivisor)));
   };
 
   const loadHomeRooms = useCallback(async () => {
@@ -10268,7 +10286,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const saveHomeRoom = async () => {
     if (!supabase || !homeRoomDraft) return;
-    const name = cleanHumanWrittenText(homeRoomDraft.name).trim();
+    const name = cleanHumanLabelText(homeRoomDraft.name).trim();
     if (!name) {
       setError('Room name is required.');
       return;
@@ -10286,7 +10304,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             room_type: cleanRoomOptionalText(homeRoomDraft.room_type),
             floor_label: cleanRoomOptionalText(homeRoomDraft.floor_label),
             area_label: cleanRoomOptionalText(homeRoomDraft.area_label),
-            notes: cleanRoomOptionalText(homeRoomDraft.notes),
+            notes: cleanRoomNoteText(homeRoomDraft.notes),
           })
           .eq('id', homeRoomDraft.id);
         if (updateError) throw updateError;
@@ -10303,7 +10321,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             room_type: cleanRoomOptionalText(homeRoomDraft.room_type),
             floor_label: cleanRoomOptionalText(homeRoomDraft.floor_label),
             area_label: cleanRoomOptionalText(homeRoomDraft.area_label),
-            notes: cleanRoomOptionalText(homeRoomDraft.notes),
+            notes: cleanRoomNoteText(homeRoomDraft.notes),
             sort_order: sortOrder,
           });
         if (insertError) throw insertError;
@@ -10350,6 +10368,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     });
   };
 
+  const nudgeHomeRoomLayout = (layout: HomeRoomLayout, updates: Partial<Pick<HomeRoomLayout, 'layout_x' | 'layout_y' | 'layout_width' | 'layout_height'>>) => {
+    const next: Partial<HomeRoomLayout> = {};
+    if (updates.layout_x !== undefined) next.layout_x = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_width, Math.max(0, updates.layout_x));
+    if (updates.layout_y !== undefined) next.layout_y = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, updates.layout_y));
+    if (updates.layout_width !== undefined) next.layout_width = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(1, updates.layout_width));
+    if (updates.layout_height !== undefined) next.layout_height = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(1, updates.layout_height));
+    updateHomeRoomLayoutLocal(layout.id, next);
+  };
+
   const openHomeRoomLayoutForm = (homeId: string, layout?: HomeRoomLayout) => {
     const rooms = homeRoomsByHomeId[homeId] || [];
     setError('');
@@ -10383,7 +10410,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       let roomId = homeRoomLayoutDraft.home_room_id;
       const rooms = homeRoomsByHomeId[homeRoomLayoutDraft.home_id] || [];
       if (!homeRoomLayoutDraft.id && homeRoomLayoutDraft.create_new_room) {
-        const roomName = cleanHumanWrittenText(homeRoomLayoutDraft.new_room_name).trim();
+        const roomName = cleanHumanLabelText(homeRoomLayoutDraft.new_room_name).trim();
         if (!roomName) throw new Error('Room name is required before adding it to the Home Map.');
         const sortOrder = rooms.reduce((max, room) => Math.max(max, room.sort_order || 0), 0) + 10;
         const { data: createdRoom, error: roomError } = await supabase
@@ -10406,14 +10433,28 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
       if (!roomId) throw new Error('Choose a room before saving this Home Map box.');
       const existingLayouts = homeRoomLayoutsByHomeId[homeRoomLayoutDraft.home_id] || [];
+      const measuredWidth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_width);
+      const measuredDepth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_depth);
+      const roughLayoutWidth = roughHomeMapGridSpan(
+        measuredWidth,
+        homeRoomLayoutDraft.measurement_unit,
+        parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS),
+        HOME_MAP_GRID_COLUMNS,
+      );
+      const roughLayoutHeight = roughHomeMapGridSpan(
+        measuredDepth,
+        homeRoomLayoutDraft.measurement_unit,
+        parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS),
+        HOME_MAP_GRID_ROWS,
+      );
       const layoutPayload = {
         floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
         layout_x: parseHomeMapNumber(homeRoomLayoutDraft.layout_x, 0, 0, HOME_MAP_GRID_COLUMNS - 1),
         layout_y: parseHomeMapNumber(homeRoomLayoutDraft.layout_y, 0, 0, HOME_MAP_GRID_ROWS - 1),
-        layout_width: parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS),
-        layout_height: parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS),
-        measured_width: parseOptionalMeasurement(homeRoomLayoutDraft.measured_width),
-        measured_depth: parseOptionalMeasurement(homeRoomLayoutDraft.measured_depth),
+        layout_width: homeRoomLayoutDraft.id ? parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS) : roughLayoutWidth,
+        layout_height: homeRoomLayoutDraft.id ? parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS) : roughLayoutHeight,
+        measured_width: measuredWidth,
+        measured_depth: measuredDepth,
         measurement_unit: homeRoomLayoutDraft.measured_width || homeRoomLayoutDraft.measured_depth ? homeRoomLayoutDraft.measurement_unit : null,
       };
 
@@ -10479,7 +10520,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     }
   };
 
-  const openHomeAssetForm = (homeId: string, asset?: HomeAsset) => {
+  const openHomeAssetForm = (homeId: string, asset?: HomeAsset, roomId = '') => {
     setError('');
     setNotice('');
     setHomeAssetDraft(asset
@@ -10496,13 +10537,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           warranty_expires_on: asset.warranty_expires_on || '',
           notes: asset.notes || '',
         }
-      : emptyHomeAssetDraft(homeId));
+      : { ...emptyHomeAssetDraft(homeId), home_room_id: roomId });
   };
 
   const saveHomeAsset = async () => {
     if (!supabase || !homeAssetDraft) return;
-    const name = cleanHumanWrittenText(homeAssetDraft.name).trim();
-    const assetCategory = cleanHumanWrittenText(homeAssetDraft.asset_category).trim();
+    const name = cleanHumanLabelText(homeAssetDraft.name).trim();
+    const assetCategory = cleanHumanLabelText(homeAssetDraft.asset_category).trim();
     if (!name) {
       setError('Asset name is required.');
       return;
@@ -10525,7 +10566,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         model: cleanHomeMapOptionalText(homeAssetDraft.model),
         install_date: homeAssetDraft.install_date || null,
         warranty_expires_on: homeAssetDraft.warranty_expires_on || null,
-        notes: cleanHomeMapOptionalText(homeAssetDraft.notes),
+        notes: cleanHomeMapNoteText(homeAssetDraft.notes),
       };
 
       if (homeAssetDraft.id) {
@@ -11219,7 +11260,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const saveHomeReminder = async () => {
     if (!supabase) return;
-    const title = cleanHumanWrittenText(homeReminderDraft.title);
+    const title = cleanHumanLabelText(homeReminderDraft.title);
     const notes = cleanHumanWrittenText(homeReminderDraft.notes);
     if (!title) {
       setError('Add a reminder title before saving.');
@@ -14635,8 +14676,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     };
     return typeLabels[documentType] ?? documentType;
   };
-  const renderHomeRoomDetailPanel = (room: HomeRoom, showNotes: boolean) => {
+  const renderHomeRoomDetailPanel = (room: HomeRoom, showNotes: boolean, canManage = false) => {
     const details = roomDetailParts(room);
+    const selectedLayout = (homeRoomLayoutsByHomeId[room.home_id] || []).find(layout => layout.home_room_id === room.id) ?? null;
+    const dimensionLabel = selectedLayout?.measured_width && selectedLayout.measured_depth
+      ? `${selectedLayout.measured_width} x ${selectedLayout.measured_depth} ${selectedLayout.measurement_unit || 'ft'}`
+      : '';
     const linkedReminders = homeReminders
       .filter(reminder => reminder.home_id === room.home_id && reminder.home_room_id === room.id)
       .slice()
@@ -14664,6 +14709,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             ) : (
               <p className="mt-1 text-sm leading-6 text-slate-500">Room basics only.</p>
             )}
+            {dimensionLabel && (
+              <p className="mt-1 text-sm font-semibold text-blue-700">Rough dimensions: {dimensionLabel}</p>
+            )}
           </div>
           <button type="button" className={buttonClass('secondary')} onClick={() => setSelectedHomeRoomDetailId(null)}>
             Close details
@@ -14674,6 +14722,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="mt-3 rounded-xl border border-white bg-white/80 px-3 py-2">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Manager notes</p>
             <p className="mt-1 text-sm leading-6 text-slate-700">{room.notes}</p>
+          </div>
+        )}
+
+        {canManage && selectedLayout && (
+          <div className="mt-3 rounded-xl border border-blue-100 bg-white px-3 py-3" data-testid="home-map-room-controls">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Map controls</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Drag the room box on the map, use the corner handle to resize, or make small adjustments here.</p>
+              </div>
+              <button type="button" className={buttonClass('secondary')} onClick={() => openHomeRoomLayoutForm(room.home_id, selectedLayout)}>
+                <Pencil size={14} />
+                Edit dimensions
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: selectedLayout.layout_y - 1 })}>Move up</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: selectedLayout.layout_y + 1 })}>Move down</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: selectedLayout.layout_x - 1 })}>Move left</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: selectedLayout.layout_x + 1 })}>Move right</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: selectedLayout.layout_width + 1 })}>Wider</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: selectedLayout.layout_width - 1 })}>Narrower</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: selectedLayout.layout_height + 1 })}>Deeper</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: selectedLayout.layout_height - 1 })}>Shallower</button>
+            </div>
           </div>
         )}
 
@@ -14742,9 +14815,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-bold text-slate-950">Linked assets</p>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                {linkedAssets.length} asset{linkedAssets.length === 1 ? '' : 's'}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  {linkedAssets.length} asset{linkedAssets.length === 1 ? '' : 's'}
+                </span>
+                {canManage && (
+                  <button type="button" className={buttonClass('secondary')} onClick={() => openHomeAssetForm(room.home_id, undefined, room.id)} disabled={Boolean(homeAssetDraft)}>
+                    <Plus size={14} />
+                    Add asset
+                  </button>
+                )}
+              </div>
             </div>
             {linkedAssets.length === 0 ? (
               <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
@@ -14913,15 +14994,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     canManage,
     showNotes,
     compact = false,
+    showDetailPanel = true,
   }: {
     homeId: string;
     label: string;
     canManage: boolean;
     showNotes: boolean;
     compact?: boolean;
+    showDetailPanel?: boolean;
   }) => {
     const rooms = homeRoomsByHomeId[homeId] || [];
-    const detailRoom = !compact && canManage
+    const detailRoom = showDetailPanel && !compact && canManage
       ? rooms.find(room => room.id === selectedHomeRoomDetailId) ?? null
       : null;
     return (
@@ -14952,7 +15035,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         ) : (
           renderHomeRoomsList(rooms, canManage, showNotes, Boolean(!compact && canManage))
         )}
-        {detailRoom && renderHomeRoomDetailPanel(detailRoom, showNotes)}
+        {detailRoom && renderHomeRoomDetailPanel(detailRoom, showNotes, canManage)}
       </div>
     );
   };
@@ -15046,30 +15129,27 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               placeholder="Main, upstairs, basement..."
             />
           </Field>
-          <Field label="X">
-            <input className={inputClass()} type="number" min="0" max={HOME_MAP_GRID_COLUMNS - 1} value={homeRoomLayoutDraft.layout_x} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_x: event.target.value } : current)} />
-          </Field>
-          <Field label="Y">
-            <input className={inputClass()} type="number" min="0" max={HOME_MAP_GRID_ROWS - 1} value={homeRoomLayoutDraft.layout_y} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_y: event.target.value } : current)} />
-          </Field>
-          <Field label="Width">
-            <input className={inputClass()} type="number" min="1" max={HOME_MAP_GRID_COLUMNS} value={homeRoomLayoutDraft.layout_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_width: event.target.value } : current)} />
-          </Field>
-          <Field label="Depth">
-            <input className={inputClass()} type="number" min="1" max={HOME_MAP_GRID_ROWS} value={homeRoomLayoutDraft.layout_height} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, layout_height: event.target.value } : current)} />
-          </Field>
-          <Field label="Approx. measured width">
-            <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_width: event.target.value } : current)} placeholder="Optional" />
-          </Field>
-          <Field label="Approx. measured depth">
-            <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_depth} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_depth: event.target.value } : current)} placeholder="Optional" />
-          </Field>
-          <Field label="Unit">
-            <select className={inputClass()} value={homeRoomLayoutDraft.measurement_unit} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measurement_unit: event.target.value as 'ft' | 'm' } : current)}>
-              <option value="ft">Feet</option>
-              <option value="m">Meters</option>
-            </select>
-          </Field>
+          <div className="rounded-xl border border-blue-100 bg-white p-3 md:col-span-2" data-testid="home-map-room-dimensions">
+            <p className="text-sm font-bold text-slate-950">Room dimensions</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Enter rough dimensions like 10 x 14. The map box is an organizer only and can be moved or resized after it is added.
+            </p>
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_1fr_120px] md:items-end">
+              <Field label="Length">
+                <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_width: event.target.value } : current)} placeholder="10" />
+              </Field>
+              <span className="hidden pb-3 text-sm font-bold text-slate-500 md:block">x</span>
+              <Field label="Width">
+                <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_depth} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_depth: event.target.value } : current)} placeholder="14" />
+              </Field>
+              <Field label="Unit">
+                <select className={inputClass()} value={homeRoomLayoutDraft.measurement_unit} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measurement_unit: event.target.value as 'ft' | 'm' } : current)}>
+                  <option value="ft">Feet</option>
+                  <option value="m">Meters</option>
+                </select>
+              </Field>
+            </div>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className={buttonClass('primary')} onClick={() => void saveHomeRoomLayoutDraft()} disabled={savingHomeRoomLayout}>
@@ -15175,12 +15255,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               const measurements = layout.measured_width && layout.measured_depth
                 ? `${layout.measured_width} x ${layout.measured_depth} ${layout.measurement_unit || 'ft'}`
                 : '';
+              const isSelected = selectedHomeRoomDetailId === room.id;
               return (
                 <button
                   key={layout.id}
                   type="button"
                   data-testid="home-map-room-box"
-                  className="absolute z-10 flex flex-col items-start justify-between rounded-xl border border-blue-200 bg-white/95 p-2 text-left shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className={`absolute z-10 flex cursor-grab flex-col items-start justify-between rounded-xl border bg-white/95 p-2 text-left shadow-sm transition active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-200 hover:border-blue-300'
+                  }`}
                   style={{
                     left: `${(layout.layout_x / HOME_MAP_GRID_COLUMNS) * 100}%`,
                     top: `${(layout.layout_y / HOME_MAP_GRID_ROWS) * 100}%`,
@@ -15193,6 +15276,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onPointerDown={event => {
                     if (!canManage) return;
                     event.currentTarget.setPointerCapture(event.pointerId);
+                    setSelectedHomeRoomDetailId(room.id);
                     setHomeMapDrag({
                       layoutId: layout.id,
                       mode: 'move',
@@ -15209,9 +15293,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   onPointerCancel={() => setHomeMapDrag(null)}
                 >
                   <span className="min-w-0">
-                    <span className="block break-words text-sm font-bold text-slate-950">{room.name}</span>
+                    <span className="flex items-start gap-1">
+                      {canManage && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
+                      <span className="block break-words text-sm font-bold text-slate-950">{room.name}</span>
+                    </span>
                     <span className="mt-1 block text-xs leading-4 text-slate-500">{[room.room_type, layout.floor_label || room.floor_label, room.area_label].filter(Boolean).join(' • ') || 'Room box'}</span>
                     {measurements && <span className="mt-1 block text-xs font-semibold text-blue-700">{measurements}</span>}
+                    {canManage && <span className="mt-1 block text-[11px] font-semibold text-blue-600">Drag to move</span>}
                   </span>
                   <span className="mt-2 flex flex-wrap gap-1">
                     {canShowPrivateCounts && <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">{reminderCount} rem</span>}
@@ -15237,26 +15325,32 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       >
                         Edit
                       </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600"
-                        onPointerDown={event => {
-                          event.stopPropagation();
-                          setHomeMapDrag({
-                            layoutId: layout.id,
-                            mode: 'resize',
-                            startX: event.clientX,
-                            startY: event.clientY,
-                            originX: layout.layout_x,
-                            originY: layout.layout_y,
-                            originWidth: layout.layout_width,
-                            originHeight: layout.layout_height,
-                          });
-                        }}
-                      >
-                        Resize
-                      </span>
+                    </span>
+                  )}
+                  {canManage && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Resize ${room.name}`}
+                      data-testid="home-map-resize-handle"
+                      className="absolute bottom-1.5 right-1.5 inline-flex h-7 w-7 cursor-nwse-resize items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
+                      onPointerDown={event => {
+                        event.stopPropagation();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        setSelectedHomeRoomDetailId(room.id);
+                        setHomeMapDrag({
+                          layoutId: layout.id,
+                          mode: 'resize',
+                          startX: event.clientX,
+                          startY: event.clientY,
+                          originX: layout.layout_x,
+                          originY: layout.layout_y,
+                          originWidth: layout.layout_width,
+                          originHeight: layout.layout_height,
+                        });
+                      }}
+                    >
+                      <Maximize2 size={14} />
                     </span>
                   )}
                 </button>
@@ -15411,6 +15505,70 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             })}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderHomeMapSystemsSection = (homeId: string, label: string) => {
+    const rooms = homeRoomsByHomeId[homeId] || [];
+    const selectedRoom = rooms.find(room => room.id === selectedHomeRoomDetailId) ?? null;
+    return (
+      <div className="space-y-5" data-testid="home-map-systems-section">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-bold text-blue-950">Map your rooms first</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
+                Map your rooms, organize systems, and keep related documents and reminders together. Rooms are the organizing backbone for this home.
+              </p>
+            </div>
+            <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">
+              Simple organizer
+            </span>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-blue-800">
+            Home Map remains a rough, not-to-scale layout. It is not CAD, a measured floor plan, LiDAR, scanning, floor-plan generation, or 3D.
+          </p>
+        </div>
+
+        <section aria-label="Map" data-testid="home-map-systems-map">
+          {renderHomeMapSection({
+            homeId,
+            label,
+            canManage: true,
+            canShowPrivateCounts: true,
+          })}
+        </section>
+
+        {selectedRoom ? (
+          <section aria-label="Selected room detail" data-testid="home-map-systems-room-detail">
+            {renderHomeRoomDetailPanel(selectedRoom, true, true)}
+          </section>
+        ) : (
+          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+            Select a room on the map or in the room list to manage details, assets, documents, reminders, and notes.
+          </p>
+        )}
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4" aria-label="Rooms list" data-testid="home-map-systems-rooms-list">
+            {renderHomeRoomsSection({
+              homeId,
+              label,
+              canManage: true,
+              showNotes: true,
+              showDetailPanel: false,
+            })}
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4" aria-label="All systems and assets" data-testid="home-map-systems-assets-list">
+            {renderHomeAssetsSection({
+              homeId,
+              label,
+              canManage: true,
+              showNotes: true,
+            })}
+          </section>
+        </div>
       </div>
     );
   };
@@ -16665,7 +16823,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   Start with the basics: property details, rooms, assets, photos, documents, reminders, and notes.
                 </p>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-                  Rooms, Assets &amp; Systems, and a simple Home Map preview are available now for basic home organization. Key Home Locations and true Home Setup Templates remain future tools.
+                  Home Map &amp; Systems is available now as one room-centered place to map rooms, organize systems, and keep related documents and reminders together. Key Home Locations and true Home Setup Templates remain future tools.
                 </p>
               </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -16685,9 +16843,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-sm font-bold text-blue-950">Home Map preview</p>
+                  <p className="text-sm font-bold text-blue-950">Home Map &amp; Systems</p>
                   <p className="mt-1 text-xs leading-5 text-blue-800">
-                    Home Map starts as simple not-to-scale room boxes with optional display-only measurements. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
+                    Home Map &amp; Systems uses simple not-to-scale room boxes and room-linked assets, documents, and reminders. It is not a measured floor plan, CAD tool, LiDAR scan, floor-plan generator, or 3D model.
                   </p>
                 </div>
                 <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
@@ -16700,45 +16858,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </div>
           </Card>
           {selectedHome?.id ? (
-            <Card title="Rooms" icon={<Home size={18} />}>
-              {renderHomeRoomsSection({
-                homeId: selectedHome.id,
-                label: homeProfileDisplayLabel(selectedHome),
-                canManage: true,
-                showNotes: true,
-              })}
+            <Card title="Home Map & Systems" icon={<MapPin size={18} />}>
+              {renderHomeMapSystemsSection(selectedHome.id, homeProfileDisplayLabel(selectedHome))}
             </Card>
           ) : (
-            <Card title="Rooms" icon={<Home size={18} />}>
-              <p className="text-sm text-slate-500">Save a property before adding rooms.</p>
-            </Card>
-          )}
-          {selectedHome?.id ? (
-            <Card title="Home Map" icon={<MapPin size={18} />}>
-              {renderHomeMapSection({
-                homeId: selectedHome.id,
-                label: homeProfileDisplayLabel(selectedHome),
-                canManage: true,
-                canShowPrivateCounts: true,
-              })}
-            </Card>
-          ) : (
-            <Card title="Home Map" icon={<MapPin size={18} />}>
-              <p className="text-sm text-slate-500">Save a property before creating a Home Map.</p>
-            </Card>
-          )}
-          {selectedHome?.id ? (
-            <Card title="Assets & Systems" icon={<ClipboardList size={18} />}>
-              {renderHomeAssetsSection({
-                homeId: selectedHome.id,
-                label: homeProfileDisplayLabel(selectedHome),
-                canManage: true,
-                showNotes: true,
-              })}
-            </Card>
-          ) : (
-            <Card title="Assets & Systems" icon={<ClipboardList size={18} />}>
-              <p className="text-sm text-slate-500">Save a property before adding assets or systems.</p>
+            <Card title="Home Map & Systems" icon={<MapPin size={18} />}>
+              <p className="text-sm text-slate-500">Save a property before mapping rooms or adding assets and systems.</p>
             </Card>
           )}
           {renderSharedHomeShellsPanel()}
@@ -18311,7 +18436,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {...writingAssistProps}
                           value={serviceRequestDraft.title || requestDraftTitle}
                           onChange={event => setServiceRequestDraft(current => ({ ...current, title: event.target.value }))}
-                          onBlur={event => setServiceRequestDraft(current => ({ ...current, title: cleanHumanWrittenText(event.target.value) }))}
+                          onBlur={event => setServiceRequestDraft(current => ({ ...current, title: cleanHumanLabelText(event.target.value) }))}
                         />
                       </Field>
                       <Field label="Service type">
@@ -22459,7 +22584,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const manualWorkItemRpcPayload = () => {
-    const title = cleanHumanWrittenText(manualWorkItemDraft.title);
+    const title = cleanHumanLabelText(manualWorkItemDraft.title);
     if (!title) return { error: 'Enter a work item title.' };
     const quantity = parseManualJobWorkItemNumber(manualWorkItemDraft.quantity, 'Quantity', { required: true });
     if (quantity.error || quantity.value === null) return { error: quantity.error || 'Quantity is required.' };
@@ -23119,7 +23244,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const serviceAgreementTemplatePayload = () => {
-    const name = cleanHumanWrittenText(serviceAgreementTemplateDraft.name);
+    const name = cleanHumanLabelText(serviceAgreementTemplateDraft.name);
     if (!name) return { error: 'Enter a service agreement template name.' };
     const duration = parseOptionalWholeNumber(serviceAgreementTemplateDraft.default_duration_months, 'Default duration months', { positive: true });
     if (duration.error) return { error: duration.error };
@@ -23233,7 +23358,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const serviceAgreementOfferPayload = () => {
-    const title = cleanHumanWrittenText(serviceAgreementOfferDraft.title);
+    const title = cleanHumanLabelText(serviceAgreementOfferDraft.title);
     if (!title) return { error: 'Enter an offer title.' };
     if (!serviceAgreementOfferDraft.template_id) return { error: 'Choose an active template before creating an offer.' };
     if (!serviceAgreementOfferDraft.connection_id) return { error: 'Choose a connected homeowner before creating an offer.' };
@@ -37139,7 +37264,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 });
               };
               const addSimpleTask = () => {
-                const title = cleanHumanWrittenText(simpleTaskTitleDraft);
+                const title = cleanHumanLabelText(simpleTaskTitleDraft);
                 if (!title) return;
                 const existingTask = simpleTaskRows.some(row => normalizeText(row.finding.title) === normalizeText(title));
                 if (existingTask) {
@@ -37388,7 +37513,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           data-prose-cleanup="true"
                                           defaultValue={row.finding.title}
                                           disabled={simpleJobReadonly}
-                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanWrittenText(event.target.value))}
+                                          onBlur={event => updateSimpleTaskTitle(row.roomKey, row.finding.title, cleanHumanLabelText(event.target.value))}
                                         />
                                       </div>
                                       <button

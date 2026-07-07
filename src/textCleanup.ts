@@ -153,6 +153,17 @@ export function cleanHumanWrittenText(value: string) {
     .replace(/\n{3,}/g, '\n\n');
 }
 
+export function cleanHumanLabelText(value: string) {
+  if (containsUrlOrEmailLikeText(value)) {
+    return value.replace(/[ \t]+/g, ' ').trim();
+  }
+  return restoreHumanTextTradeTerms(value)
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+([,;:])/g, '$1')
+    .replace(/([,;:])(?=\S)/g, '$1 ')
+    .trim();
+}
+
 function applyHumanTextLiveContractions(value: string) {
   const contractionPattern = Object.keys(HUMAN_TEXT_CONTRACTIONS).join('|');
   return value.replace(new RegExp(`(^|[^A-Za-z])(${contractionPattern})(?=\\s|[.!?,;:]|$)`, 'gi'), (_match, prefix: string, word: string) => {
