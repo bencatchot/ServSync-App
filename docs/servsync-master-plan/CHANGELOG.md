@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-mobile-layout-v1`
+- Starting main SHA: `780a00cb23b046920215b08a1cff975e33753e7c`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a mobile-specific Home Map Builder layout so phones use a full-width canvas, a compact bottom action toolbar, mobile sheet behavior for room lists, and the existing bottom-sheet room detail surface instead of a permanent left toolbar squeezing the canvas.
+- Reason for change: The desktop builder layout was improving, but on mobile the permanent side toolbar consumed too much width and made room boxes hard to read. This pass keeps the canvas primary on phone-sized screens while preserving the desktop side toolbar.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted mobile Home Map Builder tests
+  - targeted desktop Home Map Builder tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Touch drag/resize remains browser/device-dependent; the existing room detail fine-tune controls remain available as a fallback.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records mobile-specific Home Map Builder layout behavior with a canvas-first mobile workspace, bottom toolbar, and mobile sheets.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend mobile usability polish within the already-approved Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-builder-one-foot-grid-visual-v1`
 - Starting main SHA: `8dfffeac8084d0c491c9703d086a94b77620a5e8`
 - Files changed:

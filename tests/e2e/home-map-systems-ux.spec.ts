@@ -65,10 +65,17 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(builder).toContain('Home Map Builder');
     expect(builder).toContain('data-testid="home-map-builder-header"');
     expect(builder).toContain('data-testid="home-map-builder-side-toolbar"');
+    expect(builder).toContain('hidden min-h-0 flex-col');
+    expect(builder).toContain('data-testid="home-map-builder-mobile-toolbar"');
+    expect(builder).toContain('fixed inset-x-0 bottom-0 z-50');
     expect(builder).toContain('data-testid="home-map-builder-shell"');
+    expect(builder).toContain('flex min-h-0 flex-1 flex-col');
+    expect(builder).toContain('lg:grid lg:grid-cols-[144px_minmax(0,1fr)]');
     expect(builder).toContain('data-testid="home-map-builder-canvas"');
+    expect(builder).toContain('flex-1 flex-col');
     expect(builder).toContain('Drag to move. Use the corner handle to resize.');
     expect(builder).toContain('data-testid="home-map-room-detail-drawer"');
+    expect(builder).toContain('rounded-t-3xl');
     expect(builder).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
     expect(builder).toContain('<span>Add Room</span>');
     expect(builder).toContain('<span>Add Hallway</span>');
@@ -76,6 +83,8 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(builder).toContain('Fit View');
     expect(builder).toContain('<span>Zoom In</span>');
     expect(builder).toContain('data-testid="home-map-builder-room-list-panel"');
+    expect(builder).toContain('fixed inset-x-0 bottom-0 z-40');
+    expect(builder).toContain('max-h-[78vh]');
     expect(builder).toContain('setHomeMapRoomsPanelOpen(current => !current)');
     expect(builder).toContain('Rooms on this map');
     expect(builder).toContain('Rooms not on map');
@@ -94,6 +103,7 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(form).toContain('Width');
     expect(form).toContain('Enter rough dimensions like 10 x 14.');
     expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
+    expect(map).toContain('Grid: ~1 ft. Approximate.');
     expect(map).toContain('data-testid="home-map-grid-measurement-copy"');
     expect(map).toContain('canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom');
     expect(map).toContain('repeating-linear-gradient(to right');
