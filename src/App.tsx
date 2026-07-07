@@ -15528,12 +15528,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const unmappedRooms = rooms.filter(room => !usedRoomIds.has(room.id));
     const canAddMapBox = canManage && !compact;
     const mapZoom = builderMode ? homeMapZoom : 1;
-    const canvasBaseWidth = builderMode ? HOME_MAP_WORKSPACE_WIDTH : (compact ? 680 : 960);
-    const canvasBaseHeight = builderMode ? HOME_MAP_WORKSPACE_HEIGHT : (compact ? 420 : 560);
-    const canvasWidth = canvasBaseWidth * mapZoom;
-    const canvasHeight = canvasBaseHeight * mapZoom;
-    const canvasCellWidth = canvasWidth / HOME_MAP_GRID_COLUMNS;
-    const canvasCellHeight = canvasHeight / HOME_MAP_GRID_ROWS;
+    const canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom;
+    const canvasCellWidth = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT;
+    const canvasCellHeight = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT;
+    const canvasMajorGridSize = canvasPixelsPerFoot * HOME_MAP_MAJOR_GRID_EVERY_FEET;
+    const canvasWidth = HOME_MAP_WORKSPACE_WIDTH * mapZoom;
+    const canvasHeight = HOME_MAP_WORKSPACE_HEIGHT * mapZoom;
 
     const pointerMoveForLayout = (layout: HomeRoomLayout, event: PointerEvent<HTMLElement>) => {
       if (!homeMapDrag || homeMapDrag.layoutId !== layout.id) return;
@@ -15605,8 +15605,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 height: `${canvasHeight}px`,
                 minWidth: `${canvasWidth}px`,
                 minHeight: `${canvasHeight}px`,
-                backgroundImage: 'linear-gradient(to right, rgba(148, 163, 184, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(148, 163, 184, 0.2) 1px, transparent 1px), linear-gradient(to right, rgba(71, 85, 105, 0.28) 1px, transparent 1px), linear-gradient(to bottom, rgba(71, 85, 105, 0.28) 1px, transparent 1px)',
-                backgroundSize: `${canvasCellWidth}px ${canvasCellHeight}px, ${canvasCellWidth}px ${canvasCellHeight}px, ${canvasCellWidth * HOME_MAP_MAJOR_GRID_EVERY_FEET}px ${canvasCellHeight * HOME_MAP_MAJOR_GRID_EVERY_FEET}px, ${canvasCellWidth * HOME_MAP_MAJOR_GRID_EVERY_FEET}px ${canvasCellHeight * HOME_MAP_MAJOR_GRID_EVERY_FEET}px`,
+                backgroundImage: `repeating-linear-gradient(to right, rgba(30, 64, 175, 0.42) 0, rgba(30, 64, 175, 0.42) 2px, transparent 2px, transparent ${canvasMajorGridSize}px), repeating-linear-gradient(to bottom, rgba(30, 64, 175, 0.42) 0, rgba(30, 64, 175, 0.42) 2px, transparent 2px, transparent ${canvasMajorGridSize}px), repeating-linear-gradient(to right, rgba(100, 116, 139, 0.38) 0, rgba(100, 116, 139, 0.38) 1px, transparent 1px, transparent ${canvasCellWidth}px), repeating-linear-gradient(to bottom, rgba(100, 116, 139, 0.38) 0, rgba(100, 116, 139, 0.38) 1px, transparent 1px, transparent ${canvasCellHeight}px)`,
               }}
             >
               {layouts.map(layout => {

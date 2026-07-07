@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-07
 
+- Branch: `codex/home-map-builder-one-foot-grid-visual-v1`
+- Starting main SHA: `8dfffeac8084d0c491c9703d086a94b77620a5e8`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed the Home Map Builder visual grid so the rendered minor grid lines use the same pixels-per-foot constant as room box sizing, drag snapping, resize snapping, and dimension-to-layout conversion. The canvas now renders clearer 1-ft minor grid lines with stronger 5-ft major lines, keeping the existing approximate measurement copy.
+- Reason for change: The prior measured-grid slice aligned the data model math but the visible grid could still read too coarse in smoke testing. This pass makes the visual grid match the rough 1-ft measurement/snap behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder grid rendering tests
+  - targeted Home Map Builder interaction tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - The grid remains approximate organization data, not precision floor-plan data.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records that the visible grid rendering matches the 1-ft measurement and snap logic.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a frontend visual rendering fix within the already-approved Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-builder-measured-grid-v1`
 - Starting main SHA: `6bead7fc66fb1e636b246f5f6d11523def335bef`
 - Files changed:

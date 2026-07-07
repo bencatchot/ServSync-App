@@ -95,6 +95,8 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(form).toContain('Enter rough dimensions like 10 x 14.');
     expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
     expect(map).toContain('data-testid="home-map-grid-measurement-copy"');
+    expect(map).toContain('canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom');
+    expect(map).toContain('repeating-linear-gradient(to right');
     expect(map).toContain('HOME_MAP_MAJOR_GRID_EVERY_FEET');
     expect(form).not.toContain('<Field label="X">');
     expect(form).not.toContain('<Field label="Y">');
