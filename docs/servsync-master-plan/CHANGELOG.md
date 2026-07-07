@@ -4,6 +4,44 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-07
+
+- Branch: `codex/home-map-systems-ux-consolidation-v1`
+- Starting main SHA: `f07c7d8a2cee431b7c603279cd933649af5ca392`
+- Files changed:
+  - `src/App.tsx`
+  - `src/textCleanup.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `tests/e2e/home-document-room-ui.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/home-room-detail-ui.spec.ts`
+  - `tests/e2e/home-rooms-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Consolidated the homeowner Properties room/map/assets surfaces into one Home Map & Systems experience. The unified feature keeps Map as the default entry point, uses selected Room Detail as the central room management panel, keeps Rooms and All assets as secondary sections, simplifies map room creation/editing to rough room dimensions instead of visible x/y/layout fields, improves map drag/resize affordances, and lets room-detail asset creation preselect the room.
+- Reason for change: Home Map v1, Rooms, Assets & Systems, Room Detail, room-linked documents, and room-linked reminders were functional but exposed implementation concepts as separate homeowner features. This pass aligns the Properties UX with the homeowner mental model: map rooms, organize systems, and keep related documents/reminders together by room.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-systems-ux.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-map-systems-ux.spec.ts tests/e2e/home-map-ui.spec.ts tests/e2e/home-assets-ui.spec.ts tests/e2e/home-room-detail-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-rooms-ui.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, document download/delete behavior, reminder delivery/status behavior, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - Ceiling height remains future structured data and should not be stored in notes.
+  - Map rectangles remain rough organization boxes; homeowner-entered dimensions are not scale, permit, or CAD data.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records Home Map & Systems as the unified homeowner Properties experience while preserving the existing Home Map/asset privacy and future-scope guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now records the room-centered Home Map & Systems consolidation and keeps ceiling height, key locations, contractor visibility, and advanced map/floor-plan tooling future-scoped.
+
 ## 2026-07-06
 
 - Branch: `codex/home-map-v1-rooms-systems-builder`

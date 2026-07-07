@@ -175,7 +175,9 @@ test.describe('home reminder room picker UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/textCleanup.ts',
       'src/types.ts',
+      'tests/e2e/home-map-systems-ux.spec.ts',
       'servsync-home-map-layout-foundation.sql',
       'tests/e2e/home-assets-foundation.spec.ts',
       'tests/e2e/home-map-layout-foundation.spec.ts',

@@ -35,7 +35,7 @@ function changedFiles() {
 }
 
 test.describe('homeowner room detail panel', () => {
-  test('adds homeowner-owned room detail state and controls inside the Rooms card only', () => {
+  test('adds homeowner-owned room detail state and controls inside the unified room-centered feature', () => {
     const app = appSource();
     const roomState = sourceBetween(app, 'const [homeRoomsByHomeId, setHomeRoomsByHomeId]', 'const [connections, setConnections]');
     const resetEffects = sourceBetween(app, 'useEffect(() => {\n    setHomeownerReminderRoomFilter', 'const openHomeRoomForm =');
@@ -48,7 +48,9 @@ test.describe('homeowner room detail panel', () => {
     expect(roomUiSource).toContain('Close details');
     expect(roomUiSource).toContain("data-testid=\"home-room-detail-panel\"");
     expect(roomUiSource).toContain('!compact && canManage');
-    expect(roomUiSource).toContain('renderHomeRoomDetailPanel(detailRoom, showNotes)');
+    expect(roomUiSource).toContain('showDetailPanel');
+    expect(roomUiSource).toContain('renderHomeRoomDetailPanel(detailRoom, showNotes, canManage)');
+    expect(roomUiSource).toContain('renderHomeRoomDetailPanel(selectedRoom, true, true)');
   });
 
   test('room detail uses existing linked reminders and documents without adding mutations', () => {
@@ -103,7 +105,9 @@ test.describe('homeowner room detail panel', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/textCleanup.ts',
       'src/types.ts',
+      'tests/e2e/home-map-systems-ux.spec.ts',
       'servsync-home-map-layout-foundation.sql',
       'tests/e2e/home-assets-foundation.spec.ts',
       'tests/e2e/home-map-layout-foundation.spec.ts',
