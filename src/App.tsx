@@ -21351,7 +21351,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
   const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
-  const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false);
+  const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
   const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
@@ -23283,7 +23283,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderLastOutput(null);
     setEstimateStartMode('choose');
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     setEstimateAssistantNotice('');
     setEstimateTemplateStartNotice('');
     setInvoiceTemplateStartNotice('');
@@ -23318,7 +23318,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderLastOutput(null);
     setEstimateStartMode('draft');
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     setEstimateAssistantNotice('');
     setEstimateTemplateStartNotice(estimateTemplateStartNoticeForTemplate(template));
     setEstimateHelperNotice('');
@@ -23547,7 +23547,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLastOutput(null);
       setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
-      setEstimateReferenceToolsExpanded(false);
+      setEstimateLineSourcePanel(null);
       setEstimateAssistantNotice('');
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
@@ -23815,7 +23815,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLastOutput(null);
       setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
-      setEstimateReferenceToolsExpanded(false);
+      setEstimateLineSourcePanel(null);
       setEstimateAssistantNotice('');
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
@@ -25768,7 +25768,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       builtJobType: builtDraft.builtJobType,
     });
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     const unpricedCount = builtDraft.lines.filter(draftLineIsUnpriced).length;
     const matchedCopy = builtDraft.matchedCount > 0
       ? ` Matched saved-charge pricing for ${builtDraft.matchedCount} line${builtDraft.matchedCount === 1 ? '' : 's'}.`
@@ -26120,49 +26120,41 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
-  const renderEstimateReferenceTools = () => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="estimate-reference-tools">
-      <button
-        type="button"
-        onClick={() => setEstimateReferenceToolsExpanded(value => !value)}
-        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
-        aria-expanded={estimateReferenceToolsExpanded}
-      >
-        <span>
-          <span className="block text-sm font-bold text-slate-950">Optional tools</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
-            Saved charges, Price Book, templates, and helper suggestions are available when you need them.
-          </span>
-        </span>
-        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
-          {estimateReferenceToolsExpanded ? 'Hide optional tools' : 'Show optional tools'}
-        </span>
-      </button>
-
-      {estimateReferenceToolsExpanded && (
-        <div className="mt-3 space-y-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-slate-950">Estimate Templates</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Contractor-owned templates stay separate from app-owned draft recipes.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setContractorJobsViewAndScroll('templates')}
-                className={buttonClass('secondary')}
-              >
-                Open templates
-              </button>
-            </div>
-          </div>
-          {renderSavedChargeQuickPick()}
-          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
-          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
-        </div>
-      )}
+  const renderEstimateLineItemSources = () => (
+    <div className="space-y-3" data-testid="estimate-line-item-sources">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setEstimateLineSourcePanel(null);
+            setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }));
+          }}
+          className={buttonClass('secondary')}
+        >
+          <Plus size={14} />
+          Add line
+        </button>
+        <button
+          type="button"
+          onClick={() => setEstimateLineSourcePanel(current => current === 'saved' ? null : 'saved')}
+          className={buttonClass(estimateLineSourcePanel === 'saved' ? 'primary' : 'secondary')}
+          aria-expanded={estimateLineSourcePanel === 'saved'}
+        >
+          <Plus size={14} />
+          Add saved item
+        </button>
+        <button
+          type="button"
+          onClick={() => setEstimateLineSourcePanel(current => current === 'priceBook' ? null : 'priceBook')}
+          className={buttonClass(estimateLineSourcePanel === 'priceBook' ? 'primary' : 'secondary')}
+          aria-expanded={estimateLineSourcePanel === 'priceBook'}
+        >
+          <Plus size={14} />
+          Add from Price Book
+        </button>
+      </div>
+      {estimateLineSourcePanel === 'saved' && renderSavedChargeQuickPick()}
+      {estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()}
     </div>
   );
 
@@ -34929,9 +34921,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         )}
                                         <p className="mt-2 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
                                       </div>
-                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
-                                        Cancel
-                                      </button>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {!isInvoiceWorkspaceTab && estimateStartMode !== 'choose' && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEstimateStartMode('choose');
+                                              setEstimateGuidedBuilderActive(false);
+                                              setEstimateLineSourcePanel(null);
+                                            }}
+                                            className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                          >
+                                            Back to estimate options
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEstimateComposerOpen(false);
+                                            setEditingEstimateId(null);
+                                            setEstimateLineSourcePanel(null);
+                                          }}
+                                          className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                        >
+                                          Discard draft
+                                        </button>
+                                      </div>
                                     </div>
                                     {(isInvoiceWorkspaceTab || (estimateStartMode !== 'choose' && estimateStartMode !== 'template')) && (
                                       <div className="grid gap-3 md:grid-cols-2">
@@ -34981,17 +34996,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <div className="mt-4">
                                           {renderEstimateStartChoice()}
                                         </div>
-                                        <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
-                                        </div>
                                       </>
                                     ) : estimateStartMode === 'template' && !isInvoiceWorkspaceTab ? (
                                       <>
                                         <div className="mt-4">
                                           {renderSavedEstimateTemplateStartPicker(conn?.display_name || localCustomer?.display_name || 'Customer')}
-                                        </div>
-                                        <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
                                         </div>
                                       </>
                                     ) : estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
@@ -35000,16 +35009,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                         </div>
                                         <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
+                                          {renderEstimateHelperPanel()}
                                         </div>
                                       </>
                                     ) : (
                                       <>
-                                    {!isInvoiceWorkspaceTab && (
-                                      <div className="mt-4">
-                                        {renderEstimateReferenceTools()}
-                                      </div>
-                                    )}
                                     {estimateTemplateStartNotice && !isInvoiceWorkspaceTab && (
                                       <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
                                         {estimateTemplateStartNotice}
@@ -35034,17 +35038,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
 
                                     <div className="mt-4 space-y-3">
-                                      <div className="flex items-center justify-between gap-3">
+                                      <div className="flex flex-wrap items-center justify-between gap-3">
                                         <p className="text-sm font-bold text-slate-950">Line items</p>
-                                        <button
-                                          type="button"
-                                          onClick={() => setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          <Plus size={14} />
-                                          Add line
-                                        </button>
                                       </div>
+                                      {renderEstimateLineItemSources()}
                                       {estimateDraft.line_items.map((line, index) => (
                                         renderStructuredLineDraftEditor({
                                           line,
@@ -35088,8 +35085,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <Receipt size={15} />
                                         {savingEstimate ? 'Saving...' : editingEstimateId ? `Update ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                                       </button>
-                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
-                                        Cancel
+                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                                        Discard draft
                                       </button>
                                     </div>
                                       </>
@@ -35169,7 +35166,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraftBuilderLastOutput(null);
                                                   setEstimateStartMode('draft');
                                                   setEstimateGuidedBuilderActive(false);
-                                                  setEstimateReferenceToolsExpanded(false);
+                                                  setEstimateLineSourcePanel(null);
                                                   setEstimateAssistantNotice('');
                                                   setEstimateTemplateStartNotice('');
                                                   setEstimateHelperNotice('');
@@ -35445,7 +35442,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEstimateDraftBuilderLastOutput(null);
                                                     setEstimateStartMode('draft');
                                                     setEstimateGuidedBuilderActive(false);
-                                                    setEstimateReferenceToolsExpanded(false);
+                                                    setEstimateLineSourcePanel(null);
                                                     setEstimateAssistantNotice('');
                                                     setEstimateTemplateStartNotice('');
                                                     setEstimateHelperNotice('');
@@ -36189,9 +36186,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <p className="mt-0.5 text-xs text-blue-800">{selectedJobsCustomerAddress}</p>
                             )}
                           </div>
-                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
-                            Cancel
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {estimateStartMode !== 'choose' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEstimateStartMode('choose');
+                                  setEstimateGuidedBuilderActive(false);
+                                  setEstimateLineSourcePanel(null);
+                                }}
+                                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                              >
+                                Back to estimate options
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEstimateComposerOpen(false);
+                                setEditingEstimateId(null);
+                                setEstimateLineSourcePanel(null);
+                              }}
+                              className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                            >
+                              Discard draft
+                            </button>
+                          </div>
                         </div>
 
                         {estimateStartMode !== 'choose' && estimateStartMode !== 'template' && (
@@ -36228,17 +36248,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div className="mt-4">
                               {renderEstimateStartChoice()}
                             </div>
-                            <div className="mt-4">
-                              {renderEstimateReferenceTools()}
-                            </div>
                           </>
                         ) : estimateStartMode === 'template' && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
                           <>
                             <div className="mt-4">
                               {renderSavedEstimateTemplateStartPicker(selectedJobsCustomerName || 'Customer')}
-                            </div>
-                            <div className="mt-4">
-                              {renderEstimateReferenceTools()}
                             </div>
                           </>
                         ) : estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
@@ -36247,16 +36261,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
                             </div>
                             <div className="mt-4">
-                              {renderEstimateReferenceTools()}
+                              {renderEstimateHelperPanel()}
                             </div>
                           </>
                         ) : (
                           <>
-                        {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && (
-                          <div className="mt-4">
-                            {renderEstimateReferenceTools()}
-                          </div>
-                        )}
                         {estimateTemplateStartNotice && (
                           <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
                             {estimateTemplateStartNotice}
@@ -36282,13 +36291,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
 
                         <div className="mt-4 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Line items</p>
-                            <button type="button" onClick={() => setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
-                              <Plus size={14} />
-                              Add line
-                            </button>
                           </div>
+                          {renderEstimateLineItemSources()}
                           {estimateDraft.line_items.map((line, index) => (
                             renderStructuredLineDraftEditor({
                               line,
@@ -36324,8 +36330,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <Receipt size={15} />
                             {savingEstimate ? 'Saving...' : editingEstimateId ? 'Update draft' : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                           </button>
-                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
-                            Cancel
+                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                            Discard draft
                           </button>
                         </div>
                           </>
@@ -36875,7 +36881,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateDraftBuilderLastOutput(null);
                                         setEstimateStartMode('draft');
                                         setEstimateGuidedBuilderActive(false);
-                                        setEstimateReferenceToolsExpanded(false);
+                                        setEstimateLineSourcePanel(null);
                                         setEstimateAssistantNotice('');
                                         setEstimateTemplateStartNotice('');
                                         setEstimateHelperNotice('');

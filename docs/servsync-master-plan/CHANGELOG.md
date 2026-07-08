@@ -6,7 +6,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
-- Branch: `codex/contractor-estimate-creation-cleanup-v1`
+- Branch: `codex/contractor-estimate-creation-cleanup-v1b`
 - Starting main SHA: `f3f2cf6cdce13cad54dcedf347e2cc4df5d1c09d`
 - Files changed:
   - `src/App.tsx`
@@ -14,8 +14,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Cleaned up the contractor estimate creation UI so the start choices read as `Build blank estimate`, `Choose estimate template`, and `Build draft estimator`; the blank and template paths continue into the normal single-page estimate form; optional accelerators are grouped under collapsed `Optional tools`; and advanced line-item metadata is moved behind a per-line `More details` control while preserving editable estimate behavior.
-- Reason for change: The estimate creation workflow was functional but visually overloaded. Contractors need the normal quote path to feel like a simple estimate form while keeping Price Book, saved charges, templates, and helper tools available as optional accelerators.
+- Summary of change: Cleaned up the contractor estimate creation UI so the start choices read as `Build blank estimate`, `Choose estimate template`, and `Build draft estimator`; the blank and template paths continue into the normal single-page estimate form; the broad in-editor optional-tools drawer was replaced with line-item actions for `Add line`, `Add saved item`, and `Add from Price Book`; and advanced line-item metadata is moved behind a per-line `More details` control while preserving editable estimate behavior.
+- Reason for change: The estimate creation workflow was functional but visually overloaded. Contractors need the normal quote path to feel like a simple estimate form, with templates and draft builder as start paths and saved charges / Price Book as contextual line-item sources instead of a mixed toolbox inside the active editor.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`
@@ -28,7 +28,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `npm run build`
 - Known risks or follow-ups:
   - Frontend/test/docs only. No SQL/RLS/RPC/schema, backend, Supabase, storage, package/lock, env/config/deployment/native/service-worker, production deploy, production SQL, production data, estimate status, job creation, homeowner-side workflow, send/email/SMS/PDF modal, invoice type, change-order, or Price Book recipe/autopricing changes are included.
-  - Customer-after-estimate save redesign, change orders, Price Book assemblies/autopricing, invoice type/deposit/progress/final support, and broader customer/job workflow changes remain future approval-gated work.
+  - Template management, Draft Builder coverage/functionality, Estimate Helper expansion, customer-after-estimate save redesign, change orders, Price Book assemblies/autopricing, invoice type/deposit/progress/final support, and broader customer/job workflow changes remain future approval-gated work.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-027 now records the first contractor estimate creation UI simplification slice.

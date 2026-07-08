@@ -60,17 +60,21 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(templateStartSource).toContain('setEstimateGuidedBuilderActive(false)');
   });
 
-  test('optional accelerators stay collapsed and estimate line advanced fields use More details', () => {
+  test('line item sources replace the broad optional tools drawer and More details stays available', () => {
     const source = appSource();
-    const optionalToolsSource = sourceBetween(source, 'const renderEstimateReferenceTools =', 'const startEstimateAssistantSpeech =');
+    const lineSourceSource = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
     const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
     const jobsEstimateComposerSource = sourceBetween(source, 'Estimate / Invoice Workspace', '{invoiceComposerOpen && selectedJobsCustomerName && (');
 
-    expect(optionalToolsSource).toContain('Optional tools');
-    expect(optionalToolsSource).toContain('Show optional tools');
-    expect(optionalToolsSource).toContain('renderSavedChargeQuickPick()');
-    expect(optionalToolsSource).toContain('renderPriceBookQuickPick()');
-    expect(optionalToolsSource).toContain('renderEstimateHelperPanel()');
+    expect(source).not.toContain('renderEstimateReferenceTools');
+    expect(source).not.toContain('Optional tools');
+    expect(lineSourceSource).toContain('Add line');
+    expect(lineSourceSource).toContain('Add saved item');
+    expect(lineSourceSource).toContain('Add from Price Book');
+    expect(lineSourceSource).toContain('renderSavedChargeQuickPick()');
+    expect(lineSourceSource).toContain('renderPriceBookQuickPick()');
+    expect(lineSourceSource).not.toContain('renderEstimateHelperPanel()');
+    expect(lineSourceSource).not.toContain('renderSavedEstimateTemplateStartPicker');
 
     expect(lineEditorSource).toContain('compactAdvanced = false');
     expect(lineEditorSource).toContain('More details');
@@ -80,9 +84,9 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(lineEditorSource).toContain('supplyStatusField');
     expect(lineEditorSource).toContain('Source note');
     expect(jobsEstimateComposerSource).toContain('compactAdvanced: true');
-    expect(jobsEstimateComposerSource).not.toContain('{renderSavedChargeQuickPick()}');
-    expect(jobsEstimateComposerSource).not.toContain('renderPriceBookQuickPick()}');
-    expect(jobsEstimateComposerSource).not.toContain('renderEstimateHelperPanel()}');
+    expect(jobsEstimateComposerSource).toContain('renderEstimateLineItemSources()');
+    expect(jobsEstimateComposerSource).toContain('Back to estimate options');
+    expect(jobsEstimateComposerSource).toContain('Discard draft');
   });
 });
 
@@ -113,6 +117,11 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByRole('button', { name: /^Choose estimate template\b/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Build draft estimator\b/i })).toBeVisible();
     await main.getByRole('button', { name: /^Build blank estimate\b/i }).click();
+    await expect(main.getByRole('button', { name: /^Back to estimate options$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Discard draft$/i }).first()).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Add line$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Add saved item$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Add from Price Book$/i })).toBeVisible();
 
     const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
     const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
