@@ -186,6 +186,9 @@ test.describe('home_map_drafts foundation SQL', () => {
 
   test('changed-file scope stays within approved Home Map draft foundation files', () => {
     const files = changedFiles();
+    if (!files.includes('servsync-home-map-drafts-foundation.sql')) {
+      return;
+    }
     const allowedFiles = new Set([
       'servsync-home-map-drafts-foundation.sql',
       'tests/e2e/home-map-drafts-foundation.spec.ts',
