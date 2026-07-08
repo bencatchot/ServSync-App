@@ -311,6 +311,28 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(builder).toContain('data-testid="home-map-room-detail-drawer"');
   });
 
+  test('room edit and resize controls appear only for the selected manageable room', () => {
+    const app = appSource();
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+
+    expect(map).toContain('const isSelected = selectedHomeRoomDetailId === room.id');
+    expect(map).toContain("${canManage && isSelected ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}");
+    expect(map).toContain('if (!isSelected) {');
+    expect(map).toContain('setSelectedHomeRoomDetailId(room.id);');
+    expect(map).toContain('return;');
+    expect(map).toContain('{canManage && isSelected && <Move');
+    expect(map).toContain('{canManage && builderMode && isSelected && !showExternalCallout && (');
+    expect(map).toContain('{canManage && isSelected && (');
+    expect(map).toContain('data-testid="home-map-room-edit"');
+    expect(map).toContain('data-testid="home-map-resize-handle"');
+    expect(map).toContain('const showExternalCallout = showExternalLabel && isSelected');
+    expect(map).toContain('data-testid="home-map-room-floating-label"');
+    expect(map).toContain('width: `${box.widthFeet * canvasCellWidth}px`');
+    expect(map).toContain('height: `${box.depthFeet * canvasCellHeight}px`');
+    expect(map).not.toContain('minWidth: builderMode');
+    expect(map).not.toContain('minHeight: builderMode');
+  });
+
   test('selected room panel is responsive editable room context without document or reminder mutations', () => {
     const app = appSource();
     const builder = sourceBetween(app, 'const renderHomeMapBuilderView =', 'const renderSharedHomeShellsPanel =');

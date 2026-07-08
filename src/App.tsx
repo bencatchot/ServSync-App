@@ -15932,9 +15932,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     role="button"
                     tabIndex={0}
                     data-testid="home-map-room-box"
-                    className={`absolute z-10 cursor-grab select-none rounded-xl border bg-white/80 text-left shadow-sm transition [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none] active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    className={`absolute z-10 select-none rounded-xl border bg-white/80 text-left shadow-sm transition [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none] focus:outline-none focus:ring-2 focus:ring-blue-300 ${
                       isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-200 hover:border-blue-300'
-                    }`}
+                    } ${canManage && isSelected ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                     style={{
                       left: `${box.xFeet * canvasCellWidth}px`,
                       top: `${box.yFeet * canvasCellHeight}px`,
@@ -15954,9 +15954,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     }}
                     onPointerDown={event => {
                       if (!canManage) return;
+                      if (!isSelected) {
+                        setSelectedHomeRoomDetailId(room.id);
+                        return;
+                      }
                       event.preventDefault();
                       event.currentTarget.setPointerCapture(event.pointerId);
-                      setSelectedHomeRoomDetailId(room.id);
                       setHomeMapDrag({
                         layoutId: layout.id,
                         mode: 'move',
@@ -15987,7 +15990,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       {labelMode === 'full' && (
                         <>
                           <span className="flex min-w-0 items-start gap-1">
-                            {canManage && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
+                            {canManage && isSelected && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
                             <span className="block min-w-0 truncate text-sm font-bold text-slate-950">{room.name}</span>
                           </span>
                           <span className="mt-1 block truncate text-xs leading-4 text-slate-500">{roomMetadata || 'Room box'}</span>
@@ -16032,7 +16035,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         )}
                       </span>
                     )}
-                    {canManage && builderMode && !showExternalCallout && (
+                    {canManage && builderMode && isSelected && !showExternalCallout && (
                       <button
                         type="button"
                         className="absolute left-0 top-full z-20 mt-1 inline-flex select-none items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 shadow-sm [touch-action:manipulation] [-webkit-touch-callout:none] [-webkit-user-select:none] hover:bg-blue-100"
@@ -16047,7 +16050,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         Edit
                       </button>
                     )}
-                    {canManage && (
+                    {canManage && isSelected && (
                       <span
                         role="button"
                         tabIndex={0}
