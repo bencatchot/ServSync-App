@@ -175,9 +175,19 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(sizingHelper).toContain('Math.round(span)');
     expect(sizingHelper).toContain('measurementWidthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
     expect(sizingHelper).toContain('measurementDepthFeet / HOME_MAP_FEET_PER_GRID_UNIT');
-    expect(saveLayout).toContain('const shouldApplyRoughDimensions = !homeRoomLayoutDraft.id || dimensionsChanged');
-    expect(saveLayout).toContain('rawLayoutWidth = shouldApplyRoughDimensions ? roughLayoutSize.layoutWidth : fallbackLayoutWidth');
-    expect(saveLayout).toContain('rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight');
+    expect(app).toContain('type HomeMapBox = {');
+    expect(app).toContain('xFeet: number;');
+    expect(app).toContain('widthFeet: number;');
+    expect(app).toContain('const homeMapBoxFromLayout = (layout: HomeRoomLayout): HomeMapBox => {');
+    expect(app).toContain('const homeMapLayoutFieldsFromBox = (box: HomeMapBox)');
+    expect(app).toContain('measured_width: feetBox.widthFeet');
+    expect(app).toContain('measured_depth: feetBox.depthFeet');
+    expect(app).toContain("measurement_unit: 'ft'");
+    expect(app).toContain('const homeMapDimensionLabel = (layout: HomeRoomLayout | null | undefined)');
+    expect(saveLayout).toContain('const layoutBox = clampHomeMapBox({');
+    expect(saveLayout).toContain('widthFeet,');
+    expect(saveLayout).toContain('depthFeet,');
+    expect(saveLayout).toContain('...homeMapLayoutFieldsFromBox(layoutBox)');
     expect(map).toContain('Each grid line represents roughly 1 ft. Measurements are approximate.');
     expect(map).toContain('Grid: ~1 ft. Approximate.');
     expect(map).toContain('sm:hidden');
@@ -196,10 +206,13 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth)');
     expect(map).toContain('Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight)');
     expect(map).toContain('HOME_MAP_MAJOR_GRID_EVERY_FEET');
-    expect(map).toContain('layout.layout_x * canvasCellWidth');
-    expect(map).toContain('layout.layout_y * canvasCellHeight');
-    expect(map).toContain('layout.layout_width * canvasCellWidth');
-    expect(map).toContain('layout.layout_height * canvasCellHeight');
+    expect(map).toContain('const box = homeMapBoxFromLayout(layout)');
+    expect(map).toContain('box.xFeet * canvasCellWidth');
+    expect(map).toContain('box.yFeet * canvasCellHeight');
+    expect(map).toContain('box.widthFeet * canvasCellWidth');
+    expect(map).toContain('box.depthFeet * canvasCellHeight');
+    expect(map).toContain('updateHomeRoomLayoutFeetLocal(layout, { xFeet: nextX, yFeet: nextY })');
+    expect(map).toContain('updateHomeRoomLayoutFeetLocal(layout, { widthFeet: nextWidth, depthFeet: nextHeight })');
   });
 
   test('mobile room tiles suppress text selection while measured footprints stay exact', () => {
@@ -217,8 +230,8 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('event.currentTarget.setPointerCapture(event.pointerId)');
     expect(map).toContain('event.currentTarget.releasePointerCapture(event.pointerId)');
     expect(map).toContain('const endPointerInteraction = (event: PointerEvent<HTMLElement>) => {');
-    expect(map).toContain('width: `${layout.layout_width * canvasCellWidth}px`');
-    expect(map).toContain('height: `${layout.layout_height * canvasCellHeight}px`');
+    expect(map).toContain('width: `${box.widthFeet * canvasCellWidth}px`');
+    expect(map).toContain('height: `${box.depthFeet * canvasCellHeight}px`');
     expect(map).not.toContain('minWidth: builderMode');
     expect(map).not.toContain('minHeight: builderMode');
     expect(map).toContain('data-testid="home-map-room-touch-target"');
@@ -304,7 +317,7 @@ test.describe('Home Map Builder dedicated view', () => {
 
     expect(map).toContain('data-testid="home-map-room-box"');
     expect(map).toContain('{room.name}');
-    expect(map).toContain('measurements');
+    expect(map).toContain('homeMapDimensionLabel(layout)');
     expect(map).toContain('data-testid="home-map-room-edit"');
     expect(map).toContain('Edit');
     expect(map).toContain('data-testid="home-map-resize-handle"');
@@ -330,6 +343,7 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(stateSource).toContain('homeMapSaveInFlightRef');
     expect(autosaveSource).toContain('next.add(layoutId)');
     expect(autosaveSource).toContain('flushHomeMapPendingSaves');
+    expect(autosaveSource).toContain('...homeMapLayoutFieldsFromBox(homeMapBoxFromLayout(layout))');
     expect(autosaveSource).toContain("setHomeMapSaveStatus('dirty')");
     expect(autosaveSource).toContain("setHomeMapSaveStatus('saving')");
     expect(autosaveSource).toContain("setHomeMapSaveStatus('saved')");
@@ -371,8 +385,8 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('xl:h-[calc(100vh-190px)]');
     expect(map).toContain('canvasCellWidth');
     expect(map).toContain('canvasCellHeight');
-    expect(map).toContain('layout.layout_x * canvasCellWidth');
-    expect(map).toContain('layout.layout_width * canvasCellWidth');
+    expect(map).toContain('box.xFeet * canvasCellWidth');
+    expect(map).toContain('box.widthFeet * canvasCellWidth');
     expect(app).not.toContain('react-rnd');
     expect(app).not.toContain('interactjs');
   });

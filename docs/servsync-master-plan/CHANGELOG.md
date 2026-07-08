@@ -4,6 +4,41 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-08
+
+- Branch: `codex/home-map-builder-feet-source-v1`
+- Starting main SHA: `8c0e5d7f1ac1a0985271f2351ee94ab1799433da`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `tests/e2e/home-map-systems-ux.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Refactored the Home Map Builder so room-box rendering, labels, drag, resize, dimension editing, and autosave use one feet-based frontend model before writing the same values into existing layout and measured columns.
+- Reason for change: Smoke testing showed that visual room boxes could change while displayed dimensions stayed stale because layout fields and measured fields were being updated independently.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder feet-source tests
+  - targeted measured-grid tests
+  - targeted mobile touch tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, storage bucket/policy changes, env/config/package/deployment/native/service-worker/backend changes, manual deployment, production data, contractor visibility, shared member/viewer asset/document/reminder expansion, key locations, sensitive access fields, CAD/floor-plan/LiDAR/3D behavior, L-shaped/multi-section rooms, floor-plan upload/parsing, ceiling-height schema, document/reminder behavior changes, or job/estimate/invoice/inspection/service-agreement workflow changes are included.
+  - SVG rendering remains a future optional improvement now that the builder has one measured frontend source of truth.
+  - L-shaped and other multi-section rooms remain future SQL/RLS work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the Home Map Builder feet-source reset so grid, dimensions, labels, drag, resize, and autosave share one measured model.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend architecture cleanup within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 ## 2026-07-07
 
 - Branch: `codex/home-map-builder-mobile-touch-footprint-v1`

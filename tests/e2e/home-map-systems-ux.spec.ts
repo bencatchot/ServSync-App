@@ -126,8 +126,9 @@ test.describe('Home Map & Systems dedicated builder UX', () => {
     expect(map).toContain('[-webkit-touch-callout:none]');
     expect(map).toContain('event.preventDefault();');
     expect(map).toContain('event.currentTarget.releasePointerCapture(event.pointerId)');
-    expect(map).toContain('width: `${layout.layout_width * canvasCellWidth}px`');
-    expect(map).toContain('height: `${layout.layout_height * canvasCellHeight}px`');
+    expect(map).toContain('width: `${box.widthFeet * canvasCellWidth}px`');
+    expect(map).toContain('height: `${box.depthFeet * canvasCellHeight}px`');
+    expect(map).toContain('homeMapDimensionLabel(layout)');
     expect(map).not.toContain('minWidth: builderMode');
     expect(map).not.toContain('minHeight: builderMode');
     expect(detail).toContain('data-testid="home-map-room-basics-editor"');
