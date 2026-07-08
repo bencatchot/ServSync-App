@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/multiple-invoices-foundation-v1`
+- Starting main SHA: `ee011756bc6990ffc65cb12bcce708b0dad4f872`
+- Files changed:
+  - `servsync-multiple-invoices-foundation.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/multiple-invoices-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a SQL/RLS/types/tests foundation for future multiple invoices from one estimate. The SQL patch adds `invoices.invoice_type` with allowed values `total`, `deposit`, `progress`, and `final`; adds nullable positive `invoice_sequence`; preserves multiple invoices per `estimate_id` by avoiding uniqueness constraints; backfills existing invoices to `total`; backfills invoices tied to durable job work items to `progress`; and replaces the partial job/work-item invoice RPC so future partial invoices explicitly write `invoice_type = 'progress'`. App invoice selects and TypeScript types now include the foundation fields.
+- Reason for change: ServSync can technically store multiple invoices per estimate, but the app lacked structured invoice purpose/order fields. This foundation prepares for later deposit/progress/final/total invoice workflows without enabling the frontend multi-invoice experience yet.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted multiple-invoices foundation source-static tests
+  - targeted security catalog tests attempted; blocked locally because Supabase CLI is not linked to sandbox `zpzdkoaubyjtsomccxya`
+  - targeted partial invoicing foundation tests attempted; blocked locally because `.env.test.local` / `VITE_SUPABASE_URL` test credentials are not present in this clone
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/types/tests/docs foundation only. No frontend invoice type picker, create-another-invoice UI, linked invoice summary UI, remaining-balance UI, over-invoice warning, Stripe/payment behavior, send/email/SMS changes, Home History changes, homeowner invoice redesign, change orders, or line-level remaining calculations are included.
+  - Production SQL is not applied by this implementation task. The SQL patch requires separate sandbox validation and explicit production-apply approval before the new columns are available in deployed environments; live sandbox catalog/partial-invoice tests should be rerun after linking Supabase CLI to sandbox and loading approved test env.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the multiple-invoice SQL foundation and keeps deposit/progress/final UI future-scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The invoice current-state description now documents structured invoice purpose/order fields as a foundation, not a completed multi-invoice workflow.
+
 - Branch: `codex/contractor-estimate-creation-cleanup-v1b`
 - Starting main SHA: `f3f2cf6cdce13cad54dcedf347e2cc4df5d1c09d`
 - Files changed:

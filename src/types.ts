@@ -31,6 +31,7 @@ export type EstimateLaborMode = 'job_total' | 'line_specific';
 export type EstimateChargeType = 'flat' | 'hourly';
 export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
+export type InvoiceType = 'total' | 'deposit' | 'progress' | 'final';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type JobWorkItemCompletionStatus = 'open' | 'completed' | 'declined' | 'removed';
 export type JobWorkItemBillingStatus = 'unbilled' | 'drafted' | 'invoiced' | 'not_billable';
@@ -208,6 +209,8 @@ export interface Invoice {
   home_label?: string | null;
   home_address?: string | null;
   invoice_number: string;
+  invoice_type: InvoiceType;
+  invoice_sequence?: number | null;
   title: string;
   scope: string;
   notes: string;
