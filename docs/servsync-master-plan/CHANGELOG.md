@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/home-map-responsive-room-labels-v1`
+- Starting main SHA: `82291cad7f29ba403abff0a504bd3fae5820203c`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added responsive Home Map Builder room label modes so large rooms keep full labels, medium rooms use compact labels, small rooms use minimal labels, and very small or narrow selected rooms use an external floating callout instead of forcing full label content inside the true-size room footprint.
+- Reason for change: True feet-based room boxes now render correctly, but narrow spaces such as hallways could still overflow because label content used one fixed mini-card pattern regardless of the measured box size.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder responsive label tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, backend changes, storage bucket/policy changes, auth, billing, env/config/package/lock/deployment/native/service-worker changes, manual deployment, production data, Home Map persistence/autosave schema changes, grid true-size scaling changes, permission changes, floor-plan/CAD/LiDAR/3D behavior, key locations, contractor visibility, or shared member/viewer expansion are included.
+  - Very small rooms preserve their measured grid footprint; label detail may move into a selected floating callout for readability and tap usability.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records responsive room labels for true-size Home Map Builder room boxes.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend label/layout polish within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/deck-true-size-source-fix-v1`
 - Starting main SHA: `e4dfcf982480f66d90b25b61a3a660623f0ee3d1`
 - Files changed:

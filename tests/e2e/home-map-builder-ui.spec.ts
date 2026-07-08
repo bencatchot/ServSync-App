@@ -242,6 +242,38 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('absolute -bottom-3 -right-3 z-20 inline-flex h-9 w-9');
   });
 
+  test('room labels adapt to small true-size footprints without resizing the measured box', () => {
+    const app = appSource();
+    const helper = sourceBetween(app, 'const homeMapRoomLabelModeForBox =', 'const loadHomeRooms =');
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+
+    expect(app).toContain("type HomeMapRoomLabelMode = 'full' | 'compact' | 'minimal' | 'external';");
+    expect(helper).toContain('const pixelWidth = box.widthFeet * canvasCellWidth');
+    expect(helper).toContain('const pixelHeight = box.depthFeet * canvasCellHeight');
+    expect(helper).toContain('pixelWidth >= 150 && pixelHeight >= 88');
+    expect(helper).toContain('pixelWidth >= 96 && pixelHeight >= 56');
+    expect(helper).toContain("return 'external'");
+    expect(helper).toContain("return 'minimal'");
+    expect(map).toContain('const labelMode = homeMapRoomLabelModeForBox(box, canvasCellWidth, canvasCellHeight)');
+    expect(map).toContain('data-testid="home-map-room-label"');
+    expect(map).toContain('data-label-mode={labelMode}');
+    expect(map).toContain("labelMode === 'full'");
+    expect(map).toContain("labelMode === 'compact'");
+    expect(map).toContain("labelMode === 'minimal'");
+    expect(map).toContain("labelMode === 'external'");
+    expect(map).toContain('const showExternalCallout = showExternalLabel && isSelected');
+    expect(map).toContain('data-testid="home-map-room-floating-label"');
+    expect(map).toContain('max-w-[calc(100%-0.5rem)]');
+    expect(map).toContain('overflow-hidden');
+    expect(map).toContain('truncate');
+    expect(map).toContain('const roomMetadata = [room.room_type, layout.floor_label || room.floor_label].filter(Boolean).join');
+    expect(map).toContain("{roomMetadata || 'Room box'}");
+    expect(map).toContain('width: `${box.widthFeet * canvasCellWidth}px`');
+    expect(map).toContain('height: `${box.depthFeet * canvasCellHeight}px`');
+    expect(map).not.toContain('minWidth: builderMode');
+    expect(map).not.toContain('minHeight: builderMode');
+  });
+
   test('unmapped rooms can be added without creating duplicate rooms', () => {
     const app = appSource();
     const addExisting = sourceBetween(app, 'const addExistingRoomToHomeMap = async (homeId: string, room: HomeRoom) => {', "const createHomeMapRoomBox = async");

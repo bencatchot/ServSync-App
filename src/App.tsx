@@ -511,6 +511,7 @@ type HomeMapBox = {
   widthFeet: number;
   depthFeet: number;
 };
+type HomeMapRoomLabelMode = 'full' | 'compact' | 'minimal' | 'external';
 type HomeAssetDraft = {
   id: string | null;
   home_id: string;
@@ -10275,6 +10276,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return `${box.widthFeet} x ${box.depthFeet} ft`;
   };
 
+  const homeMapRoomLabelModeForBox = (box: HomeMapBox, canvasCellWidth: number, canvasCellHeight: number): HomeMapRoomLabelMode => {
+    const pixelWidth = box.widthFeet * canvasCellWidth;
+    const pixelHeight = box.depthFeet * canvasCellHeight;
+    const isVeryNarrow = pixelWidth < 56 || pixelHeight < 34 || pixelWidth / Math.max(pixelHeight, 1) < 0.55;
+    if (isVeryNarrow) return 'external';
+    if (pixelWidth >= 150 && pixelHeight >= 88) return 'full';
+    if (pixelWidth >= 96 && pixelHeight >= 56) return 'compact';
+    return 'minimal';
+  };
+
   const loadHomeRooms = useCallback(async () => {
     if (!supabase) return;
     const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
@@ -15740,6 +15751,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 const box = homeMapBoxFromLayout(layout);
                 const measurements = homeMapDimensionLabel(layout);
                 const isSelected = selectedHomeRoomDetailId === room.id;
+                const labelMode = homeMapRoomLabelModeForBox(box, canvasCellWidth, canvasCellHeight);
+                const roomMetadata = [room.room_type, layout.floor_label || room.floor_label].filter(Boolean).join(' • ');
+                const showExternalLabel = labelMode === 'external';
+                const showExternalCallout = showExternalLabel && isSelected;
                 return (
                   <div
                     key={layout.id}
@@ -15787,15 +15802,66 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     onPointerCancel={event => endPointerInteraction(event)}
                   >
                     <span aria-hidden="true" className="absolute -inset-2 rounded-xl" data-testid="home-map-room-touch-target" />
-                    <span className="pointer-events-none absolute left-1 top-1 max-w-[150px] select-none rounded-lg bg-white/95 px-2 py-1 shadow-sm [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none]">
-                      <span className="flex items-start gap-1">
-                        {canManage && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
-                        <span className="block break-words text-sm font-bold text-slate-950">{room.name}</span>
-                      </span>
-                      <span className="mt-1 block text-xs leading-4 text-slate-500">{[room.room_type, layout.floor_label || room.floor_label].filter(Boolean).join(' • ') || 'Room box'}</span>
-                      {measurements && <span className="mt-1 block text-xs font-semibold text-blue-700">{measurements}</span>}
+                    <span
+                      className={`pointer-events-none absolute left-1 top-1 max-w-[calc(100%-0.5rem)] select-none overflow-hidden rounded-lg bg-white/95 shadow-sm [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none] ${
+                        labelMode === 'full'
+                          ? 'px-2 py-1'
+                          : labelMode === 'compact'
+                            ? 'px-1.5 py-1'
+                            : 'px-1 py-0.5'
+                      }`}
+                      data-testid="home-map-room-label"
+                      data-label-mode={labelMode}
+                    >
+                      {labelMode === 'full' && (
+                        <>
+                          <span className="flex min-w-0 items-start gap-1">
+                            {canManage && <Move size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />}
+                            <span className="block min-w-0 truncate text-sm font-bold text-slate-950">{room.name}</span>
+                          </span>
+                          <span className="mt-1 block truncate text-xs leading-4 text-slate-500">{roomMetadata || 'Room box'}</span>
+                          {measurements && <span className="mt-1 block truncate text-xs font-semibold text-blue-700">{measurements}</span>}
+                        </>
+                      )}
+                      {labelMode === 'compact' && (
+                        <>
+                          <span className="block truncate text-xs font-bold leading-4 text-slate-950">{room.name}</span>
+                          {measurements && <span className="block truncate text-[11px] font-semibold leading-4 text-blue-700">{measurements}</span>}
+                        </>
+                      )}
+                      {labelMode === 'minimal' && (
+                        <span className="block truncate text-[10px] font-bold leading-3 text-slate-950">{room.name || measurements}</span>
+                      )}
+                      {showExternalLabel && (
+                        <span className="block truncate text-[10px] font-bold leading-3 text-blue-700">{measurements || room.name}</span>
+                      )}
                     </span>
-                    {canManage && builderMode && (
+                    {showExternalCallout && (
+                      <span
+                        className="absolute left-0 top-full z-20 mt-1 w-max max-w-[180px] select-none rounded-lg border border-blue-200 bg-white px-2 py-1 text-left shadow-lg [touch-action:manipulation] [-webkit-touch-callout:none] [-webkit-user-select:none]"
+                        data-testid="home-map-room-floating-label"
+                        onPointerDown={event => event.stopPropagation()}
+                      >
+                        <span className="block truncate text-xs font-bold leading-4 text-slate-950">{room.name}</span>
+                        {measurements && <span className="block truncate text-[11px] font-semibold leading-4 text-blue-700">{measurements}</span>}
+                        {canManage && builderMode && (
+                          <button
+                            type="button"
+                            className="mt-1 inline-flex select-none items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold text-blue-700 [touch-action:manipulation] [-webkit-touch-callout:none] [-webkit-user-select:none] hover:bg-blue-100"
+                            data-testid="home-map-room-edit"
+                            onPointerDown={event => event.stopPropagation()}
+                            onClick={event => {
+                              event.stopPropagation();
+                              openHomeMapRoomEditor(room, layout);
+                            }}
+                          >
+                            <Pencil size={11} />
+                            Edit
+                          </button>
+                        )}
+                      </span>
+                    )}
+                    {canManage && builderMode && !showExternalCallout && (
                       <button
                         type="button"
                         className="absolute left-0 top-full z-20 mt-1 inline-flex select-none items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 shadow-sm [touch-action:manipulation] [-webkit-touch-callout:none] [-webkit-user-select:none] hover:bg-blue-100"
