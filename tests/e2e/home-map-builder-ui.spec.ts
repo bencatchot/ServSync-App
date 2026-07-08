@@ -401,6 +401,8 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(constants).toContain('HOME_MAP_WORKSPACE_HEIGHT');
     expect(constants).toContain('HOME_MAP_ZOOM_MIN');
     expect(constants).toContain('HOME_MAP_ZOOM_MAX');
+    expect(constants).toContain('const HOME_MAP_ZOOM_MIN = 0.5');
+    expect(constants).toContain('const HOME_MAP_ZOOM_MAX = 3');
     expect(builder).toContain('data-testid="home-map-zoom-out"');
     expect(builder).toContain('data-testid="home-map-fit-view"');
     expect(builder).toContain('data-testid="home-map-zoom-in"');
@@ -421,6 +423,50 @@ test.describe('Home Map Builder dedicated view', () => {
     expect(map).toContain('box.widthFeet * canvasCellWidth');
     expect(app).not.toContain('react-rnd');
     expect(app).not.toContain('interactjs');
+  });
+
+  test('mobile pinch zoom changes viewport scale without changing feet geometry', () => {
+    const app = appSource();
+    const stateSource = sourceBetween(app, 'const [homeMapDrag, setHomeMapDrag]', 'const [homeAssetsByHomeId, setHomeAssetsByHomeId]');
+    const helper = sourceBetween(app, 'const clampHomeMapZoom =', 'const feetFromMeasurement =');
+    const map = sourceBetween(app, 'const renderHomeMapSection =', 'const renderHomeAssetForm =');
+
+    expect(app).toContain('type HomeMapPinchGesture = {');
+    expect(app).toContain('startDistance: number;');
+    expect(app).toContain('startZoom: number;');
+    expect(app).toContain('midpointX: number;');
+    expect(app).toContain('startScrollLeft: number;');
+    expect(stateSource).toContain('homeMapPinchGestureRef');
+    expect(stateSource).toContain('useRef<HomeMapPinchGesture | null>(null)');
+    expect(helper).toContain('Math.min(HOME_MAP_ZOOM_MAX, Math.max(HOME_MAP_ZOOM_MIN');
+    expect(helper).toContain("const homeMapTouchDistance = (touches: TouchEvent<HTMLDivElement>['touches'])");
+    expect(helper).toContain("const homeMapTouchMidpoint = (touches: TouchEvent<HTMLDivElement>['touches'], element: HTMLElement)");
+    expect(map).toContain('const startHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {');
+    expect(map).toContain('if (!builderMode || event.touches.length !== 2) return;');
+    expect(map).toContain('setHomeMapDrag(null);');
+    expect(map).toContain('startZoom: homeMapZoom');
+    expect(map).toContain('const moveHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {');
+    expect(map).toContain('if (!gesture?.active || event.touches.length !== 2) return;');
+    expect(map).toContain('event.preventDefault();');
+    expect(map).toContain('const nextZoom = clampHomeMapZoom(gesture.startZoom * (nextDistance / gesture.startDistance));');
+    expect(map).toContain('setHomeMapZoom(nextZoom);');
+    expect(map).toContain('scrollContainer.scrollLeft = Math.max(0, nextScrollLeft);');
+    expect(map).toContain('scrollContainer.scrollTop = Math.max(0, nextScrollTop);');
+    expect(map).toContain('onTouchStartCapture={startHomeMapPinch}');
+    expect(map).toContain('onTouchMoveCapture={moveHomeMapPinch}');
+    expect(map).toContain('onTouchEndCapture={endHomeMapPinch}');
+    expect(map).toContain('onTouchCancelCapture={endHomeMapPinch}');
+    expect(map).toContain('box.xFeet * canvasCellWidth');
+    expect(map).toContain('box.yFeet * canvasCellHeight');
+    expect(map).toContain('box.widthFeet * canvasCellWidth');
+    expect(map).toContain('box.depthFeet * canvasCellHeight');
+    expect(map).toContain('Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth)');
+    expect(map).toContain('Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight)');
+    expect(map).toContain('homeMapRoomLabelModeForBox(box, canvasCellWidth, canvasCellHeight)');
+    expect(map).toContain('data-testid="home-map-resize-handle"');
+    expect(map).toContain('data-testid="home-map-room-box"');
+    expect(map).not.toContain('minWidth: builderMode');
+    expect(map).not.toContain('minHeight: builderMode');
   });
 
   test('future floor-plan objects and upload remain documented-only, not live behavior', () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode, TouchEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import {
@@ -512,6 +512,15 @@ type HomeMapBox = {
   depthFeet: number;
 };
 type HomeMapRoomLabelMode = 'full' | 'compact' | 'minimal' | 'external';
+type HomeMapPinchGesture = {
+  active: boolean;
+  startDistance: number;
+  startZoom: number;
+  midpointX: number;
+  midpointY: number;
+  startScrollLeft: number;
+  startScrollTop: number;
+};
 type HomeAssetDraft = {
   id: string | null;
   home_id: string;
@@ -7014,8 +7023,8 @@ const HOME_MAP_GRID_ROWS = 40;
 const HOME_MAP_MIN_ROOM_GRID_UNITS = 1;
 const HOME_MAP_WORKSPACE_WIDTH = HOME_MAP_GRID_COLUMNS * HOME_MAP_PIXELS_PER_FOOT;
 const HOME_MAP_WORKSPACE_HEIGHT = HOME_MAP_GRID_ROWS * HOME_MAP_PIXELS_PER_FOOT;
-const HOME_MAP_ZOOM_MIN = 0.7;
-const HOME_MAP_ZOOM_MAX = 1.4;
+const HOME_MAP_ZOOM_MIN = 0.5;
+const HOME_MAP_ZOOM_MAX = 3;
 const HOME_ASSET_CATEGORIES = ['HVAC', 'Plumbing', 'Electrical', 'Appliance', 'Roof', 'Exterior', 'Garage', 'Safety', 'Other'];
 
 type ManualHomeDocumentPrepareResponse = {
@@ -9856,6 +9865,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeMapRoomsPanelOpen, setHomeMapRoomsPanelOpen] = useState(false);
   const homeMapAutosaveTimerRef = useRef<number | null>(null);
   const homeMapSaveInFlightRef = useRef(false);
+  const homeMapPinchGestureRef = useRef<HomeMapPinchGesture | null>(null);
   const [homeAssetsByHomeId, setHomeAssetsByHomeId] = useState<Record<string, HomeAsset[]>>({});
   const [loadingHomeAssets, setLoadingHomeAssets] = useState(false);
   const [homeAssetDraft, setHomeAssetDraft] = useState<HomeAssetDraft | null>(null);
@@ -10219,6 +10229,30 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const snapHomeMapFeet = (value: number, min: number, max: number) => {
     if (!Number.isFinite(value)) return min;
     return Math.min(max, Math.max(min, Math.round(value)));
+  };
+
+  const clampHomeMapZoom = (value: number) => {
+    if (!Number.isFinite(value)) return 1;
+    return Math.min(HOME_MAP_ZOOM_MAX, Math.max(HOME_MAP_ZOOM_MIN, Number(value.toFixed(2))));
+  };
+
+  const homeMapTouchDistance = (touches: TouchEvent<HTMLDivElement>['touches']) => {
+    if (touches.length < 2) return 0;
+    const firstTouch = touches.item(0);
+    const secondTouch = touches.item(1);
+    if (!firstTouch || !secondTouch) return 0;
+    return Math.hypot(firstTouch.clientX - secondTouch.clientX, firstTouch.clientY - secondTouch.clientY);
+  };
+
+  const homeMapTouchMidpoint = (touches: TouchEvent<HTMLDivElement>['touches'], element: HTMLElement) => {
+    const firstTouch = touches.item(0);
+    const secondTouch = touches.item(1);
+    const rect = element.getBoundingClientRect();
+    if (!firstTouch || !secondTouch) return { x: rect.width / 2, y: rect.height / 2 };
+    return {
+      x: (firstTouch.clientX + secondTouch.clientX) / 2 - rect.left,
+      y: (firstTouch.clientY + secondTouch.clientY) / 2 - rect.top,
+    };
   };
 
   const feetFromMeasurement = (value: number | null | undefined, unit: string | null | undefined) => {
@@ -15686,6 +15720,48 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setHomeMapDrag(null);
     };
 
+    const startHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
+      if (!builderMode || event.touches.length !== 2) return;
+      const startDistance = homeMapTouchDistance(event.touches);
+      if (!startDistance) return;
+      event.preventDefault();
+      setHomeMapDrag(null);
+      const midpoint = homeMapTouchMidpoint(event.touches, event.currentTarget);
+      homeMapPinchGestureRef.current = {
+        active: true,
+        startDistance,
+        startZoom: homeMapZoom,
+        midpointX: midpoint.x,
+        midpointY: midpoint.y,
+        startScrollLeft: event.currentTarget.scrollLeft,
+        startScrollTop: event.currentTarget.scrollTop,
+      };
+    };
+
+    const moveHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
+      const gesture = homeMapPinchGestureRef.current;
+      if (!gesture?.active || event.touches.length !== 2) return;
+      const nextDistance = homeMapTouchDistance(event.touches);
+      if (!nextDistance || !gesture.startDistance) return;
+      event.preventDefault();
+      const nextZoom = clampHomeMapZoom(gesture.startZoom * (nextDistance / gesture.startDistance));
+      const zoomRatio = nextZoom / gesture.startZoom;
+      setHomeMapZoom(nextZoom);
+      const scrollContainer = event.currentTarget;
+      const nextScrollLeft = (gesture.startScrollLeft + gesture.midpointX) * zoomRatio - gesture.midpointX;
+      const nextScrollTop = (gesture.startScrollTop + gesture.midpointY) * zoomRatio - gesture.midpointY;
+      window.requestAnimationFrame(() => {
+        scrollContainer.scrollLeft = Math.max(0, nextScrollLeft);
+        scrollContainer.scrollTop = Math.max(0, nextScrollTop);
+      });
+    };
+
+    const endHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
+      if (event.touches.length < 2) {
+        homeMapPinchGestureRef.current = null;
+      }
+    };
+
     return (
       <div className={compact ? 'rounded-lg border border-indigo-100 bg-indigo-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-map-section' : 'home-map-section'}>
         {!builderMode && (
@@ -15733,7 +15809,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             No room boxes yet. Start with rooms or hallways you already added, or create a new room box.
           </p>
         ) : (
-          <div className={builderMode ? 'h-[62vh] min-h-[420px] overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3 xl:h-[calc(100vh-190px)] xl:min-h-[620px]' : 'overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3'} data-testid="home-map-canvas-scroll">
+          <div
+            className={builderMode ? 'h-[62vh] min-h-[420px] overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3 xl:h-[calc(100vh-190px)] xl:min-h-[620px]' : 'overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3'}
+            data-testid="home-map-canvas-scroll"
+            onTouchStartCapture={startHomeMapPinch}
+            onTouchMoveCapture={moveHomeMapPinch}
+            onTouchEndCapture={endHomeMapPinch}
+            onTouchCancelCapture={endHomeMapPinch}
+          >
             <div
               className="relative rounded-xl bg-slate-50"
               data-testid="home-map-canvas"
@@ -16157,7 +16240,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <button
               type="button"
               className={buttonClass('secondary')}
-              onClick={() => setHomeMapZoom(current => Math.max(HOME_MAP_ZOOM_MIN, Number((current - 0.1).toFixed(2))))}
+              onClick={() => setHomeMapZoom(current => clampHomeMapZoom(current - 0.1))}
               data-testid="home-map-zoom-out"
               title="Zoom out"
             >
@@ -16176,7 +16259,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <button
               type="button"
               className={buttonClass('secondary')}
-              onClick={() => setHomeMapZoom(current => Math.min(HOME_MAP_ZOOM_MAX, Number((current + 0.1).toFixed(2))))}
+              onClick={() => setHomeMapZoom(current => clampHomeMapZoom(current + 0.1))}
               data-testid="home-map-zoom-in"
               title="Zoom in"
             >
@@ -16282,7 +16365,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <button
               type="button"
               className={buttonClass('secondary')}
-              onClick={() => setHomeMapZoom(current => Math.max(HOME_MAP_ZOOM_MIN, Number((current - 0.1).toFixed(2))))}
+              onClick={() => setHomeMapZoom(current => clampHomeMapZoom(current - 0.1))}
               data-testid="home-map-mobile-zoom-out"
               title="Zoom out"
             >
@@ -16301,7 +16384,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <button
               type="button"
               className={buttonClass('secondary')}
-              onClick={() => setHomeMapZoom(current => Math.min(HOME_MAP_ZOOM_MAX, Number((current + 0.1).toFixed(2))))}
+              onClick={() => setHomeMapZoom(current => clampHomeMapZoom(current + 0.1))}
               data-testid="home-map-mobile-zoom-in"
               title="Zoom in"
             >
