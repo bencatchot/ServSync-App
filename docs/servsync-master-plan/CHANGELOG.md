@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/home-map-selected-room-controls-v1`
+- Starting main SHA: `fd7b0812589ddecd63138ff25b4f96e64a7d6782`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Cleaned up Home Map Builder room boxes so visible Edit, resize, and move affordances appear only on the selected manageable room, while unselected rooms show only their true-size footprint and responsive label.
+- Reason for change: Mobile maps were visually crowded because every manageable room box showed editing controls at the same time after the true-size label and gesture hardening work.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder selected-room control tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, backend changes, storage bucket/policy changes, auth, billing, env/config/package/lock/deployment/native/mobile wrapper/service-worker changes, manual deployment, production data, Home Map persistence/autosave schema changes, room geometry model changes, grid true-size scaling changes, permission/shared visibility changes, floor-plan/CAD/LiDAR/3D behavior, key locations, dependencies, or contractor visibility are included.
+  - Selected-first drag/edit behavior should be smoke-tested on real mobile maps to confirm the reduced visual clutter still feels discoverable.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records selected-only visible controls for the dedicated Home Map Builder canvas.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend canvas UI cleanup within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-gesture-hardening-v1`
 - Starting main SHA: `3db1d991b31d5e3177fe9147042587f97ebc6bef`
 - Files changed:
