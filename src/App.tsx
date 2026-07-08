@@ -21352,6 +21352,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
   const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false);
+  const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [estimateTemplateStartNotice, setEstimateTemplateStartNotice] = useState('');
@@ -25018,6 +25019,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     index,
     itemLabel,
     laborMode,
+    compactAdvanced = false,
     onChange,
     onRemove,
   }: {
@@ -25025,6 +25027,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     index: number;
     itemLabel: 'estimate' | 'invoice';
     laborMode?: EstimateLaborMode;
+    compactAdvanced?: boolean;
     onChange: (updates: Partial<EstimateLineDraft>) => void;
     onRemove: () => void;
   }) => {
@@ -25034,122 +25037,197 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const hasSecondaryRow = showModelSpec || showSupplyStatus;
     const showLaborHours = laborMode === 'line_specific' && draftLineCanTrackLaborHours(line);
     const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
+    const advancedDetailsOpen = !compactAdvanced || Boolean(expandedEstimateLineDetails[line.id]);
+    const setAdvancedDetailsOpen = (open: boolean) => {
+      setExpandedEstimateLineDetails(prev => ({ ...prev, [line.id]: open }));
+    };
+    const descriptionField = (
+      <Field label="Description">
+        <div className="space-y-2">
+          <input
+            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+            className={inputClass()}
+            {...writingAssistProps}
+            value={line.line_title}
+            onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+            placeholder="Labor, material, trip fee..."
+          />
+          {!compactAdvanced && sourceNote ? (
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+              {sourceNote}
+            </p>
+          ) : null}
+        </div>
+      </Field>
+    );
+    const quantityField = (
+      <Field label="Qty">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
+          className={inputClass()}
+          type="number"
+          min="0"
+          step="0.01"
+          value={line.quantity}
+          onChange={event => onChange({ quantity: event.target.value })}
+        />
+      </Field>
+    );
+    const unitField = (
+      <Field label="Unit">
+        <input
+          className={inputClass()}
+          value={line.unit}
+          onChange={event => onChange({ unit: event.target.value })}
+        />
+      </Field>
+    );
+    const unitPriceField = (
+      <Field label="Unit price">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
+          className={inputClass()}
+          value={line.unit_price}
+          onChange={event => onChange({ unit_price: event.target.value })}
+          placeholder="$0.00"
+        />
+      </Field>
+    );
+    const totalBlock = (
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
+          {draftLineTotalLabel(line)}
+        </p>
+      </div>
+    );
+    const removeButton = (
+      <button
+        type="button"
+        onClick={onRemove}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+        aria-label={`Remove ${itemLabel} line ${index + 1}`}
+      >
+        <Trash2 size={15} />
+      </button>
+    );
+    const lineTypeField = (
+      <Field label="Type">
+        <select
+          className={inputClass()}
+          value={line.line_type}
+          onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
+        >
+          {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
+            <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
+          ))}
+        </select>
+      </Field>
+    );
+    const laborHoursField = showLaborHours ? (
+      <Field label="Labor hrs">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
+          className={inputClass()}
+          type="number"
+          min="0"
+          step="0.25"
+          value={line.labor_hours}
+          onChange={event => onChange({ labor_hours: event.target.value })}
+          placeholder="0"
+        />
+      </Field>
+    ) : null;
+    const modelSpecField = (
+      <Field label="Model/spec">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
+          className={inputClass()}
+          value={line.model_spec}
+          onChange={event => onChange({ model_spec: event.target.value })}
+          placeholder="Optional model, size, brand, or spec"
+        />
+      </Field>
+    );
+    const supplyStatusField = (
+      <Field label="Supply status">
+        <select
+          className={inputClass()}
+          value={line.supply_status}
+          onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
+        >
+          <option value="">Not specified</option>
+          {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </Field>
+    );
+
+    if (compactAdvanced) {
+      return (
+        <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_5rem_5rem_7rem_6rem_auto] lg:items-end">
+            {descriptionField}
+            {quantityField}
+            {unitField}
+            {unitPriceField}
+            {totalBlock}
+            {removeButton}
+          </div>
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setAdvancedDetailsOpen(!advancedDetailsOpen)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+              aria-expanded={advancedDetailsOpen}
+              aria-label={`${advancedDetailsOpen ? 'Hide' : 'Show'} estimate line item ${index + 1} more details`}
+            >
+              {advancedDetailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              More details
+            </button>
+            {advancedDetailsOpen && (
+              <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                {lineTypeField}
+                {laborHoursField}
+                {modelSpecField}
+                {supplyStatusField}
+                {sourceNote ? (
+                  <div className="lg:col-span-4">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Source note</p>
+                    <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                      {sourceNote}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
         <div className={`grid gap-3 ${priceColumnClass} lg:items-end`}>
-          <Field label="Type">
-            <select
-              className={inputClass()}
-              value={line.line_type}
-              onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
-            >
-              {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
-                <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Description">
-            <div className="space-y-2">
-              <input
-                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
-                className={inputClass()}
-                {...writingAssistProps}
-                value={line.line_title}
-                onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-                placeholder="Labor, material, trip fee..."
-              />
-              {sourceNote ? (
-                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                  {sourceNote}
-                </p>
-              ) : null}
-            </div>
-          </Field>
-          <Field label="Qty">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
-              className={inputClass()}
-              type="number"
-              min="0"
-              step="0.01"
-              value={line.quantity}
-              onChange={event => onChange({ quantity: event.target.value })}
-            />
-          </Field>
-          <Field label="Unit">
-            <input
-              className={inputClass()}
-              value={line.unit}
-              onChange={event => onChange({ unit: event.target.value })}
-            />
-          </Field>
-          <Field label="Unit price">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
-              className={inputClass()}
-              value={line.unit_price}
-              onChange={event => onChange({ unit_price: event.target.value })}
-              placeholder="$0.00"
-            />
-          </Field>
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-              {draftLineTotalLabel(line)}
-            </p>
-          </div>
-          {showLaborHours ? (
-            <Field label="Labor hrs">
-              <input
-                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
-                className={inputClass()}
-                type="number"
-                min="0"
-                step="0.25"
-                value={line.labor_hours}
-                onChange={event => onChange({ labor_hours: event.target.value })}
-                placeholder="0"
-              />
-            </Field>
-          ) : null}
-          <button
-            type="button"
-            onClick={onRemove}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-            aria-label={`Remove ${itemLabel} line ${index + 1}`}
-          >
-            <Trash2 size={15} />
-          </button>
+          {lineTypeField}
+          {descriptionField}
+          {quantityField}
+          {unitField}
+          {unitPriceField}
+          {totalBlock}
+          {laborHoursField}
+          {removeButton}
         </div>
         {hasSecondaryRow ? (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
             <div className="space-y-2">
               {showModelSpec ? (
-                <Field label="Model/spec">
-                  <input
-                    aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
-                    className={inputClass()}
-                    value={line.model_spec}
-                    onChange={event => onChange({ model_spec: event.target.value })}
-                    placeholder="Optional model, size, brand, or spec"
-                  />
-                </Field>
+                modelSpecField
               ) : null}
             </div>
             {showSupplyStatus ? (
-              <Field label="Supply status">
-                <select
-                  className={inputClass()}
-                  value={line.supply_status}
-                  onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
-                >
-                  <option value="">Not specified</option>
-                  {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </Field>
+              supplyStatusField
             ) : null}
           </div>
         ) : null}
@@ -25726,6 +25804,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <button
           type="button"
           onClick={() => {
+            setEstimateStartMode('draft');
+            setEstimateGuidedBuilderActive(false);
+            setEstimateTemplateStartNotice('');
+            setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
+          }}
+          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
+        >
+          <span className="block text-sm font-bold text-slate-950">Build blank estimate</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Create a simple quote manually.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             setEstimateStartMode('template');
             setEstimateGuidedBuilderActive(false);
             setEstimateTemplateStartNotice('');
@@ -25733,7 +25824,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }}
           className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
         >
-          <span className="block text-sm font-bold text-slate-950">Build from saved template</span>
+          <span className="block text-sm font-bold text-slate-950">Choose estimate template</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Use one of your reusable estimate templates.</span>
         </button>
         <button
@@ -25746,21 +25837,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }}
           className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
         >
-          <span className="block text-sm font-bold text-slate-950">Build with guided draft builder</span>
+          <span className="block text-sm font-bold text-slate-950">Build draft estimator</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Answer a few questions and let ServSync suggest a draft.</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setEstimateStartMode('draft');
-            setEstimateGuidedBuilderActive(false);
-            setEstimateTemplateStartNotice('');
-            setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
-          }}
-          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
-        >
-          <span className="block text-sm font-bold text-slate-950">Start blank</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">Create the estimate manually.</span>
         </button>
       </div>
     </div>
@@ -26051,13 +26129,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         aria-expanded={estimateReferenceToolsExpanded}
       >
         <span>
-          <span className="block text-sm font-bold text-slate-950">Reference tools</span>
+          <span className="block text-sm font-bold text-slate-950">Optional tools</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">
             Saved charges, Price Book, templates, and helper suggestions are available when you need them.
           </span>
         </span>
         <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
-          {estimateReferenceToolsExpanded ? 'Hide reference tools' : 'Show reference tools'}
+          {estimateReferenceToolsExpanded ? 'Hide optional tools' : 'Show optional tools'}
         </span>
       </button>
 
@@ -34967,15 +35045,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           Add line
                                         </button>
                                       </div>
-                                      {renderSavedChargeQuickPick()}
-                                      {!isInvoiceWorkspaceTab && renderPriceBookQuickPick()}
-                                      {!isInvoiceWorkspaceTab && renderEstimateHelperPanel()}
                                       {estimateDraft.line_items.map((line, index) => (
                                         renderStructuredLineDraftEditor({
                                           line,
                                           index,
                                           itemLabel: 'estimate',
                                           laborMode: estimateDraft.labor_mode,
+                                          compactAdvanced: true,
                                           onChange: updates => setEstimateDraft(d => ({
                                             ...d,
                                             line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
@@ -36213,15 +36289,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               Add line
                             </button>
                           </div>
-                          {renderSavedChargeQuickPick()}
-                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
-                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
                           {estimateDraft.line_items.map((line, index) => (
                             renderStructuredLineDraftEditor({
                               line,
                               index,
                               itemLabel: 'estimate',
                               laborMode: estimateDraft.labor_mode,
+                              compactAdvanced: true,
                               onChange: updates => setEstimateDraft(d => ({
                                 ...d,
                                 line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
