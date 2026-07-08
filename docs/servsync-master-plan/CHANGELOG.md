@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/home-map-gesture-hardening-v1`
+- Starting main SHA: `3db1d991b31d5e3177fe9147042587f97ebc6bef`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened Home Map Builder mobile gestures so the canvas owns map touch interactions. The builder now uses canvas-local non-passive native touch listeners, local touch containment, two-finger pinch zoom plus midpoint-based pan, and scoped one-finger empty-canvas pan while keeping room drag, resize, selection, and zoom buttons intact.
+- Reason for change: Real-device review after display-only pinch zoom found that browser/page gestures could still win and two-finger movement did not pan the canvas because the prior scroll anchoring used only the original midpoint.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder gesture hardening tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, backend changes, storage bucket/policy changes, auth, billing, env/config/package/lock/deployment/native/mobile wrapper/service-worker changes, manual deployment, production data, Home Map persistence/autosave schema changes, room geometry model changes, grid true-size scaling changes, permission/shared visibility changes, floor-plan/CAD/LiDAR/3D behavior, key locations, dependencies, or contractor visibility are included.
+  - Real-device iOS and Android smoke testing should verify that two-finger pinch/pan stays canvas-local while one-finger room drag and resize handles remain usable.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records canvas-owned gesture hardening for the dedicated Home Map Builder.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend mobile canvas polish within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-pinch-zoom-v1`
 - Starting main SHA: `bb1f9a115c420eed3f7de6e68be8621745160597`
 - Files changed:

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, PointerEvent, ReactNode, TouchEvent } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import {
@@ -512,15 +512,25 @@ type HomeMapBox = {
   depthFeet: number;
 };
 type HomeMapRoomLabelMode = 'full' | 'compact' | 'minimal' | 'external';
-type HomeMapPinchGesture = {
-  active: boolean;
-  startDistance: number;
-  startZoom: number;
-  midpointX: number;
-  midpointY: number;
-  startScrollLeft: number;
-  startScrollTop: number;
-};
+type HomeMapCanvasGesture =
+  | {
+      active: true;
+      mode: 'pinch';
+      startDistance: number;
+      startZoom: number;
+      startMidpointX: number;
+      startMidpointY: number;
+      startScrollLeft: number;
+      startScrollTop: number;
+    }
+  | {
+      active: true;
+      mode: 'pan';
+      startX: number;
+      startY: number;
+      startScrollLeft: number;
+      startScrollTop: number;
+    };
 type HomeAssetDraft = {
   id: string | null;
   home_id: string;
@@ -9865,7 +9875,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [homeMapRoomsPanelOpen, setHomeMapRoomsPanelOpen] = useState(false);
   const homeMapAutosaveTimerRef = useRef<number | null>(null);
   const homeMapSaveInFlightRef = useRef(false);
-  const homeMapPinchGestureRef = useRef<HomeMapPinchGesture | null>(null);
+  const homeMapCanvasScrollRef = useRef<HTMLDivElement | null>(null);
+  const [homeMapCanvasScrollElement, setHomeMapCanvasScrollElement] = useState<HTMLDivElement | null>(null);
+  const homeMapZoomRef = useRef(homeMapZoom);
+  const homeMapCanvasGestureRef = useRef<HomeMapCanvasGesture | null>(null);
   const [homeAssetsByHomeId, setHomeAssetsByHomeId] = useState<Record<string, HomeAsset[]>>({});
   const [loadingHomeAssets, setLoadingHomeAssets] = useState(false);
   const [homeAssetDraft, setHomeAssetDraft] = useState<HomeAssetDraft | null>(null);
@@ -10236,7 +10249,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return Math.min(HOME_MAP_ZOOM_MAX, Math.max(HOME_MAP_ZOOM_MIN, Number(value.toFixed(2))));
   };
 
-  const homeMapTouchDistance = (touches: TouchEvent<HTMLDivElement>['touches']) => {
+  const homeMapTouchDistance = (touches: TouchList) => {
     if (touches.length < 2) return 0;
     const firstTouch = touches.item(0);
     const secondTouch = touches.item(1);
@@ -10244,7 +10257,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return Math.hypot(firstTouch.clientX - secondTouch.clientX, firstTouch.clientY - secondTouch.clientY);
   };
 
-  const homeMapTouchMidpoint = (touches: TouchEvent<HTMLDivElement>['touches'], element: HTMLElement) => {
+  const homeMapTouchMidpoint = (touches: TouchList, element: HTMLElement) => {
     const firstTouch = touches.item(0);
     const secondTouch = touches.item(1);
     const rect = element.getBoundingClientRect();
@@ -10254,6 +10267,126 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       y: (firstTouch.clientY + secondTouch.clientY) / 2 - rect.top,
     };
   };
+
+  const homeMapTouchTargetIsInteractive = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest([
+      '[data-testid="home-map-room-box"]',
+      '[data-testid="home-map-room-edit"]',
+      '[data-testid="home-map-resize-handle"]',
+      '[data-testid="home-map-room-floating-label"]',
+      'button',
+      'input',
+      'textarea',
+      'select',
+      'label',
+      'a',
+      'summary',
+      '[role="button"]',
+      'form',
+    ].join(',')));
+  };
+
+  useEffect(() => {
+    homeMapZoomRef.current = homeMapZoom;
+  }, [homeMapZoom]);
+
+  const setHomeMapCanvasScrollNode = useCallback((node: HTMLDivElement | null) => {
+    homeMapCanvasScrollRef.current = node;
+    setHomeMapCanvasScrollElement(node);
+  }, []);
+
+  useEffect(() => {
+    const scrollContainer = homeMapCanvasScrollElement;
+    if (!homeMapBuilderHomeId || !scrollContainer) return undefined;
+
+    const startHomeMapGesture = (event: globalThis.TouchEvent) => {
+      if (event.touches.length === 2) {
+        const startDistance = homeMapTouchDistance(event.touches);
+        if (!startDistance) return;
+        event.preventDefault();
+        setHomeMapDrag(null);
+        const midpoint = homeMapTouchMidpoint(event.touches, scrollContainer);
+        homeMapCanvasGestureRef.current = {
+          active: true,
+          mode: 'pinch',
+          startDistance,
+          startZoom: homeMapZoomRef.current,
+          startMidpointX: midpoint.x,
+          startMidpointY: midpoint.y,
+          startScrollLeft: scrollContainer.scrollLeft,
+          startScrollTop: scrollContainer.scrollTop,
+        };
+        return;
+      }
+
+      if (event.touches.length === 1 && !homeMapTouchTargetIsInteractive(event.target)) {
+        const touch = event.touches.item(0);
+        if (!touch) return;
+        event.preventDefault();
+        homeMapCanvasGestureRef.current = {
+          active: true,
+          mode: 'pan',
+          startX: touch.clientX,
+          startY: touch.clientY,
+          startScrollLeft: scrollContainer.scrollLeft,
+          startScrollTop: scrollContainer.scrollTop,
+        };
+      }
+    };
+
+    const moveHomeMapGesture = (event: globalThis.TouchEvent) => {
+      const gesture = homeMapCanvasGestureRef.current;
+      if (!gesture?.active) return;
+
+      if (gesture.mode === 'pinch') {
+        if (event.touches.length !== 2) return;
+        const nextDistance = homeMapTouchDistance(event.touches);
+        if (!nextDistance || !gesture.startDistance) return;
+        event.preventDefault();
+        const currentMidpoint = homeMapTouchMidpoint(event.touches, scrollContainer);
+        const nextZoom = clampHomeMapZoom(gesture.startZoom * (nextDistance / gesture.startDistance));
+        const zoomRatio = nextZoom / gesture.startZoom;
+        setHomeMapZoom(nextZoom);
+        window.requestAnimationFrame(() => {
+          scrollContainer.scrollLeft = Math.max(0, (gesture.startScrollLeft + gesture.startMidpointX) * zoomRatio - currentMidpoint.x);
+          scrollContainer.scrollTop = Math.max(0, (gesture.startScrollTop + gesture.startMidpointY) * zoomRatio - currentMidpoint.y);
+        });
+        return;
+      }
+
+      if (gesture.mode === 'pan') {
+        if (event.touches.length !== 1) return;
+        const touch = event.touches.item(0);
+        if (!touch) return;
+        event.preventDefault();
+        scrollContainer.scrollLeft = Math.max(0, gesture.startScrollLeft + gesture.startX - touch.clientX);
+        scrollContainer.scrollTop = Math.max(0, gesture.startScrollTop + gesture.startY - touch.clientY);
+      }
+    };
+
+    const endHomeMapGesture = (event: globalThis.TouchEvent) => {
+      const gesture = homeMapCanvasGestureRef.current;
+      if (!gesture) return;
+      if (event.touches.length === 0 || (gesture.mode === 'pinch' && event.touches.length < 2) || (gesture.mode === 'pan' && event.touches.length !== 1)) {
+        homeMapCanvasGestureRef.current = null;
+      }
+    };
+
+    const touchListenerOptions = { passive: false } as AddEventListenerOptions;
+    scrollContainer.addEventListener('touchstart', startHomeMapGesture, touchListenerOptions);
+    scrollContainer.addEventListener('touchmove', moveHomeMapGesture, touchListenerOptions);
+    scrollContainer.addEventListener('touchend', endHomeMapGesture, touchListenerOptions);
+    scrollContainer.addEventListener('touchcancel', endHomeMapGesture, touchListenerOptions);
+
+    return () => {
+      scrollContainer.removeEventListener('touchstart', startHomeMapGesture);
+      scrollContainer.removeEventListener('touchmove', moveHomeMapGesture);
+      scrollContainer.removeEventListener('touchend', endHomeMapGesture);
+      scrollContainer.removeEventListener('touchcancel', endHomeMapGesture);
+      homeMapCanvasGestureRef.current = null;
+    };
+  }, [homeMapBuilderHomeId, homeMapCanvasScrollElement]);
 
   const feetFromMeasurement = (value: number | null | undefined, unit: string | null | undefined) => {
     if (!value || value <= 0) return null;
@@ -15720,48 +15853,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setHomeMapDrag(null);
     };
 
-    const startHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
-      if (!builderMode || event.touches.length !== 2) return;
-      const startDistance = homeMapTouchDistance(event.touches);
-      if (!startDistance) return;
-      event.preventDefault();
-      setHomeMapDrag(null);
-      const midpoint = homeMapTouchMidpoint(event.touches, event.currentTarget);
-      homeMapPinchGestureRef.current = {
-        active: true,
-        startDistance,
-        startZoom: homeMapZoom,
-        midpointX: midpoint.x,
-        midpointY: midpoint.y,
-        startScrollLeft: event.currentTarget.scrollLeft,
-        startScrollTop: event.currentTarget.scrollTop,
-      };
-    };
-
-    const moveHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
-      const gesture = homeMapPinchGestureRef.current;
-      if (!gesture?.active || event.touches.length !== 2) return;
-      const nextDistance = homeMapTouchDistance(event.touches);
-      if (!nextDistance || !gesture.startDistance) return;
-      event.preventDefault();
-      const nextZoom = clampHomeMapZoom(gesture.startZoom * (nextDistance / gesture.startDistance));
-      const zoomRatio = nextZoom / gesture.startZoom;
-      setHomeMapZoom(nextZoom);
-      const scrollContainer = event.currentTarget;
-      const nextScrollLeft = (gesture.startScrollLeft + gesture.midpointX) * zoomRatio - gesture.midpointX;
-      const nextScrollTop = (gesture.startScrollTop + gesture.midpointY) * zoomRatio - gesture.midpointY;
-      window.requestAnimationFrame(() => {
-        scrollContainer.scrollLeft = Math.max(0, nextScrollLeft);
-        scrollContainer.scrollTop = Math.max(0, nextScrollTop);
-      });
-    };
-
-    const endHomeMapPinch = (event: TouchEvent<HTMLDivElement>) => {
-      if (event.touches.length < 2) {
-        homeMapPinchGestureRef.current = null;
-      }
-    };
-
     return (
       <div className={compact ? 'rounded-lg border border-indigo-100 bg-indigo-50/70 p-3' : 'space-y-4'} data-testid={compact ? 'shared-home-map-section' : 'home-map-section'}>
         {!builderMode && (
@@ -15810,12 +15901,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </p>
         ) : (
           <div
-            className={builderMode ? 'h-[62vh] min-h-[420px] overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3 xl:h-[calc(100vh-190px)] xl:min-h-[620px]' : 'overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3'}
+            ref={builderMode ? setHomeMapCanvasScrollNode : undefined}
+            className={builderMode ? 'h-[62vh] min-h-[420px] select-none overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3 [overscroll-behavior:contain] [touch-action:none] [-webkit-touch-callout:none] xl:h-[calc(100vh-190px)] xl:min-h-[620px]' : 'overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3'}
             data-testid="home-map-canvas-scroll"
-            onTouchStartCapture={startHomeMapPinch}
-            onTouchMoveCapture={moveHomeMapPinch}
-            onTouchEndCapture={endHomeMapPinch}
-            onTouchCancelCapture={endHomeMapPinch}
           >
             <div
               className="relative rounded-xl bg-slate-50"
