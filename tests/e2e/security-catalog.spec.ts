@@ -106,6 +106,9 @@ const CORE_PRIVATE_TABLES = [
   'home_rooms',
   'home_room_layouts',
   'home_assets',
+  'home_map_drafts',
+  'home_map_draft_rooms',
+  'home_map_draft_room_layouts',
   'home_memberships',
   'home_membership_audit_events',
   'home_membership_email_invites',
@@ -178,6 +181,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_local_home',
+  'servsync_create_home_map_draft',
   'servsync_create_home_property_proposal',
   'servsync_create_service_agreement_template',
   'servsync_create_service_agreement_offer',
@@ -201,6 +205,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_register_manual_home_document_upload',
   'servsync_remove_job_work_item',
   'servsync_homeowner_respond_to_estimate',
+  'servsync_accept_home_map_draft',
+  'servsync_decline_home_map_draft',
   'servsync_homeowner_accept_home_property_proposal',
   'servsync_homeowner_reject_home_property_proposal',
   'servsync_homeowner_view_invoice',
@@ -210,16 +216,19 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_send_invoice',
   'servsync_send_workflow_message',
   'servsync_submit_contextual_connection_request',
+  'servsync_submit_home_map_draft',
   'servsync_submit_contractor_referral_invite',
   'servsync_sync_simple_job_work_items',
   'servsync_revoke_home_membership',
   'servsync_revoke_home_membership_email_invite',
+  'servsync_revoke_home_map_draft',
   'servsync_revoke_home_property_proposal',
   'servsync_homeowner_respond_to_service_agreement_offer',
   'servsync_send_service_agreement_offer',
   'servsync_update_local_home',
   'servsync_update_connection_shared_properties',
   'servsync_update_service_agreement_template',
+  'servsync_upsert_home_map_draft_room',
   'servsync_update_job_work_item',
   'servsync_validate_manual_home_document_upload',
   'servsync_void_invoice',
@@ -374,6 +383,9 @@ order by e.table_name;
 with expected(table_name) as (
   values
     ('contractor_home_property_proposals'),
+    ('home_map_drafts'),
+    ('home_map_draft_rooms'),
+    ('home_map_draft_room_layouts'),
     ('home_memberships'),
     ('home_membership_audit_events'),
     ('home_membership_email_invites'),
@@ -404,7 +416,7 @@ left join pg_class c
 order by e.table_name;
     `);
 
-    expect(rows, 'Foundation privilege rows should match expected table count').toHaveLength(7);
+    expect(rows, 'Foundation privilege rows should match expected table count').toHaveLength(10);
     for (const row of rows) {
       expect(row.exists, `${row.table_name} should exist`).toBe(true);
       expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);

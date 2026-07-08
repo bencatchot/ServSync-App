@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/home-map-drafts-foundation-v1`
+- Starting main SHA: `d3da1f4bef4d62b8c2da8df2c347653055403db2`
+- Files changed:
+  - `servsync-home-map-drafts-foundation.sql`
+  - `tests/e2e/home-map-drafts-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the Home Map Draft SQL/RLS/RPC foundation for future contractor-created, service-request-scoped Home Map proposals. The foundation creates draft header, draft room, and draft layout tables plus RPCs for contractor create/edit/submit/revoke and homeowner-manager accept/decline.
+- Reason for change: Contractors need a future workflow-safe way to draft map updates during active service work, while homeowners must retain ownership and approval over the permanent Home Map.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - focused Home Map Draft foundation source-static tests
+  - security catalog source update review
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Foundation only. No contractor Home Map UI, homeowner review UI, document/reminder/storage visibility changes, contractor asset browsing, estimate/job draft anchors, production SQL application, manual deployment, or production data touch is included.
+  - Sandbox SQL application and live RLS/RPC probes remain a separate approval/validation step before production SQL consideration.
+  - Future UI slices should use only the draft RPC/table boundary and must not grant contractors direct access to permanent `home_rooms`, `home_room_layouts`, or `home_assets`.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the Home Map Draft foundation, its service-request-only anchor, and deferred contractor/homeowner UI follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: This changes the Home Map workflow roadmap by introducing a contractor-created draft/approval foundation while preserving homeowner ownership of the permanent Home Map.
+
 - Branch: `codex/home-map-selected-room-controls-v1`
 - Starting main SHA: `fd7b0812589ddecd63138ff25b4f96e64a7d6782`
 - Files changed:
