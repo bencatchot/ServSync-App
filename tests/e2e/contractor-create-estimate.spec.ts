@@ -109,10 +109,10 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
     await expect(main.getByText(customerName, { exact: true })).toBeVisible();
     await expect(main.getByTestId('estimate-start-choice')).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build blank estimate$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Choose estimate template$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build draft estimator$/i })).toBeVisible();
-    await main.getByRole('button', { name: /^Build blank estimate$/i }).click();
+    await expect(main.getByRole('button', { name: /^Build blank estimate\b/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Choose estimate template\b/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build draft estimator\b/i })).toBeVisible();
+    await main.getByRole('button', { name: /^Build blank estimate\b/i }).click();
 
     const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
     const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
@@ -187,9 +187,9 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
     await expect(main.getByText(customerName, { exact: true })).toBeVisible();
     await expect(main.getByTestId('estimate-start-choice')).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build blank estimate$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Choose estimate template$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Build draft estimator$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build blank estimate\b/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Choose estimate template\b/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build draft estimator\b/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Save and use customer$/i })).toHaveCount(0);
     await expect(main.getByText(/Service job or checklist report workflow/i)).toHaveCount(0);
 
