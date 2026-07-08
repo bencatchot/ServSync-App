@@ -1357,7 +1357,7 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     labor_mode: 'job_total',
     labor_rate: '',
     job_labor_hours: '',
-    line_items: [createEstimateLineDraft()],
+    line_items: [],
     ...overrides,
   };
 }
@@ -21352,6 +21352,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
   const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
+  const [estimateLineFocusId, setEstimateLineFocusId] = useState<string | null>(null);
   const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
@@ -21571,6 +21572,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }, 6000);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!estimateLineFocusId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = Array.from(document.querySelectorAll<HTMLInputElement>('[data-estimate-line-description-id]'))
+        .find(element => element.dataset.estimateLineDescriptionId === estimateLineFocusId);
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target?.focus();
+      setEstimateLineFocusId(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [estimateDraft.line_items.length, estimateLineFocusId]);
 
   useEffect(() => {
     setNotice('');
@@ -24999,6 +25012,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
       };
     });
+    setEstimateLineFocusId(nextLine.id);
     setSavedChargeQuickPickNotice(`Added "${charge.name}" as an editable estimate line item.`);
   };
 
@@ -25011,7 +25025,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
       };
     });
+    setEstimateLineFocusId(nextLine.id);
     setEstimatePriceBookQuickPickNotice(`Added "${item.title}" from Price Book as an editable estimate line item.`);
+  };
+
+  const addBlankEstimateLineToDraft = () => {
+    const nextLine = createEstimateLineDraft();
+    setEstimateLineSourcePanel(null);
+    setEstimateDraft(draft => ({
+      ...draft,
+      line_items: [...draft.line_items, nextLine],
+    }));
+    setEstimateLineFocusId(nextLine.id);
   };
 
   const renderStructuredLineDraftEditor = ({
@@ -25046,6 +25071,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <div className="space-y-2">
           <input
             aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+            data-estimate-line-description-id={line.id}
             className={inputClass()}
             {...writingAssistProps}
             value={line.line_title}
@@ -26120,19 +26146,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
-  const renderEstimateLineItemSources = () => (
-    <div className="space-y-3" data-testid="estimate-line-item-sources">
+  const renderEstimateLineItemSources = ({ empty = false }: { empty?: boolean } = {}) => (
+    <div
+      className={empty ? 'rounded-2xl border border-dashed border-blue-200 bg-white/80 p-4 shadow-sm' : 'space-y-3'}
+      data-testid={empty ? 'estimate-line-empty-state' : 'estimate-line-item-sources'}
+    >
+      {empty && (
+        <div className="mb-3">
+          <p className="text-sm font-bold text-slate-950">No line items yet</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Start with a blank row, a saved item, or an active Price Book item. At least one line item is required before saving.
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => {
-            setEstimateLineSourcePanel(null);
-            setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }));
-          }}
+          onClick={addBlankEstimateLineToDraft}
           className={buttonClass('secondary')}
         >
           <Plus size={14} />
-          Add line
+          Add blank line
         </button>
         <button
           type="button"
@@ -34510,51 +34544,53 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   ))}
                                 </div>
 
-                                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                      else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create job</p>
-                                    <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={createEstimateCapability.disabled}
-                                    onClick={() => {
-                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create estimate</p>
-                                    <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={createInvoiceCapability.disabled}
-                                    onClick={() => {
-                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create invoice</p>
-                                    <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
-                                  </button>
-                                </div>
-                                {(createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
+                                {!estimateComposerOpen && (
+                                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
+                                        else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create job</p>
+                                      <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={createEstimateCapability.disabled}
+                                      onClick={() => {
+                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                        beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
+                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create estimate</p>
+                                      <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={createInvoiceCapability.disabled}
+                                      onClick={() => {
+                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                        beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
+                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create invoice</p>
+                                      <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
+                                    </button>
+                                  </div>
+                                )}
+                                {!estimateComposerOpen && (createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
                                   <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
                                     {createEstimateCapability.reason || createInvoiceCapability.reason}
                                   </p>
@@ -34872,6 +34908,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
+                                  {!estimateComposerOpen && (
                                   <div className="flex flex-wrap gap-2">
                                     {isInvoiceWorkspaceTab ? (
                                       <button
@@ -34902,6 +34939,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                     )}
                                   </div>
+                                  )}
                                 </div>
 
                                 {estimateComposerOpen && (
@@ -35041,24 +35079,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div className="flex flex-wrap items-center justify-between gap-3">
                                         <p className="text-sm font-bold text-slate-950">Line items</p>
                                       </div>
-                                      {renderEstimateLineItemSources()}
-                                      {estimateDraft.line_items.map((line, index) => (
-                                        renderStructuredLineDraftEditor({
-                                          line,
-                                          index,
-                                          itemLabel: 'estimate',
-                                          laborMode: estimateDraft.labor_mode,
-                                          compactAdvanced: true,
-                                          onChange: updates => setEstimateDraft(d => ({
-                                            ...d,
-                                            line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                                          })),
-                                          onRemove: () => setEstimateDraft(d => ({
-                                            ...d,
-                                            line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                                          })),
-                                        })
-                                      ))}
+                                      {estimateDraft.line_items.length === 0 ? (
+                                        renderEstimateLineItemSources({ empty: true })
+                                      ) : (
+                                        <>
+                                          {estimateDraft.line_items.map((line, index) => (
+                                            renderStructuredLineDraftEditor({
+                                              line,
+                                              index,
+                                              itemLabel: 'estimate',
+                                              laborMode: estimateDraft.labor_mode,
+                                              compactAdvanced: true,
+                                              onChange: updates => setEstimateDraft(d => ({
+                                                ...d,
+                                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                                              })),
+                                              onRemove: () => setEstimateDraft(d => ({
+                                                ...d,
+                                                line_items: d.line_items.filter(item => item.id !== line.id),
+                                              })),
+                                            })
+                                          ))}
+                                          {renderEstimateLineItemSources()}
+                                        </>
+                                      )}
                                     </div>
 
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -36030,6 +36074,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Back to Jobs Overview
                           </button>
                         </div>
+                        {!estimateComposerOpen && (
                         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
@@ -36075,6 +36120,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Create invoice
                           </button>
                         </div>
+                        )}
 
                         {!selectedJobsCustomerName && (
                           <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
@@ -36294,24 +36340,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Line items</p>
                           </div>
-                          {renderEstimateLineItemSources()}
-                          {estimateDraft.line_items.map((line, index) => (
-                            renderStructuredLineDraftEditor({
-                              line,
-                              index,
-                              itemLabel: 'estimate',
-                              laborMode: estimateDraft.labor_mode,
-                              compactAdvanced: true,
-                              onChange: updates => setEstimateDraft(d => ({
-                                ...d,
-                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                              })),
-                              onRemove: () => setEstimateDraft(d => ({
-                                ...d,
-                                line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                              })),
-                            })
-                          ))}
+                          {estimateDraft.line_items.length === 0 ? (
+                            renderEstimateLineItemSources({ empty: true })
+                          ) : (
+                            <>
+                              {estimateDraft.line_items.map((line, index) => (
+                                renderStructuredLineDraftEditor({
+                                  line,
+                                  index,
+                                  itemLabel: 'estimate',
+                                  laborMode: estimateDraft.labor_mode,
+                                  compactAdvanced: true,
+                                  onChange: updates => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                                  })),
+                                  onRemove: () => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.filter(item => item.id !== line.id),
+                                  })),
+                                })
+                              ))}
+                              {renderEstimateLineItemSources()}
+                            </>
+                          )}
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">

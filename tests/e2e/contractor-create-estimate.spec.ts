@@ -68,13 +68,16 @@ test.describe('contractor estimate creation UI structure', () => {
 
     expect(source).not.toContain('renderEstimateReferenceTools');
     expect(source).not.toContain('Optional tools');
-    expect(lineSourceSource).toContain('Add line');
+    expect(lineSourceSource).toContain('Add blank line');
     expect(lineSourceSource).toContain('Add saved item');
     expect(lineSourceSource).toContain('Add from Price Book');
+    expect(lineSourceSource).toContain('estimate-line-empty-state');
+    expect(lineSourceSource).toContain('addBlankEstimateLineToDraft');
     expect(lineSourceSource).toContain('renderSavedChargeQuickPick()');
     expect(lineSourceSource).toContain('renderPriceBookQuickPick()');
     expect(lineSourceSource).not.toContain('renderEstimateHelperPanel()');
     expect(lineSourceSource).not.toContain('renderSavedEstimateTemplateStartPicker');
+    expect(source).toContain('line_items: []');
 
     expect(lineEditorSource).toContain('compactAdvanced = false');
     expect(lineEditorSource).toContain('More details');
@@ -85,8 +88,10 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(lineEditorSource).toContain('Source note');
     expect(jobsEstimateComposerSource).toContain('compactAdvanced: true');
     expect(jobsEstimateComposerSource).toContain('renderEstimateLineItemSources()');
+    expect(jobsEstimateComposerSource).toContain('renderEstimateLineItemSources({ empty: true })');
     expect(jobsEstimateComposerSource).toContain('Back to estimate options');
     expect(jobsEstimateComposerSource).toContain('Discard draft');
+    expect(jobsEstimateComposerSource.indexOf('estimateDraft.line_items.map')).toBeLessThan(jobsEstimateComposerSource.indexOf('renderEstimateLineItemSources()'));
   });
 });
 
@@ -119,13 +124,28 @@ test.describe('contractor mutating estimate creation', () => {
     await main.getByRole('button', { name: /^Build blank estimate\b/i }).click();
     await expect(main.getByRole('button', { name: /^Back to estimate options$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Discard draft$/i }).first()).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Add line$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Create new customer$/i })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Create estimate$/i })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Create invoice$/i })).toHaveCount(0);
+    await expect(main.getByTestId('estimate-line-empty-state')).toBeVisible();
+    await expect(main.getByRole('textbox', { name: /^Estimate line item 1 description$/i })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Add blank line$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Add saved item$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Add from Price Book$/i })).toBeVisible();
 
+    await main.getByRole('button', { name: /^Add blank line$/i }).click();
+    const lineDescriptionField = main.getByRole('textbox', { name: /^Estimate line item 1 description$/i });
+    await expect(lineDescriptionField).toBeVisible();
+    await expect(lineDescriptionField).toBeFocused();
+    const addBlankLineButton = main.getByRole('button', { name: /^Add blank line$/i });
+    const lineBox = await lineDescriptionField.boundingBox();
+    const addBox = await addBlankLineButton.boundingBox();
+    expect(lineBox, 'line item description should have a visible bounding box').not.toBeNull();
+    expect(addBox, 'add controls should have a visible bounding box').not.toBeNull();
+    expect(addBox!.y).toBeGreaterThan(lineBox!.y);
+
     const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
     const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
-    const lineDescriptionField = main.getByRole('textbox', { name: /^Estimate line item 1 description$/i });
     const lineQuantityField = main.getByRole('spinbutton', { name: /^Estimate line item 1 quantity$/i });
     const lineUnitPriceField = main.getByRole('textbox', { name: /^Estimate line item 1 unit price$/i });
 

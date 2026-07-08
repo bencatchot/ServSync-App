@@ -14,8 +14,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Cleaned up the contractor estimate creation UI so the start choices read as `Build blank estimate`, `Choose estimate template`, and `Build draft estimator`; the blank and template paths continue into the normal single-page estimate form; the broad in-editor optional-tools drawer was replaced with line-item actions for `Add line`, `Add saved item`, and `Add from Price Book`; and advanced line-item metadata is moved behind a per-line `More details` control while preserving editable estimate behavior.
-- Reason for change: The estimate creation workflow was functional but visually overloaded. Contractors need the normal quote path to feel like a simple estimate form, with templates and draft builder as start paths and saved charges / Price Book as contextual line-item sources instead of a mixed toolbox inside the active editor.
+- Summary of change: Cleaned up the contractor estimate creation UI so the start choices read as `Build blank estimate`, `Choose estimate template`, and `Build draft estimator`; the blank and template paths continue into the normal single-page estimate form; the broad in-editor optional-tools drawer was replaced with contextual line-item actions for `Add blank line`, `Add saved item`, and `Add from Price Book`; top create controls are hidden while an estimate draft is active; blank estimates start with an empty line-item state; add controls move below existing line rows; and advanced line-item metadata is moved behind a per-line `More details` control while preserving editable estimate behavior.
+- Reason for change: The estimate creation workflow was functional but visually overloaded. Contractors need the normal quote path to feel like a simple estimate form, with templates and draft builder as start paths, saved charges / Price Book as contextual line-item sources, and active draft editing clearly separated from the broader create-job/create-estimate/create-invoice controls.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`
@@ -23,7 +23,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - changed-line credential-shaped secret scan
   - forbidden-scope scan
   - targeted contractor estimate creation source-static tests
-  - targeted contractor estimate-to-invoice source-static tests
+  - targeted contractor estimate creation live mutating tests
+  - targeted contractor estimate-to-invoice source-static preservation tests
   - `npm run typecheck`
   - `npm run build`
 - Known risks or follow-ups:
