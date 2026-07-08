@@ -14,7 +14,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Added a direct `Create invoice from estimate` action to saved/focused estimate records for draft, sent, and accepted estimates. The action opens the existing editable invoice composer using the frontend `sourceEstimate` seed path, copies supported estimate context and line items, and opens existing linked non-void invoices instead of creating another invoice.
+- Summary of change: Added a direct `Create invoice from estimate` action to saved/focused estimate records for draft, sent, and accepted estimates. The action opens the existing editable invoice composer using the frontend `sourceEstimate` seed path, copies supported estimate context and line items, and opens existing linked non-void invoices instead of creating another invoice. Follow-up preview fix tightened the invoice composer send-loading state so a new unsaved draft no longer displays `Sending...` before the contractor explicitly starts a send action.
 - Reason for change: Contractors need an estimate-led ordinary service workflow that can move from a saved estimate into an editable invoice draft without requiring a visible Jobs-tab step.
 - Tests/checks run:
   - `git status --short --branch`

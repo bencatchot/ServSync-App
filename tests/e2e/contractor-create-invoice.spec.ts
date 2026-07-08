@@ -100,6 +100,24 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(beginDraftSource).toContain('unit_price: lineUnitPriceInputFromCents(line.unit_price_cents)');
     expect(beginDraftSource).toContain('labor_hours: laborHoursInputFromValue(line.labor_hours)');
   });
+
+  test('invoice-from-estimate composer does not show a sending state before an explicit send', () => {
+    const source = appSource();
+    const invoiceStateSource = sourceBetween(source, 'const activeInvoiceDraftRecord =', 'const connectedHomesForPropertyLabels =');
+    const invoiceComposerActionsSource = sourceBetween(
+      source,
+      'disabled={savingInvoice || invoiceDraftSendInProgress',
+      '{invoiceDraft.job_id && (',
+    );
+
+    expect(invoiceStateSource).toContain('const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId))');
+    expect(invoiceComposerActionsSource).toContain('|| !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}');
+    expect(invoiceComposerActionsSource).toContain('{invoiceDraftSendInProgress');
+    expect(invoiceComposerActionsSource).toContain("? 'Sending...'");
+    expect(invoiceComposerActionsSource).toContain("? 'Save Invoice and Send to Homeowner'");
+    expect(invoiceComposerActionsSource).not.toContain('savingInvoice || updatingInvoiceId === editingInvoiceId');
+    expect(invoiceComposerActionsSource).not.toContain("savingInvoice ? 'Sending...'");
+  });
 });
 
 test.describe('contractor mutating invoice creation', () => {

@@ -27856,6 +27856,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const partialInvoiceSelectedTotalCents = partialInvoiceSelectedItems.reduce((sum, item) => sum + jobWorkItemLineTotalCents(item), 0);
   const activeInvoiceDraftRecord = editingInvoiceId ? invoices.find(invoice => invoice.id === editingInvoiceId) ?? null : null;
   const invoiceDraftCanSendToHomeowner = Boolean(selectedJobsSubject.homeownerUserId || activeInvoiceDraftRecord?.homeowner_user_id);
+  const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId));
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
   const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
   const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
@@ -36446,13 +36447,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 }
                               }
                             }}
-                            disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}
+                            disabled={savingInvoice || invoiceDraftSendInProgress || !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}
                             title={sendInvoiceCapability.disabled ? sendInvoiceCapability.reason : undefined}
                             data-testid="contractor-save-and-send-invoice"
                             className={buttonClass('primary')}
                           >
                             <Send size={15} />
-                            {savingInvoice || updatingInvoiceId === editingInvoiceId
+                            {invoiceDraftSendInProgress
                               ? 'Sending...'
                               : invoiceDraftCanSendToHomeowner
                                 ? 'Save Invoice and Send to Homeowner'
