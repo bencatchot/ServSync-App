@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/contractor-invoice-from-estimate-v1`
+- Starting main SHA: `a1857a82f142ee692483783d6b16970c1e545251`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a direct `Create invoice from estimate` action to saved/focused estimate records for draft, sent, and accepted estimates. The action opens the existing editable invoice composer using the frontend `sourceEstimate` seed path, copies supported estimate context and line items, and opens existing linked non-void invoices instead of creating another invoice. Follow-up preview fix tightened the invoice composer send-loading state so a new unsaved draft no longer displays `Sending...` before the contractor explicitly starts a send action.
+- Reason for change: Contractors need an estimate-led ordinary service workflow that can move from a saved estimate into an editable invoice draft without requiring a visible Jobs-tab step.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted contractor estimate-to-invoice source-static tests
+  - targeted contractor estimate/invoice UI tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, backend, Supabase, storage, package/lock, env/config/deployment/native/service-worker, manual deployment, production SQL, production data, payment/Stripe, estimate status, job creation, Home History filing, send/email/SMS/PDF modal, or invoice type changes are included.
+  - Existing linked-invoice behavior remains one non-void invoice indicator/open action for now. Invoice type selection, deposit/progress/final/total UI, create-another-invoice behavior, and fuller multi-invoice management remain future approval-gated work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the estimate-led draft invoice composer action and defers invoice types/multi-invoice follow-ups.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: This updates contractor workflow direction by documenting the new estimate-led invoice draft path for ordinary service work.
+
 - Branch: `codex/contractor-home-map-draft-ui-v1`
 - Starting main SHA: `4f69f3cea6c1399b9445e706459c18e90112a905`
 - Files changed:
