@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/contractor-home-map-draft-ui-v1`
+- Starting main SHA: `4f69f3cea6c1399b9445e706459c18e90112a905`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-home-map-drafts-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the first contractor-facing Home Map Draft UI slice inside contractor Service Requests. Contractors can create a blank request-scoped draft, add or edit draft rooms/hallways, submit for homeowner review, and revoke draft/submitted proposals through the existing Home Map Draft RPC boundary.
+- Reason for change: Contractors need a workflow-safe way to propose simple room/map updates during authorized service requests while homeowners retain ownership and approval control over the permanent Home Map.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Contractor Home Map Draft UI source-static tests
+  - targeted Home Map Draft foundation tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase function, backend, storage policy, auth, billing, env/config/package/lock/deployment/native/mobile wrapper/service-worker, estimate/job/invoice lifecycle, manual deployment, production SQL, or production data changes are included.
+  - Slice 1 starts from a blank draft only and deliberately does not import or expose the permanent Home Map. Contractors do not gain direct access to permanent `home_rooms`, `home_room_layouts`, or `home_assets`, and asset notes, documents, reminders, storage data, key locations, sensitive access fields, and homeowner-private notes remain out of scope.
+  - Homeowner review/accept/decline UI remains a separate approval-gated follow-up.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the first contractor request-scoped Home Map Draft UI slice and its guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: This changes the Home Map workflow roadmap by surfacing contractor draft creation/edit/submit/revoke UI while preserving homeowner approval before permanent map writes.
+
 - Branch: `codex/home-map-drafts-foundation-v1`
 - Starting main SHA: `d3da1f4bef4d62b8c2da8df2c347653055403db2`
 - Files changed:

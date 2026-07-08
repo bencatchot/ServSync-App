@@ -511,6 +511,54 @@ type HomeMapBox = {
   widthFeet: number;
   depthFeet: number;
 };
+type HomeMapDraftStatus = 'draft' | 'submitted' | 'accepted' | 'declined' | 'revoked';
+type ContractorHomeMapDraft = {
+  id: string;
+  home_id: string;
+  homeowner_user_id: string;
+  contractor_id: string;
+  service_request_id: string;
+  status: HomeMapDraftStatus;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+type ContractorHomeMapDraftRoom = {
+  id: string;
+  draft_id: string;
+  source_home_room_id: string | null;
+  name: string;
+  room_type: string | null;
+  floor_label: string | null;
+  area_label: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+type ContractorHomeMapDraftRoomLayout = {
+  id: string;
+  draft_room_id: string;
+  x_feet: number;
+  y_feet: number;
+  width_feet: number;
+  depth_feet: number;
+  measurement_unit: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+type ContractorHomeMapDraftRoomForm = {
+  name: string;
+  room_type: string;
+  floor_label: string;
+  area_label: string;
+  notes: string;
+  widthFeet: string;
+  depthFeet: string;
+};
 type HomeMapRoomLabelMode = 'full' | 'compact' | 'minimal' | 'external';
 type HomeMapCanvasGesture =
   | {
@@ -1906,7 +1954,7 @@ function isMissingSimpleJobWorkItemSyncRpcError(error: unknown) {
 function isMissingHomeMapSchemaError(error: unknown) {
   const err = error as { code?: string; message?: string; details?: string; hint?: string } | null | undefined;
   const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`;
-  return /home_room_layouts|home_assets/i.test(text)
+  return /home_room_layouts|home_assets|home_map_drafts|home_map_draft_rooms|home_map_draft_room_layouts/i.test(text)
     && /schema cache|could not find|does not exist|relation/i.test(text);
 }
 
@@ -7035,6 +7083,8 @@ const HOME_MAP_WORKSPACE_WIDTH = HOME_MAP_GRID_COLUMNS * HOME_MAP_PIXELS_PER_FOO
 const HOME_MAP_WORKSPACE_HEIGHT = HOME_MAP_GRID_ROWS * HOME_MAP_PIXELS_PER_FOOT;
 const HOME_MAP_ZOOM_MIN = 0.5;
 const HOME_MAP_ZOOM_MAX = 3;
+const CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET = 48;
+const CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET = 24;
 const HOME_ASSET_CATEGORIES = ['HVAC', 'Plumbing', 'Electrical', 'Appliance', 'Roof', 'Exterior', 'Garage', 'Safety', 'Other'];
 
 type ManualHomeDocumentPrepareResponse = {
@@ -21310,6 +21360,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [contractorResponseDrafts, setContractorResponseDrafts] = useState<Record<string, string>>({});
   const [contractorQuoteDrafts, setContractorQuoteDrafts] = useState<Record<string, { enabled: boolean; amount: string; scope: string }>>({});
+  const [contractorHomeMapDraftsByRequestId, setContractorHomeMapDraftsByRequestId] = useState<Record<string, ContractorHomeMapDraft>>({});
+  const [contractorHomeMapDraftRoomsByDraftId, setContractorHomeMapDraftRoomsByDraftId] = useState<Record<string, ContractorHomeMapDraftRoom[]>>({});
+  const [contractorHomeMapDraftLayoutsByRoomId, setContractorHomeMapDraftLayoutsByRoomId] = useState<Record<string, ContractorHomeMapDraftRoomLayout>>({});
+  const [contractorHomeMapSelectedRoomIds, setContractorHomeMapSelectedRoomIds] = useState<Record<string, string | null>>({});
+  const [contractorHomeMapDraftRoomForms, setContractorHomeMapDraftRoomForms] = useState<Record<string, ContractorHomeMapDraftRoomForm>>({});
+  const [contractorHomeMapDrag, setContractorHomeMapDrag] = useState<{ roomId: string; mode: 'move' | 'resize'; startX: number; startY: number; originX: number; originY: number; originWidth: number; originHeight: number } | null>(null);
+  const [contractorHomeMapDirtyRoomIds, setContractorHomeMapDirtyRoomIds] = useState<Set<string>>(() => new Set());
+  const [contractorHomeMapBusyKey, setContractorHomeMapBusyKey] = useState<string | null>(null);
   const [proposingAppointmentId, setProposingAppointmentId] = useState<string | null>(null);
   const [contractorAppointmentWindowDrafts, setContractorAppointmentWindowDrafts] = useState<Record<string, ContractorAppointmentWindowDraft>>({});
   const [proposingAppointmentWindowsRequestId, setProposingAppointmentWindowsRequestId] = useState<string | null>(null);
@@ -21625,6 +21683,228 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const inviteTeamCapability = getContractorCapabilityState(contractorEntitlementState.entitlements, 'can_invite_team_members');
   const readOnlyContractorActionReason = getContractorDisabledReason(contractorEntitlementState.entitlements, 'can_create_estimates');
 
+  const contractorDraftSnapFeet = (value: number, min: number, max: number) => {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, Math.round(value)));
+  };
+
+  const contractorHomeMapDraftBoxFromLayout = (layout: ContractorHomeMapDraftRoomLayout): HomeMapBox => {
+    const widthFeet = contractorDraftSnapFeet(layout.width_feet, HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET);
+    const depthFeet = contractorDraftSnapFeet(layout.depth_feet, HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET);
+    return {
+      layoutId: layout.id,
+      roomId: layout.draft_room_id,
+      xFeet: contractorDraftSnapFeet(layout.x_feet, 0, Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET, HOME_MAP_GRID_COLUMNS - widthFeet)),
+      yFeet: contractorDraftSnapFeet(layout.y_feet, 0, Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET, HOME_MAP_GRID_ROWS - depthFeet)),
+      widthFeet,
+      depthFeet,
+    };
+  };
+
+  const clampContractorHomeMapDraftBox = (box: HomeMapBox): HomeMapBox => {
+    const widthFeet = contractorDraftSnapFeet(box.widthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET);
+    const depthFeet = contractorDraftSnapFeet(box.depthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET);
+    return {
+      ...box,
+      widthFeet,
+      depthFeet,
+      xFeet: contractorDraftSnapFeet(box.xFeet, 0, Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET, HOME_MAP_GRID_COLUMNS - widthFeet)),
+      yFeet: contractorDraftSnapFeet(box.yFeet, 0, Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_POSITION_FEET, HOME_MAP_GRID_ROWS - depthFeet)),
+    };
+  };
+
+  const contractorHomeMapDraftLabelModeForBox = (box: HomeMapBox, canvasCellWidth: number, canvasCellHeight: number): HomeMapRoomLabelMode => {
+    const pixelWidth = box.widthFeet * canvasCellWidth;
+    const pixelHeight = box.depthFeet * canvasCellHeight;
+    const isVeryNarrow = pixelWidth < 56 || pixelHeight < 34 || pixelWidth / Math.max(pixelHeight, 1) < 0.55;
+    if (isVeryNarrow) return 'external';
+    if (pixelWidth >= 150 && pixelHeight >= 88) return 'full';
+    if (pixelWidth >= 96 && pixelHeight >= 56) return 'compact';
+    return 'minimal';
+  };
+
+  const contractorHomeMapDraftRoomFormFor = (
+    room: ContractorHomeMapDraftRoom,
+    layout: ContractorHomeMapDraftRoomLayout | null | undefined,
+  ): ContractorHomeMapDraftRoomForm => {
+    const box = layout ? contractorHomeMapDraftBoxFromLayout(layout) : {
+      layoutId: '',
+      roomId: room.id,
+      xFeet: 0,
+      yFeet: 0,
+      widthFeet: 10,
+      depthFeet: 10,
+    };
+    return contractorHomeMapDraftRoomForms[room.id] ?? {
+      name: room.name || 'New room',
+      room_type: room.room_type || '',
+      floor_label: room.floor_label || '',
+      area_label: room.area_label || '',
+      notes: room.notes || '',
+      widthFeet: String(box.widthFeet),
+      depthFeet: String(box.depthFeet),
+    };
+  };
+
+  const updateContractorHomeMapDraftRoomForm = (roomId: string, updates: Partial<ContractorHomeMapDraftRoomForm>) => {
+    setContractorHomeMapDraftRoomForms(current => {
+      const room = Object.values(contractorHomeMapDraftRoomsByDraftId).flat().find(item => item.id === roomId);
+      const layout = contractorHomeMapDraftLayoutsByRoomId[roomId];
+      const fallback = room
+        ? contractorHomeMapDraftRoomFormFor(room, layout)
+        : { name: 'New room', room_type: '', floor_label: '', area_label: '', notes: '', widthFeet: '10', depthFeet: '10' };
+      return {
+        ...current,
+        [roomId]: {
+          ...fallback,
+          ...updates,
+        },
+      };
+    });
+    setContractorHomeMapDirtyRoomIds(current => new Set(current).add(roomId));
+  };
+
+  const updateContractorHomeMapDraftLayoutLocal = (roomId: string, updates: Partial<Omit<HomeMapBox, 'layoutId' | 'roomId'>>) => {
+    const layout = contractorHomeMapDraftLayoutsByRoomId[roomId];
+    if (!layout) return;
+    const nextBox = clampContractorHomeMapDraftBox({
+      ...contractorHomeMapDraftBoxFromLayout(layout),
+      ...updates,
+    });
+    setContractorHomeMapDraftLayoutsByRoomId(current => ({
+      ...current,
+      [roomId]: {
+        ...layout,
+        x_feet: nextBox.xFeet,
+        y_feet: nextBox.yFeet,
+        width_feet: nextBox.widthFeet,
+        depth_feet: nextBox.depthFeet,
+      },
+    }));
+    setContractorHomeMapDraftRoomForms(current => {
+      const existing = current[roomId];
+      if (!existing) return current;
+      return {
+        ...current,
+        [roomId]: {
+          ...existing,
+          widthFeet: String(nextBox.widthFeet),
+          depthFeet: String(nextBox.depthFeet),
+        },
+      };
+    });
+    setContractorHomeMapDirtyRoomIds(current => new Set(current).add(roomId));
+  };
+
+  const nextContractorHomeMapDraftPosition = (draftId: string, widthFeet: number, depthFeet: number) => {
+    const existingRooms = contractorHomeMapDraftRoomsByDraftId[draftId] || [];
+    const index = existingRooms.length;
+    return {
+      xFeet: Math.min(HOME_MAP_GRID_COLUMNS - widthFeet, Math.max(0, (index * 3) % HOME_MAP_GRID_COLUMNS)),
+      yFeet: Math.min(HOME_MAP_GRID_ROWS - depthFeet, Math.max(0, Math.floor((index * 3) / HOME_MAP_GRID_COLUMNS) * 3)),
+    };
+  };
+
+  const contractorHomeMapDraftStatusLabel = (status: HomeMapDraftStatus) => ({
+    draft: 'Draft',
+    submitted: 'Submitted for homeowner review',
+    accepted: 'Approved by homeowner',
+    declined: 'Declined by homeowner',
+    revoked: 'Revoked',
+  }[status]);
+
+  const contractorHomeMapDraftStatusClass = (status: HomeMapDraftStatus) => ({
+    draft: 'bg-blue-100 text-blue-800',
+    submitted: 'bg-amber-100 text-amber-800',
+    accepted: 'bg-emerald-100 text-emerald-800',
+    declined: 'bg-red-100 text-red-800',
+    revoked: 'bg-slate-100 text-slate-700',
+  }[status]);
+
+  const contractorHomeMapDraftCanCreateForRequest = (request: ServiceRequestSummary) =>
+    Boolean(request.home_id) && !['closed', 'declined'].includes(request.status);
+
+  const contractorHomeMapDraftCanEdit = (draft: ContractorHomeMapDraft | null | undefined) =>
+    draft?.status === 'draft';
+
+  const contractorHomeMapDraftCanRevoke = (draft: ContractorHomeMapDraft | null | undefined) =>
+    draft?.status === 'draft' || draft?.status === 'submitted';
+
+  const loadContractorHomeMapDrafts = useCallback(async (requestsForDrafts: ServiceRequestSummary[]) => {
+    if (!supabase) return;
+    const homeScopedRequestIds = requestsForDrafts
+      .filter(request => Boolean(request.home_id))
+      .map(request => request.id);
+
+    if (homeScopedRequestIds.length === 0) {
+      setContractorHomeMapDraftsByRequestId({});
+      setContractorHomeMapDraftRoomsByDraftId({});
+      setContractorHomeMapDraftLayoutsByRoomId({});
+      return;
+    }
+
+    const draftsRes = await supabase
+      .from('home_map_drafts')
+      .select('id, home_id, homeowner_user_id, contractor_id, service_request_id, status, submitted_at, reviewed_at, review_note, created_at, updated_at')
+      .in('service_request_id', homeScopedRequestIds)
+      .order('updated_at', { ascending: false });
+
+    if (draftsRes.error) {
+      if (isMissingHomeMapSchemaError(draftsRes.error)) {
+        setContractorHomeMapDraftsByRequestId({});
+        setContractorHomeMapDraftRoomsByDraftId({});
+        setContractorHomeMapDraftLayoutsByRoomId({});
+        return;
+      }
+      throw draftsRes.error;
+    }
+
+    const drafts = (draftsRes.data || []) as ContractorHomeMapDraft[];
+    const latestByRequest = drafts.reduce<Record<string, ContractorHomeMapDraft>>((draftsByRequest, draft) => {
+      if (!draftsByRequest[draft.service_request_id]) draftsByRequest[draft.service_request_id] = draft;
+      return draftsByRequest;
+    }, {});
+    setContractorHomeMapDraftsByRequestId(latestByRequest);
+
+    const draftIds = drafts.map(draft => draft.id);
+    if (draftIds.length === 0) {
+      setContractorHomeMapDraftRoomsByDraftId({});
+      setContractorHomeMapDraftLayoutsByRoomId({});
+      return;
+    }
+
+    const roomsRes = await supabase
+      .from('home_map_draft_rooms')
+      .select('id, draft_id, source_home_room_id, name, room_type, floor_label, area_label, notes, sort_order, created_at, updated_at')
+      .in('draft_id', draftIds)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (roomsRes.error) throw roomsRes.error;
+    const rooms = (roomsRes.data || []) as ContractorHomeMapDraftRoom[];
+    setContractorHomeMapDraftRoomsByDraftId(rooms.reduce<Record<string, ContractorHomeMapDraftRoom[]>>((roomsByDraft, room) => {
+      roomsByDraft[room.draft_id] = [...(roomsByDraft[room.draft_id] || []), room];
+      return roomsByDraft;
+    }, {}));
+
+    const roomIds = rooms.map(room => room.id);
+    if (roomIds.length === 0) {
+      setContractorHomeMapDraftLayoutsByRoomId({});
+      return;
+    }
+
+    const layoutsRes = await supabase
+      .from('home_map_draft_room_layouts')
+      .select('id, draft_room_id, x_feet, y_feet, width_feet, depth_feet, measurement_unit, sort_order, created_at, updated_at')
+      .in('draft_room_id', roomIds)
+      .order('sort_order', { ascending: true });
+    if (layoutsRes.error) throw layoutsRes.error;
+    const layouts = (layoutsRes.data || []) as ContractorHomeMapDraftRoomLayout[];
+    setContractorHomeMapDraftLayoutsByRoomId(layouts.reduce<Record<string, ContractorHomeMapDraftRoomLayout>>((layoutsByRoom, layout) => {
+      layoutsByRoom[layout.draft_room_id] = layout;
+      return layoutsByRoom;
+    }, {}));
+  }, [supabase]);
+
   const loadContractor = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -21711,6 +21991,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       setConnections(loadedConnections);
       setServiceRequests(loadedServiceRequests);
+      await loadContractorHomeMapDrafts(loadedServiceRequests);
       setConnectionHistory(groupConnectionHistory((historyRes.data || []) as ConnectionAuditEvent[]));
       setInvites(loadedInvites);
       setConnectionRequests(loadedRequests);
@@ -22475,6 +22756,215 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(readableError(err, 'Unable to update service request.'));
     } finally {
       setUpdatingServiceRequestId(null);
+    }
+  };
+
+  const upsertContractorHomeMapDraftRoom = async (
+    draft: ContractorHomeMapDraft,
+    room: ContractorHomeMapDraftRoom | null,
+    layout: ContractorHomeMapDraftRoomLayout | null,
+    form: ContractorHomeMapDraftRoomForm,
+    boxOverride?: HomeMapBox,
+  ) => {
+    if (!supabase) return null;
+    const fallbackBox = layout
+      ? contractorHomeMapDraftBoxFromLayout(layout)
+      : clampContractorHomeMapDraftBox({
+          layoutId: '',
+          roomId: room?.id || '',
+          xFeet: 0,
+          yFeet: 0,
+          widthFeet: 10,
+          depthFeet: 10,
+        });
+    const parsedWidth = Number.parseFloat(form.widthFeet);
+    const parsedDepth = Number.parseFloat(form.depthFeet);
+    const box = clampContractorHomeMapDraftBox({
+      ...(boxOverride || fallbackBox),
+      widthFeet: Number.isFinite(parsedWidth) ? parsedWidth : fallbackBox.widthFeet,
+      depthFeet: Number.isFinite(parsedDepth) ? parsedDepth : fallbackBox.depthFeet,
+    });
+    const roomName = cleanHumanLabelText(form.name).trim();
+    if (!roomName) {
+      setError('Enter a room name before saving this Home Map draft room.');
+      return null;
+    }
+
+    const busyKey = `save-draft-room-${room?.id || draft.id}`;
+    setContractorHomeMapBusyKey(busyKey);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: upsertError } = await supabase.rpc('servsync_upsert_home_map_draft_room', {
+        p_draft_id: draft.id,
+        p_draft_room_id: room?.id ?? null,
+        p_name: roomName,
+        p_room_type: cleanHumanLabelText(form.room_type).trim() || null,
+        p_floor_label: cleanHumanLabelText(form.floor_label).trim() || null,
+        p_area_label: cleanHumanLabelText(form.area_label).trim() || null,
+        p_notes: cleanHumanWrittenText(form.notes).trim() || null,
+        p_source_home_room_id: null,
+        p_x_feet: box.xFeet,
+        p_y_feet: box.yFeet,
+        p_width_feet: box.widthFeet,
+        p_depth_feet: box.depthFeet,
+        p_sort_order: room?.sort_order ?? (contractorHomeMapDraftRoomsByDraftId[draft.id]?.length || 0),
+      });
+      if (upsertError) throw upsertError;
+      const result = data as { room?: ContractorHomeMapDraftRoom; layout?: ContractorHomeMapDraftRoomLayout } | null;
+      if (!result?.room || !result.layout) throw new Error('Home Map draft room was saved, but the response was incomplete.');
+
+      setContractorHomeMapDraftRoomsByDraftId(current => {
+        const rooms = current[draft.id] || [];
+        const nextRooms = rooms.some(item => item.id === result.room!.id)
+          ? rooms.map(item => item.id === result.room!.id ? result.room! : item)
+          : [...rooms, result.room!];
+        return {
+          ...current,
+          [draft.id]: nextRooms.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+        };
+      });
+      setContractorHomeMapDraftLayoutsByRoomId(current => ({
+        ...current,
+        [result.layout!.draft_room_id]: result.layout!,
+      }));
+      setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: result.room!.id }));
+      setContractorHomeMapDraftRoomForms(current => ({
+        ...current,
+        [result.room!.id]: {
+          name: result.room!.name,
+          room_type: result.room!.room_type || '',
+          floor_label: result.room!.floor_label || '',
+          area_label: result.room!.area_label || '',
+          notes: result.room!.notes || '',
+          widthFeet: String(contractorHomeMapDraftBoxFromLayout(result.layout!).widthFeet),
+          depthFeet: String(contractorHomeMapDraftBoxFromLayout(result.layout!).depthFeet),
+        },
+      }));
+      setContractorHomeMapDirtyRoomIds(current => {
+        const next = new Set(current);
+        next.delete(result.room!.id);
+        return next;
+      });
+      setNotice('Home Map draft room saved.');
+      return result;
+    } catch (err) {
+      setError(readableError(err, 'Unable to save Home Map draft room.'));
+      return null;
+    } finally {
+      setContractorHomeMapBusyKey(null);
+    }
+  };
+
+  const createContractorHomeMapDraft = async (request: ServiceRequestSummary) => {
+    if (!supabase) return;
+    if (!contractorHomeMapDraftCanCreateForRequest(request)) {
+      setError('Home Map drafts require an active service request tied to a homeowner property.');
+      return;
+    }
+    setContractorHomeMapBusyKey(`create-draft-${request.id}`);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_home_map_draft', {
+        p_service_request_id: request.id,
+      });
+      if (createError) throw createError;
+      const draft = data as ContractorHomeMapDraft;
+      setContractorHomeMapDraftsByRequestId(current => ({ ...current, [request.id]: draft }));
+      setContractorHomeMapDraftRoomsByDraftId(current => ({ ...current, [draft.id]: [] }));
+      setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: null }));
+      setNotice('Home Map draft created. Add rooms or hallways before submitting it for homeowner review.');
+      await loadContractorHomeMapDrafts(serviceRequests);
+    } catch (err) {
+      setError(readableError(err, 'Unable to create Home Map draft.'));
+    } finally {
+      setContractorHomeMapBusyKey(null);
+    }
+  };
+
+  const addContractorHomeMapDraftRoom = async (draft: ContractorHomeMapDraft, kind: 'room' | 'hallway') => {
+    const isHallway = kind === 'hallway';
+    const widthFeet = isHallway ? 4 : 10;
+    const depthFeet = isHallway ? 16 : 10;
+    const position = nextContractorHomeMapDraftPosition(draft.id, widthFeet, depthFeet);
+    await upsertContractorHomeMapDraftRoom(
+      draft,
+      null,
+      null,
+      {
+        name: isHallway ? 'New hallway' : 'New room',
+        room_type: isHallway ? 'Hallway' : '',
+        floor_label: '',
+        area_label: '',
+        notes: '',
+        widthFeet: String(widthFeet),
+        depthFeet: String(depthFeet),
+      },
+      {
+        layoutId: '',
+        roomId: '',
+        xFeet: position.xFeet,
+        yFeet: position.yFeet,
+        widthFeet,
+        depthFeet,
+      },
+    );
+  };
+
+  const saveSelectedContractorHomeMapDraftRoom = async (draft: ContractorHomeMapDraft) => {
+    const selectedRoomId = contractorHomeMapSelectedRoomIds[draft.id];
+    const room = (contractorHomeMapDraftRoomsByDraftId[draft.id] || []).find(item => item.id === selectedRoomId) || null;
+    if (!room) {
+      setError('Select a draft room before saving changes.');
+      return null;
+    }
+    const layout = contractorHomeMapDraftLayoutsByRoomId[room.id] || null;
+    const form = contractorHomeMapDraftRoomFormFor(room, layout);
+    return upsertContractorHomeMapDraftRoom(draft, room, layout, form);
+  };
+
+  const submitContractorHomeMapDraft = async (draft: ContractorHomeMapDraft) => {
+    if (!supabase) return;
+    if (contractorHomeMapDirtyRoomIds.size > 0 && contractorHomeMapSelectedRoomIds[draft.id]) {
+      const saved = await saveSelectedContractorHomeMapDraftRoom(draft);
+      if (!saved) return;
+    }
+    setContractorHomeMapBusyKey(`submit-draft-${draft.id}`);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: submitError } = await supabase.rpc('servsync_submit_home_map_draft', {
+        p_draft_id: draft.id,
+      });
+      if (submitError) throw submitError;
+      const updatedDraft = data as ContractorHomeMapDraft;
+      setContractorHomeMapDraftsByRequestId(current => ({ ...current, [updatedDraft.service_request_id]: updatedDraft }));
+      setNotice('Home Map draft submitted for homeowner review.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to submit Home Map draft.'));
+    } finally {
+      setContractorHomeMapBusyKey(null);
+    }
+  };
+
+  const revokeContractorHomeMapDraft = async (draft: ContractorHomeMapDraft) => {
+    if (!supabase) return;
+    setContractorHomeMapBusyKey(`revoke-draft-${draft.id}`);
+    setNotice('');
+    setError('');
+    try {
+      const { data, error: revokeError } = await supabase.rpc('servsync_revoke_home_map_draft', {
+        p_draft_id: draft.id,
+      });
+      if (revokeError) throw revokeError;
+      const updatedDraft = data as ContractorHomeMapDraft;
+      setContractorHomeMapDraftsByRequestId(current => ({ ...current, [updatedDraft.service_request_id]: updatedDraft }));
+      setNotice('Home Map draft revoked.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to revoke Home Map draft.'));
+    } finally {
+      setContractorHomeMapBusyKey(null);
     }
   };
 
@@ -25661,6 +26151,451 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     recognition.onend = () => setEstimateAssistantListening(false);
     setEstimateAssistantListening(true);
     recognition.start();
+  };
+
+  const renderContractorHomeMapDraftPanel = (request: ServiceRequestSummary) => {
+    const draft = contractorHomeMapDraftsByRequestId[request.id] || null;
+    const canCreateDraft = contractorHomeMapDraftCanCreateForRequest(request);
+    const canEditDraft = contractorHomeMapDraftCanEdit(draft);
+    const canRevokeDraft = contractorHomeMapDraftCanRevoke(draft);
+    const rooms = draft ? contractorHomeMapDraftRoomsByDraftId[draft.id] || [] : [];
+    const selectedRoomId = draft ? contractorHomeMapSelectedRoomIds[draft.id] || rooms[0]?.id || null : null;
+    const selectedRoom = rooms.find(room => room.id === selectedRoomId) || null;
+    const selectedLayout = selectedRoom ? contractorHomeMapDraftLayoutsByRoomId[selectedRoom.id] || null : null;
+    const selectedForm = selectedRoom ? contractorHomeMapDraftRoomFormFor(selectedRoom, selectedLayout) : null;
+    const mapZoom = 0.72;
+    const canvasPixelsPerFoot = HOME_MAP_PIXELS_PER_FOOT * mapZoom;
+    const canvasCellWidth = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT;
+    const canvasCellHeight = canvasPixelsPerFoot * HOME_MAP_FEET_PER_GRID_UNIT;
+    const canvasMajorGridSize = canvasPixelsPerFoot * HOME_MAP_MAJOR_GRID_EVERY_FEET;
+    const canvasWidth = HOME_MAP_WORKSPACE_WIDTH * mapZoom;
+    const canvasHeight = HOME_MAP_WORKSPACE_HEIGHT * mapZoom;
+
+    const pointerMoveForDraftRoom = (room: ContractorHomeMapDraftRoom, event: PointerEvent<HTMLElement>) => {
+      if (!contractorHomeMapDrag || contractorHomeMapDrag.roomId !== room.id) return;
+      event.preventDefault();
+      const deltaX = Math.round((event.clientX - contractorHomeMapDrag.startX) / canvasCellWidth);
+      const deltaY = Math.round((event.clientY - contractorHomeMapDrag.startY) / canvasCellHeight);
+      if (contractorHomeMapDrag.mode === 'move') {
+        const layout = contractorHomeMapDraftLayoutsByRoomId[room.id];
+        if (!layout) return;
+        const box = contractorHomeMapDraftBoxFromLayout(layout);
+        const nextX = Math.min(HOME_MAP_GRID_COLUMNS - box.widthFeet, Math.max(0, contractorHomeMapDrag.originX + deltaX));
+        const nextY = Math.min(HOME_MAP_GRID_ROWS - box.depthFeet, Math.max(0, contractorHomeMapDrag.originY + deltaY));
+        updateContractorHomeMapDraftLayoutLocal(room.id, { xFeet: nextX, yFeet: nextY });
+      } else {
+        const layout = contractorHomeMapDraftLayoutsByRoomId[room.id];
+        if (!layout) return;
+        const box = contractorHomeMapDraftBoxFromLayout(layout);
+        const nextWidth = Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET, HOME_MAP_GRID_COLUMNS - box.xFeet, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, contractorHomeMapDrag.originWidth + deltaX));
+        const nextHeight = Math.min(CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET, HOME_MAP_GRID_ROWS - box.yFeet, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, contractorHomeMapDrag.originHeight + deltaY));
+        updateContractorHomeMapDraftLayoutLocal(room.id, { widthFeet: nextWidth, depthFeet: nextHeight });
+      }
+    };
+
+    const endDraftPointerInteraction = (event: PointerEvent<HTMLElement>) => {
+      event.preventDefault();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      setContractorHomeMapDrag(null);
+    };
+
+    return (
+      <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 sm:p-4" data-testid="contractor-home-map-draft-panel">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-bold text-slate-950">Home Map draft</p>
+              {draft ? (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${contractorHomeMapDraftStatusClass(draft.status)}`} data-testid="contractor-home-map-draft-status">
+                  {contractorHomeMapDraftStatusLabel(draft.status)}
+                </span>
+              ) : (
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-indigo-700">Request-scoped</span>
+              )}
+            </div>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-indigo-950">
+              Create a draft map for this service request. The homeowner must approve it before anything changes their permanent Home Map.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
+              Draft only. Do not include access codes, keys, private homeowner details, asset notes, documents, reminders, or storage references.
+            </p>
+          </div>
+          <div className={mobileActionRowClass()}>
+            {!draft && (
+              <button
+                type="button"
+                className={mobileButtonClass('primary')}
+                data-testid="contractor-home-map-draft-create"
+                disabled={!canCreateDraft || contractorHomeMapBusyKey === `create-draft-${request.id}`}
+                onClick={() => void createContractorHomeMapDraft(request)}
+              >
+                <MapPin size={15} />
+                {contractorHomeMapBusyKey === `create-draft-${request.id}` ? 'Creating...' : 'Create Home Map draft'}
+              </button>
+            )}
+            {draft && canEditDraft && (
+              <>
+                <button
+                  type="button"
+                  className={mobileButtonClass('secondary')}
+                  data-testid="contractor-home-map-draft-add-room"
+                  disabled={Boolean(contractorHomeMapBusyKey)}
+                  onClick={() => void addContractorHomeMapDraftRoom(draft, 'room')}
+                >
+                  <Plus size={15} />
+                  Add Room
+                </button>
+                <button
+                  type="button"
+                  className={mobileButtonClass('secondary')}
+                  data-testid="contractor-home-map-draft-add-hallway"
+                  disabled={Boolean(contractorHomeMapBusyKey)}
+                  onClick={() => void addContractorHomeMapDraftRoom(draft, 'hallway')}
+                >
+                  <Plus size={15} />
+                  Add Hallway
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {!canCreateDraft && !draft && (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+            Home Map drafts are available only for active service requests tied to a homeowner property.
+          </p>
+        )}
+
+        {draft && (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="min-w-0">
+              <p className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600" data-testid="contractor-home-map-draft-copy">
+                Grid: ~1 ft. Approximate proposal only. This does not read or edit the homeowner's permanent map.
+              </p>
+              {rooms.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-indigo-200 bg-white p-4" data-testid="contractor-home-map-draft-empty">
+                  <p className="text-sm font-bold text-slate-950">No draft rooms yet</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Start blank with a room or hallway for this request.</p>
+                </div>
+              ) : (
+                <div className="overflow-auto rounded-2xl border border-slate-200 bg-slate-100 p-3" data-testid="contractor-home-map-draft-canvas-scroll">
+                  <div
+                    className="relative rounded-xl bg-slate-50"
+                    data-testid="contractor-home-map-draft-canvas"
+                    style={{
+                      width: `${canvasWidth}px`,
+                      height: `${canvasHeight}px`,
+                      minWidth: `${canvasWidth}px`,
+                      minHeight: `${canvasHeight}px`,
+                      backgroundImage: `repeating-linear-gradient(to right, rgba(30, 64, 175, 0.38) 0, rgba(30, 64, 175, 0.38) 2px, transparent 2px, transparent ${canvasMajorGridSize}px), repeating-linear-gradient(to bottom, rgba(30, 64, 175, 0.38) 0, rgba(30, 64, 175, 0.38) 2px, transparent 2px, transparent ${canvasMajorGridSize}px), repeating-linear-gradient(to right, rgba(100, 116, 139, 0.34) 0, rgba(100, 116, 139, 0.34) 1px, transparent 1px, transparent ${canvasCellWidth}px), repeating-linear-gradient(to bottom, rgba(100, 116, 139, 0.34) 0, rgba(100, 116, 139, 0.34) 1px, transparent 1px, transparent ${canvasCellHeight}px)`,
+                    }}
+                  >
+                    {rooms.map(room => {
+                      const layout = contractorHomeMapDraftLayoutsByRoomId[room.id];
+                      if (!layout) return null;
+                      const box = contractorHomeMapDraftBoxFromLayout(layout);
+                      const isSelected = selectedRoomId === room.id;
+                      const labelMode = contractorHomeMapDraftLabelModeForBox(box, canvasCellWidth, canvasCellHeight);
+                      const measurements = `${box.widthFeet} x ${box.depthFeet} ft`;
+                      const showExternalCallout = labelMode === 'external' && isSelected;
+                      const metadata = [room.room_type, room.floor_label].filter(Boolean).join(' • ');
+                      return (
+                        <div
+                          key={room.id}
+                          role="button"
+                          tabIndex={0}
+                          data-testid="contractor-home-map-draft-room-box"
+                          className={`absolute z-10 select-none rounded-xl border bg-white/85 text-left shadow-sm transition [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none] focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                            isSelected ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-indigo-200 hover:border-indigo-300'
+                          } ${canEditDraft && isSelected ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          style={{
+                            left: `${box.xFeet * canvasCellWidth}px`,
+                            top: `${box.yFeet * canvasCellHeight}px`,
+                            width: `${box.widthFeet * canvasCellWidth}px`,
+                            height: `${box.depthFeet * canvasCellHeight}px`,
+                          }}
+                          onClick={() => setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: room.id }))}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: room.id }));
+                            }
+                          }}
+                          onContextMenu={event => event.preventDefault()}
+                          onDragStart={event => event.preventDefault()}
+                          onPointerDown={event => {
+                            if (!canEditDraft) return;
+                            if (!isSelected) {
+                              setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: room.id }));
+                              return;
+                            }
+                            event.preventDefault();
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            setContractorHomeMapDrag({
+                              roomId: room.id,
+                              mode: 'move',
+                              startX: event.clientX,
+                              startY: event.clientY,
+                              originX: box.xFeet,
+                              originY: box.yFeet,
+                              originWidth: box.widthFeet,
+                              originHeight: box.depthFeet,
+                            });
+                          }}
+                          onPointerMove={event => pointerMoveForDraftRoom(room, event)}
+                          onPointerUp={event => endDraftPointerInteraction(event)}
+                          onPointerCancel={event => endDraftPointerInteraction(event)}
+                        >
+                          <span
+                            className={`pointer-events-none absolute left-1 top-1 max-w-[calc(100%-0.5rem)] select-none overflow-hidden rounded-lg bg-white/95 shadow-sm ${
+                              labelMode === 'full'
+                                ? 'px-2 py-1'
+                                : labelMode === 'compact'
+                                  ? 'px-1.5 py-1'
+                                  : 'px-1 py-0.5'
+                            }`}
+                            data-testid="contractor-home-map-draft-room-label"
+                            data-label-mode={labelMode}
+                          >
+                            {labelMode === 'full' && (
+                              <>
+                                <span className="flex min-w-0 items-start gap-1">
+                                  {canEditDraft && isSelected && <Move size={14} className="mt-0.5 shrink-0 text-indigo-500" aria-hidden="true" />}
+                                  <span className="block min-w-0 truncate text-sm font-bold text-slate-950">{room.name}</span>
+                                </span>
+                                <span className="mt-1 block truncate text-xs leading-4 text-slate-500">{metadata || 'Draft room'}</span>
+                                <span className="mt-1 block truncate text-xs font-semibold text-indigo-700">{measurements}</span>
+                              </>
+                            )}
+                            {labelMode === 'compact' && (
+                              <>
+                                <span className="block truncate text-xs font-bold leading-4 text-slate-950">{room.name}</span>
+                                <span className="block truncate text-[11px] font-semibold leading-4 text-indigo-700">{measurements}</span>
+                              </>
+                            )}
+                            {labelMode === 'minimal' && (
+                              <span className="block truncate text-[10px] font-bold leading-3 text-slate-950">{room.name || measurements}</span>
+                            )}
+                            {labelMode === 'external' && (
+                              <span className="block truncate text-[10px] font-bold leading-3 text-indigo-700">{measurements}</span>
+                            )}
+                          </span>
+                          {showExternalCallout && (
+                            <span className="absolute left-0 top-full z-20 mt-1 w-max max-w-[180px] select-none rounded-lg border border-indigo-200 bg-white px-2 py-1 text-left shadow-lg" data-testid="contractor-home-map-draft-floating-label">
+                              <span className="block truncate text-xs font-bold leading-4 text-slate-950">{room.name}</span>
+                              <span className="block truncate text-[11px] font-semibold leading-4 text-indigo-700">{measurements}</span>
+                            </span>
+                          )}
+                          {canEditDraft && isSelected && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Resize ${room.name}`}
+                              data-testid="contractor-home-map-draft-resize-handle"
+                              className="absolute -bottom-3 -right-3 z-20 inline-flex h-9 w-9 cursor-nwse-resize select-none items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm [touch-action:none] [-webkit-touch-callout:none] [-webkit-user-select:none]"
+                              onPointerDown={event => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                event.currentTarget.setPointerCapture(event.pointerId);
+                                setContractorHomeMapSelectedRoomIds(current => ({ ...current, [draft.id]: room.id }));
+                                setContractorHomeMapDrag({
+                                  roomId: room.id,
+                                  mode: 'resize',
+                                  startX: event.clientX,
+                                  startY: event.clientY,
+                                  originX: box.xFeet,
+                                  originY: box.yFeet,
+                                  originWidth: box.widthFeet,
+                                  originHeight: box.depthFeet,
+                                });
+                              }}
+                              onPointerMove={event => pointerMoveForDraftRoom(room, event)}
+                              onPointerUp={event => endDraftPointerInteraction(event)}
+                              onPointerCancel={event => endDraftPointerInteraction(event)}
+                            >
+                              <Maximize2 size={14} />
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <aside className="rounded-2xl border border-slate-200 bg-white p-3" data-testid="contractor-home-map-draft-room-editor">
+              {selectedRoom && selectedLayout && selectedForm ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Selected draft room</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      These proposal notes are homeowner-visible. Keep access details and private information out.
+                    </p>
+                  </div>
+                  <Field label="Room name">
+                    <input
+                      className={inputClass()}
+                      value={selectedForm.name}
+                      disabled={!canEditDraft}
+                      onChange={event => updateContractorHomeMapDraftRoomForm(selectedRoom.id, { name: event.target.value })}
+                    />
+                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Room type">
+                      <input
+                        className={inputClass()}
+                        value={selectedForm.room_type}
+                        disabled={!canEditDraft}
+                        placeholder="Kitchen, hallway..."
+                        onChange={event => updateContractorHomeMapDraftRoomForm(selectedRoom.id, { room_type: event.target.value })}
+                      />
+                    </Field>
+                    <Field label="Floor / level">
+                      <input
+                        className={inputClass()}
+                        value={selectedForm.floor_label}
+                        disabled={!canEditDraft}
+                        placeholder="Main floor"
+                        onChange={event => updateContractorHomeMapDraftRoomForm(selectedRoom.id, { floor_label: event.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Area label optional">
+                    <input
+                      className={inputClass()}
+                      value={selectedForm.area_label}
+                      disabled={!canEditDraft}
+                      placeholder="North side, basement..."
+                      onChange={event => updateContractorHomeMapDraftRoomForm(selectedRoom.id, { area_label: event.target.value })}
+                    />
+                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Length ft">
+                      <input
+                        className={inputClass()}
+                        type="number"
+                        min={HOME_MAP_MIN_ROOM_GRID_UNITS}
+                        max={CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET}
+                        value={selectedForm.widthFeet}
+                        disabled={!canEditDraft}
+                        onChange={event => {
+                          updateContractorHomeMapDraftRoomForm(selectedRoom.id, { widthFeet: event.target.value });
+                          updateContractorHomeMapDraftLayoutLocal(selectedRoom.id, { widthFeet: contractorDraftSnapFeet(Number.parseFloat(event.target.value), HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET) });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Width ft">
+                      <input
+                        className={inputClass()}
+                        type="number"
+                        min={HOME_MAP_MIN_ROOM_GRID_UNITS}
+                        max={CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET}
+                        value={selectedForm.depthFeet}
+                        disabled={!canEditDraft}
+                        onChange={event => {
+                          updateContractorHomeMapDraftRoomForm(selectedRoom.id, { depthFeet: event.target.value });
+                          updateContractorHomeMapDraftLayoutLocal(selectedRoom.id, { depthFeet: contractorDraftSnapFeet(Number.parseFloat(event.target.value), HOME_MAP_MIN_ROOM_GRID_UNITS, CONTRACTOR_HOME_MAP_DRAFT_MAX_SPAN_FEET) });
+                        }}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Draft notes optional">
+                    <textarea
+                      className={inputClass()}
+                      rows={3}
+                      {...writingAssistProps}
+                      value={selectedForm.notes}
+                      disabled={!canEditDraft}
+                      placeholder="General proposal notes only. No keys, access codes, private homeowner details, asset notes, documents, or reminders."
+                      onChange={event => updateContractorHomeMapDraftRoomForm(selectedRoom.id, { notes: event.target.value })}
+                    />
+                  </Field>
+                  {canEditDraft ? (
+                    <div className={mobileActionRowClass()}>
+                      <button
+                        type="button"
+                        className={mobileButtonClass('primary')}
+                        data-testid="contractor-home-map-draft-save-room"
+                        disabled={Boolean(contractorHomeMapBusyKey)}
+                        onClick={() => void saveSelectedContractorHomeMapDraftRoom(draft)}
+                      >
+                        <CheckCircle2 size={15} />
+                        {contractorHomeMapBusyKey === `save-draft-room-${selectedRoom.id}` ? 'Saving...' : contractorHomeMapDirtyRoomIds.has(selectedRoom.id) ? 'Save selected room' : 'Saved'}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                      This draft is read-only in its current status.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+                  Select a draft room to edit its basics.
+                </p>
+              )}
+            </aside>
+          </div>
+        )}
+
+        {draft && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-indigo-100 pt-3 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-xs leading-5 text-slate-600">
+              Drafts stay request-scoped. Contractors cannot accept, decline, or write to the permanent homeowner Home Map.
+            </p>
+            <div className={mobileActionRowClass()}>
+              {canRevokeDraft && (
+                <button
+                  type="button"
+                  className={mobileButtonClass('secondary')}
+                  data-testid="contractor-home-map-draft-revoke"
+                  disabled={Boolean(contractorHomeMapBusyKey)}
+                  onClick={() => void revokeContractorHomeMapDraft(draft)}
+                >
+                  Revoke draft
+                </button>
+              )}
+              {canEditDraft && (
+                <button
+                  type="button"
+                  className={mobileButtonClass('primary')}
+                  data-testid="contractor-home-map-draft-submit"
+                  disabled={Boolean(contractorHomeMapBusyKey) || rooms.length === 0}
+                  onClick={() => void submitContractorHomeMapDraft(draft)}
+                >
+                  <ArrowRight size={15} />
+                  Submit for homeowner review
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {draft?.status === 'submitted' && (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+            Submitted for homeowner review. You can revoke it before approval if the draft should not be used.
+          </p>
+        )}
+        {draft?.status === 'accepted' && (
+          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
+            Approved by homeowner. Permanent map updates are controlled by the homeowner approval RPC, not contractor direct table access.
+          </p>
+        )}
+        {draft?.status === 'declined' && (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
+            Declined by homeowner{draft.review_note ? `: ${draft.review_note}` : '.'}
+          </p>
+        )}
+        {draft?.status === 'revoked' && (
+          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+            This draft was revoked and is no longer editable.
+          </p>
+        )}
+      </div>
+    );
   };
 
   const serviceRequestIdsWithJobs = new Set(
@@ -30385,6 +31320,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               const contractorCancelAppointmentDraft = contractorCancelAppointmentDrafts[request.id] ?? { open: false, reason: '' };
               const hasQuote = Boolean(request.quote);
               const propertyLabel = serviceRequestPropertyLabel(request);
+              const homeMapDraft = contractorHomeMapDraftsByRequestId[request.id] || null;
               const requestConnection = connections.find(connection =>
                 connection.connection_id === request.connection_id
                 || connection.homeowner_user_id === request.homeowner_user_id
@@ -30455,6 +31391,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               Estimate {estimateStatusLabel(linkedRequestEstimate.status)}
                             </span>
                           )}
+                          {homeMapDraft && (
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${contractorHomeMapDraftStatusClass(homeMapDraft.status)}`} data-testid="contractor-home-map-draft-card-status">
+                              Home Map {contractorHomeMapDraftStatusLabel(homeMapDraft.status)}
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           {request.homeowner_name || 'Homeowner'}{request.homeowner_city ? ` · ${request.homeowner_city}` : ''} · {request.category} · {urgencyLabel(request.urgency)} · {formatDateTime(request.updated_at)}
@@ -30522,6 +31463,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <ClipboardCheck size={15} />
                         {activeRequestVisit ? 'View service visit' : 'Create service visit'}
                       </button>
+                      {request.home_id && (
+                        <button
+                          type="button"
+                          onClick={toggleInlineRequest}
+                          className={mobileButtonClass(homeMapDraft ? 'secondary' : 'primary')}
+                          data-testid="contractor-home-map-draft-open"
+                        >
+                          <MapPin size={15} />
+                          {homeMapDraft
+                            ? homeMapDraft.status === 'draft'
+                              ? 'Continue Home Map draft'
+                              : contractorHomeMapDraftStatusLabel(homeMapDraft.status)
+                            : 'Create Home Map draft'}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -30538,6 +31494,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700">
                         {request.description || 'No request description provided.'}
                       </p>
+                      {renderContractorHomeMapDraftPanel(request)}
                       <details className="mt-4" open>
                         <summary className="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Thread · {request.messages.length} {request.messages.length === 1 ? 'message' : 'messages'}
