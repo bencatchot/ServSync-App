@@ -26216,10 +26216,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               )}
             </div>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-indigo-950">
-              Create a draft map for this service request. The homeowner must approve it before anything changes their permanent Home Map.
+              Create a draft map for this request.
+            </p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-indigo-950">
+              The homeowner must approve before anything changes their permanent Home Map.
             </p>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-600">
-              Draft only. Do not include access codes, keys, private homeowner details, asset notes, documents, reminders, or storage references.
+              Draft only. Do not include access codes, keys, or private homeowner details. Do not include asset notes, documents, reminders, or storage references.
             </p>
           </div>
           <div className={mobileActionRowClass()}>
@@ -26272,7 +26275,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0">
               <p className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600" data-testid="contractor-home-map-draft-copy">
-                Grid: ~1 ft. Approximate proposal only. This does not read or edit the homeowner's permanent map.
+                Grid: ~1 ft. Approximate proposal only. This draft does not update the homeowner’s permanent Home Map until approved.
               </p>
               {rooms.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-indigo-200 bg-white p-4" data-testid="contractor-home-map-draft-empty">
@@ -26567,7 +26570,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   onClick={() => void submitContractorHomeMapDraft(draft)}
                 >
                   <ArrowRight size={15} />
-                  Submit for homeowner review
+                  Submit draft for homeowner review
                 </button>
               )}
             </div>
@@ -31475,7 +31478,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             ? homeMapDraft.status === 'draft'
                               ? 'Continue Home Map draft'
                               : contractorHomeMapDraftStatusLabel(homeMapDraft.status)
-                            : 'Create Home Map draft'}
+                            : 'Use Home Map for this job'}
                         </button>
                       )}
                     </div>

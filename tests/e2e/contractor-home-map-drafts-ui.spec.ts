@@ -45,7 +45,7 @@ test.describe('Contractor Home Map Draft UI source guardrails', () => {
 
     expect(requestSource).toContain('contractorHomeMapDraftsByRequestId[request.id]');
     expect(requestSource).toContain('data-testid="contractor-home-map-draft-open"');
-    expect(requestSource).toContain('Create Home Map draft');
+    expect(requestSource).toContain('Use Home Map for this job');
     expect(requestSource).toContain('Continue Home Map draft');
     expect(source).toContain('Submitted for homeowner review');
     expect(source).toContain('Approved by homeowner');
@@ -111,17 +111,22 @@ test.describe('Contractor Home Map Draft UI source guardrails', () => {
     );
 
     expect(panelSource).toContain('data-testid="contractor-home-map-draft-panel"');
+    expect(panelSource).toContain('Create a draft map for this request.');
+    expect(panelSource).toContain('The homeowner must approve before anything changes their permanent Home Map.');
+    expect(panelSource).toContain('Draft only. Do not include access codes, keys, or private homeowner details.');
     expect(panelSource).toContain('No draft rooms yet');
     expect(panelSource).toContain('Start blank with a room or hallway for this request.');
+    expect(panelSource).toContain('Create Home Map draft');
     expect(panelSource).toContain('data-testid="contractor-home-map-draft-add-room"');
     expect(panelSource).toContain('data-testid="contractor-home-map-draft-add-hallway"');
     expect(panelSource).toContain('data-testid="contractor-home-map-draft-submit"');
     expect(panelSource).toContain('data-testid="contractor-home-map-draft-revoke"');
+    expect(panelSource).toContain('Submit draft for homeowner review');
     expect(panelSource).toContain("draft?.status === 'submitted'");
     expect(panelSource).toContain("draft?.status === 'accepted'");
     expect(panelSource).toContain("draft?.status === 'declined'");
     expect(panelSource).toContain("draft?.status === 'revoked'");
-    expect(panelSource).toContain('The homeowner must approve it before anything changes their permanent Home Map.');
+    expect(panelSource).toContain('This draft does not update the homeowner’s permanent Home Map until approved.');
     expect(panelSource).toContain('Contractors cannot accept, decline, or write to the permanent homeowner Home Map.');
     expect(panelSource).not.toContain('servsync_accept_home_map_draft');
     expect(panelSource).not.toContain('servsync_decline_home_map_draft');
