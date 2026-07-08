@@ -503,6 +503,14 @@ type HomeRoomLayoutDraft = {
   measured_depth: string;
   measurement_unit: 'ft' | 'm';
 };
+type HomeMapBox = {
+  layoutId: string;
+  roomId: string;
+  xFeet: number;
+  yFeet: number;
+  widthFeet: number;
+  depthFeet: number;
+};
 type HomeAssetDraft = {
   id: string | null;
   home_id: string;
@@ -10162,6 +10170,66 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     };
   };
 
+  const snapHomeMapFeet = (value: number, min: number, max: number) => {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, Math.round(value)));
+  };
+
+  const feetFromMeasurement = (value: number | null | undefined, unit: string | null | undefined) => {
+    if (!value || value <= 0) return null;
+    return unit === 'm' ? value * 3.28084 : value;
+  };
+
+  const homeMapBoxFromLayout = (layout: HomeRoomLayout): HomeMapBox => {
+    const measuredWidthFeet = feetFromMeasurement(layout.measured_width, layout.measurement_unit);
+    const measuredDepthFeet = feetFromMeasurement(layout.measured_depth, layout.measurement_unit);
+    const rawWidthFeet = layout.layout_width || measuredWidthFeet || HOME_MAP_MIN_ROOM_GRID_UNITS;
+    const rawDepthFeet = layout.layout_height || measuredDepthFeet || HOME_MAP_MIN_ROOM_GRID_UNITS;
+    const widthFeet = snapHomeMapFeet(rawWidthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, HOME_MAP_GRID_COLUMNS);
+    const depthFeet = snapHomeMapFeet(rawDepthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, HOME_MAP_GRID_ROWS);
+    const xFeet = snapHomeMapFeet(layout.layout_x, 0, HOME_MAP_GRID_COLUMNS - widthFeet);
+    const yFeet = snapHomeMapFeet(layout.layout_y, 0, HOME_MAP_GRID_ROWS - depthFeet);
+    return {
+      layoutId: layout.id,
+      roomId: layout.home_room_id,
+      xFeet,
+      yFeet,
+      widthFeet,
+      depthFeet,
+    };
+  };
+
+  const clampHomeMapBox = (box: HomeMapBox): HomeMapBox => {
+    const widthFeet = snapHomeMapFeet(box.widthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, HOME_MAP_GRID_COLUMNS);
+    const depthFeet = snapHomeMapFeet(box.depthFeet, HOME_MAP_MIN_ROOM_GRID_UNITS, HOME_MAP_GRID_ROWS);
+    return {
+      ...box,
+      widthFeet,
+      depthFeet,
+      xFeet: snapHomeMapFeet(box.xFeet, 0, HOME_MAP_GRID_COLUMNS - widthFeet),
+      yFeet: snapHomeMapFeet(box.yFeet, 0, HOME_MAP_GRID_ROWS - depthFeet),
+    };
+  };
+
+  const homeMapLayoutFieldsFromBox = (box: HomeMapBox): Pick<HomeRoomLayout, 'layout_x' | 'layout_y' | 'layout_width' | 'layout_height' | 'measured_width' | 'measured_depth' | 'measurement_unit'> => {
+    const feetBox = clampHomeMapBox(box);
+    return {
+      layout_x: feetBox.xFeet,
+      layout_y: feetBox.yFeet,
+      layout_width: feetBox.widthFeet,
+      layout_height: feetBox.depthFeet,
+      measured_width: feetBox.widthFeet,
+      measured_depth: feetBox.depthFeet,
+      measurement_unit: 'ft',
+    };
+  };
+
+  const homeMapDimensionLabel = (layout: HomeRoomLayout | null | undefined) => {
+    if (!layout) return '';
+    const box = homeMapBoxFromLayout(layout);
+    return `${box.widthFeet} x ${box.depthFeet} ft`;
+  };
+
   const loadHomeRooms = useCallback(async () => {
     if (!supabase) return;
     const homeIds = Array.from(new Set(knownHomeRoomIdKey.split('|').map(id => id.trim()).filter(Boolean)));
@@ -10351,13 +10419,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           .from('home_room_layouts')
           .update({
             floor_label: layout.floor_label,
-            layout_x: layout.layout_x,
-            layout_y: layout.layout_y,
-            layout_width: layout.layout_width,
-            layout_height: layout.layout_height,
-            measured_width: layout.measured_width,
-            measured_depth: layout.measured_depth,
-            measurement_unit: layout.measurement_unit,
+            ...homeMapLayoutFieldsFromBox(homeMapBoxFromLayout(layout)),
           })
           .eq('id', layout.id);
         if (updateError) throw updateError;
@@ -10502,13 +10564,20 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (markDirty) markHomeMapLayoutDirty(layoutId);
   };
 
+  const updateHomeRoomLayoutFeetLocal = (layout: HomeRoomLayout, updates: Partial<Omit<HomeMapBox, 'layoutId' | 'roomId'>>) => {
+    const box = homeMapBoxFromLayout(layout);
+    const nextBox = clampHomeMapBox({ ...box, ...updates });
+    updateHomeRoomLayoutLocal(layout.id, homeMapLayoutFieldsFromBox(nextBox));
+  };
+
   const nudgeHomeRoomLayout = (layout: HomeRoomLayout, updates: Partial<Pick<HomeRoomLayout, 'layout_x' | 'layout_y' | 'layout_width' | 'layout_height'>>) => {
-    const next: Partial<HomeRoomLayout> = {};
-    if (updates.layout_x !== undefined) next.layout_x = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_width, Math.max(0, updates.layout_x));
-    if (updates.layout_y !== undefined) next.layout_y = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, updates.layout_y));
-    if (updates.layout_width !== undefined) next.layout_width = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, updates.layout_width));
-    if (updates.layout_height !== undefined) next.layout_height = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, updates.layout_height));
-    updateHomeRoomLayoutLocal(layout.id, next);
+    const box = homeMapBoxFromLayout(layout);
+    updateHomeRoomLayoutFeetLocal(layout, {
+      xFeet: updates.layout_x ?? box.xFeet,
+      yFeet: updates.layout_y ?? box.yFeet,
+      widthFeet: updates.layout_width ?? box.widthFeet,
+      depthFeet: updates.layout_height ?? box.depthFeet,
+    });
   };
 
   const nextHomeMapPosition = (homeId: string, layoutWidth: number, layoutHeight: number) => {
@@ -10623,6 +10692,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
   const openHomeRoomLayoutForm = (homeId: string, layout?: HomeRoomLayout) => {
     const rooms = homeRoomsByHomeId[homeId] || [];
+    const box = layout ? homeMapBoxFromLayout(layout) : null;
     setError('');
     setNotice('');
     setHomeRoomLayoutDraft(layout
@@ -10634,15 +10704,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           new_room_name: '',
           new_room_type: '',
           floor_label: layout.floor_label || '',
-          layout_x: String(layout.layout_x),
-          layout_y: String(layout.layout_y),
-          layout_width: String(layout.layout_width),
-          layout_height: String(layout.layout_height),
-          measured_width: layout.measured_width ? String(layout.measured_width) : '',
-          measured_depth: layout.measured_depth ? String(layout.measured_depth) : '',
-          measurement_unit: (layout.measurement_unit === 'm' ? 'm' : 'ft'),
+          layout_x: String(box?.xFeet ?? 0),
+          layout_y: String(box?.yFeet ?? 0),
+          layout_width: String(box?.widthFeet ?? 4),
+          layout_height: String(box?.depthFeet ?? 3),
+          measured_width: String(box?.widthFeet ?? ''),
+          measured_depth: String(box?.depthFeet ?? ''),
+          measurement_unit: 'ft',
         }
       : emptyHomeRoomLayoutDraft(homeId, rooms));
+  };
+
+  const updateHomeRoomLayoutDimensionDraft = (field: 'measured_width' | 'measured_depth', value: string) => {
+    setHomeRoomLayoutDraft(current => {
+      if (!current) return current;
+      const next = { ...current, [field]: value, measurement_unit: 'ft' as const };
+      if (next.id) {
+        const layout = (homeRoomLayoutsByHomeId[next.home_id] || []).find(candidate => candidate.id === next.id);
+        const widthFeet = parseOptionalMeasurement(next.measured_width);
+        const depthFeet = parseOptionalMeasurement(next.measured_depth);
+        if (layout && widthFeet && depthFeet) {
+          updateHomeRoomLayoutFeetLocal(layout, { widthFeet, depthFeet });
+        }
+      }
+      return next;
+    });
   };
 
   const openHomeMapRoomEditor = (room: HomeRoom, layout?: HomeRoomLayout | null) => {
@@ -10690,38 +10776,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const existingLayouts = homeRoomLayoutsByHomeId[homeRoomLayoutDraft.home_id] || [];
       const measuredWidth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_width);
       const measuredDepth = parseOptionalMeasurement(homeRoomLayoutDraft.measured_depth);
-      const existingLayout = homeRoomLayoutDraft.id
-        ? existingLayouts.find(layout => layout.id === homeRoomLayoutDraft.id) ?? null
-        : null;
       const fallbackLayoutWidth = parseHomeMapNumber(homeRoomLayoutDraft.layout_width, 4, 1, HOME_MAP_GRID_COLUMNS);
       const fallbackLayoutHeight = parseHomeMapNumber(homeRoomLayoutDraft.layout_height, 3, 1, HOME_MAP_GRID_ROWS);
-      const roughLayoutSize = roughHomeMapGridSize(
-        measuredWidth,
-        measuredDepth,
-        homeRoomLayoutDraft.measurement_unit,
-        fallbackLayoutWidth,
-        fallbackLayoutHeight,
-      );
-      const nextMeasurementUnit = measuredWidth || measuredDepth ? homeRoomLayoutDraft.measurement_unit : null;
-      const dimensionsChanged = Boolean(existingLayout && (
-        (existingLayout.measured_width ?? null) !== measuredWidth ||
-        (existingLayout.measured_depth ?? null) !== measuredDepth ||
-        (existingLayout.measurement_unit ?? null) !== nextMeasurementUnit
-      ));
-      const shouldApplyRoughDimensions = !homeRoomLayoutDraft.id || dimensionsChanged;
       const layoutX = parseHomeMapNumber(homeRoomLayoutDraft.layout_x, 0, 0, HOME_MAP_GRID_COLUMNS - 1);
       const layoutY = parseHomeMapNumber(homeRoomLayoutDraft.layout_y, 0, 0, HOME_MAP_GRID_ROWS - 1);
-      const rawLayoutWidth = shouldApplyRoughDimensions ? roughLayoutSize.layoutWidth : fallbackLayoutWidth;
-      const rawLayoutHeight = shouldApplyRoughDimensions ? roughLayoutSize.layoutHeight : fallbackLayoutHeight;
+      const widthFeet = snapHomeMapFeet(
+        feetFromMeasurement(measuredWidth, homeRoomLayoutDraft.measurement_unit) ?? fallbackLayoutWidth,
+        HOME_MAP_MIN_ROOM_GRID_UNITS,
+        HOME_MAP_GRID_COLUMNS,
+      );
+      const depthFeet = snapHomeMapFeet(
+        feetFromMeasurement(measuredDepth, homeRoomLayoutDraft.measurement_unit) ?? fallbackLayoutHeight,
+        HOME_MAP_MIN_ROOM_GRID_UNITS,
+        HOME_MAP_GRID_ROWS,
+      );
+      const layoutBox = clampHomeMapBox({
+        layoutId: homeRoomLayoutDraft.id || 'new',
+        roomId,
+        xFeet: layoutX,
+        yFeet: layoutY,
+        widthFeet,
+        depthFeet,
+      });
       const layoutPayload = {
         floor_label: cleanHomeMapOptionalText(homeRoomLayoutDraft.floor_label),
-        layout_x: layoutX,
-        layout_y: layoutY,
-        layout_width: Math.min(HOME_MAP_GRID_COLUMNS - layoutX, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, rawLayoutWidth)),
-        layout_height: Math.min(HOME_MAP_GRID_ROWS - layoutY, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, rawLayoutHeight)),
-        measured_width: measuredWidth,
-        measured_depth: measuredDepth,
-        measurement_unit: nextMeasurementUnit,
+        ...homeMapLayoutFieldsFromBox(layoutBox),
       };
 
       if (homeRoomLayoutDraft.id) {
@@ -10772,13 +10851,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           .from('home_room_layouts')
           .update({
             floor_label: layout.floor_label,
-            layout_x: layout.layout_x,
-            layout_y: layout.layout_y,
-            layout_width: layout.layout_width,
-            layout_height: layout.layout_height,
-            measured_width: layout.measured_width,
-            measured_depth: layout.measured_depth,
-            measurement_unit: layout.measurement_unit,
+            ...homeMapLayoutFieldsFromBox(homeMapBoxFromLayout(layout)),
           })
           .eq('id', layout.id);
         if (updateError) throw updateError;
@@ -14957,9 +15030,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const renderHomeRoomDetailPanel = (room: HomeRoom, showNotes: boolean, canManage = false) => {
     const details = roomDetailParts(room);
     const selectedLayout = (homeRoomLayoutsByHomeId[room.home_id] || []).find(layout => layout.home_room_id === room.id) ?? null;
-    const dimensionLabel = selectedLayout?.measured_width && selectedLayout.measured_depth
-      ? `${selectedLayout.measured_width} x ${selectedLayout.measured_depth} ${selectedLayout.measurement_unit || 'ft'}`
-      : '';
+    const dimensionLabel = homeMapDimensionLabel(selectedLayout);
     const showEditableBasics = Boolean(canManage && homeMapBuilderHomeId === room.home_id && homeMapDetailPanelOpen);
     const linkedReminders = homeReminders
       .filter(reminder => reminder.home_id === room.home_id && reminder.home_room_id === room.id)
@@ -15080,14 +15151,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: selectedLayout.layout_y - 1 })}>Move up</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: selectedLayout.layout_y + 1 })}>Move down</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: selectedLayout.layout_x - 1 })}>Move left</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: selectedLayout.layout_x + 1 })}>Move right</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: selectedLayout.layout_width + 1 })}>Wider</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: selectedLayout.layout_width - 1 })}>Narrower</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: selectedLayout.layout_height + 1 })}>Deeper</button>
-              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: selectedLayout.layout_height - 1 })}>Shallower</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: homeMapBoxFromLayout(selectedLayout).yFeet - 1 })}>Move up</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_y: homeMapBoxFromLayout(selectedLayout).yFeet + 1 })}>Move down</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: homeMapBoxFromLayout(selectedLayout).xFeet - 1 })}>Move left</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_x: homeMapBoxFromLayout(selectedLayout).xFeet + 1 })}>Move right</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: homeMapBoxFromLayout(selectedLayout).widthFeet + 1 })}>Wider</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_width: homeMapBoxFromLayout(selectedLayout).widthFeet - 1 })}>Narrower</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: homeMapBoxFromLayout(selectedLayout).depthFeet + 1 })}>Deeper</button>
+              <button type="button" className={buttonClass('secondary')} onClick={() => nudgeHomeRoomLayout(selectedLayout, { layout_height: homeMapBoxFromLayout(selectedLayout).depthFeet - 1 })}>Shallower</button>
             </div>
           </details>
         )}
@@ -15483,16 +15554,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_1fr_120px] md:items-end">
               <Field label="Length">
-                <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_width} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_width: event.target.value } : current)} placeholder="10" />
+                <input className={inputClass()} type="number" min="0" step="1" value={homeRoomLayoutDraft.measured_width} onChange={event => updateHomeRoomLayoutDimensionDraft('measured_width', event.target.value)} placeholder="10" />
               </Field>
               <span className="hidden pb-3 text-sm font-bold text-slate-500 md:block">x</span>
               <Field label="Width">
-                <input className={inputClass()} type="number" min="0" step="0.1" value={homeRoomLayoutDraft.measured_depth} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measured_depth: event.target.value } : current)} placeholder="14" />
+                <input className={inputClass()} type="number" min="0" step="1" value={homeRoomLayoutDraft.measured_depth} onChange={event => updateHomeRoomLayoutDimensionDraft('measured_depth', event.target.value)} placeholder="14" />
               </Field>
               <Field label="Unit">
-                <select className={inputClass()} value={homeRoomLayoutDraft.measurement_unit} onChange={event => setHomeRoomLayoutDraft(current => current ? { ...current, measurement_unit: event.target.value as 'ft' | 'm' } : current)}>
+                <select className={inputClass()} value="ft" onChange={() => setHomeRoomLayoutDraft(current => current ? { ...current, measurement_unit: 'ft' } : current)}>
                   <option value="ft">Feet</option>
-                  <option value="m">Meters</option>
                 </select>
               </Field>
             </div>
@@ -15541,13 +15611,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const deltaX = Math.round((event.clientX - homeMapDrag.startX) / canvasCellWidth);
       const deltaY = Math.round((event.clientY - homeMapDrag.startY) / canvasCellHeight);
       if (homeMapDrag.mode === 'move') {
-        const nextX = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_width, Math.max(0, homeMapDrag.originX + deltaX));
-        const nextY = Math.min(HOME_MAP_GRID_ROWS - layout.layout_height, Math.max(0, homeMapDrag.originY + deltaY));
-        updateHomeRoomLayoutLocal(layout.id, { layout_x: nextX, layout_y: nextY });
+        const box = homeMapBoxFromLayout(layout);
+        const nextX = Math.min(HOME_MAP_GRID_COLUMNS - box.widthFeet, Math.max(0, homeMapDrag.originX + deltaX));
+        const nextY = Math.min(HOME_MAP_GRID_ROWS - box.depthFeet, Math.max(0, homeMapDrag.originY + deltaY));
+        updateHomeRoomLayoutFeetLocal(layout, { xFeet: nextX, yFeet: nextY });
       } else {
-        const nextWidth = Math.min(HOME_MAP_GRID_COLUMNS - layout.layout_x, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originWidth + deltaX));
-        const nextHeight = Math.min(HOME_MAP_GRID_ROWS - layout.layout_y, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originHeight + deltaY));
-        updateHomeRoomLayoutLocal(layout.id, { layout_width: nextWidth, layout_height: nextHeight });
+        const box = homeMapBoxFromLayout(layout);
+        const nextWidth = Math.min(HOME_MAP_GRID_COLUMNS - box.xFeet, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originWidth + deltaX));
+        const nextHeight = Math.min(HOME_MAP_GRID_ROWS - box.yFeet, Math.max(HOME_MAP_MIN_ROOM_GRID_UNITS, homeMapDrag.originHeight + deltaY));
+        updateHomeRoomLayoutFeetLocal(layout, { widthFeet: nextWidth, depthFeet: nextHeight });
       }
     };
     const endPointerInteraction = (event: PointerEvent<HTMLElement>) => {
@@ -15620,9 +15692,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               {layouts.map(layout => {
                 const room = roomById.get(layout.home_room_id);
                 if (!room) return null;
-                const measurements = layout.measured_width && layout.measured_depth
-                  ? `${layout.measured_width} x ${layout.measured_depth} ${layout.measurement_unit || 'ft'}`
-                  : '';
+                const box = homeMapBoxFromLayout(layout);
+                const measurements = homeMapDimensionLabel(layout);
                 const isSelected = selectedHomeRoomDetailId === room.id;
                 return (
                   <div
@@ -15634,10 +15705,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-200 hover:border-blue-300'
                     }`}
                     style={{
-                      left: `${layout.layout_x * canvasCellWidth}px`,
-                      top: `${layout.layout_y * canvasCellHeight}px`,
-                      width: `${layout.layout_width * canvasCellWidth}px`,
-                      height: `${layout.layout_height * canvasCellHeight}px`,
+                      left: `${box.xFeet * canvasCellWidth}px`,
+                      top: `${box.yFeet * canvasCellHeight}px`,
+                      width: `${box.widthFeet * canvasCellWidth}px`,
+                      height: `${box.depthFeet * canvasCellHeight}px`,
                     }}
                     onContextMenu={event => event.preventDefault()}
                     onDragStart={event => event.preventDefault()}
@@ -15660,10 +15731,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         mode: 'move',
                         startX: event.clientX,
                         startY: event.clientY,
-                        originX: layout.layout_x,
-                        originY: layout.layout_y,
-                        originWidth: layout.layout_width,
-                        originHeight: layout.layout_height,
+                        originX: box.xFeet,
+                        originY: box.yFeet,
+                        originWidth: box.widthFeet,
+                        originHeight: box.depthFeet,
                       });
                     }}
                     onPointerMove={event => pointerMoveForLayout(layout, event)}
@@ -15712,10 +15783,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             mode: 'resize',
                             startX: event.clientX,
                             startY: event.clientY,
-                            originX: layout.layout_x,
-                            originY: layout.layout_y,
-                            originWidth: layout.layout_width,
-                          originHeight: layout.layout_height,
+                            originX: box.xFeet,
+                            originY: box.yFeet,
+                            originWidth: box.widthFeet,
+                            originHeight: box.depthFeet,
                         });
                       }}
                       onPointerMove={event => pointerMoveForLayout(layout, event)}
