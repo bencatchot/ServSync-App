@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/deck-true-size-source-fix-v1`
+- Starting main SHA: `e4dfcf982480f66d90b25b61a3a660623f0ee3d1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Normalized rough deck dimensions into a shared true-size source object for the guided estimate fallback deck board material allowance. Material math and grid/reference labels now use the same parsed width, depth, area, perimeter, and source text for scopes such as `10x10`, `10 x 10`, and `10 by 10`.
+- Reason for change: The deck helper previously parsed dimensions locally, calculated a board allowance, and flattened true dimensions into prose/quantity, leaving no shared source of truth for grid/reference guidance.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, backend changes, storage bucket/policy changes, auth, billing, env/config/package/lock/deployment/native/service-worker changes, manual deployment, production data, estimate sending, saved-template persistence, pricing behavior, AI, recipe-library expansion, or standalone Advanced Trade Tools UI restoration are included.
+  - Deck board counts and grid/reference labels remain rough, editable, price-free, and contractor-review-required. Final layout, board length, joist direction, picture framing, stairs, railing, code, and waste must still be verified before sending.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the deck true-size source object used by the guided fallback deck material and grid/reference guidance.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is a narrow frontend/test/docs fix inside the existing Guided Estimate Draft Builder / Advanced Trade Tools cleanup direction and does not change roadmap, permissions, backend scope, pricing strategy, or product strategy.
+
 - Branch: `codex/home-map-builder-feet-source-v1`
 - Starting main SHA: `8c0e5d7f1ac1a0985271f2351ee94ab1799433da`
 - Files changed:

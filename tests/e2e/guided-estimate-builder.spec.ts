@@ -58,7 +58,7 @@ test.describe('Guided Estimate Draft Builder Slice A-E', () => {
 
     expect(pickerSource).toContain('data-testid="estimate-saved-template-picker"');
     expect(pickerSource).toContain('Choose a template');
-    expect(pickerSource).toContain('Use template');
+    expect(pickerSource).toContain('Use for Estimate');
     expect(pickerSource).toContain('No saved templates yet');
     expect(pickerSource).toContain('Create a template from a finished estimate so you can reuse it later.');
     expect(pickerSource).toContain('estimateTemplates.map(template =>');
@@ -171,16 +171,39 @@ test.describe('Guided Estimate Draft Builder Slice A-E', () => {
 
   test('deck dimension fallback preserves review-required price-free material guidance without standalone trade tools', () => {
     const source = appSource();
+    const parsedDimensionTypeSource = sourceBetween(source, 'type ParsedDeckDimensions =', 'type EstimateDraftBuilderMaterialAliasRule');
+    const parsedDimensionSource = sourceBetween(source, 'function parseDeckDimensionsFromScope', 'function deckDimensionLabel');
+    const gridGuidanceSource = sourceBetween(source, 'function deckTrueSizeGridGuidance', 'const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES');
     const deckHelperSource = sourceBetween(source, 'function estimateBuilderDeckDimensionSeed', 'function estimateDraftBuilderSeeds');
     const seedSource = sourceBetween(source, 'function estimateDraftBuilderSeeds', 'function estimateBuilderDefaultLineDescription');
     const lineSource = sourceBetween(source, 'function estimateBuilderLineFromSeed', 'function customerFacingRoughScope');
     const helperSource = sourceBetween(source, 'function buildEstimateHelperSuggestions', 'const KUDOS_OPTIONS =');
 
-    expect(deckHelperSource).toContain("roughScope.match(/(\\d+(?:\\.\\d+)?)\\s*(?:ft|feet|')?\\s*(?:x|by)\\s*(\\d+(?:\\.\\d+)?)");
+    expect(parsedDimensionTypeSource).toContain('width_ft: number');
+    expect(parsedDimensionTypeSource).toContain('depth_ft: number');
+    expect(parsedDimensionTypeSource).toContain('area_sqft: number');
+    expect(parsedDimensionTypeSource).toContain('perimeter_ft: number');
+    expect(parsedDimensionTypeSource).toContain('source_text: string');
+    expect(parsedDimensionSource).toContain("trade !== 'Carpentry'");
+    expect(parsedDimensionSource).toContain("textIncludesAny(normalized, ['deck', 'decking', 'deck board', 'deck boards'])");
+    expect(parsedDimensionSource).toContain("roughScope.match(/(\\d+(?:\\.\\d+)?)\\s*(?:ft|feet|')?\\s*(?:x|by)\\s*(\\d+(?:\\.\\d+)?)");
+    expect(parsedDimensionSource).toContain('width_ft');
+    expect(parsedDimensionSource).toContain('depth_ft');
+    expect(parsedDimensionSource).toContain('area_sqft: width_ft * depth_ft');
+    expect(parsedDimensionSource).toContain('perimeter_ft: 2 * (width_ft + depth_ft)');
+    expect(parsedDimensionSource).toContain('source_text: dimensionMatch[0].trim()');
+    expect(gridGuidanceSource).toContain('Grid scale: 1 square = 1 ft');
+    expect(gridGuidanceSource).toContain('areaLabel');
+    expect(gridGuidanceSource).toContain('perimeterLabel');
+    expect(deckHelperSource).toContain('const dimensions = parseDeckDimensionsFromScope({ trade, roughScope })');
     expect(deckHelperSource).toContain('deckBoardFaceWidthInches = 5.5');
     expect(deckHelperSource).toContain('boardGapInches = 0.125');
     expect(deckHelperSource).toContain('wasteFactorPercent = 10');
     expect(deckHelperSource).toContain('defaultBoardLengthFt = 16');
+    expect(deckHelperSource).toContain('dimensions.area_sqft');
+    expect(deckHelperSource).toContain('deckTrueSizeGridGuidance(dimensions)');
+    expect(deckHelperSource).toContain('True-size reference:');
+    expect(deckHelperSource).toContain('gridGuidance.scaleLabel');
     expect(deckHelperSource).toContain('Deck boards material allowance');
     expect(deckHelperSource).toContain('unit: \'boards\'');
     expect(lineSource).toContain("unit_price: ''");

@@ -654,6 +654,13 @@ type EstimateDraftBuilderLineSeed = {
   unit?: string;
   keywords?: string[];
 };
+type ParsedDeckDimensions = {
+  width_ft: number;
+  depth_ft: number;
+  area_sqft: number;
+  perimeter_ft: number;
+  source_text: string;
+};
 type EstimateDraftBuilderMaterialAliasRule = {
   key: string;
   trade: EstimateDraftBuilderTrade | 'Generic';
@@ -2236,6 +2243,50 @@ function textIncludesAny(normalizedText: string, keywords: string[]) {
   return keywords.some(keyword => normalizedText.includes(compactText(keyword)));
 }
 
+function formatDeckDimensionFeet(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function parseDeckDimensionsFromScope({
+  trade,
+  roughScope,
+}: {
+  trade: EstimateDraftBuilderTrade;
+  roughScope: string;
+}): ParsedDeckDimensions | null {
+  const normalized = compactText(roughScope);
+  if (trade !== 'Carpentry' || !textIncludesAny(normalized, ['deck', 'decking', 'deck board', 'deck boards'])) return null;
+
+  const dimensionMatch = roughScope.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|')?\s*(?:x|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|')?/i);
+  if (!dimensionMatch) return null;
+
+  const width_ft = Number.parseFloat(dimensionMatch[1]);
+  const depth_ft = Number.parseFloat(dimensionMatch[2]);
+  if (!Number.isFinite(width_ft) || !Number.isFinite(depth_ft) || width_ft <= 0 || depth_ft <= 0) return null;
+
+  return {
+    width_ft,
+    depth_ft,
+    area_sqft: width_ft * depth_ft,
+    perimeter_ft: 2 * (width_ft + depth_ft),
+    source_text: dimensionMatch[0].trim(),
+  };
+}
+
+function deckDimensionLabel(dimensions: ParsedDeckDimensions) {
+  return `${formatDeckDimensionFeet(dimensions.width_ft)} ft by ${formatDeckDimensionFeet(dimensions.depth_ft)} ft`;
+}
+
+function deckTrueSizeGridGuidance(dimensions: ParsedDeckDimensions) {
+  return {
+    widthLabel: `${formatDeckDimensionFeet(dimensions.width_ft)} ft`,
+    depthLabel: `${formatDeckDimensionFeet(dimensions.depth_ft)} ft`,
+    areaLabel: `${formatDeckDimensionFeet(dimensions.area_sqft)} sq ft`,
+    perimeterLabel: `${formatDeckDimensionFeet(dimensions.perimeter_ft)} ft perimeter`,
+    scaleLabel: 'Grid scale: 1 square = 1 ft',
+  };
+}
+
 const ESTIMATE_DRAFT_BUILDER_MATERIAL_ALIAS_RULES: EstimateDraftBuilderMaterialAliasRule[] = [
   { key: 'plumbing_sink', trade: 'Plumbing', title: 'Sink', aliases: ['kitchen sink', 'sink replacement', 'new sink', 'replace kitchen sink'], unit: 'each' },
   { key: 'plumbing_faucet', trade: 'Plumbing', title: 'Faucet / hardware', aliases: ['faucet', 'sink faucet', 'faucet hardware'], unit: 'each' },
@@ -2494,31 +2545,25 @@ function estimateBuilderDeckDimensionSeed({
   trade: EstimateDraftBuilderTrade;
   roughScope: string;
 }): EstimateDraftBuilderLineSeed | null {
-  const normalized = compactText(roughScope);
-  if (trade !== 'Carpentry' || !textIncludesAny(normalized, ['deck', 'decking', 'deck board', 'deck boards'])) return null;
-
-  const dimensionMatch = roughScope.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|')?\s*(?:x|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|')?/i);
-  if (!dimensionMatch) return null;
-
-  const lengthFt = Number.parseFloat(dimensionMatch[1]);
-  const widthFt = Number.parseFloat(dimensionMatch[2]);
-  if (!Number.isFinite(lengthFt) || !Number.isFinite(widthFt) || lengthFt <= 0 || widthFt <= 0) return null;
+  const dimensions = parseDeckDimensionsFromScope({ trade, roughScope });
+  if (!dimensions) return null;
 
   const deckBoardFaceWidthInches = 5.5;
   const boardGapInches = 0.125;
   const wasteFactorPercent = 10;
   const defaultBoardLengthFt = 16;
-  const deckAreaSqFt = lengthFt * widthFt;
   const boardCoverageWidthFt = (deckBoardFaceWidthInches + boardGapInches) / 12;
-  const boardLinearFt = Math.ceil((deckAreaSqFt / boardCoverageWidthFt) * (1 + wasteFactorPercent / 100));
+  const boardLinearFt = Math.ceil((dimensions.area_sqft / boardCoverageWidthFt) * (1 + wasteFactorPercent / 100));
   const estimatedBoardCount = Math.max(1, Math.ceil(boardLinearFt / defaultBoardLengthFt));
-  const dimensionLabel = `${Number.isInteger(lengthFt) ? String(lengthFt) : lengthFt.toFixed(1)} ft by ${Number.isInteger(widthFt) ? String(widthFt) : widthFt.toFixed(1)} ft`;
+  const dimensionLabel = deckDimensionLabel(dimensions);
+  const gridGuidance = deckTrueSizeGridGuidance(dimensions);
+  const trueSizeSummary = `${gridGuidance.widthLabel} x ${gridGuidance.depthLabel} (${gridGuidance.areaLabel}; ${gridGuidance.perimeterLabel})`;
 
   return {
     line_type: 'material',
     description: 'Deck boards material allowance',
-    customer_description: `Editable deck board material allowance based on rough ${dimensionLabel} dimensions. Contractor should verify final quantities before sending.`,
-    editor_source_note: `Contractor review required: estimated from rough ${dimensionLabel} deck dimensions using ${deckBoardFaceWidthInches} inch actual board face width, ${boardGapInches} inch board gap, ${wasteFactorPercent}% waste factor, and ${defaultBoardLengthFt} ft default board length. Verify layout direction, board length, joist direction, picture framing, stairs, railing, local code requirements, and final waste factor before sending.`,
+    customer_description: `Editable deck board material allowance based on rough ${dimensionLabel} dimensions (${gridGuidance.areaLabel}). Contractor should verify final quantities before sending.`,
+    editor_source_note: `Contractor review required: estimated from rough ${dimensionLabel} deck dimensions using ${deckBoardFaceWidthInches} inch actual board face width, ${boardGapInches} inch board gap, ${wasteFactorPercent}% waste factor, and ${defaultBoardLengthFt} ft default board length. True-size reference: ${trueSizeSummary}. ${gridGuidance.scaleLabel}. Verify layout direction, board length, joist direction, picture framing, stairs, railing, local code requirements, and final waste factor before sending.`,
     quantity: String(estimatedBoardCount),
     unit: 'boards',
     keywords: ['deck', 'deck boards', 'decking', 'material allowance', 'waste factor'],
