@@ -1872,6 +1872,11 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
   };
 }
 
+function invoiceTitleFromEstimate(estimate: Pick<Estimate, 'title'>) {
+  const estimateTitle = (estimate.title || '').trim().replace(/^estimate\s*[—:-]\s*/i, '').trim();
+  return estimateTitle ? `Invoice — ${estimateTitle}` : 'Invoice from estimate';
+}
+
 function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'notes'>) {
   const haystack = normalizeText(`${estimate.title || ''} ${estimate.scope || ''} ${estimate.notes || ''}`);
   if (/\b(invoice|completed work|payment due|paid|final invoice|billable work)\b/.test(haystack)) return 'Invoice';
@@ -23207,6 +23212,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
+      ...(options.sourceEstimate
+        ? {
+            title: invoiceTitleFromEstimate(options.sourceEstimate),
+            notes: options.sourceEstimate.notes || '',
+            terms: options.sourceEstimate.terms || '',
+          }
+        : {}),
       service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id ?? '',
       job_id: options.jobId ?? options.sourceEstimate?.inspection_id ?? '',
       estimate_id: options.estimateId ?? options.sourceEstimate?.id ?? '',
@@ -23846,8 +23858,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return true;
   };
 
-  const createInvoiceFromEstimate = async (estimate: Estimate) => {
-    if (!supabase) return;
+  const beginInvoiceDraftFromEstimate = (estimate: Estimate, subjectName: string) => {
     setNotice('');
     setError('');
     const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void');
@@ -23856,27 +23867,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
       return;
     }
-    if (createInvoiceCapability.disabled) {
-      setError(createInvoiceCapability.reason);
-      return;
-    }
-    setCreatingInvoiceSourceId(`estimate:${estimate.id}`);
-    try {
-      const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate', {
-        p_estimate_id: estimate.id,
-      });
-      if (createError) throw createError;
-      const result = (data || {}) as { invoice_id?: string; created?: boolean; status?: Invoice['status'] };
-      if (!result.invoice_id) throw new Error('Invoice was created, but no invoice id was returned.');
-      const invoice = await loadInvoiceById(result.invoice_id);
-      openInvoiceRecord(invoice);
-      setNotice(result.created ? 'Invoice draft created from accepted estimate.' : 'Opened the existing invoice for this estimate.');
-      await loadContractor();
-    } catch (err) {
-      setError(readableError(err, 'Unable to create invoice from estimate. Make sure the invoice-from-source SQL has been applied.'));
-    } finally {
-      setCreatingInvoiceSourceId(null);
-    }
+    beginInvoiceDraftForCustomer(subjectName || 'Customer', {
+      sourceEstimate: estimate,
+      homeId: estimate.home_id,
+      localHomeId: estimate.local_home_id,
+    });
+    setNotice('Invoice draft started from this estimate. Review it before saving or sending.');
   };
 
   const createInvoiceFromJob = async (job: Inspection) => {
@@ -35306,6 +35302,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       const hasLinkedJob = estimateHasLinkedJob(estimate);
                                       const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
+                                      const canCreateInvoiceDraftFromEstimate = ['draft', 'sent', 'accepted'].includes(estimate.status);
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -35324,6 +35321,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               {estimate.status === 'accepted' && !hasLinkedJob && (
                                                 <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
                                                   Next step: create the job from this approved estimate.
+                                                </p>
+                                              )}
+                                              {linkedInvoice && (
+                                                <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                  Invoice created
                                                 </p>
                                               )}
                                             </div>
@@ -35417,20 +35419,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     View Job
                                                   </button>
                                                 )}
-                                                <button
-                                                  type="button"
-                                                  onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : void createInvoiceFromEstimate(estimate)}
-                                                  disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
-                                                  className={buttonClass('secondary')}
-                                                >
-                                                  <Receipt size={15} />
-                                                  {creatingInvoiceSourceId === `estimate:${estimate.id}`
-                                                    ? 'Creating...'
-                                                    : linkedInvoice
-                                                      ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
-                                                      : 'Create Invoice'}
-                                                </button>
                                               </>
+                                            )}
+                                            {canCreateInvoiceDraftFromEstimate && !isInvoiceWorkspaceTab && (
+                                              <button
+                                                type="button"
+                                                onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
+                                                className={buttonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                              >
+                                                <Receipt size={15} />
+                                                {linkedInvoice
+                                                  ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                                  : 'Create invoice from estimate'}
+                                              </button>
                                             )}
                                             {estimate.status === 'sent' && (
                                               <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
@@ -36734,6 +36735,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const hasLinkedJob = estimateHasLinkedJob(estimate);
                           const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
+                          const canCreateInvoiceDraftFromEstimate = !isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status);
                           return (
                             <div
                               key={estimate.id}
@@ -36755,6 +36757,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {estimate.status === 'accepted' && !hasLinkedJob && (
                                     <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
                                       Next step: create the job from this approved estimate before closeout.
+                                    </p>
+                                  )}
+                                  {linkedInvoice && (
+                                    <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                      Invoice created
                                     </p>
                                   )}
                                 </div>
@@ -36845,24 +36852,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         View Job
                                       </button>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-                                        if (linkedInvoice) openInvoiceRecord(linkedInvoice);
-                                        else void createInvoiceFromEstimate(estimate);
-                                      }}
-                                      disabled={creatingInvoiceSourceId === `estimate:${estimate.id}`}
-                                      className={mobileButtonClass('secondary')}
-                                    >
-                                      <Receipt size={15} />
-                                      {creatingInvoiceSourceId === `estimate:${estimate.id}`
-                                        ? 'Creating...'
-                                        : linkedInvoice
-                                          ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
-                                          : 'Create Invoice'}
-                                    </button>
                                   </>
+                                )}
+                                {canCreateInvoiceDraftFromEstimate && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+                                      beginInvoiceDraftFromEstimate(estimate, customerName);
+                                    }}
+                                    className={mobileButtonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                  >
+                                    <Receipt size={15} />
+                                    {linkedInvoice
+                                      ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                      : 'Create invoice from estimate'}
+                                  </button>
                                 )}
                                 {estimate.status === 'sent' && (
                                   <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Waiting on homeowner</span>

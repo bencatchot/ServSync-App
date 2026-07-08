@@ -1,4 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import {
@@ -9,6 +11,17 @@ import {
   waitForContractorWorkspaceReady,
 } from './helpers/customers';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+
+const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const appSource = () => sourceFile('src/App.tsx');
+
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  expect(startIndex, `Expected to find source marker: ${start}`).toBeGreaterThanOrEqual(0);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex, `Expected to find source end marker: ${end}`).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
 
 async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator) {
   const saveError = main.getByText(
@@ -22,6 +35,72 @@ async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator
     }),
   ]);
 }
+
+test.describe('contractor estimate-to-invoice draft source', () => {
+  test('saved estimate actions can open an editable invoice draft without the accepted-only RPC', () => {
+    const source = appSource();
+    const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromJob =');
+    const selectedWorkspaceEstimateCards = sourceBetween(
+      source,
+      'selectedDocumentSection.estimates.map(estimate => {',
+      "{estimate.status === 'sent' && (",
+    );
+    const focusedEstimateCards = sourceBetween(
+      source,
+      'visibleEstimateRecords.map(estimate => {',
+      "{estimate.status === 'sent' && (",
+    );
+
+    expect(source).toContain('Create invoice from estimate');
+    expect(selectedWorkspaceEstimateCards).toContain("['draft', 'sent', 'accepted'].includes(estimate.status)");
+    expect(focusedEstimateCards).toContain("!isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status)");
+    expect(selectedWorkspaceEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate, headerName)');
+    expect(focusedEstimateCards).toContain('beginInvoiceDraftFromEstimate(estimate, customerName)');
+    expect(selectedWorkspaceEstimateCards).toContain('Invoice created');
+    expect(focusedEstimateCards).toContain('Invoice created');
+
+    expect(directDraftSource).toContain('const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== \'void\')');
+    expect(directDraftSource).toContain('openInvoiceRecord(existingInvoice)');
+    expect(directDraftSource).toContain('beginInvoiceDraftForCustomer(subjectName || \'Customer\', {');
+    expect(directDraftSource).toContain('sourceEstimate: estimate');
+    expect(directDraftSource).toContain('Invoice draft started from this estimate. Review it before saving or sending.');
+    expect(directDraftSource).not.toContain('servsync_create_invoice_from_estimate');
+    expect(directDraftSource).not.toContain('createJobFromAcceptedEstimate');
+    expect(directDraftSource).not.toContain('startNewInspection');
+    expect(directDraftSource).not.toContain('saveInvoiceDraft');
+    expect(directDraftSource).not.toContain('sendInvoiceToHomeowner');
+  });
+
+  test('invoice composer seed copies supported estimate context and line items', () => {
+    const source = appSource();
+    const titleHelperSource = sourceBetween(source, 'function invoiceTitleFromEstimate', 'function estimateDocumentLabel');
+    const beginDraftSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
+
+    expect(titleHelperSource).toContain('Invoice — ${estimateTitle}');
+    expect(beginDraftSource).toContain('title: invoiceTitleFromEstimate(options.sourceEstimate)');
+    expect(beginDraftSource).toContain('notes: options.sourceEstimate.notes ||');
+    expect(beginDraftSource).toContain('terms: options.sourceEstimate.terms ||');
+    expect(beginDraftSource).toContain('service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id');
+    expect(beginDraftSource).toContain('job_id: options.jobId ?? options.sourceEstimate?.inspection_id');
+    expect(beginDraftSource).toContain('estimate_id: options.estimateId ?? options.sourceEstimate?.id');
+    expect(beginDraftSource).toContain('home_id: options.homeId ?? options.sourceEstimate?.home_id');
+    expect(beginDraftSource).toContain('local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id');
+    expect(beginDraftSource).toContain('scope: options.sourceEstimate?.scope');
+    expect(beginDraftSource).toContain('labor_mode: normalizeEstimateLaborMode(options.sourceEstimate?.labor_mode)');
+    expect(beginDraftSource).toContain('labor_rate: laborRateInputFromCents(options.sourceEstimate?.labor_rate_cents');
+    expect(beginDraftSource).toContain('job_labor_hours: laborHoursInputFromValue(options.sourceEstimate?.job_labor_hours)');
+    expect(beginDraftSource).toContain('[...options.sourceEstimate.line_items]');
+    expect(beginDraftSource).toContain('.sort((a, b) => a.sort_order - b.sort_order)');
+    expect(beginDraftSource).toContain('line_title: line.line_title || line.description ||');
+    expect(beginDraftSource).toContain('customer_description: line.customer_description ||');
+    expect(beginDraftSource).toContain('model_spec: line.model_spec ||');
+    expect(beginDraftSource).toContain('supply_status: normalizeEstimateLineSupplyStatus(line.supply_status)');
+    expect(beginDraftSource).toContain('quantity: String(line.quantity)');
+    expect(beginDraftSource).toContain('unit: line.unit');
+    expect(beginDraftSource).toContain('unit_price: lineUnitPriceInputFromCents(line.unit_price_cents)');
+    expect(beginDraftSource).toContain('labor_hours: laborHoursInputFromValue(line.labor_hours)');
+  });
+});
 
 test.describe('contractor mutating invoice creation', () => {
   test('creates an E2E invoice draft for a local E2E customer', async ({ page }, testInfo) => {
