@@ -1,4 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expectActiveTabHeading, loginAs, openSidebarTab } from './helpers/auth';
 import { captureMajorConsoleErrors } from './helpers/console';
 import {
@@ -9,6 +11,17 @@ import {
   waitForContractorWorkspaceReady,
 } from './helpers/customers';
 import { requireApprovedSandboxForMutation } from './helpers/guards';
+
+const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const appSource = () => sourceFile('src/App.tsx');
+
+function sourceBetween(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  expect(startIndex, `Expected to find source marker: ${start}`).toBeGreaterThanOrEqual(0);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex, `Expected to find source end marker: ${end}`).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
 
 async function waitForEstimateDraftSave(main: Locator, saveEstimateButton: Locator) {
   const saveError = main.getByText(
@@ -22,6 +35,56 @@ async function waitForEstimateDraftSave(main: Locator, saveEstimateButton: Locat
     }),
   ]);
 }
+
+test.describe('contractor estimate creation UI structure', () => {
+  test('normal estimate starts use blank, template, and draft estimator choices', () => {
+    const source = appSource();
+    const startChoiceSource = sourceBetween(source, 'const renderEstimateStartChoice =', 'const renderSavedEstimateTemplateStartPicker =');
+    const templateStartSource = sourceBetween(source, 'const applySavedEstimateTemplateStart =', 'const applySavedEstimateTemplateInvoiceDraft =');
+
+    expect(startChoiceSource).toContain('Build blank estimate');
+    expect(startChoiceSource).toContain('Choose estimate template');
+    expect(startChoiceSource).toContain('Build draft estimator');
+    expect(startChoiceSource.indexOf('Build blank estimate')).toBeLessThan(startChoiceSource.indexOf('Choose estimate template'));
+    expect(startChoiceSource.indexOf('Choose estimate template')).toBeLessThan(startChoiceSource.indexOf('Build draft estimator'));
+    expect(startChoiceSource).toContain("setEstimateStartMode('draft')");
+    expect(startChoiceSource).toContain("setEstimateStartMode('template')");
+    expect(startChoiceSource).toContain("setEstimateStartMode('guided')");
+    expect(startChoiceSource).toContain('setEstimateGuidedBuilderActive(true)');
+    expect(startChoiceSource).not.toContain('Build from saved template');
+    expect(startChoiceSource).not.toContain('Build with guided draft builder');
+    expect(startChoiceSource).not.toContain('Start blank</span>');
+
+    expect(templateStartSource).toContain('estimateDraftFromTemplate(template');
+    expect(templateStartSource).toContain("setEstimateStartMode('draft')");
+    expect(templateStartSource).toContain('setEstimateGuidedBuilderActive(false)');
+  });
+
+  test('optional accelerators stay collapsed and estimate line advanced fields use More details', () => {
+    const source = appSource();
+    const optionalToolsSource = sourceBetween(source, 'const renderEstimateReferenceTools =', 'const startEstimateAssistantSpeech =');
+    const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
+    const jobsEstimateComposerSource = sourceBetween(source, 'Estimate / Invoice Workspace', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+
+    expect(optionalToolsSource).toContain('Optional tools');
+    expect(optionalToolsSource).toContain('Show optional tools');
+    expect(optionalToolsSource).toContain('renderSavedChargeQuickPick()');
+    expect(optionalToolsSource).toContain('renderPriceBookQuickPick()');
+    expect(optionalToolsSource).toContain('renderEstimateHelperPanel()');
+
+    expect(lineEditorSource).toContain('compactAdvanced = false');
+    expect(lineEditorSource).toContain('More details');
+    expect(lineEditorSource).toContain('lineTypeField');
+    expect(lineEditorSource).toContain('laborHoursField');
+    expect(lineEditorSource).toContain('modelSpecField');
+    expect(lineEditorSource).toContain('supplyStatusField');
+    expect(lineEditorSource).toContain('Source note');
+    expect(jobsEstimateComposerSource).toContain('compactAdvanced: true');
+    expect(jobsEstimateComposerSource).not.toContain('{renderSavedChargeQuickPick()}');
+    expect(jobsEstimateComposerSource).not.toContain('renderPriceBookQuickPick()}');
+    expect(jobsEstimateComposerSource).not.toContain('renderEstimateHelperPanel()}');
+  });
+});
 
 test.describe('contractor mutating estimate creation', () => {
   test('creates an E2E estimate draft for a local E2E customer', async ({ page }, testInfo) => {
@@ -45,8 +108,11 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByText(/^Estimate draft$/i)).toBeVisible();
     await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
     await expect(main.getByText(customerName, { exact: true })).toBeVisible();
-    await expect(main.getByTestId('guided-estimate-builder')).toBeVisible();
-    await main.getByRole('button', { name: /^Start blank estimate$/i }).click();
+    await expect(main.getByTestId('estimate-start-choice')).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build blank estimate$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Choose estimate template$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build draft estimator$/i })).toBeVisible();
+    await main.getByRole('button', { name: /^Build blank estimate$/i }).click();
 
     const estimateTitleField = main.getByRole('textbox', { name: /^Estimate title$/i });
     const scopeField = main.getByRole('textbox', { name: /^Scope of work$/i });
@@ -120,7 +186,10 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByText(/^Estimate draft$/i)).toBeVisible();
     await expect(main.getByText(/Creating estimate for:/i)).toBeVisible();
     await expect(main.getByText(customerName, { exact: true })).toBeVisible();
-    await expect(main.getByTestId('guided-estimate-builder')).toBeVisible();
+    await expect(main.getByTestId('estimate-start-choice')).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build blank estimate$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Choose estimate template$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Build draft estimator$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Save and use customer$/i })).toHaveCount(0);
     await expect(main.getByText(/Service job or checklist report workflow/i)).toHaveCount(0);
 
