@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/home-map-pinch-zoom-v1`
+- Starting main SHA: `bb1f9a115c420eed3f7de6e68be8621745160597`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/home-map-builder-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added mobile-friendly two-finger pinch zoom support to the Home Map Builder canvas using the existing display-only `homeMapZoom` path. The canvas keeps existing zoom buttons, widens zoom bounds for mobile review, and anchors the scroll position around the pinch midpoint while preserving feet-based room geometry.
+- Reason for change: The Home Map Builder already had true-size room boxes and responsive labels, but mobile users still needed a natural way to zoom the canvas without changing persisted room dimensions.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted Home Map Builder pinch zoom tests
+  - targeted Home Map & Systems tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase functions, backend changes, storage bucket/policy changes, auth, billing, env/config/package/lock/deployment/native/service-worker changes, manual deployment, production data, Home Map persistence/autosave schema changes, room geometry model changes, grid true-size scaling changes, permission/shared visibility changes, floor-plan/CAD/LiDAR/3D behavior, key locations, or contractor visibility are included.
+  - Pinch behavior remains canvas-local display state; real-device iOS and Android smoke testing should verify two-finger zoom, one-finger room drag, resize handles, and native scroll feel.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records display-only pinch zoom support for the dedicated Home Map Builder canvas.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: This is frontend mobile canvas polish within the existing Home Map Builder direction and does not change roadmap, permissions, backend scope, or product strategy.
+
 - Branch: `codex/home-map-responsive-room-labels-v1`
 - Starting main SHA: `82291cad7f29ba403abff0a504bd3fae5820203c`
 - Files changed:
