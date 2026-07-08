@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/contractor-estimate-creation-cleanup-v1b`
+- Starting main SHA: `f3f2cf6cdce13cad54dcedf347e2cc4df5d1c09d`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Cleaned up the contractor estimate creation UI so the start choices read as `Build blank estimate`, `Choose estimate template`, and `Build draft estimator`; the blank and template paths continue into the normal single-page estimate form; the broad in-editor optional-tools drawer was replaced with contextual line-item actions for `Add blank line`, `Add saved item`, and `Add from Price Book`; top create controls are hidden while an estimate draft is active; blank estimates start with an empty line-item state; add controls move below existing line rows; and advanced line-item metadata is moved behind a per-line `More details` control while preserving editable estimate behavior.
+- Reason for change: The estimate creation workflow was functional but visually overloaded. Contractors need the normal quote path to feel like a simple estimate form, with templates and draft builder as start paths, saved charges / Price Book as contextual line-item sources, and active draft editing clearly separated from the broader create-job/create-estimate/create-invoice controls.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted contractor estimate creation source-static tests
+  - targeted contractor estimate creation live mutating tests
+  - targeted contractor estimate-to-invoice source-static preservation tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, backend, Supabase, storage, package/lock, env/config/deployment/native/service-worker, production deploy, production SQL, production data, estimate status, job creation, homeowner-side workflow, send/email/SMS/PDF modal, invoice type, change-order, or Price Book recipe/autopricing changes are included.
+  - Template management, Draft Builder coverage/functionality, Estimate Helper expansion, customer-after-estimate save redesign, change orders, Price Book assemblies/autopricing, invoice type/deposit/progress/final support, and broader customer/job workflow changes remain future approval-gated work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the first contractor estimate creation UI simplification slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: This updates contractor estimate workflow direction by documenting the simplified normal estimate start and single-page form hierarchy.
+
 - Branch: `codex/contractor-invoice-from-estimate-v1`
 - Starting main SHA: `a1857a82f142ee692483783d6b16970c1e545251`
 - Files changed:

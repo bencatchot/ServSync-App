@@ -1357,7 +1357,7 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     labor_mode: 'job_total',
     labor_rate: '',
     job_labor_hours: '',
-    line_items: [createEstimateLineDraft()],
+    line_items: [],
     ...overrides,
   };
 }
@@ -21351,7 +21351,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
   const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
-  const [estimateReferenceToolsExpanded, setEstimateReferenceToolsExpanded] = useState(false);
+  const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
+  const [estimateLineFocusId, setEstimateLineFocusId] = useState<string | null>(null);
+  const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
   const [estimateTemplateStartNotice, setEstimateTemplateStartNotice] = useState('');
@@ -21570,6 +21572,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }, 6000);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!estimateLineFocusId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = Array.from(document.querySelectorAll<HTMLInputElement>('[data-estimate-line-description-id]'))
+        .find(element => element.dataset.estimateLineDescriptionId === estimateLineFocusId);
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target?.focus();
+      setEstimateLineFocusId(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [estimateDraft.line_items.length, estimateLineFocusId]);
 
   useEffect(() => {
     setNotice('');
@@ -23282,7 +23296,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderLastOutput(null);
     setEstimateStartMode('choose');
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     setEstimateAssistantNotice('');
     setEstimateTemplateStartNotice('');
     setInvoiceTemplateStartNotice('');
@@ -23317,7 +23331,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateDraftBuilderLastOutput(null);
     setEstimateStartMode('draft');
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     setEstimateAssistantNotice('');
     setEstimateTemplateStartNotice(estimateTemplateStartNoticeForTemplate(template));
     setEstimateHelperNotice('');
@@ -23546,7 +23560,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLastOutput(null);
       setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
-      setEstimateReferenceToolsExpanded(false);
+      setEstimateLineSourcePanel(null);
       setEstimateAssistantNotice('');
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
@@ -23814,7 +23828,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateDraftBuilderLastOutput(null);
       setEstimateStartMode('draft');
       setEstimateGuidedBuilderActive(false);
-      setEstimateReferenceToolsExpanded(false);
+      setEstimateLineSourcePanel(null);
       setEstimateAssistantNotice('');
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
@@ -24998,6 +25012,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
       };
     });
+    setEstimateLineFocusId(nextLine.id);
     setSavedChargeQuickPickNotice(`Added "${charge.name}" as an editable estimate line item.`);
   };
 
@@ -25010,7 +25025,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         line_items: usableLines.length === 0 ? [nextLine] : [...draft.line_items, nextLine],
       };
     });
+    setEstimateLineFocusId(nextLine.id);
     setEstimatePriceBookQuickPickNotice(`Added "${item.title}" from Price Book as an editable estimate line item.`);
+  };
+
+  const addBlankEstimateLineToDraft = () => {
+    const nextLine = createEstimateLineDraft();
+    setEstimateLineSourcePanel(null);
+    setEstimateDraft(draft => ({
+      ...draft,
+      line_items: [...draft.line_items, nextLine],
+    }));
+    setEstimateLineFocusId(nextLine.id);
   };
 
   const renderStructuredLineDraftEditor = ({
@@ -25018,6 +25044,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     index,
     itemLabel,
     laborMode,
+    compactAdvanced = false,
     onChange,
     onRemove,
   }: {
@@ -25025,6 +25052,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     index: number;
     itemLabel: 'estimate' | 'invoice';
     laborMode?: EstimateLaborMode;
+    compactAdvanced?: boolean;
     onChange: (updates: Partial<EstimateLineDraft>) => void;
     onRemove: () => void;
   }) => {
@@ -25034,122 +25062,198 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const hasSecondaryRow = showModelSpec || showSupplyStatus;
     const showLaborHours = laborMode === 'line_specific' && draftLineCanTrackLaborHours(line);
     const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
+    const advancedDetailsOpen = !compactAdvanced || Boolean(expandedEstimateLineDetails[line.id]);
+    const setAdvancedDetailsOpen = (open: boolean) => {
+      setExpandedEstimateLineDetails(prev => ({ ...prev, [line.id]: open }));
+    };
+    const descriptionField = (
+      <Field label="Description">
+        <div className="space-y-2">
+          <input
+            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
+            data-estimate-line-description-id={line.id}
+            className={inputClass()}
+            {...writingAssistProps}
+            value={line.line_title}
+            onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
+            placeholder="Labor, material, trip fee..."
+          />
+          {!compactAdvanced && sourceNote ? (
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+              {sourceNote}
+            </p>
+          ) : null}
+        </div>
+      </Field>
+    );
+    const quantityField = (
+      <Field label="Qty">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
+          className={inputClass()}
+          type="number"
+          min="0"
+          step="0.01"
+          value={line.quantity}
+          onChange={event => onChange({ quantity: event.target.value })}
+        />
+      </Field>
+    );
+    const unitField = (
+      <Field label="Unit">
+        <input
+          className={inputClass()}
+          value={line.unit}
+          onChange={event => onChange({ unit: event.target.value })}
+        />
+      </Field>
+    );
+    const unitPriceField = (
+      <Field label="Unit price">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
+          className={inputClass()}
+          value={line.unit_price}
+          onChange={event => onChange({ unit_price: event.target.value })}
+          placeholder="$0.00"
+        />
+      </Field>
+    );
+    const totalBlock = (
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
+          {draftLineTotalLabel(line)}
+        </p>
+      </div>
+    );
+    const removeButton = (
+      <button
+        type="button"
+        onClick={onRemove}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
+        aria-label={`Remove ${itemLabel} line ${index + 1}`}
+      >
+        <Trash2 size={15} />
+      </button>
+    );
+    const lineTypeField = (
+      <Field label="Type">
+        <select
+          className={inputClass()}
+          value={line.line_type}
+          onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
+        >
+          {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
+            <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
+          ))}
+        </select>
+      </Field>
+    );
+    const laborHoursField = showLaborHours ? (
+      <Field label="Labor hrs">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
+          className={inputClass()}
+          type="number"
+          min="0"
+          step="0.25"
+          value={line.labor_hours}
+          onChange={event => onChange({ labor_hours: event.target.value })}
+          placeholder="0"
+        />
+      </Field>
+    ) : null;
+    const modelSpecField = (
+      <Field label="Model/spec">
+        <input
+          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
+          className={inputClass()}
+          value={line.model_spec}
+          onChange={event => onChange({ model_spec: event.target.value })}
+          placeholder="Optional model, size, brand, or spec"
+        />
+      </Field>
+    );
+    const supplyStatusField = (
+      <Field label="Supply status">
+        <select
+          className={inputClass()}
+          value={line.supply_status}
+          onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
+        >
+          <option value="">Not specified</option>
+          {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      </Field>
+    );
+
+    if (compactAdvanced) {
+      return (
+        <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_5rem_5rem_7rem_6rem_auto] lg:items-end">
+            {descriptionField}
+            {quantityField}
+            {unitField}
+            {unitPriceField}
+            {totalBlock}
+            {removeButton}
+          </div>
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setAdvancedDetailsOpen(!advancedDetailsOpen)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+              aria-expanded={advancedDetailsOpen}
+              aria-label={`${advancedDetailsOpen ? 'Hide' : 'Show'} estimate line item ${index + 1} more details`}
+            >
+              {advancedDetailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              More details
+            </button>
+            {advancedDetailsOpen && (
+              <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                {lineTypeField}
+                {laborHoursField}
+                {modelSpecField}
+                {supplyStatusField}
+                {sourceNote ? (
+                  <div className="lg:col-span-4">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Source note</p>
+                    <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
+                      {sourceNote}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
         <div className={`grid gap-3 ${priceColumnClass} lg:items-end`}>
-          <Field label="Type">
-            <select
-              className={inputClass()}
-              value={line.line_type}
-              onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
-            >
-              {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
-                <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Description">
-            <div className="space-y-2">
-              <input
-                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
-                className={inputClass()}
-                {...writingAssistProps}
-                value={line.line_title}
-                onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-                placeholder="Labor, material, trip fee..."
-              />
-              {sourceNote ? (
-                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                  {sourceNote}
-                </p>
-              ) : null}
-            </div>
-          </Field>
-          <Field label="Qty">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
-              className={inputClass()}
-              type="number"
-              min="0"
-              step="0.01"
-              value={line.quantity}
-              onChange={event => onChange({ quantity: event.target.value })}
-            />
-          </Field>
-          <Field label="Unit">
-            <input
-              className={inputClass()}
-              value={line.unit}
-              onChange={event => onChange({ unit: event.target.value })}
-            />
-          </Field>
-          <Field label="Unit price">
-            <input
-              aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
-              className={inputClass()}
-              value={line.unit_price}
-              onChange={event => onChange({ unit_price: event.target.value })}
-              placeholder="$0.00"
-            />
-          </Field>
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-            <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-              {draftLineTotalLabel(line)}
-            </p>
-          </div>
-          {showLaborHours ? (
-            <Field label="Labor hrs">
-              <input
-                aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
-                className={inputClass()}
-                type="number"
-                min="0"
-                step="0.25"
-                value={line.labor_hours}
-                onChange={event => onChange({ labor_hours: event.target.value })}
-                placeholder="0"
-              />
-            </Field>
-          ) : null}
-          <button
-            type="button"
-            onClick={onRemove}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-            aria-label={`Remove ${itemLabel} line ${index + 1}`}
-          >
-            <Trash2 size={15} />
-          </button>
+          {lineTypeField}
+          {descriptionField}
+          {quantityField}
+          {unitField}
+          {unitPriceField}
+          {totalBlock}
+          {laborHoursField}
+          {removeButton}
         </div>
         {hasSecondaryRow ? (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
             <div className="space-y-2">
               {showModelSpec ? (
-                <Field label="Model/spec">
-                  <input
-                    aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
-                    className={inputClass()}
-                    value={line.model_spec}
-                    onChange={event => onChange({ model_spec: event.target.value })}
-                    placeholder="Optional model, size, brand, or spec"
-                  />
-                </Field>
+                modelSpecField
               ) : null}
             </div>
             {showSupplyStatus ? (
-              <Field label="Supply status">
-                <select
-                  className={inputClass()}
-                  value={line.supply_status}
-                  onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
-                >
-                  <option value="">Not specified</option>
-                  {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </Field>
+              supplyStatusField
             ) : null}
           </div>
         ) : null}
@@ -25690,7 +25794,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       builtJobType: builtDraft.builtJobType,
     });
     setEstimateGuidedBuilderActive(false);
-    setEstimateReferenceToolsExpanded(false);
+    setEstimateLineSourcePanel(null);
     const unpricedCount = builtDraft.lines.filter(draftLineIsUnpriced).length;
     const matchedCopy = builtDraft.matchedCount > 0
       ? ` Matched saved-charge pricing for ${builtDraft.matchedCount} line${builtDraft.matchedCount === 1 ? '' : 's'}.`
@@ -25726,6 +25830,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <button
           type="button"
           onClick={() => {
+            setEstimateStartMode('draft');
+            setEstimateGuidedBuilderActive(false);
+            setEstimateTemplateStartNotice('');
+            setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
+          }}
+          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
+        >
+          <span className="block text-sm font-bold text-slate-950">Build blank estimate</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">Create a simple quote manually.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             setEstimateStartMode('template');
             setEstimateGuidedBuilderActive(false);
             setEstimateTemplateStartNotice('');
@@ -25733,7 +25850,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }}
           className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
         >
-          <span className="block text-sm font-bold text-slate-950">Build from saved template</span>
+          <span className="block text-sm font-bold text-slate-950">Choose estimate template</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Use one of your reusable estimate templates.</span>
         </button>
         <button
@@ -25746,21 +25863,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           }}
           className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
         >
-          <span className="block text-sm font-bold text-slate-950">Build with guided draft builder</span>
+          <span className="block text-sm font-bold text-slate-950">Build draft estimator</span>
           <span className="mt-1 block text-xs leading-5 text-slate-500">Answer a few questions and let ServSync suggest a draft.</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setEstimateStartMode('draft');
-            setEstimateGuidedBuilderActive(false);
-            setEstimateTemplateStartNotice('');
-            setEstimateAssistantNotice('Blank estimate ready. Add scope, lines, pricing, and terms manually.');
-          }}
-          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-white"
-        >
-          <span className="block text-sm font-bold text-slate-950">Start blank</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">Create the estimate manually.</span>
         </button>
       </div>
     </div>
@@ -26042,49 +26146,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
-  const renderEstimateReferenceTools = () => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="estimate-reference-tools">
-      <button
-        type="button"
-        onClick={() => setEstimateReferenceToolsExpanded(value => !value)}
-        className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
-        aria-expanded={estimateReferenceToolsExpanded}
-      >
-        <span>
-          <span className="block text-sm font-bold text-slate-950">Reference tools</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">
-            Saved charges, Price Book, templates, and helper suggestions are available when you need them.
-          </span>
-        </span>
-        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
-          {estimateReferenceToolsExpanded ? 'Hide reference tools' : 'Show reference tools'}
-        </span>
-      </button>
-
-      {estimateReferenceToolsExpanded && (
-        <div className="mt-3 space-y-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-slate-950">Estimate Templates</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Contractor-owned templates stay separate from app-owned draft recipes.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setContractorJobsViewAndScroll('templates')}
-                className={buttonClass('secondary')}
-              >
-                Open templates
-              </button>
-            </div>
-          </div>
-          {renderSavedChargeQuickPick()}
-          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
-          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
+  const renderEstimateLineItemSources = ({ empty = false }: { empty?: boolean } = {}) => (
+    <div
+      className={empty ? 'rounded-2xl border border-dashed border-blue-200 bg-white/80 p-4 shadow-sm' : 'space-y-3'}
+      data-testid={empty ? 'estimate-line-empty-state' : 'estimate-line-item-sources'}
+    >
+      {empty && (
+        <div className="mb-3">
+          <p className="text-sm font-bold text-slate-950">No line items yet</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Start with a blank row, a saved item, or an active Price Book item. At least one line item is required before saving.
+          </p>
         </div>
       )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={addBlankEstimateLineToDraft}
+          className={buttonClass('secondary')}
+        >
+          <Plus size={14} />
+          Add blank line
+        </button>
+        <button
+          type="button"
+          onClick={() => setEstimateLineSourcePanel(current => current === 'saved' ? null : 'saved')}
+          className={buttonClass(estimateLineSourcePanel === 'saved' ? 'primary' : 'secondary')}
+          aria-expanded={estimateLineSourcePanel === 'saved'}
+        >
+          <Plus size={14} />
+          Add saved item
+        </button>
+        <button
+          type="button"
+          onClick={() => setEstimateLineSourcePanel(current => current === 'priceBook' ? null : 'priceBook')}
+          className={buttonClass(estimateLineSourcePanel === 'priceBook' ? 'primary' : 'secondary')}
+          aria-expanded={estimateLineSourcePanel === 'priceBook'}
+        >
+          <Plus size={14} />
+          Add from Price Book
+        </button>
+      </div>
+      {estimateLineSourcePanel === 'saved' && renderSavedChargeQuickPick()}
+      {estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()}
     </div>
   );
 
@@ -34440,51 +34544,53 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   ))}
                                 </div>
 
-                                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
-                                      else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create job</p>
-                                    <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={createEstimateCapability.disabled}
-                                    onClick={() => {
-                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create estimate</p>
-                                    <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={createInvoiceCapability.disabled}
-                                    onClick={() => {
-                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                      if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                                      beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
-                                    }}
-                                    title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
-                                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
-                                    <p className="mt-2 text-sm font-bold">Create invoice</p>
-                                    <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
-                                  </button>
-                                </div>
-                                {(createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
+                                {!estimateComposerOpen && (
+                                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isConn && conn) beginFieldWorkForHomeowner(conn, { homeId: workspaceNewRecordHomeId || undefined });
+                                        else if (localCustomer && !requireLocalPropertyForNewRecord()) beginFieldWorkForLocalContact(localCustomer, { localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-900 transition hover:border-blue-300 hover:bg-blue-100"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-blue-100 p-1.5 text-blue-700"><ClipboardCheck size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create job</p>
+                                      <p className="mt-1 text-xs text-blue-700">Service job or checklist report workflow</p>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={createEstimateCapability.disabled}
+                                      onClick={() => {
+                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                        beginEstimateDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
+                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create estimate</p>
+                                      <p className="mt-1 text-xs text-slate-500">Draft pricing before work begins</p>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={createInvoiceCapability.disabled}
+                                      onClick={() => {
+                                        if (localCustomer && requireLocalPropertyForNewRecord()) return;
+                                        if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
+                                        beginInvoiceDraftForCustomer(headerName, { homeId: workspaceNewRecordHomeId || undefined, localHomeId: workspaceNewRecordLocalHomeId || undefined });
+                                      }}
+                                      title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
+                                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      <span className="inline-flex rounded-lg bg-slate-100 p-1.5 text-slate-600"><Receipt size={15} /></span>
+                                      <p className="mt-2 text-sm font-bold">Create invoice</p>
+                                      <p className="mt-1 text-xs text-slate-500">Bill for completed or approved work</p>
+                                    </button>
+                                  </div>
+                                )}
+                                {!estimateComposerOpen && (createEstimateCapability.disabled || createInvoiceCapability.disabled) && (
                                   <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
                                     {createEstimateCapability.reason || createInvoiceCapability.reason}
                                   </p>
@@ -34802,6 +34908,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
+                                  {!estimateComposerOpen && (
                                   <div className="flex flex-wrap gap-2">
                                     {isInvoiceWorkspaceTab ? (
                                       <button
@@ -34832,6 +34939,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       </button>
                                     )}
                                   </div>
+                                  )}
                                 </div>
 
                                 {estimateComposerOpen && (
@@ -34851,9 +34959,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         )}
                                         <p className="mt-2 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
                                       </div>
-                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
-                                        Cancel
-                                      </button>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {!isInvoiceWorkspaceTab && estimateStartMode !== 'choose' && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEstimateStartMode('choose');
+                                              setEstimateGuidedBuilderActive(false);
+                                              setEstimateLineSourcePanel(null);
+                                            }}
+                                            className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                          >
+                                            Back to estimate options
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEstimateComposerOpen(false);
+                                            setEditingEstimateId(null);
+                                            setEstimateLineSourcePanel(null);
+                                          }}
+                                          className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                                        >
+                                          Discard draft
+                                        </button>
+                                      </div>
                                     </div>
                                     {(isInvoiceWorkspaceTab || (estimateStartMode !== 'choose' && estimateStartMode !== 'template')) && (
                                       <div className="grid gap-3 md:grid-cols-2">
@@ -34903,17 +35034,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <div className="mt-4">
                                           {renderEstimateStartChoice()}
                                         </div>
-                                        <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
-                                        </div>
                                       </>
                                     ) : estimateStartMode === 'template' && !isInvoiceWorkspaceTab ? (
                                       <>
                                         <div className="mt-4">
                                           {renderSavedEstimateTemplateStartPicker(conn?.display_name || localCustomer?.display_name || 'Customer')}
-                                        </div>
-                                        <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
                                         </div>
                                       </>
                                     ) : estimateGuidedBuilderActive && !isInvoiceWorkspaceTab ? (
@@ -34922,16 +35047,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           {renderBuildEstimateDraftPanel(conn?.display_name || localCustomer?.display_name || 'Customer')}
                                         </div>
                                         <div className="mt-4">
-                                          {renderEstimateReferenceTools()}
+                                          {renderEstimateHelperPanel()}
                                         </div>
                                       </>
                                     ) : (
                                       <>
-                                    {!isInvoiceWorkspaceTab && (
-                                      <div className="mt-4">
-                                        {renderEstimateReferenceTools()}
-                                      </div>
-                                    )}
                                     {estimateTemplateStartNotice && !isInvoiceWorkspaceTab && (
                                       <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
                                         {estimateTemplateStartNotice}
@@ -34956,36 +35076,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </div>
 
                                     <div className="mt-4 space-y-3">
-                                      <div className="flex items-center justify-between gap-3">
+                                      <div className="flex flex-wrap items-center justify-between gap-3">
                                         <p className="text-sm font-bold text-slate-950">Line items</p>
-                                        <button
-                                          type="button"
-                                          onClick={() => setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))}
-                                          className={buttonClass('secondary')}
-                                        >
-                                          <Plus size={14} />
-                                          Add line
-                                        </button>
                                       </div>
-                                      {renderSavedChargeQuickPick()}
-                                      {!isInvoiceWorkspaceTab && renderPriceBookQuickPick()}
-                                      {!isInvoiceWorkspaceTab && renderEstimateHelperPanel()}
-                                      {estimateDraft.line_items.map((line, index) => (
-                                        renderStructuredLineDraftEditor({
-                                          line,
-                                          index,
-                                          itemLabel: 'estimate',
-                                          laborMode: estimateDraft.labor_mode,
-                                          onChange: updates => setEstimateDraft(d => ({
-                                            ...d,
-                                            line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                                          })),
-                                          onRemove: () => setEstimateDraft(d => ({
-                                            ...d,
-                                            line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                                          })),
-                                        })
-                                      ))}
+                                      {estimateDraft.line_items.length === 0 ? (
+                                        renderEstimateLineItemSources({ empty: true })
+                                      ) : (
+                                        <>
+                                          {estimateDraft.line_items.map((line, index) => (
+                                            renderStructuredLineDraftEditor({
+                                              line,
+                                              index,
+                                              itemLabel: 'estimate',
+                                              laborMode: estimateDraft.labor_mode,
+                                              compactAdvanced: true,
+                                              onChange: updates => setEstimateDraft(d => ({
+                                                ...d,
+                                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                                              })),
+                                              onRemove: () => setEstimateDraft(d => ({
+                                                ...d,
+                                                line_items: d.line_items.filter(item => item.id !== line.id),
+                                              })),
+                                            })
+                                          ))}
+                                          {renderEstimateLineItemSources()}
+                                        </>
+                                      )}
                                     </div>
 
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -35012,8 +35129,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <Receipt size={15} />
                                         {savingEstimate ? 'Saving...' : editingEstimateId ? `Update ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                                       </button>
-                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
-                                        Cancel
+                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                                        Discard draft
                                       </button>
                                     </div>
                                       </>
@@ -35093,7 +35210,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   setEstimateDraftBuilderLastOutput(null);
                                                   setEstimateStartMode('draft');
                                                   setEstimateGuidedBuilderActive(false);
-                                                  setEstimateReferenceToolsExpanded(false);
+                                                  setEstimateLineSourcePanel(null);
                                                   setEstimateAssistantNotice('');
                                                   setEstimateTemplateStartNotice('');
                                                   setEstimateHelperNotice('');
@@ -35369,7 +35486,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     setEstimateDraftBuilderLastOutput(null);
                                                     setEstimateStartMode('draft');
                                                     setEstimateGuidedBuilderActive(false);
-                                                    setEstimateReferenceToolsExpanded(false);
+                                                    setEstimateLineSourcePanel(null);
                                                     setEstimateAssistantNotice('');
                                                     setEstimateTemplateStartNotice('');
                                                     setEstimateHelperNotice('');
@@ -35957,6 +36074,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Back to Jobs Overview
                           </button>
                         </div>
+                        {!estimateComposerOpen && (
                         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
@@ -36002,6 +36120,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Create invoice
                           </button>
                         </div>
+                        )}
 
                         {!selectedJobsCustomerName && (
                           <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
@@ -36113,9 +36232,32 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <p className="mt-0.5 text-xs text-blue-800">{selectedJobsCustomerAddress}</p>
                             )}
                           </div>
-                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} className="text-xs font-semibold text-blue-700 hover:text-blue-900">
-                            Cancel
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {estimateStartMode !== 'choose' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEstimateStartMode('choose');
+                                  setEstimateGuidedBuilderActive(false);
+                                  setEstimateLineSourcePanel(null);
+                                }}
+                                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                              >
+                                Back to estimate options
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEstimateComposerOpen(false);
+                                setEditingEstimateId(null);
+                                setEstimateLineSourcePanel(null);
+                              }}
+                              className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+                            >
+                              Discard draft
+                            </button>
+                          </div>
                         </div>
 
                         {estimateStartMode !== 'choose' && estimateStartMode !== 'template' && (
@@ -36152,17 +36294,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div className="mt-4">
                               {renderEstimateStartChoice()}
                             </div>
-                            <div className="mt-4">
-                              {renderEstimateReferenceTools()}
-                            </div>
                           </>
                         ) : estimateStartMode === 'template' && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
                           <>
                             <div className="mt-4">
                               {renderSavedEstimateTemplateStartPicker(selectedJobsCustomerName || 'Customer')}
-                            </div>
-                            <div className="mt-4">
-                              {renderEstimateReferenceTools()}
                             </div>
                           </>
                         ) : estimateGuidedBuilderActive && estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' ? (
@@ -36171,16 +36307,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {renderBuildEstimateDraftPanel(selectedJobsCustomerName || 'Customer')}
                             </div>
                             <div className="mt-4">
-                              {renderEstimateReferenceTools()}
+                              {renderEstimateHelperPanel()}
                             </div>
                           </>
                         ) : (
                           <>
-                        {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && (
-                          <div className="mt-4">
-                            {renderEstimateReferenceTools()}
-                          </div>
-                        )}
                         {estimateTemplateStartNotice && (
                           <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800" data-testid="estimate-template-pricing-notice">
                             {estimateTemplateStartNotice}
@@ -36206,32 +36337,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
 
                         <div className="mt-4 space-y-3">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Line items</p>
-                            <button type="button" onClick={() => setEstimateDraft(d => ({ ...d, line_items: [...d.line_items, createEstimateLineDraft()] }))} className={buttonClass('secondary')}>
-                              <Plus size={14} />
-                              Add line
-                            </button>
                           </div>
-                          {renderSavedChargeQuickPick()}
-                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}
-                          {estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderEstimateHelperPanel()}
-                          {estimateDraft.line_items.map((line, index) => (
-                            renderStructuredLineDraftEditor({
-                              line,
-                              index,
-                              itemLabel: 'estimate',
-                              laborMode: estimateDraft.labor_mode,
-                              onChange: updates => setEstimateDraft(d => ({
-                                ...d,
-                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                              })),
-                              onRemove: () => setEstimateDraft(d => ({
-                                ...d,
-                                line_items: d.line_items.length === 1 ? [createEstimateLineDraft()] : d.line_items.filter(item => item.id !== line.id),
-                              })),
-                            })
-                          ))}
+                          {estimateDraft.line_items.length === 0 ? (
+                            renderEstimateLineItemSources({ empty: true })
+                          ) : (
+                            <>
+                              {estimateDraft.line_items.map((line, index) => (
+                                renderStructuredLineDraftEditor({
+                                  line,
+                                  index,
+                                  itemLabel: 'estimate',
+                                  laborMode: estimateDraft.labor_mode,
+                                  compactAdvanced: true,
+                                  onChange: updates => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+                                  })),
+                                  onRemove: () => setEstimateDraft(d => ({
+                                    ...d,
+                                    line_items: d.line_items.filter(item => item.id !== line.id),
+                                  })),
+                                })
+                              ))}
+                              {renderEstimateLineItemSources()}
+                            </>
+                          )}
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -36250,8 +36382,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <Receipt size={15} />
                             {savingEstimate ? 'Saving...' : editingEstimateId ? 'Update draft' : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                           </button>
-                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
-                            Cancel
+                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                            Discard draft
                           </button>
                         </div>
                           </>
@@ -36801,7 +36933,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setEstimateDraftBuilderLastOutput(null);
                                         setEstimateStartMode('draft');
                                         setEstimateGuidedBuilderActive(false);
-                                        setEstimateReferenceToolsExpanded(false);
+                                        setEstimateLineSourcePanel(null);
                                         setEstimateAssistantNotice('');
                                         setEstimateTemplateStartNotice('');
                                         setEstimateHelperNotice('');
