@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-08
 
+- Branch: `codex/multiple-invoices-frontend-mvp-v1`
+- Starting main SHA: `8fd6921ff0ca1539b558b90dee5aa8eb5c82194e`
+- Files changed:
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the contractor-side multiple-invoices frontend MVP for estimate-origin invoice creation. Saved/focused estimate records now show a linked invoice summary for all non-void invoices, including type/status/total/date/open actions plus estimate total, linked invoice total, remaining balance, and draft-inclusive copy. `Create invoice from estimate` now opens an invoice type chooser for total, deposit, progress, or final invoice drafts instead of opening the first existing linked invoice. The existing editable invoice composer is still used with `sourceEstimate`, selected `invoice_type`, optional next `invoice_sequence`, copied estimate context/line items, draft-inclusive remaining summary, and a warning-only over-estimate notice.
+- Reason for change: The backend foundation supports multiple invoices per estimate, but the contractor UI still behaved like one active linked invoice. Contractors need a minimal, explicit way to start total/deposit/progress/final invoice drafts and see linked invoice context without adding payment, automation, or homeowner-side complexity.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused contractor invoice source-static tests
+  - focused contractor estimate-to-invoice tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, backend, Supabase, storage, package/lock, env/config/deployment/native/service-worker, production deploy, production SQL, production data, Stripe/payment, send/email/SMS/PDF modal, Home History, homeowner invoice redesign, change-order, or line-level estimate-item tracking changes are included.
+  - Deposit/progress/final amounts remain manually editable; ServSync shows warnings but does not auto-calculate, enforce remaining balance, track invoiced estimate line items, or manage multi-invoice schedules yet.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the first contractor-side multi-invoice MVP and keeps deeper billing automation future-scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The invoice current-state description now reflects the contractor-side type chooser and linked invoice summary while preserving deferred homeowner/payment/automation work.
+
 - Branch: `codex/multiple-invoices-foundation-v1`
 - Starting main SHA: `ee011756bc6990ffc65cb12bcce708b0dad4f872`
 - Files changed:

@@ -244,6 +244,8 @@ export interface Invoice {
 
 export interface InvoiceDraft {
   invoice_number: string;
+  invoice_type: InvoiceType;
+  invoice_sequence?: number | null;
   title: string;
   scope: string;
   notes: string;
