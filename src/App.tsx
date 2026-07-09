@@ -179,6 +179,8 @@ import type {
   Invoice,
   InvoiceBacklogItem,
   InvoiceLineItem,
+  InvoiceStatus,
+  InvoiceType,
   JobWorkItem,
   JobLifecycleStatus,
   LegacyEstimateLineType,
@@ -1027,6 +1029,8 @@ function persistedLineFromDraft(line: EstimateLineDraft, ownerIdField: 'estimate
 }
 type InvoiceDraftForm = {
   invoice_number: string;
+  invoice_type: InvoiceType;
+  invoice_sequence: number | null;
   title: string;
   scope: string;
   notes: string;
@@ -1045,6 +1049,14 @@ type InvoiceDraftForm = {
   labor_rate: string;
   job_labor_hours: string;
   line_items: EstimateLineDraft[];
+};
+type InvoiceDepositChooserState = {
+  estimateId: string;
+  subjectName: string;
+  mode: 'amount' | 'percentage';
+  amount: string;
+  percentage: string;
+  error: string;
 };
 type LocalCustomerClaimPreview = {
   invite_id: string;
@@ -1855,6 +1867,8 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
     estimate_id: '',
     home_id: '',
     local_home_id: '',
+    invoice_type: 'total' as InvoiceType,
+    invoice_sequence: null,
     due_at: '',
     tax: '',
     discount_type: 'amount' as const,
@@ -1872,9 +1886,92 @@ function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<In
   };
 }
 
-function invoiceTitleFromEstimate(estimate: Pick<Estimate, 'title'>) {
+const INVOICE_TYPE_CHOICES: Array<{ type: InvoiceType; label: string; helper: string }> = [
+  { type: 'total', label: 'Total invoice', helper: 'Bill the full estimate amount as one editable draft invoice.' },
+  { type: 'deposit', label: 'Deposit invoice', helper: 'Start an upfront invoice. Set the amount manually before saving.' },
+  { type: 'progress', label: 'Progress invoice', helper: 'Start a partial progress invoice. Choose amounts manually for now.' },
+  { type: 'final', label: 'Final invoice', helper: 'Start a final invoice draft. Review remaining balance before saving.' },
+];
+
+const LINKED_INVOICE_REMAINING_STATUSES = new Set<InvoiceStatus>([
+  'draft',
+  'sent',
+  'viewed',
+  'overdue',
+  'partially_paid',
+  'paid',
+]);
+
+function invoiceTypeLabel(invoiceType: InvoiceType | null | undefined) {
+  if (invoiceType === 'deposit') return 'Deposit invoice';
+  if (invoiceType === 'progress') return 'Progress invoice';
+  if (invoiceType === 'final') return 'Final invoice';
+  return 'Total invoice';
+}
+
+function invoiceTitleFromEstimate(estimate: Pick<Estimate, 'title'>, invoiceType: InvoiceType = 'total') {
   const estimateTitle = (estimate.title || '').trim().replace(/^estimate\s*[—:-]\s*/i, '').trim();
-  return estimateTitle ? `Invoice — ${estimateTitle}` : 'Invoice from estimate';
+  const prefix = invoiceType === 'total' ? 'Invoice' : invoiceTypeLabel(invoiceType);
+  return estimateTitle ? `${prefix} — ${estimateTitle}` : `${prefix} from estimate`;
+}
+
+function depositInvoicePreviewCents(estimateTotalCents: number, chooser: Pick<InvoiceDepositChooserState, 'mode' | 'amount' | 'percentage'>) {
+  if (chooser.mode === 'amount') {
+    return priceInputIsBlank(chooser.amount) ? 0 : dollarsToCents(chooser.amount);
+  }
+  const percent = parsePercentValue(chooser.percentage);
+  return Math.round(estimateTotalCents * percent / 100);
+}
+
+function depositInvoiceLineForEstimate(estimate: Pick<Estimate, 'title'>, depositCents: number): EstimateLineDraft {
+  return createEstimateLineDraft({
+    line_type: 'fee',
+    description: 'Deposit for estimate',
+    line_title: 'Deposit for estimate',
+    customer_description: `Deposit for ${estimate.title || 'estimate'}.`,
+    quantity: '1',
+    unit: 'deposit',
+    unit_price: centsToDollars(depositCents),
+    editor_source_note: 'Deposit invoice created from estimate. Review the amount, terms, and remaining balance before saving or sending.',
+  });
+}
+
+function linkedInvoicesForEstimate(invoices: Invoice[], estimateId: string) {
+  return invoices
+    .filter(invoice => invoice.estimate_id === estimateId && invoice.status !== 'void')
+    .sort((a, b) => {
+      const sequenceDelta = (a.invoice_sequence ?? Number.MAX_SAFE_INTEGER) - (b.invoice_sequence ?? Number.MAX_SAFE_INTEGER);
+      if (sequenceDelta !== 0) return sequenceDelta;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+}
+
+function linkedInvoiceTotalCents(invoices: Invoice[]) {
+  return invoices
+    .filter(invoice => LINKED_INVOICE_REMAINING_STATUSES.has(invoice.status))
+    .reduce((sum, invoice) => sum + invoice.total_cents, 0);
+}
+
+function linkedInvoiceStatusCounts(invoices: Invoice[]) {
+  return invoices.reduce<Record<string, number>>((counts, invoice) => {
+    if (LINKED_INVOICE_REMAINING_STATUSES.has(invoice.status)) {
+      counts[invoice.status] = (counts[invoice.status] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+}
+
+function nextInvoiceSequenceForLinkedInvoices(invoices: Invoice[]) {
+  const highestSequence = invoices.reduce((max, invoice) => {
+    const sequence = invoice.invoice_sequence ?? 0;
+    return sequence > max ? sequence : max;
+  }, 0);
+  return Math.max(highestSequence, invoices.length) + 1;
+}
+
+function invoiceDateLabel(invoice: Invoice) {
+  if (invoice.issued_at) return `Sent ${formatDateTime(invoice.issued_at)}`;
+  return `Created ${formatDateTime(invoice.created_at)}`;
 }
 
 function estimateDocumentLabel(estimate: Pick<Estimate, 'title' | 'scope' | 'notes'>) {
@@ -3130,6 +3227,8 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
     : 0;
   return {
     invoice_number: invoice.invoice_number,
+    invoice_type: invoice.invoice_type ?? 'total',
+    invoice_sequence: invoice.invoice_sequence ?? null,
     title: invoice.title,
     scope: invoice.scope,
     notes: invoice.notes,
@@ -21296,6 +21395,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [invoiceComposerOpen, setInvoiceComposerOpen] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraftForm>(() => createBlankInvoiceDraft());
+  const [invoiceTypeChooser, setInvoiceTypeChooser] = useState<{ estimateId: string; subjectName: string } | null>(null);
+  const [invoiceDepositChooser, setInvoiceDepositChooser] = useState<InvoiceDepositChooserState | null>(null);
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [jobWorkItemsByJobId, setJobWorkItemsByJobId] = useState<Record<string, JobWorkItem[]>>({});
@@ -23217,7 +23318,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const beginInvoiceDraftForCustomer = (
     subjectName: string,
-    options: { serviceRequestId?: string; jobId?: string; estimateId?: string; sourceEstimate?: Estimate; homeId?: string | null; localHomeId?: string | null } = {},
+    options: {
+      serviceRequestId?: string;
+      jobId?: string;
+      estimateId?: string;
+      sourceEstimate?: Estimate;
+      homeId?: string | null;
+      localHomeId?: string | null;
+      invoiceType?: InvoiceType;
+      invoiceSequence?: number | null;
+      invoiceTitle?: string;
+      invoiceScope?: string;
+      invoiceNotes?: string;
+      invoiceLineItems?: EstimateLineDraft[];
+    } = {},
   ) => {
     if (createInvoiceCapability.disabled) {
       setError(createInvoiceCapability.reason);
@@ -23225,11 +23339,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
+    setInvoiceTypeChooser(null);
+    setInvoiceDepositChooser(null);
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
+      invoice_type: options.invoiceType ?? 'total',
+      invoice_sequence: options.invoiceSequence ?? null,
       ...(options.sourceEstimate
         ? {
-            title: invoiceTitleFromEstimate(options.sourceEstimate),
-            notes: options.sourceEstimate.notes || '',
+            title: options.invoiceTitle ?? invoiceTitleFromEstimate(options.sourceEstimate, options.invoiceType ?? 'total'),
+            notes: options.invoiceNotes ?? (options.sourceEstimate.notes || ''),
             terms: options.sourceEstimate.terms || '',
           }
         : {}),
@@ -23238,11 +23356,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       estimate_id: options.estimateId ?? options.sourceEstimate?.id ?? '',
       home_id: options.homeId ?? options.sourceEstimate?.home_id ?? defaultConnectedHomeId,
       local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id ?? defaultLocalHomeId,
-      scope: options.sourceEstimate?.scope || 'Completed work performed for the customer.',
+      scope: options.invoiceScope ?? (options.sourceEstimate?.scope || 'Completed work performed for the customer.'),
       labor_mode: normalizeEstimateLaborMode(options.sourceEstimate?.labor_mode),
       labor_rate: laborRateInputFromCents(options.sourceEstimate?.labor_rate_cents ?? contractor?.default_labor_rate_cents),
       job_labor_hours: laborHoursInputFromValue(options.sourceEstimate?.job_labor_hours),
-      line_items: options.sourceEstimate?.line_items?.length
+      line_items: options.invoiceLineItems ?? (options.sourceEstimate?.line_items?.length
         ? [...options.sourceEstimate.line_items]
             .sort((a, b) => a.sort_order - b.sort_order)
             .map(line => createEstimateLineDraft({
@@ -23257,7 +23375,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
               labor_hours: laborHoursInputFromValue(line.labor_hours),
             }))
-        : undefined,
+        : undefined),
     }));
     setInvoiceTemplateStartNotice('');
     setInvoiceComposerOpen(true);
@@ -23631,6 +23749,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         home_id: (subject.homeownerUserId || currentInvoice?.homeowner_user_id) ? property.home_id || null : null,
         local_home_id: (subject.localContactId || currentInvoice?.local_contact_id) ? property.local_home_id || null : null,
         invoice_number: invoiceDraft.invoice_number.trim(),
+        invoice_type: invoiceDraft.invoice_type,
+        invoice_sequence: invoiceDraft.invoice_sequence,
         title: invoiceDraft.title.trim(),
         scope: cleanHumanWrittenText(invoiceDraft.scope),
         notes: cleanHumanWrittenText(invoiceDraft.notes),
@@ -23779,6 +23899,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const openInvoiceRecord = (invoice: Invoice) => {
     setFocusedEstimateRecordId(null);
     setInvoiceTemplateStartNotice('');
+    setInvoiceTypeChooser(null);
+    setInvoiceDepositChooser(null);
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
     const local = invoice.local_contact_id ? localContacts.find(item => item.id === invoice.local_contact_id) : null;
     setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -23798,6 +23920,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInvoiceComposerOpen(false);
     setEstimateComposerOpen(false);
     setContractorJobsView(['paid', 'void'].includes(invoice.status) ? 'closed_financial' : 'open_financial');
+  };
+
+  const renderEstimateLinkedInvoiceSummary = (estimate: Estimate) => {
+    const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
+    if (linkedInvoices.length === 0) return null;
+    const linkedTotalCents = linkedInvoiceTotalCents(linkedInvoices);
+    const remainingCents = estimate.total_cents - linkedTotalCents;
+    const statusCounts = linkedInvoiceStatusCounts(linkedInvoices);
+    const statusSummary = Object.entries(statusCounts)
+      .map(([status, count]) => `${count} ${invoiceStatusLabel(status as InvoiceStatus).toLowerCase()}`)
+      .join(' · ');
+
+    return (
+      <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3" data-testid="estimate-linked-invoices-summary">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Invoices linked</p>
+            <p className="mt-1 text-xs leading-5 text-blue-900">Totals include draft invoices. Void invoices are excluded.</p>
+            {statusSummary && <p className="mt-1 text-xs font-semibold text-blue-800">{statusSummary}</p>}
+          </div>
+          <div className="grid gap-1 text-xs text-slate-600 sm:text-right">
+            <span>Estimate total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong></span>
+            <span>Linked invoice total <strong className="text-slate-950">{formatMoney(linkedTotalCents)}</strong></span>
+            <span>Remaining <strong className="text-slate-950">{formatMoney(remainingCents)}</strong></span>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {linkedInvoices.map(invoice => (
+            <div key={invoice.id} className="flex flex-col gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between" data-testid="estimate-linked-invoice-row">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-950">{invoiceTypeLabel(invoice.invoice_type)} · {invoice.invoice_number || invoice.title}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {invoiceStatusLabel(invoice.status)} · {formatMoney(invoice.total_cents)} · {invoiceDateLabel(invoice)}
+                </p>
+              </div>
+              <button type="button" className={buttonClass('secondary')} onClick={() => openInvoiceRecord(invoice)}>
+                Open invoice
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const openEstimateRecord = (estimate: Estimate) => {
@@ -23875,18 +24040,49 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const beginInvoiceDraftFromEstimate = (estimate: Estimate, subjectName: string) => {
     setNotice('');
     setError('');
-    const existingInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void');
-    if (existingInvoice) {
-      openInvoiceRecord(existingInvoice);
-      setNotice(existingInvoice.status === 'draft' ? 'Opened the draft invoice for this estimate.' : 'Opened the invoice linked to this estimate.');
+    setInvoiceDepositChooser(null);
+    setInvoiceTypeChooser({ estimateId: estimate.id, subjectName: subjectName || 'Customer' });
+  };
+
+  const startInvoiceDraftFromEstimate = (estimate: Estimate, subjectName: string, invoiceType: InvoiceType) => {
+    const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
+    if (invoiceType === 'deposit') {
+      setInvoiceTypeChooser(null);
+      setInvoiceDepositChooser({
+        estimateId: estimate.id,
+        subjectName: subjectName || 'Customer',
+        mode: 'percentage',
+        amount: '',
+        percentage: '10',
+        error: '',
+      });
       return;
     }
+    setInvoiceTypeChooser(null);
     beginInvoiceDraftForCustomer(subjectName || 'Customer', {
       sourceEstimate: estimate,
       homeId: estimate.home_id,
       localHomeId: estimate.local_home_id,
+      invoiceType,
+      invoiceSequence: nextInvoiceSequenceForLinkedInvoices(linkedInvoices),
     });
-    setNotice('Invoice draft started from this estimate. Review it before saving or sending.');
+    setNotice(`${invoiceTypeLabel(invoiceType)} draft started from this estimate. Review it before saving or sending.`);
+  };
+
+  const startDepositInvoiceDraftFromEstimate = (estimate: Estimate, subjectName: string, depositCents: number) => {
+    const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
+    beginInvoiceDraftForCustomer(subjectName || 'Customer', {
+      sourceEstimate: estimate,
+      homeId: estimate.home_id,
+      localHomeId: estimate.local_home_id,
+      invoiceType: 'deposit',
+      invoiceSequence: nextInvoiceSequenceForLinkedInvoices(linkedInvoices),
+      invoiceTitle: invoiceTitleFromEstimate(estimate, 'deposit'),
+      invoiceScope: `Deposit for estimate: ${estimate.title || 'Estimate'}.`,
+      invoiceNotes: 'Deposit invoice for this estimate. Review the amount, terms, and remaining balance before saving or sending.',
+      invoiceLineItems: [depositInvoiceLineForEstimate(estimate, depositCents)],
+    });
+    setNotice('Deposit invoice draft started from this estimate. Review the amount before saving or sending.');
   };
 
   const createInvoiceFromJob = async (job: Inspection) => {
@@ -25448,6 +25644,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             { label: 'Total', amount: invoiceTotalCents(invoiceDraft), bold: true },
           ])}
         </div>
+        {activeInvoiceEstimate && (
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3" data-testid="invoice-estimate-remaining-summary">
+            <p className="text-sm font-bold text-slate-950">Estimate invoice summary</p>
+            <p className="mt-1 text-xs leading-5 text-blue-900">Totals include draft invoices. Void invoices are excluded.</p>
+            <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+              <span>Invoice type <strong className="text-slate-950">{invoiceTypeLabel(invoiceDraft.invoice_type)}</strong></span>
+              <span>Estimate total <strong className="text-slate-950">{formatMoney(activeInvoiceEstimate.total_cents)}</strong></span>
+              <span>Linked invoice total <strong className="text-slate-950">{formatMoney(activeInvoiceLinkedTotalCents)}</strong></span>
+              <span>Remaining before this draft <strong className="text-slate-950">{formatMoney(activeInvoiceRemainingCents)}</strong></span>
+              <span>Current draft total <strong className="text-slate-950">{formatMoney(activeInvoiceDraftTotalCents)}</strong></span>
+              <span>Projected linked total <strong className="text-slate-950">{formatMoney(activeInvoiceProjectedTotalCents)}</strong></span>
+            </div>
+            {activeInvoiceOverEstimate && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800" data-testid="invoice-over-estimate-warning">
+                This would bring linked invoices above the estimate total. Review before saving or sending.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -27928,6 +28143,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     homeownerUserId: selectedJobsConnection?.homeowner_user_id ?? null,
     localContactId: selectedJobsLocalContact?.id ?? null,
   };
+  const activeInvoiceEstimate = invoiceDraft.estimate_id
+    ? estimates.find(estimate => estimate.id === invoiceDraft.estimate_id) ?? null
+    : null;
+  const activeInvoiceLinkedInvoices = activeInvoiceEstimate
+    ? linkedInvoicesForEstimate(invoices, activeInvoiceEstimate.id).filter(invoice => invoice.id !== editingInvoiceId)
+    : [];
+  const activeInvoiceLinkedTotalCents = linkedInvoiceTotalCents(activeInvoiceLinkedInvoices);
+  const activeInvoiceDraftTotalCents = invoiceTotalCents(invoiceDraft);
+  const activeInvoiceProjectedTotalCents = activeInvoiceLinkedTotalCents + activeInvoiceDraftTotalCents;
+  const activeInvoiceRemainingCents = activeInvoiceEstimate ? activeInvoiceEstimate.total_cents - activeInvoiceLinkedTotalCents : 0;
+  const activeInvoiceOverEstimate = Boolean(activeInvoiceEstimate && activeInvoiceProjectedTotalCents > activeInvoiceEstimate.total_cents);
   const groupedWorkItemsForJob = (jobId: string) => {
     const items = workItemsForJob(jobId);
     return {
@@ -35418,7 +35644,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       ) : selectedDocumentSection.estimates.map(estimate => {
                                       const lineCount = estimate.line_items?.length ?? 0;
                                       const hasLinkedJob = estimateHasLinkedJob(estimate);
-                                      const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                                      const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
                                       const canCreateInvoiceDraftFromEstimate = ['draft', 'sent', 'accepted'].includes(estimate.status);
                                       return (
@@ -35441,14 +35667,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   Next step: create the job from this approved estimate.
                                                 </p>
                                               )}
-                                              {linkedInvoice && (
-                                                <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                                  Invoice created
-                                                </p>
-                                              )}
                                             </div>
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
+                                          {renderEstimateLinkedInvoiceSummary(estimate)}
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             <button
                                               type="button"
@@ -35543,12 +35765,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <button
                                                 type="button"
                                                 onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
-                                                className={buttonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                                className={buttonClass(linkedInvoices.length ? 'secondary' : 'primary')}
                                               >
                                                 <Receipt size={15} />
-                                                {linkedInvoice
-                                                  ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
-                                                  : 'Create invoice from estimate'}
+                                                Create invoice from estimate
                                               </button>
                                             )}
                                             {estimate.status === 'sent' && (
@@ -36706,7 +36926,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">First-class invoices</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">INVOICES</p>
                                 <p className="mt-1 text-xs text-slate-500">{visibleInvoiceRecords.length} invoice{visibleInvoiceRecords.length === 1 ? '' : 's'} in this view</p>
                               </div>
                               <button
@@ -36866,7 +37086,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const customerName = connection?.display_name || local?.display_name || 'Customer';
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                           const hasLinkedJob = estimateHasLinkedJob(estimate);
-                          const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                          const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
                           const canCreateInvoiceDraftFromEstimate = !isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status);
                           return (
@@ -36892,14 +37112,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       Next step: create the job from this approved estimate before closeout.
                                     </p>
                                   )}
-                                  {linkedInvoice && (
-                                    <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                      Invoice created
-                                    </p>
-                                  )}
                                 </div>
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
+                              {renderEstimateLinkedInvoiceSummary(estimate)}
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <button
                                   type="button"
@@ -36994,12 +37210,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                       beginInvoiceDraftFromEstimate(estimate, customerName);
                                     }}
-                                    className={mobileButtonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                    className={mobileButtonClass(linkedInvoices.length ? 'secondary' : 'primary')}
                                   >
                                     <Receipt size={15} />
-                                    {linkedInvoice
-                                      ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
-                                      : 'Create invoice from estimate'}
+                                    Create invoice from estimate
                                   </button>
                                 )}
                                 {estimate.status === 'sent' && (
@@ -41459,6 +41673,180 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           </div>
         </div>
       )}
+
+      {invoiceTypeChooser && (() => {
+        const estimate = estimates.find(item => item.id === invoiceTypeChooser.estimateId);
+        if (!estimate) return null;
+        const linkedInvoices = linkedInvoicesForEstimate(invoices, estimate.id);
+        const linkedTotalCents = linkedInvoiceTotalCents(linkedInvoices);
+        const remainingCents = estimate.total_cents - linkedTotalCents;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="invoice-type-chooser-title"
+            data-testid="invoice-type-chooser-modal"
+          >
+            <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-2xl sm:rounded-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Invoice from estimate</p>
+                  <h2 id="invoice-type-chooser-title" className="mt-1 text-xl font-bold text-slate-950">Create invoice from estimate</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Choose the invoice type to start an editable draft. Deposit drafts ask for an amount first; progress and final drafts stay manually editable for now.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceTypeChooser(null)}
+                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Cancel"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3" data-testid="estimate-invoice-remaining-summary">
+                <p className="text-sm font-bold text-slate-950">{estimate.title}</p>
+                <p className="mt-1 text-xs leading-5 text-blue-900">Totals include draft invoices. Void invoices are excluded.</p>
+                <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
+                  <span>Estimate total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong></span>
+                  <span>Linked invoice total <strong className="text-slate-950">{formatMoney(linkedTotalCents)}</strong></span>
+                  <span>Remaining <strong className="text-slate-950">{formatMoney(remainingCents)}</strong></span>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {INVOICE_TYPE_CHOICES.map(choice => (
+                  <button
+                    key={choice.type}
+                    type="button"
+                    className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                    onClick={() => startInvoiceDraftFromEstimate(estimate, invoiceTypeChooser.subjectName, choice.type)}
+                  >
+                    <span className="text-sm font-bold text-slate-950">{choice.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{choice.helper}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {invoiceDepositChooser && (() => {
+        const estimate = estimates.find(item => item.id === invoiceDepositChooser.estimateId);
+        if (!estimate) return null;
+        const previewCents = depositInvoicePreviewCents(estimate.total_cents, invoiceDepositChooser);
+        const confirmDepositDraft = () => {
+          if (previewCents <= 0) {
+            setInvoiceDepositChooser(current => current ? { ...current, error: 'Enter a deposit amount greater than $0.' } : current);
+            return;
+          }
+          startDepositInvoiceDraftFromEstimate(estimate, invoiceDepositChooser.subjectName, previewCents);
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deposit-invoice-chooser-title"
+            data-testid="deposit-invoice-chooser-modal"
+          >
+            <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Deposit invoice</p>
+                  <h2 id="deposit-invoice-chooser-title" className="mt-1 text-xl font-bold text-slate-950">Deposit invoice amount</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Choose a dollar amount or percentage before creating the deposit invoice draft.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceDepositChooser(null)}
+                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Cancel deposit invoice"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                <p className="text-sm font-bold text-slate-950">{estimate.title}</p>
+                <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                  <span>Estimate total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong></span>
+                  <span>Deposit total <strong className="text-slate-950">{formatMoney(previewCents)}</strong></span>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${invoiceDepositChooser.mode === 'amount' ? 'border-blue-500 bg-blue-50 text-blue-950' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`}>
+                  <input
+                    type="radio"
+                    name="deposit-invoice-mode"
+                    value="amount"
+                    checked={invoiceDepositChooser.mode === 'amount'}
+                    onChange={() => setInvoiceDepositChooser(current => current ? { ...current, mode: 'amount', error: '' } : current)}
+                    className="mt-1 h-4 w-4 border-slate-300 accent-blue-600"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold">Dollar amount</span>
+                    <span className="mt-2 block">
+                      <input
+                        className={inputClass()}
+                        aria-label="Deposit dollar amount"
+                        value={invoiceDepositChooser.amount}
+                        onChange={event => setInvoiceDepositChooser(current => current ? { ...current, amount: event.target.value, mode: 'amount', error: '' } : current)}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                      />
+                    </span>
+                  </span>
+                </label>
+
+                <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${invoiceDepositChooser.mode === 'percentage' ? 'border-blue-500 bg-blue-50 text-blue-950' : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'}`}>
+                  <input
+                    type="radio"
+                    name="deposit-invoice-mode"
+                    value="percentage"
+                    checked={invoiceDepositChooser.mode === 'percentage'}
+                    onChange={() => setInvoiceDepositChooser(current => current ? { ...current, mode: 'percentage', error: '' } : current)}
+                    className="mt-1 h-4 w-4 border-slate-300 accent-blue-600"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold">Percentage of estimate</span>
+                    <span className="mt-2 block">
+                      <input
+                        className={inputClass()}
+                        aria-label="Deposit percentage"
+                        value={invoiceDepositChooser.percentage}
+                        onChange={event => setInvoiceDepositChooser(current => current ? { ...current, percentage: event.target.value, mode: 'percentage', error: '' } : current)}
+                        inputMode="decimal"
+                        placeholder="10"
+                      />
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {invoiceDepositChooser.error && (
+                <Notice tone="error" text={invoiceDepositChooser.error} />
+              )}
+
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" className={buttonClass('secondary')} onClick={() => setInvoiceDepositChooser(null)}>
+                  Cancel
+                </button>
+                <button type="button" className={buttonClass('primary')} onClick={confirmDepositDraft}>
+                  Create deposit invoice draft
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {saveEstimateTemplateModal && (
         <div
