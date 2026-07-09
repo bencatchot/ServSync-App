@@ -1490,6 +1490,42 @@ function estimatePaymentScheduleDraftFromEstimate(estimate: Estimate): EstimateP
   };
 }
 
+function estimatePaymentScheduleInvoiceTypeCustomerLabel(value: string | null | undefined) {
+  switch (value) {
+    case 'total':
+      return 'Total invoice';
+    case 'deposit':
+      return 'Deposit invoice';
+    case 'progress':
+      return 'Progress invoice';
+    case 'final':
+      return 'Final invoice';
+    default:
+      return 'Scheduled invoice';
+  }
+}
+
+function sortedEstimatePaymentScheduleRows(estimate: Estimate) {
+  return [...(estimate.payment_schedule_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function estimatePaymentScheduleDisplayTotalCents(estimate: Estimate) {
+  return sortedEstimatePaymentScheduleRows(estimate).reduce((sum, row) => sum + row.calculated_amount_cents, 0);
+}
+
+function estimatePaymentScheduleDisplayWarning(estimate: Estimate) {
+  const rows = sortedEstimatePaymentScheduleRows(estimate);
+  if (rows.length === 0) return '';
+  const scheduleTotalCents = rows.reduce((sum, row) => sum + row.calculated_amount_cents, 0);
+  if (scheduleTotalCents > estimate.total_cents) {
+    return 'This payment schedule total is above the estimate total. Ask your contractor to correct it before approving.';
+  }
+  if (scheduleTotalCents !== estimate.total_cents) {
+    return 'This payment schedule total does not match the estimate total. Ask your contractor to confirm before approving.';
+  }
+  return '';
+}
+
 function createBlankSavedEstimateChargeDraft(overrides: Partial<SavedEstimateChargeDraft> = {}): SavedEstimateChargeDraft {
   return {
     name: '',
@@ -14628,6 +14664,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const cardTone = options.needsReview ? 'attention' : options.accepted ? 'accepted' : 'closed';
     const propertyLabel = propertyRecordLabel(estimate, { homes });
     const totals = persistedFinancialBreakdown(estimate);
+    const paymentScheduleRows = sortedEstimatePaymentScheduleRows(estimate);
+    const paymentScheduleTotalCents = estimatePaymentScheduleDisplayTotalCents(estimate);
+    const paymentScheduleWarning = estimatePaymentScheduleDisplayWarning(estimate);
 
     return (
       <div
@@ -14762,6 +14801,49 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <span className="text-slate-500">Total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong></span>
               </div>
             </div>
+            {paymentScheduleRows.length > 0 && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3" data-testid="homeowner-estimate-payment-schedule">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Payment Schedule</p>
+                    <p className="mt-1 text-sm leading-5 text-blue-900">
+                      These payment terms are part of the estimate your contractor sent.
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-white/80 px-3 py-2 text-sm shadow-sm">
+                    <span className="text-slate-500">Schedule total </span>
+                    <strong className="text-slate-950">{formatMoney(paymentScheduleTotalCents)}</strong>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {paymentScheduleRows.map(row => {
+                    const label = row.label?.trim() || estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type);
+                    const typeLabel = estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type);
+                    const dueTrigger = row.due_trigger?.trim() || 'Due date to be confirmed';
+                    return (
+                      <div key={row.id} className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-950">{label}</p>
+                            <p className="mt-0.5 text-xs font-medium text-slate-500">{typeLabel} · {dueTrigger}</p>
+                          </div>
+                          <p className="font-bold text-slate-950 sm:text-right">{formatMoney(row.calculated_amount_cents)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {paymentScheduleWarning && (
+                  <p className={`mt-3 rounded-lg border px-3 py-2 text-xs font-semibold leading-5 ${
+                    paymentScheduleWarning.includes('above')
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-800'
+                  }`}>
+                    {paymentScheduleWarning}
+                  </p>
+                )}
+              </div>
+            )}
             {(estimate.notes || estimate.terms) && (
               <div className="grid gap-3 md:grid-cols-2">
                 {estimate.notes && (
@@ -14780,6 +14862,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             )}
             {estimate.status === 'sent' && (
               <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+                {paymentScheduleRows.length > 0 && (
+                  <p className="basis-full rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900">
+                    By approving, you accept the estimate scope, total, and payment schedule.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => void respondToEstimate(estimate, 'accept')}

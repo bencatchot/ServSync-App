@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/homeowner-estimate-payment-schedule-display-v1`
+- Starting main SHA: `721d85d2be6366aaf277825854ecee5ba7033687`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/homeowner-estimate-payment-schedule.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added homeowner in-app display for structured estimate payment schedules in the expanded estimate review area. Homeowners now see configured schedule rows sorted by display order, with row label, invoice type, amount, due trigger, schedule total, warning-only mismatch/over-total copy, and schedule-aware approval helper copy before accepting. Legacy/no-schedule estimates remain unchanged, Terms stay separate, and existing PDF schedule output remains unchanged.
+- Reason for change: Structured payment schedules should be visible before homeowner approval so approval can cover the estimate scope, total, and agreed billing schedule without introducing invoice generation or payment collection.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused homeowner estimate payment schedule source-static tests
+  - focused contractor estimate payment schedule source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, invoice generation from schedule, PR #256 invoice type chooser, Stripe/payment collection, QuickBooks/accounting sync, email/SMS/push/send changes, change orders, Home History changes, homeowner invoice redesign, deployment, or production data changes are included.
+  - Future slices still need separately approved invoice generation from approved schedule items and any payment collection/accounting behavior.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-023/FB-027 now record homeowner in-app payment schedule visibility before approval while preserving invoice-generation guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The homeowner approval and estimate/invoice roadmap now distinguishes display/approval of structured schedule terms from future invoice generation and payment collection.
+
 - Branch: `codex/estimate-payment-schedule-ui-v1`
 - Starting main SHA: `11f008d9ef73f140b6314edc1cf3aff34a6eef3c`
 - Files changed:
