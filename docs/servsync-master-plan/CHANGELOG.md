@@ -6,6 +6,38 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/contractor-schedule-invoice-ui-v1`
+- Starting main SHA: `e31413dfed10d1af724ddb627fc3e4547e1b9e7a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-estimate-schedule-invoice-ui.spec.ts`
+  - `tests/e2e/estimate-schedule-invoice-generation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the first contractor accepted-estimate UI for creating/opening draft invoices from approved estimate payment schedule rows. Contractor estimate cards now show compact Payment schedule rows when structured schedule items exist, allow accepted unlinked rows to call the approved `servsync_create_invoice_from_estimate_schedule_item` RPC, show linked invoice status/open actions when loaded, keep draft/sent/non-accepted schedules read-only, and preserve the existing generic `Create invoice from estimate` behavior for legacy/no-schedule estimates.
+- Reason for change: The backend RPC foundation is now production-applied, so contractors need a narrow UI path to turn homeowner-approved schedule terms into draft invoices without arbitrary invoice type choices or direct frontend invoice/schedule writes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused contractor schedule invoice UI source-static tests
+  - relevant estimate schedule invoice generation source-static tests
+  - relevant contractor estimate/payment schedule source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema changes, SQL application, deployment, production data changes, production mutation probes, invoice sending, payment collection, Stripe, QuickBooks/accounting sync, email/SMS/push/send behavior, payment reminders, Home History filing, replacement invoice behavior, homeowner invoice redesign, PR #256 invoice type chooser behavior, or arbitrary create-another-invoice flow is included.
+  - Future slices should preview row-level schedule invoice behavior with beta users before adding linked-invoice summaries, replacement behavior for voided linked rows, remaining-balance warnings, payment collection, or accounting export.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-023/FB-027 now record contractor accepted-estimate schedule-row invoice actions while preserving payment/accounting/multi-invoice guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The estimate/invoice roadmap now distinguishes approved schedule-row draft invoice creation from future payment collection, accounting export, replacement invoices, and broader multi-invoice UX.
+
 - Branch: `codex/estimate-schedule-invoice-rpc-v1`
 - Starting main SHA: `8dfa0ce6f1b7dcee27f02c2a71fdebb383107bf2`
 - Files changed:
