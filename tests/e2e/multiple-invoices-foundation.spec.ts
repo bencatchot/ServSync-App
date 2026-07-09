@@ -50,6 +50,8 @@ test.describe('multiple invoices from one estimate foundation source checks', ()
     const rpcSql = match![0];
     expect(rpcSql).toMatch(/security definer/i);
     expect(rpcSql).toMatch(/set search_path = public/i);
+    expect(rpcSql).toMatch(/current_user_can_manage_contractor_billing\(v_job\.contractor_id\)/i);
+    expect(rpcSql).not.toMatch(/current_user_can_write_contractor_jobs\(v_job\.contractor_id\)/i);
     expect(rpcSql).toMatch(/insert into public\.invoices \([\s\S]*estimate_id,\s+invoice_type,/i);
     expect(rpcSql).toMatch(/v_job\.estimate_id,\s+'progress',/i);
     expect(sql).toMatch(/grant execute on function public\.servsync_create_partial_invoice_from_job\(uuid, uuid\[\]\) to authenticated/i);

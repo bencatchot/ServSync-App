@@ -13,10 +13,11 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `src/App.tsx`
   - `src/types.ts`
   - `tests/e2e/multiple-invoices-foundation.spec.ts`
+  - `tests/e2e/fb020-role-boundary-money-probes.spec.ts`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Added a SQL/RLS/types/tests foundation for future multiple invoices from one estimate. The SQL patch adds `invoices.invoice_type` with allowed values `total`, `deposit`, `progress`, and `final`; adds nullable positive `invoice_sequence`; preserves multiple invoices per `estimate_id` by avoiding uniqueness constraints; backfills existing invoices to `total`; backfills invoices tied to durable job work items to `progress`; and replaces the partial job/work-item invoice RPC so future partial invoices explicitly write `invoice_type = 'progress'`. App invoice selects and TypeScript types now include the foundation fields.
+- Summary of change: Added a SQL/RLS/types/tests foundation for future multiple invoices from one estimate. The SQL patch adds `invoices.invoice_type` with allowed values `total`, `deposit`, `progress`, and `final`; adds nullable positive `invoice_sequence`; preserves multiple invoices per `estimate_id` by avoiding uniqueness constraints; backfills existing invoices to `total`; backfills invoices tied to durable job work items to `progress`; and replaces the partial job/work-item invoice RPC so future partial invoices explicitly write `invoice_type = 'progress'` and use the contractor billing permission helper instead of general job-write permission. App invoice selects and TypeScript types now include the foundation fields.
 - Reason for change: ServSync can technically store multiple invoices per estimate, but the app lacked structured invoice purpose/order fields. This foundation prepares for later deposit/progress/final/total invoice workflows without enabling the frontend multi-invoice experience yet.
 - Tests/checks run:
   - `git status --short --branch`
@@ -25,13 +26,15 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - changed-line credential-shaped secret scan
   - forbidden-scope scan
   - targeted multiple-invoices foundation source-static tests
-  - targeted security catalog tests attempted; blocked locally because Supabase CLI is not linked to sandbox `zpzdkoaubyjtsomccxya`
-  - targeted partial invoicing foundation tests attempted; blocked locally because `.env.test.local` / `VITE_SUPABASE_URL` test credentials are not present in this clone
+  - targeted security catalog tests against sandbox
+  - targeted FB-020 role-boundary money probes against sandbox
+  - targeted partial invoicing foundation tests against sandbox
+  - targeted contractor invoice creation tests against sandbox
   - `npm run typecheck`
   - `npm run build`
 - Known risks or follow-ups:
   - SQL/types/tests/docs foundation only. No frontend invoice type picker, create-another-invoice UI, linked invoice summary UI, remaining-balance UI, over-invoice warning, Stripe/payment behavior, send/email/SMS changes, Home History changes, homeowner invoice redesign, change orders, or line-level remaining calculations are included.
-  - Production SQL is not applied by this implementation task. The SQL patch requires separate sandbox validation and explicit production-apply approval before the new columns are available in deployed environments; live sandbox catalog/partial-invoice tests should be rerun after linking Supabase CLI to sandbox and loading approved test env.
+  - Production SQL is not applied by this implementation task. The SQL patch was re-applied to sandbox after tightening the partial-invoice RPC permission guard; production still requires separate explicit production-apply approval after merge.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-027 now records the multiple-invoice SQL foundation and keeps deposit/progress/final UI future-scoped.

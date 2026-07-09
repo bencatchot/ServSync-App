@@ -104,7 +104,7 @@ begin
     raise exception 'Job not found.';
   end if;
 
-  if not public.current_user_can_write_contractor_jobs(v_job.contractor_id) then
+  if not public.current_user_can_manage_contractor_billing(v_job.contractor_id) then
     raise exception 'You do not have permission to create invoices for this job.';
   end if;
 
