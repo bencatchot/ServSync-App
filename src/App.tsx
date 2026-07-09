@@ -896,6 +896,25 @@ const ESTIMATE_PAYMENT_SCHEDULE_AMOUNT_TYPE_LABELS: Record<EstimatePaymentSchedu
   percentage: 'Percentage',
 };
 
+const ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS: Record<EstimatePaymentScheduleInvoiceType, { label: string; dueTrigger: string }> = {
+  total: {
+    label: 'Full payment',
+    dueTrigger: 'Due on completion',
+  },
+  deposit: {
+    label: 'Deposit',
+    dueTrigger: 'Due on approval',
+  },
+  progress: {
+    label: 'Progress payment',
+    dueTrigger: 'Due at milestone',
+  },
+  final: {
+    label: 'Final payment',
+    dueTrigger: 'Due on completion',
+  },
+};
+
 function normalizeEstimateLineType(lineType: LegacyEstimateLineType | string | null | undefined): EstimateLineType {
   if (lineType === 'labor' || lineType === 'material' || lineType === 'fee' || lineType === 'other') return lineType;
   if (lineType === 'equipment') return 'material';
@@ -25703,6 +25722,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }));
   };
 
+  const updateEstimatePaymentScheduleRowType = (rowId: string, invoiceType: EstimatePaymentScheduleInvoiceType) => {
+    const defaults = ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS[invoiceType];
+    updateEstimatePaymentScheduleRow(rowId, {
+      invoice_type: invoiceType,
+      label: defaults.label,
+      due_trigger: defaults.dueTrigger,
+    });
+  };
+
   const addCustomEstimatePaymentScheduleRow = () => {
     setEstimatePaymentScheduleDraft(draft => ({
       mode: 'custom',
@@ -25765,7 +25793,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               className={inputClass()}
               value={row.invoice_type}
               disabled={estimatePaymentScheduleDraft.mode === 'deposit_final'}
-              onChange={event => updateEstimatePaymentScheduleRow(row.id, { invoice_type: event.target.value as EstimatePaymentScheduleInvoiceType })}
+              onChange={event => updateEstimatePaymentScheduleRowType(row.id, event.target.value as EstimatePaymentScheduleInvoiceType)}
             >
               <option value="total">Total</option>
               <option value="deposit">Deposit</option>

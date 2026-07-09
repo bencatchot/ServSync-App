@@ -14,6 +14,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const pdfDocumentsSource = () => sourceFile('src/utils/pdfDocuments.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -96,6 +97,7 @@ test.describe('contractor estimate creation UI structure', () => {
 
   test('contractor draft estimates include a structured payment schedule editor without invoice generation', () => {
     const source = appSource();
+    const pdfSource = pdfDocumentsSource();
     const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
     const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
     const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
@@ -120,6 +122,17 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(source).toContain("invoice_type: 'deposit'");
     expect(source).toContain("invoice_type: 'final'");
     expect(source).toContain('Math.max(0, estimateTotalCents - depositCents)');
+    expect(source).toContain('ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS');
+    expect(source).toContain("total: {\n    label: 'Full payment',\n    dueTrigger: 'Due on completion'");
+    expect(source).toContain("deposit: {\n    label: 'Deposit',\n    dueTrigger: 'Due on approval'");
+    expect(source).toContain("progress: {\n    label: 'Progress payment',\n    dueTrigger: 'Due at milestone'");
+    expect(source).toContain("final: {\n    label: 'Final payment',\n    dueTrigger: 'Due on completion'");
+    expect(source).toContain('const updateEstimatePaymentScheduleRowType =');
+    expect(source).toContain('label: defaults.label');
+    expect(source).toContain('due_trigger: defaults.dueTrigger');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRowType(row.id, event.target.value as EstimatePaymentScheduleInvoiceType)}');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRow(row.id, { label: event.target.value })}');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRow(row.id, { due_trigger: event.target.value })}');
     expect(source).toContain('estimatePaymentScheduleDraftFromEstimate(estimate)');
 
     expect(source).toContain("if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };");
@@ -134,6 +147,14 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(jobsEstimateComposerSource).toContain('<Field label="Terms">');
     expect(source).not.toContain('beginInvoiceDraftFromPaymentSchedule');
     expect(source).not.toContain('servsync_create_invoice_from_schedule');
+
+    expect(pdfSource).toContain("sectionTitle('Payment Schedule')");
+    expect(pdfSource).toContain('const paymentScheduleRows = [...(estimate.payment_schedule_items || [])]');
+    expect(pdfSource).toContain('.sort((a, b) => a.sort_order - b.sort_order)');
+    expect(pdfSource).toContain('paymentScheduleInvoiceTypeLabel(row.invoice_type)');
+    expect(pdfSource).toContain('formatMoney(row.calculated_amount_cents)');
+    expect(pdfSource).toContain("row.due_trigger?.trim() || 'Due date to be confirmed'");
+    expect(pdfSource).toContain("sectionTitle('Terms')");
   });
 
   test('Jobs financial records split estimates and invoices behind section tabs', () => {

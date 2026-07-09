@@ -14,8 +14,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Added the first contractor draft estimate payment schedule editor. The estimate editor now includes a compact structured `Payment schedule` section with `Full invoice on completion`, `Deposit + final`, and `Custom schedule` presets, fixed/percentage amount entry, calculated amount previews, warning-only schedule-total mismatch/over-total copy, and draft-estimate persistence for explicitly configured schedule rows.
-- Reason for change: Contractors should be able to define planned billing terms on the estimate before later homeowner/PDF display and invoice-generation slices make those terms customer-facing and actionable.
+- Summary of change: Added the first contractor draft estimate payment schedule editor. The estimate editor now includes a compact structured `Payment schedule` section with `Full invoice on completion`, `Deposit + final`, and `Custom schedule` presets, fixed/percentage amount entry, calculated amount previews, warning-only schedule-total mismatch/over-total copy, and draft-estimate persistence for explicitly configured schedule rows. Follow-up preview fixes seed sensible label/due-trigger defaults when a contractor changes a schedule row type, and estimate PDFs now include a `Payment Schedule` section when structured schedule rows exist.
+- Reason for change: Contractors should be able to define planned billing terms on the estimate, keep schedule row labels aligned with selected invoice types, and show defined payment terms on estimate PDFs before later homeowner in-app display and invoice-generation slices make those terms fully actionable.
 - Tests/checks run:
   - `git status --short --branch`
   - `git diff --check`
@@ -23,18 +23,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - changed-line credential-shaped secret scan
   - forbidden-scope scan
   - focused contractor estimate creation/payment schedule source-static tests
+  - focused estimate PDF payment schedule source-static tests
   - focused contractor estimate-to-invoice source-static preservation tests
   - `npm run typecheck`
   - `npm run build`
 - Known risks or follow-ups:
-  - Frontend/test/docs only. No SQL/RLS/RPC/schema, homeowner payment schedule display, PDF payment schedule display, invoice generation from schedule, PR #256 invoice type chooser, Stripe/payment collection, QuickBooks integration, send/email/SMS changes, change orders, Home History changes, accounting ledger behavior, deployment, or production data changes are included.
-  - Customer-facing schedule display and invoice generation should be planned next before treating schedule rows as approved billing terms.
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema, homeowner in-app payment schedule display, invoice generation from schedule, PR #256 invoice type chooser, Stripe/payment collection, QuickBooks integration, send/email/SMS changes, change orders, Home History changes, accounting ledger behavior, deployment, or production data changes are included.
+  - Homeowner in-app schedule display and invoice generation should be planned next before treating schedule rows as fully approved billing terms.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-023/FB-027 now record the contractor draft payment schedule editor while preserving future homeowner/PDF/invoice-generation guardrails.
+  - REASON: FB-023/FB-027 now record the contractor draft payment schedule editor and estimate PDF schedule output while preserving future homeowner in-app/invoice-generation guardrails.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
-  - REASON: The contractor estimate and invoice roadmap now distinguishes contractor-side schedule planning from future customer-facing approval and invoice generation.
+  - REASON: The contractor estimate and invoice roadmap now distinguishes contractor-side schedule planning and PDF output from future homeowner in-app approval and invoice generation.
 
 - Branch: `codex/estimate-payment-schedule-foundation-v1`
 - Starting main SHA: `d986d43f55ad469d69ec97a5ae523124a281422b`

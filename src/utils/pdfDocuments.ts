@@ -75,6 +75,21 @@ function invoiceBacklogStatusLabel(item: Pick<InvoiceBacklogItem, 'completion_st
   return 'Open backlog';
 }
 
+function paymentScheduleInvoiceTypeLabel(value: string | null | undefined) {
+  switch (value) {
+    case 'total':
+      return 'Total invoice';
+    case 'deposit':
+      return 'Deposit invoice';
+    case 'progress':
+      return 'Progress invoice';
+    case 'final':
+      return 'Final invoice';
+    default:
+      return 'Scheduled invoice';
+  }
+}
+
 function normalizeEstimateLaborMode(value: string | null | undefined) {
   return value === 'line_specific' ? 'line_specific' : 'job_total';
 }
@@ -855,6 +870,27 @@ export async function createEstimatePdf(
   moneyRow('Fees', totals.feeTotalCents);
   moneyRow('Tax', totals.taxCents);
   moneyRow('Total', totals.totalCents, true);
+
+  const paymentScheduleRows = [...(estimate.payment_schedule_items || [])]
+    .sort((a, b) => a.sort_order - b.sort_order);
+  if (paymentScheduleRows.length > 0) {
+    sectionTitle('Payment Schedule');
+    paymentScheduleRows.forEach(row => {
+      const label = row.label?.trim() || paymentScheduleInvoiceTypeLabel(row.invoice_type);
+      const typeLabel = paymentScheduleInvoiceTypeLabel(row.invoice_type);
+      const dueTrigger = row.due_trigger?.trim() || 'Due date to be confirmed';
+      const rowText = `${label} · ${typeLabel} · ${formatMoney(row.calculated_amount_cents)} · ${dueTrigger}`;
+      const rowLines = pdf.splitTextToSize(rowText, contentW - 6);
+      addPageIfNeeded(8 + rowLines.length * 5);
+      pdf.setFillColor(248, 250, 252);
+      pdf.roundedRect(margin, y - 4, contentW, 6 + rowLines.length * 5, 2, 2, 'F');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(rowLines, margin + 3, y);
+      y += 6 + rowLines.length * 5;
+    });
+  }
 
   if (estimate.notes) {
     sectionTitle('Notes / Exclusions');
