@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/estimate-schedule-invoice-rpc-v1`
+- Starting main SHA: `8dfa0ce6f1b7dcee27f02c2a71fdebb383107bf2`
+- Files changed:
+  - `servsync-estimate-schedule-invoice-generation.sql`
+  - `tests/e2e/estimate-schedule-invoice-generation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a narrow SQL/RPC/test/docs foundation for future invoice generation from one approved estimate payment schedule row. The new `servsync_create_invoice_from_estimate_schedule_item` RPC is security-definer, uses the contractor billing permission boundary, requires an accepted parent estimate and an unlinked schedule row, creates one draft invoice with the schedule row's invoice type and display sequence, creates one schedule-billing invoice line from the schedule amount, and links the schedule row to the draft invoice atomically.
+- Reason for change: Payment schedule rows are now visible before homeowner approval, so the next backend foundation should let future UI create invoices from approved schedule terms without non-atomic frontend writes or arbitrary post-estimate invoice type choices.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused estimate schedule invoice generation source-static tests
+  - relevant security catalog source-static checks
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RPC/test/docs foundation only. No UI, SQL application, deployment, production data changes, invoice sending, payment collection, Stripe, QuickBooks/accounting sync, email/SMS/push/send behavior, payment reminders, Home History filing, replacement invoice behavior, or PR #256 invoice type chooser behavior is included.
+  - Sandbox SQL validation is required before merge consideration. Future contractor UI should call this RPC only from accepted estimate payment schedule rows and keep legacy/no-schedule estimates on the existing invoice path.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-023/FB-027 now record the RPC foundation for future invoice generation from approved schedule rows while preserving UI/payment/accounting guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The invoice roadmap now distinguishes the approved schedule-row invoice generation RPC foundation from future contractor UI, payment collection, accounting export, and linked-invoice summary work.
+
 - Branch: `codex/homeowner-estimate-payment-schedule-display-v1`
 - Starting main SHA: `721d85d2be6366aaf277825854ecee5ba7033687`
 - Files changed:
