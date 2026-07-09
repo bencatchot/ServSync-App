@@ -114,9 +114,39 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(chooserSource).toContain('startInvoiceDraftFromEstimate(estimate, invoiceTypeChooser.subjectName, choice.type)');
     expect(beginDraftSource).toContain("invoice_type: options.invoiceType ?? 'total'");
     expect(beginDraftSource).toContain('invoice_sequence: options.invoiceSequence ?? null');
-    expect(beginDraftSource).toContain("title: invoiceTitleFromEstimate(options.sourceEstimate, options.invoiceType ?? 'total')");
+    expect(beginDraftSource).toContain("title: options.invoiceTitle ?? invoiceTitleFromEstimate(options.sourceEstimate, options.invoiceType ?? 'total')");
     expect(saveInvoiceSource).toContain('invoice_type: invoiceDraft.invoice_type');
     expect(saveInvoiceSource).toContain('invoice_sequence: invoiceDraft.invoice_sequence');
+  });
+
+  test('deposit invoices ask for amount and seed one deposit line instead of all estimate lines', () => {
+    const source = appSource();
+    const depositHelpersSource = sourceBetween(source, 'function depositInvoicePreviewCents', 'function linkedInvoicesForEstimate');
+    const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromJob =');
+    const beginDraftSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
+    const depositModalSource = sourceBetween(source, '{invoiceDepositChooser && (() => {', '{saveEstimateTemplateModal && (');
+
+    expect(directDraftSource).toContain("if (invoiceType === 'deposit')");
+    expect(directDraftSource).toContain('setInvoiceDepositChooser({');
+    expect(depositModalSource).toContain('Deposit invoice amount');
+    expect(depositModalSource).toContain('Choose a dollar amount or percentage before creating the deposit invoice draft.');
+    expect(depositModalSource).toContain('Deposit dollar amount');
+    expect(depositModalSource).toContain('Deposit percentage');
+    expect(depositModalSource).toContain('Deposit total');
+    expect(depositModalSource).toContain('Create deposit invoice draft');
+
+    expect(depositHelpersSource).toContain("chooser.mode === 'amount'");
+    expect(depositHelpersSource).toContain('dollarsToCents(chooser.amount)');
+    expect(depositHelpersSource).toContain('Math.round(estimateTotalCents * percent / 100)');
+    expect(depositHelpersSource).toContain('function depositInvoiceLineForEstimate');
+    expect(depositHelpersSource).toContain('Deposit for estimate');
+    expect(depositHelpersSource).toContain("unit: 'deposit'");
+
+    expect(directDraftSource).toContain('const startDepositInvoiceDraftFromEstimate =');
+    expect(directDraftSource).toContain("invoiceType: 'deposit'");
+    expect(directDraftSource).toContain("invoiceTitle: invoiceTitleFromEstimate(estimate, 'deposit')");
+    expect(directDraftSource).toContain('invoiceLineItems: [depositInvoiceLineForEstimate(estimate, depositCents)]');
+    expect(beginDraftSource).toContain('line_items: options.invoiceLineItems ?? (options.sourceEstimate?.line_items?.length');
   });
 
   test('invoice composer shows remaining summary and warning without blocking save', () => {
@@ -138,20 +168,22 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     const source = appSource();
     const titleHelperSource = sourceBetween(source, 'function invoiceTitleFromEstimate', 'function estimateDocumentLabel');
     const beginDraftSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
+    const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromJob =');
 
     expect(titleHelperSource).toContain('const prefix = invoiceType === \'total\' ? \'Invoice\' : invoiceTypeLabel(invoiceType)');
-    expect(beginDraftSource).toContain("title: invoiceTitleFromEstimate(options.sourceEstimate, options.invoiceType ?? 'total')");
-    expect(beginDraftSource).toContain('notes: options.sourceEstimate.notes ||');
+    expect(beginDraftSource).toContain("title: options.invoiceTitle ?? invoiceTitleFromEstimate(options.sourceEstimate, options.invoiceType ?? 'total')");
+    expect(beginDraftSource).toContain('notes: options.invoiceNotes ?? (options.sourceEstimate.notes ||');
     expect(beginDraftSource).toContain('terms: options.sourceEstimate.terms ||');
     expect(beginDraftSource).toContain('service_request_id: options.serviceRequestId ?? options.sourceEstimate?.service_request_id');
     expect(beginDraftSource).toContain('job_id: options.jobId ?? options.sourceEstimate?.inspection_id');
     expect(beginDraftSource).toContain('estimate_id: options.estimateId ?? options.sourceEstimate?.id');
     expect(beginDraftSource).toContain('home_id: options.homeId ?? options.sourceEstimate?.home_id');
     expect(beginDraftSource).toContain('local_home_id: options.localHomeId ?? options.sourceEstimate?.local_home_id');
-    expect(beginDraftSource).toContain('scope: options.sourceEstimate?.scope');
+    expect(beginDraftSource).toContain('scope: options.invoiceScope ?? (options.sourceEstimate?.scope');
     expect(beginDraftSource).toContain('labor_mode: normalizeEstimateLaborMode(options.sourceEstimate?.labor_mode)');
     expect(beginDraftSource).toContain('labor_rate: laborRateInputFromCents(options.sourceEstimate?.labor_rate_cents');
     expect(beginDraftSource).toContain('job_labor_hours: laborHoursInputFromValue(options.sourceEstimate?.job_labor_hours)');
+    expect(beginDraftSource).toContain('line_items: options.invoiceLineItems ?? (options.sourceEstimate?.line_items?.length');
     expect(beginDraftSource).toContain('[...options.sourceEstimate.line_items]');
     expect(beginDraftSource).toContain('.sort((a, b) => a.sort_order - b.sort_order)');
     expect(beginDraftSource).toContain('line_title: line.line_title || line.description ||');
@@ -162,6 +194,18 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(beginDraftSource).toContain('unit: line.unit');
     expect(beginDraftSource).toContain('unit_price: lineUnitPriceInputFromCents(line.unit_price_cents)');
     expect(beginDraftSource).toContain('labor_hours: laborHoursInputFromValue(line.labor_hours)');
+    expect(directDraftSource).toContain('beginInvoiceDraftForCustomer(subjectName || \'Customer\', {');
+    expect(directDraftSource).toContain('sourceEstimate: estimate');
+    expect(directDraftSource).toContain('invoiceType,');
+  });
+
+  test('invoice list uses contractor-facing section copy', () => {
+    const source = appSource();
+
+    expect(source).not.toContain('First-class invoices');
+    expect(source).not.toContain('FIRST-CLASS INVOICES');
+    expect(source).toContain('>INVOICES</p>');
+    expect(source).toContain('invoice{visibleInvoiceRecords.length === 1 ?');
   });
 
   test('invoice-from-estimate composer does not show a sending state before an explicit send', () => {
