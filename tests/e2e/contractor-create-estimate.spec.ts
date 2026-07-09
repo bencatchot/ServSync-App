@@ -157,6 +157,19 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(pdfSource).toContain("sectionTitle('Terms')");
   });
 
+  test('edited estimate draft save returns to the saved estimate record', () => {
+    const source = appSource();
+    const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
+
+    expect(saveSource).toContain('const focusSavedEstimateActions = (estimate: Estimate) => {');
+    expect(saveSource).toContain("setContractorFinancialRecordKind('estimates');");
+    expect(saveSource).toContain('setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));');
+    expect(saveSource).toContain('setFocusedEstimateRecordId(estimate.id);');
+    expect(saveSource).toContain("setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');");
+    expect(saveSource).toContain('focusSavedEstimateActions(savedEstimate);');
+    expect(saveSource).not.toContain('if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);');
+  });
+
   test('Jobs financial records split estimates and invoices behind section tabs', () => {
     const source = appSource();
     const financialListSource = sourceBetween(

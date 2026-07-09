@@ -23824,9 +23824,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
-      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
+      focusSavedEstimateActions(savedEstimate);
       await loadContractor();
-      if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);
+      focusSavedEstimateActions(savedEstimate);
     } catch (err) {
       setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
     } finally {
