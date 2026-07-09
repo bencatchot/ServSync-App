@@ -1526,6 +1526,14 @@ function estimatePaymentScheduleDisplayWarning(estimate: Estimate) {
   return '';
 }
 
+function scheduleLinkedInvoiceStatusLabel(invoice: Invoice | null | undefined, linkedInvoiceId?: string | null) {
+  if (invoice?.status === 'draft') return 'Draft invoice created';
+  if (invoice?.status === 'void') return 'Voided';
+  if (invoice) return invoiceStatusLabel(invoice.status);
+  if (linkedInvoiceId) return 'Invoice linked';
+  return 'Not invoiced';
+}
+
 function createBlankSavedEstimateChargeDraft(overrides: Partial<SavedEstimateChargeDraft> = {}): SavedEstimateChargeDraft {
   return {
     name: '',
@@ -24239,6 +24247,38 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setNotice('Invoice draft started from this estimate. Review it before saving or sending.');
   };
 
+  const createInvoiceFromEstimateScheduleItem = async (estimate: Estimate, scheduleItemId: string) => {
+    if (!supabase) return;
+    if (createInvoiceCapability.disabled) {
+      setError(createInvoiceCapability.reason);
+      return;
+    }
+    setNotice('');
+    setError('');
+    setCreatingInvoiceSourceId(`schedule-item:${scheduleItemId}`);
+    try {
+      const { data, error: createError } = await supabase.rpc('servsync_create_invoice_from_estimate_schedule_item', {
+        p_schedule_item_id: scheduleItemId,
+      });
+      if (createError) throw createError;
+      const result = (data || {}) as { invoice_id?: string; created?: boolean; schedule_item_id?: string };
+      if (!result.invoice_id) throw new Error('Schedule invoice was created, but no invoice id was returned.');
+      const invoice = await loadInvoiceById(result.invoice_id);
+      openInvoiceRecord(invoice);
+      setNotice('Draft invoice created from the approved payment schedule row.');
+      await loadContractor();
+    } catch (err) {
+      setError(readableError(err, 'Unable to create a draft invoice from this payment schedule row.'));
+      const refreshedEstimate = estimates.find(item => item.id === estimate.id) ?? estimate;
+      setFocusedEstimateRecordId(refreshedEstimate.id);
+      setContractorFinancialRecordKind('estimates');
+      setContractorJobsView('open_financial');
+      setContractorTab('inspections');
+    } finally {
+      setCreatingInvoiceSourceId(null);
+    }
+  };
+
   const createInvoiceFromJob = async (job: Inspection) => {
     if (!supabase) return;
     setNotice('');
@@ -36054,8 +36094,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       const lineCount = estimate.line_items?.length ?? 0;
                                       const hasLinkedJob = estimateHasLinkedJob(estimate);
                                       const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                                      const scheduleRows = sortedEstimatePaymentScheduleRows(estimate);
+                                      const hasPaymentScheduleRows = scheduleRows.length > 0;
                                       const propertyLabel = recordPropertyLabelForContractor(estimate);
                                       const canCreateInvoiceDraftFromEstimate = ['draft', 'sent', 'accepted'].includes(estimate.status);
+                                      const canUseGenericEstimateInvoiceAction = canCreateInvoiceDraftFromEstimate && !hasPaymentScheduleRows;
                                       return (
                                         <div key={estimate.id} className={`rounded-xl border bg-white p-4 ${estimate.status === 'accepted' ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-200'}`}>
                                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -36076,7 +36119,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   Next step: create the job from this approved estimate.
                                                 </p>
                                               )}
-                                              {linkedInvoice && (
+                                              {linkedInvoice && !hasPaymentScheduleRows && (
                                                 <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                                   Invoice created
                                                 </p>
@@ -36084,6 +36127,76 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             </div>
                                             <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                                           </div>
+                                          {hasPaymentScheduleRows && (
+                                            <div data-testid="contractor-estimate-payment-schedule-section" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                                <div>
+                                                  <p className="text-sm font-bold text-slate-950">Payment schedule</p>
+                                                  {estimate.status === 'accepted' ? (
+                                                    <p className="text-xs text-slate-500">Create draft invoices from the homeowner-approved schedule rows.</p>
+                                                  ) : (
+                                                    <p className="text-xs text-slate-500">Invoices can be created after homeowner approval.</p>
+                                                  )}
+                                                </div>
+                                                <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                                                  Schedule total {formatMoney(estimatePaymentScheduleDisplayTotalCents(estimate))}
+                                                </span>
+                                              </div>
+                                              <div className="mt-3 grid gap-2">
+                                                {scheduleRows.map(row => {
+                                                  const rowInvoice = row.linked_invoice_id
+                                                    ? invoices.find(invoice => invoice.id === row.linked_invoice_id) ?? null
+                                                    : null;
+                                                  const linkedStatus = scheduleLinkedInvoiceStatusLabel(rowInvoice, row.linked_invoice_id);
+                                                  const scheduleActionKey = `schedule-item:${row.id}`;
+                                                  return (
+                                                    <div key={row.id} data-testid="contractor-estimate-payment-schedule-row" className="rounded-lg border border-slate-200 bg-white p-3">
+                                                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="min-w-0">
+                                                          <div className="flex flex-wrap items-center gap-2">
+                                                            <p className="font-semibold text-slate-950">{row.label || estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}</p>
+                                                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                              {estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}
+                                                            </span>
+                                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${rowInvoice ? invoiceStatusClass(rowInvoice.status) : 'bg-slate-100 text-slate-600'}`}>
+                                                              {linkedStatus}
+                                                            </span>
+                                                          </div>
+                                                          <p className="mt-1 text-xs text-slate-500">
+                                                            {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
+                                                          </p>
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap gap-2">
+                                                          {estimate.status === 'accepted' && !row.linked_invoice_id && (
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => void createInvoiceFromEstimateScheduleItem(estimate, row.id)}
+                                                              disabled={creatingInvoiceSourceId === scheduleActionKey || createInvoiceCapability.disabled}
+                                                              data-testid="contractor-create-schedule-invoice"
+                                                              className={buttonClass('primary')}
+                                                            >
+                                                              <Receipt size={15} />
+                                                              {creatingInvoiceSourceId === scheduleActionKey ? 'Creating...' : 'Create draft invoice'}
+                                                            </button>
+                                                          )}
+                                                          {rowInvoice && (
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => openInvoiceRecord(rowInvoice)}
+                                                              className={buttonClass('secondary')}
+                                                            >
+                                                              <Receipt size={15} />
+                                                              Open invoice
+                                                            </button>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             <button
                                               type="button"
@@ -36175,7 +36288,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 )}
                                               </>
                                             )}
-                                            {canCreateInvoiceDraftFromEstimate && !isInvoiceWorkspaceTab && (
+                                            {canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
                                               <button
                                                 type="button"
                                                 onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
@@ -37795,8 +37908,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const customerAddress = connection?.home?.address_line1 || local?.homes?.[0]?.address_line1 || '';
                           const hasLinkedJob = estimateHasLinkedJob(estimate);
                           const linkedInvoice = invoices.find(invoice => invoice.estimate_id === estimate.id && invoice.status !== 'void') ?? null;
+                          const scheduleRows = sortedEstimatePaymentScheduleRows(estimate);
+                          const hasPaymentScheduleRows = scheduleRows.length > 0;
                           const propertyLabel = recordPropertyLabelForContractor(estimate);
                           const canCreateInvoiceDraftFromEstimate = !isInvoice && ['draft', 'sent', 'accepted'].includes(estimate.status);
+                          const canUseGenericEstimateInvoiceAction = canCreateInvoiceDraftFromEstimate && !hasPaymentScheduleRows;
                           return (
                             <div
                               key={estimate.id}
@@ -37820,7 +37936,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       Next step: create the job from this approved estimate before closeout.
                                     </p>
                                   )}
-                                  {linkedInvoice && (
+                                  {linkedInvoice && !hasPaymentScheduleRows && (
                                     <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                                       Invoice created
                                     </p>
@@ -37828,6 +37944,76 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </div>
                                 <p className="text-xl font-bold text-slate-950">${(estimate.total_cents / 100).toFixed(2)}</p>
                               </div>
+                              {hasPaymentScheduleRows && (
+                                <div data-testid="contractor-estimate-payment-schedule-section" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-bold text-slate-950">Payment schedule</p>
+                                      {estimate.status === 'accepted' ? (
+                                        <p className="text-xs text-slate-500">Create draft invoices from the homeowner-approved schedule rows.</p>
+                                      ) : (
+                                        <p className="text-xs text-slate-500">Invoices can be created after homeowner approval.</p>
+                                      )}
+                                    </div>
+                                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+                                      Schedule total {formatMoney(estimatePaymentScheduleDisplayTotalCents(estimate))}
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 grid gap-2">
+                                    {scheduleRows.map(row => {
+                                      const rowInvoice = row.linked_invoice_id
+                                        ? invoices.find(invoice => invoice.id === row.linked_invoice_id) ?? null
+                                        : null;
+                                      const linkedStatus = scheduleLinkedInvoiceStatusLabel(rowInvoice, row.linked_invoice_id);
+                                      const scheduleActionKey = `schedule-item:${row.id}`;
+                                      return (
+                                        <div key={row.id} data-testid="contractor-estimate-payment-schedule-row" className="rounded-lg border border-slate-200 bg-white p-3">
+                                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="min-w-0">
+                                              <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold text-slate-950">{row.label || estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}</p>
+                                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                  {estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}
+                                                </span>
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${rowInvoice ? invoiceStatusClass(rowInvoice.status) : 'bg-slate-100 text-slate-600'}`}>
+                                                  {linkedStatus}
+                                                </span>
+                                              </div>
+                                              <p className="mt-1 text-xs text-slate-500">
+                                                {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
+                                              </p>
+                                            </div>
+                                            <div className="flex shrink-0 flex-wrap gap-2">
+                                              {estimate.status === 'accepted' && !row.linked_invoice_id && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => void createInvoiceFromEstimateScheduleItem(estimate, row.id)}
+                                                  disabled={creatingInvoiceSourceId === scheduleActionKey || createInvoiceCapability.disabled}
+                                                  data-testid="contractor-create-schedule-invoice"
+                                                  className={mobileButtonClass('primary')}
+                                                >
+                                                  <Receipt size={15} />
+                                                  {creatingInvoiceSourceId === scheduleActionKey ? 'Creating...' : 'Create draft invoice'}
+                                                </button>
+                                              )}
+                                              {rowInvoice && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openInvoiceRecord(rowInvoice)}
+                                                  className={mobileButtonClass('secondary')}
+                                                >
+                                                  <Receipt size={15} />
+                                                  Open invoice
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <button
                                   type="button"
@@ -37916,7 +38102,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     )}
                                   </>
                                 )}
-                                {canCreateInvoiceDraftFromEstimate && (
+                                {canUseGenericEstimateInvoiceAction && (
                                   <button
                                     type="button"
                                     onClick={() => {

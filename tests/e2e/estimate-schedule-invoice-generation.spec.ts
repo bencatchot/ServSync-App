@@ -71,15 +71,23 @@ test.describe('estimate schedule invoice generation RPC source checks', () => {
     expect((sql.match(/insert into public\.invoice_line_items/gi) ?? []).length).toBe(1);
   });
 
-  test('RPC returns future-UI identifiers without side effects outside draft creation', () => {
+  test('RPC returns UI identifiers while app keeps schedule invoice writes RPC-only', () => {
     const sql = read(sqlPath);
     const app = read(appPath);
+    const createScheduleInvoiceStart = app.indexOf('const createInvoiceFromEstimateScheduleItem = async');
+    expect(createScheduleInvoiceStart).toBeGreaterThanOrEqual(0);
+    const createScheduleInvoiceEnd = app.indexOf('const createInvoiceFromJob = async', createScheduleInvoiceStart);
+    expect(createScheduleInvoiceEnd).toBeGreaterThan(createScheduleInvoiceStart);
+    const createScheduleInvoiceSource = app.slice(createScheduleInvoiceStart, createScheduleInvoiceEnd);
 
     expect(sql).toMatch(/jsonb_build_object\([\s\S]*'invoice_id', v_invoice\.id,[\s\S]*'schedule_item_id', v_schedule\.id,[\s\S]*'created', true/i);
     expect(sql).not.toMatch(/create table|alter table|create policy|alter policy|drop policy/i);
     expect(sql).not.toMatch(/servsync_send_invoice|servsync_mark_invoice_paid|servsync_file_invoice_to_home_history/i);
     expect(sql).not.toMatch(/stripe|quickbooks|qbo|intuit|twilio|sendgrid|sms|push|notification|home_history/i);
-    expect(app).not.toContain('servsync_create_invoice_from_estimate_schedule_item');
+    expect(createScheduleInvoiceSource).toContain('servsync_create_invoice_from_estimate_schedule_item');
+    expect(createScheduleInvoiceSource).not.toContain(".from('invoices')");
+    expect(createScheduleInvoiceSource).not.toContain(".from('invoice_line_items')");
+    expect(createScheduleInvoiceSource).not.toContain(".from('estimate_payment_schedule_items')");
     expect(app).not.toContain('beginInvoiceDraftFromPaymentSchedule');
   });
 });
