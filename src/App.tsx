@@ -651,6 +651,8 @@ type PrivacyRequestKind = 'export' | 'account_deletion' | 'file_deletion' | 'que
 type HomeownerWorkspaceTab = 'overview' | 'profile' | 'home' | 'fieldwork' | 'inspections' | 'estimates' | 'invoices' | 'requests' | 'schedule';
 type ContractorHomeownerPropertyScope = 'selected' | 'all' | 'unassigned';
 type ContractorJobsView = 'overview' | 'new_jobs' | 'open_jobs' | 'closed_jobs' | 'new_financial' | 'open_financial' | 'closed_financial' | 'templates' | 'custom_pricing' | 'service_agreements';
+type ContractorJobsHeaderTab = 'overview' | 'estimates' | 'invoices' | 'jobs_reports' | 'templates';
+type ContractorFinancialRecordKind = 'estimates' | 'invoices';
 type InspectionView = 'list' | 'new' | 'detail';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type ServiceAgreementTemplateDraft = {
@@ -21283,6 +21285,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }, []);
+  const [contractorFinancialRecordKind, setContractorFinancialRecordKind] = useState<ContractorFinancialRecordKind>('estimates');
   const [jobsListDateFilter, setJobsListDateFilter] = useState('');
   const [jobsListStatusFilter, setJobsListStatusFilter] = useState<JobLifecycleStatus | 'all'>('all');
   const [jobsListTypeFilter, setJobsListTypeFilter] = useState('all');
@@ -23225,6 +23228,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
+    setContractorFinancialRecordKind('invoices');
     setInvoiceDraft(createBlankInvoiceDraft(subjectName, {
       ...(options.sourceEstimate
         ? {
@@ -23279,6 +23283,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return;
     }
     const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
+    setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
@@ -23354,6 +23359,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setError(createInvoiceCapability.reason);
       return;
     }
+    setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
     setEditingInvoiceId(null);
     setInvoiceDraft(invoiceDraftFromTemplate(template, subjectName || 'Customer', {
@@ -23423,6 +23429,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return;
     }
     setInspectionView('list');
+    setContractorFinancialRecordKind('invoices');
     setContractorJobsView('open_financial');
     setContractorTab('inspections');
   };
@@ -23464,6 +23471,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setSavingEstimate(true);
     const currentEditingEstimateId = editingEstimateId;
     const focusSavedEstimateActions = (estimate: Estimate) => {
+      setContractorFinancialRecordKind('estimates');
       const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
       const local = estimate.local_contact_id ? localContacts.find(item => item.id === estimate.local_contact_id) : null;
       setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
@@ -23698,6 +23706,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           openInspection(linkedJob, { subTab: isSimpleServiceJob(linkedJob) && inspectionCanSaveProgress(linkedJob) ? 'inspect' : undefined });
         } else {
           setInspectionView('list');
+          setContractorFinancialRecordKind('invoices');
           setContractorJobsView('open_financial');
           setContractorTab('inspections');
         }
@@ -23777,6 +23786,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const openInvoiceRecord = (invoice: Invoice) => {
+    setContractorFinancialRecordKind('invoices');
     setFocusedEstimateRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = invoice.homeowner_user_id ? connections.find(item => item.homeowner_user_id === invoice.homeowner_user_id) : null;
@@ -23801,6 +23811,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   };
 
   const openEstimateRecord = (estimate: Estimate) => {
+    setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
     setInvoiceTemplateStartNotice('');
     const connection = estimate.homeowner_user_id ? connections.find(item => item.homeowner_user_id === estimate.homeowner_user_id) : null;
@@ -27506,6 +27517,43 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const closedInvoiceRecords = invoices.filter(invoice => ['paid', 'void'].includes(invoice.status));
   const acceptedEstimatesNeedingJobs = estimates.filter(estimate => estimate.status === 'accepted' && !estimateHasLinkedJob(estimate));
   const invoiceAttentionRecords = openInvoiceRecords.filter(invoice => ['draft', 'overdue', 'partially_paid'].includes(invoice.status));
+  const contractorJobsHeaderTabForView = (view: ContractorJobsView): ContractorJobsHeaderTab => {
+    if (view === 'overview') return 'overview';
+    if (view === 'open_jobs' || view === 'closed_jobs' || view === 'new_jobs') return 'jobs_reports';
+    if (view === 'templates' || view === 'custom_pricing' || view === 'service_agreements') return 'templates';
+    if (view === 'new_financial') return contractorFinancialRecordKind;
+    if (view === 'open_financial' || view === 'closed_financial') return contractorFinancialRecordKind;
+    return 'overview';
+  };
+  const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {
+    setFocusedEstimateRecordId(null);
+    setEstimateComposerOpen(false);
+    setEditingEstimateId(null);
+    setInvoiceComposerOpen(false);
+    setEditingInvoiceId(null);
+    setInspectionView('list');
+    if (tab === 'overview') {
+      setContractorJobsViewAndScroll('overview');
+      return;
+    }
+    if (tab === 'estimates') {
+      setContractorFinancialRecordKind('estimates');
+      setContractorJobsViewAndScroll('open_financial');
+      return;
+    }
+    if (tab === 'invoices') {
+      setContractorFinancialRecordKind('invoices');
+      setContractorJobsViewAndScroll('open_financial');
+      return;
+    }
+    if (tab === 'jobs_reports') {
+      setContractorJobsViewAndScroll('open_jobs');
+      setInspectionView('list');
+      return;
+    }
+    setContractorJobsViewAndScroll('templates');
+    setShowTemplateLibrary(true);
+  };
   const onboardingCustomerCount = connections.length + localContacts.length;
   const onboardingSentEstimateCount = estimates.filter(estimate => estimate.status !== 'draft').length;
   const onboardingSentInvoiceCount = invoices.filter(invoice => invoice.status !== 'draft').length;
@@ -27515,8 +27563,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorJobsView('new_jobs');
     setInspectionView('new');
   };
-  const openFinancialOnboardingWorkspace = () => {
+  const openFinancialOnboardingWorkspace = (kind: ContractorFinancialRecordKind = 'estimates') => {
     setContractorTab('inspections');
+    setContractorFinancialRecordKind(kind);
     setContractorJobsView('new_financial');
     setInspectionView('list');
   };
@@ -27579,14 +27628,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       helper: 'Create and send an estimate from the Jobs workspace.',
       complete: onboardingSentEstimateCount > 0,
       actionLabel: 'Create estimate',
-      onAction: openFinancialOnboardingWorkspace,
+      onAction: () => openFinancialOnboardingWorkspace('estimates'),
     },
     {
       label: 'Send your first invoice',
       helper: 'Create and send an invoice when work is ready to bill.',
       complete: onboardingSentInvoiceCount > 0,
       actionLabel: 'Create invoice',
-      onAction: openFinancialOnboardingWorkspace,
+      onAction: () => openFinancialOnboardingWorkspace('invoices'),
     },
     {
       label: 'Invite a homeowner to ServSync',
@@ -27787,6 +27836,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length,
       onClick: () => {
         setContractorTab('inspections');
+        setContractorFinancialRecordKind(acceptedEstimatesNeedingJobs.length > 0 ? 'estimates' : 'invoices');
         setContractorJobsView('open_financial');
         setInspectionView('list');
       },
@@ -27864,6 +27914,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       icon: <FileText size={16} />,
       onClick: () => {
         setContractorTab('inspections');
+        setContractorFinancialRecordKind('estimates');
         setContractorJobsView('open_financial');
         setInspectionView('list');
       },
@@ -27886,6 +27937,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       icon: <Receipt size={16} />,
       onClick: () => {
         setContractorTab('inspections');
+        setContractorFinancialRecordKind('invoices');
         setContractorJobsView('open_financial');
         setInspectionView('list');
       },
@@ -30073,6 +30125,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               if (connection) {
                 setJobsCustomerFilterSubjectId(connection.connection_id);
                 setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
+                setContractorFinancialRecordKind('estimates');
                 setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
                 setContractorTab('inspections');
                 return;
@@ -30081,10 +30134,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             if (estimate?.local_contact_id) {
               setJobsCustomerFilterSubjectId(`local:${estimate.local_contact_id}`);
               setHomeownerWorkspaceEstimateView(estimate.status === 'accepted' ? 'accepted' : estimate.status === 'sent' ? 'sent' : ['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed' : 'draft');
+              setContractorFinancialRecordKind('estimates');
               setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');
               setContractorTab('inspections');
               return;
             }
+            setContractorFinancialRecordKind('estimates');
             setContractorJobsView('open_financial');
             setContractorTab('inspections');
             return;
@@ -35857,6 +35912,54 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {/* ── LIST VIEW ── */}
           {inspectionView === 'list' && (
             <>
+              {(() => {
+                const activeHeaderTab = contractorJobsHeaderTabForView(contractorJobsView);
+                const jobsHeaderTabs: Array<{ id: ContractorJobsHeaderTab; label: string; helper: string }> = [
+                  { id: 'overview', label: 'Overview', helper: 'Summary and next actions' },
+                  { id: 'estimates', label: 'Estimates', helper: `${openFinancialRecords.length} open` },
+                  { id: 'invoices', label: 'Invoices', helper: `${openInvoiceRecords.length} open` },
+                  { id: 'jobs_reports', label: 'Jobs & Reports', helper: `${openJobs.length} active` },
+                  { id: 'templates', label: 'Templates', helper: 'Reusable tools' },
+                ];
+                return (
+                  <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="contractor-jobs-header-tabs">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Jobs workspace</p>
+                        <h2 className="mt-1 text-xl font-bold text-slate-950">Jobs</h2>
+                      </div>
+                      <div
+                        role="tablist"
+                        aria-label="Contractor Jobs section tabs"
+                        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+                      >
+                        {jobsHeaderTabs.map(tab => {
+                          const active = activeHeaderTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              role="tab"
+                              aria-selected={active}
+                              data-testid={`contractor-jobs-header-tab-${tab.id}`}
+                              onClick={() => openContractorJobsHeaderTab(tab.id)}
+                              className={`min-w-[8.5rem] rounded-xl border px-3 py-2 text-left transition ${
+                                active
+                                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-950'
+                              }`}
+                            >
+                              <span className={`block text-sm font-bold ${active ? 'text-white' : 'text-slate-950'}`}>{tab.label}</span>
+                              <span className={`mt-0.5 block text-xs leading-4 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{tab.helper}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+
               {contractorJobsView === 'overview' && (
               <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -35899,7 +36002,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {acceptedEstimatesNeedingJobs.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setContractorJobsViewAndScroll('open_financial')}
+                          onClick={() => {
+                            setContractorFinancialRecordKind('estimates');
+                            setContractorJobsViewAndScroll('open_financial');
+                          }}
                           className={buttonClass('primary')}
                         >
                           <ClipboardCheck size={15} />
@@ -35966,6 +36072,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             key={item.id}
                             type="button"
                             onClick={() => {
+                              if (item.id === 'new_financial') setContractorFinancialRecordKind('estimates');
                               setContractorJobsViewAndScroll(item.id);
                               setInspectionView('list');
                             }}
@@ -36001,6 +36108,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           helper: 'Saved work templates and inspection checklists',
                           icon: <ClipboardList size={15} />,
                           onClick: () => {
+                            setContractorFinancialRecordKind('estimates');
                             setContractorJobsViewAndScroll('templates');
                             setInspectionView('list');
                             setShowTemplateLibrary(true);
@@ -36013,6 +36121,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           helper: 'Private pricing library',
                           icon: <Receipt size={15} />,
                           onClick: () => {
+                            setContractorFinancialRecordKind('estimates');
                             setContractorJobsViewAndScroll('custom_pricing');
                             setInspectionView('list');
                           },
@@ -36024,6 +36133,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           helper: 'Templates and offers',
                           icon: <ClipboardList size={15} />,
                           onClick: () => {
+                            setContractorFinancialRecordKind('estimates');
                             setContractorJobsViewAndScroll('service_agreements');
                             setInspectionView('list');
                           },
@@ -36050,15 +36160,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               )}
 
               {contractorJobsView === 'new_financial' && (
-                <Card title={invoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : 'New estimate or invoice'} icon={<Receipt size={18} />}>
+                <Card title={invoiceComposerOpen ? (editingInvoiceId ? 'Edit invoice' : 'Invoice draft') : contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'} icon={<Receipt size={18} />}>
                   <div className="space-y-4">
                     {!invoiceComposerOpen && (
                       <>
                         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
-                            <h3 className="mt-1 text-lg font-bold text-slate-950">Estimate / Invoice Workspace</h3>
-                            <p className="mt-1 text-sm leading-6 text-slate-500">Create or edit a customer-facing financial record without the Jobs overview cards above it.</p>
+                            <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                              {contractorFinancialRecordKind === 'estimates'
+                                ? 'Create or edit a customer-facing estimate without the Jobs overview cards above it.'
+                                : 'Create or edit a customer-facing invoice without the Jobs overview cards above it.'}
+                            </p>
                           </div>
                           <button
                             type="button"
@@ -36075,7 +36189,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </button>
                         </div>
                         {!estimateComposerOpen && (
-                        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+                        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
                               className={inputClass()}
@@ -36091,39 +36205,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               ))}
                             </select>
                           </Field>
-                          <button
-                            type="button"
-                            onClick={openEstimateCustomerCreate}
-                            className={buttonClass('secondary')}
-                          >
-                            <Plus size={15} />
-                            Create new customer
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
-                            onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                            title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
-                            className={buttonClass('primary')}
-                          >
-                            <Plus size={15} />
-                            Create estimate
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!selectedJobsCustomerName || createInvoiceCapability.disabled}
-                            onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
-                            title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
-                            className={buttonClass('secondary')}
-                          >
-                            <Receipt size={15} />
-                            Create invoice
-                          </button>
+                          {contractorFinancialRecordKind === 'estimates' && (
+                            <button
+                              type="button"
+                              onClick={openEstimateCustomerCreate}
+                              className={buttonClass('secondary')}
+                            >
+                              <Plus size={15} />
+                              Create new customer
+                            </button>
+                          )}
+                          {contractorFinancialRecordKind === 'estimates' ? (
+                            <button
+                              type="button"
+                              disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}
+                              onClick={() => beginEstimateDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                              title={createEstimateCapability.disabled ? createEstimateCapability.reason : undefined}
+                              className={buttonClass('primary')}
+                            >
+                              <Plus size={15} />
+                              Create estimate
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!selectedJobsCustomerName || createInvoiceCapability.disabled}
+                              onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                              title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
+                              className={buttonClass('primary')}
+                            >
+                              <Receipt size={15} />
+                              Create invoice
+                            </button>
+                          )}
                         </div>
                         )}
 
                         {!selectedJobsCustomerName && (
-                          <Notice tone="info" text="Choose a connected homeowner or new customer before creating an estimate or invoice." />
+                          <Notice tone="info" text={contractorFinancialRecordKind === 'estimates' ? 'Choose a connected homeowner or new customer before creating an estimate.' : 'Choose a connected homeowner or new customer before creating an invoice.'} />
                         )}
                         {readOnlyContractorActionReason && (
                           <Notice tone="info" text={readOnlyContractorActionReason} />
@@ -36626,7 +36745,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               )}
 
               {(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (
-                <Card title={contractorJobsView === 'open_financial' ? 'Open estimates and invoices' : 'Closed / billed records'} icon={<Receipt size={18} />}>
+                <Card title={contractorFinancialRecordKind === 'estimates' ? 'Estimates' : 'Invoices'} icon={<Receipt size={18} />}>
                   {(() => {
                     const records = contractorJobsView === 'open_financial'
                       ? (jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)) : openFinancialRecords)
@@ -36637,16 +36756,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const focusedEstimateRecord = contractorJobsView === 'open_financial' && focusedEstimateRecordId
                       ? records.find(estimate => estimate.id === focusedEstimateRecordId) ?? null
                       : null;
-                    const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : records;
-                    const visibleInvoiceRecords = focusedEstimateRecord ? [] : invoiceRecordsForView;
+                    const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);
+                    const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? records : [];
+                    const visibleInvoiceRecords = showingEstimates ? [] : invoiceRecordsForView;
                     const listTitle = focusedEstimateRecord
                       ? 'Saved estimate draft'
-                      : contractorJobsView === 'open_financial' ? 'Open Estimates / Invoices' : 'Closed / Billed Records';
+                      : showingEstimates
+                        ? contractorJobsView === 'open_financial' ? 'Open Estimates' : 'Closed Estimates'
+                        : contractorJobsView === 'open_financial' ? 'Open Invoices' : 'Closed Invoices';
                     const listDescription = focusedEstimateRecord
                       ? 'This is the estimate you just saved. Send it, download the PDF, save it as a template, or continue editing.'
-                      : contractorJobsView === 'open_financial'
-                      ? 'Estimate drafts, sent estimates, draft invoices, and unpaid invoices.'
-                      : 'Closed estimates and billed invoice records.';
+                      : showingEstimates
+                        ? contractorJobsView === 'open_financial'
+                          ? 'Draft, sent, and approved estimates.'
+                          : 'Declined, expired, and revised estimate records.'
+                        : contractorJobsView === 'open_financial'
+                          ? 'Invoice drafts, sent invoices, and unpaid invoices.'
+                          : 'Paid and void invoice records.';
                     return (
                       <div className="space-y-4">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -36657,6 +36783,30 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <p className="mt-1 text-sm leading-6 text-slate-500">{listDescription}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
+                              {!focusedEstimateRecord && showingEstimates && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setContractorFinancialRecordKind('estimates');
+                                    setContractorJobsViewAndScroll('new_financial');
+                                  }}
+                                  className={buttonClass('primary')}
+                                >
+                                  <Plus size={15} />
+                                  New estimate
+                                </button>
+                              )}
+                              {!focusedEstimateRecord && !showingEstimates && (
+                                <button
+                                  type="button"
+                                  onClick={() => beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer')}
+                                  disabled={!selectedJobsCustomerName}
+                                  className={buttonClass('primary')}
+                                >
+                                  <Plus size={15} />
+                                  New invoice
+                                </button>
+                              )}
                               {focusedEstimateRecord && (
                                 <button type="button" onClick={() => setFocusedEstimateRecordId(null)} className={buttonClass('secondary')}>
                                   View all open estimates
@@ -36675,7 +36825,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </div>
                           </div>
                           {!focusedEstimateRecord && (
-                          <div className="mt-4 max-w-sm">
+                          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,20rem)_auto] lg:items-end lg:justify-between">
                             <Field label="Customer">
                               <select
                                 className={inputClass()}
@@ -36694,33 +36844,48 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 ))}
                               </select>
                             </Field>
+                            <div className="flex rounded-xl border border-slate-200 bg-white p-1" aria-label={`${showingEstimates ? 'Estimate' : 'Invoice'} record status view`}>
+                              {([
+                                { id: 'open_financial', label: 'Open' },
+                                { id: 'closed_financial', label: 'Closed' },
+                              ] as Array<{ id: ContractorJobsView; label: string }>).map(option => {
+                                const active = contractorJobsView === option.id;
+                                return (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setFocusedEstimateRecordId(null);
+                                      setContractorJobsViewAndScroll(option.id);
+                                    }}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                                      active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
+                                    }`}
+                                  >
+                                    {option.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                           )}
                         </div>
 
                         {visibleEstimateRecords.length === 0 && visibleInvoiceRecords.length === 0 ? (
-                          <EmptyState text={contractorJobsView === 'open_financial' ? 'No open estimate or invoice records match this view.' : 'No closed estimate or invoice records match this view.'} />
+                          <EmptyState text={
+                            showingEstimates
+                              ? contractorJobsView === 'open_financial' ? 'No open estimate records match this view.' : 'No closed estimate records match this view.'
+                              : contractorJobsView === 'open_financial' ? 'No open invoice records match this view.' : 'No closed invoice records match this view.'
+                          } />
                         ) : (
                         <div className="space-y-2">
                         {visibleInvoiceRecords.length > 0 && (
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">First-class invoices</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice records</p>
                                 <p className="mt-1 text-xs text-slate-500">{visibleInvoiceRecords.length} invoice{visibleInvoiceRecords.length === 1 ? '' : 's'} in this view</p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setFocusedEstimateRecordId(null);
-                                  beginInvoiceDraftForCustomer(selectedJobsCustomerName || 'Customer');
-                                }}
-                                disabled={!selectedJobsCustomerName}
-                                className={buttonClass('secondary')}
-                              >
-                                <Plus size={14} />
-                                New Invoice
-                              </button>
                             </div>
                             <div className="space-y-2">
                               {visibleInvoiceRecords.map(invoice => {

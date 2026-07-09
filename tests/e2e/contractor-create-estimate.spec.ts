@@ -64,7 +64,7 @@ test.describe('contractor estimate creation UI structure', () => {
     const source = appSource();
     const lineSourceSource = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
     const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
-    const jobsEstimateComposerSource = sourceBetween(source, 'Estimate / Invoice Workspace', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
 
     expect(source).not.toContain('renderEstimateReferenceTools');
     expect(source).not.toContain('Optional tools');
@@ -92,6 +92,38 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(jobsEstimateComposerSource).toContain('Back to estimate options');
     expect(jobsEstimateComposerSource).toContain('Discard draft');
     expect(jobsEstimateComposerSource.indexOf('estimateDraft.line_items.map')).toBeLessThan(jobsEstimateComposerSource.indexOf('renderEstimateLineItemSources()'));
+  });
+
+  test('Jobs financial records split estimates and invoices behind section tabs', () => {
+    const source = appSource();
+    const financialListSource = sourceBetween(
+      source,
+      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
+      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+    );
+    const newFinancialSource = sourceBetween(
+      source,
+      "{contractorJobsView === 'new_financial' && (",
+      "{(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
+    );
+
+    expect(source).toContain("type ContractorFinancialRecordKind = 'estimates' | 'invoices';");
+    expect(source).toContain("const [contractorFinancialRecordKind, setContractorFinancialRecordKind] = useState<ContractorFinancialRecordKind>('estimates');");
+    expect(financialListSource).toContain("const showingEstimates = contractorFinancialRecordKind === 'estimates' || Boolean(focusedEstimateRecord);");
+    expect(financialListSource).toContain('const visibleEstimateRecords = focusedEstimateRecord ? [focusedEstimateRecord] : showingEstimates ? records : [];');
+    expect(financialListSource).toContain('const visibleInvoiceRecords = showingEstimates ? [] : invoiceRecordsForView;');
+    expect(financialListSource).toContain("showingEstimates\n                        ? contractorJobsView === 'open_financial' ? 'Open Estimates' : 'Closed Estimates'");
+    expect(financialListSource).toContain(": contractorJobsView === 'open_financial' ? 'Open Invoices' : 'Closed Invoices'");
+    expect(financialListSource).toContain('visibleInvoiceRecords.map(invoice => {');
+    expect(financialListSource).toContain('visibleEstimateRecords.map(estimate => {');
+    expect(financialListSource).toContain('New estimate');
+    expect(financialListSource).toContain('New invoice');
+    expect(financialListSource).toContain('aria-label={`${showingEstimates ? \'Estimate\' : \'Invoice\'} record status view`}');
+    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'New estimate' : 'New invoice'");
+    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'");
+    expect(newFinancialSource).toContain("contractorFinancialRecordKind === 'estimates' && (");
+    expect(newFinancialSource).toContain('Create estimate');
+    expect(newFinancialSource).toContain('Create invoice');
   });
 });
 
@@ -163,7 +195,7 @@ test.describe('contractor mutating estimate creation', () => {
     await saveEstimateButton.click();
     await waitForEstimateDraftSave(main, saveEstimateButton);
 
-    await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Open Estimates$/i })).toBeVisible();
     await expect(main.getByText(estimateTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(new RegExp(`${escapeRegExp(customerName)}.*Updated`, 'i'))).toBeVisible();
 

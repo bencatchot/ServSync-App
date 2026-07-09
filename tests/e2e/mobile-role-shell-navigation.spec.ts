@@ -123,12 +123,17 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(homeownerNavSource).not.toContain('dashboardAcceptedWorkEstimates.length + openHomeownerInvoiceCount + pendingEstimateCount');
   });
 
-  test('contractor Jobs keeps compact mobile overview tiles and relies on bottom-nav return behavior', () => {
+  test('contractor Jobs uses section header tabs while keeping compact mobile overview tiles', () => {
     const appSource = readRepoFile('src/App.tsx');
     const jobsShellSource = sourceBetween(
       appSource,
       "{(contractorTab === 'inspections' || (contractorTab === 'connections' && inspectionView === 'detail' && activeInspection)) && (",
       '          {/* ── LIST VIEW ── */}',
+    );
+    const jobsListSource = sourceBetween(
+      appSource,
+      "          {inspectionView === 'list' && (",
+      "{contractorJobsView === 'overview' && (",
     );
     const jobsOverviewSource = sourceBetween(
       appSource,
@@ -152,7 +157,6 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(appSource).not.toContain('data-testid="contractor-jobs-mobile-fixed-subheader-spacer"');
     expect(appSource).not.toContain('data-testid="contractor-jobs-mobile-overview-back"');
     expect(jobsShellSource).not.toContain("contractorTab === 'inspections' && contractorJobsView !== 'overview'");
-    expect(jobsShellSource).not.toContain('aria-label="Contractor Jobs section navigation"');
     expect(jobsShellSource).not.toContain('fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4rem)]');
     expect(jobsShellSource).not.toContain('sticky top-0');
     expect(jobsShellSource).not.toContain('sticky top-[calc(env(safe-area-inset-top)+0.5rem)]');
@@ -164,6 +168,29 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsShellSource).not.toContain('className="h-[4rem] md:hidden"');
     expect(appSource).toContain('Back to Jobs Overview');
     expect(appSource).toContain('Back to Jobs');
+
+    expect(appSource).toContain("type ContractorJobsHeaderTab = 'overview' | 'estimates' | 'invoices' | 'jobs_reports' | 'templates';");
+    expect(appSource).toContain("type ContractorFinancialRecordKind = 'estimates' | 'invoices';");
+    expect(appSource).toContain("const [contractorFinancialRecordKind, setContractorFinancialRecordKind] = useState<ContractorFinancialRecordKind>('estimates');");
+    expect(appSource).toContain('const contractorJobsHeaderTabForView = (view: ContractorJobsView): ContractorJobsHeaderTab => {');
+    expect(appSource).toContain('const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {');
+    expect(jobsListSource).toContain('data-testid="contractor-jobs-header-tabs"');
+    expect(jobsListSource).toContain('role="tablist"');
+    expect(jobsListSource).toContain('aria-label="Contractor Jobs section tabs"');
+    expect(jobsListSource).toContain('overflow-x-auto');
+    expect(jobsListSource).toContain("{ id: 'overview', label: 'Overview'");
+    expect(jobsListSource).toContain("{ id: 'estimates', label: 'Estimates'");
+    expect(jobsListSource).toContain("{ id: 'invoices', label: 'Invoices'");
+    expect(jobsListSource).toContain("{ id: 'jobs_reports', label: 'Jobs & Reports'");
+    expect(jobsListSource).toContain("{ id: 'templates', label: 'Templates'");
+    expect(jobsListSource).toContain('data-testid={`contractor-jobs-header-tab-${tab.id}`}');
+    expect(appSource).toContain("if (tab === 'estimates') {");
+    expect(appSource).toContain("setContractorFinancialRecordKind('estimates');");
+    expect(appSource).toContain("if (tab === 'invoices') {");
+    expect(appSource).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(appSource).toContain("if (tab === 'jobs_reports') {");
+    expect(appSource).toContain("setContractorJobsViewAndScroll('open_jobs');");
+    expect(appSource).toContain("setContractorJobsViewAndScroll('templates');");
 
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview"');
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview-tile-grid"');
