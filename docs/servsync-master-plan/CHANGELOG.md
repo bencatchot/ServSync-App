@@ -4,6 +4,41 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-09
+
+- Branch: `codex/contractor-jobs-header-tabs-v1`
+- Starting main SHA: `8fd6921ff0ca1539b558b90dee5aa8eb5c82194e`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Reorganized the contractor Jobs workspace with section header tabs for `Overview`, `Estimates`, `Invoices`, `Jobs & Reports`, and `Templates`. The left sidebar remains unchanged, existing Jobs overview content stays under Overview, estimate and invoice record views are split behind the Estimates and Invoices tabs, checklist/report jobs stay under Jobs & Reports, and template/pricing/service-agreement management remains reachable under Templates. The slice keeps the existing estimate creation, invoice creation, `Create invoice from estimate`, checklist/report job, and template behaviors intact.
+- Reason for change: The Jobs section was carrying too much mixed workflow content in one long area. A SaaS-style major-section sidebar plus in-section header tabs makes the contractor workflow easier to scan without introducing the paused PR #256 multi-invoice chooser, payment schedule, deposit/progress/final billing, SQL, or payment changes.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted contractor Jobs navigation source-static tests
+  - targeted contractor estimate creation source-static tests
+  - targeted contractor invoice record/action source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - This is a frontend/test/docs navigation cleanup only. Full search/filter/sort controls for estimate and invoice records were deferred to keep the PR narrow.
+  - No PR #256 multi-invoice type chooser, payment schedule/billing terms, deposit/progress/final invoice creation, SQL/RLS/RPC/schema, homeowner UI, Stripe/payment collection, send/email/SMS/PDF redesign, change-order, Home History, or accounting-ledger behavior is included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the Jobs workspace header-tab shell and notes that deeper list filters remain future work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor Jobs/invoice workflow direction now documents the major-section plus in-section-tab navigation structure.
+
 ## 2026-07-08
 
 - Branch: `codex/multiple-invoices-foundation-v1`

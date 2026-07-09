@@ -118,6 +118,36 @@ test.describe('contractor estimate-to-invoice draft source', () => {
     expect(invoiceComposerActionsSource).not.toContain('savingInvoice || updatingInvoiceId === editingInvoiceId');
     expect(invoiceComposerActionsSource).not.toContain("savingInvoice ? 'Sending...'");
   });
+
+  test('Jobs Invoices tab keeps invoice records and actions reachable', () => {
+    const source = appSource();
+    const tabSource = sourceBetween(
+      source,
+      'const openContractorJobsHeaderTab = (tab: ContractorJobsHeaderTab) => {',
+      'const onboardingCustomerCount =',
+    );
+    const financialListSource = sourceBetween(
+      source,
+      "(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (",
+      "(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+    );
+    const beginInvoiceSource = sourceBetween(source, 'const beginInvoiceDraftForCustomer =', 'const defaultEstimateDraftBuilderTrade =');
+    const openInvoiceSource = sourceBetween(source, 'const openInvoiceRecord = (invoice: Invoice) => {', 'const openEstimateRecord = (estimate: Estimate) => {');
+
+    expect(tabSource).toContain("if (tab === 'invoices') {");
+    expect(tabSource).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(tabSource).toContain("setContractorJobsViewAndScroll('open_financial');");
+    expect(financialListSource).toContain("const visibleInvoiceRecords = showingEstimates ? [] : invoiceRecordsForView;");
+    expect(financialListSource).toContain('visibleInvoiceRecords.map(invoice => {');
+    expect(financialListSource).toContain('data-testid="contractor-invoice-card"');
+    expect(financialListSource).toContain('Download PDF');
+    expect(financialListSource).toContain('Send Invoice');
+    expect(financialListSource).toContain('Edit draft');
+    expect(financialListSource).toContain('Mark Paid');
+    expect(financialListSource).toContain('New invoice');
+    expect(beginInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");
+    expect(openInvoiceSource).toContain("setContractorFinancialRecordKind('invoices');");
+  });
 });
 
 test.describe('contractor mutating invoice creation', () => {
@@ -166,7 +196,7 @@ test.describe('contractor mutating invoice creation', () => {
     await saveInvoiceButton.click();
     await waitForInvoiceDraftSave(main, saveInvoiceButton);
 
-    await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible();
+    await expect(main.getByRole('heading', { name: /^Open Invoices$/i })).toBeVisible();
     await expect(main.getByText(invoiceTitle, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(main.getByText(new RegExp(`${escapeRegExp(customerName)}.*Updated`, 'i'))).toBeVisible();
 
