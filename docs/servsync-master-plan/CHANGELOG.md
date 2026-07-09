@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/contractor-record-list-controls-v1`
+- Starting main SHA: `87379715eebce1fdbc2fb32f28b0ffa2301aac9a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added compact search, status filter, and sort controls to the contractor Jobs `Estimates` and `Invoices` tab contexts. Estimate search covers customer/property/title/scope, estimate status filters include All/Draft/Sent/Approved/Invoiced/Closed, and estimate sorting supports updated, created, amount, and customer order. Invoice search covers customer/property/title/invoice number/scope, invoice status filters include All/Draft/Sent/Viewed/Overdue/Partially paid/Paid/Void, and invoice sorting adds due date alongside updated, created, amount, and customer order. The existing estimate cards remain out of the Invoices tab and invoice cards remain out of the Estimates tab.
+- Reason for change: After the Jobs header tabs landed, contractors needed a way to quickly find records inside the separated Estimates and Invoices lists without returning to one mixed financial dashboard.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted contractor Jobs/estimate/invoice source-static tests
+  - relevant mobile Jobs navigation source-static test
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No PR #256 multi-invoice type chooser, linked-invoice summary, payment schedule/billing terms, deposit/progress/final invoice creation, automatic overdue derivation, SQL/RLS/RPC/schema, homeowner UI, Stripe/payment collection, send/email/SMS/PDF redesign, change orders, Home History, accounting-ledger behavior, native mobile work, deployment, or production data changes are included.
+  - The `Invoiced` estimate filter uses existing linked non-void invoices only and does not add multi-invoice behavior.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records completed lightweight list controls inside the Jobs Estimates and Invoices tabs.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The contractor Jobs workflow now includes the approved list-scanning refinement for Estimates and Invoices.
+
 - Branch: `codex/contractor-jobs-header-tabs-v1`
 - Starting main SHA: `8fd6921ff0ca1539b558b90dee5aa8eb5c82194e`
 - Files changed:
