@@ -6,6 +6,35 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/contractor-schedule-invoice-summary-v1`
+- Starting main SHA: `f3e765f9abb9af5a3d6fe469c5a6b8b76e416a01`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-estimate-schedule-invoice-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a compact informational schedule-invoice summary to contractor accepted estimates with structured payment schedule rows. The summary shows how many schedule invoices have been created, the scheduled total, the uninvoiced scheduled amount based on unlinked rows, and loaded linked-invoice status counts. Voided linked rows now show warning-only replacement-not-supported copy while preserving existing open-invoice behavior.
+- Reason for change: Contractors need a clearer closeout view after creating draft invoices from approved schedule rows, without adding replacement invoices, payment collection, arbitrary invoice type choices, Home History filing, or any SQL/RLS/RPC behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused contractor schedule invoice UI source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema changes, SQL application, deployment, production data changes, invoice replacement/unlink behavior, payment collection, Stripe, QuickBooks/accounting sync, invoice sending/email/SMS/push behavior, Home History filing, homeowner invoice redesign, hard remaining-balance enforcement, new lifecycle statuses, or PR #256 invoice type chooser behavior is included.
+  - Future slices should separately audit replacement behavior for voided linked rows, payment collection, accounting export, broader linked-invoice summaries, and authenticated sandbox smoke for the full schedule-row invoice workflow.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records the compact schedule-invoice summary closeout while keeping replacement/payment/accounting guardrails deferred.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The estimate/invoice roadmap now distinguishes informational schedule-invoice status summaries from future replacement behavior, payment collection, and broader accounting work.
+
 - Branch: `codex/contractor-schedule-invoice-ui-v1`
 - Starting main SHA: `e31413dfed10d1af724ddb627fc3e4547e1b9e7a`
 - Files changed:
