@@ -6,6 +6,40 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-09
 
+- Branch: `codex/estimate-payment-schedule-foundation-v1`
+- Starting main SHA: `d986d43f55ad469d69ec97a5ae523124a281422b`
+- Files changed:
+  - `servsync-estimate-payment-schedule-foundation.sql`
+  - `src/App.tsx`
+  - `src/types.ts`
+  - `tests/e2e/estimate-payment-schedule-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the SQL/RLS/types/test foundation for structured estimate payment schedule items. The new `estimate_payment_schedule_items` table supports total/deposit/progress/final schedule rows, fixed or percentage amounts, calculated amount snapshots, display ordering, and an optional future invoice link while leaving existing estimates without schedule rows untouched. Contractor schedule management uses the billing permission boundary, homeowner reads are limited to non-draft accessible estimates, and QuickBooks/accounting IDs are intentionally kept out of the core table for a future provider-neutral mapping layer.
+- Reason for change: Deposit/progress/final invoice workflows should be agreed on the estimate before customer approval. This foundation gives future UI and invoice-generation slices durable schedule item IDs and structured terms without implementing payment collection, invoice generation, homeowner display, PDFs, or accounting sync yet.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted estimate payment schedule foundation source-static tests
+  - relevant estimate source-static tests
+  - relevant multiple-invoices foundation source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL must be validated in sandbox before merge consideration and applied to production before any deployed app code selects `payment_schedule_items`.
+  - Foundation only. No contractor payment schedule UI, homeowner/PDF display, invoice generation from schedule, PR #256 reuse, Stripe/payment collection, QuickBooks API integration, send/email/SMS changes, change orders, Home History changes, accounting ledger behavior, deployment, or production data changes are included.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-023/FB-027 now record the structured estimate payment schedule foundation as the prerequisite for future deposit/progress/final invoice UX.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The estimate/invoice roadmap now distinguishes structured estimate payment terms from future payment collection and accounting sync.
+
 - Branch: `codex/contractor-record-list-controls-v1`
 - Starting main SHA: `87379715eebce1fdbc2fb32f28b0ffa2301aac9a`
 - Files changed:

@@ -124,6 +124,7 @@ const CORE_PRIVATE_TABLES = [
   'service_request_appointment_events',
   'estimates',
   'estimate_line_items',
+  'estimate_payment_schedule_items',
   'invoices',
   'invoice_line_items',
   'inspections',
