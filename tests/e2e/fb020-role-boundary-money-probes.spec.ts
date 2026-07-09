@@ -204,6 +204,7 @@ function cleanupExactSandboxProbeRows(options: { invoiceIds?: string[]; jobIds?:
   const statements = ['begin;'];
   if (invoiceList) {
     statements.push(`delete from public.notifications where invoice_id in (${invoiceList});`);
+    statements.push(`delete from public.workflow_activity_events where invoice_id in (${invoiceList});`);
     statements.push(`delete from public.invoice_backlog_items where invoice_id in (${invoiceList});`);
     statements.push(`delete from public.invoice_line_items where invoice_id in (${invoiceList});`);
     statements.push(`
@@ -221,6 +222,9 @@ update public.job_work_items
     statements.push(`delete from public.job_work_items where id in (${workItemList});`);
   }
   if (jobList) {
+    statements.push(
+      `delete from public.workflow_activity_events where invoice_id in (select id from public.invoices where job_id in (${jobList}));`,
+    );
     statements.push(`delete from public.invoice_backlog_items where invoice_id in (select id from public.invoices where job_id in (${jobList}));`);
     statements.push(`delete from public.invoice_line_items where invoice_id in (select id from public.invoices where job_id in (${jobList}));`);
     statements.push(`delete from public.invoices where job_id in (${jobList});`);
