@@ -167,6 +167,8 @@ import type {
   EstimateLineItem,
   EstimateLineSupplyStatus,
   EstimateLineType,
+  EstimatePaymentScheduleAmountType,
+  EstimatePaymentScheduleInvoiceType,
   EstimateTemplate,
   EstimateTemplateLineItem,
   ExternalReviewLink,
@@ -866,6 +868,33 @@ type EstimateDraft = {
   job_labor_hours: string;
   line_items: EstimateLineDraft[];
 };
+type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';
+type EstimatePaymentScheduleDraftRow = {
+  id: string;
+  invoice_type: EstimatePaymentScheduleInvoiceType;
+  label: string;
+  amount_type: EstimatePaymentScheduleAmountType;
+  amount_value: string;
+  due_trigger: string;
+  sort_order: number;
+};
+type EstimatePaymentScheduleDraft = {
+  mode: EstimatePaymentScheduleMode;
+  explicit: boolean;
+  rows: EstimatePaymentScheduleDraftRow[];
+};
+
+const ESTIMATE_PAYMENT_SCHEDULE_INVOICE_TYPE_LABELS: Record<EstimatePaymentScheduleInvoiceType, string> = {
+  total: 'Total',
+  deposit: 'Deposit',
+  progress: 'Progress',
+  final: 'Final',
+};
+
+const ESTIMATE_PAYMENT_SCHEDULE_AMOUNT_TYPE_LABELS: Record<EstimatePaymentScheduleAmountType, string> = {
+  fixed: 'Dollar amount',
+  percentage: 'Percentage',
+};
 
 function normalizeEstimateLineType(lineType: LegacyEstimateLineType | string | null | undefined): EstimateLineType {
   if (lineType === 'labor' || lineType === 'material' || lineType === 'fee' || lineType === 'other') return lineType;
@@ -1365,6 +1394,80 @@ function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): Estim
     job_labor_hours: '',
     line_items: [],
     ...overrides,
+  };
+}
+
+function createEstimatePaymentScheduleDraftRow(overrides: Partial<EstimatePaymentScheduleDraftRow> = {}): EstimatePaymentScheduleDraftRow {
+  return {
+    id: crypto.randomUUID(),
+    invoice_type: 'progress',
+    label: '',
+    amount_type: 'fixed',
+    amount_value: '',
+    due_trigger: '',
+    sort_order: 0,
+    ...overrides,
+  };
+}
+
+function createDefaultEstimatePaymentScheduleDraft(overrides: Partial<EstimatePaymentScheduleDraft> = {}): EstimatePaymentScheduleDraft {
+  return {
+    mode: 'default',
+    explicit: false,
+    rows: [],
+    ...overrides,
+  };
+}
+
+function createDepositFinalEstimatePaymentScheduleDraft(): EstimatePaymentScheduleDraft {
+  return {
+    mode: 'deposit_final',
+    explicit: true,
+    rows: [
+      createEstimatePaymentScheduleDraftRow({
+        invoice_type: 'deposit',
+        label: 'Deposit',
+        amount_type: 'percentage',
+        amount_value: '50',
+        due_trigger: 'Due on approval',
+        sort_order: 0,
+      }),
+      createEstimatePaymentScheduleDraftRow({
+        invoice_type: 'final',
+        label: 'Final payment',
+        amount_type: 'fixed',
+        amount_value: '',
+        due_trigger: 'Due on completion',
+        sort_order: 1,
+      }),
+    ],
+  };
+}
+
+function paymentScheduleAmountInputFromValue(value: number | null | undefined, amountType: EstimatePaymentScheduleAmountType) {
+  if (value === null || value === undefined) return '';
+  return amountType === 'fixed' ? Number(value).toFixed(2) : String(Number(value));
+}
+
+function estimatePaymentScheduleDraftFromEstimate(estimate: Estimate): EstimatePaymentScheduleDraft {
+  const rows = [...(estimate.payment_schedule_items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  if (rows.length === 0) return createDefaultEstimatePaymentScheduleDraft();
+  const draftRows = rows.map(row => createEstimatePaymentScheduleDraftRow({
+    id: row.id,
+    invoice_type: row.invoice_type,
+    label: row.label,
+    amount_type: row.amount_type,
+    amount_value: paymentScheduleAmountInputFromValue(row.amount_value, row.amount_type),
+    due_trigger: row.due_trigger,
+    sort_order: row.sort_order,
+  }));
+  const looksLikeDepositFinal = draftRows.length === 2
+    && draftRows[0]?.invoice_type === 'deposit'
+    && draftRows[1]?.invoice_type === 'final';
+  return {
+    mode: looksLikeDepositFinal ? 'deposit_final' : 'custom',
+    explicit: true,
+    rows: draftRows,
   };
 }
 
@@ -5901,6 +6004,28 @@ function parseLaborHoursValue(value: string | number | null | undefined) {
 
 function laborHoursInputFromValue(value: number | null | undefined) {
   return value === null || value === undefined ? '' : String(Number(value));
+}
+
+function parseEstimatePaymentScheduleAmount(value: string) {
+  const numeric = Number(value.replace(/[$,%]/g, '').trim());
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  return numeric;
+}
+
+function estimatePaymentScheduleCalculatedCents(row: EstimatePaymentScheduleDraftRow, estimateTotalCents: number) {
+  const amount = parseEstimatePaymentScheduleAmount(row.amount_value);
+  if (amount === null) return 0;
+  if (row.amount_type === 'percentage') {
+    return Math.round(Math.max(0, estimateTotalCents) * amount / 100);
+  }
+  return dollarsToCents(row.amount_value);
+}
+
+function estimatePaymentScheduleAmountValueForPayload(row: EstimatePaymentScheduleDraftRow) {
+  const amount = parseEstimatePaymentScheduleAmount(row.amount_value);
+  if (amount === null) return null;
+  if (row.amount_type === 'percentage') return Number(amount.toFixed(2));
+  return Number((dollarsToCents(row.amount_value) / 100).toFixed(2));
 }
 
 function formatLaborHours(value: number) {
@@ -21305,6 +21430,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [editingEstimateId, setEditingEstimateId] = useState<string | null>(null);
   const [focusedEstimateRecordId, setFocusedEstimateRecordId] = useState<string | null>(null);
   const [estimateDraft, setEstimateDraft] = useState<EstimateDraft>(() => createBlankEstimateDraft());
+  const [estimatePaymentScheduleDraft, setEstimatePaymentScheduleDraft] = useState<EstimatePaymentScheduleDraft>(() => createDefaultEstimatePaymentScheduleDraft());
   const [savingEstimate, setSavingEstimate] = useState(false);
   const [invoiceComposerOpen, setInvoiceComposerOpen] = useState(false);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
@@ -23304,6 +23430,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: options.localHomeId ?? defaultLocalHomeId,
       labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
     }));
+    setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
     setEstimateAssistantText('');
     setEstimateDraftBuilderTrade(defaultBuilderTrade);
     setEstimateDraftBuilderJobType('replacement');
@@ -23339,6 +23466,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       local_home_id: options.localHomeId ?? current.local_home_id,
       labor_rate: current.labor_rate || laborRateInputFromCents(contractor?.default_labor_rate_cents),
     }));
+    setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
     setEstimateAssistantText('');
     setEstimateDraftBuilderTrade('Other');
     setEstimateDraftBuilderJobType('repair');
@@ -23444,6 +23572,77 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('inspections');
   };
 
+  const estimateScheduleTotalCents = draftFinancialBreakdown(estimateDraft).subtotalCents;
+
+  const estimatePaymentScheduleRowsForDraft = (
+    draft: EstimatePaymentScheduleDraft = estimatePaymentScheduleDraft,
+    estimateTotalCents: number = estimateScheduleTotalCents,
+  ) => {
+    if (draft.mode === 'default') return [];
+    if (draft.mode === 'deposit_final') {
+      const depositRow = draft.rows[0] ?? createDepositFinalEstimatePaymentScheduleDraft().rows[0];
+      const finalRow = draft.rows[1] ?? createDepositFinalEstimatePaymentScheduleDraft().rows[1];
+      const depositCents = estimatePaymentScheduleCalculatedCents(depositRow, estimateTotalCents);
+      const finalCents = Math.max(0, estimateTotalCents - depositCents);
+      return [
+        { ...depositRow, invoice_type: 'deposit' as const, sort_order: 0 },
+        {
+          ...finalRow,
+          invoice_type: 'final' as const,
+          amount_type: 'fixed' as const,
+          amount_value: (finalCents / 100).toFixed(2),
+          sort_order: 1,
+        },
+      ];
+    }
+    return draft.rows.map((row, index) => ({ ...row, sort_order: index }));
+  };
+
+  const estimatePaymentScheduleRowsWithTotals = (
+    draft: EstimatePaymentScheduleDraft = estimatePaymentScheduleDraft,
+    estimateTotalCents: number = estimateScheduleTotalCents,
+  ) => estimatePaymentScheduleRowsForDraft(draft, estimateTotalCents).map((row, index) => ({
+    ...row,
+    sort_order: index,
+    calculated_amount_cents: estimatePaymentScheduleCalculatedCents(row, estimateTotalCents),
+  }));
+
+  const estimatePaymentScheduleWarning = () => {
+    const rows = estimatePaymentScheduleRowsWithTotals();
+    if (rows.length === 0 || estimateScheduleTotalCents <= 0) return '';
+    const scheduleTotalCents = rows.reduce((sum, row) => sum + row.calculated_amount_cents, 0);
+    if (scheduleTotalCents > estimateScheduleTotalCents) return 'Payment schedule is above the estimate total. Review before saving or sending.';
+    if (scheduleTotalCents !== estimateScheduleTotalCents) return 'Payment schedule total does not match the estimate total. Review before sending.';
+    return '';
+  };
+
+  const validateEstimatePaymentScheduleForSave = () => {
+    if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };
+    const rows = estimatePaymentScheduleRowsWithTotals();
+    const normalizedRows = rows.map((row, index) => {
+      const amountValue = estimatePaymentScheduleAmountValueForPayload(row);
+      if (amountValue === null) {
+        return { error: `Enter a valid ${row.invoice_type} schedule amount before saving.`, payload: null };
+      }
+      return {
+        error: '',
+        payload: {
+          invoice_type: row.invoice_type,
+          label: row.label.trim() || ESTIMATE_PAYMENT_SCHEDULE_INVOICE_TYPE_LABELS[row.invoice_type],
+          amount_type: row.amount_type,
+          amount_value: amountValue,
+          calculated_amount_cents: row.calculated_amount_cents,
+          due_trigger: row.due_trigger.trim(),
+          sort_order: index,
+          linked_invoice_id: null,
+        },
+      };
+    });
+    const invalidRow = normalizedRows.find(row => row.error);
+    if (invalidRow?.error) return { rows: [], error: invalidRow.error };
+    return { rows: normalizedRows.map(row => row.payload).filter(Boolean), error: '' };
+  };
+
   const saveEstimateDraft = async (subject: {
     homeownerUserId?: string | null;
     localContactId?: string | null;
@@ -23477,6 +23676,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (draftHasLaborHoursWithoutRate(draftForTotals)) {
       const confirmed = window.confirm('This estimate has labor hours but no labor rate. Labor hours will be saved, but labor price will be excluded from totals until a labor rate is added.\n\nChoose OK to continue anyway, or Cancel to add a labor rate.');
       if (!confirmed) return;
+    }
+    const scheduleForSave = validateEstimatePaymentScheduleForSave();
+    if (scheduleForSave.error) {
+      setError(scheduleForSave.error);
+      return;
     }
     setSavingEstimate(true);
     const currentEditingEstimateId = editingEstimateId;
@@ -23559,6 +23763,23 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .insert(usableLines.map((line, index) => persistedLineFromDraft(line, 'estimate_id', estimateId, index)));
       if (linesError) throw linesError;
 
+      if (estimatePaymentScheduleDraft.explicit) {
+        const { error: deleteScheduleError } = await supabase
+          .from('estimate_payment_schedule_items')
+          .delete()
+          .eq('estimate_id', estimateId);
+        if (deleteScheduleError) throw deleteScheduleError;
+        if (scheduleForSave.rows.length > 0) {
+          const { error: scheduleError } = await supabase
+            .from('estimate_payment_schedule_items')
+            .insert(scheduleForSave.rows.map(row => ({
+              ...row,
+              estimate_id: estimateId,
+            })));
+          if (scheduleError) throw scheduleError;
+        }
+      }
+
       const { data: savedEstimateData, error: savedEstimateError } = await supabase
         .from('estimates')
         .select(ESTIMATE_WITH_LINES_SELECT)
@@ -23571,6 +23792,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
+      setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
       setEstimateAssistantText('');
       setEstimateDraftBuilderTrade('Other');
       setEstimateDraftBuilderJobType('repair');
@@ -23842,6 +24064,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     if (estimate.status === 'draft') {
       setEditingEstimateId(estimate.id);
       setEstimateDraft(estimateDraftFromEstimate(estimate));
+      setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
       setEstimateAssistantText('');
       setEstimateDraftBuilderTrade('Other');
       setEstimateDraftBuilderJobType('repair');
@@ -25443,6 +25666,234 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           { label: 'Tax', amount: taxCents },
           { label: 'Total', amount: totals.subtotalCents + taxCents, bold: true },
         ])}
+      </div>
+    );
+  };
+
+  const setEstimatePaymentScheduleMode = (mode: EstimatePaymentScheduleMode) => {
+    if (mode === 'default') {
+      setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft({ explicit: true }));
+      return;
+    }
+    if (mode === 'deposit_final') {
+      setEstimatePaymentScheduleDraft(createDepositFinalEstimatePaymentScheduleDraft());
+      return;
+    }
+    setEstimatePaymentScheduleDraft({
+      mode: 'custom',
+      explicit: true,
+      rows: [
+        createEstimatePaymentScheduleDraftRow({
+          invoice_type: 'progress',
+          label: 'Progress payment',
+          amount_type: 'percentage',
+          amount_value: '100',
+          due_trigger: 'Due when scheduled milestone is complete',
+          sort_order: 0,
+        }),
+      ],
+    });
+  };
+
+  const updateEstimatePaymentScheduleRow = (rowId: string, updates: Partial<EstimatePaymentScheduleDraftRow>) => {
+    setEstimatePaymentScheduleDraft(draft => ({
+      ...draft,
+      explicit: true,
+      rows: draft.rows.map(row => row.id === rowId ? { ...row, ...updates } : row),
+    }));
+  };
+
+  const addCustomEstimatePaymentScheduleRow = () => {
+    setEstimatePaymentScheduleDraft(draft => ({
+      mode: 'custom',
+      explicit: true,
+      rows: [
+        ...draft.rows,
+        createEstimatePaymentScheduleDraftRow({
+          invoice_type: 'progress',
+          label: `Progress payment ${draft.rows.length + 1}`,
+          amount_type: 'fixed',
+          due_trigger: 'Due at milestone',
+          sort_order: draft.rows.length,
+        }),
+      ],
+    }));
+  };
+
+  const removeCustomEstimatePaymentScheduleRow = (rowId: string) => {
+    setEstimatePaymentScheduleDraft(draft => ({
+      ...draft,
+      explicit: true,
+      rows: draft.rows.filter(row => row.id !== rowId).map((row, index) => ({ ...row, sort_order: index })),
+    }));
+  };
+
+  const renderEstimatePaymentScheduleAmountInput = (row: EstimatePaymentScheduleDraftRow, disabled = false) => (
+    <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
+      <select
+        aria-label={`${row.label || row.invoice_type} amount type`}
+        className={inputClass()}
+        value={row.amount_type}
+        disabled={disabled}
+        onChange={event => updateEstimatePaymentScheduleRow(row.id, { amount_type: event.target.value as EstimatePaymentScheduleAmountType, amount_value: '' })}
+      >
+        <option value="fixed">{ESTIMATE_PAYMENT_SCHEDULE_AMOUNT_TYPE_LABELS.fixed}</option>
+        <option value="percentage">{ESTIMATE_PAYMENT_SCHEDULE_AMOUNT_TYPE_LABELS.percentage}</option>
+      </select>
+      <input
+        aria-label={`${row.label || row.invoice_type} amount`}
+        className={inputClass()}
+        type="number"
+        min="0"
+        step={row.amount_type === 'percentage' ? '0.01' : '0.01'}
+        value={row.amount_value}
+        disabled={disabled}
+        onChange={event => updateEstimatePaymentScheduleRow(row.id, { amount_value: event.target.value })}
+        placeholder={row.amount_type === 'percentage' ? '0' : '0.00'}
+      />
+    </div>
+  );
+
+  const renderEstimatePaymentScheduleRow = (row: EstimatePaymentScheduleDraftRow, options: { removable?: boolean; amountLocked?: boolean } = {}) => {
+    const calculatedCents = estimatePaymentScheduleCalculatedCents(row, estimateScheduleTotalCents);
+    return (
+      <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-3" data-testid="estimate-payment-schedule-row">
+        <div className="grid gap-3 lg:grid-cols-[9rem_1fr_1fr]">
+          <Field label="Type">
+            <select
+              aria-label="Payment schedule invoice type"
+              className={inputClass()}
+              value={row.invoice_type}
+              disabled={estimatePaymentScheduleDraft.mode === 'deposit_final'}
+              onChange={event => updateEstimatePaymentScheduleRow(row.id, { invoice_type: event.target.value as EstimatePaymentScheduleInvoiceType })}
+            >
+              <option value="total">Total</option>
+              <option value="deposit">Deposit</option>
+              <option value="progress">Progress</option>
+              <option value="final">Final</option>
+            </select>
+          </Field>
+          <Field label="Label / milestone">
+            <input
+              aria-label="Payment schedule label"
+              className={inputClass()}
+              value={row.label}
+              onChange={event => updateEstimatePaymentScheduleRow(row.id, { label: event.target.value })}
+              placeholder={ESTIMATE_PAYMENT_SCHEDULE_INVOICE_TYPE_LABELS[row.invoice_type]}
+            />
+          </Field>
+          <Field label="Amount">
+            {renderEstimatePaymentScheduleAmountInput(row, options.amountLocked)}
+          </Field>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_12rem] md:items-end">
+          <Field label="Due trigger">
+            <input
+              aria-label="Payment schedule due trigger"
+              className={inputClass()}
+              value={row.due_trigger}
+              onChange={event => updateEstimatePaymentScheduleRow(row.id, { due_trigger: event.target.value })}
+              placeholder="Due on completion"
+            />
+          </Field>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</p>
+            <p className="mt-1 text-sm font-bold text-slate-950">{formatMoney(calculatedCents)}</p>
+          </div>
+        </div>
+        {options.removable && (
+          <button type="button" onClick={() => removeCustomEstimatePaymentScheduleRow(row.id)} className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700">
+            Remove payment
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderEstimatePaymentScheduleEditor = () => {
+    const rows = estimatePaymentScheduleRowsWithTotals();
+    const warning = estimatePaymentScheduleWarning();
+    const scheduleTotalCents = rows.reduce((sum, row) => sum + row.calculated_amount_cents, 0);
+    const defaultActive = estimatePaymentScheduleDraft.mode === 'default';
+    const depositFinalRows = estimatePaymentScheduleDraft.mode === 'deposit_final'
+      ? estimatePaymentScheduleRowsForDraft()
+      : [];
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3" data-testid="estimate-payment-schedule-section">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Payment schedule</p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
+              Use this to plan billing for the estimate. Customer-facing display and invoice generation will be added in a later step.
+            </p>
+          </div>
+          <div className="rounded-lg bg-white px-3 py-2 text-right text-xs shadow-sm">
+            <p className="font-semibold uppercase tracking-wide text-slate-500">Estimate total</p>
+            <p className="mt-0.5 text-sm font-bold text-slate-950">{formatMoney(estimateScheduleTotalCents)}</p>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          {([
+            ['default', 'Full invoice on completion'],
+            ['deposit_final', 'Deposit + final'],
+            ['custom', 'Custom schedule'],
+          ] as Array<[EstimatePaymentScheduleMode, string]>).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setEstimatePaymentScheduleMode(mode)}
+              className={`rounded-xl border px-3 py-2 text-left text-sm font-bold transition ${
+                estimatePaymentScheduleDraft.mode === mode
+                  ? 'border-blue-500 bg-blue-50 text-blue-950'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {defaultActive && (
+          <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+            Full invoice on completion is the default for new and legacy estimates. No payment schedule rows are saved unless you choose Deposit + final or Custom schedule.
+          </p>
+        )}
+
+        {estimatePaymentScheduleDraft.mode === 'deposit_final' && depositFinalRows.length === 2 && (
+          <div className="mt-3 space-y-3">
+            {renderEstimatePaymentScheduleRow(depositFinalRows[0])}
+            {renderEstimatePaymentScheduleRow(depositFinalRows[1], { amountLocked: true })}
+          </div>
+        )}
+
+        {estimatePaymentScheduleDraft.mode === 'custom' && (
+          <div className="mt-3 space-y-3">
+            {estimatePaymentScheduleDraft.rows.map(row => renderEstimatePaymentScheduleRow(row, { removable: estimatePaymentScheduleDraft.rows.length > 1 }))}
+            <button type="button" onClick={addCustomEstimatePaymentScheduleRow} className={buttonClass('secondary')}>
+              <Plus size={14} />
+              Add payment
+            </button>
+          </div>
+        )}
+
+        {rows.length > 0 && (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold text-slate-600">Schedule total</span>
+              <span className="font-bold text-slate-950">{formatMoney(scheduleTotalCents)}</span>
+            </div>
+          </div>
+        )}
+        {warning && (
+          <p className={`mt-3 rounded-lg border px-3 py-2 text-xs font-semibold leading-5 ${
+            warning.includes('above')
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}>
+            {warning}
+          </p>
+        )}
       </div>
     );
   };
@@ -35181,6 +35632,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div className="mt-4">
                                       {renderEstimateDraftTotals()}
                                     </div>
+                                    <div className="mt-4">
+                                      {renderEstimatePaymentScheduleEditor()}
+                                    </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                       <button
                                         type="button"
@@ -35194,7 +35648,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <Receipt size={15} />
                                         {savingEstimate ? 'Saving...' : editingEstimateId ? `Update ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft` : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                                       </button>
-                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                                      <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft()); }} disabled={savingEstimate} className={buttonClass('secondary')}>
                                         Discard draft
                                       </button>
                                     </div>
@@ -35268,6 +35722,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                     local_home_id: workspaceNewRecordLocalHomeId,
                                                     labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
                                                   });
+                                                  setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
                                                   setEstimateAssistantText('');
                                                   setEstimateDraftBuilderTrade('Other');
                                                   setEstimateDraftBuilderJobType('repair');
@@ -35544,6 +35999,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   onClick={() => {
                                                     setEditingEstimateId(estimate.id);
                                                     setEstimateDraft(estimateDraftFromEstimate(estimate));
+                                                    setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
                                                     setEstimateAssistantText('');
                                                     setEstimateDraftBuilderTrade('Other');
                                                     setEstimateDraftBuilderJobType('repair');
@@ -36506,12 +36962,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mt-4">
                           {renderEstimateDraftTotals()}
                         </div>
+                        <div className="mt-4">
+                          {renderEstimatePaymentScheduleEditor()}
+                        </div>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => void saveEstimateDraft(selectedJobsSubject)} disabled={savingEstimate} className={buttonClass('primary')}>
                             <Receipt size={15} />
                             {savingEstimate ? 'Saving...' : editingEstimateId ? 'Update draft' : `Save ${estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }).toLowerCase()} draft`}
                           </button>
-                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); }} disabled={savingEstimate} className={buttonClass('secondary')}>
+                          <button type="button" onClick={() => { setEstimateComposerOpen(false); setEditingEstimateId(null); setEstimateLineSourcePanel(null); setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft()); }} disabled={savingEstimate} className={buttonClass('secondary')}>
                             Discard draft
                           </button>
                         </div>
@@ -37280,6 +37739,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                         setEditingEstimateId(estimate.id);
                                         setEstimateDraft(estimateDraftFromEstimate(estimate));
+                                        setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
                                         setEstimateAssistantText('');
                                         setEstimateDraftBuilderTrade('Other');
                                         setEstimateDraftBuilderJobType('repair');

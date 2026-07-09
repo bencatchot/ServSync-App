@@ -94,6 +94,48 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(jobsEstimateComposerSource.indexOf('estimateDraft.line_items.map')).toBeLessThan(jobsEstimateComposerSource.indexOf('renderEstimateLineItemSources()'));
   });
 
+  test('contractor draft estimates include a structured payment schedule editor without invoice generation', () => {
+    const source = appSource();
+    const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
+    const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
+    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+
+    expect(scheduleSource).toContain('Payment schedule');
+    expect(scheduleSource).toContain('Use this to plan billing for the estimate. Customer-facing display and invoice generation will be added in a later step.');
+    expect(scheduleSource).toContain('Full invoice on completion');
+    expect(scheduleSource).toContain('Deposit + final');
+    expect(scheduleSource).toContain('Custom schedule');
+    expect(scheduleSource).toContain('No payment schedule rows are saved unless you choose Deposit + final or Custom schedule.');
+    expect(source).toContain('Payment schedule total does not match the estimate total. Review before sending.');
+    expect(source).toContain('Payment schedule is above the estimate total. Review before saving or sending.');
+    expect(scheduleSource).toContain('Add payment');
+    expect(source).toContain('Payment schedule label');
+    expect(source).toContain('Payment schedule due trigger');
+    expect(scheduleSource).toContain('estimate-payment-schedule-section');
+    expect(scheduleSource).not.toContain('linked_invoice_id');
+
+    expect(source).toContain("type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';");
+    expect(source).toContain('function estimatePaymentScheduleCalculatedCents');
+    expect(source).toContain("row.amount_type === 'percentage'");
+    expect(source).toContain("invoice_type: 'deposit'");
+    expect(source).toContain("invoice_type: 'final'");
+    expect(source).toContain('Math.max(0, estimateTotalCents - depositCents)');
+    expect(source).toContain('estimatePaymentScheduleDraftFromEstimate(estimate)');
+
+    expect(source).toContain("if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };");
+    expect(saveSource).toContain(".from('estimate_payment_schedule_items')");
+    expect(saveSource).toContain('.delete()');
+    expect(saveSource).toContain('.insert(scheduleForSave.rows.map(row => ({');
+    expect(source).toContain('linked_invoice_id: null');
+    expect(saveSource).not.toContain('servsync_create_invoice_from_estimate');
+    expect(saveSource).not.toContain('beginInvoiceDraftFromEstimate');
+
+    expect(jobsEstimateComposerSource).toContain('renderEstimatePaymentScheduleEditor()');
+    expect(jobsEstimateComposerSource).toContain('<Field label="Terms">');
+    expect(source).not.toContain('beginInvoiceDraftFromPaymentSchedule');
+    expect(source).not.toContain('servsync_create_invoice_from_schedule');
+  });
+
   test('Jobs financial records split estimates and invoices behind section tabs', () => {
     const source = appSource();
     const financialListSource = sourceBetween(
