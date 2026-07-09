@@ -32,6 +32,53 @@ export type EstimateChargeType = 'flat' | 'hourly';
 export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type InvoiceType = 'total' | 'deposit' | 'progress' | 'final';
+export type ExternalObjectMappingStatus = 'active' | 'pending' | 'conflict' | 'failed' | 'archived';
+export type ExternalObjectMappingSyncDirection = 'imported' | 'exported' | 'synced' | 'linked';
+export type ExternalObjectMappingEntityType =
+  | 'contractor_profile'
+  | 'homeowner_profile'
+  | 'home'
+  | 'home_document'
+  | 'home_reminder'
+  | 'contractor_local_contact'
+  | 'contractor_local_home'
+  | 'homeowner_contractor_connection'
+  | 'service_request'
+  | 'service_request_appointment'
+  | 'contractor_calendar_event'
+  | 'estimate'
+  | 'estimate_line_item'
+  | 'invoice'
+  | 'invoice_line_item'
+  | 'inspection'
+  | 'job_work_item'
+  | 'home_maintenance_log'
+  | 'notification'
+  | 'workflow_message'
+  | 'workflow_activity_event'
+  | 'service_agreement_template'
+  | 'service_agreement_offer'
+  | 'service_agreement'
+  | 'contractor_price_book_item';
+export type IntegrationOutboxChannel =
+  | 'accounting'
+  | 'payment'
+  | 'calendar'
+  | 'email'
+  | 'sms'
+  | 'push'
+  | 'document'
+  | 'crm'
+  | 'webhook'
+  | 'other';
+export type IntegrationOutboxStatus =
+  | 'pending'
+  | 'locked'
+  | 'processing'
+  | 'succeeded'
+  | 'failed'
+  | 'dead_letter'
+  | 'cancelled';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type JobWorkItemCompletionStatus = 'open' | 'completed' | 'declined' | 'removed';
 export type JobWorkItemBillingStatus = 'unbilled' | 'drafted' | 'invoiced' | 'not_billable';
@@ -240,6 +287,59 @@ export interface Invoice {
   updated_at: string;
   line_items?: InvoiceLineItem[];
   backlog_items?: InvoiceBacklogItem[];
+}
+
+export interface ExternalObjectMapping {
+  id: string;
+  provider: string;
+  provider_account_id: string;
+  provider_object_type: string;
+  provider_object_id: string;
+  provider_parent_object_id?: string | null;
+  servsync_entity_type: ExternalObjectMappingEntityType;
+  servsync_entity_id: string;
+  contractor_id?: string | null;
+  homeowner_user_id?: string | null;
+  home_id?: string | null;
+  mapping_status: ExternalObjectMappingStatus;
+  sync_direction: ExternalObjectMappingSyncDirection;
+  last_synced_at?: string | null;
+  last_seen_at?: string | null;
+  external_updated_at?: string | null;
+  metadata: Record<string, unknown>;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationOutboxEvent {
+  id: string;
+  event_key: string;
+  channel: IntegrationOutboxChannel;
+  provider: string;
+  event_type: string;
+  aggregate_type: string;
+  aggregate_id?: string | null;
+  contractor_id?: string | null;
+  homeowner_user_id?: string | null;
+  home_id?: string | null;
+  status: IntegrationOutboxStatus;
+  priority: number;
+  scheduled_for: string;
+  attempt_count: number;
+  max_attempts: number;
+  locked_at?: string | null;
+  locked_by?: string | null;
+  processing_started_at?: string | null;
+  processed_at?: string | null;
+  failed_at?: string | null;
+  cancelled_at?: string | null;
+  last_error_code?: string | null;
+  last_error_message?: string | null;
+  payload: Record<string, unknown>;
+  result_metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface InvoiceDraft {
