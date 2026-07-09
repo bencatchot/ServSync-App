@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-04
+Last updated: 2026-07-09
 
 Last reconciled through PR #198 / merge commit `1f721ae10fb92de9a76b9f30bf2eeeeab83330bc`.
 
@@ -675,10 +675,13 @@ Guardrails:
 
 ### FB-013 — QuickBooks / Accounting Integration
 
-Status: Later / Future
+Status: Foundation Started / Future
 
 Purpose:
 Potentially allow contractors to connect invoices/customers/payments with QuickBooks later.
+
+Current foundation:
+ServSync now has a provider-neutral integration foundation planned/implemented at the SQL/test/docs level through `external_object_mappings` and `integration_outbox_events`. This foundation gives future accounting export/sync work a safe place to map ServSync records to external provider objects and queue idempotent external side effects without adding provider-specific columns to invoices, customers, estimates, jobs, or homes. QuickBooks/accounting sync is not live, no OAuth/token storage exists, and no browser/client access is granted to these internal tables.
 
 Guardrails:
 
@@ -687,13 +690,17 @@ Guardrails:
 - Requires Intuit/QuickBooks approval/research.
 - Should remain optional for contractors.
 - ServSync should not become full accounting software.
+- Future QuickBooks/accounting IDs should use provider-neutral external object mappings or a reviewed extension of that pattern, not ad hoc columns on core business records.
 
 ### FB-014 — Payments / Stripe
 
-Status: Later / Future
+Status: Foundation Planned / Future
 
 Purpose:
 Allow homeowners to pay invoices through ServSync later.
+
+Current foundation:
+The provider-neutral integration foundation gives future payment work an internal event/outbox and external-object mapping pattern, but payments/Stripe remain inactive. No payment provider wiring, checkout, card/ACH collection, webhook handling, subscription payment flow, or payment ledger behavior is live.
 
 Guardrails:
 
@@ -701,6 +708,7 @@ Guardrails:
 - Do not claim in-app payments are live.
 - Manual mark-paid may exist, but that is not payment processing.
 - Stripe should come after invoice workflow is tested.
+- Do not store provider-specific payment IDs directly on core invoice/customer tables unless a separately approved payment-ledger design requires it.
 
 ### FB-015 — Native Mobile Apps
 
@@ -1198,7 +1206,7 @@ Use beta feedback to decide whether the next slice should consolidate compact da
 
 ### FB-028 — Accounting Export Foundation
 
-Status: Later / Future
+Status: Foundation Started / Future
 
 Priority: Medium
 
@@ -1209,10 +1217,10 @@ Product area:
 - Accounting/export
 
 Summary:
-QuickBooks/accounting sync is not live. A safer future step is export-ready invoice/customer/payment data and CSV-style export before any full accounting integration.
+QuickBooks/accounting sync is not live. A provider-neutral integration foundation now defines internal-only external object mappings and idempotent integration outbox events so future accounting/export work can avoid rewriting core records or attaching provider-specific IDs directly to business tables. A safer future user-facing step is still export-ready invoice/customer/payment data and CSV-style export before any full accounting integration.
 
 Current next step:
-Revisit after invoice reliability and manual payment status workflows are stable.
+Validate the provider-neutral SQL foundation in sandbox before merge consideration. After that, revisit export-ready invoice/customer/payment data only after invoice reliability and manual payment status workflows are stable. Do not build live accounting sync, provider OAuth, automatic exports, or QuickBooks-specific behavior from this foundation alone.
 
 ### FB-029 — Recurring Maintenance / Service Plan Lite
 
