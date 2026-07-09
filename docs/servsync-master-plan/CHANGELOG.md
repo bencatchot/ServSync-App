@@ -28,10 +28,11 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - targeted estimate payment schedule foundation source-static tests
   - relevant estimate source-static tests
   - relevant multiple-invoices foundation source-static tests
+  - sandbox SQL/RLS validation on `zpzdkoaubyjtsomccxya`
   - `npm run typecheck`
   - `npm run build`
 - Known risks or follow-ups:
-  - SQL must be validated in sandbox before merge consideration and applied to production before any deployed app code selects `payment_schedule_items`.
+  - Sandbox SQL validation passed on `zpzdkoaubyjtsomccxya`; production SQL still requires separate explicit approval and must be applied before any deployed app code selects `payment_schedule_items`.
   - Foundation only. No contractor payment schedule UI, homeowner/PDF display, invoice generation from schedule, PR #256 reuse, Stripe/payment collection, QuickBooks API integration, send/email/SMS changes, change orders, Home History changes, accounting ledger behavior, deployment, or production data changes are included.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
@@ -39,6 +40,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
   - REASON: The estimate/invoice roadmap now distinguishes structured estimate payment terms from future payment collection and accounting sync.
+
+- Branch: `codex/provider-neutral-integration-foundation-v1`
+- Starting main SHA: `d986d43f55ad469d69ec97a5ae523124a281422b`
+- Files changed:
+  - `servsync-integration-foundation.sql`
+  - `src/types.ts`
+  - `tests/e2e/integration-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a provider-neutral integration foundation for future reviewed external integrations. The SQL patch creates internal-only `external_object_mappings` and `integration_outbox_events` tables with UUID primary keys, text check constraints, provider-neutral fields, idempotency/lookup indexes, RLS enabled, and all direct browser-role table grants revoked. TypeScript now includes matching foundation types, security catalog coverage includes both private tables, and source-static tests verify no provider-specific ID columns, no browser-callable RPCs, no UI wiring, and foundation-only documentation.
+- Reason for change: Before real-user onboarding and later QuickBooks, Stripe, calendar, notification, document/e-signature, CRM/import-export, or mobile/offline work, ServSync needs additive data-safety seams that avoid stuffing provider IDs into core business tables or creating duplicate external side effects.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - targeted provider-neutral integration foundation source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - SQL/RLS/types/tests/docs foundation only. No live QuickBooks/accounting sync, Stripe/payment activation, calendar sync, email/SMS/push sending, e-signature, CRM import/export, offline queue, OAuth/token storage, provider account connection UI, invoice/payment behavior change, snapshot generation, deployment, production SQL, or production data change is included.
+  - The new tables are internal/service-role only for now. Future access should go through reviewed Edge Functions/RPCs, with sandbox SQL validation required before merge consideration and separate production SQL approval before any deployed app/runtime depends on the tables.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-013, FB-014, FB-025, and FB-028 now record the provider-neutral integration foundation as groundwork only, while preserving no-live-integration guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The roadmap now documents provider-neutral mapping/outbox seams as data-safety preparation for future integrations, not as active provider behavior.
 
 - Branch: `codex/contractor-record-list-controls-v1`
 - Starting main SHA: `87379715eebce1fdbc2fb32f28b0ffa2301aac9a`

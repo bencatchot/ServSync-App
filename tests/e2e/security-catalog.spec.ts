@@ -160,6 +160,8 @@ const CORE_PRIVATE_TABLES = [
   'estimate_templates',
   'home_document_upload_reservations',
   'home_document_upload_events',
+  'external_object_mappings',
+  'integration_outbox_events',
 ];
 
 const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
@@ -571,6 +573,54 @@ order by e.table_name;
     `);
 
     expect(rows, 'Runtime settings privilege rows should match expected table count').toHaveLength(1);
+    for (const row of rows) {
+      expect(row.exists, `${row.table_name} should exist`).toBe(true);
+      expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
+      expect(row.public_insert, `${row.table_name} should not grant INSERT to PUBLIC`).toBe(false);
+      expect(row.public_update, `${row.table_name} should not grant UPDATE to PUBLIC`).toBe(false);
+      expect(row.public_delete, `${row.table_name} should not grant DELETE to PUBLIC`).toBe(false);
+      expect(row.anon_select, `${row.table_name} should not grant SELECT to anon`).toBe(false);
+      expect(row.anon_insert, `${row.table_name} should not grant INSERT to anon`).toBe(false);
+      expect(row.anon_update, `${row.table_name} should not grant UPDATE to anon`).toBe(false);
+      expect(row.anon_delete, `${row.table_name} should not grant DELETE to anon`).toBe(false);
+      expect(row.authenticated_select, `${row.table_name} should not grant SELECT to authenticated`).toBe(false);
+      expect(row.authenticated_insert, `${row.table_name} should not grant INSERT to authenticated`).toBe(false);
+      expect(row.authenticated_update, `${row.table_name} should not grant UPDATE to authenticated`).toBe(false);
+      expect(row.authenticated_delete, `${row.table_name} should not grant DELETE to authenticated`).toBe(false);
+    }
+  });
+
+  test('integration foundation tables remain internal-only for browser roles', () => {
+    const rows = runCatalogQuery<TablePrivilegeRow>(`
+with expected(table_name) as (
+  values
+    ('external_object_mappings'),
+    ('integration_outbox_events')
+)
+select
+  e.table_name,
+  c.oid is not null as exists,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'SELECT') end as public_select,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'INSERT') end as public_insert,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'UPDATE') end as public_update,
+  case when c.oid is not null then has_table_privilege('public', c.oid, 'DELETE') end as public_delete,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'SELECT') end as anon_select,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'INSERT') end as anon_insert,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'UPDATE') end as anon_update,
+  case when c.oid is not null then has_table_privilege('anon', c.oid, 'DELETE') end as anon_delete,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'SELECT') end as authenticated_select,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'INSERT') end as authenticated_insert,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'UPDATE') end as authenticated_update,
+  case when c.oid is not null then has_table_privilege('authenticated', c.oid, 'DELETE') end as authenticated_delete
+from expected e
+left join pg_class c
+  on c.relname = e.table_name
+ and c.relnamespace = 'public'::regnamespace
+ and c.relkind in ('r', 'p')
+order by e.table_name;
+    `);
+
+    expect(rows, 'Integration foundation privilege rows should match expected table count').toHaveLength(2);
     for (const row of rows) {
       expect(row.exists, `${row.table_name} should exist`).toBe(true);
       expect(row.public_select, `${row.table_name} should not grant SELECT to PUBLIC`).toBe(false);
