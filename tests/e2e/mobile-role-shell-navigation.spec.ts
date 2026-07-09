@@ -177,12 +177,17 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsListSource).toContain('data-testid="contractor-jobs-header-tabs"');
     expect(jobsListSource).toContain('role="tablist"');
     expect(jobsListSource).toContain('aria-label="Contractor Jobs section tabs"');
-    expect(jobsListSource).toContain('overflow-x-auto');
+    expect(jobsListSource).toContain('grid w-full grid-cols-6 gap-1.5 lg:w-auto lg:grid-cols-5 lg:gap-2');
+    expect(jobsListSource).not.toContain('overflow-x-auto');
     expect(jobsListSource).toContain("{ id: 'overview', label: 'Overview'");
     expect(jobsListSource).toContain("{ id: 'estimates', label: 'Estimates'");
     expect(jobsListSource).toContain("{ id: 'invoices', label: 'Invoices'");
     expect(jobsListSource).toContain("{ id: 'jobs_reports', label: 'Jobs & Reports'");
     expect(jobsListSource).toContain("{ id: 'templates', label: 'Templates'");
+    expect(jobsListSource).toContain("mobileClassName: 'col-span-2'");
+    expect(jobsListSource).toContain("mobileClassName: 'col-span-3'");
+    expect(jobsListSource).toContain('min-h-[3.25rem]');
+    expect(jobsListSource).toContain('lg:col-span-1');
     expect(jobsListSource).toContain('data-testid={`contractor-jobs-header-tab-${tab.id}`}');
     expect(appSource).toContain("if (tab === 'estimates') {");
     expect(appSource).toContain("setContractorFinancialRecordKind('estimates');");

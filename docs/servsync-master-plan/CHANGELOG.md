@@ -10,12 +10,13 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Starting main SHA: `87379715eebce1fdbc2fb32f28b0ffa2301aac9a`
 - Files changed:
   - `src/App.tsx`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
   - `tests/e2e/contractor-create-estimate.spec.ts`
   - `tests/e2e/contractor-create-invoice.spec.ts`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
-- Summary of change: Added compact search, status filter, and sort controls to the contractor Jobs `Estimates` and `Invoices` tab contexts. Estimate search covers customer/property/title/scope, estimate status filters include All/Draft/Sent/Approved/Invoiced/Closed, and estimate sorting supports updated, created, amount, and customer order. Invoice search covers customer/property/title/invoice number/scope, invoice status filters include All/Draft/Sent/Viewed/Overdue/Partially paid/Paid/Void, and invoice sorting adds due date alongside updated, created, amount, and customer order. The existing estimate cards remain out of the Invoices tab and invoice cards remain out of the Estimates tab.
+- Summary of change: Added compact search, status filter, and sort controls to the contractor Jobs `Estimates` and `Invoices` tab contexts. Estimate search covers customer/property/title/scope, estimate status filters include All/Draft/Sent/Approved/Invoiced/Closed, and estimate sorting supports updated, created, amount, and customer order. Invoice search covers customer/property/title/invoice number/scope, invoice status filters include All/Draft/Sent/Viewed/Overdue/Partially paid/Paid/Void, and invoice sorting adds due date alongside updated, created, amount, and customer order. The existing estimate cards remain out of the Invoices tab and invoice cards remain out of the Estimates tab. Follow-up mobile polish changed the Jobs header tabs from large horizontally scrolling tiles to a compact stacked 3-over-2 grid.
 - Reason for change: After the Jobs header tabs landed, contractors needed a way to quickly find records inside the separated Estimates and Invoices lists without returning to one mixed financial dashboard.
 - Tests/checks run:
   - `git status --short --branch`

@@ -35924,12 +35924,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <>
               {(() => {
                 const activeHeaderTab = contractorJobsHeaderTabForView(contractorJobsView);
-                const jobsHeaderTabs: Array<{ id: ContractorJobsHeaderTab; label: string; helper: string }> = [
-                  { id: 'overview', label: 'Overview', helper: 'Summary and next actions' },
-                  { id: 'estimates', label: 'Estimates', helper: `${openFinancialRecords.length} open` },
-                  { id: 'invoices', label: 'Invoices', helper: `${openInvoiceRecords.length} open` },
-                  { id: 'jobs_reports', label: 'Jobs & Reports', helper: `${openJobs.length} active` },
-                  { id: 'templates', label: 'Templates', helper: 'Reusable tools' },
+                const jobsHeaderTabs: Array<{ id: ContractorJobsHeaderTab; label: string; helper: string; mobileClassName: string }> = [
+                  { id: 'overview', label: 'Overview', helper: 'Summary and next actions', mobileClassName: 'col-span-2' },
+                  { id: 'estimates', label: 'Estimates', helper: `${openFinancialRecords.length} open`, mobileClassName: 'col-span-2' },
+                  { id: 'invoices', label: 'Invoices', helper: `${openInvoiceRecords.length} open`, mobileClassName: 'col-span-2' },
+                  { id: 'jobs_reports', label: 'Jobs & Reports', helper: `${openJobs.length} active`, mobileClassName: 'col-span-3' },
+                  { id: 'templates', label: 'Templates', helper: 'Reusable tools', mobileClassName: 'col-span-3' },
                 ];
                 return (
                   <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-testid="contractor-jobs-header-tabs">
@@ -35941,7 +35941,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div
                         role="tablist"
                         aria-label="Contractor Jobs section tabs"
-                        className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+                        className="grid w-full grid-cols-6 gap-1.5 lg:w-auto lg:grid-cols-5 lg:gap-2"
                       >
                         {jobsHeaderTabs.map(tab => {
                           const active = activeHeaderTab === tab.id;
@@ -35953,14 +35953,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               aria-selected={active}
                               data-testid={`contractor-jobs-header-tab-${tab.id}`}
                               onClick={() => openContractorJobsHeaderTab(tab.id)}
-                              className={`min-w-[8.5rem] rounded-xl border px-3 py-2 text-left transition ${
+                              className={`${tab.mobileClassName} min-h-[3.25rem] rounded-xl border px-2 py-1.5 text-left transition sm:px-2.5 lg:col-span-1 lg:min-w-[8.5rem] lg:px-3 lg:py-2 ${
                                 active
                                   ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
                                   : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-950'
                               }`}
                             >
-                              <span className={`block text-sm font-bold ${active ? 'text-white' : 'text-slate-950'}`}>{tab.label}</span>
-                              <span className={`mt-0.5 block text-xs leading-4 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{tab.helper}</span>
+                              <span className={`block text-xs font-bold sm:text-sm ${active ? 'text-white' : 'text-slate-950'}`}>{tab.label}</span>
+                              <span className={`mt-0.5 block text-[0.68rem] leading-3 sm:text-xs sm:leading-4 ${active ? 'text-blue-50' : 'text-slate-500'}`}>{tab.helper}</span>
                             </button>
                           );
                         })}
