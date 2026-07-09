@@ -32,6 +32,8 @@ export type EstimateChargeType = 'flat' | 'hourly';
 export type EstimateLineSupplyStatus = 'contractor_supplied' | 'customer_supplied' | 'to_be_confirmed';
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'partially_paid' | 'void' | 'overdue';
 export type InvoiceType = 'total' | 'deposit' | 'progress' | 'final';
+export type EstimatePaymentScheduleInvoiceType = InvoiceType;
+export type EstimatePaymentScheduleAmountType = 'fixed' | 'percentage';
 export type ExternalObjectMappingStatus = 'active' | 'pending' | 'conflict' | 'failed' | 'archived';
 export type ExternalObjectMappingSyncDirection = 'imported' | 'exported' | 'synced' | 'linked';
 export type ExternalObjectMappingEntityType =
@@ -148,6 +150,21 @@ export interface EstimateLineItem {
   updated_at: string;
 }
 
+export interface EstimatePaymentScheduleItem {
+  id: string;
+  estimate_id: string;
+  invoice_type: EstimatePaymentScheduleInvoiceType;
+  label: string;
+  amount_type: EstimatePaymentScheduleAmountType;
+  amount_value: number;
+  calculated_amount_cents: number;
+  due_trigger: string;
+  sort_order: number;
+  linked_invoice_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Estimate {
   id: string;
   contractor_id: string;
@@ -178,6 +195,7 @@ export interface Estimate {
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItem[];
+  payment_schedule_items?: EstimatePaymentScheduleItem[];
 }
 
 export interface InvoiceLineItem {
