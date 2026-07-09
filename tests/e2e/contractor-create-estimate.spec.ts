@@ -14,6 +14,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const pdfDocumentsSource = () => sourceFile('src/utils/pdfDocuments.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -92,6 +93,81 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(jobsEstimateComposerSource).toContain('Back to estimate options');
     expect(jobsEstimateComposerSource).toContain('Discard draft');
     expect(jobsEstimateComposerSource.indexOf('estimateDraft.line_items.map')).toBeLessThan(jobsEstimateComposerSource.indexOf('renderEstimateLineItemSources()'));
+  });
+
+  test('contractor draft estimates include a structured payment schedule editor without invoice generation', () => {
+    const source = appSource();
+    const pdfSource = pdfDocumentsSource();
+    const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
+    const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
+    const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
+
+    expect(scheduleSource).toContain('Payment schedule');
+    expect(scheduleSource).toContain('Use this to plan billing for the estimate. Customer-facing display and invoice generation will be added in a later step.');
+    expect(scheduleSource).toContain('Full invoice on completion');
+    expect(scheduleSource).toContain('Deposit + final');
+    expect(scheduleSource).toContain('Custom schedule');
+    expect(scheduleSource).toContain('No payment schedule rows are saved unless you choose Deposit + final or Custom schedule.');
+    expect(source).toContain('Payment schedule total does not match the estimate total. Review before sending.');
+    expect(source).toContain('Payment schedule is above the estimate total. Review before saving or sending.');
+    expect(scheduleSource).toContain('Add payment');
+    expect(source).toContain('Payment schedule label');
+    expect(source).toContain('Payment schedule due trigger');
+    expect(scheduleSource).toContain('estimate-payment-schedule-section');
+    expect(scheduleSource).not.toContain('linked_invoice_id');
+
+    expect(source).toContain("type EstimatePaymentScheduleMode = 'default' | 'deposit_final' | 'custom';");
+    expect(source).toContain('function estimatePaymentScheduleCalculatedCents');
+    expect(source).toContain("row.amount_type === 'percentage'");
+    expect(source).toContain("invoice_type: 'deposit'");
+    expect(source).toContain("invoice_type: 'final'");
+    expect(source).toContain('Math.max(0, estimateTotalCents - depositCents)');
+    expect(source).toContain('ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS');
+    expect(source).toContain("total: {\n    label: 'Full payment',\n    dueTrigger: 'Due on completion'");
+    expect(source).toContain("deposit: {\n    label: 'Deposit',\n    dueTrigger: 'Due on approval'");
+    expect(source).toContain("progress: {\n    label: 'Progress payment',\n    dueTrigger: 'Due at milestone'");
+    expect(source).toContain("final: {\n    label: 'Final payment',\n    dueTrigger: 'Due on completion'");
+    expect(source).toContain('const updateEstimatePaymentScheduleRowType =');
+    expect(source).toContain('label: defaults.label');
+    expect(source).toContain('due_trigger: defaults.dueTrigger');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRowType(row.id, event.target.value as EstimatePaymentScheduleInvoiceType)}');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRow(row.id, { label: event.target.value })}');
+    expect(source).toContain('onChange={event => updateEstimatePaymentScheduleRow(row.id, { due_trigger: event.target.value })}');
+    expect(source).toContain('estimatePaymentScheduleDraftFromEstimate(estimate)');
+
+    expect(source).toContain("if (!estimatePaymentScheduleDraft.explicit) return { rows: [], error: '' };");
+    expect(saveSource).toContain(".from('estimate_payment_schedule_items')");
+    expect(saveSource).toContain('.delete()');
+    expect(saveSource).toContain('.insert(scheduleForSave.rows.map(row => ({');
+    expect(source).toContain('linked_invoice_id: null');
+    expect(saveSource).not.toContain('servsync_create_invoice_from_estimate');
+    expect(saveSource).not.toContain('beginInvoiceDraftFromEstimate');
+
+    expect(jobsEstimateComposerSource).toContain('renderEstimatePaymentScheduleEditor()');
+    expect(jobsEstimateComposerSource).toContain('<Field label="Terms">');
+    expect(source).not.toContain('beginInvoiceDraftFromPaymentSchedule');
+    expect(source).not.toContain('servsync_create_invoice_from_schedule');
+
+    expect(pdfSource).toContain("sectionTitle('Payment Schedule')");
+    expect(pdfSource).toContain('const paymentScheduleRows = [...(estimate.payment_schedule_items || [])]');
+    expect(pdfSource).toContain('.sort((a, b) => a.sort_order - b.sort_order)');
+    expect(pdfSource).toContain('paymentScheduleInvoiceTypeLabel(row.invoice_type)');
+    expect(pdfSource).toContain('formatMoney(row.calculated_amount_cents)');
+    expect(pdfSource).toContain("row.due_trigger?.trim() || 'Due date to be confirmed'");
+    expect(pdfSource).toContain("sectionTitle('Terms')");
+  });
+
+  test('edited estimate draft save returns to the saved estimate record', () => {
+    const source = appSource();
+    const saveSource = sourceBetween(source, 'const saveEstimateDraft = async', 'const saveInvoiceDraft = async');
+
+    expect(saveSource).toContain('const focusSavedEstimateActions = (estimate: Estimate) => {');
+    expect(saveSource).toContain("setContractorFinancialRecordKind('estimates');");
+    expect(saveSource).toContain('setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));');
+    expect(saveSource).toContain('setFocusedEstimateRecordId(estimate.id);');
+    expect(saveSource).toContain("setContractorJobsView(['declined', 'expired', 'revised'].includes(estimate.status) ? 'closed_financial' : 'open_financial');");
+    expect(saveSource).toContain('focusSavedEstimateActions(savedEstimate);');
+    expect(saveSource).not.toContain('if (!currentEditingEstimateId) focusSavedEstimateActions(savedEstimate);');
   });
 
   test('Jobs financial records split estimates and invoices behind section tabs', () => {
