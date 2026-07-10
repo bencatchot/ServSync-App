@@ -109,7 +109,6 @@ import {
 } from './features/jobs/status';
 import { JobWorkItemSummaryStrip } from './features/jobs/WorkItemSummaryStrip';
 import {
-  getJobWorkItemNextAction,
   getJobWorkItemSummary,
   getJobWorkItemSummaryBadges,
   jobWorkItemCanInvoice,
@@ -977,6 +976,9 @@ function customerLineDisplayDetailRows(
   }
   return rows;
 }
+
+const ITEM_BASED_INVOICE_RECOMMENDATION = 'Recommended: create an invoice from completed, priced work items. Open backlog stays on the job.';
+const COMPLETED_JOB_INVOICE_RECOMMENDATION = 'Recommended: create one invoice from this completed job.';
 
 function invoiceBacklogStatusLabel(item: Pick<InvoiceBacklogItem, 'completion_status' | 'billing_status'>) {
   if (item.completion_status === 'declined') return 'Declined';
@@ -31254,7 +31256,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="flex flex-col gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-blue-950">Completed jobs ready to invoice</p>
-                              <p className="mt-0.5 text-xs leading-5 text-blue-800">Review recent closed jobs and create invoices from completed work.</p>
+                              <p className="mt-0.5 text-xs leading-5 text-blue-800">Review completed jobs. ServSync will guide you to item-based or completed-job invoicing.</p>
                             </div>
                             <button
                               type="button"
@@ -38270,7 +38272,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           const hasInvoiceableWorkItems = jobWorkItems.some(jobWorkItemCanInvoice);
                           const workItemSummary = getJobWorkItemSummary(jobWorkItems, linkedInvoice);
                           const primaryWorkItemBadge = getJobWorkItemSummaryBadges(workItemSummary)[0] ?? null;
-                          const workItemNextAction = getJobWorkItemNextAction(workItemSummary);
                           const showJobInvoiceAction = inspectionIsClosedJob(insp);
                           const messageIndicator = workflowJobMessageIndicators[insp.id];
                           return (
@@ -38320,12 +38321,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                   {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && !hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
-                                      Next step: create the invoice for this completed job.
+                                      {COMPLETED_JOB_INVOICE_RECOMMENDATION}
                                     </p>
                                   )}
                                   {!checklistStyle && inspectionIsClosedJob(insp) && !linkedInvoice && hasDurableWorkItems && (
                                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
-                                      Next step: {workItemNextAction || 'use item-based invoicing for completed work items.'}
+                                      {ITEM_BASED_INVOICE_RECOMMENDATION}
                                     </p>
                                   )}
                                   {!checklistStyle && linkedInvoice && (
@@ -38353,15 +38354,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     type="button"
                                     onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)}
                                     disabled={!linkedInvoice && !hasDurableWorkItems && creatingInvoiceSourceId === `job:${insp.id}`}
-                                    className={mobileButtonClass(linkedInvoice?.status === 'draft' ? 'secondary' : 'primary')}
+                                    className={mobileButtonClass('primary')}
                                   >
                                     <Receipt size={15} />
                                     {creatingInvoiceSourceId === `job:${insp.id}` && !hasDurableWorkItems
                                       ? 'Creating...'
-                                      : linkedInvoice
-                                        ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
+                                        : linkedInvoice
+                                          ? linkedInvoice.status === 'draft' ? 'Edit Draft Invoice' : 'View Invoice'
                                         : hasDurableWorkItems
-                                          ? hasInvoiceableWorkItems ? 'Create invoice from completed items' : 'Open item invoicing'
+                                          ? hasInvoiceableWorkItems ? 'Create invoice from completed items' : 'Review work items'
                                         : 'Create Invoice'}
                                   </button>
                                 )}
@@ -40297,7 +40298,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             const activeJobHasInvoiceableWorkItems = activeJobWorkItems.some(jobWorkItemCanInvoice);
             const activeJobWorkItemSummary = getJobWorkItemSummary(activeJobWorkItems, linkedInvoiceForJob);
             const activeJobWorkItemBadge = getJobWorkItemSummaryBadges(activeJobWorkItemSummary)[0] ?? null;
-            const activeJobWorkItemNextAction = getJobWorkItemNextAction(activeJobWorkItemSummary);
             const linkedVisitEventForJob = contractorVisitEvents.find(event =>
               event.inspection_id === activeInspection.id && event.status !== 'cancelled'
             ) ?? null;
@@ -40350,12 +40350,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   <p className="text-xs leading-5 text-slate-500">{jobTypeHelperCopy(activeInspection)}</p>
                   {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && !activeJobHasDurableWorkItems && (
                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
-                      Next step: create an invoice so the completed job has a billing record.
+                      {COMPLETED_JOB_INVOICE_RECOMMENDATION}
                     </p>
                   )}
                   {!linkedInvoiceForJob && inspectionIsClosedJob(activeInspection) && activeJobHasDurableWorkItems && (
                     <p className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
-                      Next step: {activeJobWorkItemNextAction || 'create an item-based invoice from completed, priced work items.'}
+                      {ITEM_BASED_INVOICE_RECOMMENDATION}
                     </p>
                   )}
                   {activeJobHasDurableWorkItems && (
