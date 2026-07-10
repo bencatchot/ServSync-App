@@ -71,6 +71,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
       'servsync_demo_reset_registered_run',
     ]) {
       expect(sql).toMatch(new RegExp(`create or replace function public\\.${fn}`, 'i'));
+      expect(sql).toMatch(new RegExp(`create or replace function public\\.${fn}[\\s\\S]*security definer[\\s\\S]*set search_path = public, pg_temp`, 'i'));
       expect(sql).toMatch(new RegExp(`revoke execute on function public\\.${fn}[\\s\\S]* from public`, 'i'));
       expect(sql).toMatch(new RegExp(`revoke execute on function public\\.${fn}[\\s\\S]* from anon`, 'i'));
       expect(sql).toMatch(new RegExp(`revoke execute on function public\\.${fn}[\\s\\S]* from authenticated`, 'i'));
@@ -96,6 +97,13 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(() =>
       module.assertSafeDemoTarget({
         ...baseEnv,
+        DEMO_SUPABASE_URL: 'https://bbbbbbbbbbbbbbbbbbbb.supabase.co',
+        DEMO_SUPABASE_PROJECT_REF: 'aaaaaaaaaaaaaaaaaaaa',
+      })
+    ).toThrow(/does not match/i);
+    expect(() =>
+      module.assertSafeDemoTarget({
+        ...baseEnv,
         DEMO_SUPABASE_URL: 'https://uqgtheclhxqlnjpfmheq.supabase.co',
         DEMO_SUPABASE_PROJECT_REF: 'uqgtheclhxqlnjpfmheq',
       })
@@ -114,6 +122,91 @@ test.describe('Demo Mode hidden foundation source checks', () => {
         DEMO_RESET_ACKNOWLEDGE: 'reset-water_heater_core_loop',
       })
     ).not.toThrow();
+    for (const truthy of ['true', ' TRUE ', '1', 'yes', 'on', 'enabled']) {
+      expect(() => module.assertSafeDemoTarget({ ...baseEnv, EMAIL_ENABLED: truthy })).toThrow(/EMAIL_ENABLED/i);
+    }
+    expect(() => module.assertSafeDemoTarget({ ...baseEnv, EMAIL_ENABLED: 'maybe' })).toThrow(/unrecognized boolean/i);
+    expect(() => module.assertSafeDemoTarget({ ...baseEnv, EMAIL_ENABLED: ' false ' })).not.toThrow();
+  });
+
+  test('script reconciles every non-reset seed run before reseeding or resetting', () => {
+    const script = read(scriptPath);
+
+    expect(script).toContain("const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded']");
+    expect(script).toMatch(/async function getScenarioRuns[\s\S]*\.eq\('operation', 'seed'\)[\s\S]*\.in\('status', statuses\)/);
+    expect(script).toMatch(/async function inspectNonResetRuns[\s\S]*getRegisteredRecordsForRun/);
+    expect(script).toMatch(/async function resetNonResetRuns[\s\S]*for \(const run of runs\)[\s\S]*await resetRun\(service, run\.id\)/);
+    expect(script).toMatch(/const previousReset = await resetNonResetRuns\(service, scenarioKey, 'pre-seed-reconciliation'\)/);
+    expect(script).not.toMatch(/getLatestSucceededRun|resetLatestIfPresent/);
+  });
+
+  test('script fails closed on likely unregistered scenario residue and avoids broad cleanup fallbacks', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/async function assertNoLikelyUnregisteredScenarioRecords/);
+    expect(script).toMatch(/findRegisteredRecord\(service, tableName, record\.id\)/);
+    expect(script).toMatch(/Demo seed refused: likely unregistered scenario-owned records found/);
+    expect(script).toMatch(/\.eq\('nickname', DEMO_PROPERTY\.nickname\)/);
+    expect(script).toMatch(/\.eq\('title', 'Water heater replacement estimate'\)/);
+    expect(script).not.toMatch(/delete\(\)\.eq\('homeowner_user_id'|delete\(\)\.eq\('user_id'|delete\(\)\.ilike\('title'|delete\(\)\.gte\('created_at'/);
+    expect(script).not.toMatch(/truncate|delete from auth\.users/i);
+  });
+
+  test('script reduces insert-before-register risk with exact compensation only', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/async function registerCreatedRecord/);
+    expect(script).toMatch(/await registerRecord\(service, runId, tableName, recordId/);
+    expect(script).toMatch(/await deleteExactCreatedRecord\(service, tableName, recordId\)/);
+    expect(script).toMatch(/Exact compensation failed for orphan candidate/);
+    expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'homes'/);
+    expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'service_requests'/);
+    expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'estimates'/);
+    expect(script).toMatch(/await registerCreatedRecord\(service, runId, 'inspections'/);
+  });
+
+  test('verify checks complete workflow linkage, identities, registry, and duplicate absence', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/async function verifyScenario\(service, scenarioKey, env = process\.env\)/);
+    expect(script).toMatch(/assertSafeDemoTarget\(env\)/);
+    expect(script).toMatch(/Unresolved started\/failed runs still own registered records/);
+    expect(script).toMatch(/Expected exactly one active succeeded scenario run with records/);
+    expect(script).toMatch(/verifyAuthUser\(service, homeownerEmail, scenarioKey, 'homeowner'/);
+    expect(script).toMatch(/verifyAuthUser\(service, contractorEmail, scenarioKey, 'contractor_owner'/);
+    expect(script).toMatch(/Homeowner and contractor auth users resolved to the same ID/);
+    expect(script).toMatch(/Required scenario table \$\{tableName\} has no registered records/);
+    expect(script).toMatch(/verifyRegistryCompleteness\(service, records, issues\)/);
+    expect(script).toMatch(/Registry points to missing/);
+    expect(script).toMatch(/Demo service request is not linked to the expected homeowner, contractor, connection, and title/);
+    expect(script).toMatch(/Demo estimate is not accepted or not linked to the expected request\/homeowner\/contractor\/home/);
+    expect(script).toMatch(/Demo job is not linked to the accepted estimate and expected scenario records/);
+    expect(script).toMatch(/Expected exactly one job linked to the demo estimate/);
+    expect(script).toMatch(/Demo verification failed/);
+  });
+
+  test('auth reconciliation requires explicit demo ownership metadata', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/servsync_demo_owned/);
+    expect(script).toMatch(/servsync_demo_scenario/);
+    expect(script).toMatch(/servsync_demo_role/);
+    expect(script).toMatch(/assertDemoAuthMetadata\(existing, email, scenarioKey, role\)/);
+    expect(script).toMatch(/is not marked as ServSync demo-owned/);
+    expect(script).toMatch(/belongs to a different demo scenario/);
+    expect(script).toMatch(/has an unexpected demo role/);
+    expect(script).toMatch(/multiple auth users matched/);
+    expect(script).toMatch(/assertDistinctDemoIdentities/);
+  });
+
+  test('notification registration is not broad timestamp-based ownership', () => {
+    const script = read(scriptPath);
+
+    expect(script).toMatch(/function notificationHandlingDecision/);
+    expect(script).toContain('does not register them for reset');
+    expect(script).not.toMatch(/registerRecentNotifications/);
+    expect(script).not.toMatch(/\.from\('notifications'\)[\s\S]*\.in\('user_id'/);
+    expect(script).not.toMatch(/\.from\('notifications'\)[\s\S]*\.gte\('created_at'/);
   });
 
   test('script creates deterministic current-looking demo dates from an anchor', async () => {

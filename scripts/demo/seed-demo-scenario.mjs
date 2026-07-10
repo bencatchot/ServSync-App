@@ -29,6 +29,44 @@ const FORBIDDEN_EXTERNAL_FLAGS = [
   'GEOCODING_ENABLED',
 ];
 
+const ENABLED_BOOLEAN_VALUES = new Set(['true', '1', 'yes', 'on', 'enabled']);
+const DISABLED_BOOLEAN_VALUES = new Set(['false', '0', 'no', 'off', 'disabled']);
+const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded'];
+const DEMO_AUTH_METADATA = {
+  owned: 'servsync_demo_owned',
+  scenario: 'servsync_demo_scenario',
+  role: 'servsync_demo_role',
+};
+const RESETTABLE_PRIMARY_KEYS = {
+  workflow_activity_events: 'id',
+  notifications: 'id',
+  job_work_items: 'id',
+  estimate_payment_schedule_items: 'id',
+  estimate_line_items: 'id',
+  inspections: 'id',
+  estimates: 'id',
+  service_request_messages: 'id',
+  service_requests: 'id',
+  connection_audit_events: 'id',
+  connection_permissions: 'connection_id',
+  homeowner_contractor_connections: 'id',
+  home_assets: 'id',
+  home_rooms: 'id',
+  homes: 'id',
+};
+const REQUIRED_SCENARIO_TABLES = [
+  'homes',
+  'home_rooms',
+  'home_assets',
+  'homeowner_contractor_connections',
+  'connection_permissions',
+  'service_requests',
+  'estimates',
+  'estimate_line_items',
+  'estimate_payment_schedule_items',
+  'inspections',
+];
+
 const DEMO_HOMEOWNER = {
   emailEnv: 'DEMO_HOMEOWNER_EMAIL',
   passwordEnv: 'DEMO_HOMEOWNER_PASSWORD',
@@ -111,8 +149,17 @@ export function assertSafeDemoTarget(env = process.env) {
   }
 
   for (const flag of FORBIDDEN_EXTERNAL_FLAGS) {
-    if (String(env[flag] || '').toLowerCase() === 'true') {
-      throw new Error(`Demo runner refused: ${flag} must not be true for Demo Mode seeding.`);
+    const normalized = String(env[flag] || '').trim().toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+
+    if (ENABLED_BOOLEAN_VALUES.has(normalized)) {
+      throw new Error(`Demo runner refused: ${flag} must not be enabled for Demo Mode seeding.`);
+    }
+
+    if (!DISABLED_BOOLEAN_VALUES.has(normalized)) {
+      throw new Error(`Demo runner refused: ${flag} has an unrecognized boolean value; unset it or use false.`);
     }
   }
 
@@ -202,29 +249,58 @@ async function maybeSingle(result, message) {
   return result.data || null;
 }
 
-async function findAuthUserByEmail(service, email) {
+function demoUserMetadata(scenarioKey, role) {
+  return {
+    [DEMO_AUTH_METADATA.owned]: true,
+    [DEMO_AUTH_METADATA.scenario]: scenarioKey,
+    [DEMO_AUTH_METADATA.role]: role,
+  };
+}
+
+function assertDemoAuthMetadata(user, expectedEmail, scenarioKey, role) {
+  const metadata = user?.user_metadata || {};
+  if (user?.email?.toLowerCase() !== expectedEmail.toLowerCase()) {
+    throw new Error(`Existing auth user email did not match configured demo email: ${expectedEmail}`);
+  }
+  if (metadata[DEMO_AUTH_METADATA.owned] !== true) {
+    throw new Error(`Existing auth user ${expectedEmail} is not marked as ServSync demo-owned.`);
+  }
+  if (metadata[DEMO_AUTH_METADATA.scenario] !== scenarioKey) {
+    throw new Error(`Existing auth user ${expectedEmail} belongs to a different demo scenario.`);
+  }
+  if (metadata[DEMO_AUTH_METADATA.role] !== role) {
+    throw new Error(`Existing auth user ${expectedEmail} has an unexpected demo role.`);
+  }
+}
+
+async function findAuthUsersByEmail(service, email) {
+  const matches = [];
   for (let page = 1; page <= 20; page += 1) {
     const { data, error } = await service.auth.admin.listUsers({ page, perPage: 100 });
     if (error) {
       throw new Error(`Unable to inspect demo auth users: ${error.message}`);
     }
 
-    const user = data.users.find((item) => item.email?.toLowerCase() === email.toLowerCase());
-    if (user) {
-      return user;
-    }
+    matches.push(...data.users.filter((item) => item.email?.toLowerCase() === email.toLowerCase()));
 
     if (data.users.length < 100) {
-      return null;
+      return matches;
     }
   }
 
   throw new Error('Unable to reconcile demo auth users within the expected page limit.');
 }
 
-async function ensureAuthUser(service, email, password, userMetadata) {
-  const existing = await findAuthUserByEmail(service, email);
-  if (existing) {
+async function ensureAuthUser(service, email, password, scenarioKey, role) {
+  const userMetadata = demoUserMetadata(scenarioKey, role);
+  const matches = await findAuthUsersByEmail(service, email);
+  if (matches.length > 1) {
+    throw new Error(`Demo runner refused: multiple auth users matched ${email}.`);
+  }
+
+  if (matches.length === 1) {
+    const existing = matches[0];
+    assertDemoAuthMetadata(existing, email, scenarioKey, role);
     const { data, error } = await service.auth.admin.updateUserById(existing.id, {
       password,
       email_confirm: true,
@@ -246,6 +322,15 @@ async function ensureAuthUser(service, email, password, userMetadata) {
     throw new Error(`Unable to create demo auth user ${email}: ${error.message}`);
   }
   return data.user;
+}
+
+function assertDistinctDemoIdentities(homeownerEmail, contractorEmail, homeownerUser, contractorUser) {
+  if (homeownerEmail.toLowerCase() === contractorEmail.toLowerCase()) {
+    throw new Error('Demo runner refused: homeowner and contractor demo emails must be different.');
+  }
+  if (homeownerUser.id === contractorUser.id) {
+    throw new Error('Demo runner refused: homeowner and contractor demo auth users resolved to the same ID.');
+  }
 }
 
 async function signInDemoUser(makeUserClient, email, password) {
@@ -308,19 +393,38 @@ async function registerRecord(service, runId, tableName, recordId, recordRole, c
   );
 }
 
-async function getLatestSucceededRun(service, scenarioKey) {
-  const run = await maybeSingle(
+async function getScenarioRuns(service, scenarioKey, statuses = NON_RESET_RUN_STATUSES) {
+  return ensureOk(
     await service
       .from('demo_scenario_runs')
-      .select('id, scenario_key, status, started_at')
+      .select('id, scenario_key, operation, status, started_at, completed_at, anchor_timestamp, metadata')
       .eq('scenario_key', scenarioKey)
-      .eq('status', 'succeeded')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    'Unable to inspect latest demo run'
+      .eq('operation', 'seed')
+      .in('status', statuses)
+      .order('started_at', { ascending: false }),
+    'Unable to inspect demo scenario runs'
   );
-  return run;
+}
+
+async function getRegisteredRecordsForRun(service, runId) {
+  return ensureOk(
+    await service
+      .from('demo_scenario_records')
+      .select('id, run_id, schema_name, table_name, primary_key_column, record_id, record_role, checkpoint, reset_order')
+      .eq('run_id', runId)
+      .order('reset_order', { ascending: false }),
+    'Unable to inspect registered demo records'
+  );
+}
+
+async function inspectNonResetRuns(service, scenarioKey) {
+  const runs = await getScenarioRuns(service, scenarioKey);
+  const inspected = [];
+  for (const run of runs) {
+    const records = await getRegisteredRecordsForRun(service, run.id);
+    inspected.push({ ...run, records, recordCount: records.length });
+  }
+  return inspected;
 }
 
 async function resetRun(service, runId) {
@@ -331,16 +435,155 @@ async function resetRun(service, runId) {
   return data || [];
 }
 
-async function resetLatestIfPresent(service, scenarioKey) {
-  const run = await getLatestSucceededRun(service, scenarioKey);
-  if (!run) {
-    return { runId: null, removed: [] };
+async function resetNonResetRuns(service, scenarioKey, reason) {
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const considered = [];
+  for (const run of runs) {
+    try {
+      const removed = await resetRun(service, run.id);
+      considered.push({
+        runId: run.id,
+        previousStatus: run.status,
+        registeredRecords: run.recordCount,
+        removed,
+        action: 'reset',
+        reason,
+      });
+    } catch (error) {
+      considered.push({
+        runId: run.id,
+        previousStatus: run.status,
+        registeredRecords: run.recordCount,
+        action: 'failed',
+        reason,
+        error: error.message,
+      });
+      throw new Error(`Unable to reconcile prior demo run ${run.id}: ${error.message}`);
+    }
   }
+  return { considered, removed: considered.flatMap((item) => item.removed || []) };
+}
 
-  return {
-    runId: run.id,
-    removed: await resetRun(service, run.id),
-  };
+async function deleteExactCreatedRecord(service, tableName, recordId) {
+  const primaryKey = RESETTABLE_PRIMARY_KEYS[tableName];
+  if (!primaryKey || !recordId) {
+    throw new Error(`No exact compensation path exists for ${tableName}.${recordId || 'unknown'}.`);
+  }
+  await ensureOk(
+    await service.from(tableName).delete().eq(primaryKey, recordId),
+    `Unable to compensate just-created demo record ${tableName}.${recordId}`
+  );
+}
+
+async function registerCreatedRecord(service, runId, tableName, recordId, recordRole, checkpoint = 'job_ready', metadata = {}) {
+  try {
+    await registerRecord(service, runId, tableName, recordId, recordRole, checkpoint, metadata);
+  } catch (error) {
+    try {
+      await deleteExactCreatedRecord(service, tableName, recordId);
+    } catch (compensationError) {
+      throw new Error(
+        `${error.message}. Exact compensation failed for orphan candidate ${tableName}.${recordId}: ${compensationError.message}`
+      );
+    }
+    throw new Error(`${error.message}. Exact compensation removed just-created record ${tableName}.${recordId}.`);
+  }
+}
+
+async function findRegisteredRecord(service, tableName, recordId) {
+  return maybeSingle(
+    await service
+      .from('demo_scenario_records')
+      .select('id, run_id')
+      .eq('schema_name', 'public')
+      .eq('table_name', tableName)
+      .eq('record_id', recordId)
+      .limit(1)
+      .maybeSingle(),
+    `Unable to inspect demo registry for ${tableName}.${recordId}`
+  );
+}
+
+async function addUnregisteredFindings(service, findings, tableName, records) {
+  for (const record of records || []) {
+    const registered = await findRegisteredRecord(service, tableName, record.id);
+    if (!registered) {
+      findings.push({ tableName, recordId: record.id });
+    }
+  }
+}
+
+async function assertNoLikelyUnregisteredScenarioRecords(service, { homeownerId, contractorId }) {
+  const findings = [];
+
+  const homes = await ensureOk(
+    await service
+      .from('homes')
+      .select('id')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('nickname', DEMO_PROPERTY.nickname)
+      .eq('address_line1', DEMO_PROPERTY.address_line1)
+      .eq('zip_code', DEMO_PROPERTY.zip_code),
+    'Unable to inspect possible unregistered demo homes'
+  );
+  await addUnregisteredFindings(service, findings, 'homes', homes);
+
+  const connections = await ensureOk(
+    await service
+      .from('homeowner_contractor_connections')
+      .select('id')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('contractor_id', contractorId),
+    'Unable to inspect possible unregistered demo connections'
+  );
+  await addUnregisteredFindings(service, findings, 'homeowner_contractor_connections', connections);
+
+  const requests = connections?.length
+    ? await ensureOk(
+        await service
+          .from('service_requests')
+          .select('id')
+          .eq('title', 'Replace leaking water heater')
+          .in(
+            'connection_id',
+            connections.map((connection) => connection.id)
+          )
+          .eq('homeowner_user_id', homeownerId)
+          .eq('contractor_id', contractorId),
+        'Unable to inspect possible unregistered demo service requests'
+      )
+    : [];
+  await addUnregisteredFindings(service, findings, 'service_requests', requests);
+
+  const estimates = await ensureOk(
+    await service
+      .from('estimates')
+      .select('id')
+      .eq('title', 'Water heater replacement estimate')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('contractor_id', contractorId),
+    'Unable to inspect possible unregistered demo estimates'
+  );
+  await addUnregisteredFindings(service, findings, 'estimates', estimates);
+
+  const jobs = estimates?.length
+    ? await ensureOk(
+        await service
+          .from('inspections')
+          .select('id')
+          .in(
+            'estimate_id',
+            estimates.map((estimate) => estimate.id)
+          ),
+        'Unable to inspect possible unregistered demo jobs'
+      )
+    : [];
+  await addUnregisteredFindings(service, findings, 'inspections', jobs);
+
+  if (findings.length > 0) {
+    const details = findings.map((finding) => `${finding.tableName}.${finding.recordId}`).join(', ');
+    throw new Error(`Demo seed refused: likely unregistered scenario-owned records found: ${details}`);
+  }
 }
 
 async function upsertProfileRecords(service, runId, homeownerUser, contractorUser, dates, env) {
@@ -441,7 +684,7 @@ async function createProperty(service, runId, homeownerId, dates) {
       .single(),
     'Unable to create demo home'
   );
-  await registerRecord(service, runId, 'homes', home.id, 'demo_home', 'property_ready');
+  await registerCreatedRecord(service, runId, 'homes', home.id, 'demo_home', 'property_ready');
 
   const room = await ensureOk(
     await service
@@ -462,7 +705,7 @@ async function createProperty(service, runId, homeownerId, dates) {
       .single(),
     'Unable to create demo home room'
   );
-  await registerRecord(service, runId, 'home_rooms', room.id, 'demo_utility_room', 'property_ready');
+  await registerCreatedRecord(service, runId, 'home_rooms', room.id, 'demo_utility_room', 'property_ready');
 
   const asset = await ensureOk(
     await service
@@ -486,7 +729,7 @@ async function createProperty(service, runId, homeownerId, dates) {
       .single(),
     'Unable to create demo home asset'
   );
-  await registerRecord(service, runId, 'home_assets', asset.id, 'demo_water_heater_asset', 'property_ready');
+  await registerCreatedRecord(service, runId, 'home_assets', asset.id, 'demo_water_heater_asset', 'property_ready');
 
   return { homeId: home.id, roomId: room.id, assetId: asset.id };
 }
@@ -546,7 +789,7 @@ async function createServiceRequest(homeownerClient, service, runId, connectionI
     'Unable to create demo service request through homeowner RPC'
   );
   const requestId = result.request_id;
-  await registerRecord(service, runId, 'service_requests', requestId, 'demo_service_request', 'request_ready');
+  await registerCreatedRecord(service, runId, 'service_requests', requestId, 'demo_service_request', 'request_ready');
 
   await ensureOk(
     await service
@@ -665,7 +908,7 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
       .single(),
     'Unable to create demo estimate'
   );
-  await registerRecord(service, runId, 'estimates', estimate.id, 'demo_estimate', 'estimate_ready');
+  await registerCreatedRecord(service, runId, 'estimates', estimate.id, 'demo_estimate', 'estimate_ready');
 
   for (const line of estimateLines()) {
     const insertedLine = await ensureOk(
@@ -681,7 +924,7 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
         .single(),
       `Unable to create demo estimate line: ${line.line_title}`
     );
-    await registerRecord(service, runId, 'estimate_line_items', insertedLine.id, 'demo_estimate_line_item', 'estimate_ready');
+    await registerCreatedRecord(service, runId, 'estimate_line_items', insertedLine.id, 'demo_estimate_line_item', 'estimate_ready');
   }
 
   const scheduleRows = [
@@ -719,7 +962,7 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
         .single(),
       `Unable to create demo estimate payment schedule row: ${row.label}`
     );
-    await registerRecord(
+    await registerCreatedRecord(
       service,
       runId,
       'estimate_payment_schedule_items',
@@ -760,7 +1003,7 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
   );
 
   const jobId = result.job_id;
-  await registerRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_ready');
+  await registerCreatedRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_ready');
 
   await ensureOk(
     await service.from('inspections').update({ created_at: dates.jobCreatedAt, updated_at: dates.jobCreatedAt }).eq('id', jobId),
@@ -786,45 +1029,364 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
   return { jobId, workItemCount: workItems?.length || 0 };
 }
 
-async function registerRecentNotifications(service, runId, homeownerId, contractorId, dates) {
-  const notifications = await ensureOk(
-    await service
-      .from('notifications')
-      .select('id')
-      .in('user_id', [homeownerId, contractorId])
-      .gte('created_at', dates.requestCreatedAt),
-    'Unable to inspect demo notifications'
-  );
+function notificationHandlingDecision() {
+  return 'Slice 1 leaves incidental in-app notifications untouched and does not register them for reset.';
+}
 
-  for (const notification of notifications || []) {
-    await registerRecord(service, runId, 'notifications', notification.id, 'demo_notification', 'job_ready');
+function countBy(records, field) {
+  return records.reduce((acc, record) => {
+    const key = record[field] || 'unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function recordIds(records, tableName, role = null) {
+  return records
+    .filter((record) => record.table_name === tableName && (!role || record.record_role === role))
+    .map((record) => record.record_id);
+}
+
+function requireExactlyOneId(issues, records, tableName, role, label) {
+  const ids = recordIds(records, tableName, role);
+  if (ids.length !== 1) {
+    issues.push(`${label} registry count expected 1, found ${ids.length}.`);
+    return null;
+  }
+  return ids[0];
+}
+
+async function fetchOneByPrimaryKey(service, tableName, primaryKey, value, select = '*') {
+  return maybeSingle(
+    await service.from(tableName).select(select).eq(primaryKey, value).maybeSingle(),
+    `Unable to inspect ${tableName}.${value}`
+  );
+}
+
+function assertOrderedTimestamps(issues, label, earlier, later) {
+  if (!earlier || !later) {
+    issues.push(`${label} timestamp ordering could not be checked because a timestamp is missing.`);
+    return;
+  }
+  if (new Date(earlier).getTime() > new Date(later).getTime()) {
+    issues.push(`${label} timestamp ordering is invalid.`);
   }
 }
 
-async function verifyScenario(service, scenarioKey) {
-  const run = await getLatestSucceededRun(service, scenarioKey);
-  if (!run) {
-    return { ok: false, reason: 'No succeeded demo scenario run found.' };
+async function verifyAuthUser(service, email, scenarioKey, role, issues) {
+  const matches = await findAuthUsersByEmail(service, email);
+  if (matches.length !== 1) {
+    issues.push(`Auth identity ${email} expected exactly one user, found ${matches.length}.`);
+    return null;
   }
 
-  const records = await ensureOk(
-    await service.from('demo_scenario_records').select('table_name, record_role').eq('run_id', run.id),
-    'Unable to inspect registered demo records'
-  );
+  try {
+    assertDemoAuthMetadata(matches[0], email, scenarioKey, role);
+  } catch (error) {
+    issues.push(error.message);
+  }
+  return matches[0];
+}
 
-  const counts = records.reduce((acc, record) => {
-    acc[record.table_name] = (acc[record.table_name] || 0) + 1;
-    return acc;
-  }, {});
+async function verifyRegistryCompleteness(service, records, issues) {
+  const seen = new Set();
+  for (const record of records) {
+    const primaryKey = RESETTABLE_PRIMARY_KEYS[record.table_name];
+    const key = `${record.schema_name}.${record.table_name}.${record.primary_key_column}.${record.record_id}`;
+    if (seen.has(key)) {
+      issues.push(`Duplicate registry row for ${key}.`);
+      continue;
+    }
+    seen.add(key);
 
-  const hasRequest = (counts.service_requests || 0) >= 1;
-  const hasEstimate = (counts.estimates || 0) >= 1;
-  const hasJob = (counts.inspections || 0) >= 1;
+    if (record.schema_name !== 'public') {
+      issues.push(`Unsupported registry schema ${record.schema_name} for ${record.table_name}.${record.record_id}.`);
+      continue;
+    }
+    if (!primaryKey) {
+      issues.push(`Unsupported registry table ${record.table_name}.`);
+      continue;
+    }
+    if (record.primary_key_column !== primaryKey) {
+      issues.push(`Registry primary key mismatch for ${record.table_name}.${record.record_id}.`);
+      continue;
+    }
+
+    const row = await fetchOneByPrimaryKey(service, record.table_name, primaryKey, record.record_id, primaryKey);
+    if (!row) {
+      issues.push(`Registry points to missing ${record.table_name}.${record.record_id}.`);
+    }
+  }
+}
+
+async function verifyScenario(service, scenarioKey, env = process.env) {
+  assertSafeDemoTarget(env);
+
+  const issues = [];
+  const homeownerEmail = env.DEMO_HOMEOWNER_EMAIL || DEMO_HOMEOWNER.defaultEmail;
+  const contractorEmail = env.DEMO_CONTRACTOR_EMAIL || DEMO_CONTRACTOR.defaultEmail;
+  const runs = await inspectNonResetRuns(service, scenarioKey);
+  const unresolvedRuns = runs.filter((run) => ['started', 'failed'].includes(run.status) && run.recordCount > 0);
+  const succeededRunsWithRecords = runs.filter((run) => run.status === 'succeeded' && run.recordCount > 0);
+  const zeroRecordRuns = runs.filter((run) => run.recordCount === 0);
+
+  if (unresolvedRuns.length > 0) {
+    issues.push(`Unresolved started/failed runs still own registered records: ${unresolvedRuns.map((run) => run.id).join(', ')}.`);
+  }
+  if (succeededRunsWithRecords.length !== 1) {
+    issues.push(`Expected exactly one active succeeded scenario run with records, found ${succeededRunsWithRecords.length}.`);
+  }
+  if (zeroRecordRuns.some((run) => run.status === 'succeeded')) {
+    issues.push(`Succeeded runs without records require reset or investigation: ${zeroRecordRuns.map((run) => run.id).join(', ')}.`);
+  }
+
+  const run = succeededRunsWithRecords[0] || null;
+  if (!run) {
+    return {
+      ok: false,
+      reason: issues[0] || 'No complete succeeded demo scenario run found.',
+      issues,
+      runs: runs.map(({ id, status, recordCount }) => ({ id, status, recordCount })),
+    };
+  }
+  if (!run.completed_at) {
+    issues.push(`Succeeded run ${run.id} is missing completed_at.`);
+  }
+  if (!run.anchor_timestamp) {
+    issues.push(`Succeeded run ${run.id} is missing anchor_timestamp.`);
+  }
+
+  const records = run.records;
+  const counts = countBy(records, 'table_name');
+  for (const tableName of REQUIRED_SCENARIO_TABLES) {
+    if (!counts[tableName]) {
+      issues.push(`Required scenario table ${tableName} has no registered records.`);
+    }
+  }
+  await verifyRegistryCompleteness(service, records, issues);
+
+  const homeownerUser = await verifyAuthUser(service, homeownerEmail, scenarioKey, 'homeowner', issues);
+  const contractorUser = await verifyAuthUser(service, contractorEmail, scenarioKey, 'contractor_owner', issues);
+  if (homeownerUser && contractorUser) {
+    if (homeownerUser.id === contractorUser.id) {
+      issues.push('Homeowner and contractor auth users resolved to the same ID.');
+    }
+    if (homeownerEmail.toLowerCase() === contractorEmail.toLowerCase()) {
+      issues.push('Homeowner and contractor configured emails must be distinct.');
+    }
+  }
+
+  const homeownerProfile = homeownerUser
+    ? await fetchOneByPrimaryKey(service, 'profiles', 'id', homeownerUser.id, 'id, email, role')
+    : null;
+  const contractorProfile = contractorUser
+    ? await fetchOneByPrimaryKey(service, 'profiles', 'id', contractorUser.id, 'id, email, role')
+    : null;
+  if (!homeownerProfile || homeownerProfile.role !== 'homeowner') {
+    issues.push('Homeowner public profile is missing or has an unexpected role.');
+  }
+  if (!contractorProfile || contractorProfile.role !== 'contractor') {
+    issues.push('Contractor public profile is missing or has an unexpected role.');
+  }
+
+  const homeownerDetails = homeownerUser
+    ? await fetchOneByPrimaryKey(service, 'homeowner_profiles', 'user_id', homeownerUser.id, 'user_id, display_name')
+    : null;
+  if (!homeownerDetails) {
+    issues.push('Homeowner profile details are missing.');
+  }
+
+  const contractorRows = contractorUser
+    ? await ensureOk(
+        await service
+          .from('contractor_profiles')
+          .select('id, owner_user_id, business_name, slug, account_status')
+          .eq('owner_user_id', contractorUser.id),
+        'Unable to inspect contractor profile'
+      )
+    : [];
+  if (contractorRows.length !== 1) {
+    issues.push(`Contractor company/profile expected exactly one row, found ${contractorRows.length}.`);
+  }
+  const contractor = contractorRows[0] || null;
+  if (contractor && (contractor.business_name !== DEMO_CONTRACTOR.businessName || contractor.account_status !== 'active')) {
+    issues.push('Contractor company/profile does not match the expected active demo contractor.');
+  }
+
+  const homeId = requireExactlyOneId(issues, records, 'homes', 'demo_home', 'demo home');
+  const connectionId = requireExactlyOneId(issues, records, 'homeowner_contractor_connections', 'demo_connection', 'demo connection');
+  const requestId = requireExactlyOneId(issues, records, 'service_requests', 'demo_service_request', 'demo service request');
+  const estimateId = requireExactlyOneId(issues, records, 'estimates', 'demo_estimate', 'demo estimate');
+  const jobId = requireExactlyOneId(issues, records, 'inspections', 'demo_job', 'demo job');
+
+  const home = homeId ? await fetchOneByPrimaryKey(service, 'homes', 'id', homeId, 'id, homeowner_user_id, nickname, address_line1, zip_code, created_at') : null;
+  const connection = connectionId
+    ? await fetchOneByPrimaryKey(
+        service,
+        'homeowner_contractor_connections',
+        'id',
+        connectionId,
+        'id, homeowner_user_id, contractor_id, status, source, created_at'
+      )
+    : null;
+  const permissions = connectionId
+    ? await fetchOneByPrimaryKey(
+        service,
+        'connection_permissions',
+        'connection_id',
+        connectionId,
+        'connection_id, share_contact, share_home_overview, share_address'
+      )
+    : null;
+  const request = requestId
+    ? await fetchOneByPrimaryKey(
+        service,
+        'service_requests',
+        'id',
+        requestId,
+        'id, connection_id, homeowner_user_id, contractor_id, title, status, created_at'
+      )
+    : null;
+  const estimate = estimateId
+    ? await fetchOneByPrimaryKey(
+        service,
+        'estimates',
+        'id',
+        estimateId,
+        'id, contractor_id, homeowner_user_id, home_id, service_request_id, inspection_id, title, status, created_at, updated_at'
+      )
+    : null;
+  const job = jobId
+    ? await fetchOneByPrimaryKey(
+        service,
+        'inspections',
+        'id',
+        jobId,
+        'id, contractor_id, homeowner_user_id, home_id, service_request_id, estimate_id, status, job_status, created_at'
+      )
+    : null;
+
+  if (home && homeownerUser && (home.homeowner_user_id !== homeownerUser.id || home.nickname !== DEMO_PROPERTY.nickname)) {
+    issues.push('Demo home is not linked to the expected homeowner or property marker.');
+  }
+  if (
+    connection &&
+    homeownerUser &&
+    contractor &&
+    (connection.homeowner_user_id !== homeownerUser.id ||
+      connection.contractor_id !== contractor.id ||
+      connection.status !== 'active' ||
+      connection.source !== 'demo_seed')
+  ) {
+    issues.push('Demo connection does not link the expected homeowner, contractor, and active demo source.');
+  }
+  if (!permissions || !permissions.share_contact || !permissions.share_home_overview || !permissions.share_address) {
+    issues.push('Demo connection permissions are missing required workflow sharing.');
+  }
+  if (
+    request &&
+    homeownerUser &&
+    contractor &&
+    (request.connection_id !== connectionId ||
+      request.homeowner_user_id !== homeownerUser.id ||
+      request.contractor_id !== contractor.id ||
+      request.title !== 'Replace leaking water heater')
+  ) {
+    issues.push('Demo service request is not linked to the expected homeowner, contractor, connection, and title.');
+  }
+  if (
+    estimate &&
+    homeownerUser &&
+    contractor &&
+    (estimate.service_request_id !== requestId ||
+      estimate.homeowner_user_id !== homeownerUser.id ||
+      estimate.contractor_id !== contractor.id ||
+      estimate.home_id !== homeId ||
+      estimate.status !== 'accepted')
+  ) {
+    issues.push('Demo estimate is not accepted or not linked to the expected request/homeowner/contractor/home.');
+  }
+  if (
+    job &&
+    homeownerUser &&
+    contractor &&
+    (job.estimate_id !== estimateId ||
+      job.service_request_id !== requestId ||
+      job.homeowner_user_id !== homeownerUser.id ||
+      job.contractor_id !== contractor.id ||
+      job.home_id !== homeId ||
+      !['draft', 'scheduled'].includes(job.job_status))
+  ) {
+    issues.push('Demo job is not linked to the accepted estimate and expected scenario records.');
+  }
+  if (estimate && job && estimate.inspection_id !== job.id) {
+    issues.push('Accepted estimate does not point to the linked demo job.');
+  }
+
+  if (estimateId) {
+    const lineItems = recordIds(records, 'estimate_line_items', 'demo_estimate_line_item');
+    const scheduleItems = recordIds(records, 'estimate_payment_schedule_items', 'demo_estimate_payment_schedule_item');
+    if (lineItems.length !== estimateLines().length) {
+      issues.push(`Expected ${estimateLines().length} registered estimate line items, found ${lineItems.length}.`);
+    }
+    if (scheduleItems.length !== 2) {
+      issues.push(`Expected 2 registered estimate payment schedule rows, found ${scheduleItems.length}.`);
+    }
+  }
+
+  const duplicateJobs = estimateId
+    ? await ensureOk(
+        await service.from('inspections').select('id').eq('estimate_id', estimateId),
+        'Unable to inspect duplicate demo jobs'
+      )
+    : [];
+  if (duplicateJobs.length !== 1) {
+    issues.push(`Expected exactly one job linked to the demo estimate, found ${duplicateJobs.length}.`);
+  }
+
+  if (run.anchor_timestamp && connection && request && estimate && job) {
+    assertOrderedTimestamps(issues, 'Connection before request', connection.created_at, request.created_at);
+    assertOrderedTimestamps(issues, 'Request before estimate creation', request.created_at, estimate.created_at);
+    assertOrderedTimestamps(issues, 'Estimate creation before acceptance update', estimate.created_at, estimate.updated_at);
+    assertOrderedTimestamps(issues, 'Estimate acceptance update before job creation', estimate.updated_at, job.created_at);
+  }
 
   return {
-    ok: hasRequest && hasEstimate && hasJob,
+    ok: issues.length === 0,
+    reason: issues[0] || null,
+    issues,
     runId: run.id,
     counts,
+    categories: {
+      runs: {
+        activeSucceededRuns: succeededRunsWithRecords.length,
+        unresolvedRuns: unresolvedRuns.length,
+        zeroRecordRuns: zeroRecordRuns.length,
+      },
+      auth: {
+        homeownerUserId: homeownerUser?.id || null,
+        contractorUserId: contractorUser?.id || null,
+        distinctUsers: Boolean(homeownerUser && contractorUser && homeownerUser.id !== contractorUser.id),
+      },
+      profiles: {
+        homeownerProfile: Boolean(homeownerProfile && homeownerDetails),
+        contractorProfile: Boolean(contractor),
+      },
+      workflow: {
+        homeId,
+        connectionId,
+        requestId,
+        estimateId,
+        jobId,
+        estimateStatus: estimate?.status || null,
+        jobStatus: job?.job_status || null,
+      },
+      registry: {
+        tables: counts,
+        recordsChecked: records.length,
+      },
+      notifications: notificationHandlingDecision(),
+    },
   };
 }
 
@@ -832,8 +1394,8 @@ async function seedScenario(env, target, scenarioKey) {
   const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
   const { service, anonKey, makeUserClient } = createSupabaseClients(env, target);
 
-  const previousReset = await resetLatestIfPresent(service, scenarioKey);
-  const runId = await startRun(service, scenarioKey, 'seed', target, dates);
+  const previousReset = await resetNonResetRuns(service, scenarioKey, 'pre-seed-reconciliation');
+  let runId = null;
 
   try {
     const homeownerEmail = env.DEMO_HOMEOWNER_EMAIL || DEMO_HOMEOWNER.defaultEmail;
@@ -841,16 +1403,17 @@ async function seedScenario(env, target, scenarioKey) {
     const homeownerPassword = requireEnv(env, 'DEMO_HOMEOWNER_PASSWORD');
     const contractorPassword = requireEnv(env, 'DEMO_CONTRACTOR_PASSWORD');
 
-    const homeownerUser = await ensureAuthUser(service, homeownerEmail, homeownerPassword, {
-      demo_scenario: scenarioKey,
-      demo_role: 'homeowner',
-    });
-    const contractorUser = await ensureAuthUser(service, contractorEmail, contractorPassword, {
-      demo_scenario: scenarioKey,
-      demo_role: 'contractor_owner',
-    });
+    const homeownerUser = await ensureAuthUser(service, homeownerEmail, homeownerPassword, scenarioKey, 'homeowner');
+    const contractorUser = await ensureAuthUser(service, contractorEmail, contractorPassword, scenarioKey, 'contractor_owner');
+    assertDistinctDemoIdentities(homeownerEmail, contractorEmail, homeownerUser, contractorUser);
 
     const { contractorId } = await upsertProfileRecords(service, runId, homeownerUser, contractorUser, dates, env);
+    await assertNoLikelyUnregisteredScenarioRecords(service, {
+      homeownerId: homeownerUser.id,
+      contractorId,
+    });
+
+    runId = await startRun(service, scenarioKey, 'seed', target, dates);
     const { homeId } = await createProperty(service, runId, homeownerUser.id, dates);
     const { connectionId } = await createConnection(service, runId, homeownerUser.id, contractorId, dates);
 
@@ -870,12 +1433,6 @@ async function seedScenario(env, target, scenarioKey) {
       dates
     );
     const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, estimateId, dates);
-    await registerRecentNotifications(service, runId, homeownerUser.id, contractorUser.id, dates);
-
-    const verification = await verifyScenario(service, scenarioKey);
-    if (!verification.ok) {
-      throw new Error(`Demo seed verification failed: ${verification.reason || 'missing registered records'}`);
-    }
 
     await finishRun(service, runId, 'succeeded', {
       homeowner_user_id: homeownerUser.id,
@@ -888,6 +1445,12 @@ async function seedScenario(env, target, scenarioKey) {
       estimate_total_cents: totalCents,
       job_work_items_created: workItemCount,
     });
+
+    const verification = await verifyScenario(service, scenarioKey, env);
+    if (!verification.ok) {
+      await finishRun(service, runId, 'failed', { verification_issues: verification.issues }).catch(() => {});
+      throw new Error(`Demo seed verification failed: ${verification.reason || 'incomplete scenario state'}`);
+    }
 
     return {
       operation: 'seed',
@@ -909,11 +1472,13 @@ async function seedScenario(env, target, scenarioKey) {
         workItemCount,
       },
       verification,
-      externalEffects: 'No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, storage, or deployment calls were made by this runner.',
+      externalEffects: `No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, storage, or deployment calls were made by this runner. ${notificationHandlingDecision()}`,
       anonKeyUsed: Boolean(anonKey),
     };
   } catch (error) {
-    await finishRun(service, runId, 'failed', { error: error.message }).catch(() => {});
+    if (runId) {
+      await finishRun(service, runId, 'failed', { error: error.message }).catch(() => {});
+    }
     throw error;
   }
 }
@@ -921,20 +1486,32 @@ async function seedScenario(env, target, scenarioKey) {
 async function resetScenario(env, target, scenarioKey) {
   const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
   const { service } = createSupabaseClients(env, target);
-  const run = await getLatestSucceededRun(service, scenarioKey);
-  if (!run) {
-    return { operation: 'reset', removed: [], runId: null, message: 'No succeeded demo run found.' };
-  }
-
   const resetRunId = await startRun(service, scenarioKey, 'reset', target, dates);
-  const removed = await resetRun(service, run.id);
-  await finishRun(service, resetRunId, 'succeeded', { reset_source_run_id: run.id, removed_count: removed.length });
-  return { operation: 'reset', runId: run.id, resetRunId, removed };
+  try {
+    const resetResult = await resetNonResetRuns(service, scenarioKey, 'explicit-reset');
+    await finishRun(service, resetRunId, 'succeeded', {
+      considered_runs: resetResult.considered.map(({ runId, previousStatus, registeredRecords, action }) => ({
+        runId,
+        previousStatus,
+        registeredRecords,
+        action,
+      })),
+      removed_count: resetResult.removed.length,
+    });
+    return { operation: 'reset', runId: null, resetRunId, removed: resetResult.removed, considered: resetResult.considered };
+  } catch (error) {
+    await finishRun(service, resetRunId, 'failed', { error: error.message }).catch(() => {});
+    throw error;
+  }
 }
 
 async function verifyDemoScenario(env, target, scenarioKey) {
   const { service } = createSupabaseClients(env, target);
-  return { operation: 'verify', verification: await verifyScenario(service, scenarioKey) };
+  const verification = await verifyScenario(service, scenarioKey, env);
+  if (!verification.ok) {
+    throw new Error(`Demo verification failed: ${verification.reason || 'scenario state is incomplete'}`);
+  }
+  return { operation: 'verify', verification };
 }
 
 function summarize(result, target, scenarioKey) {

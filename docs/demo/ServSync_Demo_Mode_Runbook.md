@@ -50,7 +50,7 @@ Values are intentionally omitted from this runbook.
 - `DEMO_RESET_ACKNOWLEDGE` for reset only
 - `DEMO_ANCHOR_TIMESTAMP` optional
 
-The runner also refuses to proceed if these external-effect flags are set to `true` in the process environment:
+The runner also refuses to proceed if these external-effect flags are set to enabled-looking values in the process environment. Rejected values are case-insensitive and include `true`, `1`, `yes`, `on`, and `enabled`. Unrecognized non-empty boolean values also fail closed; unset the flag or use a clear disabled value such as `false`.
 
 - `EMAIL_ENABLED`
 - `STRIPE_ENABLED`
@@ -80,7 +80,7 @@ npm run demo:verify
 DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop npm run demo:reset
 ```
 
-The command output reports safe identifiers and record counts. It must not print passwords, tokens, access keys, or full sensitive environment values.
+The command output reports safe identifiers, run reconciliation summaries, verification categories, and record counts. It must not print passwords, tokens, access keys, or full sensitive environment values.
 
 ## Scenario Contents
 
@@ -133,6 +133,10 @@ Use `DEMO_ANCHOR_TIMESTAMP` only when a recording needs a deterministic timestam
 
 Reset is registry-based. The runner may delete only rows registered in `demo_scenario_records` for a specific run and only from the SQL allowlist of supported Slice 1 tables.
 
+Before reseeding, the runner inspects all non-reset seed runs for the selected scenario, including `started`, `failed`, and `succeeded` runs. It reconciles registered records from those prior runs before starting a new run, and it refuses to continue if any prior run cannot be safely reset. It does not silently ignore failed or started runs.
+
+Before creating new resettable records, the runner also checks for likely scenario-owned residue that matches stable demo ownership markers but is not registered. If such records are found, the seed fails closed and reports the affected table and ID. Do not add a broad cleanup shortcut by email, user ID, title text, timestamp, or scenario-like wording.
+
 Reset does not:
 
 - Truncate tables.
@@ -144,6 +148,24 @@ Reset does not:
 - Clean broad production or sandbox data.
 
 If registry ownership is incomplete, stop and audit rather than adding an unsafe cleanup shortcut.
+
+Slice 1 does not register or reset incidental in-app notifications. Existing workflow triggers may still create in-app notifications, but the demo runner does not claim notification ownership using broad recipient or timestamp queries.
+
+## Verify Behavior
+
+`npm run demo:verify` checks the complete water-heater scenario, not just record counts. A successful verification requires:
+
+- The dedicated demo-project guard to pass.
+- Exactly one active succeeded seed run with registered records.
+- No unresolved `started` or `failed` seed runs that still own registered records.
+- Demo homeowner and contractor auth users with expected demo ownership metadata.
+- Distinct homeowner and contractor identities.
+- Matching public profiles, homeowner profile, and contractor profile/company.
+- One intended demo home, active connection, required connection permissions, service request, accepted estimate, and linked job.
+- Registry rows that point to real supported records with no duplicate registry target.
+- Valid date ordering from connection to request, estimate, acceptance, and job creation.
+
+`verify` exits non-zero if any required check fails.
 
 ## Login and Recording Guidance
 
@@ -166,21 +188,34 @@ If seed fails:
 - Confirm `DEMO_SUPABASE_URL` and `DEMO_SUPABASE_PROJECT_REF` point to the same dedicated demo project.
 - Confirm the target is not production and not the shared sandbox.
 - Confirm demo passwords are present but not printed.
-- Confirm external-effect flags are not `true`.
+- Confirm external-effect flags are unset or clearly disabled, not enabled-looking values.
+- If an existing auth email is found, confirm that user already has `servsync_demo_owned`, `servsync_demo_scenario`, and `servsync_demo_role` metadata for this scenario. The runner will not repurpose a normal user by email alone.
 
 If reset fails:
 
 - Confirm `DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop`.
-- Confirm the previous seed created a succeeded run.
+- Confirm all prior `started`, `failed`, and `succeeded` seed runs can be inspected.
 - Do not perform broad manual deletes. Audit the registry rows first.
 
 If repeated seed shows duplicates:
 
 - Run `npm run demo:verify`.
-- Confirm reset did not fail.
+- Confirm no failed or started run still owns records.
 - Confirm all newly created rows were registered.
 - Do not delete records by user ID as a shortcut.
 - Remember that auth identities, public profiles, homeowner profile details, and contractor company identity rows are intentionally reconciled and preserved rather than reset/deleted.
+
+If `verify` reports suspected unregistered records:
+
+- Stop and inspect the reported table and record IDs.
+- Confirm whether the rows are demo-owned and why they were not registered.
+- Prefer a targeted, separately reviewed recovery step. Manual cleanup must never use broad table deletes, truncation, user-wide deletes, timestamp windows, or title-text matching.
+
+If multiple active runs are reported:
+
+- Run the guarded reset command once with the explicit acknowledgement.
+- Re-run `npm run demo:verify`.
+- Stop if any run cannot be reset through the registry.
 
 ## Adding Future Scenarios
 

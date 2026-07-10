@@ -7,6 +7,25 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 ## 2026-07-10
 
 - Branch: `codex/demo-mode-foundation-slice-1`
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened the Demo Mode Slice 1 private runner after final-audit findings. The runner now reconciles all non-reset seed runs instead of only the latest succeeded run, refuses likely unregistered scenario residue, verifies the full homeowner/contractor/request/accepted-estimate/job graph, stops broad notification registration, requires demo-owned auth metadata before updating existing users, and rejects broader enabled-looking external-effect flag values.
+- Reason for change: Demo Mode seed/reset must be repeatable and fail closed before a draft PR or dedicated demo environment validation. The correction reduces duplicate/orphan risk, avoids repurposing non-demo auth users by email, and prevents `demo:verify` from falsely passing incomplete scenario data.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `git diff --check`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - No SQL was applied, no Supabase users were provisioned, no seed/reset command was run, no Supabase/Vercel setting was changed, and no deployment occurred.
+  - Dedicated demo-project SQL application and live seed/reset/verify validation remain separate approval steps.
+  - The shared security-catalog test may remain blocked in this checkout while the local Supabase CLI link points to production; do not relink as part of this correction task.
+
+- Branch: `codex/demo-mode-foundation-slice-1`
 - Starting main SHA: `93eff085a991dff7f8eea77efb67b33c3d59c6a1`
 - Files changed:
   - `servsync-demo-mode-foundation.sql`
