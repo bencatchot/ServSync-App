@@ -4,6 +4,39 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-10
+
+- Branch: `codex/homeowner-invoice-filed-next-step-v1`
+- Starting main SHA: `ab7b76886da877fa6575b8b89e34c220f8a708cf`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/homeowner-invoice-home-history-next-step.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added a clearer homeowner filed-invoice next step. Filed homeowner invoice cards now show `View Home History` whenever the invoice is durably filed, including filed invoices that are not paid, and show compact copy explaining that the homeowner can add a manual follow-up reminder from Home History. The full core-loop test now follows that filed-invoice next action before creating the reminder.
+- Reason for change: Beta users need a clearer closeout handoff after filing an invoice to Home History, without changing invoice status, filing behavior, reminder creation, payments, notifications, or Home History storage behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused homeowner invoice/Home History source-static test
+  - `tests/e2e/full-core-loop.spec.ts` attempted with local/non-production env; blocked before workflow execution by missing `TEST_HOMEOWNER_EMAIL`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema changes, SQL application, deployment, production data changes, payment collection, Stripe/ACH, QuickBooks/accounting export, replacement invoices, automatic reminder creation, recurring reminders, email/SMS/push, calendar sync, Home History schema redesign, contractor-side filing changes, or production test-record cleanup is included.
+  - The new next action uses the existing Home History tab and existing manual reminder composer. It does not create reminders automatically or change invoice payment status.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: The core beta loop now records the homeowner filed-invoice next action and its manual-reminder guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The homeowner invoice/Home History workflow now distinguishes filed-invoice navigation polish from payment collection, reminder automation, and broader Home History redesign.
+
 ## 2026-07-09
 
 - Branch: `codex/contractor-schedule-invoice-summary-v1`
