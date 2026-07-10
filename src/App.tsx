@@ -28267,6 +28267,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setJobsListStatusFilter('all');
     setJobsListTypeFilter('all');
   };
+  const openAcceptedEstimatesNeedingJobs = () => {
+    setContractorTab('inspections');
+    setContractorFinancialRecordKind('estimates');
+    setContractorJobsViewAndScroll('open_financial');
+    setInspectionView('list');
+    setFocusedEstimateRecordId(null);
+    setJobsCustomerFilterSubjectId(null);
+    setContractorEstimateRecordSearch('');
+    setContractorEstimateRecordStatusFilter('approved');
+    setContractorEstimateRecordSort('updated_newest');
+  };
   const openJobs = inspections.filter(inspectionIsOpenJob);
   const closedJobs = inspections.filter(inspectionIsClosedJob);
   const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);
@@ -28594,8 +28605,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       label: 'Estimates / invoices',
       count: acceptedEstimatesNeedingJobs.length + invoiceAttentionRecords.length,
       onClick: () => {
+        if (acceptedEstimatesNeedingJobs.length > 0) {
+          openAcceptedEstimatesNeedingJobs();
+          return;
+        }
         setContractorTab('inspections');
-        setContractorFinancialRecordKind(acceptedEstimatesNeedingJobs.length > 0 ? 'estimates' : 'invoices');
+        setContractorFinancialRecordKind('invoices');
         setContractorJobsView('open_financial');
         setInspectionView('list');
       },
@@ -31221,11 +31236,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <button
                               type="button"
                               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:border-emerald-300 hover:text-emerald-900 sm:w-auto"
-                              onClick={() => {
-                                setContractorTab('inspections');
-                                setContractorJobsView('open_financial');
-                                setInspectionView('list');
-                              }}
+                              onClick={openAcceptedEstimatesNeedingJobs}
                             >
                               <ClipboardCheck size={14} />
                               {acceptedEstimatesNeedingJobs.length} need jobs
@@ -36257,10 +36268,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               </p>
                                               {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                               {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
-                                              {estimate.status === 'accepted' && !hasLinkedJob && (
-                                                <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
-                                                  Next step: create the job from this approved estimate.
-                                                </p>
+                                              {estimate.status === 'accepted' && (
+                                                <div data-testid="accepted-estimate-job-handoff" className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                                                  <p className="text-xs font-bold text-emerald-900">{hasLinkedJob ? 'Job created' : 'Ready for job'}</p>
+                                                  <p className="mt-0.5 text-xs font-medium leading-5 text-emerald-800">
+                                                    {hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'}
+                                                  </p>
+                                                </div>
                                               )}
                                               {linkedInvoice && !hasPaymentScheduleRows && (
                                                 <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -36272,6 +36286,34 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           </div>
                                           {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows)}
                                           <div className="mt-3 flex flex-wrap gap-2">
+                                            {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
+                                              <>
+                                                {!hasLinkedJob && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void createJobFromAcceptedEstimate(estimate)}
+                                                    disabled={convertingEstimateId === estimate.id}
+                                                    data-testid="contractor-create-job-from-accepted-estimate"
+                                                    aria-label={`Create job from accepted estimate ${estimate.title}`}
+                                                    className={buttonClass('primary')}
+                                                  >
+                                                    <ClipboardCheck size={15} />
+                                                    {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
+                                                  </button>
+                                                )}
+                                                {hasLinkedJob && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void openLinkedJobForEstimate(estimate)}
+                                                    disabled={convertingEstimateId === estimate.id}
+                                                    className={buttonClass('primary')}
+                                                  >
+                                                    <ClipboardCheck size={15} />
+                                                    View Job
+                                                  </button>
+                                                )}
+                                              </>
+                                            )}
                                             <button
                                               type="button"
                                               onClick={() => void downloadEstimatePdf(estimate, {
@@ -36334,39 +36376,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 </button>
                                               </>
                                             )}
-                                            {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
-                                              <>
-                                                {!hasLinkedJob && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void createJobFromAcceptedEstimate(estimate)}
-                                                    disabled={convertingEstimateId === estimate.id}
-                                                    data-testid="contractor-create-job-from-accepted-estimate"
-                                                    aria-label={`Create job from accepted estimate ${estimate.title}`}
-                                                    className={buttonClass('primary')}
-                                                  >
-                                                    <ClipboardCheck size={15} />
-                                                    {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
-                                                  </button>
-                                                )}
-                                                {hasLinkedJob && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void openLinkedJobForEstimate(estimate)}
-                                                    disabled={convertingEstimateId === estimate.id}
-                                                    className={buttonClass('primary')}
-                                                  >
-                                                    <ClipboardCheck size={15} />
-                                                    View Job
-                                                  </button>
-                                                )}
-                                              </>
-                                            )}
                                             {canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
                                               <button
                                                 type="button"
                                                 onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
-                                                className={buttonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                                className={buttonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')}
                                               >
                                                 <Receipt size={15} />
                                                 {linkedInvoice
@@ -36770,10 +36784,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {acceptedEstimatesNeedingJobs.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setContractorFinancialRecordKind('estimates');
-                            setContractorJobsViewAndScroll('open_financial');
-                          }}
+                          onClick={openAcceptedEstimatesNeedingJobs}
                           className={buttonClass('primary')}
                         >
                           <ClipboardCheck size={15} />
@@ -38005,10 +38016,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
                                   {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                                   {estimate.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{estimate.scope}</p>}
-                                  {estimate.status === 'accepted' && !hasLinkedJob && (
-                                    <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
-                                      Next step: create the job from this approved estimate before closeout.
-                                    </p>
+                                  {estimate.status === 'accepted' && (
+                                    <div data-testid="accepted-estimate-job-handoff" className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                                      <p className="text-xs font-bold text-emerald-900">{hasLinkedJob ? 'Job created' : 'Ready for job'}</p>
+                                      <p className="mt-0.5 text-xs font-medium leading-5 text-emerald-800">
+                                        {hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'}
+                                      </p>
+                                    </div>
                                   )}
                                   {linkedInvoice && !hasPaymentScheduleRows && (
                                     <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -38020,6 +38034,34 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </div>
                               {hasPaymentScheduleRows && renderContractorEstimatePaymentScheduleSection(estimate, scheduleRows, { mobile: true })}
                               <div className="mt-3 flex flex-wrap gap-2">
+                                {estimate.status === 'accepted' && !isInvoice && (
+                                  <>
+                                    {!hasLinkedJob && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void createJobFromAcceptedEstimate(estimate)}
+                                        disabled={convertingEstimateId === estimate.id}
+                                        data-testid="contractor-create-job-from-accepted-estimate"
+                                        aria-label={`Create job from accepted estimate ${estimate.title}`}
+                                        className={mobileButtonClass('primary')}
+                                      >
+                                        <ClipboardCheck size={15} />
+                                        {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
+                                      </button>
+                                    )}
+                                    {hasLinkedJob && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void openLinkedJobForEstimate(estimate)}
+                                        disabled={convertingEstimateId === estimate.id}
+                                        className={mobileButtonClass('primary')}
+                                      >
+                                        <ClipboardCheck size={15} />
+                                        View Job
+                                      </button>
+                                    )}
+                                  </>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => void downloadEstimatePdf(estimate, {
@@ -38079,34 +38121,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </button>
                                   </>
                                 )}
-                                {estimate.status === 'accepted' && !isInvoice && (
-                                  <>
-                                    {!hasLinkedJob && (
-                                      <button
-                                        type="button"
-                                        onClick={() => void createJobFromAcceptedEstimate(estimate)}
-                                        disabled={convertingEstimateId === estimate.id}
-                                        data-testid="contractor-create-job-from-accepted-estimate"
-                                        aria-label={`Create job from accepted estimate ${estimate.title}`}
-                                        className={mobileButtonClass('primary')}
-                                      >
-                                        <ClipboardCheck size={15} />
-                                        {convertingEstimateId === estimate.id ? 'Creating...' : 'Create Job'}
-                                      </button>
-                                    )}
-                                    {hasLinkedJob && (
-                                      <button
-                                        type="button"
-                                        onClick={() => void openLinkedJobForEstimate(estimate)}
-                                        disabled={convertingEstimateId === estimate.id}
-                                        className={mobileButtonClass('primary')}
-                                      >
-                                        <ClipboardCheck size={15} />
-                                        View Job
-                                      </button>
-                                    )}
-                                  </>
-                                )}
                                 {canUseGenericEstimateInvoiceAction && (
                                   <button
                                     type="button"
@@ -38114,7 +38128,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
                                       beginInvoiceDraftFromEstimate(estimate, customerName);
                                     }}
-                                    className={mobileButtonClass(linkedInvoice ? 'secondary' : 'primary')}
+                                    className={mobileButtonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')}
                                   >
                                     <Receipt size={15} />
                                     {linkedInvoice
