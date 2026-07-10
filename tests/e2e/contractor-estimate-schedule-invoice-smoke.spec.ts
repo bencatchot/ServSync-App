@@ -464,6 +464,7 @@ test.describe('contractor schedule invoice authenticated smoke', () => {
 test.describe('contractor schedule invoice smoke source guards', () => {
   test('keeps the schedule-row invoice UI on the approved RPC path', async () => {
     const source = await readFile(path.join(REPO_ROOT, 'src/App.tsx'), 'utf8');
+    const fullCoreSmokeSource = await readFile(path.join(REPO_ROOT, 'tests/e2e/full-core-loop.spec.ts'), 'utf8');
 
     expect(source).toContain('servsync_create_invoice_from_estimate_schedule_item');
     expect(source).toContain('contractor-create-schedule-invoice');
@@ -482,5 +483,22 @@ test.describe('contractor schedule invoice smoke source guards', () => {
     expect(scheduleInvoiceHandler).not.toContain(".from('estimate_payment_schedule_items')");
     expect(scheduleInvoiceHandler).not.toContain('linked_invoice_id');
     expect(scheduleInvoiceHandler).not.toMatch(/home history|home_history|stripe|quickbooks|sendgrid|twilio/i);
+
+    expect(fullCoreSmokeSource).toContain("const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';");
+    expect(fullCoreSmokeSource).toContain('process.env[PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN] === \'true\'');
+    expect(fullCoreSmokeSource).toContain('url.includes(SANDBOX_SUPABASE_REF)');
+    expect(fullCoreSmokeSource).toContain('productionConnectedTestAccountRun');
+    expect(fullCoreSmokeSource).toContain('SUPABASE_SERVICE_ROLE_KEY');
+
+    const workItemCompletionStart = fullCoreSmokeSource.indexOf('async function markSeededPricedWorkItemsCompleted');
+    expect(workItemCompletionStart, 'work-item completion helper should exist').toBeGreaterThanOrEqual(0);
+    const workItemCompletionEnd = fullCoreSmokeSource.indexOf('async function setPropertyScopeAllIfAvailable', workItemCompletionStart);
+    expect(workItemCompletionEnd, 'work-item completion helper should be bounded').toBeGreaterThan(workItemCompletionStart);
+    const workItemCompletionHelper = fullCoreSmokeSource.slice(workItemCompletionStart, workItemCompletionEnd);
+
+    expect(workItemCompletionHelper).toContain('productionConnectedTestAccountRun');
+    expect(workItemCompletionHelper).toContain('productionTestAccountSmokeOptedIn');
+    expect(workItemCompletionHelper).toContain('process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()');
+    expect(workItemCompletionHelper).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY[^?]*requiredEnv/);
   });
 });

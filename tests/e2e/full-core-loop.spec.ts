@@ -9,6 +9,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
 const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
+const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';
 
 function appContextOptions() {
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
@@ -50,11 +51,16 @@ async function markSeededPricedWorkItemsCompleted(jobId: string) {
   const url = requiredEnv('VITE_SUPABASE_URL');
   const appHost = new URL(requiredEnv('TEST_APP_URL')).hostname.toLowerCase();
   const approvedProductionTestHost = appHost.endsWith('.vercel.app') && !PRODUCTION_HOSTS.has(appHost);
+  const productionTestAccountSmokeOptedIn = process.env[PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN] === 'true';
+  const productionConnectedTestAccountRun =
+    url.includes(PRODUCTION_SUPABASE_REF) && approvedProductionTestHost && productionTestAccountSmokeOptedIn;
   if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
     throw new Error('Refusing to complete E2E work items with a service-role key present.');
   }
-  if (!url.includes(SANDBOX_SUPABASE_REF) && !(url.includes(PRODUCTION_SUPABASE_REF) && approvedProductionTestHost)) {
-    throw new Error(`Refusing to update seeded work items outside sandbox ref ${SANDBOX_SUPABASE_REF} or the approved production test-account deployment.`);
+  if (!url.includes(SANDBOX_SUPABASE_REF) && !productionConnectedTestAccountRun) {
+    throw new Error(
+      `Refusing to update seeded work items outside sandbox ref ${SANDBOX_SUPABASE_REF}. Production-connected test-account runs require ${PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN}=true on an approved Vercel preview host.`,
+    );
   }
   const client = createClient(url, requiredEnv('VITE_SUPABASE_ANON_KEY'), {
     auth: {
