@@ -8,6 +8,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 
 const SANDBOX_SUPABASE_REF = 'zpzdkoaubyjtsomccxya';
 const PRODUCTION_SUPABASE_REF = 'uqgtheclhxqlnjpfmheq';
+const PRODUCTION_HOSTS = new Set(['servsync.app', 'www.servsync.app']);
 
 function appContextOptions() {
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
@@ -47,8 +48,13 @@ async function freshRolePage(browser: Browser, role: 'contractor' | 'homeowner')
 
 async function markSeededPricedWorkItemsCompleted(jobId: string) {
   const url = requiredEnv('VITE_SUPABASE_URL');
-  if (url.includes(PRODUCTION_SUPABASE_REF) || !url.includes(SANDBOX_SUPABASE_REF)) {
-    throw new Error(`Refusing to update seeded work items outside sandbox Supabase ref ${SANDBOX_SUPABASE_REF}.`);
+  const appHost = new URL(requiredEnv('TEST_APP_URL')).hostname.toLowerCase();
+  const approvedProductionTestHost = appHost.endsWith('.vercel.app') && !PRODUCTION_HOSTS.has(appHost);
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    throw new Error('Refusing to complete E2E work items with a service-role key present.');
+  }
+  if (!url.includes(SANDBOX_SUPABASE_REF) && !(url.includes(PRODUCTION_SUPABASE_REF) && approvedProductionTestHost)) {
+    throw new Error(`Refusing to update seeded work items outside sandbox ref ${SANDBOX_SUPABASE_REF} or the approved production test-account deployment.`);
   }
   const client = createClient(url, requiredEnv('VITE_SUPABASE_ANON_KEY'), {
     auth: {
@@ -59,7 +65,7 @@ async function markSeededPricedWorkItemsCompleted(jobId: string) {
 
   try {
     const signIn = await client.auth.signInWithPassword(credentialsFor('contractor'));
-    expect(signIn.error, 'Contractor sandbox login for work-item completion should succeed').toBeNull();
+    expect(signIn.error, 'Contractor test-account login for work-item completion should succeed').toBeNull();
 
     const workItems = await client
       .from('job_work_items')
@@ -197,9 +203,18 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
 
   await expectActiveTabHeading(page, /^Jobs$/i);
   await expect(main.getByText(/^Estimate draft$/i)).toBeVisible({ timeout: 30_000 });
+  const buildBlankEstimate = main.getByRole('button', { name: /^Build blank estimate\b/i }).first();
+  if (await buildBlankEstimate.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await buildBlankEstimate.click();
+  }
   await main.getByRole('textbox', { name: /^Estimate title$/i }).fill(estimateTitle);
   await main.getByRole('textbox', { name: /^Scope of work$/i }).fill(`${recordPrefix}: approved service scope for the full sandbox E2E core loop.`);
-  await main.getByRole('textbox', { name: /^Estimate line item 1 description$/i }).fill(`${recordPrefix} approved work item`);
+  const firstLineDescription = main.getByLabel(/^Estimate line item 1 description$/i);
+  if (!(await firstLineDescription.isVisible({ timeout: 2_000 }).catch(() => false))) {
+    await main.getByRole('button', { name: /^Add blank line$/i }).click();
+  }
+  await expect(firstLineDescription).toBeVisible({ timeout: 10_000 });
+  await firstLineDescription.fill(`${recordPrefix} approved work item`);
   await main.getByRole('spinbutton', { name: /^Estimate line item 1 quantity$/i }).fill('1');
   await main.getByRole('textbox', { name: /^Estimate line item 1 unit price$/i }).fill('125');
 
@@ -208,13 +223,9 @@ async function createAndSendEstimateFromRequest(page: Page, requestTitle: string
   await saveEstimateButton.click();
   await waitForEstimateDraftSave(main, saveEstimateButton);
 
-  const backToJobsOverview = main.getByRole('button', { name: /^Back to Jobs Overview$/i });
-  if (await backToJobsOverview.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await backToJobsOverview.click();
-  }
-  await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
-  await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible({ timeout: 30_000 });
-  const estimateCard = main.getByTestId('contractor-estimate-card').filter({ hasText: estimateTitle }).first();
+  await expect(main.getByText(/^Saved estimate draft$/i)).toBeVisible({ timeout: 30_000 });
+  const estimateCard = main.getByTestId('contractor-estimate-card').filter({ hasText: estimateTitle });
+  await expect(estimateCard).toHaveCount(1, { timeout: 30_000 });
   await expect(estimateCard).toBeVisible({ timeout: 30_000 });
 
   const sendEstimateResponse = page.waitForResponse(
@@ -258,11 +269,15 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
 
   await openSidebarTab(page, /^Jobs\b/i);
   await expectActiveTabHeading(page, /^Jobs$/i);
-  await main.getByRole('button', { name: /Open Estimates \/ Invoices/i }).click();
-  await expect(main.getByRole('heading', { name: /^Open estimates and invoices$/i })).toBeVisible({ timeout: 30_000 });
+  const estimatesTab = main.getByRole('tab', { name: /^Estimates\b/i });
+  if (await estimatesTab.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await estimatesTab.click();
+  }
 
-  const acceptedEstimateCard = main.getByTestId('contractor-estimate-card').filter({ hasText: estimateTitle }).first();
+  const acceptedEstimateCard = main.getByTestId('contractor-estimate-card').filter({ hasText: estimateTitle });
+  await expect(acceptedEstimateCard).toHaveCount(1, { timeout: 30_000 });
   await expect(acceptedEstimateCard).toBeVisible({ timeout: 30_000 });
+  await expect(acceptedEstimateCard.getByTestId('contractor-create-job-from-accepted-estimate')).toBeVisible({ timeout: 30_000 });
   const createJobResponse = page.waitForResponse(
     response => response.url().includes('/rpc/servsync_create_job_from_estimate'),
     { timeout: 30_000 },
