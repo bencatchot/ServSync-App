@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-10
 
+- Branch: `codex/completed-job-invoice-path-guidance-v1`
+- Starting main SHA: `4642556e9efe0ffbf3bb5f119f764c6272150a9f`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `tests/e2e/partial-invoicing-data-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added compact contractor completed-job invoice path guidance. Closed job rows and job detail now explain whether the recommended path is completed/priced work-item invoicing or one completed-job invoice for no-work-item jobs, renamed the unavailable item-invoicing row action from `Open item invoicing` to `Review work items`, and kept linked invoice actions visually primary.
+- Reason for change: Contractors need clearer next-step confidence after completing work, especially when choosing between item-based invoicing and the existing completed-job fallback, without changing invoice eligibility, lifecycle state, RPC behavior, or billing behavior.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused contractor pipeline/job invoice source-static test
+  - `tests/e2e/full-core-loop.spec.ts` attempted with local/non-production env; blocked before workflow execution by missing `TEST_HOMEOWNER_EMAIL`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema changes, invoice eligibility changes, payment collection, Stripe/ACH, QuickBooks/accounting export, replacement invoices, new invoice lifecycle states, automatic item selection, automatic invoice creation, notifications, email/SMS/push, AI, native apps, dashboard redesign, estimate payment schedule redesign, deployment, or production data actions are included.
+  - This is guidance-only; future billing features should still be separately audited before implementation.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records contractor completed-job invoice path guidance while preserving item-based/legacy fallback guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The core job/invoice loop now distinguishes the visible recommended invoice path from unchanged invoice eligibility and backend behavior.
+
 - Branch: `codex/homeowner-invoice-filed-next-step-v1`
 - Starting main SHA: `ab7b76886da877fa6575b8b89e34c220f8a708cf`
 - Files changed:

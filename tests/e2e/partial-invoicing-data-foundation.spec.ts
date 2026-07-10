@@ -651,7 +651,7 @@ test.describe('partial invoicing data foundation', () => {
       const guardedRow = main.getByTestId('contractor-job-row').filter({ hasText: guardedJobName }).first();
       await expect(guardedRow).toBeVisible({ timeout: 30_000 });
       await expect(guardedRow.getByTestId('job-work-item-summary-badge')).toHaveText(/^Ready to invoice$/i);
-      await expect(guardedRow.getByText(/Create an item-based invoice/i)).toBeVisible();
+      await expect(guardedRow.getByText(/create an invoice from completed, priced work items/i)).toBeVisible();
       await expect(guardedRow.getByRole('button', { name: /^Create Invoice$/i })).toHaveCount(0);
       const itemBasedButton = guardedRow.getByRole('button', { name: /^Create invoice from completed items$/i });
       await expect(itemBasedButton).toBeVisible();

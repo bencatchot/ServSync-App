@@ -143,7 +143,7 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(contractorSource).toContain("label: 'Completed jobs'");
     expect(workflowOverviewSource).toContain('completedJobsReadyToInvoice.length > 0');
     expect(workflowOverviewSource).toContain('Completed jobs ready to invoice');
-    expect(workflowOverviewSource).toContain('Review recent closed jobs and create invoices from completed work.');
+    expect(workflowOverviewSource).toContain('Review completed jobs. ServSync will guide you to item-based or completed-job invoicing.');
     expect(workflowOverviewSource).toContain('{completedJobsReadyToInvoice.length} ready');
     expect(workflowOverviewSource).toContain('onClick={openCompletedJobsReadyToInvoice}');
     expect(completedJobInvoiceSource).toContain("setContractorJobsView('closed_jobs')");
@@ -151,9 +151,18 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(workflowOverviewSource).not.toContain('openPartialInvoiceReview');
 
     expect(jobRowSource).toContain('linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)');
+    expect(jobRowSource).toContain('ITEM_BASED_INVOICE_RECOMMENDATION');
+    expect(jobRowSource).toContain('COMPLETED_JOB_INVOICE_RECOMMENDATION');
+    expect(jobRowSource).toContain('Review work items');
+    expect(jobRowSource).not.toContain('Open item invoicing');
+    expect(jobRowSource).toContain("className={mobileButtonClass('primary')}");
     expect(jobDetailInvoiceActionSource).toContain('if (linkedInvoiceForJob) openInvoiceRecord(linkedInvoiceForJob);');
     expect(jobDetailInvoiceActionSource).toContain('else if (activeJobHasDurableWorkItems) openPartialInvoiceReview(activeInspection);');
     expect(jobDetailInvoiceActionSource).toContain('else void createInvoiceFromJob(activeInspection);');
+    expect(jobDetailInvoiceActionSource).toContain('ITEM_BASED_INVOICE_RECOMMENDATION');
+    expect(jobDetailInvoiceActionSource).toContain('COMPLETED_JOB_INVOICE_RECOMMENDATION');
+    expect(jobDetailInvoiceActionSource).not.toContain('automatic');
+    expect(jobDetailInvoiceActionSource).not.toContain('auto-create');
   });
 
   test('dashboard summary stays lightweight and uses existing loaded workflow data', () => {
