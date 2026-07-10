@@ -6,6 +6,58 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-10
 
+- Branch: `codex/demo-mode-foundation-slice-1`
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened the Demo Mode Slice 1 private runner after final-audit findings. The runner now reconciles all non-reset seed runs instead of only the latest succeeded run, refuses likely unregistered scenario residue, verifies the full homeowner/contractor/request/accepted-estimate/job graph, stops broad notification registration, requires demo-owned auth metadata before updating existing users, and rejects broader enabled-looking external-effect flag values.
+- Reason for change: Demo Mode seed/reset must be repeatable and fail closed before a draft PR or dedicated demo environment validation. The correction reduces duplicate/orphan risk, avoids repurposing non-demo auth users by email, and prevents `demo:verify` from falsely passing incomplete scenario data.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `git diff --check`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - No SQL was applied, no Supabase users were provisioned, no seed/reset command was run, no Supabase/Vercel setting was changed, and no deployment occurred.
+  - Dedicated demo-project SQL application and live seed/reset/verify validation remain separate approval steps.
+  - The shared security-catalog test may remain blocked in this checkout while the local Supabase CLI link points to production; do not relink as part of this correction task.
+
+- Branch: `codex/demo-mode-foundation-slice-1`
+- Starting main SHA: `93eff085a991dff7f8eea77efb67b33c3d59c6a1`
+- Files changed:
+  - `servsync-demo-mode-foundation.sql`
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `package.json`
+- Summary of change: Added Demo Mode Slice 1 hidden foundation for a dedicated demo Supabase/Vercel environment. The slice adds private demo scenario/run/record registry SQL, a private seed/reset/verify runner, guarded package scripts, a water-heater core scenario that seeds real ServSync records through request, estimate approval, and accepted-estimate job creation, source-static security tests, and an internal runbook.
+- Reason for change: ServSync needs repeatable, presentation-safe demo data for screenshots, recordings, QA, onboarding, and sales demonstrations without confusing demo records with real customer data or weakening production/shared-sandbox guardrails.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused Demo Mode foundation source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Hidden foundation only. No SQL was applied, no Supabase users were provisioned, no dedicated demo project or Vercel environment was created, no app UI was added, no deployment occurred, and no production or shared-sandbox data was touched.
+  - The seed/reset/verify runner requires separately approved dedicated demo environment variables and the SQL foundation applied to that dedicated demo project before it can run successfully.
+  - Slice 1 stops at job creation. Job progress/completion, invoice, Home History, reminders, messages, documents/media, presentation mode, public demo links, and automated capture tooling remain future separately approved slices.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Added FB-034 Demo Mode / Marketing Capture Environment with hidden-foundation scope, guardrails, and future slice sequence.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now recognizes Demo Mode as internal marketing/QA support infrastructure while explicitly excluding public demo exposure, production SQL, deployment, and external effects.
+
 - Branch: `codex/project-collaboration-hidden-foundation-v1`
 - Starting main SHA: `bf8d67312201f038ec65a9e5185b20e243ad6db5`
 - Files changed:

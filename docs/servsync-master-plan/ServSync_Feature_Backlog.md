@@ -131,6 +131,7 @@ Important guardrails:
 | FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
 | FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Foundation Loop Complete / Closeout Polish Pending | Medium-High | The core foundation loop is complete: Slice 2 SQL/RLS/RPC foundation is merged and production-applied, Slice 3A adds contractor-side template/offer UI, and Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
 | FB-033 | Project Collaboration | Multi-contractor project coordination, project parties, authority, events, job grouping | Hidden Foundation In Progress | Later / Future | Slice 1 adds only a hidden SQL/RLS/RPC/types/test/docs foundation for durable project identity, property association, commercial parties, individual memberships, Project Lead authority, project events, and one-project-per-job association. Runtime mutation gate defaults disabled and profile allowlisting is required. No UI, Beta exposure, Project Board, assignments, invitations, financial sharing, project billing, production SQL application, production allowlist activation, or estimate/invoice permission changes are included. |
+| FB-034 | Demo Mode / Marketing Capture Environment | Demo data, screenshots, recordings, QA/onboarding support | Hidden Foundation Started | Medium | Slice 1 adds a dedicated-demo-project foundation only: private demo registry SQL, a private seed/reset/verify runner, guarded package scripts, a water-heater core scenario through accepted-estimate job creation, focused source-static tests, and an internal runbook. It does not add app UI, public Demo Mode, role switching, media, job completion, invoice/Home History/reminder demo data, production SQL application, shared sandbox use, deployment, external notifications, payments, or production data actions. |
 
 ## Detailed feature notes
 
@@ -1411,6 +1412,45 @@ Recommended implementation sequence:
 
 Current next step:
 Finish Slice 1 PR review and sandbox SQL validation. Do not expose Project Collaboration to ordinary production users, do not apply production SQL, and do not add UI or Beta labeling until a separate exposure slice is approved.
+
+### FB-034 — Demo Mode / Marketing Capture Environment
+
+Status: Hidden Foundation Started
+
+Priority: Medium
+
+Product area:
+
+- Dedicated demo environment
+- Marketing screenshots and recordings
+- QA and onboarding demo support
+- Safe demo seed/reset operations
+
+Product goal:
+Demo Mode should provide a reusable, presentation-safe environment for showing real ServSync workflows without confusing demo records with real customer data. It should use dedicated demo identities, realistic fictional data, repeatable scenarios, and deterministic current-looking dates while preserving normal permissions and lifecycle behavior.
+
+Current status:
+Slice 1 adds a hidden foundation for a dedicated demo Supabase/Vercel environment. It creates private registry tables for demo scenarios, runs, and resettable records; adds a private Node seed/reset/verify runner; provisions dedicated demo auth identities when run against the dedicated demo project; and seeds a water-heater scenario through homeowner request, contractor estimate, homeowner approval, and accepted-estimate job creation. The runner refuses the known production project and the existing shared sandbox project by default and does not print secrets.
+
+MVP guardrails:
+
+- Demo Mode must use a dedicated demo Supabase project and dedicated demo Vercel environment.
+- Demo reset must delete only explicitly registered demo-owned records from an internal allowlist.
+- No broad `is_demo` columns are added to core product tables.
+- No service-role key may appear in browser code.
+- Demo identities and data must be fictional and presentation-safe.
+- Production, shared sandbox, external delivery, payments, webhooks, AI, geocoding, media uploads, and deployment are out of scope for Slice 1.
+- Demo Mode is not a public user feature and must not be marketed as live user-facing functionality.
+
+Recommended implementation sequence:
+
+1. Slice 1: dedicated demo registry foundation, private seed/reset/verify runner, water-heater core scenario through job creation, tests, and runbook.
+2. Future Slice 2: dedicated demo environment provisioning and validation after separate Supabase/Vercel approval.
+3. Future Slice 3: named checkpoints, richer reset controls, and date refresh once the foundation is validated.
+4. Future Slice 4: completed job, invoice, Home History, reminder, documents/media, and presentation/capture tooling after separate audit.
+
+Current next step:
+Audit the Slice 1 implementation, then provision/apply only in a dedicated demo environment after separate approval. Do not apply SQL to production or the existing shared sandbox, do not deploy, and do not create demo auth users until environment approval is explicit.
 
 ## Current next recommended focus
 
