@@ -81,6 +81,25 @@ export type IntegrationOutboxStatus =
   | 'failed'
   | 'dead_letter'
   | 'cancelled';
+export type ProjectStatus = 'active' | 'paused' | 'closed';
+export type ProjectPartyType = 'contractor_company' | 'homeowner';
+export type ProjectPartyStatus = 'invited' | 'active' | 'paused' | 'left' | 'removed';
+export type ProjectPartyMembershipStatus = 'active' | 'paused' | 'revoked';
+export type ProjectAuthorityRole = 'project_lead' | 'controller' | 'manager';
+export type ProjectAuthorityStatus = 'active' | 'revoked' | 'superseded';
+export type ProjectEventType =
+  | 'project_created'
+  | 'project_metadata_updated'
+  | 'creator_party_activated'
+  | 'creator_membership_activated'
+  | 'project_lead_assigned'
+  | 'job_attached';
+export type ProjectEventVisibilityScope =
+  | 'all_active_participants'
+  | 'lead_controllers_managers'
+  | 'specific_project_party'
+  | 'assigned_contractor_and_lead'
+  | 'platform_admin_only';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
 export type JobWorkItemCompletionStatus = 'open' | 'completed' | 'declined' | 'removed';
 export type JobWorkItemBillingStatus = 'unbilled' | 'drafted' | 'invoiced' | 'not_billable';
@@ -161,6 +180,101 @@ export interface EstimatePaymentScheduleItem {
   due_trigger: string;
   sort_order: number;
   linked_invoice_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  status: ProjectStatus;
+  home_id?: string | null;
+  local_home_id?: string | null;
+  original_creator_user_id: string;
+  original_creator_party_type: ProjectPartyType;
+  original_creator_contractor_id?: string | null;
+  original_creator_homeowner_user_id?: string | null;
+  paused_at?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectParty {
+  id: string;
+  project_id: string;
+  party_type: ProjectPartyType;
+  contractor_id?: string | null;
+  homeowner_user_id?: string | null;
+  display_name_snapshot: string;
+  status: ProjectPartyStatus;
+  created_by_user_id?: string | null;
+  activated_at?: string | null;
+  paused_at?: string | null;
+  left_at?: string | null;
+  removed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectPartyMembership {
+  id: string;
+  project_id: string;
+  project_party_id: string;
+  user_id: string;
+  contractor_team_member_id?: string | null;
+  company_role_snapshot: '' | 'owner' | 'admin' | 'office' | 'field_tech' | 'viewer';
+  status: ProjectPartyMembershipStatus;
+  activated_at?: string | null;
+  paused_at?: string | null;
+  revoked_at?: string | null;
+  revoked_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectAuthorityAssignment {
+  id: string;
+  project_id: string;
+  project_party_id: string;
+  project_party_membership_id: string;
+  user_id: string;
+  authority_role: ProjectAuthorityRole;
+  status: ProjectAuthorityStatus;
+  assigned_by_user_id?: string | null;
+  assigned_at: string;
+  revoked_by_user_id?: string | null;
+  revoked_at?: string | null;
+  superseded_by_assignment_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectEvent {
+  id: string;
+  project_id: string;
+  event_type: ProjectEventType;
+  actor_user_id?: string | null;
+  actor_project_party_id?: string | null;
+  subject_project_party_id?: string | null;
+  subject_authority_assignment_id?: string | null;
+  related_inspection_id?: string | null;
+  visibility_scope: ProjectEventVisibilityScope;
+  visible_project_party_id?: string | null;
+  event_details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ProjectCollaborationAllowedProfile {
+  profile_id: string;
+  enabled: boolean;
+  approved_by_user_id?: string | null;
+  approved_at: string;
+  approval_reason: string;
+  expires_at?: string | null;
+  revoked_by_user_id?: string | null;
+  revoked_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1297,6 +1411,7 @@ export interface Inspection {
   job_type?: string;
   job_status?: JobLifecycleStatus;
   estimate_id?: string | null;
+  project_id?: string | null;
   completed_at?: string | null;
   closed_at?: string | null;
   rooms_with_findings: InspectionRoomData[];

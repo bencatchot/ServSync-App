@@ -130,6 +130,7 @@ Important guardrails:
 | FB-030 | Shared Home / Home Access | Homeowner access, shared homes, invites, reminders, permissions | Started / Guarded Partial | High | Home membership foundations, shared-home shells, shared reminder shells, invite UI, disabled email function deployment, DB delivery-enable contract, and Closeout A permission-boundary tests are merged/applied. Production invite email delivery remains disabled; shared record access expands only one approved surface at a time. |
 | FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
 | FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Foundation Loop Complete / Closeout Polish Pending | Medium-High | The core foundation loop is complete: Slice 2 SQL/RLS/RPC foundation is merged and production-applied, Slice 3A adds contractor-side template/offer UI, and Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
+| FB-033 | Project Collaboration | Multi-contractor project coordination, project parties, authority, events, job grouping | Hidden Foundation In Progress | Later / Future | Slice 1 adds only a hidden SQL/RLS/RPC/types/test/docs foundation for durable project identity, property association, commercial parties, individual memberships, Project Lead authority, project events, and one-project-per-job association. Runtime mutation gate defaults disabled and profile allowlisting is required. No UI, Beta exposure, Project Board, assignments, invitations, financial sharing, project billing, production SQL application, production allowlist activation, or estimate/invoice permission changes are included. |
 
 ## Detailed feature notes
 
@@ -1368,6 +1369,48 @@ FB-029 remains reminder/service-plan-lite oriented unless the backlog owner late
 
 Current next step:
 Close out the foundation loop with copy/docs/test alignment. After closeout, pause automation-heavy Service Agreement expansion until a separate backlog item or explicitly approved subtrack is selected; do not add agreement visits, job linking, invoice reminders/drafts, renewals/cancellations, member perks, payments/autopay, reminders, notifications, email/SMS/push, scheduling, Home Timeline writes, or automation without separate approval.
+
+### FB-033 — Project Collaboration
+
+Status: Hidden Foundation In Progress
+
+Priority: Later / Future
+
+Product area:
+
+- Multi-contractor project coordination
+- Project parties and individual authority
+- Project Lead continuity
+- Project event history
+- Future Project Board, assignments, and project cost summary
+
+Product goal:
+Project Collaboration should eventually let homeowners and contractors coordinate multi-party work around one property without forcing ordinary single-contractor jobs into a project workflow too early. The canonical product reference is `docs/servsync-master-plan/ServSync_Project_Collaboration_Spec_v1.md`.
+
+Current status:
+Slice 1 is a hidden SQL/RLS/RPC/types/test/docs foundation only. It creates durable project identity, exactly-one-property association, commercial project parties, individual party memberships, Project Lead authority assignments, append-only project events with structured visibility, and a nullable one-project-per-job association on inspection-backed jobs. Project mutations are disabled by default through `project_collaboration_mutations_enabled` and require a private allowlist. No UI, Beta exposure, production SQL application, production allowlist activation, Project Board, assignments, invitations, pause/close workflow, project billing, financial sharing, estimate/invoice permission changes, or homeowner-led project creation exposure is included.
+
+MVP guardrails:
+
+- Project authority controls ServSync workspace records only; it does not establish legal general-contractor status or control physical work outside ServSync.
+- Use Project Lead, not General Contractor, in product-facing language.
+- Project membership does not grant estimate or invoice access.
+- Project-level authority may never exceed company-level permissions.
+- Property ownership does not automatically grant control over a contractor-created project.
+- Historical creator, party, authority, and event records must remain durable.
+- Runtime gating and allowlisting are required before any mutation RPC can be used.
+- Ordinary production users must not be able to use the hidden foundation through direct RPC calls.
+
+Recommended implementation sequence:
+
+1. Slice 1: hidden SQL/RLS/RPC/types/test/docs foundation with runtime gate and private allowlist.
+2. Future Slice 2: final audit/sandbox validation and production SQL preparation only after separate approval.
+3. Future Slice 3: read-only internal/test project shell if product review approves hidden/internal exposure.
+4. Future Slice 4: limited Beta-labeled project UI only after coherent workflow, kill switch, and support guardrails are approved.
+5. Future separately approved tracks: invitations, participant management, Project Board, assignments, project calendar, pause/close/reopen, succession, Project Cost Summary, financial-access grants, homeowner-created project subscription, and external integrations.
+
+Current next step:
+Finish Slice 1 PR review and sandbox SQL validation. Do not expose Project Collaboration to ordinary production users, do not apply production SQL, and do not add UI or Beta labeling until a separate exposure slice is approved.
 
 ## Current next recommended focus
 

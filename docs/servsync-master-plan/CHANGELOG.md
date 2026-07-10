@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-10
 
+- Branch: `codex/project-collaboration-hidden-foundation-v1`
+- Starting main SHA: `bf8d67312201f038ec65a9e5185b20e243ad6db5`
+- Files changed:
+  - `servsync-project-collaboration-foundation.sql`
+  - `src/types.ts`
+  - `tests/e2e/project-collaboration-foundation.spec.ts`
+  - `tests/e2e/security-catalog.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Project Collaboration Slice 1 hidden foundation. The SQL/RLS/RPC foundation creates durable projects, project parties, individual party memberships, Project Lead authority assignments, append-only project events with structured visibility, a nullable `inspections.project_id` association, a private profile allowlist, and disabled-by-default runtime gating for project mutations. TypeScript types, source-static tests, and security catalog coverage were added.
+- Reason for change: Project Collaboration needs a permission-first database foundation that preserves authority history, company-ceiling boundaries, property association, job grouping, and financial privacy before any UI or Beta exposure is considered.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused Project Collaboration foundation source-static tests
+  - security catalog source-static coverage
+  - estimate schedule invoice generation source-static regression checks
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Hidden foundation only. Runtime mutation gate defaults disabled and a private allowlist is required. No UI, Beta exposure, Project Board, assignments, invitations, homeowner-led project creation exposure, project billing, financial sharing, estimate/invoice permission changes, production SQL application, production allowlist activation, deployment, or production data actions are included.
+  - Sandbox SQL validation remains required before merge consideration, and production SQL preparation/application must be separately authorized later. Sandbox-backed partial-invoicing/security probes were not run from this checkout because the local Supabase link points to production and the required sandbox auth/catalog environment was not loaded.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Added FB-033 Project Collaboration with hidden-foundation status, guardrails, and future slice sequence.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan now recognizes Project Collaboration as a governed, hidden-foundation track while explicitly preserving no-live-feature and no-financial-sharing guardrails.
+
 - Branch: `codex/accepted-estimate-job-handoff-focus-v1`
 - Starting main SHA: `d13a099439e500ad76b15f83770b9d559d3d8a45`
 - Files changed:

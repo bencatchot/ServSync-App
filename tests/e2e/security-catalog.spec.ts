@@ -162,6 +162,12 @@ const CORE_PRIVATE_TABLES = [
   'home_document_upload_events',
   'external_object_mappings',
   'integration_outbox_events',
+  'projects',
+  'project_parties',
+  'project_party_memberships',
+  'project_authority_assignments',
+  'project_events',
+  'project_collaboration_allowed_profiles',
 ];
 
 const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
@@ -184,6 +190,7 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_cancel_service_request_appointment',
   'servsync_create_invoice_from_job',
   'servsync_create_invoice_from_estimate_schedule_item',
+  'servsync_create_project',
   'servsync_create_local_home',
   'servsync_create_home_map_draft',
   'servsync_create_home_property_proposal',
@@ -230,6 +237,8 @@ const BROWSER_CALLABLE_SECURITY_DEFINER_RPCS = [
   'servsync_homeowner_respond_to_service_agreement_offer',
   'servsync_send_service_agreement_offer',
   'servsync_update_local_home',
+  'servsync_update_project',
+  'servsync_attach_job_to_project',
   'servsync_update_connection_shared_properties',
   'servsync_update_service_agreement_template',
   'servsync_upsert_home_map_draft_room',
