@@ -1,7 +1,7 @@
 # ServSync Project Collaboration Specification v1
 
-**Status:** Product direction / canonical planning reference  
-**Implementation status:** Not implemented unless separately confirmed by code, SQL, tests, deployment evidence, or an approved implementation report  
+**Status:** Product direction / canonical planning reference
+**Implementation status:** Not implemented unless separately confirmed by code, SQL, tests, deployment evidence, or an approved implementation report
 **Last updated:** 2026-07-10
 
 ## Purpose
