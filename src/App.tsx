@@ -14526,10 +14526,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const isOpen = viewingInvoiceId === invoice.id;
     const cardTone = options.showPaymentGuidance ? 'invoice' : 'closed';
     const propertyLabel = propertyRecordLabel(invoice, { homes });
-    const invoiceFiled = maintenanceLog.some(entry => entry.invoice_id === invoice.id);
+    const filedInvoiceHomeHistoryEntry = maintenanceLog.find(entry => entry.invoice_id === invoice.id) ?? null;
+    const invoiceFiled = Boolean(filedInvoiceHomeHistoryEntry);
     const invoiceFileable = invoice.status !== 'draft' && invoice.status !== 'void';
     const invoiceRecordLabel = invoice.status === 'paid' ? 'receipt/invoice record' : 'invoice record';
     const totals = persistedFinancialBreakdown(invoice);
+    const openFiledInvoiceHomeHistory = () => {
+      const filedHomeId = filedInvoiceHomeHistoryEntry?.home_id || invoice.home_id;
+      setHomeownerMaintenancePropertyScope(filedHomeId ? 'all' : 'unassigned');
+      setHomeownerTab('log');
+    };
 
     return (
       <div
@@ -14586,20 +14592,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Download size={16} />
             Download PDF
           </button>
-          {invoice.status === 'paid' && (
-            invoiceFiled ? (
+          {invoiceFiled && (
             <button
               type="button"
-              onClick={() => {
-                setHomeownerMaintenancePropertyScope(invoice.home_id ? 'all' : 'unassigned');
-                setHomeownerTab('log');
-              }}
+              onClick={openFiledInvoiceHomeHistory}
+              data-testid="homeowner-view-filed-invoice-home-history"
               className={mobileButtonClass('secondary')}
             >
               <ClipboardList size={16} />
               View Home History
             </button>
-            ) : null
           )}
           {invoiceFileable && (
             <button
@@ -14615,6 +14617,14 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </button>
           )}
         </div>
+        {invoiceFiled && (
+          <p
+            data-testid="homeowner-invoice-filed-next-step-copy"
+            className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-900"
+          >
+            This invoice is saved in Home History. You can add a follow-up reminder there for future service.
+          </p>
+        )}
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
             {invoiceFiled && (

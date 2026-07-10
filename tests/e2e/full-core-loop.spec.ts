@@ -384,8 +384,11 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
   await invoiceCard.getByTestId('homeowner-file-invoice-to-home-history').click();
   expect((await fileInvoiceResponse).ok()).toBeTruthy();
   await expect(invoiceCard.getByText(/Filed to Home History/i)).toBeVisible({ timeout: 30_000 });
+  await expect(invoiceCard.getByTestId('homeowner-invoice-filed-next-step-copy')).toContainText(
+    /This invoice is saved in Home History\. You can add a follow-up reminder there for future service\./i,
+  );
 
-  await openSidebarTab(page, /Home History/i);
+  await invoiceCard.getByTestId('homeowner-view-filed-invoice-home-history').click();
   await expectActiveTabHeading(page, /^Home History$/i);
   await setPropertyScopeAllIfAvailable(main, /^Property$/i);
 
