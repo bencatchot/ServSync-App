@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-10
 
+- Branch: `codex/accepted-estimate-job-handoff-focus-v1`
+- Starting main SHA: `d13a099439e500ad76b15f83770b9d559d3d8a45`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/fb027-contractor-pipeline-summary.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added accepted estimate -> job handoff focus polish. Dashboard and Jobs overview `need jobs` CTAs now route directly to Jobs -> Estimates with the Approved estimate filter active, stale estimate search cleared, and customer filtering cleared so accepted estimates needing jobs are immediately visible. Accepted estimate cards now show compact `Ready for job` or `Job created` helper states and keep Create/View Job primary over direct estimate invoice actions.
+- Reason for change: Controlled beta contractors need clearer next-action confidence after homeowner approval without changing job creation eligibility, invoice eligibility, lifecycle statuses, backend behavior, or the existing estimate invoice path.
+- Tests/checks run:
+  - `git status --short --branch`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+  - focused contractor pipeline summary source-static tests
+  - mobile role shell navigation source-static tests
+  - `npm run typecheck`
+  - `npm run build`
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC/schema changes, Supabase migrations, Edge Functions, backend API changes, new tables, new enums, feature flags, notification work, payment logic, scheduling changes, AI functionality, homeowner workflow changes, manual deployment, or production data actions are included.
+  - The direct estimate invoice action remains available where existing logic allows it, but accepted cards visually prioritize Create/View Job for the normal approved-estimate work handoff.
+  - Sandbox-mutating partial-invoicing tests were not run because this slice did not change invoice/job write paths and those tests require approved sandbox Supabase credentials.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-027 now records accepted estimate job handoff focus, dashboard filter/reset behavior, and job-action hierarchy guardrails.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The core homeowner-approval-to-job workflow now has clearer contractor-facing navigation and helper states without changing backend workflow behavior.
+
 - Branch: `codex/completed-job-invoice-path-guidance-v1`
 - Starting main SHA: `4642556e9efe0ffbf3bb5f119f764c6272150a9f`
 - Files changed:

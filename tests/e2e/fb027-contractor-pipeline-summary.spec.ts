@@ -57,9 +57,17 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(workflowOverviewSource).toContain('Accepted estimates ready for jobs');
     expect(workflowOverviewSource).toContain('Create jobs from approved estimates in the existing Jobs workspace.');
     expect(workflowOverviewSource).toContain('{acceptedEstimatesNeedingJobs.length} need jobs');
-    expect(workflowOverviewSource).toContain("setContractorTab('inspections')");
-    expect(workflowOverviewSource).toContain("setContractorJobsView('open_financial')");
-    expect(workflowOverviewSource).toContain("setInspectionView('list')");
+    expect(workflowOverviewSource).toContain('onClick={openAcceptedEstimatesNeedingJobs}');
+    expect(acceptedEstimateSource).toContain('const openAcceptedEstimatesNeedingJobs = () => {');
+    expect(acceptedEstimateSource).toContain("setContractorTab('inspections')");
+    expect(acceptedEstimateSource).toContain("setContractorFinancialRecordKind('estimates')");
+    expect(acceptedEstimateSource).toContain("setContractorJobsViewAndScroll('open_financial')");
+    expect(acceptedEstimateSource).toContain("setInspectionView('list')");
+    expect(acceptedEstimateSource).toContain('setFocusedEstimateRecordId(null)');
+    expect(acceptedEstimateSource).toContain('setJobsCustomerFilterSubjectId(null)');
+    expect(acceptedEstimateSource).toContain("setContractorEstimateRecordSearch('')");
+    expect(acceptedEstimateSource).toContain("setContractorEstimateRecordStatusFilter('approved')");
+    expect(acceptedEstimateSource).toContain("setContractorEstimateRecordSort('updated_newest')");
     expect(workflowOverviewSource).not.toContain('createJobFromAcceptedEstimate');
 
     for (const unapprovedStatus of ['needs_job', 'job_needed', 'ready_for_job', 'follow_up']) {
@@ -266,7 +274,12 @@ test.describe('FB-027 contractor pipeline summary', () => {
     expect(estimateCardSource).toContain('data-testid="contractor-create-job-from-accepted-estimate"');
     expect(estimateCardSource).toContain('aria-label={`Create job from accepted estimate ${estimate.title}`}');
     expect(estimateCardSource).toContain('onClick={() => void createJobFromAcceptedEstimate(estimate)}');
+    expect(estimateCardSource).toContain('data-testid="accepted-estimate-job-handoff"');
+    expect(estimateCardSource).toContain("hasLinkedJob ? 'Job created' : 'Ready for job'");
+    expect(estimateCardSource).toContain("hasLinkedJob ? 'Continue working from the linked job.' : 'Create a job to begin tracking work.'");
     expect(estimateCardSource).toContain('View Job');
     expect(estimateCardSource).toContain('onClick={() => void openLinkedJobForEstimate(estimate)}');
+    expect(estimateCardSource).toContain("mobileButtonClass(estimate.status === 'accepted' || linkedInvoice ? 'secondary' : 'primary')");
+    expect(estimateCardSource.indexOf('data-testid="contractor-create-job-from-accepted-estimate"')).toBeLessThan(estimateCardSource.indexOf('Create invoice from estimate'));
   });
 });
