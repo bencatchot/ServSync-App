@@ -91,11 +91,12 @@ function captureMajorConsoleErrors(page: Page) {
 async function signIn(page: Page, role: TestRole): Promise<void> {
   const { email, password } = credentialsFor(role);
   await page.goto('/#/role');
-  await page.getByRole('button', { name: role === 'contractor' ? /contractor/i : /homeowner/i }).click();
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.getByRole('button', { name: /sign in/i })).toBeHidden({ timeout: 30_000 });
+  await page.getByRole('button', { name: role === 'contractor' ? /^Contractor$/i : /^Homeowner$/i }).click();
+  const authMain = page.getByRole('main');
+  await authMain.getByLabel(/email/i).fill(email);
+  await authMain.getByLabel(/password/i).fill(password);
+  await authMain.getByRole('button', { name: /^Sign in$/i }).click();
+  await expect(authMain.getByRole('heading', { name: /^Sign in$/i })).toBeHidden({ timeout: 30_000 });
   await dismissTourIfVisible(page);
 }
 
@@ -124,51 +125,16 @@ async function setPropertyScopeAllIfAvailable(page: Page): Promise<void> {
   }
 }
 
-async function chooseConnectedContractorForRequest(page: Page): Promise<void> {
-  const audienceSelect = main(page).getByLabel(/Who should this go to\?/i);
-  await expect(audienceSelect).toBeVisible({ timeout: 10_000 });
-
-  const options = await audienceSelect.locator('option').evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      value: (node as HTMLOptionElement).value,
-      label: (node.textContent || '').trim(),
-      disabled: (node as HTMLOptionElement).disabled,
-    })),
-  );
-
-  const connected = options.find(
-    (option) =>
-      option.value &&
-      !option.disabled &&
-      /contractor|handyman|pro|company|team/i.test(option.label) &&
-      !/discover|marketplace|not connected/i.test(option.label),
-  );
-
-  if (!connected) {
-    throw new Error(
-      `No connected contractor option was available in the sandbox request composer. Options: ${options
-        .map((option) => `${option.label || '(blank)'}=${option.value}`)
-        .join(', ')}`,
-    );
-  }
-
-  await audienceSelect.selectOption(connected.value);
-}
-
 async function advanceServiceRequestComposerToIssueStep(page: Page): Promise<void> {
-  const nextButton = main(page).getByRole('button', { name: /^Next$/i });
-  for (let attempts = 0; attempts < 4; attempts += 1) {
-    const requestTitle = main(page).getByLabel(/Request title/i);
-    if (await isVisible(requestTitle, 700)) {
-      return;
-    }
-    if (!(await isVisible(nextButton, 700))) {
-      break;
-    }
-    await nextButton.click();
+  const issueTextbox = main(page).getByRole('textbox', { name: /^What do you need help with\?$/i });
+  if (await isVisible(issueTextbox, 2_000)) {
+    return;
   }
 
-  await expect(main(page).getByLabel(/Request title/i)).toBeVisible({ timeout: 10_000 });
+  const continueButton = main(page).getByRole('button', { name: /^Continue$/i }).first();
+  await expect(continueButton).toBeEnabled({ timeout: 10_000 });
+  await continueButton.click();
+  await expect(issueTextbox).toBeVisible({ timeout: 10_000 });
 }
 
 async function createHomeownerServiceRequest(page: Page, requestTitle: string): Promise<void> {
@@ -176,9 +142,21 @@ async function createHomeownerServiceRequest(page: Page, requestTitle: string): 
   await setPropertyScopeAllIfAvailable(page);
 
   await main(page).getByRole('button', { name: /New request/i }).click();
-  await main(page).getByRole('button', { name: /What do you need help with\?/i }).click();
-  await chooseConnectedContractorForRequest(page);
   await advanceServiceRequestComposerToIssueStep(page);
+  await main(page).getByRole('textbox', { name: /^What do you need help with\?$/i }).fill('E2E sandbox-only schedule invoice smoke request.');
+  const handymanSuggestion = main(page).getByRole('button', { name: /^Handyman\b/i }).first();
+  if (await isVisible(handymanSuggestion, 5_000)) {
+    await handymanSuggestion.click();
+  } else {
+    await main(page).getByLabel(/^Who should this go to\?/i).selectOption({ label: 'Handyman' });
+  }
+  await main(page).getByRole('button', { name: /^Continue$/i }).click();
+  await expect(main(page).getByText(/^Choose a contractor$/i)).toBeVisible({ timeout: 10_000 });
+  const selectContractor = main(page).getByRole('button', { name: /^Select contractor$/i }).first();
+  await expect(selectContractor).toBeVisible({ timeout: 10_000 });
+  await selectContractor.click();
+  await main(page).getByRole('button', { name: /^Continue$/i }).click();
+  await expect(main(page).getByText(/After you send this/i)).toBeVisible({ timeout: 10_000 });
   await main(page).getByLabel(/Request title/i).fill(requestTitle);
   await main(page).getByLabel(/Message to contractor/i).fill('E2E sandbox-only schedule invoice smoke request.');
 
@@ -188,11 +166,35 @@ async function createHomeownerServiceRequest(page: Page, requestTitle: string): 
   await main(page).getByRole('button', { name: /Send Request/i }).click();
   const response = await createRequest;
   expect(response.ok(), 'service request creation RPC should succeed').toBeTruthy();
-  await expect(main(page).getByText(requestTitle).first()).toBeVisible({ timeout: 15_000 });
+  await expect(main(page).getByText(/Service request sent/i)).toBeVisible({ timeout: 30_000 });
+  await dismissTourIfVisible(page);
+
+  const openPendingRequests = main(page).getByRole('button', { name: /Open \/ Pending Requests/i }).first();
+  if (await isVisible(openPendingRequests, 2_000)) {
+    await openPendingRequests.click();
+  }
+  await expect(
+    main(page).getByTestId('homeowner-service-request-card').filter({ hasText: requestTitle }).first(),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 async function openContractorRequest(page: Page, requestTitle: string): Promise<Locator> {
   await openSidebarTab(page, /Service Requests/i);
+  const skipSetup = main(page).getByRole('button', { name: /^Skip for Now$/i }).first();
+  if (await isVisible(skipSetup, 1_000)) {
+    await skipSetup.click();
+  }
+
+  const newRequestsQueue = main(page).getByRole('button', { name: /^New requests\b/i }).first();
+  if (await isVisible(newRequestsQueue, 2_000)) {
+    await newRequestsQueue.click();
+  }
+
+  const queueSearch = main(page).getByRole('textbox', { name: /^Search this queue$/i }).first();
+  if (await isVisible(queueSearch, 2_000)) {
+    await queueSearch.fill(requestTitle);
+  }
+
   const requestCard = main(page).getByTestId('contractor-service-request-card').filter({ hasText: requestTitle }).first();
   await expect(requestCard).toBeVisible({ timeout: 30_000 });
   return requestCard;
@@ -201,9 +203,15 @@ async function openContractorRequest(page: Page, requestTitle: string): Promise<
 async function openContractorEstimatesTab(page: Page): Promise<void> {
   await openSidebarTab(page, /^Jobs\b/i);
 
-  const estimatesTab = main(page).getByRole('button', { name: /^Estimates$/i }).first();
+  const estimatesTab = main(page).getByRole('tab', { name: /^Estimates\b/i }).first();
   if (await isVisible(estimatesTab, 3_000)) {
     await estimatesTab.click();
+    return;
+  }
+
+  const estimatesButton = main(page).getByRole('button', { name: /^Estimates$/i }).first();
+  if (await isVisible(estimatesButton, 2_000)) {
+    await estimatesButton.click();
     return;
   }
 
@@ -239,7 +247,7 @@ async function createAndSendScheduledEstimateFromRequest(
 
   const scope = main(page).getByRole('textbox', { name: /Scope of work/i });
   if (await isVisible(scope, 1_000)) {
-    await scope.fill('Replace and tune the E2E sandbox schedule invoice workflow.');
+    await scope.fill('Replace and tune the E2E sandbox scheduled billing workflow.');
   }
 
   const terms = main(page).getByRole('textbox', { name: /^Terms$/i });
@@ -266,9 +274,15 @@ async function createAndSendScheduledEstimateFromRequest(
   const scheduleRows = main(page).getByTestId('estimate-payment-schedule-row');
   await expect(scheduleRows).toHaveCount(2);
   await expect(scheduleRows.nth(0)).toContainText(/Deposit/i);
-  await expect(scheduleRows.nth(0)).toContainText(/Due on approval/i);
-  await expect(scheduleRows.nth(1)).toContainText(/Final payment/i);
-  await expect(scheduleRows.nth(1)).toContainText(/Due on completion/i);
+  await expect(scheduleRows.nth(0).getByRole('textbox', { name: /^Payment schedule due trigger$/i })).toHaveValue(
+    /Due on approval/i,
+  );
+  await expect(scheduleRows.nth(1).getByRole('textbox', { name: /^Payment schedule label$/i })).toHaveValue(
+    /Final payment/i,
+  );
+  await expect(scheduleRows.nth(1).getByRole('textbox', { name: /^Payment schedule due trigger$/i })).toHaveValue(
+    /Due on completion/i,
+  );
 
   const saveEstimate = page.waitForResponse((response) => {
     const url = response.url();
@@ -335,7 +349,10 @@ async function acceptHomeownerEstimate(page: Page, estimateTitle: string): Promi
   await estimateCard.getByTestId('homeowner-accept-estimate').click();
   const response = await acceptEstimate;
   expect(response.ok(), 'homeowner accept estimate RPC should succeed').toBeTruthy();
-  await expect(estimateCard).toContainText(/accepted|approved/i, { timeout: 15_000 });
+  await expect(estimateCard.getByRole('button', { name: /Updating/i })).toBeHidden({ timeout: 30_000 });
+  await main(page).getByRole('button').filter({ hasText: /^Accepted Estimates/i }).first().click();
+  const acceptedEstimateCard = main(page).getByTestId('homeowner-estimate-card').filter({ hasText: estimateTitle }).first();
+  await expect(acceptedEstimateCard.getByText(/^Accepted$/i)).toBeVisible({ timeout: 30_000 });
 }
 
 async function acceptedContractorEstimateCard(page: Page, estimateTitle: string): Promise<Locator> {
@@ -377,7 +394,7 @@ test.describe('contractor schedule invoice authenticated smoke', () => {
 
     const timestamp = Date.now();
     const requestTitle = `E2E Schedule Invoice Request ${timestamp}`;
-    const estimateTitle = `E2E Schedule Invoice Estimate ${timestamp}`;
+    const estimateTitle = `E2E Payment Schedule Estimate ${timestamp}`;
 
     const homeownerRequest = await freshRolePage(browser, 'homeowner');
     await createHomeownerServiceRequest(homeownerRequest.page, requestTitle);
@@ -421,9 +438,9 @@ test.describe('contractor schedule invoice authenticated smoke', () => {
 
     estimateCard = await acceptedContractorEstimateCard(contractorInvoice.page, estimateTitle);
     scheduleSection = await expectScheduleSummary(estimateCard, 1, 2, '$100.00');
-    await expect(scheduleSection.getByTestId('contractor-estimate-payment-schedule-summary')).toContainText(
-      /Draft invoice created/i,
-    );
+    const linkedInvoiceSummary = scheduleSection.getByTestId('contractor-estimate-payment-schedule-summary');
+    await expect(linkedInvoiceSummary).toContainText(/Loaded invoice statuses/i);
+    await expect(linkedInvoiceSummary).toContainText(/1 draft/i);
     scheduleRows = scheduleSection.getByTestId('contractor-estimate-payment-schedule-row');
 
     await expect(scheduleRows.nth(0)).toContainText(/Draft invoice created/i);
@@ -447,6 +464,7 @@ test.describe('contractor schedule invoice authenticated smoke', () => {
 test.describe('contractor schedule invoice smoke source guards', () => {
   test('keeps the schedule-row invoice UI on the approved RPC path', async () => {
     const source = await readFile(path.join(REPO_ROOT, 'src/App.tsx'), 'utf8');
+    const fullCoreSmokeSource = await readFile(path.join(REPO_ROOT, 'tests/e2e/full-core-loop.spec.ts'), 'utf8');
 
     expect(source).toContain('servsync_create_invoice_from_estimate_schedule_item');
     expect(source).toContain('contractor-create-schedule-invoice');
@@ -465,5 +483,22 @@ test.describe('contractor schedule invoice smoke source guards', () => {
     expect(scheduleInvoiceHandler).not.toContain(".from('estimate_payment_schedule_items')");
     expect(scheduleInvoiceHandler).not.toContain('linked_invoice_id');
     expect(scheduleInvoiceHandler).not.toMatch(/home history|home_history|stripe|quickbooks|sendgrid|twilio/i);
+
+    expect(fullCoreSmokeSource).toContain("const PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN = 'ALLOW_PRODUCTION_TEST_ACCOUNT_SMOKE';");
+    expect(fullCoreSmokeSource).toContain('process.env[PRODUCTION_TEST_ACCOUNT_SMOKE_OPT_IN] === \'true\'');
+    expect(fullCoreSmokeSource).toContain('url.includes(SANDBOX_SUPABASE_REF)');
+    expect(fullCoreSmokeSource).toContain('productionConnectedTestAccountRun');
+    expect(fullCoreSmokeSource).toContain('SUPABASE_SERVICE_ROLE_KEY');
+
+    const workItemCompletionStart = fullCoreSmokeSource.indexOf('async function markSeededPricedWorkItemsCompleted');
+    expect(workItemCompletionStart, 'work-item completion helper should exist').toBeGreaterThanOrEqual(0);
+    const workItemCompletionEnd = fullCoreSmokeSource.indexOf('async function setPropertyScopeAllIfAvailable', workItemCompletionStart);
+    expect(workItemCompletionEnd, 'work-item completion helper should be bounded').toBeGreaterThan(workItemCompletionStart);
+    const workItemCompletionHelper = fullCoreSmokeSource.slice(workItemCompletionStart, workItemCompletionEnd);
+
+    expect(workItemCompletionHelper).toContain('productionConnectedTestAccountRun');
+    expect(workItemCompletionHelper).toContain('productionTestAccountSmokeOptedIn');
+    expect(workItemCompletionHelper).toContain('process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()');
+    expect(workItemCompletionHelper).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY[^?]*requiredEnv/);
   });
 });
