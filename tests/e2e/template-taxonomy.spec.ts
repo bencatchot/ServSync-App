@@ -68,132 +68,57 @@ test.describe('Jobs template taxonomy', () => {
     expect(savedWorkTemplatesSource).not.toContain('beginFieldWorkForLocalContact');
   });
 
-  test('selected customer context can create manual invoice drafts from saved work templates without sending or creating jobs', () => {
+  test('selected customer estimates panel does not render template catalogs as customer records', () => {
     const source = appSource();
-    const selectedCustomerTemplateSource = sourceBetween(
+    const selectedCustomerEstimatePanelSource = sourceBetween(
       source,
-      'Create Manual Invoice Draft uses the selected customer context only.',
-      '{activeDocumentRecords.length === 0 ? (',
-    );
-    const invoiceTemplateDraftSource = sourceBetween(
-      source,
-      'function invoiceDraftFromTemplate(',
-      'function invoiceTemplateStartNoticeForTemplate',
-    );
-    const applyInvoiceTemplateSource = sourceBetween(
-      source,
-      'const applySavedEstimateTemplateInvoiceDraft =',
-      'const applySavedEstimateTemplateManualJobStart =',
+      "{(activeTabId === 'estimates' || activeTabId === 'invoices') && (",
+      "{activeTabId === 'requests' && conn && (",
     );
 
-    expect(selectedCustomerTemplateSource).toContain('Create Manual Invoice Draft');
-    expect(selectedCustomerTemplateSource).toContain('Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending.');
-    expect(selectedCustomerTemplateSource).toContain('This does not create a job or estimate and does not send the invoice.');
-    expect(selectedCustomerTemplateSource).toContain('applySavedEstimateTemplateInvoiceDraft(template, subjectName');
-    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordHomeId');
-    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordLocalHomeId');
-
-    expect(invoiceTemplateDraftSource).toContain('title: `Invoice — ${template.name}');
-    expect(invoiceTemplateDraftSource).toContain('scope: template.scope');
-    expect(invoiceTemplateDraftSource).toContain('notes: template.notes');
-    expect(invoiceTemplateDraftSource).toContain('terms: template.terms');
-    expect(invoiceTemplateDraftSource).toContain('line_type: normalizeEstimateLineType(line.line_type)');
-    expect(invoiceTemplateDraftSource).toContain('line_title: line.line_title');
-    expect(invoiceTemplateDraftSource).toContain('customer_description: line.customer_description');
-    expect(invoiceTemplateDraftSource).toContain('model_spec: line.model_spec');
-    expect(invoiceTemplateDraftSource).toContain('supply_status: normalizeEstimateLineSupplyStatus(line.supply_status)');
-    expect(invoiceTemplateDraftSource).toContain('quantity: String(line.quantity)');
-    expect(invoiceTemplateDraftSource).toContain('unit: line.unit');
-    expect(invoiceTemplateDraftSource).toContain('unit_price: lineUnitPriceInputFromCents(line.unit_price_cents)');
-    expect(invoiceTemplateDraftSource).toContain('labor_hours: laborHoursInputFromValue(line.labor_hours)');
-
-    expect(applyInvoiceTemplateSource).toContain('setInvoiceDraft(invoiceDraftFromTemplate(template');
-    expect(applyInvoiceTemplateSource).toContain('setInvoiceTemplateStartNotice(invoiceTemplateStartNoticeForTemplate(template))');
-    expect(applyInvoiceTemplateSource).toContain('setInvoiceComposerOpen(true)');
-    expect(applyInvoiceTemplateSource).toContain('setEstimateComposerOpen(false)');
-    expect(applyInvoiceTemplateSource).not.toContain('saveInvoiceDraft');
-    expect(applyInvoiceTemplateSource).not.toContain('sendInvoiceToHomeowner');
-    expect(applyInvoiceTemplateSource).not.toContain('startNewInspection');
-    expect(applyInvoiceTemplateSource).not.toContain('beginFieldWorkForHomeowner');
-    expect(applyInvoiceTemplateSource).not.toContain('beginFieldWorkForLocalContact');
-    expect(applyInvoiceTemplateSource).not.toContain('createInvoiceFromEstimate');
-    expect(applyInvoiceTemplateSource).not.toContain('createInvoiceFromJob');
+    expect(selectedCustomerEstimatePanelSource).toContain('Create estimate');
+    expect(selectedCustomerEstimatePanelSource).toContain('selectedDocumentSection.estimates.map(estimate =>');
+    expect(selectedCustomerEstimatePanelSource).toContain('recordPropertyLabelForContractor(estimate)');
+    expect(selectedCustomerEstimatePanelSource).toContain('noSubjectEstimateCopy');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('ServSync estimate starters');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Search estimate templates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('visibleStarterEstimateTemplates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('visibleEstimateTemplates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Saved Work Templates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Create Manual Invoice Draft');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Start Manual Job');
   });
 
-  test('selected customer context can start manual job forms from saved work templates without copying line items or creating jobs', () => {
+  test('intentional estimate creation flow still offers saved templates without direct invoice or job actions', () => {
     const source = appSource();
-    const selectedCustomerTemplateSource = sourceBetween(
+    const beginEstimateSource = sourceBetween(
       source,
-      'Create Manual Invoice Draft uses the selected customer context only.',
-      '{activeDocumentRecords.length === 0 ? (',
+      'const beginEstimateDraftForCustomer =',
+      'const beginInvoiceDraftFromEstimate =',
     );
-    const manualJobTemplateStartSource = sourceBetween(
+    const estimateStartChoiceSource = sourceBetween(
       source,
-      'const applySavedEstimateTemplateManualJobStart =',
-      'const closeActiveInvoiceEditor =',
+      'const renderEstimateStartChoice =',
+      'const renderSavedEstimateTemplateStartPicker =',
     );
-    const beginFieldWorkSource = sourceBetween(
+    const templatePickerSource = sourceBetween(
       source,
-      'type BeginFieldWorkOptions =',
-      'const fieldWorkSubjectLabel =',
-    );
-    const newJobFormSource = sourceBetween(
-      source,
-      "{inspectionView === 'new' && (",
-      "{inspectionView === 'detail' && activeInspection && (() => {",
+      'const renderSavedEstimateTemplateStartPicker =',
+      'const renderBuildEstimateDraftPanel =',
     );
 
-    expect(selectedCustomerTemplateSource).toContain('Start Manual Job');
-    expect(selectedCustomerTemplateSource).toContain('Start Manual Job uses the selected customer context only.');
-    expect(selectedCustomerTemplateSource).toContain('Start Manual Job copies this template’s name and scope only.');
-    expect(selectedCustomerTemplateSource).toContain('Template line items and pricing are not copied to the job.');
-    expect(selectedCustomerTemplateSource).toContain('Add job work items after creating the job if you want to track tasks for completion or invoicing.');
-    expect(selectedCustomerTemplateSource).toContain('Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing.');
-    expect(selectedCustomerTemplateSource).toContain('applySavedEstimateTemplateManualJobStart(template, subjectName');
-    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordHomeId');
-    expect(selectedCustomerTemplateSource).toContain('workspaceNewRecordLocalHomeId');
-
-    expect(manualJobTemplateStartSource).toContain('const jobName = `${template.name}');
-    expect(manualJobTemplateStartSource).toContain("scope: template.scope || ''");
-    expect(manualJobTemplateStartSource).toContain("workflowKind: 'work_order'");
-    expect(manualJobTemplateStartSource).toContain("templateSource: 'blank'");
-    expect(manualJobTemplateStartSource).toContain('manualJobTemplateStartNoticeForTemplate()');
-    expect(manualJobTemplateStartSource).toContain('setEstimateComposerOpen(false)');
-    expect(manualJobTemplateStartSource).toContain('setInvoiceComposerOpen(false)');
-    expect(manualJobTemplateStartSource).toContain('beginFieldWorkForHomeowner(options.connection');
-    expect(manualJobTemplateStartSource).toContain('beginFieldWorkForLocalContact(options.localContact');
-    expect(manualJobTemplateStartSource).not.toContain('line_items');
-    expect(manualJobTemplateStartSource).not.toContain('unit_price');
-    expect(manualJobTemplateStartSource).not.toContain('unit_price_cents');
-    expect(manualJobTemplateStartSource).not.toContain('quantity');
-    expect(manualJobTemplateStartSource).not.toContain('labor_hours');
-    expect(manualJobTemplateStartSource).not.toContain('terms');
-    expect(manualJobTemplateStartSource).not.toContain('model_spec');
-    expect(manualJobTemplateStartSource).not.toContain('supply_status');
-    expect(manualJobTemplateStartSource).not.toContain('startNewInspection');
-    expect(manualJobTemplateStartSource).not.toContain('servsync_create_field_work');
-    expect(manualJobTemplateStartSource).not.toContain('servsync_create_job_work_item');
-    expect(manualJobTemplateStartSource).not.toContain('servsync_sync_simple_job_work_items');
-    expect(manualJobTemplateStartSource).not.toContain('saveManualWorkItem');
-    expect(manualJobTemplateStartSource).not.toContain('saveInvoiceDraft');
-    expect(manualJobTemplateStartSource).not.toContain('sendInvoiceToHomeowner');
-    expect(manualJobTemplateStartSource).not.toContain('estimateDraftFromTemplate');
-    expect(manualJobTemplateStartSource).not.toContain('invoiceDraftFromTemplate');
-
-    expect(beginFieldWorkSource).toContain('scope?: string');
-    expect(beginFieldWorkSource).toContain('manualJobTemplateStartNotice?: string');
-    expect(beginFieldWorkSource).toContain("scope: options?.scope ?? ''");
-    expect(beginFieldWorkSource).toContain("setManualJobTemplateStartNotice(options?.manualJobTemplateStartNotice ?? '')");
-    expect(beginFieldWorkSource).not.toContain('estimateTemplates');
-    expect(beginFieldWorkSource).not.toContain('estimateDraftFromTemplate');
-    expect(beginFieldWorkSource).not.toContain('invoiceDraftFromTemplate');
-    expect(beginFieldWorkSource).not.toContain('saveInvoiceDraft');
-    expect(beginFieldWorkSource).not.toContain('sendInvoiceToHomeowner');
-
-    expect(newJobFormSource).toContain('manualJobTemplateStartNotice');
-    expect(newJobFormSource).toContain('Job name');
-    expect(newJobFormSource).toContain('Scope / description');
-    expect(newJobFormSource).toContain('Create job');
+    expect(beginEstimateSource).toContain("setEstimateStartMode('choose')");
+    expect(beginEstimateSource).toContain('setEstimateComposerOpen(true)');
+    expect(estimateStartChoiceSource).toContain('Choose estimate template');
+    expect(estimateStartChoiceSource).toContain("setEstimateStartMode('template')");
+    expect(templatePickerSource).toContain('estimateTemplates.map(template =>');
+    expect(templatePickerSource).toContain('Use for Estimate');
+    expect(templatePickerSource).toContain('applySavedEstimateTemplateStart(template, subjectName)');
+    expect(templatePickerSource).not.toContain('Create Manual Invoice Draft');
+    expect(templatePickerSource).not.toContain('Start Manual Job');
+    expect(templatePickerSource).not.toContain('invoiceDraftFromTemplate');
+    expect(templatePickerSource).not.toContain('beginFieldWorkForHomeowner');
+    expect(templatePickerSource).not.toContain('beginFieldWorkForLocalContact');
   });
 
   test('home-scoped inspection checklist UI no longer uses general Home Templates labels', () => {

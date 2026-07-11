@@ -64,17 +64,37 @@ test.describe('contractor selected-homeowner estimates tile', () => {
     expect(estimatesCardSource).not.toContain('visibleEstimateTemplates');
   });
 
-  test('keeps the saved templates area on the dedicated template collections', () => {
+  test('keeps starter and saved template catalogs out of the selected-customer estimates panel', () => {
     const source = appSource();
-    const selectedCustomerTemplateSource = sourceBetween(
+    const selectedCustomerEstimatePanelSource = sourceBetween(
       source,
-      'Saved Work Templates',
-      '{activeDocumentRecords.length === 0 ? (',
+      "{(activeTabId === 'estimates' || activeTabId === 'invoices') && (",
+      "{activeTabId === 'requests' && conn && (",
+    );
+    const estimateCreationFlowSource = sourceBetween(
+      source,
+      'const beginEstimateDraftForCustomer =',
+      'const beginInvoiceDraftFromEstimate =',
+    ) + sourceBetween(
+      source,
+      'const renderEstimateStartChoice =',
+      'const renderBuildEstimateDraftPanel =',
     );
 
-    expect(selectedCustomerTemplateSource).toContain('{visibleEstimateTemplates.length} shown of {estimateTemplates.length}');
-    expect(selectedCustomerTemplateSource).toContain('visibleEstimateTemplates.length');
-    expect(selectedCustomerTemplateSource).toContain('visibleEstimateTemplates.map(template =>');
-    expect(selectedCustomerTemplateSource).toContain('Start faster with a reusable scope, terms, and line-item structure.');
+    expect(selectedCustomerEstimatePanelSource).toContain('Create estimate');
+    expect(selectedCustomerEstimatePanelSource).toContain('activeDocumentRecords.length === 0');
+    expect(selectedCustomerEstimatePanelSource).toContain('selectedDocumentSection.estimates.map(estimate =>');
+    expect(selectedCustomerEstimatePanelSource).toContain('noSubjectEstimateCopy');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('ServSync estimate starters');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Search estimate templates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('visibleStarterEstimateTemplates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('visibleEstimateTemplates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Saved Work Templates');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Create Manual Invoice Draft');
+    expect(selectedCustomerEstimatePanelSource).not.toContain('Start Manual Job');
+
+    expect(estimateCreationFlowSource).toContain('setEstimateStartMode(\'choose\')');
+    expect(estimateCreationFlowSource).toContain('Choose estimate template');
+    expect(estimateCreationFlowSource).toContain('renderSavedEstimateTemplateStartPicker');
   });
 });
