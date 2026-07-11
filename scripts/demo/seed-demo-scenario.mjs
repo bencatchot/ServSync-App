@@ -979,7 +979,7 @@ async function sendEstimate(contractorClient, estimateId, dates) {
   return { estimateId };
 }
 
-async function acceptEstimate(homeownerClient, service, runId, estimateId) {
+async function acceptEstimate(homeownerClient, service, runId, estimateId, dates) {
   await ensureOk(
     await homeownerClient.rpc('servsync_homeowner_respond_to_estimate', {
       p_estimate_id: estimateId,
@@ -998,19 +998,27 @@ async function acceptEstimate(homeownerClient, service, runId, estimateId) {
     'Unable to inspect demo estimate approval workflow event'
   );
   for (const event of events || []) {
+    await ensureOk(
+      await service.from('workflow_activity_events').update({ created_at: dates.estimateAcceptedAt }).eq('id', event.id),
+      'Unable to normalize demo estimate approval workflow event date'
+    );
     await registerRecord(service, runId, 'workflow_activity_events', event.id, 'demo_estimate_approved_event', 'estimate_accepted');
   }
 
   return { estimateId, approvalEventCount: events?.length || 0 };
 }
 
-async function createJobFromEstimate(contractorClient, service, runId, estimateId) {
+async function createJobFromEstimate(contractorClient, service, runId, estimateId, dates) {
   const result = await ensureOk(
     await contractorClient.rpc('servsync_create_job_from_estimate', { p_estimate_id: estimateId }),
     'Unable to create demo job from accepted estimate through contractor RPC'
   );
 
   const jobId = result.job_id;
+  await ensureOk(
+    await service.from('inspections').update({ created_at: dates.jobCreatedAt, updated_at: dates.jobCreatedAt }).eq('id', jobId),
+    'Unable to normalize demo job creation date'
+  );
   await registerCreatedRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_created');
 
   const workItems = await ensureOk(
@@ -1026,6 +1034,10 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
     'Unable to inspect demo workflow events'
   );
   for (const event of events || []) {
+    await ensureOk(
+      await service.from('workflow_activity_events').update({ created_at: dates.jobCreatedAt }).eq('id', event.id),
+      'Unable to normalize demo job-created workflow event date'
+    );
     await registerRecord(service, runId, 'workflow_activity_events', event.id, 'demo_job_created_event', 'job_created');
   }
 
@@ -1454,7 +1466,7 @@ export function verifyEstimateApprovalWorkflowEvent(issues, { estimate, events }
 export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events }) {
   if (!estimate || !job) {
     issues.push('Accepted estimate workflow event verification requires both estimate and job records.');
-    return;
+    return null;
   }
 
   const estimateApprovedEvent = verifyEstimateApprovalWorkflowEvent(issues, { estimate, events });
@@ -1475,6 +1487,19 @@ export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, ev
   }
   if (jobCreatedEvent) {
     assertOrderedTimestamps(issues, 'Estimate creation before job creation event', estimate.created_at, jobCreatedEvent.created_at);
+  }
+
+  return { estimateApprovedEvent, jobCreatedEvent };
+}
+
+export function verifyScheduledVisitTimestampOrdering(issues, { job, visitEvent, jobCreatedEvent = null }) {
+  if (!job || !visitEvent) {
+    return;
+  }
+
+  assertOrderedTimestamps(issues, 'Job creation before scheduled visit', job.created_at, visitEvent.scheduled_at);
+  if (jobCreatedEvent) {
+    assertOrderedTimestamps(issues, 'Job creation event before scheduled visit', jobCreatedEvent.created_at, visitEvent.scheduled_at);
   }
 }
 
@@ -1965,8 +1990,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (requiresAccepted && estimate) {
     verifyEstimateApprovalWorkflowEvent(issues, { estimate, events: workflowEvents });
   }
+  let acceptedEstimateWorkflowEvidence = null;
   if (requiresJob && estimate && job) {
-    verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events: workflowEvents });
+    acceptedEstimateWorkflowEvidence = verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events: workflowEvents });
   }
   if (!requiresAccepted) {
     const approvalEvents = filterScenarioWorkflowEvents(workflowEvents, {
@@ -1994,7 +2020,11 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     issues.push('Demo Slice 2B must not fabricate job_completed workflow events.');
   }
   if (requiresJobScheduled && job && visitEvents[0]) {
-    assertOrderedTimestamps(issues, 'Job creation before scheduled visit', job.created_at, visitEvents[0].scheduled_at);
+    verifyScheduledVisitTimestampOrdering(issues, {
+      job,
+      visitEvent: visitEvents[0],
+      jobCreatedEvent: acceptedEstimateWorkflowEvidence?.jobCreatedEvent,
+    });
   }
   if (requiresJobCompleted && job && visitEvents[0]) {
     assertOrderedTimestamps(issues, 'Scheduled visit before job completion', visitEvents[0].scheduled_at, job.completed_at);
@@ -2134,13 +2164,13 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
     }
 
     if (checkpointRequires(checkpointKey, 'estimateAccepted')) {
-      const { approvalEventCount } = await acceptEstimate(homeownerClient, service, runId, created.estimateId);
+      const { approvalEventCount } = await acceptEstimate(homeownerClient, service, runId, created.estimateId, dates);
       created.approvalEventCount = approvalEventCount;
       executedSteps.push('estimateAccepted');
     }
 
     if (checkpointRequires(checkpointKey, 'jobCreated')) {
-      const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, created.estimateId);
+      const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, created.estimateId, dates);
       created.jobId = jobId;
       created.jobWorkItemCount = workItemCount;
       created.openWorkItemCount = workItemCount;

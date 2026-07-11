@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/fix-demo-job-scheduled-timestamps`
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed Demo Mode Slice 2B scheduled-job checkpoint timestamp ordering by normalizing demo-owned RPC-created approval/job workflow events and the linked demo job row into the anchor-based date sequence before scheduled-visit verification.
+- Reason for change: Dedicated-demo live validation found that `servsync_create_job_from_estimate` created the job and `job_created` event at real execution time, while the runner normalized the visit to an earlier anchor-derived timestamp, causing `job_scheduled` verification to fail.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Source/docs/test fix only. The failed dedicated-demo run remains for a separately approved recovery/live-validation rerun; no remote seed/reset/verify, additional SQL, Vercel, production, shared-sandbox, invoice, Home History, report, media, payment, notification, or external-effect action is included.
+
 - Branch: `codex/demo-mode-job-checkpoints-slice-2b`
 - Files changed:
   - `servsync-demo-mode-foundation.sql`
