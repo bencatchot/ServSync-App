@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/fix-homeowner-estimates-tile`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-homeowner-estimates-tile.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Corrected the contractor selected-homeowner Estimates tile so it summarizes real estimate records for the selected connected homeowner or local customer, uses all properties for the tile count, excludes invoice-like legacy estimate records, removes template wording from the tile copy, and always opens the customer-filtered Jobs → Estimates list instead of routing empty states to new estimate creation.
+- Reason for change: The homeowner profile tile was blending estimate-record and template language and used the property-scoped estimate collection even though the relationship-level tile should represent actual estimates for that homeowner/customer across their connected properties.
+- Tests/checks run:
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-homeowner-estimates-tile.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium --grep "Jobs overview uses clarified template helper copy|Templates library separates saved work templates|global Saved Work Templates keep direct-job starts future-only|selected customer context can create manual invoice drafts|selected customer context can start manual job forms|saved work templates still use estimate template data|direct service job creation remains separate"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "Jobs financial records split estimates and invoices behind section tabs|edited estimate draft save returns to the saved estimate record"`
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/test/docs-only correction. No SQL/RLS/RPC/schema, Supabase, Vercel, deployment, production-data, estimate lifecycle, invoice, job, or template behavior changes are included.
+  - `npm run lint` remains blocked by the repository's ESLint 9 / `@typescript-eslint/no-unused-expressions` rule-loading mismatch. A full `template-taxonomy` run also still hits an existing broad `home_map` forbidden-string assertion, while the focused template/estimate separation subset passes.
+
 - Branch: `codex/demo-mode-checkpoints-slice-2a`
 - Files changed:
   - `scripts/demo/scenarios/water-heater-core-loop.mjs`
