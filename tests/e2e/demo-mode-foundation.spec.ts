@@ -181,8 +181,111 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(script).toMatch(/Demo service request is not linked to the expected homeowner, contractor, connection, and title/);
     expect(script).toMatch(/Demo estimate is not accepted or not linked to the expected request\/homeowner\/contractor\/home/);
     expect(script).toMatch(/Demo job is not linked to the accepted estimate and expected scenario records/);
+    expect(script).toMatch(/verifyAcceptedEstimateWorkflowEvents\(issues, \{ estimate, job, events: workflowEvents \}\)/);
+    expect(script).toMatch(/Estimate approval event before job creation event/);
     expect(script).toMatch(/Expected exactly one job linked to the demo estimate/);
     expect(script).toMatch(/Demo verification failed/);
+  });
+
+  test('verify uses accepted-estimate workflow events instead of trigger-managed estimate updated_at', async () => {
+    const module = await import('../../scripts/demo/seed-demo-scenario.mjs');
+    const issues: string[] = [];
+
+    module.verifyAcceptedEstimateWorkflowEvents(issues, {
+      estimate: {
+        id: 'estimate-current',
+        status: 'accepted',
+        created_at: '2026-07-10T22:50:41.833Z',
+        updated_at: '2026-07-11T04:50:45.364Z',
+      },
+      job: {
+        id: 'job-current',
+        estimate_id: 'estimate-current',
+        created_at: '2026-07-11T03:50:41.833Z',
+      },
+      events: [
+        {
+          event_type: 'estimate_approved',
+          estimate_id: 'estimate-current',
+          inspection_id: null,
+          created_at: '2026-07-11T04:50:45.242Z',
+          metadata: { source_rpc: 'servsync_homeowner_respond_to_estimate' },
+        },
+        {
+          event_type: 'job_created',
+          estimate_id: 'estimate-current',
+          inspection_id: 'job-current',
+          created_at: '2026-07-11T04:50:45.364Z',
+          metadata: { source_rpc: 'servsync_create_job_from_estimate' },
+        },
+      ],
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  test('verify rejects missing, stale, or unrelated accepted-estimate workflow evidence', async () => {
+    const module = await import('../../scripts/demo/seed-demo-scenario.mjs');
+    const baseEstimate = {
+      id: 'estimate-current',
+      status: 'accepted',
+      created_at: '2026-07-10T22:50:41.833Z',
+      updated_at: '2026-07-11T04:50:45.364Z',
+    };
+    const baseJob = {
+      id: 'job-current',
+      estimate_id: 'estimate-current',
+      created_at: '2026-07-11T04:50:45.360Z',
+    };
+    const jobEvent = {
+      event_type: 'job_created',
+      estimate_id: 'estimate-current',
+      inspection_id: 'job-current',
+      created_at: '2026-07-11T04:50:45.364Z',
+      metadata: { source_rpc: 'servsync_create_job_from_estimate' },
+    };
+
+    const missingApprovalIssues: string[] = [];
+    module.verifyAcceptedEstimateWorkflowEvents(missingApprovalIssues, {
+      estimate: baseEstimate,
+      job: baseJob,
+      events: [jobEvent],
+    });
+    expect(missingApprovalIssues).toContain('Estimate approval workflow event count expected 1, found 0.');
+
+    const staleApprovalIssues: string[] = [];
+    module.verifyAcceptedEstimateWorkflowEvents(staleApprovalIssues, {
+      estimate: baseEstimate,
+      job: baseJob,
+      events: [
+        {
+          event_type: 'estimate_approved',
+          estimate_id: 'estimate-prior-run',
+          inspection_id: null,
+          created_at: '2026-07-11T04:50:45.242Z',
+          metadata: { source_rpc: 'servsync_homeowner_respond_to_estimate' },
+        },
+        jobEvent,
+      ],
+    });
+    expect(staleApprovalIssues).toContain('Estimate approval workflow event count expected 1, found 0.');
+
+    const wrongStatusIssues: string[] = [];
+    module.verifyAcceptedEstimateWorkflowEvents(wrongStatusIssues, {
+      estimate: { ...baseEstimate, status: 'sent' },
+      job: baseJob,
+      events: [
+        {
+          event_type: 'estimate_approved',
+          estimate_id: 'estimate-current',
+          inspection_id: null,
+          created_at: '2026-07-11T04:50:45.242Z',
+          metadata: { source_rpc: 'servsync_homeowner_respond_to_estimate' },
+        },
+        jobEvent,
+      ],
+    });
+    expect(wrongStatusIssues).toContain('Demo estimate must be accepted before workflow event ordering can be verified.');
   });
 
   test('auth reconciliation requires explicit demo ownership metadata', () => {
@@ -219,6 +322,15 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(new Date(dates.estimateSentAt).getTime()).toBeLessThan(new Date(dates.estimateAcceptedAt).getTime());
     expect(new Date(dates.estimateAcceptedAt).getTime()).toBeLessThan(new Date(dates.jobCreatedAt).getTime());
     expect(new Date(dates.jobCreatedAt).getTime()).toBeLessThan(new Date(dates.visitWindowStart).getTime());
+  });
+
+  test('script does not patch trigger-managed estimate acceptance timestamps directly', () => {
+    const script = read(scriptPath);
+
+    expect(script).not.toMatch(/updated_at:\s*dates\.estimateAcceptedAt/);
+    expect(script).not.toMatch(/Estimate acceptance update before job creation/);
+    expect(script).not.toMatch(/Unable to set demo estimate accepted date/);
+    expect(script).toMatch(/Estimate approval event before job creation event/);
   });
 
   test('package scripts and runbook describe private dedicated-demo usage only', () => {

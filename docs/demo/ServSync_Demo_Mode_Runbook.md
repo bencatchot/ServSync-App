@@ -124,8 +124,8 @@ The runner uses a reset-time anchor timestamp. Relative dates are regenerated fr
 - Connection predates the request.
 - Request appears about one day before the anchor.
 - Estimate appears after the request.
-- Estimate acceptance appears after the estimate is sent.
-- Job creation appears after acceptance.
+- Estimate approval is verified through the durable `estimate_approved` workflow activity event created by the homeowner response RPC. The runner does not treat trigger-managed `estimates.updated_at` as a dedicated acceptance timestamp.
+- Job creation is verified through the durable `job_created` workflow activity event and the linked job record created by the accepted-estimate-to-job RPC.
 
 Use `DEMO_ANCHOR_TIMESTAMP` only when a recording needs a deterministic timestamp. Otherwise the runner uses the current time.
 
@@ -163,7 +163,7 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 - Matching public profiles, homeowner profile, and contractor profile/company.
 - One intended demo home, active connection, required connection permissions, service request, accepted estimate, and linked job.
 - Registry rows that point to real supported records with no duplicate registry target.
-- Valid date ordering from connection to request, estimate, acceptance, and job creation.
+- Valid date ordering from connection to request and estimate creation, plus exact workflow activity evidence that the accepted-estimate approval event precedes the job-created event for the same estimate/job.
 
 `verify` exits non-zero if any required check fails.
 
