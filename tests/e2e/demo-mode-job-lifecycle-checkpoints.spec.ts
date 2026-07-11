@@ -79,15 +79,42 @@ test.describe('Demo Mode Slice 2B job lifecycle checkpoint source checks', () =>
     const script = read(scriptPath);
 
     expect(script).toMatch(/job\.job_status !== checkpoint\.expected\.jobStatus/);
+    expect(script).toMatch(/created_at: dates\.jobCreatedAt, updated_at: dates\.jobCreatedAt/);
+    expect(script).toMatch(/workflow_activity_events'\)\.update\(\{ created_at: dates\.jobCreatedAt \}/);
+    expect(script).toMatch(/workflow_activity_events'\)\.update\(\{ created_at: dates\.estimateAcceptedAt \}/);
     expect(script).toMatch(/verifyExactJobWorkItemOwnership\(issues, \{ registeredWorkItemIds: jobWorkItemIds, jobWorkItems \}\)/);
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.completedWorkItemCount\} completed job work items/);
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.openWorkItemCount\} open job work items/);
     expect(script).toMatch(/verifyExactVisitEventOwnership\(issues, \{ registeredVisitEventIds: visitEventIds, visitEvents \}\)/);
+    expect(script).toMatch(/verifyScheduledVisitTimestampOrdering\(issues/);
     expect(script).toMatch(/visitEvent\.share_with_homeowner !== false/);
     expect(script).toMatch(/scenarioInvoices\.length !== 0/);
     expect(script).toMatch(/homeHistoryRows\.length !== 0/);
     expect(script).toMatch(/const workflowEventClauses = \[estimateId \? `estimate_id\.eq\.\$\{estimateId\}`/);
     expect(script).toMatch(/Scheduled visit before job completion/);
+  });
+
+  test('scheduled visit verification rejects wall-clock job timestamps after normalized visit times', async () => {
+    const runner = await import('../../scripts/demo/seed-demo-scenario.mjs');
+
+    const liveFailureIssues: string[] = [];
+    runner.verifyScheduledVisitTimestampOrdering(liveFailureIssues, {
+      job: { created_at: '2026-07-11T15:49:07.406948+00:00' },
+      visitEvent: { scheduled_at: '2026-07-11T15:04:04.124+00:00' },
+      jobCreatedEvent: { created_at: '2026-07-11T15:49:07.406948+00:00' },
+    });
+    expect(liveFailureIssues).toEqual([
+      'Job creation before scheduled visit timestamp ordering is invalid.',
+      'Job creation event before scheduled visit timestamp ordering is invalid.',
+    ]);
+
+    const normalizedIssues: string[] = [];
+    runner.verifyScheduledVisitTimestampOrdering(normalizedIssues, {
+      job: { created_at: '2026-07-11T14:49:04.124+00:00' },
+      visitEvent: { scheduled_at: '2026-07-11T15:04:04.124+00:00' },
+      jobCreatedEvent: { created_at: '2026-07-11T14:49:04.124+00:00' },
+    });
+    expect(normalizedIssues).toEqual([]);
   });
 
   test('job-completed verification rejects current-job events without relying on estimate linkage', async () => {

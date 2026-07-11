@@ -167,8 +167,8 @@ The runner uses a reset-time anchor timestamp. Relative dates are regenerated fr
 - Connection predates the request.
 - Request appears about one day before the anchor.
 - Estimate appears after the request.
-- Estimate approval is verified through the durable `estimate_approved` workflow activity event created by the homeowner response RPC. The runner does not treat trigger-managed `estimates.updated_at` as a dedicated acceptance timestamp.
-- Job creation is verified through the durable `job_created` workflow activity event and the linked job record created by the accepted-estimate-to-job RPC.
+- Estimate approval is verified through the durable `estimate_approved` workflow activity event created by the homeowner response RPC. The runner normalizes that demo-owned event into the anchor-based date sequence, but it does not treat trigger-managed `estimates.updated_at` as a dedicated acceptance timestamp.
+- Job creation is verified through the durable `job_created` workflow activity event and the linked job record created by the accepted-estimate-to-job RPC. The runner normalizes the demo-owned job row and job-created event into the anchor-based date sequence before later checkpoint verification.
 - Job scheduling uses the product `servsync_schedule_visit_event` RPC with `share_with_homeowner=false`, then normalizes the registered visit event timestamp from the anchor so recordings remain current-looking.
 - Job progress and review-ready checkpoints use controlled fixture transitions because ServSync does not yet expose dedicated start-job or review-ready RPCs.
 - Lightweight job completion mirrors the current simple job completion boundary: it marks the job completed and completes the linked visit event without finalizing a report, creating an invoice, uploading storage, filing Home History, or notifying the homeowner.
