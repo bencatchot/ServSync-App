@@ -118,19 +118,76 @@ test.describe('Demo presentation mode guard and source wiring', () => {
       'const presentationCurrentJob = activeJobRecords[0]',
       'const workspaceCards: Array<',
     );
-    const presentationCardSource = sourceBetween(
-      app,
-      'data-testid="demo-presentation-current-job-summary"',
-      '<div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">',
-    );
 
     expect(selectedHomeownerSource).toContain('const subjectEstimateRecordsAcrossProperties = rawSubjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== \'Invoice\');');
     expect(presentationSummarySource).toContain('const presentationCurrentJob = activeJobRecords[0] ?? workOrderRecords[0] ?? inspectionRecords[0] ?? null;');
     expect(presentationSummarySource).toContain('const presentationCurrentJobItems = presentationCurrentJob ? workItemsForJob(presentationCurrentJob.id) : [];');
     expect(presentationSummarySource).toContain('const presentationCurrentJobProperty = presentationCurrentJob ? recordPropertyLabelForContractor(presentationCurrentJob) : \'\';');
-    expect(presentationCardSource).toContain('{presentationCurrentJob.name}');
-    expect(presentationCardSource).toContain('{presentationCurrentJobProgress}');
-    expect(presentationCardSource).toContain('Property: {presentationCurrentJobProperty}');
+    expect(presentationSummarySource).toContain('data-testid="demo-presentation-current-job-summary"');
+    expect(presentationSummarySource).toContain('{presentationCurrentJob.name}');
+    expect(presentationSummarySource).toContain('{presentationCurrentJobCopy}');
+    expect(presentationSummarySource).toContain('{presentationCurrentJobProgress}');
+    expect(presentationSummarySource).toContain('Property: {presentationCurrentJobProperty}');
+  });
+
+  test('selected-homeowner presentation summary appears on the default profile and jobs views', () => {
+    const app = sourceFile('src/App.tsx');
+    const profileViewSource = sourceBetween(
+      app,
+      "{activeTabId === 'profile' && (",
+      "{activeTabId === 'home' && (",
+    );
+    const jobsViewSource = sourceBetween(
+      app,
+      "{activeTabId === 'fieldwork' && (",
+      "{(activeTabId === 'estimates' || activeTabId === 'invoices') && (",
+    );
+
+    expect(profileViewSource).toContain('{renderDemoPresentationCurrentJobSummary()}');
+    expect(profileViewSource).toContain('Profile');
+    expect(jobsViewSource).toContain('{renderDemoPresentationCurrentJobSummary()}');
+    expect(jobsViewSource).toContain('Jobs dashboard');
+  });
+
+  test('presentation mode hides property suggestion mutation without removing normal code', () => {
+    const app = sourceFile('src/App.tsx');
+    const propertySuggestionSource = sourceBetween(
+      app,
+      'const renderConnectedPropertySuggestions = () => {',
+      '{isLoadingSuggestions && proposals.length === 0 ? (',
+    );
+
+    expect(propertySuggestionSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && (');
+    expect(propertySuggestionSource).toContain('Suggest property');
+    expect(propertySuggestionSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && isSuggesting && (');
+    expect(propertySuggestionSource).toContain('openConnectedPropertyProposalForm(connectionId)');
+  });
+
+  test('contractor Jobs workspace surfaces the current checkpoint story for capture', () => {
+    const app = sourceFile('src/App.tsx');
+    const storySource = sourceBetween(
+      app,
+      'const demoPresentationCurrentContractorJob = openJobs[0]',
+      'const estimateSourceProperty = (draft: Pick<EstimateDraft',
+    );
+    const jobsOverviewSource = sourceBetween(
+      app,
+      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'new_financial' && (",
+    );
+    const jobsListSource = sourceBetween(
+      app,
+      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{showLocalContactForm && (",
+    );
+
+    expect(storySource).toContain('data-testid="demo-presentation-jobs-checkpoint-story"');
+    expect(storySource).toContain('{demoPresentationCurrentContractorJob.name}');
+    expect(storySource).toContain('{demoPresentationCurrentContractorJobCopy}');
+    expect(storySource).toContain('{demoPresentationCurrentContractorJobProgress}');
+    expect(storySource).toContain('Property: {demoPresentationCurrentContractorJobProperty}');
+    expect(jobsOverviewSource).toContain('{renderDemoPresentationJobsCheckpointStory()}');
+    expect(jobsListSource).toContain('{renderDemoPresentationJobsCheckpointStory()}');
   });
 
   test('PR 279 template-free selected-homeowner estimate behavior remains intact', () => {

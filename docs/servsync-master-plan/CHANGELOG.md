@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-presentation-followup-2c-a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/demo-presentation-mode.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Refined Demo Mode Slice 2C-A presentation controls so the contractor selected-homeowner default Profile view and Jobs view visibly show the current demo job title, property context, checkpoint-safe copy, and work-item progress. The contractor Jobs workspace now surfaces the current checkpoint story near the top of the capture surface, and the mutating `Suggest property` control is hidden in presentation mode while remaining available in normal mode.
+- Reason for change: Live dedicated-demo validation showed that the presentation-only job summary was wired to an unreachable selected-homeowner `overview` tab, the selected-homeowner Jobs view did not show the checkpoint story, the contractor Jobs capture surface needed clearer above-the-fold narrative context, and the property suggestion action remained visible during capture.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-presentation-mode.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL, demo runner, reset allowlist, auth, Supabase/Vercel settings, production/shared-sandbox data, browser checkpoint controls, role switching, invoice, Home History, report/PDF, media, reminder, payment, notification delivery, deployment, or external-effect changes are included.
+  - Presentation capture still requires manual live review against the dedicated demo deployment after the PR is merged and the demo Vercel project is rebuilt.
+
 - Branch: `codex/demo-presentation-controls-slice-2c-a`
 - Files changed:
   - `src/App.tsx`
