@@ -33893,6 +33893,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const subjectEstimates = rawSubjectEstimates.filter(matchesWorkspacePropertyScope);
                     const invoiceRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) === 'Invoice');
                     const estimateRecords = subjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
+                    const subjectEstimateRecordsAcrossProperties = rawSubjectEstimates.filter(estimate => estimateDocumentLabel(estimate) !== 'Invoice');
+                    const subjectEstimateDraftCountAcrossProperties = subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'draft').length;
+                    const subjectEstimateAcceptedCountAcrossProperties = subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'accepted').length;
+                    const noSubjectEstimateCopy = isConn ? 'No estimates for this homeowner yet' : 'No estimates for this customer yet';
                     const connReqs = rawConnReqs.filter(matchesWorkspacePropertyScope);
                     const workspaceUnassignedRecordCount = propertyScopeEnabled
                       ? rawFieldWork.filter(work => isConn ? !work.home_id : !work.local_home_id).length
@@ -34077,10 +34081,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {
                         id: 'estimates',
                         label: 'Estimates',
-                        value: String(estimateRecords.length),
-                        helper: estimateRecords.length > 0 ? 'Drafts, sent work, and templates' : 'Use templates or create a draft',
+                        value: String(subjectEstimateRecordsAcrossProperties.length),
+                        helper: subjectEstimateRecordsAcrossProperties.length > 0 ? 'Estimate records for this customer' : noSubjectEstimateCopy,
                         icon: <Receipt size={15} />,
-                        tone: estimateRecords.length > 0 ? 'blue' : 'slate',
+                        tone: subjectEstimateRecordsAcrossProperties.length > 0 ? 'blue' : 'slate',
                       },
                       {
                         id: 'schedule',
@@ -34145,14 +34149,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       },
                       {
                         label: 'Estimates',
-                        value: String(estimateRecords.length),
-                        helper: `${draftEstimateCount} draft${draftEstimateCount === 1 ? '' : 's'} · ${estimateRecords.filter(estimate => estimate.status === 'accepted').length} accepted`,
+                        value: String(subjectEstimateRecordsAcrossProperties.length),
+                        helper: subjectEstimateRecordsAcrossProperties.length > 0
+                          ? `${subjectEstimateDraftCountAcrossProperties} draft${subjectEstimateDraftCountAcrossProperties === 1 ? '' : 's'} · ${subjectEstimateAcceptedCountAcrossProperties} accepted`
+                          : noSubjectEstimateCopy,
                         icon: <Receipt size={16} />,
-                        tone: estimateRecords.some(estimate => estimate.status === 'accepted') ? 'emerald' : draftEstimateCount > 0 ? 'amber' : 'slate',
+                        tone: subjectEstimateAcceptedCountAcrossProperties > 0 ? 'emerald' : subjectEstimateDraftCountAcrossProperties > 0 ? 'amber' : 'slate',
                         onClick: () => {
                           if (workspaceSubjectFilterId) setJobsCustomerFilterSubjectId(workspaceSubjectFilterId);
-                          setHomeownerWorkspaceEstimateView(estimateRecords.some(estimate => estimate.status === 'accepted') ? 'accepted' : draftEstimateCount > 0 ? 'draft' : 'sent');
-                          setContractorJobsView(estimateRecords.length > 0 ? 'open_financial' : 'new_financial');
+                          setFocusedEstimateRecordId(null);
+                          setContractorFinancialRecordKind('estimates');
+                          setHomeownerWorkspaceEstimateView(subjectEstimateAcceptedCountAcrossProperties > 0 ? 'accepted' : subjectEstimateDraftCountAcrossProperties > 0 ? 'draft' : 'sent');
+                          setContractorJobsView('open_financial');
                           setContractorTab('inspections');
                         },
                       },
