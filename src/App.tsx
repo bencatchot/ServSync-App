@@ -14538,19 +14538,21 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Receipt size={16} />
             {isOpen ? 'Hide Details' : options.needsReview ? 'Review Estimate' : 'View Details'}
           </button>
-          <button
-            type="button"
-            onClick={() => void downloadEstimatePdf(estimate, {
-              contractorName,
-              customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
-              customerAddress: home?.address_line1 || '',
-              contractorLogoUrl: estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url || null,
-            }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
-            className={buttonClass('secondary')}
-          >
-            <Download size={16} />
-            Download PDF
-          </button>
+          {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+            <button
+              type="button"
+              onClick={() => void downloadEstimatePdf(estimate, {
+                contractorName,
+                customerName: homeowner?.display_name || profile.full_name || 'Homeowner',
+                customerAddress: home?.address_line1 || '',
+                contractorLogoUrl: estimateConnection?.logo_url || estimateDirectoryContractor?.logo_url || null,
+              }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
+              className={buttonClass('secondary')}
+            >
+              <Download size={16} />
+              Download PDF
+            </button>
+          )}
           {linkedRequest && (
             <button
               type="button"
@@ -14580,7 +14582,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </div>
               </div>
             )}
-            {estimate.status === 'accepted' && (
+            {!SERVSYNC_DEMO_PRESENTATION_MODE && estimate.status === 'accepted' && (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"

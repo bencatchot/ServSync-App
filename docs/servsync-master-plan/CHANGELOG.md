@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-presentation-homeowner-estimate-cleanup`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/demo-presentation-mode.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hid homeowner accepted-estimate `Download PDF`, `File to Home History`, and `View Home History` action buttons while dedicated-demo presentation mode is active. The accepted estimate title, contractor context, line items, totals, approval copy, linked-job context, and normal non-presentation PDF/Home History behavior remain intact.
+- Reason for change: Live dedicated-demo validation after PR #284 showed the homeowner accepted-estimate detail capture surface still exposed PDF and Home History actions even though report/PDF/Home History workflows are intentionally outside the current Demo Mode recording story.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-presentation-mode.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL, demo runner, reset allowlist, auth, Supabase/Vercel settings, production/shared-sandbox data, browser checkpoint controls, role switching, invoice creation, Home History filing, report/PDF generation, media, reminder mutation, payment, notification delivery, deployment, or external-effect changes are included.
+  - Presentation capture still requires manual live review against the dedicated demo deployment after the PR is merged and the demo Vercel project is rebuilt.
+
 - Branch: `codex/demo-presentation-cleanup-slice-2c-a`
 - Files changed:
   - `src/App.tsx`
