@@ -243,6 +243,42 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(activeWorkSource).toContain('Job created from this estimate.');
   });
 
+  test('homeowner accepted-estimate detail hides PDF and Home History actions only in presentation mode', () => {
+    const app = sourceFile('src/App.tsx');
+    const estimateCardSource = sourceBetween(
+      app,
+      'const renderHomeownerEstimateCard = (estimate: Estimate',
+      'const renderHomeownerEstimatesInvoicesPage = () => (',
+    );
+    const estimateActionSource = sourceBetween(
+      estimateCardSource,
+      '<div className="mt-3 flex flex-wrap items-center gap-2">',
+      '{isOpen && (',
+    );
+    const acceptedActionSource = sourceBetween(
+      estimateCardSource,
+      "{!SERVSYNC_DEMO_PRESENTATION_MODE && estimate.status === 'accepted' && (",
+      '{estimate.scope &&',
+    );
+
+    expect(estimateActionSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && (');
+    expect(estimateActionSource).toContain('downloadEstimatePdf(estimate');
+    expect(estimateActionSource).toContain('Download PDF');
+    expect(estimateActionSource).toContain('View Request');
+
+    expect(acceptedActionSource).toContain('fileEstimateToHomeRecords(estimate, contractorName)');
+    expect(acceptedActionSource).toContain('File to Home History');
+    expect(acceptedActionSource).toContain("onClick={() => setHomeownerTab('log')}");
+    expect(acceptedActionSource).toContain('View Home History');
+
+    expect(estimateCardSource).toContain('You accepted this estimate.');
+    expect(estimateCardSource).toContain('The contractor has created a job from this approved estimate.');
+    expect(estimateCardSource).toContain('{estimate.scope &&');
+    expect(estimateCardSource).toContain('estimate.line_items');
+    expect(estimateCardSource).toContain('Payment Schedule');
+    expect(estimateCardSource).toContain('Total <strong className="text-slate-950">{formatMoney(estimate.total_cents)}</strong>');
+  });
+
   test('PR 279 template-free selected-homeowner estimate behavior remains intact', () => {
     const app = sourceFile('src/App.tsx');
     const selectedCustomerEstimatePanelSource = sourceBetween(
