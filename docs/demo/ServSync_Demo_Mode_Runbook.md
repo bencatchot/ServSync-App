@@ -102,10 +102,11 @@ The command output reports safe identifiers, run reconciliation summaries, verif
 
 ## Supported Slice 2A and Slice 2B Checkpoints
 
-Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints, without invoice creation, Home History filing, report finalization, media, storage, public controls, or browser checkpoint controls. Slice 2C-A adds a dedicated-demo-only presentation mode that makes these checkpoints easier to capture visually while preserving the underlying product states.
+Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation. The `contractor_discovery_ready` checkpoint adds a pre-connection opening state for recording Sarah finding Gulf Coast Home Services and requesting a connection through the existing homeowner contractor search/profile path. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints, without invoice creation, Home History filing, report finalization, media, storage, public controls, or browser checkpoint controls. Slice 2C-A adds a dedicated-demo-only presentation mode that makes these checkpoints easier to capture visually while preserving the underlying product states.
 
 | Checkpoint | Primary role | Purpose | Expected records |
 | --- | --- | --- | --- |
+| `contractor_discovery_ready` | Homeowner | Pre-connection contractor discovery opening clip. | Homeowner profile, Demo Bay Home, public/searchable Gulf Coast contractor profile; no connection, request, estimate, job, visit, invoice, Home History, media, reminder, report, or payment records. |
 | `request_ready` | Homeowner | Fresh homeowner request for water-heater replacement. | Property, connection, one service request; no estimate or job. |
 | `contractor_review_ready` | Contractor | Contractor-readable request state. This is a narrative checkpoint, not a fabricated product status. | Property, connection, one service request; no estimate or job. |
 | `estimate_draft` | Contractor | Contractor draft estimate with line items and payment schedule rows. | One draft estimate; no sent evidence, approval event, or job. |
@@ -124,6 +125,8 @@ Deferred checkpoints are not supported in Slice 2B and must not be claimed as av
 Checkpoint seed uses one canonical lifecycle path and advances only as far as the selected checkpoint. It does not keep independent per-checkpoint seed scripts.
 
 Before any seed, the runner resets all non-reset seed runs for the scenario, including `started`, `failed`, and `succeeded` runs. Moving from a later checkpoint to an earlier checkpoint therefore uses reset-and-rebuild behavior. For example, seeding `job_created` and then seeding `request_ready` removes the registered job, estimate, workflow-event, and request rows from the old run, then rebuilds only the request-ready graph while preserving the demo auth identities.
+
+The `contractor_discovery_ready` checkpoint intentionally stops before creating a connection. During recording, the homeowner may use the real UI to send the existing connection request, which creates a pending `homeowner_request` connection. On the next guarded reset/seed, the runner may register that exact pending Sarah-to-Gulf-Coast connection, its permission row, and its connection audit events to the discovery run before invoking the canonical registered-record reset. This is limited to the exact demo homeowner, exact demo contractor, status `pending`, and source `homeowner_request`; it does not add a broad cleanup path and it does not auto-accept the connection.
 
 `demo:verify` behavior is checkpoint-aware:
 
@@ -159,7 +162,8 @@ Scenario records:
 - Populated homeowner profile.
 - Populated contractor profile/company.
 - One property with a garage utility area and water-heater asset.
-- Active homeowner-contractor connection with only the permissions needed for this workflow.
+- `contractor_discovery_ready` only: no homeowner-contractor connection yet, so the homeowner can record finding Gulf Coast Home Services and sending the existing connection request.
+- Connected workflow checkpoints: active homeowner-contractor connection with only the permissions needed for this workflow.
 - Service request: `Replace leaking water heater`.
 - Estimate with realistic fictional line items, notes, terms, and structured payment schedule rows.
 - Homeowner acceptance through the existing estimate response RPC.
@@ -211,6 +215,7 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 
 Checkpoint-specific verification includes:
 
+- `contractor_discovery_ready`: requires the homeowner profile, Demo Bay Home, and the public/searchable Gulf Coast contractor profile, then forbids any homeowner-to-Gulf-Coast connection row, water-heater request, estimate, job, visit event, invoice, Home History row, report/media/reminder/payment artifact, or downstream workflow record.
 - `request_ready`: requires one request and forbids estimates, jobs, approval events, and job-created events.
 - `contractor_review_ready`: requires the same request graph in a contractor-readable state without fabricating a durable request status.
 - `estimate_draft`: requires one draft estimate with line items and payment schedule rows, and forbids sent evidence, approval events, and jobs.

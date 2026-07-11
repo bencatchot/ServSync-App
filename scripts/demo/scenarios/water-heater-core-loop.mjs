@@ -1,6 +1,7 @@
 export const scenarioKey = 'water_heater_core_loop';
 
 export const supportedCheckpointKeys = [
+  'contractor_discovery_ready',
   'request_ready',
   'contractor_review_ready',
   'estimate_draft',
@@ -27,6 +28,7 @@ export const lifecycleStepKeys = [
   'identities',
   'profilesAndCompany',
   'property',
+  'contractorDiscovery',
   'connection',
   'request',
   'contractorReview',
@@ -41,6 +43,23 @@ export const lifecycleStepKeys = [
 ];
 
 export const checkpointDefinitions = [
+  {
+    key: 'contractor_discovery_ready',
+    displayName: 'Contractor Discovery Ready',
+    primaryRole: 'homeowner',
+    narrativePurpose:
+      'Show Sarah finding Gulf Coast Home Services in homeowner contractor search/profile surfaces before sending a connection request.',
+    requiredSteps: ['identities', 'profilesAndCompany', 'property', 'contractorDiscovery'],
+    expected: {
+      connectionCount: 0,
+      requestCount: 0,
+      estimateCount: 0,
+      jobCount: 0,
+      visitEventCount: 0,
+      invoiceCount: 0,
+      homeHistoryCount: 0,
+    },
+  },
   {
     key: 'request_ready',
     displayName: 'Fresh Homeowner Request',
@@ -465,6 +484,7 @@ export const dateOffsets = {
 };
 
 export const presentationNotes = [
+  'Use contractor_discovery_ready for the homeowner find-and-connect opening clip before any connection exists.',
   'Use request_ready for homeowner request screenshots.',
   'Use contractor_review_ready for contractor intake screenshots.',
   'Use estimate_draft for contractor editing screenshots.',
