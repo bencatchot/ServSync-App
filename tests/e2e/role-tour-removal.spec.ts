@@ -50,7 +50,7 @@ test.describe('automatic role tour removal', () => {
       'const completedHomeownerOnboardingCount =',
     );
 
-    expect(appSource).toContain('const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;');
+    expect(appSource).toContain('const showInitialHomeSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE && !loading && homes.length === 0 && !homeSetupSkipped;');
     expect(setupPromptSource).toContain('Home setup');
     expect(setupPromptSource).toContain('Tell us about your home');
     expect(setupPromptSource).toContain('Save home profile');
@@ -59,7 +59,7 @@ test.describe('automatic role tour removal', () => {
     expect(onboardingSource).toContain('Connect with a contractor');
     expect(onboardingSource).toContain('Request service');
     expect(onboardingSource).toContain('Review an estimate or invoice');
-    expect(appSource).toContain('const showHomeownerOnboardingChecklist = completedHomeownerOnboardingCount < homeownerOnboardingItems.length;');
+    expect(appSource).toContain('const showHomeownerOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE && completedHomeownerOnboardingCount < homeownerOnboardingItems.length;');
     expect(appSource).toContain('Set up your home record');
   });
 
@@ -76,7 +76,7 @@ test.describe('automatic role tour removal', () => {
       'const completedContractorOnboardingCount =',
     );
 
-    expect(appSource).toContain('const showInitialContractorProfileSetupPrompt = !loading');
+    expect(appSource).toContain('const showInitialContractorProfileSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE');
     expect(setupPromptSource).toContain('Business setup');
     expect(setupPromptSource).toContain('Set up your business profile');
     expect(setupPromptSource).toContain('Set Up Business Profile');
@@ -85,7 +85,7 @@ test.describe('automatic role tour removal', () => {
     expect(onboardingSource).toContain('Add your first customer');
     expect(onboardingSource).toContain('Send your first estimate');
     expect(onboardingSource).toContain('Send your first invoice');
-    expect(appSource).toContain('const showContractorOnboardingChecklist = completedContractorOnboardingCount < contractorOnboardingItems.length;');
+    expect(appSource).toContain('const showContractorOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE && completedContractorOnboardingCount < contractorOnboardingItems.length;');
     expect(appSource).toContain('Follow the core workflow once, then this checklist gets out of the way.');
   });
 });
