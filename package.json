@@ -11,6 +11,7 @@
     "demo:seed": "node scripts/demo/seed-demo-scenario.mjs seed water_heater_core_loop",
     "demo:reset": "node scripts/demo/seed-demo-scenario.mjs reset water_heater_core_loop",
     "demo:verify": "node scripts/demo/seed-demo-scenario.mjs verify water_heater_core_loop",
+    "demo:checkpoints": "node scripts/demo/seed-demo-scenario.mjs checkpoints",
     "qa": "npm run typecheck && npm run build",
     "qa:e2e": "npm run typecheck && npm run build && npm run test:e2e",
     "qa:e2e:geocoding": "playwright test tests/e2e/discover-geocoding-radius.spec.ts",
