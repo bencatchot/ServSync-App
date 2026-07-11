@@ -4,6 +4,38 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-11
+
+- Branch: `codex/remove-role-tour-ui`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/localStorage.ts`
+  - `tests/e2e/role-tour-removal.spec.ts`
+  - `tests/e2e/mobile-smoke.spec.ts`
+  - `tests/e2e/full-core-loop.spec.ts`
+  - `tests/e2e/fb021-scheduling-foundation.spec.ts`
+  - `tests/e2e/fb025-job-message-thread-ui.spec.ts`
+  - `tests/e2e/contractor-estimate-schedule-invoice-smoke.spec.ts`
+  - `tests/e2e/signout-local-storage.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Removed the automatic homeowner and contractor role-based onboarding tour UI and its dedicated local-storage state while preserving the initial property/business-profile setup prompts and the existing homeowner/contractor onboarding checklists.
+- Reason for change: The automatic role tour duplicated more actionable setup prompts and checklist guidance. Future help should be searchable, task-specific, and optionally guided, including safe Demo Mode practice where appropriate, rather than an automatic post-setup card.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - deleted-tour source scan
+- Known risks or follow-ups:
+  - Previously saved `servsync.homeowner.walkthroughSkipped:{profileId}` and `servsync.contractor.walkthroughSkipped:{profileId}` browser values may remain harmlessly in user local storage; no migration or cleanup was added.
+  - `npm run lint` is currently blocked before linting this change by the repository's ESLint 9 / `@typescript-eslint/no-unused-expressions` rule-loading mismatch.
+  - `tests/e2e/home-setup-clarity.spec.ts` was attempted as adjacent homeowner setup coverage, but existing stale Home Map/assets expectations fail against current `main`; the focused tour-removal regression passes.
+  - No searchable help center, guided walkthrough system, Demo Mode change, SQL/RLS/RPC/schema change, Supabase change, Vercel change, deployment, or production data action is included.
+
 ## 2026-07-10
 
 - Branch: `codex/demo-mode-acceptance-timestamp-fix`

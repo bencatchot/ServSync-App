@@ -18,17 +18,6 @@ async function loginMobile(page: Page, role: TestRole) {
   await expect(page.getByText(role === 'contractor' ? /Contractor command center/i : /Home command center/i)).toBeVisible({ timeout: 30_000 });
 }
 
-async function dismissTourIfVisible(page: Page) {
-  const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
-  for (let index = 0; index < await skipTour.count(); index += 1) {
-    const candidate = skipTour.nth(index);
-    if (await candidate.isVisible({ timeout: 500 }).catch(() => false)) {
-      await candidate.click({ force: true });
-      break;
-    }
-  }
-}
-
 function mobileHeader(page: Page): Locator {
   return page.locator('div.md\\:hidden').first();
 }
@@ -66,7 +55,6 @@ test.describe('mobile read-only smoke', () => {
     const main = page.getByRole('main');
 
     await loginMobile(page, 'homeowner');
-    await dismissTourIfVisible(page);
     await expectNoHorizontalOverflow(page);
     await expect(main.getByText(/Home command center/i)).toBeVisible();
     await expect(main.getByText(/Upcoming reminders/i)).toBeVisible();
@@ -100,7 +88,6 @@ test.describe('mobile read-only smoke', () => {
     const main = page.getByRole('main');
 
     await loginMobile(page, 'contractor');
-    await dismissTourIfVisible(page);
     await expectNoHorizontalOverflow(page);
     await expect(main.getByText(/Contractor command center/i)).toBeVisible();
 
@@ -140,7 +127,6 @@ test.describe('iPhone SE homeowner properties mobile layout', () => {
     const main = page.getByRole('main');
 
     await loginMobile(page, 'homeowner');
-    await dismissTourIfVisible(page);
 
     await openMobileTab(page, /^Properties\b/i, 'Properties', false);
     await expect(main.getByRole('heading', { level: 2, name: /^Home \/ Properties$/i })).toBeVisible();

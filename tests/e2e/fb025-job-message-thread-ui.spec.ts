@@ -228,7 +228,6 @@ async function freshRolePage(browser: Browser, role: 'contractor' | 'homeowner')
   }
   const consoleErrors = captureMajorConsoleErrors(page);
   await loginAs(page, role);
-  await dismissTourIfVisible(page);
   return { context, page, consoleErrors };
 }
 
@@ -240,16 +239,7 @@ async function freshContractorPage(browser: Browser, credentials: TestCredential
   });
   const consoleErrors = captureMajorConsoleErrors(page);
   await loginAsContractorWithCredentials(page, credentials);
-  await dismissTourIfVisible(page);
   return { context, page, consoleErrors };
-}
-
-async function dismissTourIfVisible(page: Page) {
-  const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
-  for (let attempts = 0; attempts < 3; attempts += 1) {
-    if (!(await skipTour.first().isVisible({ timeout: 500 }).catch(() => false))) return;
-    await skipTour.first().click({ force: true });
-  }
 }
 
 async function openHomeownerJobThread(page: Page, requestTitle: string) {
@@ -268,7 +258,6 @@ async function openContractorJobThread(page: Page, estimateTitle: string) {
   const main = page.getByRole('main');
   await openSidebarTab(page, /^Jobs\b/i);
   await expectActiveTabHeading(page, /^Jobs$/i);
-  await dismissTourIfVisible(page);
   const openJobsTile = main.getByRole('button', { name: /Open Jobs/i }).first();
   if (await openJobsTile.isVisible({ timeout: 1_000 }).catch(() => false)) {
     await openJobsTile.click();

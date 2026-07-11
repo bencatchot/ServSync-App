@@ -243,11 +243,6 @@ async function openRequestCard(page: Page, testId: string, title: string) {
   await openSidebarTab(page, /Service Requests/i);
   await expectActiveTabHeading(page, /^Service Requests$/i);
 
-  const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
-  if (await skipTour.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await skipTour.click();
-  }
-
   if (testId === 'homeowner-service-request-card') {
     const propertyFilter = main.getByLabel(/^Property$/i);
     if (await propertyFilter.isVisible({ timeout: 2_000 }).catch(() => false)) {

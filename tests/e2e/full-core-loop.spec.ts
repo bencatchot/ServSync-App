@@ -22,28 +22,11 @@ function appContextOptions() {
   };
 }
 
-async function dismissTourIfVisible(page: Page) {
-  const skipTour = page.getByRole('button', { name: /^Skip Tour$/i });
-  for (let attempts = 0; attempts < 3; attempts += 1) {
-    let visibleSkip: Locator | null = null;
-    for (let index = 0; index < await skipTour.count(); index += 1) {
-      const candidate = skipTour.nth(index);
-      if (await candidate.isVisible({ timeout: 500 }).catch(() => false)) {
-        visibleSkip = candidate;
-        break;
-      }
-    }
-    if (!visibleSkip) return;
-    await visibleSkip.click({ force: true });
-  }
-}
-
 async function freshRolePage(browser: Browser, role: 'contractor' | 'homeowner') {
   const context = await browser.newContext(appContextOptions());
   const page = await context.newPage();
   const consoleErrors = captureMajorConsoleErrors(page);
   await loginAs(page, role);
-  await dismissTourIfVisible(page);
   return { context, page, consoleErrors };
 }
 
@@ -144,7 +127,6 @@ async function advanceServiceRequestComposerToIssueStep(page: Page) {
   const main = page.getByRole('main');
   const issueTextbox = main.getByRole('textbox', { name: /^What do you need help with\?$/i });
 
-  await dismissTourIfVisible(page);
   if (await issueTextbox.isVisible({ timeout: 2_000 }).catch(() => false)) return issueTextbox;
 
   const propertySelector = main.getByRole('combobox', { name: /^Request for$/i });
@@ -155,7 +137,6 @@ async function advanceServiceRequestComposerToIssueStep(page: Page) {
     await propertySelector.selectOption({ index: 1 });
   }
 
-  await dismissTourIfVisible(page);
   const continueButton = main.getByRole('button', { name: /^Continue$/i }).first();
   await expect(continueButton).toBeEnabled({ timeout: 10_000 });
   await continueButton.click();
@@ -171,9 +152,7 @@ async function createHomeownerServiceRequest(page: Page, recordPrefix: string) {
 
   await openSidebarTab(page, /Service Requests/i);
   await expectActiveTabHeading(page, /^Service Requests$/i);
-  await dismissTourIfVisible(page);
   await main.getByRole('button', { name: /^New request$/i }).click();
-  await dismissTourIfVisible(page);
 
   await advanceServiceRequestComposerToIssueStep(page);
   await chooseConnectedContractorForRequest(page, requestDescription);
@@ -311,7 +290,6 @@ async function createJobCompleteAndSendInvoice(page: Page, estimateTitle: string
   await expect(main.getByText(/Progress saved/i)).toBeVisible({ timeout: 30_000 });
   await markSeededPricedWorkItemsCompleted(jobId);
   await page.reload();
-  await dismissTourIfVisible(page);
 
   const completeJobResponse = page.waitForResponse(
     response => response.url().includes('/rest/v1/inspections') && response.request().method() === 'PATCH',
@@ -411,7 +389,6 @@ async function fileInvoiceAndCreateReminder(page: Page, invoiceTitle: string, re
   await expect(main.getByText(/Home Reminder saved/i)).toBeVisible({ timeout: 30_000 });
 
   await page.reload();
-  await dismissTourIfVisible(page);
   await openSidebarTab(page, /Home History/i);
   await expectActiveTabHeading(page, /^Home History$/i);
   await setPropertyScopeAllIfAvailable(main, /^Property$/i);
@@ -431,7 +408,6 @@ test.describe('full sandbox core loop', () => {
     const homeownerErrors = captureMajorConsoleErrors(page);
 
     await loginAs(page, 'homeowner');
-    await dismissTourIfVisible(page);
 
     const { requestTitle } = await createHomeownerServiceRequest(page, recordPrefix);
     await homeownerErrors.assertClean(testInfo);

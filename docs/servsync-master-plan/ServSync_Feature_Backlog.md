@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 Last reconciled through PR #198 / merge commit `1f721ae10fb92de9a76b9f30bf2eeeeab83330bc`.
 
@@ -48,6 +48,8 @@ Homeowner request
 → Manual reminder
 
 Homeowner invoice closeout now makes the final handoff clearer: once an eligible invoice is durably filed to Home History, the invoice card shows a `View Home History` next action and compact copy explaining that the homeowner can add a manual follow-up reminder there. Contractor accepted-estimate closeout now routes dashboard `need jobs` CTAs directly into Jobs -> Estimates with the Approved filter and stale filters cleared, and accepted estimate cards distinguish `Ready for job` from `Job created` while keeping Create/View Job primary over direct estimate invoice actions. Contractor completed-job closeout now also shows compact recommended-path copy: work-item jobs point contractors toward completed, priced work-item invoicing while legacy/no-work-item jobs point toward one completed-job invoice. These remain display/navigation polish only; they do not add automatic reminders, recurring reminders, payment collection, notifications, invoice eligibility changes, job eligibility changes, or duplicate filing behavior.
+
+The automatic homeowner/contractor role-based onboarding tour has been removed because it duplicated the more actionable initial setup prompts and onboarding checklists. Future help should be searchable, task-specific, and optionally guided, with safe Demo Mode practice where appropriate, rather than an automatic post-setup tour.
 
 Important guardrails:
 

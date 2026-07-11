@@ -57,13 +57,6 @@ async function isVisible(locator: Locator, timeout = 1_000): Promise<boolean> {
   return locator.isVisible({ timeout }).catch(() => false);
 }
 
-async function dismissTourIfVisible(page: Page): Promise<void> {
-  const closeTour = page.getByRole('button', { name: /got it|skip tour|close/i }).first();
-  if (await isVisible(closeTour, 700)) {
-    await closeTour.click();
-  }
-}
-
 function captureMajorConsoleErrors(page: Page) {
   const errors: string[] = [];
   page.on('console', (msg) => {
@@ -97,7 +90,6 @@ async function signIn(page: Page, role: TestRole): Promise<void> {
   await authMain.getByLabel(/password/i).fill(password);
   await authMain.getByRole('button', { name: /^Sign in$/i }).click();
   await expect(authMain.getByRole('heading', { name: /^Sign in$/i })).toBeHidden({ timeout: 30_000 });
-  await dismissTourIfVisible(page);
 }
 
 async function freshRolePage(
@@ -113,7 +105,6 @@ async function freshRolePage(
 
 async function openSidebarTab(page: Page, name: RegExp): Promise<void> {
   await page.getByRole('button', { name }).click();
-  await dismissTourIfVisible(page);
 }
 
 async function setPropertyScopeAllIfAvailable(page: Page): Promise<void> {
@@ -167,7 +158,6 @@ async function createHomeownerServiceRequest(page: Page, requestTitle: string): 
   const response = await createRequest;
   expect(response.ok(), 'service request creation RPC should succeed').toBeTruthy();
   await expect(main(page).getByText(/Service request sent/i)).toBeVisible({ timeout: 30_000 });
-  await dismissTourIfVisible(page);
 
   const openPendingRequests = main(page).getByRole('button', { name: /Open \/ Pending Requests/i }).first();
   if (await isVisible(openPendingRequests, 2_000)) {
