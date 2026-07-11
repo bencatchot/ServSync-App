@@ -6,6 +6,40 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-mode-checkpoints-slice-2a`
+- Files changed:
+  - `scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-checkpoints.spec.ts`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `package.json`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Demo Mode Slice 2A checkpoint support for the private water-heater demo runner. The runner now has a declarative scenario manifest, supports `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`, defaults backward-compatibly to `job_created`, verifies the selected checkpoint against run metadata and the actual database graph, and keeps reset/rebuild behavior for lower-checkpoint restoration.
+- Follow-up correction: Duplicate checkpoint arguments now fail closed instead of silently using the final supplied value, and the Demo Mode runbook now describes `demo:verify` as checkpoint-specific rather than implying every checkpoint requires the full `job_created` graph.
+- Reason for change: Internal screenshots, recordings, demos, and QA walkthroughs need repeatable entry points before the final accepted-estimate/job-created state without adding browser controls or fake product statuses.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `node scripts/demo/seed-demo-scenario.mjs checkpoints`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - dedicated demo checkpoint seed/verify validation for `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`
+  - dedicated demo lower-checkpoint restoration validation for `job_created -> request_ready` and `estimate_accepted -> estimate_draft`
+  - dedicated demo same-checkpoint reseed validation for `estimate_sent`
+  - dedicated demo focused homeowner/contractor UI smoke checks for each supported checkpoint
+  - `git diff --check`
+  - changed-file scope guard
+  - credential-shaped secret scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Private runner/docs/tests only. No frontend Demo Mode UI, checkpoint selector, reset button, role switcher, presentation mode, SQL/RLS/RPC/schema change, production SQL, shared-sandbox use, Vercel setting change, deployment, service-role frontend exposure, external delivery, payment, invoice, completed-job, Home History, media, or public demo functionality is included.
+  - `contractor_review_ready` is a narrative checkpoint using the real contractor-readable request state because there is no separate durable contractor-review status to set.
+  - Later checkpoints such as estimate viewed, job progress/completion, invoice sent/paid, and Home History remain deferred.
+
 - Branch: `codex/remove-role-tour-ui`
 - Files changed:
   - `src/App.tsx`

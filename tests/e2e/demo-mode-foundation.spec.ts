@@ -168,7 +168,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
   test('verify checks complete workflow linkage, identities, registry, and duplicate absence', () => {
     const script = read(scriptPath);
 
-    expect(script).toMatch(/async function verifyScenario\(service, scenarioKey, env = process\.env\)/);
+    expect(script).toMatch(/async function verifyScenario\(service, scenarioKey, env = process\.env, requestedCheckpointKey = null\)/);
     expect(script).toMatch(/assertSafeDemoTarget\(env\)/);
     expect(script).toMatch(/Unresolved started\/failed runs still own registered records/);
     expect(script).toMatch(/Expected exactly one active succeeded scenario run with records/);
@@ -179,7 +179,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
     expect(script).toMatch(/verifyRegistryCompleteness\(service, records, issues\)/);
     expect(script).toMatch(/Registry points to missing/);
     expect(script).toMatch(/Demo service request is not linked to the expected homeowner, contractor, connection, and title/);
-    expect(script).toMatch(/Demo estimate is not accepted or not linked to the expected request\/homeowner\/contractor\/home/);
+    expect(script).toMatch(/Demo estimate is not \$\{checkpoint\.expected\.estimateStatus\} or not linked to the expected request\/homeowner\/contractor\/home/);
     expect(script).toMatch(/Demo job is not linked to the accepted estimate and expected scenario records/);
     expect(script).toMatch(/verifyAcceptedEstimateWorkflowEvents\(issues, \{ estimate, job, events: workflowEvents \}\)/);
     expect(script).toMatch(/Estimate approval event before job creation event/);
@@ -285,7 +285,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
         jobEvent,
       ],
     });
-    expect(wrongStatusIssues).toContain('Demo estimate must be accepted before workflow event ordering can be verified.');
+    expect(wrongStatusIssues).toContain('Demo estimate must be accepted before approval workflow event ordering can be verified.');
   });
 
   test('auth reconciliation requires explicit demo ownership metadata', () => {

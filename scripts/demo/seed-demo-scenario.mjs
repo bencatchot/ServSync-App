@@ -1,21 +1,34 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js';
 import { pathToFileURL } from 'node:url';
+import {
+  checkpointByKey,
+  dateOffsets,
+  defaultCheckpointKey,
+  deferredCheckpointKeys,
+  estimateFixture,
+  lifecycleStepKeys,
+  personas,
+  propertyFixture,
+  requestFixture,
+  supportedCheckpointKeys,
+  waterHeaterCoreLoopScenario,
+} from './scenarios/water-heater-core-loop.mjs';
 
-export const WATER_HEATER_SCENARIO_KEY = 'water_heater_core_loop';
+export const WATER_HEATER_SCENARIO_KEY = waterHeaterCoreLoopScenario.scenarioKey;
 export const KNOWN_PRODUCTION_REF = 'uqgtheclhxqlnjpfmheq';
 export const KNOWN_SHARED_SANDBOX_REF = 'zpzdkoaubyjtsomccxya';
 export const REQUIRED_ENABLE_VALUE = 'true';
 export const RESET_ACKNOWLEDGEMENT_PREFIX = 'reset-';
 
 const SCENARIOS = {
-  [WATER_HEATER_SCENARIO_KEY]: {
-    displayName: 'Water Heater Core Loop Demo',
-    description:
-      'Dedicated demo scenario for homeowner request, contractor estimate, homeowner approval, and job creation.',
-    checkpoint: 'job_ready',
-  },
+  [WATER_HEATER_SCENARIO_KEY]: waterHeaterCoreLoopScenario,
 };
+
+export const SUPPORTED_CHECKPOINT_KEYS = supportedCheckpointKeys;
+export const DEFAULT_CHECKPOINT_KEY = defaultCheckpointKey;
+export const DEFERRED_CHECKPOINT_KEYS = deferredCheckpointKeys;
+export const LIFECYCLE_STEP_KEYS = lifecycleStepKeys;
 
 const FORBIDDEN_EXTERNAL_FLAGS = [
   'EMAIL_ENABLED',
@@ -75,39 +88,9 @@ const REQUIRED_SCENARIO_TABLES = [
   'inspections',
 ];
 
-const DEMO_HOMEOWNER = {
-  emailEnv: 'DEMO_HOMEOWNER_EMAIL',
-  passwordEnv: 'DEMO_HOMEOWNER_PASSWORD',
-  defaultEmail: 'sarah.homeowner@example.test',
-  fullName: 'Sarah Johnson',
-  displayName: 'Sarah Johnson',
-  phone: '251-555-0104',
-};
-
-const DEMO_CONTRACTOR = {
-  emailEnv: 'DEMO_CONTRACTOR_EMAIL',
-  passwordEnv: 'DEMO_CONTRACTOR_PASSWORD',
-  defaultEmail: 'marcus.owner@example.test',
-  fullName: 'Marcus Bennett',
-  contactName: 'Marcus Bennett',
-  phone: '251-555-0118',
-  businessName: 'Gulf Coast Home Services',
-  slug: 'gulf-coast-home-services-demo',
-};
-
-const DEMO_PROPERTY = {
-  nickname: 'Demo Bay Home',
-  address_line1: '1200 Demo Bay Lane',
-  address_line2: '',
-  city: 'Fairhope',
-  state: 'AL',
-  zip_code: '36532',
-  home_type: 'Single-family home',
-  year_built: '2006',
-  square_feet: '2180',
-  notes:
-    'Fictional South Alabama demo property for ServSync recordings. No real customer address or service history.',
-};
+const DEMO_HOMEOWNER = personas.homeowner;
+const DEMO_CONTRACTOR = personas.contractor;
+const DEMO_PROPERTY = propertyFixture;
 
 function requireEnv(env, key) {
   const value = env[key];
@@ -190,6 +173,72 @@ export function requireResetAcknowledgement(operation, scenarioKey, env = proces
   }
 }
 
+export function parseCheckpointSelection(args = [], defaultKey = DEFAULT_CHECKPOINT_KEY) {
+  let checkpointKey = defaultKey;
+  let supplied = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--checkpoint') {
+      if (supplied) {
+        throw new Error('Checkpoint may be specified only once.');
+      }
+      checkpointKey = args[index + 1] || '';
+      supplied = true;
+      index += 1;
+      continue;
+    }
+    if (arg?.startsWith('--checkpoint=')) {
+      if (supplied) {
+        throw new Error('Checkpoint may be specified only once.');
+      }
+      checkpointKey = arg.slice('--checkpoint='.length);
+      supplied = true;
+      continue;
+    }
+    throw new Error(`Unsupported demo argument: ${arg}`);
+  }
+
+  if (!checkpointKey || typeof checkpointKey !== 'string') {
+    throw new Error('Unsupported demo checkpoint: checkpoint key is required.');
+  }
+
+  if (DEFERRED_CHECKPOINT_KEYS.includes(checkpointKey)) {
+    throw new Error(`Deferred demo checkpoint is not implemented in Slice 2A: ${checkpointKey}`);
+  }
+
+  if (!SUPPORTED_CHECKPOINT_KEYS.includes(checkpointKey)) {
+    throw new Error(`Unsupported demo checkpoint: ${checkpointKey}`);
+  }
+
+  return { checkpointKey, supplied };
+}
+
+export function parseCheckpointKey(args = [], defaultKey = DEFAULT_CHECKPOINT_KEY) {
+  return parseCheckpointSelection(args, defaultKey).checkpointKey;
+}
+
+export function getCheckpointDefinition(checkpointKey) {
+  const checkpoint = checkpointByKey[checkpointKey];
+  if (!checkpoint) {
+    throw new Error(`Unsupported demo checkpoint: ${checkpointKey}`);
+  }
+  return checkpoint;
+}
+
+export function listCheckpoints() {
+  return waterHeaterCoreLoopScenario.checkpointDefinitions.map((checkpoint) => ({
+    key: checkpoint.key,
+    displayName: checkpoint.displayName,
+    primaryRole: checkpoint.primaryRole,
+    narrativePurpose: checkpoint.narrativePurpose,
+    supported: true,
+  }));
+}
+
+function checkpointRequires(checkpointKey, stepKey) {
+  return getCheckpointDefinition(checkpointKey).requiredSteps.includes(stepKey);
+}
+
 export function buildDatePlan(anchorInput = new Date()) {
   const anchor = new Date(anchorInput);
   if (Number.isNaN(anchor.getTime())) {
@@ -201,17 +250,18 @@ export function buildDatePlan(anchorInput = new Date()) {
 
   return {
     anchor: anchor.toISOString(),
-    profileCreatedAt: days(-90),
-    propertyCreatedAt: days(-75),
-    connectionCreatedAt: days(-21),
-    requestCreatedAt: days(-1),
-    estimateCreatedAt: hours(-6),
-    estimateSentAt: hours(-4),
-    estimateAcceptedAt: hours(-2),
-    jobCreatedAt: hours(-1),
-    visitWindowStart: days(1),
-    waterHeaterInstallDate: days(-2555).slice(0, 10),
-    waterHeaterWarrantyDate: days(1095).slice(0, 10),
+    profileCreatedAt: days(dateOffsets.profileCreatedAtDays),
+    propertyCreatedAt: days(dateOffsets.propertyCreatedAtDays),
+    connectionCreatedAt: days(dateOffsets.connectionCreatedAtDays),
+    requestCreatedAt: days(dateOffsets.requestCreatedAtDays),
+    contractorReviewReadyAt: hours(dateOffsets.contractorReviewReadyHours),
+    estimateCreatedAt: hours(dateOffsets.estimateCreatedAtHours),
+    estimateSentAt: hours(dateOffsets.estimateSentAtHours),
+    estimateAcceptedAt: hours(dateOffsets.estimateAcceptedAtHours),
+    jobCreatedAt: hours(dateOffsets.jobCreatedAtHours),
+    visitWindowStart: days(dateOffsets.visitWindowStartDays),
+    waterHeaterInstallDate: days(dateOffsets.waterHeaterInstallDateDays).slice(0, 10),
+    waterHeaterWarrantyDate: days(dateOffsets.waterHeaterWarrantyDateDays).slice(0, 10),
   };
 }
 
@@ -350,19 +400,24 @@ async function signInDemoUser(makeUserClient, email, password) {
   return client;
 }
 
-async function startRun(service, scenarioKey, operation, target, dates) {
+async function startRun(service, scenarioKey, operation, target, dates, checkpointKey = DEFAULT_CHECKPOINT_KEY) {
   const scenario = SCENARIOS[scenarioKey];
+  const checkpoint = getCheckpointDefinition(checkpointKey);
   const runId = await ensureOk(
     await service.rpc('servsync_demo_start_run', {
       p_scenario_key: scenarioKey,
       p_display_name: scenario.displayName,
       p_description: scenario.description,
       p_operation: operation,
-      p_checkpoint: scenario.checkpoint,
+      p_checkpoint: checkpointKey,
       p_anchor_timestamp: dates.anchor,
       p_target_project_ref: target.expectedRef,
       p_metadata: {
         script: 'scripts/demo/seed-demo-scenario.mjs',
+        source_version: 'demo-mode-slice-2a',
+        selected_checkpoint: checkpointKey,
+        expected_checkpoint_graph: checkpoint.expected,
+        required_steps: checkpoint.requiredSteps,
         external_effects_disabled: true,
       },
     }),
@@ -382,7 +437,7 @@ async function finishRun(service, runId, status, metadata = {}) {
   );
 }
 
-async function registerRecord(service, runId, tableName, recordId, recordRole, checkpoint = 'job_ready', metadata = {}) {
+async function registerRecord(service, runId, tableName, recordId, recordRole, checkpoint = DEFAULT_CHECKPOINT_KEY, metadata = {}) {
   if (!recordId) {
     return;
   }
@@ -405,7 +460,7 @@ async function getScenarioRuns(service, scenarioKey, statuses = NON_RESET_RUN_ST
   return ensureOk(
     await service
       .from('demo_scenario_runs')
-      .select('id, scenario_key, operation, status, started_at, completed_at, anchor_timestamp, metadata')
+      .select('id, scenario_key, operation, status, checkpoint, started_at, completed_at, anchor_timestamp, metadata')
       .eq('scenario_key', scenarioKey)
       .eq('operation', 'seed')
       .in('status', statuses)
@@ -483,7 +538,7 @@ async function deleteExactCreatedRecord(service, tableName, recordId) {
   );
 }
 
-async function registerCreatedRecord(service, runId, tableName, recordId, recordRole, checkpoint = 'job_ready', metadata = {}) {
+async function registerCreatedRecord(service, runId, tableName, recordId, recordRole, checkpoint = DEFAULT_CHECKPOINT_KEY, metadata = {}) {
   try {
     await registerRecord(service, runId, tableName, recordId, recordRole, checkpoint, metadata);
   } catch (error) {
@@ -787,11 +842,10 @@ async function createServiceRequest(homeownerClient, service, runId, connectionI
   const result = await ensureOk(
     await homeownerClient.rpc('servsync_create_service_request', {
       p_connection_id: connectionId,
-      p_category: 'Plumbing',
-      p_urgency: 'normal',
-      p_title: 'Replace leaking water heater',
-      p_description:
-        'The existing 40-gallon water heater is leaking near the base. We would like inspection and replacement options. Access is through the garage utility area, and an appointment within the next few days would be helpful.',
+      p_category: requestFixture.category,
+      p_urgency: requestFixture.urgency,
+      p_title: requestFixture.title,
+      p_description: requestFixture.description,
       p_home_id: homeId,
     }),
     'Unable to create demo service request through homeowner RPC'
@@ -823,68 +877,16 @@ async function createServiceRequest(homeownerClient, service, runId, connectionI
 }
 
 function estimateLines() {
-  return [
-    {
-      line_type: 'labor',
-      line_title: 'Remove and dispose of existing 40-gallon water heater',
-      description: 'Remove the leaking unit and haul away from the demo property.',
-      customer_description: 'Remove existing leaking water heater and dispose of it properly.',
-      quantity: 1,
-      unit: 'job',
-      unit_price_cents: 27500,
-      sort_order: 10,
-      labor_hours: 2,
-    },
-    {
-      line_type: 'material',
-      line_title: 'Supply and install new 40-gallon water heater',
-      description: 'Demo-grade replacement water heater and normal installation materials.',
-      customer_description: 'Supply and install a fictional 40-gallon replacement water heater for demo purposes.',
-      quantity: 1,
-      unit: 'each',
-      unit_price_cents: 137500,
-      sort_order: 20,
-      supply_status: 'contractor_supplied',
-    },
-    {
-      line_type: 'material',
-      line_title: 'Replace water connections as required',
-      description: 'Demo flexible water connectors and fittings.',
-      customer_description: 'Replace water connections needed for the new unit.',
-      quantity: 1,
-      unit: 'allowance',
-      unit_price_cents: 16500,
-      sort_order: 30,
-      supply_status: 'contractor_supplied',
-    },
-    {
-      line_type: 'material',
-      line_title: 'Install drain pan',
-      description: 'Demo drain pan installed under replacement unit.',
-      customer_description: 'Install or replace a drain pan under the new water heater.',
-      quantity: 1,
-      unit: 'each',
-      unit_price_cents: 12500,
-      sort_order: 40,
-      supply_status: 'contractor_supplied',
-    },
-    {
-      line_type: 'labor',
-      line_title: 'Test system and clean work area',
-      description: 'Fill, test, verify basic operation, and clean the garage utility area.',
-      customer_description: 'Test the replacement water heater and leave the work area clean.',
-      quantity: 1,
-      unit: 'job',
-      unit_price_cents: 22500,
-      sort_order: 50,
-      labor_hours: 1.5,
-    },
-  ];
+  return estimateFixture.lines;
 }
 
-async function createAcceptedEstimate(contractorClient, homeownerClient, service, runId, contractorId, homeownerId, homeId, requestId, dates) {
-  const subtotalCents = 216500;
-  const taxCents = 0;
+function estimatePaymentScheduleRows() {
+  return estimateFixture.paymentSchedule;
+}
+
+async function createEstimateDraft(contractorClient, service, runId, contractorId, homeownerId, homeId, requestId, dates) {
+  const subtotalCents = estimateFixture.subtotalCents;
+  const taxCents = estimateFixture.taxCents;
   const totalCents = subtotalCents + taxCents;
   const estimate = await ensureOk(
     await contractorClient
@@ -894,19 +896,16 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
         homeowner_user_id: homeownerId,
         home_id: homeId,
         service_request_id: requestId,
-        title: 'Water heater replacement estimate',
-        scope:
-          'Replace the leaking 40-gallon water heater in the garage utility area using fictional demo materials and normal demo installation steps.',
-        notes:
-          'Demo estimate for presentation only. Pricing is fictional and should not be used as market guidance.',
-        terms:
-          'Demo terms: work may begin after approval. Final balance is due when the demo job is complete. No payment collection is enabled in Demo Mode.',
+        title: estimateFixture.title,
+        scope: estimateFixture.scope,
+        notes: estimateFixture.notes,
+        terms: estimateFixture.terms,
         status: 'draft',
         subtotal_cents: subtotalCents,
         total_cents: totalCents,
         labor_mode: 'line_specific',
-        material_total_cents: 166500,
-        labor_total_cents: 50000,
+        material_total_cents: estimateFixture.materialTotalCents,
+        labor_total_cents: estimateFixture.laborTotalCents,
         tax_rate_percent: 0,
         tax_cents: taxCents,
         created_at: dates.estimateCreatedAt,
@@ -916,7 +915,7 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
       .single(),
     'Unable to create demo estimate'
   );
-  await registerCreatedRecord(service, runId, 'estimates', estimate.id, 'demo_estimate', 'estimate_ready');
+  await registerCreatedRecord(service, runId, 'estimates', estimate.id, 'demo_estimate', 'estimate_draft');
 
   for (const line of estimateLines()) {
     const insertedLine = await ensureOk(
@@ -932,31 +931,10 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
         .single(),
       `Unable to create demo estimate line: ${line.line_title}`
     );
-    await registerCreatedRecord(service, runId, 'estimate_line_items', insertedLine.id, 'demo_estimate_line_item', 'estimate_ready');
+    await registerCreatedRecord(service, runId, 'estimate_line_items', insertedLine.id, 'demo_estimate_line_item', 'estimate_draft');
   }
 
-  const scheduleRows = [
-    {
-      invoice_type: 'deposit',
-      label: 'Deposit',
-      amount_type: 'fixed',
-      amount_value: 350,
-      calculated_amount_cents: 35000,
-      due_trigger: 'Due on approval',
-      sort_order: 10,
-    },
-    {
-      invoice_type: 'final',
-      label: 'Final payment',
-      amount_type: 'fixed',
-      amount_value: 1815,
-      calculated_amount_cents: 181500,
-      due_trigger: 'Due on completion',
-      sort_order: 20,
-    },
-  ];
-
-  for (const row of scheduleRows) {
+  for (const row of estimatePaymentScheduleRows()) {
     const insertedSchedule = await ensureOk(
       await contractorClient
         .from('estimate_payment_schedule_items')
@@ -976,27 +954,47 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
       'estimate_payment_schedule_items',
       insertedSchedule.id,
       'demo_estimate_payment_schedule_item',
-      'homeowner_approval_ready'
+      'estimate_draft'
     );
   }
 
+  return { estimateId: estimate.id, totalCents };
+}
+
+async function sendEstimate(contractorClient, estimateId, dates) {
   await ensureOk(
     await contractorClient
       .from('estimates')
       .update({ status: 'sent', updated_at: dates.estimateSentAt })
-      .eq('id', estimate.id),
+      .eq('id', estimateId),
     'Unable to send demo estimate'
   );
+  return { estimateId };
+}
 
+async function acceptEstimate(homeownerClient, service, runId, estimateId) {
   await ensureOk(
     await homeownerClient.rpc('servsync_homeowner_respond_to_estimate', {
-      p_estimate_id: estimate.id,
+      p_estimate_id: estimateId,
       p_action: 'accept',
     }),
     'Unable to accept demo estimate through homeowner RPC'
   );
 
-  return { estimateId: estimate.id, totalCents };
+  const events = await ensureOk(
+    await service
+      .from('workflow_activity_events')
+      .select('id')
+      .eq('estimate_id', estimateId)
+      .eq('event_type', WORKFLOW_EVENT_TYPES.estimateApproved)
+      .is('inspection_id', null),
+    'Unable to inspect demo estimate approval workflow event'
+  );
+  for (const event of events || []) {
+    await registerRecord(service, runId, 'workflow_activity_events', event.id, 'demo_estimate_approved_event', 'estimate_accepted');
+  }
+
+  return { estimateId, approvalEventCount: events?.length || 0 };
 }
 
 async function createJobFromEstimate(contractorClient, service, runId, estimateId) {
@@ -1006,14 +1004,14 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
   );
 
   const jobId = result.job_id;
-  await registerCreatedRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_ready');
+  await registerCreatedRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_created');
 
   const workItems = await ensureOk(
     await service.from('job_work_items').select('id').eq('inspection_id', jobId),
     'Unable to inspect demo job work items'
   );
   for (const item of workItems || []) {
-    await registerRecord(service, runId, 'job_work_items', item.id, 'demo_job_work_item', 'job_ready');
+    await registerRecord(service, runId, 'job_work_items', item.id, 'demo_job_work_item', 'job_created');
   }
 
   const events = await ensureOk(
@@ -1021,7 +1019,7 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
     'Unable to inspect demo workflow events'
   );
   for (const event of events || []) {
-    await registerRecord(service, runId, 'workflow_activity_events', event.id, 'demo_workflow_activity_event', 'job_ready');
+    await registerRecord(service, runId, 'workflow_activity_events', event.id, 'demo_job_created_event', 'job_created');
   }
 
   return { jobId, workItemCount: workItems?.length || 0 };
@@ -1094,13 +1092,13 @@ function requireExactlyOneWorkflowEvent(issues, events, criteria, label) {
   return matches[0];
 }
 
-export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events }) {
-  if (!estimate || !job) {
-    issues.push('Accepted estimate workflow event verification requires both estimate and job records.');
+export function verifyEstimateApprovalWorkflowEvent(issues, { estimate, events }) {
+  if (!estimate) {
+    issues.push('Estimate approval workflow event verification requires an estimate record.');
     return;
   }
   if (estimate.status !== 'accepted') {
-    issues.push('Demo estimate must be accepted before workflow event ordering can be verified.');
+    issues.push('Demo estimate must be accepted before approval workflow event ordering can be verified.');
   }
 
   const estimateApprovedEvent = requireExactlyOneWorkflowEvent(
@@ -1114,6 +1112,21 @@ export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, ev
     },
     'Estimate approval'
   );
+
+  if (estimateApprovedEvent) {
+    assertOrderedTimestamps(issues, 'Estimate creation before estimate approval event', estimate.created_at, estimateApprovedEvent.created_at);
+  }
+
+  return estimateApprovedEvent;
+}
+
+export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events }) {
+  if (!estimate || !job) {
+    issues.push('Accepted estimate workflow event verification requires both estimate and job records.');
+    return;
+  }
+
+  const estimateApprovedEvent = verifyEstimateApprovalWorkflowEvent(issues, { estimate, events });
   const jobCreatedEvent = requireExactlyOneWorkflowEvent(
     issues,
     events,
@@ -1126,9 +1139,6 @@ export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, ev
     'Job creation'
   );
 
-  if (estimateApprovedEvent) {
-    assertOrderedTimestamps(issues, 'Estimate creation before estimate approval event', estimate.created_at, estimateApprovedEvent.created_at);
-  }
   if (estimateApprovedEvent && jobCreatedEvent) {
     assertOrderedTimestamps(issues, 'Estimate approval event before job creation event', estimateApprovedEvent.created_at, jobCreatedEvent.created_at);
   }
@@ -1183,7 +1193,7 @@ async function verifyRegistryCompleteness(service, records, issues) {
   }
 }
 
-async function verifyScenario(service, scenarioKey, env = process.env) {
+async function verifyScenario(service, scenarioKey, env = process.env, requestedCheckpointKey = null) {
   assertSafeDemoTarget(env);
 
   const issues = [];
@@ -1220,9 +1230,42 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
     issues.push(`Succeeded run ${run.id} is missing anchor_timestamp.`);
   }
 
+  const activeCheckpointKey = run.checkpoint || run.metadata?.selected_checkpoint || DEFAULT_CHECKPOINT_KEY;
+  if (!SUPPORTED_CHECKPOINT_KEYS.includes(activeCheckpointKey)) {
+    issues.push(`Active run has unsupported checkpoint ${activeCheckpointKey}.`);
+  }
+  if (requestedCheckpointKey && activeCheckpointKey !== requestedCheckpointKey) {
+    issues.push(`Requested checkpoint ${requestedCheckpointKey} does not match active run checkpoint ${activeCheckpointKey}.`);
+  }
+  if (run.metadata?.selected_checkpoint && run.metadata.selected_checkpoint !== activeCheckpointKey) {
+    issues.push(`Run checkpoint ${activeCheckpointKey} does not match run metadata checkpoint ${run.metadata.selected_checkpoint}.`);
+  }
+
+  const checkpointKey = SUPPORTED_CHECKPOINT_KEYS.includes(activeCheckpointKey) ? activeCheckpointKey : DEFAULT_CHECKPOINT_KEY;
+  const checkpoint = getCheckpointDefinition(checkpointKey);
+  const requiresEstimate = checkpointRequires(checkpointKey, 'estimateDraft');
+  const requiresSent = checkpointRequires(checkpointKey, 'estimateSent');
+  const requiresAccepted = checkpointRequires(checkpointKey, 'estimateAccepted');
+  const requiresJob = checkpointRequires(checkpointKey, 'jobCreated');
+
   const records = run.records;
   const counts = countBy(records, 'table_name');
-  for (const tableName of REQUIRED_SCENARIO_TABLES) {
+  const requiredTables = REQUIRED_SCENARIO_TABLES.filter((tableName) => {
+    if (['estimates', 'estimate_line_items', 'estimate_payment_schedule_items'].includes(tableName)) {
+      return requiresEstimate;
+    }
+    if (tableName === 'inspections') {
+      return requiresJob;
+    }
+    return true;
+  });
+  if (requiresAccepted && !counts.workflow_activity_events) {
+    issues.push('Accepted-estimate checkpoints require a registered workflow activity event.');
+  }
+  if (requiresJob && !counts.job_work_items) {
+    issues.push('Job-created checkpoint requires registered job work items.');
+  }
+  for (const tableName of requiredTables) {
     if (!counts[tableName]) {
       issues.push(`Required scenario table ${tableName} has no registered records.`);
     }
@@ -1280,8 +1323,20 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
   const homeId = requireExactlyOneId(issues, records, 'homes', 'demo_home', 'demo home');
   const connectionId = requireExactlyOneId(issues, records, 'homeowner_contractor_connections', 'demo_connection', 'demo connection');
   const requestId = requireExactlyOneId(issues, records, 'service_requests', 'demo_service_request', 'demo service request');
-  const estimateId = requireExactlyOneId(issues, records, 'estimates', 'demo_estimate', 'demo estimate');
-  const jobId = requireExactlyOneId(issues, records, 'inspections', 'demo_job', 'demo job');
+  const estimateIds = recordIds(records, 'estimates', 'demo_estimate');
+  const jobIds = recordIds(records, 'inspections', 'demo_job');
+  let estimateId = null;
+  let jobId = null;
+  if (requiresEstimate) {
+    estimateId = requireExactlyOneId(issues, records, 'estimates', 'demo_estimate', 'demo estimate');
+  } else if (estimateIds.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have an estimate, found ${estimateIds.length}.`);
+  }
+  if (requiresJob) {
+    jobId = requireExactlyOneId(issues, records, 'inspections', 'demo_job', 'demo job');
+  } else if (jobIds.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have a job, found ${jobIds.length}.`);
+  }
 
   const home = homeId ? await fetchOneByPrimaryKey(service, 'homes', 'id', homeId, 'id, homeowner_user_id, nickname, address_line1, zip_code, created_at') : null;
   const connection = connectionId
@@ -1330,7 +1385,7 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
       )
     : null;
   const workflowEvents =
-    estimateId && jobId
+    estimateId
       ? await ensureOk(
           await service
             .from('workflow_activity_events')
@@ -1377,9 +1432,9 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
       estimate.homeowner_user_id !== homeownerUser.id ||
       estimate.contractor_id !== contractor.id ||
       estimate.home_id !== homeId ||
-      estimate.status !== 'accepted')
+      estimate.status !== checkpoint.expected.estimateStatus)
   ) {
-    issues.push('Demo estimate is not accepted or not linked to the expected request/homeowner/contractor/home.');
+    issues.push(`Demo estimate is not ${checkpoint.expected.estimateStatus} or not linked to the expected request/homeowner/contractor/home.`);
   }
   if (
     job &&
@@ -1397,6 +1452,9 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
   if (estimate && job && estimate.inspection_id !== job.id) {
     issues.push('Accepted estimate does not point to the linked demo job.');
   }
+  if (estimate && !requiresJob && estimate.inspection_id) {
+    issues.push(`Checkpoint ${checkpointKey} should not have a linked job on the estimate.`);
+  }
 
   if (estimateId) {
     const lineItems = recordIds(records, 'estimate_line_items', 'demo_estimate_line_item');
@@ -1407,6 +1465,18 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
     if (scheduleItems.length !== 2) {
       issues.push(`Expected 2 registered estimate payment schedule rows, found ${scheduleItems.length}.`);
     }
+    if (checkpointKey === 'estimate_draft' && estimate && estimate.status === 'draft' && estimate.updated_at !== estimate.created_at) {
+      issues.push('Draft estimate should not have sent evidence in updated_at.');
+    }
+    if (requiresSent && estimate && new Date(estimate.updated_at).getTime() <= new Date(estimate.created_at).getTime()) {
+      issues.push('Sent or later estimate checkpoint is missing sent timestamp evidence.');
+    }
+  } else {
+    const lineItems = recordIds(records, 'estimate_line_items', 'demo_estimate_line_item');
+    const scheduleItems = recordIds(records, 'estimate_payment_schedule_items', 'demo_estimate_payment_schedule_item');
+    if (lineItems.length || scheduleItems.length) {
+      issues.push(`Checkpoint ${checkpointKey} should not have estimate detail records.`);
+    }
   }
 
   const duplicateJobs = estimateId
@@ -1415,14 +1485,61 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
         'Unable to inspect duplicate demo jobs'
       )
     : [];
-  if (duplicateJobs.length !== 1) {
+  if (requiresJob && duplicateJobs.length !== 1) {
     issues.push(`Expected exactly one job linked to the demo estimate, found ${duplicateJobs.length}.`);
   }
+  if (!requiresJob && duplicateJobs.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have a job linked to the demo estimate, found ${duplicateJobs.length}.`);
+  }
 
-  if (run.anchor_timestamp && connection && request && estimate && job) {
+  const requestEstimates = requestId
+    ? await ensureOk(
+        await service.from('estimates').select('id').eq('service_request_id', requestId),
+        'Unable to inspect duplicate demo estimates for request'
+      )
+    : [];
+  if (requiresEstimate && requestEstimates.length !== 1) {
+    issues.push(`Expected exactly one estimate linked to the demo request, found ${requestEstimates.length}.`);
+  }
+  if (!requiresEstimate && requestEstimates.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have estimates linked to the demo request, found ${requestEstimates.length}.`);
+  }
+
+  if (run.anchor_timestamp && connection && request) {
     assertOrderedTimestamps(issues, 'Connection before request', connection.created_at, request.created_at);
+  }
+  if (run.anchor_timestamp && request && estimate) {
     assertOrderedTimestamps(issues, 'Request before estimate creation', request.created_at, estimate.created_at);
+  }
+  if (run.anchor_timestamp && estimate && requiresSent) {
+    assertOrderedTimestamps(issues, 'Estimate creation before sent evidence', estimate.created_at, estimate.updated_at);
+  }
+  if (requiresAccepted && estimate) {
+    verifyEstimateApprovalWorkflowEvent(issues, { estimate, events: workflowEvents });
+  }
+  if (requiresJob && estimate && job) {
     verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events: workflowEvents });
+  }
+  if (!requiresAccepted) {
+    const approvalEvents = filterScenarioWorkflowEvents(workflowEvents, {
+      eventType: WORKFLOW_EVENT_TYPES.estimateApproved,
+      estimateId,
+      inspectionId: null,
+      sourceRpc: WORKFLOW_EVENT_SOURCES.estimateResponse,
+    });
+    if (approvalEvents.length > 0) {
+      issues.push(`Checkpoint ${checkpointKey} should not have estimate approval workflow events.`);
+    }
+  }
+  if (!requiresJob) {
+    const jobEvents = filterScenarioWorkflowEvents(workflowEvents, {
+      eventType: WORKFLOW_EVENT_TYPES.jobCreated,
+      estimateId,
+      sourceRpc: WORKFLOW_EVENT_SOURCES.jobFromEstimate,
+    });
+    if (jobEvents.length > 0) {
+      issues.push(`Checkpoint ${checkpointKey} should not have job-created workflow events.`);
+    }
   }
 
   return {
@@ -1430,12 +1547,14 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
     reason: issues[0] || null,
     issues,
     runId: run.id,
+    checkpoint: checkpointKey,
     counts,
     categories: {
       runs: {
         activeSucceededRuns: succeededRunsWithRecords.length,
         unresolvedRuns: unresolvedRuns.length,
         zeroRecordRuns: zeroRecordRuns.length,
+        activeCheckpoint: checkpointKey,
       },
       auth: {
         homeownerUserId: homeownerUser?.id || null,
@@ -1464,7 +1583,8 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
   };
 }
 
-async function seedScenario(env, target, scenarioKey) {
+async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CHECKPOINT_KEY) {
+  const checkpoint = getCheckpointDefinition(checkpointKey);
   const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
   const { service, anonKey, makeUserClient } = createSupabaseClients(env, target);
 
@@ -1487,40 +1607,97 @@ async function seedScenario(env, target, scenarioKey) {
       contractorId,
     });
 
-    runId = await startRun(service, scenarioKey, 'seed', target, dates);
-    const { homeId } = await createProperty(service, runId, homeownerUser.id, dates);
-    const { connectionId } = await createConnection(service, runId, homeownerUser.id, contractorId, dates);
+    runId = await startRun(service, scenarioKey, 'seed', target, dates, checkpointKey);
+    const created = {
+      contractorId,
+      homeId: null,
+      connectionId: null,
+      requestId: null,
+      estimateId: null,
+      jobId: null,
+      estimateTotalCents: null,
+      jobWorkItemCount: 0,
+      approvalEventCount: 0,
+    };
+    const executedSteps = ['identities', 'profilesAndCompany'];
+
+    if (checkpointRequires(checkpointKey, 'property')) {
+      const { homeId } = await createProperty(service, runId, homeownerUser.id, dates);
+      created.homeId = homeId;
+      executedSteps.push('property');
+    }
+
+    if (checkpointRequires(checkpointKey, 'connection')) {
+      const { connectionId } = await createConnection(service, runId, homeownerUser.id, contractorId, dates);
+      created.connectionId = connectionId;
+      executedSteps.push('connection');
+    }
 
     const homeownerClient = await signInDemoUser(makeUserClient, homeownerEmail, homeownerPassword);
     const contractorClient = await signInDemoUser(makeUserClient, contractorEmail, contractorPassword);
 
-    const { requestId } = await createServiceRequest(homeownerClient, service, runId, connectionId, homeId, dates);
-    const { estimateId, totalCents } = await createAcceptedEstimate(
-      contractorClient,
-      homeownerClient,
-      service,
-      runId,
-      contractorId,
-      homeownerUser.id,
-      homeId,
-      requestId,
-      dates
-    );
-    const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, estimateId);
+    if (checkpointRequires(checkpointKey, 'request')) {
+      const { requestId } = await createServiceRequest(homeownerClient, service, runId, created.connectionId, created.homeId, dates);
+      created.requestId = requestId;
+      executedSteps.push('request');
+    }
+
+    if (checkpointRequires(checkpointKey, 'contractorReview')) {
+      executedSteps.push('contractorReview');
+    }
+
+    if (checkpointRequires(checkpointKey, 'estimateDraft')) {
+      const { estimateId, totalCents } = await createEstimateDraft(
+        contractorClient,
+        service,
+        runId,
+        contractorId,
+        homeownerUser.id,
+        created.homeId,
+        created.requestId,
+        dates
+      );
+      created.estimateId = estimateId;
+      created.estimateTotalCents = totalCents;
+      executedSteps.push('estimateDraft');
+    }
+
+    if (checkpointRequires(checkpointKey, 'estimateSent')) {
+      await sendEstimate(contractorClient, created.estimateId, dates);
+      executedSteps.push('estimateSent');
+    }
+
+    if (checkpointRequires(checkpointKey, 'estimateAccepted')) {
+      const { approvalEventCount } = await acceptEstimate(homeownerClient, service, runId, created.estimateId);
+      created.approvalEventCount = approvalEventCount;
+      executedSteps.push('estimateAccepted');
+    }
+
+    if (checkpointRequires(checkpointKey, 'jobCreated')) {
+      const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, created.estimateId);
+      created.jobId = jobId;
+      created.jobWorkItemCount = workItemCount;
+      executedSteps.push('jobCreated');
+    }
 
     await finishRun(service, runId, 'succeeded', {
+      selected_checkpoint: checkpointKey,
+      checkpoint_display_name: checkpoint.displayName,
+      executed_steps: executedSteps,
+      expected_checkpoint_graph: checkpoint.expected,
       homeowner_user_id: homeownerUser.id,
       contractor_user_id: contractorUser.id,
       contractor_id: contractorId,
-      home_id: homeId,
-      service_request_id: requestId,
-      estimate_id: estimateId,
-      job_id: jobId,
-      estimate_total_cents: totalCents,
-      job_work_items_created: workItemCount,
+      home_id: created.homeId,
+      service_request_id: created.requestId,
+      estimate_id: created.estimateId,
+      job_id: created.jobId,
+      estimate_total_cents: created.estimateTotalCents,
+      estimate_approval_events_created: created.approvalEventCount,
+      job_work_items_created: created.jobWorkItemCount,
     });
 
-    const verification = await verifyScenario(service, scenarioKey, env);
+    const verification = await verifyScenario(service, scenarioKey, env, checkpointKey);
     if (!verification.ok) {
       await finishRun(service, runId, 'failed', { verification_issues: verification.issues }).catch(() => {});
       throw new Error(`Demo seed verification failed: ${verification.reason || 'incomplete scenario state'}`);
@@ -1538,13 +1715,14 @@ async function seedScenario(env, target, scenarioKey) {
       },
       records: {
         contractorId,
-        homeId,
-        connectionId,
-        requestId,
-        estimateId,
-        jobId,
-        workItemCount,
+        homeId: created.homeId,
+        connectionId: created.connectionId,
+        requestId: created.requestId,
+        estimateId: created.estimateId,
+        jobId: created.jobId,
+        workItemCount: created.jobWorkItemCount,
       },
+      checkpoint: checkpointKey,
       verification,
       externalEffects: `No email, SMS, push, Stripe, webhook, accounting, AI, geocoding, storage, or deployment calls were made by this runner. ${notificationHandlingDecision()}`,
       anonKeyUsed: Boolean(anonKey),
@@ -1560,7 +1738,7 @@ async function seedScenario(env, target, scenarioKey) {
 async function resetScenario(env, target, scenarioKey) {
   const dates = buildDatePlan(env.DEMO_ANCHOR_TIMESTAMP || new Date());
   const { service } = createSupabaseClients(env, target);
-  const resetRunId = await startRun(service, scenarioKey, 'reset', target, dates);
+  const resetRunId = await startRun(service, scenarioKey, 'reset', target, dates, DEFAULT_CHECKPOINT_KEY);
   try {
     const resetResult = await resetNonResetRuns(service, scenarioKey, 'explicit-reset');
     await finishRun(service, resetRunId, 'succeeded', {
@@ -1579,9 +1757,9 @@ async function resetScenario(env, target, scenarioKey) {
   }
 }
 
-async function verifyDemoScenario(env, target, scenarioKey) {
+async function verifyDemoScenario(env, target, scenarioKey, checkpointKey = null) {
   const { service } = createSupabaseClients(env, target);
-  const verification = await verifyScenario(service, scenarioKey, env);
+  const verification = await verifyScenario(service, scenarioKey, env, checkpointKey);
   if (!verification.ok) {
     throw new Error(`Demo verification failed: ${verification.reason || 'scenario state is incomplete'}`);
   }
@@ -1595,6 +1773,7 @@ function summarize(result, target, scenarioKey) {
     scenario: scenarioKey,
     operation: result.operation,
     runId: result.runId || result.verification?.runId || null,
+    checkpoint: result.checkpoint || result.verification?.checkpoint || null,
     demoUsers: result.demoUsers
       ? {
           homeownerEmail: result.demoUsers.homeownerEmail,
@@ -1612,30 +1791,48 @@ function summarize(result, target, scenarioKey) {
 }
 
 export async function runDemoCommand(argv = process.argv.slice(2), env = process.env) {
-  const [operation, scenarioKey] = argv;
+  const [operation, scenarioKey, ...optionArgs] = argv;
+  if (operation === 'checkpoints') {
+    return {
+      operation: 'checkpoints',
+      scenario: WATER_HEATER_SCENARIO_KEY,
+      defaultCheckpoint: DEFAULT_CHECKPOINT_KEY,
+      supported: listCheckpoints(),
+      deferred: DEFERRED_CHECKPOINT_KEYS,
+      success: true,
+    };
+  }
   if (!['seed', 'reset', 'verify'].includes(operation)) {
-    throw new Error('Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify> water_heater_core_loop');
+    throw new Error(
+      'Usage: node scripts/demo/seed-demo-scenario.mjs <seed|reset|verify> water_heater_core_loop [--checkpoint=<key>]'
+    );
   }
 
   if (!SCENARIOS[scenarioKey]) {
     throw new Error(`Unsupported demo scenario: ${scenarioKey}`);
   }
 
+  const checkpointSelection = parseCheckpointSelection(optionArgs, DEFAULT_CHECKPOINT_KEY);
+  const checkpointKey = checkpointSelection.checkpointKey;
   const target = assertSafeDemoTarget(env);
   requireResetAcknowledgement(operation, scenarioKey, env);
 
   if (operation === 'seed') {
-    return summarize(await seedScenario(env, target, scenarioKey), target, scenarioKey);
+    return summarize(await seedScenario(env, target, scenarioKey, checkpointKey), target, scenarioKey);
   }
 
   if (operation === 'reset') {
     return summarize(await resetScenario(env, target, scenarioKey), target, scenarioKey);
   }
 
-  return summarize(await verifyDemoScenario(env, target, scenarioKey), target, scenarioKey);
+  return summarize(
+    await verifyDemoScenario(env, target, scenarioKey, checkpointSelection.supplied ? checkpointKey : null),
+    target,
+    scenarioKey
+  );
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runDemoCommand()
     .then((summary) => {
       console.log(JSON.stringify(summary, null, 2));

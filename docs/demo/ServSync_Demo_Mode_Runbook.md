@@ -78,9 +78,48 @@ Run commands only from the repository root after loading the dedicated demo envi
 npm run demo:seed
 npm run demo:verify
 DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop npm run demo:reset
+npm run demo:checkpoints
 ```
 
+By default, `demo:seed` restores the `job_created` checkpoint. Slice 2A also supports explicit checkpoint restoration through argument forwarding:
+
+```bash
+npm run demo:seed -- --checkpoint=request_ready
+npm run demo:verify -- --checkpoint=request_ready
+```
+
+The canonical documented form is `--checkpoint=<key>`. The runner also accepts `--checkpoint <key>` for operator convenience. Unknown, empty, malformed, or deferred checkpoint keys fail before remote target validation or mutation.
+
 The command output reports safe identifiers, run reconciliation summaries, verification categories, and record counts. It must not print passwords, tokens, access keys, or full sensitive environment values.
+
+## Supported Slice 2A Checkpoints
+
+Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation only.
+
+| Checkpoint | Primary role | Purpose | Expected records |
+| --- | --- | --- | --- |
+| `request_ready` | Homeowner | Fresh homeowner request for water-heater replacement. | Property, connection, one service request; no estimate or job. |
+| `contractor_review_ready` | Contractor | Contractor-readable request state. This is a narrative checkpoint, not a fabricated product status. | Property, connection, one service request; no estimate or job. |
+| `estimate_draft` | Contractor | Contractor draft estimate with line items and payment schedule rows. | One draft estimate; no sent evidence, approval event, or job. |
+| `estimate_sent` | Homeowner | Homeowner review state for a sent estimate. | One sent estimate with sent evidence; no approval event or job. |
+| `estimate_accepted` | Contractor | Accepted-estimate handoff before job creation. | One accepted estimate and exact `estimate_approved` workflow event; no job. |
+| `job_created` | Contractor | Final Slice 1 state with accepted estimate and linked draft job. | Accepted estimate, exact `estimate_approved` event, linked draft job, exact `job_created` event. |
+
+Deferred checkpoints are not supported in Slice 2A and must not be claimed as available: `estimate_viewed`, `job_in_progress`, `job_completed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, and `home_history_updated`.
+
+## Checkpoint Reset and Restore Behavior
+
+Checkpoint seed uses one canonical lifecycle path and advances only as far as the selected checkpoint. It does not keep independent per-checkpoint seed scripts.
+
+Before any seed, the runner resets all non-reset seed runs for the scenario, including `started`, `failed`, and `succeeded` runs. Moving from a later checkpoint to an earlier checkpoint therefore uses reset-and-rebuild behavior. For example, seeding `job_created` and then seeding `request_ready` removes the registered job, estimate, workflow-event, and request rows from the old run, then rebuilds only the request-ready graph while preserving the demo auth identities.
+
+`demo:verify` behavior is checkpoint-aware:
+
+- With no `--checkpoint`, it verifies the active successful run's recorded checkpoint.
+- With `--checkpoint=<key>`, it requires the requested checkpoint, the active run metadata, and the database graph to match.
+- Lower checkpoints explicitly require later records to be absent. For example, `request_ready` fails if an estimate or job remains, and `estimate_accepted` fails if a linked job or `job_created` event exists.
+
+Registry rows record the creation step/checkpoint for each resettable row, and every resettable row remains tied to the exact run that created it. No `is_demo` fields are added to product tables, and the reset allowlist is unchanged.
 
 ## Scenario Contents
 
@@ -153,7 +192,18 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 
 ## Verify Behavior
 
-`npm run demo:verify` checks the complete water-heater scenario, not just record counts. A successful verification requires:
+`npm run demo:verify` checks the complete graph for the active checkpoint, not just record counts. With no checkpoint argument, it verifies the checkpoint stored on the active successful run. With `--checkpoint=<key>`, the requested checkpoint must match the active run checkpoint before the database graph is accepted.
+
+Checkpoint-specific verification includes:
+
+- `request_ready`: requires one request and forbids estimates, jobs, approval events, and job-created events.
+- `contractor_review_ready`: requires the same request graph in a contractor-readable state without fabricating a durable request status.
+- `estimate_draft`: requires one draft estimate with line items and payment schedule rows, and forbids sent evidence, approval events, and jobs.
+- `estimate_sent`: requires one sent estimate with sent evidence, and forbids approval events and jobs.
+- `estimate_accepted`: requires one accepted estimate and the exact current-estimate `estimate_approved` event, and forbids jobs and `job_created` events.
+- `job_created`: requires the accepted estimate, exact current-estimate approval event, linked draft job, exact current-job `job_created` event, and valid event ordering.
+
+All checkpoint verifications also require:
 
 - The dedicated demo-project guard to pass.
 - Exactly one active succeeded seed run with registered records.
@@ -161,9 +211,9 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 - Demo homeowner and contractor auth users with expected demo ownership metadata.
 - Distinct homeowner and contractor identities.
 - Matching public profiles, homeowner profile, and contractor profile/company.
-- One intended demo home, active connection, required connection permissions, service request, accepted estimate, and linked job.
+- One intended demo home, active connection, required connection permissions, and the records required by that checkpoint.
 - Registry rows that point to real supported records with no duplicate registry target.
-- Valid date ordering from connection to request and estimate creation, plus exact workflow activity evidence that the accepted-estimate approval event precedes the job-created event for the same estimate/job.
+- Valid date ordering for every stage present in that checkpoint. The full accepted-estimate-plus-linked-job graph applies only to `job_created`.
 
 `verify` exits non-zero if any required check fails.
 
@@ -178,6 +228,8 @@ Recommended recording order:
 3. Return to the homeowner only where the seeded workflow already supports real homeowner visibility.
 
 Slice 1 does not include presentation-safe mode, automatic screenshot capture, or public demo links.
+
+Slice 2A still does not add browser checkpoint controls, role switching, a presentation-mode URL flag, reset buttons, screenshot automation, or public demo controls. Checkpoint selection remains a private local/server-side runner operation. Presentation-safe UI controls are deferred because adding frontend behavior would materially expand scope beyond deterministic checkpoint restore and verification.
 
 ## Troubleshooting
 
