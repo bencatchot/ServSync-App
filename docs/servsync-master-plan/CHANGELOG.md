@@ -6,6 +6,24 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-10
 
+- Branch: `codex/demo-mode-acceptance-timestamp-fix`
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Corrected Demo Mode Slice 1 verification so accepted-estimate job creation is validated through exact durable workflow activity events instead of treating trigger-managed `estimates.updated_at` as a dedicated acceptance timestamp.
+- Reason for change: The first Gate C seed reached the accepted-estimate/job scenario but failed verification because the estimate `updated_at` trigger replaced the runner's attempted backdated acceptance timestamp with current database time. The runner now uses the `estimate_approved` and `job_created` workflow events for the current estimate/job, removes the direct acceptance timestamp patch, and preserves failed-run reconciliation for the existing dedicated-demo failed run.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+- Known risks or follow-ups:
+  - No database mutation, reset, reseed, auth provisioning, SQL application, Vercel change, production action, or shared-sandbox action is included in this code fix.
+  - Gate C must be rerun from the beginning after this fix is audited and merged so the existing failed run can be reset through the runner and the scenario can be reseeded/verified safely.
+
 - Branch: `codex/demo-mode-foundation-slice-1`
 - Files changed:
   - `scripts/demo/seed-demo-scenario.mjs`

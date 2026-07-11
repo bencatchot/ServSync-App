@@ -32,6 +32,14 @@ const FORBIDDEN_EXTERNAL_FLAGS = [
 const ENABLED_BOOLEAN_VALUES = new Set(['true', '1', 'yes', 'on', 'enabled']);
 const DISABLED_BOOLEAN_VALUES = new Set(['false', '0', 'no', 'off', 'disabled']);
 const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded'];
+const WORKFLOW_EVENT_TYPES = {
+  estimateApproved: 'estimate_approved',
+  jobCreated: 'job_created',
+};
+const WORKFLOW_EVENT_SOURCES = {
+  estimateResponse: 'servsync_homeowner_respond_to_estimate',
+  jobFromEstimate: 'servsync_create_job_from_estimate',
+};
 const DEMO_AUTH_METADATA = {
   owned: 'servsync_demo_owned',
   scenario: 'servsync_demo_scenario',
@@ -988,15 +996,10 @@ async function createAcceptedEstimate(contractorClient, homeownerClient, service
     'Unable to accept demo estimate through homeowner RPC'
   );
 
-  await ensureOk(
-    await service.from('estimates').update({ updated_at: dates.estimateAcceptedAt }).eq('id', estimate.id),
-    'Unable to set demo estimate accepted date'
-  );
-
   return { estimateId: estimate.id, totalCents };
 }
 
-async function createJobFromEstimate(contractorClient, service, runId, estimateId, dates) {
+async function createJobFromEstimate(contractorClient, service, runId, estimateId) {
   const result = await ensureOk(
     await contractorClient.rpc('servsync_create_job_from_estimate', { p_estimate_id: estimateId }),
     'Unable to create demo job from accepted estimate through contractor RPC'
@@ -1004,11 +1007,6 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
 
   const jobId = result.job_id;
   await registerCreatedRecord(service, runId, 'inspections', jobId, 'demo_job', 'job_ready');
-
-  await ensureOk(
-    await service.from('inspections').update({ created_at: dates.jobCreatedAt, updated_at: dates.jobCreatedAt }).eq('id', jobId),
-    'Unable to set demo job date'
-  );
 
   const workItems = await ensureOk(
     await service.from('job_work_items').select('id').eq('inspection_id', jobId),
@@ -1070,6 +1068,72 @@ function assertOrderedTimestamps(issues, label, earlier, later) {
   }
   if (new Date(earlier).getTime() > new Date(later).getTime()) {
     issues.push(`${label} timestamp ordering is invalid.`);
+  }
+}
+
+function workflowEventSource(event) {
+  return event?.metadata && typeof event.metadata === 'object' ? event.metadata.source_rpc : null;
+}
+
+function filterScenarioWorkflowEvents(events, criteria) {
+  return (events || []).filter((event) => {
+    if (event.event_type !== criteria.eventType) return false;
+    if (criteria.estimateId && event.estimate_id !== criteria.estimateId) return false;
+    if (criteria.inspectionId !== undefined && event.inspection_id !== criteria.inspectionId) return false;
+    if (criteria.sourceRpc && workflowEventSource(event) !== criteria.sourceRpc) return false;
+    return true;
+  });
+}
+
+function requireExactlyOneWorkflowEvent(issues, events, criteria, label) {
+  const matches = filterScenarioWorkflowEvents(events, criteria);
+  if (matches.length !== 1) {
+    issues.push(`${label} workflow event count expected 1, found ${matches.length}.`);
+    return null;
+  }
+  return matches[0];
+}
+
+export function verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events }) {
+  if (!estimate || !job) {
+    issues.push('Accepted estimate workflow event verification requires both estimate and job records.');
+    return;
+  }
+  if (estimate.status !== 'accepted') {
+    issues.push('Demo estimate must be accepted before workflow event ordering can be verified.');
+  }
+
+  const estimateApprovedEvent = requireExactlyOneWorkflowEvent(
+    issues,
+    events,
+    {
+      eventType: WORKFLOW_EVENT_TYPES.estimateApproved,
+      estimateId: estimate.id,
+      inspectionId: null,
+      sourceRpc: WORKFLOW_EVENT_SOURCES.estimateResponse,
+    },
+    'Estimate approval'
+  );
+  const jobCreatedEvent = requireExactlyOneWorkflowEvent(
+    issues,
+    events,
+    {
+      eventType: WORKFLOW_EVENT_TYPES.jobCreated,
+      estimateId: estimate.id,
+      inspectionId: job.id,
+      sourceRpc: WORKFLOW_EVENT_SOURCES.jobFromEstimate,
+    },
+    'Job creation'
+  );
+
+  if (estimateApprovedEvent) {
+    assertOrderedTimestamps(issues, 'Estimate creation before estimate approval event', estimate.created_at, estimateApprovedEvent.created_at);
+  }
+  if (estimateApprovedEvent && jobCreatedEvent) {
+    assertOrderedTimestamps(issues, 'Estimate approval event before job creation event', estimateApprovedEvent.created_at, jobCreatedEvent.created_at);
+  }
+  if (jobCreatedEvent) {
+    assertOrderedTimestamps(issues, 'Estimate creation before job creation event', estimate.created_at, jobCreatedEvent.created_at);
   }
 }
 
@@ -1265,6 +1329,17 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
         'id, contractor_id, homeowner_user_id, home_id, service_request_id, estimate_id, status, job_status, created_at'
       )
     : null;
+  const workflowEvents =
+    estimateId && jobId
+      ? await ensureOk(
+          await service
+            .from('workflow_activity_events')
+            .select('id, event_type, estimate_id, inspection_id, created_at, metadata')
+            .eq('estimate_id', estimateId)
+            .in('event_type', [WORKFLOW_EVENT_TYPES.estimateApproved, WORKFLOW_EVENT_TYPES.jobCreated]),
+          'Unable to inspect demo workflow activity events'
+        )
+      : [];
 
   if (home && homeownerUser && (home.homeowner_user_id !== homeownerUser.id || home.nickname !== DEMO_PROPERTY.nickname)) {
     issues.push('Demo home is not linked to the expected homeowner or property marker.');
@@ -1347,8 +1422,7 @@ async function verifyScenario(service, scenarioKey, env = process.env) {
   if (run.anchor_timestamp && connection && request && estimate && job) {
     assertOrderedTimestamps(issues, 'Connection before request', connection.created_at, request.created_at);
     assertOrderedTimestamps(issues, 'Request before estimate creation', request.created_at, estimate.created_at);
-    assertOrderedTimestamps(issues, 'Estimate creation before acceptance update', estimate.created_at, estimate.updated_at);
-    assertOrderedTimestamps(issues, 'Estimate acceptance update before job creation', estimate.updated_at, job.created_at);
+    verifyAcceptedEstimateWorkflowEvents(issues, { estimate, job, events: workflowEvents });
   }
 
   return {
@@ -1432,7 +1506,7 @@ async function seedScenario(env, target, scenarioKey) {
       requestId,
       dates
     );
-    const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, estimateId, dates);
+    const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, estimateId);
 
     await finishRun(service, runId, 'succeeded', {
       homeowner_user_id: homeownerUser.id,
