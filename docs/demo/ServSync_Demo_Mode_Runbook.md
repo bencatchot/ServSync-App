@@ -192,7 +192,18 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 
 ## Verify Behavior
 
-`npm run demo:verify` checks the complete water-heater scenario, not just record counts. A successful verification requires:
+`npm run demo:verify` checks the complete graph for the active checkpoint, not just record counts. With no checkpoint argument, it verifies the checkpoint stored on the active successful run. With `--checkpoint=<key>`, the requested checkpoint must match the active run checkpoint before the database graph is accepted.
+
+Checkpoint-specific verification includes:
+
+- `request_ready`: requires one request and forbids estimates, jobs, approval events, and job-created events.
+- `contractor_review_ready`: requires the same request graph in a contractor-readable state without fabricating a durable request status.
+- `estimate_draft`: requires one draft estimate with line items and payment schedule rows, and forbids sent evidence, approval events, and jobs.
+- `estimate_sent`: requires one sent estimate with sent evidence, and forbids approval events and jobs.
+- `estimate_accepted`: requires one accepted estimate and the exact current-estimate `estimate_approved` event, and forbids jobs and `job_created` events.
+- `job_created`: requires the accepted estimate, exact current-estimate approval event, linked draft job, exact current-job `job_created` event, and valid event ordering.
+
+All checkpoint verifications also require:
 
 - The dedicated demo-project guard to pass.
 - Exactly one active succeeded seed run with registered records.
@@ -200,9 +211,9 @@ Slice 1 does not register or reset incidental in-app notifications. Existing wor
 - Demo homeowner and contractor auth users with expected demo ownership metadata.
 - Distinct homeowner and contractor identities.
 - Matching public profiles, homeowner profile, and contractor profile/company.
-- One intended demo home, active connection, required connection permissions, service request, accepted estimate, and linked job.
+- One intended demo home, active connection, required connection permissions, and the records required by that checkpoint.
 - Registry rows that point to real supported records with no duplicate registry target.
-- Valid date ordering from connection to request and estimate creation, plus exact workflow activity evidence that the accepted-estimate approval event precedes the job-created event for the same estimate/job.
+- Valid date ordering for every stage present in that checkpoint. The full accepted-estimate-plus-linked-job graph applies only to `job_created`.
 
 `verify` exits non-zero if any required check fails.
 

@@ -53,6 +53,19 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(() => module.parseCheckpointKey(['--checkpoint=job'])).toThrow(/Unsupported demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--checkpoint='])).toThrow(/checkpoint key is required|Unsupported demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--check=request_ready'])).toThrow(/Unsupported demo argument/);
+    for (const args of [
+      ['--checkpoint=request_ready', '--checkpoint=job_created'],
+      ['--checkpoint', 'request_ready', '--checkpoint', 'job_created'],
+      ['--checkpoint=request_ready', '--checkpoint', 'job_created'],
+      ['--checkpoint', 'request_ready', '--checkpoint=job_created'],
+      ['--checkpoint=request_ready', '--checkpoint=request_ready'],
+      ['--checkpoint=request_ready', '--checkpoint=estimate_sent'],
+    ]) {
+      expect(() => module.parseCheckpointKey(args)).toThrow(/Checkpoint may be specified only once/);
+    }
+    await expect(
+      module.runDemoCommand(['seed', 'water_heater_core_loop', '--checkpoint=request_ready', '--checkpoint=job_created'], {})
+    ).rejects.toThrow(/Checkpoint may be specified only once/);
   });
 
   test('runner uses one canonical step path rather than copied per-checkpoint seed routines', () => {

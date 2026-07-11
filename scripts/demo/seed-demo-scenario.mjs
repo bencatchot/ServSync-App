@@ -179,12 +179,18 @@ export function parseCheckpointSelection(args = [], defaultKey = DEFAULT_CHECKPO
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--checkpoint') {
+      if (supplied) {
+        throw new Error('Checkpoint may be specified only once.');
+      }
       checkpointKey = args[index + 1] || '';
       supplied = true;
       index += 1;
       continue;
     }
     if (arg?.startsWith('--checkpoint=')) {
+      if (supplied) {
+        throw new Error('Checkpoint may be specified only once.');
+      }
       checkpointKey = arg.slice('--checkpoint='.length);
       supplied = true;
       continue;

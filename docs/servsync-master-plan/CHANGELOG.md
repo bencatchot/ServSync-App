@@ -18,6 +18,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/CHANGELOG.md`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
 - Summary of change: Added Demo Mode Slice 2A checkpoint support for the private water-heater demo runner. The runner now has a declarative scenario manifest, supports `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`, defaults backward-compatibly to `job_created`, verifies the selected checkpoint against run metadata and the actual database graph, and keeps reset/rebuild behavior for lower-checkpoint restoration.
+- Follow-up correction: Duplicate checkpoint arguments now fail closed instead of silently using the final supplied value, and the Demo Mode runbook now describes `demo:verify` as checkpoint-specific rather than implying every checkpoint requires the full `job_created` graph.
 - Reason for change: Internal screenshots, recordings, demos, and QA walkthroughs need repeatable entry points before the final accepted-estimate/job-created state without adding browser controls or fake product statuses.
 - Tests/checks run:
   - `node --check scripts/demo/seed-demo-scenario.mjs`
