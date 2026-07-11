@@ -1283,6 +1283,54 @@ function recordIds(records, tableName, role = null) {
     .map((record) => record.record_id);
 }
 
+function normalizeRecordId(id) {
+  return id == null ? null : String(id);
+}
+
+function sortedUniqueRecordIds(ids) {
+  return [...new Set((ids || []).map(normalizeRecordId).filter(Boolean))].sort();
+}
+
+function duplicateRecordIds(ids) {
+  const seen = new Set();
+  const duplicates = new Set();
+  for (const rawId of ids || []) {
+    const id = normalizeRecordId(rawId);
+    if (!id) continue;
+    if (seen.has(id)) {
+      duplicates.add(id);
+    } else {
+      seen.add(id);
+    }
+  }
+  return [...duplicates].sort();
+}
+
+export function compareExactRecordIdSets(actualIds, registeredIds) {
+  const actual = sortedUniqueRecordIds(actualIds);
+  const registered = sortedUniqueRecordIds(registeredIds);
+  const actualSet = new Set(actual);
+  const registeredSet = new Set(registered);
+  const missingRegistered = actual.filter((id) => !registeredSet.has(id));
+  const staleRegistered = registered.filter((id) => !actualSet.has(id));
+  const duplicateActual = duplicateRecordIds(actualIds);
+  const duplicateRegistered = duplicateRecordIds(registeredIds);
+
+  return {
+    actual,
+    registered,
+    missingRegistered,
+    staleRegistered,
+    duplicateActual,
+    duplicateRegistered,
+    ok:
+      missingRegistered.length === 0 &&
+      staleRegistered.length === 0 &&
+      duplicateActual.length === 0 &&
+      duplicateRegistered.length === 0,
+  };
+}
+
 function requireExactlyOneId(issues, records, tableName, role, label) {
   const ids = recordIds(records, tableName, role);
   if (ids.length !== 1) {
@@ -1321,6 +1369,49 @@ function filterScenarioWorkflowEvents(events, criteria) {
     if (criteria.sourceRpc && workflowEventSource(event) !== criteria.sourceRpc) return false;
     return true;
   });
+}
+
+export function findForbiddenJobCompletedEvents(events, jobId) {
+  if (!jobId) return [];
+  return (events || []).filter((event) => event?.event_type === WORKFLOW_EVENT_TYPES.jobCompleted && event?.inspection_id === jobId);
+}
+
+export function verifyExactVisitEventOwnership(issues, { registeredVisitEventIds = [], visitEvents = [] }) {
+  if (registeredVisitEventIds.length !== 1) {
+    issues.push(`Expected 1 registered contractor visit event, found ${registeredVisitEventIds.length}.`);
+  }
+  if (visitEvents.length !== 1) {
+    issues.push(`Expected exactly one contractor visit event for the demo job, found ${visitEvents.length}.`);
+  }
+  if (registeredVisitEventIds.length === 1 && visitEvents.length === 1) {
+    const registeredId = normalizeRecordId(registeredVisitEventIds[0]);
+    const actualId = normalizeRecordId(visitEvents[0]?.id);
+    if (registeredId !== actualId) {
+      issues.push(`Demo contractor visit event registry ID ${registeredId || 'missing'} does not match current job visit event ${actualId || 'missing'}.`);
+    }
+  }
+}
+
+export function verifyExactJobWorkItemOwnership(issues, { registeredWorkItemIds = [], jobWorkItems = [] }) {
+  const comparison = compareExactRecordIdSets(
+    (jobWorkItems || []).map((item) => item.id),
+    registeredWorkItemIds
+  );
+
+  if (comparison.duplicateActual.length > 0) {
+    issues.push(`Duplicate current demo job work item IDs: ${comparison.duplicateActual.join(', ')}.`);
+  }
+  if (comparison.duplicateRegistered.length > 0) {
+    issues.push(`Duplicate registered demo job work item IDs: ${comparison.duplicateRegistered.join(', ')}.`);
+  }
+  if (comparison.missingRegistered.length > 0) {
+    issues.push(`Demo job work item registry is missing current job work item IDs: ${comparison.missingRegistered.join(', ')}.`);
+  }
+  if (comparison.staleRegistered.length > 0) {
+    issues.push(`Demo job work item registry includes stale IDs not attached to the current job: ${comparison.staleRegistered.join(', ')}.`);
+  }
+
+  return comparison;
 }
 
 function requireExactlyOneWorkflowEvent(issues, events, criteria, label) {
@@ -1576,6 +1667,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const estimateIds = recordIds(records, 'estimates', 'demo_estimate');
   const jobIds = recordIds(records, 'inspections', 'demo_job');
   const visitEventIds = recordIds(records, 'contractor_visit_events', 'demo_contractor_visit_event');
+  const jobWorkItemIds = recordIds(records, 'job_work_items', 'demo_job_work_item');
   let estimateId = null;
   let jobId = null;
   if (requiresEstimate) {
@@ -1783,6 +1875,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (requiresJob && job) {
     const completedItems = jobWorkItems.filter((item) => item.completion_status === 'completed');
     const openItems = jobWorkItems.filter((item) => item.completion_status === 'open');
+    verifyExactJobWorkItemOwnership(issues, { registeredWorkItemIds: jobWorkItemIds, jobWorkItems });
     if (jobWorkItems.length !== estimateLines().length) {
       issues.push(`Expected ${estimateLines().length} demo job work items, found ${jobWorkItems.length}.`);
     }
@@ -1815,12 +1908,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   }
 
   if (requiresJobScheduled) {
-    if (visitEventIds.length !== 1) {
-      issues.push(`Expected 1 registered contractor visit event, found ${visitEventIds.length}.`);
-    }
-    if (visitEvents.length !== 1) {
-      issues.push(`Expected exactly one contractor visit event for the demo job, found ${visitEvents.length}.`);
-    }
+    verifyExactVisitEventOwnership(issues, { registeredVisitEventIds: visitEventIds, visitEvents });
     const visitEvent = visitEvents[0] || null;
     if (
       visitEvent &&
@@ -1901,11 +1989,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       issues.push(`Checkpoint ${checkpointKey} should not have job-created workflow events.`);
     }
   }
-  const jobCompletedEvents = filterScenarioWorkflowEvents(workflowEvents, {
-    eventType: WORKFLOW_EVENT_TYPES.jobCompleted,
-    estimateId,
-    inspectionId: jobId,
-  });
+  const jobCompletedEvents = findForbiddenJobCompletedEvents(workflowEvents, jobId);
   if (jobCompletedEvents.length > 0) {
     issues.push('Demo Slice 2B must not fabricate job_completed workflow events.');
   }

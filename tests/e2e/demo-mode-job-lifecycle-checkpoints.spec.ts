@@ -79,14 +79,116 @@ test.describe('Demo Mode Slice 2B job lifecycle checkpoint source checks', () =>
     const script = read(scriptPath);
 
     expect(script).toMatch(/job\.job_status !== checkpoint\.expected\.jobStatus/);
+    expect(script).toMatch(/verifyExactJobWorkItemOwnership\(issues, \{ registeredWorkItemIds: jobWorkItemIds, jobWorkItems \}\)/);
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.completedWorkItemCount\} completed job work items/);
     expect(script).toMatch(/Expected \$\{checkpoint\.expected\.openWorkItemCount\} open job work items/);
-    expect(script).toMatch(/Expected exactly one contractor visit event for the demo job/);
+    expect(script).toMatch(/verifyExactVisitEventOwnership\(issues, \{ registeredVisitEventIds: visitEventIds, visitEvents \}\)/);
     expect(script).toMatch(/visitEvent\.share_with_homeowner !== false/);
     expect(script).toMatch(/scenarioInvoices\.length !== 0/);
     expect(script).toMatch(/homeHistoryRows\.length !== 0/);
     expect(script).toMatch(/const workflowEventClauses = \[estimateId \? `estimate_id\.eq\.\$\{estimateId\}`/);
     expect(script).toMatch(/Scheduled visit before job completion/);
+  });
+
+  test('job-completed verification rejects current-job events without relying on estimate linkage', async () => {
+    const runner = await import('../../scripts/demo/seed-demo-scenario.mjs');
+
+    const matches = runner.findForbiddenJobCompletedEvents(
+      [
+        { event_type: 'job_completed', inspection_id: 'job-current', estimate_id: null },
+        { event_type: 'job_completed', inspection_id: 'job-current', estimate_id: 'estimate-other' },
+        { event_type: 'job_completed', inspection_id: 'job-other', estimate_id: null },
+        { event_type: 'job_created', inspection_id: 'job-current', estimate_id: null },
+      ],
+      'job-current'
+    );
+
+    expect(matches.map((event) => event.estimate_id)).toEqual([null, 'estimate-other']);
+  });
+
+  test('visit-event verification requires the registered and actual current-job IDs to match exactly', async () => {
+    const runner = await import('../../scripts/demo/seed-demo-scenario.mjs');
+
+    const mismatchIssues: string[] = [];
+    runner.verifyExactVisitEventOwnership(mismatchIssues, {
+      registeredVisitEventIds: ['visit-registered'],
+      visitEvents: [{ id: 'visit-actual' }],
+    });
+    expect(mismatchIssues).toContain(
+      'Demo contractor visit event registry ID visit-registered does not match current job visit event visit-actual.'
+    );
+
+    const unregisteredIssues: string[] = [];
+    runner.verifyExactVisitEventOwnership(unregisteredIssues, {
+      registeredVisitEventIds: [],
+      visitEvents: [{ id: 'visit-actual' }],
+    });
+    expect(unregisteredIssues).toContain('Expected 1 registered contractor visit event, found 0.');
+
+    const staleIssues: string[] = [];
+    runner.verifyExactVisitEventOwnership(staleIssues, {
+      registeredVisitEventIds: ['visit-stale'],
+      visitEvents: [],
+    });
+    expect(staleIssues).toContain('Expected exactly one contractor visit event for the demo job, found 0.');
+
+    const duplicateIssues: string[] = [];
+    runner.verifyExactVisitEventOwnership(duplicateIssues, {
+      registeredVisitEventIds: ['visit-a', 'visit-b'],
+      visitEvents: [{ id: 'visit-a' }],
+    });
+    expect(duplicateIssues).toContain('Expected 1 registered contractor visit event, found 2.');
+
+    const exactIssues: string[] = [];
+    runner.verifyExactVisitEventOwnership(exactIssues, {
+      registeredVisitEventIds: ['visit-a'],
+      visitEvents: [{ id: 'visit-a' }],
+    });
+    expect(exactIssues).toEqual([]);
+  });
+
+  test('job-work-item verification requires exact current-job and registry ID-set equality', async () => {
+    const runner = await import('../../scripts/demo/seed-demo-scenario.mjs');
+
+    const exactIssues: string[] = [];
+    const exactComparison = runner.verifyExactJobWorkItemOwnership(exactIssues, {
+      registeredWorkItemIds: ['work-b', 'work-a'],
+      jobWorkItems: [{ id: 'work-a' }, { id: 'work-b' }],
+    });
+    expect(exactIssues).toEqual([]);
+    expect(exactComparison.ok).toBe(true);
+    expect(exactComparison.actual).toEqual(['work-a', 'work-b']);
+    expect(exactComparison.registered).toEqual(['work-a', 'work-b']);
+
+    const missingIssues: string[] = [];
+    runner.verifyExactJobWorkItemOwnership(missingIssues, {
+      registeredWorkItemIds: ['work-a'],
+      jobWorkItems: [{ id: 'work-a' }, { id: 'work-b' }],
+    });
+    expect(missingIssues).toContain('Demo job work item registry is missing current job work item IDs: work-b.');
+
+    const staleIssues: string[] = [];
+    runner.verifyExactJobWorkItemOwnership(staleIssues, {
+      registeredWorkItemIds: ['work-a', 'work-stale'],
+      jobWorkItems: [{ id: 'work-a' }],
+    });
+    expect(staleIssues).toContain('Demo job work item registry includes stale IDs not attached to the current job: work-stale.');
+
+    const duplicateIssues: string[] = [];
+    runner.verifyExactJobWorkItemOwnership(duplicateIssues, {
+      registeredWorkItemIds: ['work-a', 'work-a'],
+      jobWorkItems: [{ id: 'work-a' }],
+    });
+    expect(duplicateIssues).toContain('Duplicate registered demo job work item IDs: work-a.');
+
+    const unrelatedCurrentIssues: string[] = [];
+    runner.verifyExactJobWorkItemOwnership(unrelatedCurrentIssues, {
+      registeredWorkItemIds: ['work-a'],
+      jobWorkItems: [{ id: 'work-a' }, { id: 'work-unregistered-current-job' }],
+    });
+    expect(unrelatedCurrentIssues).toContain(
+      'Demo job work item registry is missing current job work item IDs: work-unregistered-current-job.'
+    );
   });
 
   test('demo registry SQL can reset contractor visit events only through the explicit allowlist', () => {

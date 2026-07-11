@@ -36,6 +36,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `job_in_progress` and `job_review_ready` are controlled demo fixture transitions because the current app does not expose dedicated start-job or review-ready RPCs.
   - `job_completed` intentionally models lightweight current-product completion only; invoice, Home History, report/PDF storage, reminders, and public capture tooling remain future slices.
 
+- Branch: `codex/demo-mode-job-checkpoints-slice-2b`
+- Files changed:
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Hardened Demo Mode Slice 2B job checkpoint verification so `job_completed` workflow events are rejected for the current job regardless of estimate linkage, scheduled visit events must have matching registered and actual current-job IDs, and demo job work-item registry ownership must exactly match the current job's work-item ID set.
+- Reason for change: Final PR verification found remaining edge cases where stale, unregistered, or differently linked job lifecycle records could satisfy counts without proving exact current-run ownership.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Source/test/docs-only hardening for the existing draft PR. No SQL, manifest, frontend, package, dependency, Vercel, Supabase, production, shared-sandbox, or remote demo mutation is included.
+
 - Branch: `codex/fix-homeowner-estimates-panel`
 - Files changed:
   - `src/App.tsx`
