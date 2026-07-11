@@ -1,8 +1,8 @@
 # ServSync Demo Mode Runbook
 
-This runbook describes the hidden Demo Mode Slice 1 foundation for a dedicated ServSync demo environment. It is for internal operators preparing screenshots, screen recordings, onboarding videos, App Store previews, and sales demonstrations.
+This runbook describes the hidden Demo Mode foundation for a dedicated ServSync demo environment. It is for internal operators preparing screenshots, screen recordings, onboarding videos, App Store previews, and sales demonstrations.
 
-Demo Mode is not a public feature, not production data, and not a reset button inside the application. Slice 1 seeds one connected water-heater scenario into a dedicated demo Supabase project so the existing ServSync UI can show real records, permissions, and lifecycle behavior after logging in as the demo homeowner and contractor.
+Demo Mode is not a public feature, not production data, and not a reset button inside the application. Slice 1 seeds one connected water-heater scenario into a dedicated demo Supabase project so the existing ServSync UI can show real records, permissions, and lifecycle behavior after logging in as the demo homeowner and contractor. Slice 2C-A adds a browser-safe presentation mode for the dedicated demo deployment only; it hides capture clutter and mutating controls but does not add browser-side checkpoint, reset, seed, role-switching, or privileged controls.
 
 ## Scope
 
@@ -20,7 +20,7 @@ Slice 1 excludes:
 - Shared sandbox use.
 - User-facing Demo Mode UI.
 - Role switching, impersonation, or browser-side privileged reset tools.
-- Invoice creation/sending/payment, Home History filing, finalized job reports, report PDFs, reminders, messages beyond required workflow records, media, documents, storage uploads, presentation mode, screenshots, or screen recording automation.
+- Invoice creation/sending/payment, Home History filing, finalized job reports, report PDFs, reminders, messages beyond required workflow records, media, documents, storage uploads, public capture tooling, screenshots, or screen recording automation.
 - Email, SMS, push, payment, webhook, accounting sync, AI, geocoding, or external calendar activity.
 
 ## Dedicated Environment Requirement
@@ -33,6 +33,14 @@ Known forbidden refs:
 - Shared sandbox: `zpzdkoaubyjtsomccxya`
 
 Do not run the seed/reset/verify commands against production or the shared sandbox. Do not place a service-role key in frontend code or browser-accessible environment variables.
+
+The optional presentation mode is also dedicated-demo only. It activates in browser code only when all of these public Vite variables agree on the dedicated demo project:
+
+- `VITE_SERVSYNC_DEMO_PRESENTATION_ENABLED=true`
+- `VITE_SERVSYNC_DEMO_PROJECT_REF=bdytwgejqnlblhrnqxkp`
+- `VITE_SUPABASE_URL` parses to project ref `bdytwgejqnlblhrnqxkp`
+
+Presentation mode fails closed for missing, malformed, mismatched, production, or shared-sandbox refs. Do not use it outside the dedicated demo Vercel environment.
 
 ## Required Environment Variables
 
@@ -94,7 +102,7 @@ The command output reports safe identifiers, run reconciliation summaries, verif
 
 ## Supported Slice 2A and Slice 2B Checkpoints
 
-Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints, without invoice creation, Home History filing, report finalization, media, storage, public controls, or presentation mode.
+Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints, without invoice creation, Home History filing, report finalization, media, storage, public controls, or browser checkpoint controls. Slice 2C-A adds a dedicated-demo-only presentation mode that makes these checkpoints easier to capture visually while preserving the underlying product states.
 
 | Checkpoint | Primary role | Purpose | Expected records |
 | --- | --- | --- | --- |
@@ -238,9 +246,9 @@ Recommended recording order:
 2. Log in as the demo contractor to show the connected request and accepted-estimate job handoff.
 3. Return to the homeowner only where the seeded workflow already supports real homeowner visibility.
 
-Slice 1 does not include presentation-safe mode, automatic screenshot capture, or public demo links.
+Slice 2C-A presentation mode may be enabled only in the dedicated demo Vercel environment. In that mode, setup prompts, onboarding checklists, subscription/readiness clutter, notification badges/lists, and selected mutating capture-surface controls are visually hidden so screenshots and recordings stay focused. The mode also uses presentation-safe job checkpoint copy such as `Draft job created from accepted estimate`, `Contractor visit scheduled`, `Work in progress`, `Ready for contractor review`, and `Work completed. Billing and home records are the next workflow and are intentionally outside this demo.`
 
-Slice 2A and Slice 2B still do not add browser checkpoint controls, role switching, a presentation-mode URL flag, reset buttons, screenshot automation, or public demo controls. Checkpoint selection remains a private local/server-side runner operation. Presentation-safe UI controls are deferred because adding frontend behavior would materially expand scope beyond deterministic checkpoint restore and verification.
+Slice 2C-A still does not add browser checkpoint controls, role switching, reset buttons, screenshot automation, public demo controls, invoices, Home History, reports, PDFs, media, reminders, payments, or notification delivery. Checkpoint selection remains a private local/server-side runner operation.
 
 ## Troubleshooting
 

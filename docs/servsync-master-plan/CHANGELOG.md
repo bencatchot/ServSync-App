@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-presentation-controls-slice-2c-a`
+- Files changed:
+  - `src/App.tsx`
+  - `src/demoPresentation.ts`
+  - `tests/e2e/demo-presentation-mode.spec.ts`
+  - `tests/e2e/role-tour-removal.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Demo Mode Slice 2C-A frontend presentation controls for the dedicated demo environment only. The new browser-safe guard activates only when the demo presentation flag, expected demo project ref, and parsed Supabase URL all match the dedicated demo ref, and the app hides setup/checklist/subscription/notification clutter plus selected mutating capture-surface controls while preserving read-only navigation and underlying product state. Contractor selected-homeowner profiles now get a presentation-only current-job summary with job title, property context, checkpoint-safe copy, and work-item progress.
+- Reason for change: Internal screenshots and recordings need polished capture surfaces after Slice 2A/2B checkpoints without adding public Demo Mode, browser checkpoint/reset controls, role switching, or later-slice invoice/Home History/report/media behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-presentation-mode.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL, demo runner, reset allowlist, auth, Supabase/Vercel settings, production/shared-sandbox data, browser checkpoint controls, role switching, invoice, Home History, report/PDF, media, reminder, payment, notification delivery, deployment, or external-effect changes are included.
+  - Presentation mode is controlled by public Vite variables and must be enabled only in the dedicated demo Vercel environment after review; screenshots and recordings still need manual capture QA.
+
 - Branch: `codex/fix-demo-job-scheduled-timestamps`
 - Files changed:
   - `scripts/demo/seed-demo-scenario.mjs`

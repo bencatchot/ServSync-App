@@ -125,6 +125,11 @@ import {
   invoiceStatusLabel,
 } from './features/invoices/status';
 import {
+  demoPresentationJobCheckpointLabel,
+  demoPresentationWorkItemProgress,
+  isServSyncDemoPresentationMode,
+} from './demoPresentation';
+import {
   serviceRequestStatusAccent,
   serviceRequestStatusClass,
   serviceRequestStatusLabel,
@@ -257,6 +262,7 @@ import type {
 } from './types';
 
 type RouteName = AppRouteName;
+const SERVSYNC_DEMO_PRESENTATION_MODE = isServSyncDemoPresentationMode();
 type HomeownerRequestView = 'open_pending' | 'closed' | 'invoiced';
 type HomeownerRequestComposerStep = 'property' | 'issue' | 'contractor' | 'review';
 type ContractorRequestView = 'overview' | 'new' | 'open' | 'scheduled' | 'closed' | 'declined';
@@ -13633,7 +13639,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       complete: selectedHomeRoomLayouts.length > 0,
     },
   ];
-  const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
+  const showInitialHomeSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE && !loading && homes.length === 0 && !homeSetupSkipped;
   const homeownerOnboardingItems: Array<{
     label: string;
     helper: string;
@@ -13706,7 +13712,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
   ];
   const completedHomeownerOnboardingCount = homeownerOnboardingItems.filter(item => item.complete).length;
-  const showHomeownerOnboardingChecklist = completedHomeownerOnboardingCount < homeownerOnboardingItems.length;
+  const showHomeownerOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE && completedHomeownerOnboardingCount < homeownerOnboardingItems.length;
   const homeownerFeedbackPageLabel = {
     overview: 'Dashboard',
     home: 'Home / Properties',
@@ -16797,6 +16803,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {invite.expires_at ? ` · Expires ${formatDateTime(invite.expires_at)}` : ''}
                         </p>
                       </div>
+                      {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                       <div className={mobileActionRowClass()}>
                         <button
                           type="button"
@@ -16816,6 +16823,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           Decline
                         </button>
                       </div>
+                      )}
                     </div>
                   );
                 })}
@@ -16989,10 +16997,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     void markNotificationsRead(unreadEstimateNotificationIds);
   }, [homeownerTab, unreadEstimateNotificationKey]);
 
-  const homeownerRequestsBadgeCount = homeownerActionRequestCount;
-  const homeownerCalendarBadgeCount = homeownerCalendarActionCount;
-  const homeownerEstimatesInvoicesBadgeCount = homeownerFinancialBadgeCount;
-  const homeownerSupportBadgeCount = supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
+  const homeownerRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : homeownerActionRequestCount;
+  const homeownerCalendarBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : homeownerCalendarActionCount;
+  const homeownerEstimatesInvoicesBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : homeownerFinancialBadgeCount;
+  const homeownerSupportBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
 
   const homeownerMobileNavItems: MobileNavItem[] = [
     {
@@ -17052,7 +17060,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       activeTab={homeownerTab}
       onChange={tab => setHomeownerTab(tab as typeof homeownerTab)}
       mobileNavItems={homeownerMobileNavItems}
-      actions={<NotificationBell
+      actions={SERVSYNC_DEMO_PRESENTATION_MODE ? undefined : <NotificationBell
         notifications={notifications}
         unreadCount={unreadNotificationCount}
         onMarkRead={ids => void markNotificationsRead(ids)}
@@ -17379,20 +17387,22 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-600">
                   Request help, track active work, store documents, and keep your home history in one place.
                 </p>
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <button type="button" onClick={() => setHomeownerTab('contractors')} className={buttonClass('primary')}>
-                    <MessageSquare size={16} />
-                    Request service
-                  </button>
-                  <button type="button" onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} className={buttonClass('secondary')}>
-                    <FolderOpen size={16} />
-                    Add document
-                  </button>
-                  <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className={buttonClass('secondary')}>
-                    <ClipboardList size={16} />
-                    Add history entry
-                  </button>
-                </div>
+                {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    <button type="button" onClick={() => setHomeownerTab('contractors')} className={buttonClass('primary')}>
+                      <MessageSquare size={16} />
+                      Request service
+                    </button>
+                    <button type="button" onClick={() => { setHomeownerDocumentPropertyScope('selected'); setHomeownerTab('documents'); }} className={buttonClass('secondary')}>
+                      <FolderOpen size={16} />
+                      Add document
+                    </button>
+                    <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className={buttonClass('secondary')}>
+                      <ClipboardList size={16} />
+                      Add history entry
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-5 lg:border-l lg:border-t-0">
                 <div className="grid grid-cols-2 gap-2">
@@ -17459,6 +17469,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </section>
           )}
 
+          {!SERVSYNC_DEMO_PRESENTATION_MODE && (
           <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
@@ -17480,6 +17491,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </div>
           </section>
+          )}
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -17526,6 +17538,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           </section>
 
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            {!SERVSYNC_DEMO_PRESENTATION_MODE && (
             <Card title="Start a service request" icon={<MessageSquare size={18} />}>
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -17628,6 +17641,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 )}
               </div>
             </Card>
+            )}
 
             <Card title="Active work" icon={<ClipboardCheck size={18} />}>
               <div className="space-y-3">
@@ -27620,7 +27634,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     },
   ];
   const contractorProfileOnboardingComplete = Boolean(contractorDraft.business_name.trim()) && contractorProfileScore >= 70;
-  const showInitialContractorProfileSetupPrompt = !loading
+  const showInitialContractorProfileSetupPrompt = !SERVSYNC_DEMO_PRESENTATION_MODE
+    && !loading
     && contractorTab !== 'profile'
     && !contractorProfileSetupSkipped
     && !contractorProfileOnboardingComplete;
@@ -27923,6 +27938,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setNotice('Opened the job linked to this accepted estimate.');
   };
   const workItemsForJob = (jobId: string) => [...(jobWorkItemsByJobId[jobId] || [])].sort((a, b) => a.sort_order - b.sort_order || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const demoPresentationLabelForJob = (job: Inspection) => {
+    const items = workItemsForJob(job.id);
+    return demoPresentationJobCheckpointLabel({
+      status: inspectionJobStatus(job),
+      totalWorkItems: items.length,
+      completedWorkItems: items.filter(item => item.completion_status === 'completed').length,
+    });
+  };
+  const demoPresentationBadgeLabelForJob = (job: Inspection) => {
+    if (!SERVSYNC_DEMO_PRESENTATION_MODE) return inspectionJobStatusLabel(job);
+    const label = demoPresentationLabelForJob(job);
+    if (label === 'Work completed. Billing and home records are the next workflow and are intentionally outside this demo.') return 'Work completed';
+    if (label === 'Draft job created from accepted estimate') return 'Draft job';
+    return label;
+  };
   const linkedNonVoidInvoiceForJob = (job: Pick<Inspection, 'id' | 'estimate_id'>) => invoices.find(invoice =>
     invoice.status !== 'void'
     && (invoice.job_id === job.id || (job.estimate_id ? invoice.estimate_id === job.estimate_id : false))
@@ -28100,7 +28130,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     },
   ];
   const completedContractorOnboardingCount = contractorOnboardingItems.filter(item => item.complete).length;
-  const showContractorOnboardingChecklist = completedContractorOnboardingCount < contractorOnboardingItems.length;
+  const showContractorOnboardingChecklist = !SERVSYNC_DEMO_PRESENTATION_MODE && completedContractorOnboardingCount < contractorOnboardingItems.length;
   type ContractorScheduleSnapshotItem = {
     id: string;
     dayKey: string;
@@ -28255,9 +28285,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     + completedJobsReadyToInvoice.length
     + invoiceAttentionRecords.length
     + (contractorProfileOnboardingComplete ? 0 : 1);
-  const contractorHomeownersBadgeCount = connectionRequests.length;
-  const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;
-  const contractorSupportBadgeCount = supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
+  const contractorHomeownersBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : connectionRequests.length;
+  const contractorServiceRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : contractorFollowUpCount || openServiceRequestCount;
+  const contractorSupportBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : supportInquiries.filter(inquiry => ['new', 'in_progress', 'waiting_on_user', 'waiting_on_admin'].includes(inquiry.status)).length;
   const workflowReviewItems: Array<{
     label: string;
     count: number;
@@ -30564,7 +30594,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         setContractorTab(tab as typeof contractorTab);
       }}
       mobileNavItems={contractorMobileNavItems}
-      actions={<NotificationBell
+      actions={SERVSYNC_DEMO_PRESENTATION_MODE ? undefined : <NotificationBell
         notifications={notifications}
         unreadCount={contractorUnreadNotificationCount}
         onMarkRead={ids => void markContractorNotificationsRead(ids)}
@@ -30985,8 +31015,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </div>
           </Card>
 
-          <ContractorEntitlementStatusPanel state={contractorEntitlementState} />
+          {!SERVSYNC_DEMO_PRESENTATION_MODE && <ContractorEntitlementStatusPanel state={contractorEntitlementState} />}
 
+          {!SERVSYNC_DEMO_PRESENTATION_MODE && (
           <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" open={showContractorOnboardingChecklist || undefined}>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <span className="flex items-center gap-2">
@@ -31139,6 +31170,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               </div>
             </div>
           </details>
+          )}
         </div>
       )}
 
@@ -32967,12 +32999,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <Card
           title="Calendar"
           icon={<Calendar size={18} />}
-          action={
+          action={!SERVSYNC_DEMO_PRESENTATION_MODE ? (
             <button type="button" onClick={openNewCalendarEvent} className={buttonClass('primary')}>
               <Plus size={14} />
               New event
             </button>
-          }
+          ) : undefined}
         >
           <CalendarView
             requests={serviceRequests}
@@ -33361,9 +33393,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-slate-800 text-sm">Homeowners</h2>
-                    <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                      <Plus size={14} /> Add
-                    </button>
+                    {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+                      <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                        <Plus size={14} /> Add
+                      </button>
+                    )}
                   </div>
                   {connectionRequests.length > 0 && (
                     <button
@@ -33938,6 +33972,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     const nextOpenRequest = activeReqs[0] ?? null;
                     const nextDraftWorkOrder = workOrderRecords.find(inspectionIsOpenJob) ?? null;
                     const nextAppointmentRequest = upcomingAppts[0] ?? null;
+                    const presentationCurrentJob = activeJobRecords[0] ?? workOrderRecords[0] ?? inspectionRecords[0] ?? null;
+                    const presentationCurrentJobItems = presentationCurrentJob ? workItemsForJob(presentationCurrentJob.id) : [];
+                    const presentationCurrentJobCompletedCount = presentationCurrentJobItems.filter(item => item.completion_status === 'completed').length;
+                    const presentationCurrentJobStatus = presentationCurrentJob ? inspectionJobStatus(presentationCurrentJob) : 'draft';
+                    const presentationCurrentJobProperty = presentationCurrentJob ? recordPropertyLabelForContractor(presentationCurrentJob) : '';
+                    const presentationCurrentJobProgress = demoPresentationWorkItemProgress(presentationCurrentJobItems.length, presentationCurrentJobCompletedCount);
+                    const presentationCurrentJobCopy = presentationCurrentJob ? demoPresentationJobCheckpointLabel({
+                      status: presentationCurrentJobStatus,
+                      totalWorkItems: presentationCurrentJobItems.length,
+                      completedWorkItems: presentationCurrentJobCompletedCount,
+                    }) : '';
                     const workspaceCards: Array<{ label: string; value: string; helper: string; icon: React.ReactNode; tone: 'blue' | 'amber' | 'emerald' | 'slate'; onClick: () => void }> = [
                       ...(isConn ? [
                         {
@@ -34580,6 +34625,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                           {activeTabId === 'overview' && (
                             <div className="space-y-4 max-w-5xl">
+                              {SERVSYNC_DEMO_PRESENTATION_MODE && presentationCurrentJob && (
+                                <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm" data-testid="demo-presentation-current-job-summary">
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Current job</p>
+                                      <h3 className="mt-1 break-words text-lg font-bold text-slate-950">{presentationCurrentJob.name}</h3>
+                                      <p className="mt-1 text-sm leading-5 text-slate-600">{presentationCurrentJobCopy}</p>
+                                      {presentationCurrentJobProperty && (
+                                        <p className="mt-2 text-xs font-semibold text-slate-500">Property: {presentationCurrentJobProperty}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex shrink-0 flex-col gap-2 sm:min-w-[190px]">
+                                      <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${inspectionJobBadgeClass(presentationCurrentJob)}`}>
+                                        {presentationCurrentJobCopy === 'Ready for contractor review' ? 'Ready for review' : demoPresentationBadgeLabelForJob(presentationCurrentJob)}
+                                      </span>
+                                      <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                                        {presentationCurrentJobProgress}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                   <div>
@@ -34705,7 +34772,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="min-w-0">
                                                 <p className="font-semibold text-slate-900">{insp.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{demoPresentationBadgeLabelForJob(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
                                                 {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
                                                   <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
                                                 )}
@@ -34746,7 +34813,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="min-w-0">
                                                 <p className="font-semibold text-slate-900">{insp.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{demoPresentationBadgeLabelForJob(insp)} · Updated {formatDateTime(insp.updated_at)}</p>
                                                 {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
                                                   <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
                                                 )}
@@ -35018,7 +35085,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   ))}
                                 </div>
 
-                                {!estimateComposerOpen && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
                                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
                                     <button
                                       type="button"
@@ -35090,7 +35157,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                   <p className="truncate text-sm font-semibold text-slate-900">{work.name}</p>
-                                                  <p className="mt-1 text-xs text-slate-500">{inspectionJobStatusLabel(work)} · Updated {formatDateTime(work.updated_at)}</p>
+                                                  <p className="mt-1 text-xs text-slate-500">{demoPresentationBadgeLabelForJob(work)} · Updated {formatDateTime(work.updated_at)}</p>
                                                   {propertyLabel && homeownerWorkspacePropertyScope === 'all' && (
                                                     <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>
                                                   )}
@@ -35300,7 +35367,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
                                                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                                  {inspectionJobStatusLabel(insp)}
+                                                  {demoPresentationBadgeLabelForJob(insp)}
                                                 </span>
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
@@ -35325,7 +35392,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <h3 className="font-bold text-slate-950">Checklist reports</h3>
                                     <p className="mt-1 text-xs text-slate-500">{inspectionDraftCount} draft{inspectionDraftCount === 1 ? '' : 's'} · {inspectionFinalCount} filed report{inspectionFinalCount === 1 ? '' : 's'}</p>
                                   </div>
-                                  <button
+                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
                                     type="button"
                                     onClick={() => {
                                       if (isConn && conn) {
@@ -35338,7 +35405,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   >
                                     <Plus size={14} />
                                     Create checklist report
-                                  </button>
+                                  </button>}
                                 </div>
                                 {inspectionRecords.length === 0 ? (
                                   <EmptyState text="No checklist report jobs yet for this homeowner." />
@@ -35353,7 +35420,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
                                                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                                  {inspectionJobStatusLabel(insp)}
+                                                  {demoPresentationBadgeLabelForJob(insp)}
                                                 </span>
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
@@ -35382,7 +35449,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         : 'Draft future work estimates with scope, line items, terms, and optional templates.'}
                                     </p>
                                   </div>
-                                  {!estimateComposerOpen && (
+                                  {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
                                   <div className="flex flex-wrap gap-2">
                                     {isInvoiceWorkspaceTab ? (
                                       <button
@@ -35416,7 +35483,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   )}
                                 </div>
 
-                                {estimateComposerOpen && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && estimateComposerOpen && (
                                   <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
                                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                                       <div>
@@ -35690,7 +35757,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           <div className="mt-3 flex flex-wrap gap-2">
                                             {estimate.status === 'accepted' && !isInvoiceWorkspaceTab && (
                                               <>
-                                                {!hasLinkedJob && (
+                                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && (
                                                   <button
                                                     type="button"
                                                     onClick={() => void createJobFromAcceptedEstimate(estimate)}
@@ -35716,69 +35783,73 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 )}
                                               </>
                                             )}
-                                            <button
-                                              type="button"
-                                              onClick={() => void downloadEstimatePdf(estimate, {
-                                                contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
-                                                customerName: headerName,
-                                                customerAddress: headerAddress || headerCity,
-                                                contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
-                                              }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
-                                              className={buttonClass('secondary')}
-                                            >
-                                              <Download size={15} />
-                                              Download PDF
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => openSaveEstimateTemplateModal(estimate)}
-                                              disabled={savingEstimateTemplateId === estimate.id}
-                                              className={buttonClass('secondary')}
-                                            >
-                                              <Receipt size={15} />
-                                              {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
-                                            </button>
-                                            {estimate.status === 'draft' && (
+                                            {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                                               <>
                                                 <button
                                                   type="button"
-                                                  onClick={() => {
-                                                    setEditingEstimateId(estimate.id);
-                                                    setEstimateDraft(estimateDraftFromEstimate(estimate));
-                                                    setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
-                                                    setEstimateAssistantText('');
-                                                    setEstimateDraftBuilderTrade('Other');
-                                                    setEstimateDraftBuilderJobType('repair');
-                                                    setEstimateDraftBuilderLaborMode('job_total');
-                                                    setEstimateDraftBuilderLastOutput(null);
-                                                    setEstimateStartMode('draft');
-                                                    setEstimateGuidedBuilderActive(false);
-                                                    setEstimateLineSourcePanel(null);
-                                                    setEstimateAssistantNotice('');
-                                                    setEstimateTemplateStartNotice('');
-                                                    setEstimateHelperNotice('');
-                                                    setEstimateHelperExpanded(false);
-                                                    setSavedChargeQuickPickNotice('');
-                                                    setEstimateComposerOpen(true);
-                                                  }}
+                                                  onClick={() => void downloadEstimatePdf(estimate, {
+                                                    contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                                    customerName: headerName,
+                                                    customerAddress: headerAddress || headerCity,
+                                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                                  }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
                                                   className={buttonClass('secondary')}
                                                 >
-                                                  Edit draft
+                                                  <Download size={15} />
+                                                  Download PDF
                                                 </button>
                                                 <button
                                                   type="button"
-                                                  onClick={() => void sendEstimateToHomeowner(estimate)}
-                                                  disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
-                                                  data-testid="contractor-send-estimate"
-                                                  aria-label={`Send estimate ${estimate.title} to homeowner`}
-                                                  className={buttonClass('primary')}
+                                                  onClick={() => openSaveEstimateTemplateModal(estimate)}
+                                                  disabled={savingEstimateTemplateId === estimate.id}
+                                                  className={buttonClass('secondary')}
                                                 >
-                                                  <Send size={15} />
-                                                  {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
+                                                  <Receipt size={15} />
+                                                  {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                                 </button>
+                                                {estimate.status === 'draft' && (
+                                                  <>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        setEditingEstimateId(estimate.id);
+                                                        setEstimateDraft(estimateDraftFromEstimate(estimate));
+                                                        setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
+                                                        setEstimateAssistantText('');
+                                                        setEstimateDraftBuilderTrade('Other');
+                                                        setEstimateDraftBuilderJobType('repair');
+                                                        setEstimateDraftBuilderLaborMode('job_total');
+                                                        setEstimateDraftBuilderLastOutput(null);
+                                                        setEstimateStartMode('draft');
+                                                        setEstimateGuidedBuilderActive(false);
+                                                        setEstimateLineSourcePanel(null);
+                                                        setEstimateAssistantNotice('');
+                                                        setEstimateTemplateStartNotice('');
+                                                        setEstimateHelperNotice('');
+                                                        setEstimateHelperExpanded(false);
+                                                        setSavedChargeQuickPickNotice('');
+                                                        setEstimateComposerOpen(true);
+                                                      }}
+                                                      className={buttonClass('secondary')}
+                                                    >
+                                                      Edit draft
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => void sendEstimateToHomeowner(estimate)}
+                                                      disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
+                                                      data-testid="contractor-send-estimate"
+                                                      aria-label={`Send estimate ${estimate.title} to homeowner`}
+                                                      className={buttonClass('primary')}
+                                                    >
+                                                      <Send size={15} />
+                                                      {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
+                                                    </button>
+                                                  </>
+                                                )}
                                               </>
                                             )}
-                                            {canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
+                                            {!SERVSYNC_DEMO_PRESENTATION_MODE && canUseGenericEstimateInvoiceAction && !isInvoiceWorkspaceTab && (
                                               <button
                                                 type="button"
                                                 onClick={() => beginInvoiceDraftFromEstimate(estimate, headerName)}
@@ -36203,9 +36274,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        { id: 'new_jobs', label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' },
-                        { id: 'open_jobs', label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
-                        { id: 'closed_jobs', label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
+                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
+                        { id: 'open_jobs' as const, label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
+                        { id: 'closed_jobs' as const, label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
                         const active = contractorJobsView === item.id;
                         return (
@@ -36242,9 +36313,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
-                        { id: 'new_financial', label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> },
-                        { id: 'open_financial', label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
-                        { id: 'closed_financial', label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
+                        ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_financial' as const, label: 'New Estimate/Invoice', value: '+', helper: 'Create document', icon: <Receipt size={15} /> }] : []),
+                        { id: 'open_financial' as const, label: 'Open Estimates / Invoices', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status)).length : openFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => !['paid', 'void'].includes(invoice.status)).length : openInvoiceRecords.length)), helper: 'Active estimates and invoice drafts', icon: <FileText size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
+                        { id: 'closed_financial' as const, label: 'Closed / Billed Records', value: String((jobsCustomerFilterSubjectId ? selectedJobsCustomerEstimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)).length : closedFinancialRecords.length) + (jobsCustomerFilterSubjectId ? selectedJobsCustomerInvoices.filter(invoice => ['paid', 'void'].includes(invoice.status)).length : closedInvoiceRecords.length)), helper: 'Paid invoices and closed estimates', icon: <Receipt size={15} /> },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName?: string }>).map((item, index) => {
                         const active = contractorJobsView === item.id;
                         const mobileTileClassName = item.mobileTileClassName || (index === 0 ? 'order-2 md:order-none' : 'order-3 md:order-none');
@@ -36369,7 +36440,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             Back to Jobs Overview
                           </button>
                         </div>
-                        {!estimateComposerOpen && (
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && !estimateComposerOpen && (
                         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
                           <Field label="Customer">
                             <select
@@ -37438,7 +37509,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {estimate.status === 'accepted' && !isInvoice && (
                                   <>
-                                    {!hasLinkedJob && (
+                                    {!SERVSYNC_DEMO_PRESENTATION_MODE && !hasLinkedJob && (
                                       <button
                                         type="button"
                                         onClick={() => void createJobFromAcceptedEstimate(estimate)}
@@ -37464,66 +37535,70 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     )}
                                   </>
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => void downloadEstimatePdf(estimate, {
-                                    contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
-                                    customerName,
-                                    customerAddress,
-                                    contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
-                                  }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
-                                  className={buttonClass('secondary')}
-                                >
-                                  <Download size={15} />
-                                  Download PDF
-                                </button>
-                                <button type="button" onClick={() => openSaveEstimateTemplateModal(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
-                                  <Receipt size={15} />
-                                  {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
-                                </button>
-                                {estimate.status === 'draft' && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                                   <>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
-                                        setEditingEstimateId(estimate.id);
-                                        setEstimateDraft(estimateDraftFromEstimate(estimate));
-                                        setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
-                                        setEstimateAssistantText('');
-                                        setEstimateDraftBuilderTrade('Other');
-                                        setEstimateDraftBuilderJobType('repair');
-                                        setEstimateDraftBuilderLaborMode('job_total');
-                                        setEstimateDraftBuilderLastOutput(null);
-                                        setEstimateStartMode('draft');
-                                        setEstimateGuidedBuilderActive(false);
-                                        setEstimateLineSourcePanel(null);
-                                        setEstimateAssistantNotice('');
-                                        setEstimateTemplateStartNotice('');
-                                        setEstimateHelperNotice('');
-                                        setEstimateHelperExpanded(false);
-                                        setSavedChargeQuickPickNotice('');
-                                        setEstimateComposerOpen(true);
-                                        setContractorJobsView('new_financial');
-                                      }}
-                                      className={mobileButtonClass('secondary')}
+                                      onClick={() => void downloadEstimatePdf(estimate, {
+                                        contractorName: contractor?.business_name || contractorDraft.business_name || 'Contractor',
+                                        customerName,
+                                        customerAddress,
+                                        contractorLogoUrl: contractor?.logo_url || contractorDraft.logo_url || null,
+                                      }).catch(err => setError(readableError(err, 'Unable to download estimate PDF.')))}
+                                      className={buttonClass('secondary')}
                                     >
-                                      Edit draft
+                                      <Download size={15} />
+                                      Download PDF
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void sendEstimateToHomeowner(estimate)}
-                                      disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
-                                      data-testid="contractor-send-estimate"
-                                      aria-label={`Send estimate ${estimate.title} to homeowner`}
-                                      className={mobileButtonClass('primary')}
-                                    >
-                                      <Send size={15} />
-                                      {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
+                                    <button type="button" onClick={() => openSaveEstimateTemplateModal(estimate)} disabled={savingEstimateTemplateId === estimate.id} className={mobileButtonClass('secondary')}>
+                                      <Receipt size={15} />
+                                      {savingEstimateTemplateId === estimate.id ? 'Saving...' : 'Save as template'}
                                     </button>
+                                    {estimate.status === 'draft' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setJobsCustomerFilterSubjectId(connection?.connection_id ?? (local ? `local:${local.id}` : jobsCustomerFilterSubjectId));
+                                            setEditingEstimateId(estimate.id);
+                                            setEstimateDraft(estimateDraftFromEstimate(estimate));
+                                            setEstimatePaymentScheduleDraft(estimatePaymentScheduleDraftFromEstimate(estimate));
+                                            setEstimateAssistantText('');
+                                            setEstimateDraftBuilderTrade('Other');
+                                            setEstimateDraftBuilderJobType('repair');
+                                            setEstimateDraftBuilderLaborMode('job_total');
+                                            setEstimateDraftBuilderLastOutput(null);
+                                            setEstimateStartMode('draft');
+                                            setEstimateGuidedBuilderActive(false);
+                                            setEstimateLineSourcePanel(null);
+                                            setEstimateAssistantNotice('');
+                                            setEstimateTemplateStartNotice('');
+                                            setEstimateHelperNotice('');
+                                            setEstimateHelperExpanded(false);
+                                            setSavedChargeQuickPickNotice('');
+                                            setEstimateComposerOpen(true);
+                                            setContractorJobsView('new_financial');
+                                          }}
+                                          className={mobileButtonClass('secondary')}
+                                        >
+                                          Edit draft
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void sendEstimateToHomeowner(estimate)}
+                                          disabled={sendingEstimateId === estimate.id || !estimate.homeowner_user_id}
+                                          data-testid="contractor-send-estimate"
+                                          aria-label={`Send estimate ${estimate.title} to homeowner`}
+                                          className={mobileButtonClass('primary')}
+                                        >
+                                          <Send size={15} />
+                                          {sendingEstimateId === estimate.id ? 'Sending...' : estimate.homeowner_user_id ? 'Send to homeowner' : 'Connect homeowner to send'}
+                                        </button>
+                                      </>
+                                    )}
                                   </>
                                 )}
-                                {canUseGenericEstimateInvoiceAction && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && canUseGenericEstimateInvoiceAction && (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -37703,7 +37778,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="truncate text-sm font-medium text-slate-950">{insp.name}</p>
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                      {inspectionJobStatusLabel(insp)}
+                                      {demoPresentationBadgeLabelForJob(insp)}
                                     </span>
                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{jobTypeLabel(insp)}</span>
                                     {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
@@ -37751,7 +37826,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </p>
                                   )}
                                 </div>
-                                {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                                   <button type="button" onClick={() => void deleteInspection(insp)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700">
                                     Delete
                                   </button>
@@ -37759,13 +37834,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
                                   {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                                 </button>
-                                {!checklistStyle && inspectionIsOpenJob(insp) && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && !checklistStyle && inspectionIsOpenJob(insp) && (
                                   <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('primary')}>
                                     <CheckCircle2 size={15} />
                                     Complete Job
                                   </button>
                                 )}
-                                {showJobInvoiceAction && (
+                                {!SERVSYNC_DEMO_PRESENTATION_MODE && showJobInvoiceAction && (
                                   <button
                                     type="button"
                                     onClick={() => linkedInvoice ? openInvoiceRecord(linkedInvoice) : hasDurableWorkItems ? openInspection(insp) : void createInvoiceFromJob(insp)}
@@ -39179,7 +39254,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-slate-950 truncate">{insp.name}</p>
                               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                {inspectionJobStatusLabel(insp)}
+                                {demoPresentationBadgeLabelForJob(insp)}
                               </span>
                               <span className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs font-semibold">{jobTypeLabel(insp)}</span>
                               {urgentCount > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-xs font-semibold">{urgentCount} Urgent</span>}
@@ -39742,7 +39817,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     <div className="flex flex-wrap gap-1.5">
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
-                        {inspectionJobStatusLabel(activeInspection)}
+                        {demoPresentationBadgeLabelForJob(activeInspection)}
                       </span>
                       {activeJobWorkItemBadge && (
                         <span
@@ -41601,7 +41676,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </p>
                             )}
                           </div>
-                        ) : (
+                        ) : !SERVSYNC_DEMO_PRESENTATION_MODE ? (
                           <button
                             type="button"
                             disabled={activeInspection.status !== 'finalized' || !activeInspection.homeowner_user_id || sendingInspectionReportId === activeInspection.id}
@@ -41617,14 +41692,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           >
                             <Send size={14} /> {sendingInspectionReportId === activeInspection.id ? 'Completing...' : 'Complete job & send report'}
                           </button>
-                        )}
-                        {!reportSentAndCompleted && (
+                        ) : null}
+                        {!reportSentAndCompleted && !SERVSYNC_DEMO_PRESENTATION_MODE && (
                           <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
                             {reportSendHelperText}
                           </p>
                         )}
 
-                        {activeInspection.status === 'draft' ? (
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && (activeInspection.status === 'draft' ? (
                           <button
                             type="button"
                             disabled={!inspectionClosedForReview || finalizingInspection}
@@ -41639,16 +41714,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <CheckCircle2 size={14} className="text-emerald-600" />
                             <span className="text-sm font-semibold text-emerald-700">Filed to Documents</span>
                           </div>
-                        )}
-                        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        ))}
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
                           {finalizeReportHelperText}
-                        </p>
+                        </p>}
 
-                        <p className="text-[11px] leading-relaxed text-slate-400 px-1">
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
                           Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.
-                        </p>
+                        </p>}
 
-                        <button
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
                           type="button"
                           disabled={activeInspection.status === 'draft' && !inspectionClosedForReview}
                           onClick={async () => {
@@ -41665,14 +41740,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         >
                           <Download size={14} />
                           {activeInspection.status === 'draft' && !inspectionClosedForReview ? 'Close to Preview PDF' : 'Download Preview PDF'}
-                        </button>
+                        </button>}
 
-                        {activeInspection.status !== 'finalized' && (
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && activeInspection.status !== 'finalized' && (
                           <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-800">
                             Finalize this report before creating the invoice from the completed work.
                           </p>
                         )}
-                        <button
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
                           type="button"
                           disabled={
                             activeInspection.status !== 'finalized'
@@ -41706,16 +41781,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 : activeJobHasDurableWorkItems
                                   ? 'Create invoice from completed items'
                                   : 'Create Invoice'}
-                        </button>
+                        </button>}
 
-                        <button
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <button
                           type="button"
                           disabled
                           title="Standalone scheduling coming soon"
                           className="w-full border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Calendar size={14} /> Schedule Next Visit
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   </div>
