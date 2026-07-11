@@ -5,7 +5,6 @@ export const STORAGE_KEYS = {
   homeownerRequestSearch: 'servsync.homeowner.requestSearch',
   homeownerExpandedRequests: 'servsync.homeowner.expandedRequests',
   homeownerHomeSetupSkipped: 'servsync.homeowner.homeSetupSkipped',
-  homeownerWalkthroughSkipped: 'servsync.homeowner.walkthroughSkipped',
   contractorTab: 'servsync.contractor.activeTab',
   contractorHomeownerFilter: 'servsync.contractor.homeownerFilter',
   contractorHomeownerSearch: 'servsync.contractor.homeownerSearch',
@@ -15,7 +14,6 @@ export const STORAGE_KEYS = {
   contractorJobsCustomerFilter: 'servsync.contractor.jobsCustomerFilter',
   contractorJobsView: 'servsync.contractor.jobsView',
   contractorProfileSetupSkipped: 'servsync.contractor.profileSetupSkipped',
-  contractorWalkthroughSkipped: 'servsync.contractor.walkthroughSkipped',
   contractorViewedCalendarVisits: 'servsync.contractor.viewedCalendarVisits',
   fieldWorkState: 'servsync.contractor.fieldWorkState',
 } as const;

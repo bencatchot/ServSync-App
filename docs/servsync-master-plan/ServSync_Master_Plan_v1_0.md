@@ -67,6 +67,8 @@ Project Collaboration is now governed by a canonical product specification and b
 
 Demo Mode / Marketing Capture Environment is now a support-infrastructure track for repeatable screenshots, recordings, QA demos, onboarding videos, and sales demonstrations. The first foundation slice is dedicated-demo-environment only: it adds private demo registry SQL, a private seed/reset/verify runner, guarded package scripts, a fictional water-heater core scenario through accepted-estimate job creation, and an internal runbook. This does not create a public Demo Mode, app UI, role switcher, presentation mode, media seeding, job completion, invoice/Home History/reminder demo data, production SQL application, shared sandbox use, deployment, external notifications, payments, or production data actions.
 
+The automatic homeowner and contractor role-based onboarding tour has been removed. Onboarding should rely on actionable setup prompts and checklists in the product, with future help moving toward searchable, task-specific guidance and optional walkthroughs rather than automatic tour cards after setup.
+
 # 2. Product Vision
 
 ServSync should become the organized service relationship layer between homeowners and local contractors. The homeowner should not have to chase scattered Facebook comments, text threads, old PDFs, and forgotten invoices. The contractor should not have to jump between manual estimates, messages, spreadsheets, paper notes, and one-off invoices. ServSync should give both sides a shared structure for work.

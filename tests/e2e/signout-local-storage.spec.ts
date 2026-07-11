@@ -13,7 +13,6 @@ const sensitiveKeys = [
 const preservedKeys = [
   'servsync.contractor.activeTab',
   'servsync.contractor.jobsView',
-  'servsync.contractor.walkthroughSkipped:e2e-local-storage-audit',
 ];
 
 test.describe('sign-out local storage cleanup', () => {

@@ -1240,65 +1240,6 @@ type StoredFieldWorkState = {
   draftSnapshot?: StoredFieldWorkDraft | null;
 };
 
-type WalkthroughStep = {
-  title: string;
-  body: string;
-};
-
-const HOMEOWNER_WALKTHROUGH_STEPS: WalkthroughStep[] = [
-  {
-    title: 'Welcome to ServSync',
-    body: 'ServSync helps you request service, review estimates, track job updates, and keep a history of work done on your home.',
-  },
-  {
-    title: 'Create a Service Request',
-    body: 'Describe the issue, choose the location, and add photos or notes when helpful.',
-  },
-  {
-    title: 'Review Estimates',
-    body: 'When a contractor sends an estimate, you can review the work, pricing, and notes before approving.',
-  },
-  {
-    title: 'Track the Job',
-    body: 'After approval, your contractor can create a job and share updates as the work is completed.',
-  },
-  {
-    title: 'Keep a Home History',
-    body: 'Completed work, invoices, and reminders help build a useful service history for your home.',
-  },
-];
-
-const CONTRACTOR_WALKTHROUGH_STEPS: WalkthroughStep[] = [
-  {
-    title: 'Welcome to ServSync',
-    body: 'ServSync helps you manage service requests, estimates, jobs, invoices, and customer home history in one workflow.',
-  },
-  {
-    title: 'Manage Service Requests',
-    body: 'Review homeowner requests, understand the issue, and decide the next step.',
-  },
-  {
-    title: 'Create and Send Estimates',
-    body: 'Build clear estimates with line items and notes, then send them to the homeowner for approval.',
-  },
-  {
-    title: 'Turn Approved Estimates into Jobs',
-    body: 'Once an estimate is approved, create a job so the work can be tracked from start to finish.',
-  },
-  {
-    title: 'Complete Jobs and Add Notes',
-    body: 'Use job notes, inspection details, and service updates to document the work performed.',
-  },
-  {
-    title: 'Create Invoices',
-    body: 'Create invoices from completed work and manually track payment status during the beta period.',
-  },
-  {
-    title: 'Build Customer History',
-    body: 'ServSync keeps service history connected to the home so future work is easier to understand.',
-  },
-];
-
 const LEGAL_PAGES: Record<Extract<RouteName, 'terms' | 'privacy' | 'acceptable-use' | 'contractor-agreement'>, { title: string; sections: Array<{ title: string; body: string }> }> = {
   terms: {
     title: 'Terms of Service',
@@ -7436,77 +7377,6 @@ function mobileButtonClass(kind: 'primary' | 'secondary' | 'danger' = 'primary')
   return `${buttonClass(kind)} w-full sm:w-auto`;
 }
 
-function RoleWalkthroughCard({
-  eyebrow,
-  steps,
-  currentStep,
-  onStepChange,
-  onSkip,
-  onComplete,
-}: {
-  eyebrow: string;
-  steps: WalkthroughStep[];
-  currentStep: number;
-  onStepChange: (step: number) => void;
-  onSkip: () => void;
-  onComplete: () => void;
-}) {
-  const boundedStep = Math.min(Math.max(currentStep, 0), steps.length - 1);
-  const step = steps[boundedStep];
-  const isFirstStep = boundedStep === 0;
-  const isFinalStep = boundedStep === steps.length - 1;
-
-  return (
-    <section className="mb-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">{eyebrow}</p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-950">{step.title}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{step.body}</p>
-        </div>
-        <button type="button" onClick={onSkip} className={buttonClass('secondary')}>
-          Skip Tour
-        </button>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2" aria-label={`${eyebrow} progress`}>
-        {steps.map((item, index) => (
-          <button
-            key={item.title}
-            type="button"
-            onClick={() => onStepChange(index)}
-            className={`h-2.5 rounded-full transition ${
-              index === boundedStep ? 'w-8 bg-blue-600' : index < boundedStep ? 'w-2.5 bg-blue-300' : 'w-2.5 bg-slate-200'
-            }`}
-            aria-label={`Go to ${item.title}`}
-            aria-current={index === boundedStep ? 'step' : undefined}
-          />
-        ))}
-        <span className="ml-1 text-xs font-semibold text-slate-500">
-          Step {boundedStep + 1} of {steps.length}
-        </span>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {!isFirstStep && (
-          <button type="button" onClick={() => onStepChange(boundedStep - 1)} className={buttonClass('secondary')}>
-            Back
-          </button>
-        )}
-        {isFinalStep ? (
-          <button type="button" onClick={onComplete} className={buttonClass('primary')}>
-            <CheckCircle2 size={16} />
-            Start Using ServSync
-          </button>
-        ) : (
-          <button type="button" onClick={() => onStepChange(boundedStep + 1)} className={buttonClass('primary')}>
-            Next
-            <ArrowRight size={16} />
-          </button>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function AppContent() {
   const [{ route, query }, setRouteState] = useState(currentRoute);
   const [session, setSession] = useState<Session | null>(null);
@@ -10306,11 +10176,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const [reopeningRequestId, setReopeningRequestId] = useState<string | null>(null);
   const homeSetupStorageKey = `${STORAGE_KEYS.homeownerHomeSetupSkipped}:${profile.id}`;
   const [homeSetupSkipped, setHomeSetupSkipped] = useState(() => window.localStorage.getItem(homeSetupStorageKey) === 'true');
-  const homeownerWalkthroughStorageKey = `${STORAGE_KEYS.homeownerWalkthroughSkipped}:${profile.id}`;
-  const [homeownerWalkthroughSkipped, setHomeownerWalkthroughSkipped] = useState(
-    () => window.localStorage.getItem(homeownerWalkthroughStorageKey) === 'true',
-  );
-  const [homeownerWalkthroughStep, setHomeownerWalkthroughStep] = useState(0);
   const [savingHomeSetup, setSavingHomeSetup] = useState(false);
   const [homeSetupDraft, setHomeSetupDraft] = useState({
     nickname: 'Home',
@@ -10345,12 +10210,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     const skipped = window.localStorage.getItem(homeSetupStorageKey) === 'true';
     setHomeSetupSkipped(skipped);
   }, [homeSetupStorageKey]);
-
-  useEffect(() => {
-    const skipped = window.localStorage.getItem(homeownerWalkthroughStorageKey) === 'true';
-    setHomeownerWalkthroughSkipped(skipped);
-    setHomeownerWalkthroughStep(0);
-  }, [homeownerWalkthroughStorageKey]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.homeownerTab, homeownerTab);
@@ -12409,12 +12268,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     setNotice('You can add your home anytime from Properties.');
   };
 
-  const dismissHomeownerWalkthrough = () => {
-    window.localStorage.setItem(homeownerWalkthroughStorageKey, 'true');
-    setHomeownerWalkthroughSkipped(true);
-    setHomeownerWalkthroughStep(0);
-  };
-
   const saveInitialHomeSetup = async () => {
     if (!supabase) return;
     setNotice('');
@@ -13855,7 +13708,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     },
   ];
   const showInitialHomeSetupPrompt = !loading && homes.length === 0 && !homeSetupSkipped;
-  const showHomeownerWalkthrough = !loading && !showInitialHomeSetupPrompt && !homeownerWalkthroughSkipped;
   const homeownerOnboardingItems: Array<{
     label: string;
     helper: string;
@@ -17541,17 +17393,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </button>
           </div>
         </section>
-      )}
-
-      {showHomeownerWalkthrough && (
-        <RoleWalkthroughCard
-          eyebrow="Homeowner tour"
-          steps={HOMEOWNER_WALKTHROUGH_STEPS}
-          currentStep={homeownerWalkthroughStep}
-          onStepChange={setHomeownerWalkthroughStep}
-          onSkip={dismissHomeownerWalkthrough}
-          onComplete={dismissHomeownerWalkthrough}
-        />
       )}
 
       {homes.length !== 1 && !['requests', 'discover'].includes(homeownerTab) && (
@@ -21848,15 +21689,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorProfileSetupSkipped, setContractorProfileSetupSkipped] = useState(
     () => window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true',
   );
-  const contractorWalkthroughStorageKey = `${STORAGE_KEYS.contractorWalkthroughSkipped}:${profile.id}`;
-  const [contractorWalkthroughSkipped, setContractorWalkthroughSkipped] = useState(
-    () => window.localStorage.getItem(contractorWalkthroughStorageKey) === 'true',
-  );
   const contractorViewedCalendarVisitsStorageKey = `${STORAGE_KEYS.contractorViewedCalendarVisits}:${profile.id}`;
   const [viewedContractorVisitKeys, setViewedContractorVisitKeys] = useState<Set<string>>(
     () => storedStringSet(contractorViewedCalendarVisitsStorageKey),
   );
-  const [contractorWalkthroughStep, setContractorWalkthroughStep] = useState(0);
 
   useEffect(() => {
     if (!notice) return;
@@ -21885,11 +21721,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   useEffect(() => {
     setContractorProfileSetupSkipped(window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true');
   }, [contractorProfileSetupStorageKey]);
-
-  useEffect(() => {
-    setContractorWalkthroughSkipped(window.localStorage.getItem(contractorWalkthroughStorageKey) === 'true');
-    setContractorWalkthroughStep(0);
-  }, [contractorWalkthroughStorageKey]);
 
   useEffect(() => {
     setViewedContractorVisitKeys(storedStringSet(contractorViewedCalendarVisitsStorageKey));
@@ -27938,18 +27769,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     && contractorTab !== 'profile'
     && !contractorProfileSetupSkipped
     && !contractorProfileOnboardingComplete;
-  const showContractorWalkthrough = !loading
-    && contractorTab !== 'profile'
-    && !showInitialContractorProfileSetupPrompt
-    && !contractorWalkthroughSkipped;
   const dismissContractorProfileSetupPrompt = () => {
     window.localStorage.setItem(contractorProfileSetupStorageKey, 'true');
     setContractorProfileSetupSkipped(true);
-  };
-  const dismissContractorWalkthrough = () => {
-    window.localStorage.setItem(contractorWalkthroughStorageKey, 'true');
-    setContractorWalkthroughSkipped(true);
-    setContractorWalkthroughStep(0);
   };
   const skipInitialContractorProfileSetup = () => {
     dismissContractorProfileSetupPrompt();
@@ -30983,17 +30805,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             </button>
           </div>
         </section>
-      )}
-
-      {showContractorWalkthrough && (
-        <RoleWalkthroughCard
-          eyebrow="Contractor tour"
-          steps={CONTRACTOR_WALKTHROUGH_STEPS}
-          currentStep={contractorWalkthroughStep}
-          onStepChange={setContractorWalkthroughStep}
-          onSkip={dismissContractorWalkthrough}
-          onComplete={dismissContractorWalkthrough}
-        />
       )}
 
       {homeTemplatePrompt && (
