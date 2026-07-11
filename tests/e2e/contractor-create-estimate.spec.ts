@@ -41,7 +41,7 @@ test.describe('contractor estimate creation UI structure', () => {
   test('normal estimate starts use blank, template, and draft estimator choices', () => {
     const source = appSource();
     const startChoiceSource = sourceBetween(source, 'const renderEstimateStartChoice =', 'const renderSavedEstimateTemplateStartPicker =');
-    const templateStartSource = sourceBetween(source, 'const applySavedEstimateTemplateStart =', 'const applySavedEstimateTemplateInvoiceDraft =');
+    const templateStartSource = sourceBetween(source, 'const applySavedEstimateTemplateStart =', 'const closeActiveInvoiceEditor =');
 
     expect(startChoiceSource).toContain('Build blank estimate');
     expect(startChoiceSource).toContain('Choose estimate template');

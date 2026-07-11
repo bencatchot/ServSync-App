@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/fix-homeowner-estimates-panel`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-homeowner-estimates-tile.spec.ts`
+  - `tests/e2e/guided-estimate-builder.spec.ts`
+  - `tests/e2e/template-taxonomy.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Removed the inline ServSync starter-template and Saved Work Templates catalog from the contractor selected-homeowner/customer Estimates panel. The panel now shows only real estimate records for the selected subject across properties, keeps property labels and the existing Create estimate action, and preserves saved-template selection inside the intentional estimate creation flow and Jobs → Templates area.
+- Reason for change: PR #278 corrected the Estimates tile, but the larger selected-customer Estimates panel still displayed global starter/template cards before the real estimate list, making templates look like customer estimate records.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-homeowner-estimates-tile.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/template-taxonomy.spec.ts --project=chromium --grep "Templates library separates|global Saved Work Templates|selected customer estimates panel|intentional estimate creation flow|saved work templates still use|direct service job creation"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "normal estimate starts|Jobs financial records split estimates and invoices behind section tabs|edited estimate draft save returns to the saved estimate record"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/guided-estimate-builder.spec.ts --project=chromium --grep "saved template start picker|saved template start path"`
+  - `git diff --check`
+  - changed-file scope guard
+  - changed-line credential-shaped secret scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/test/docs-only correction. No SQL/RLS/RPC/schema, Supabase, Vercel, deployment, production-data, estimate lifecycle, invoice, job, or template persistence changes are included.
+  - `npm run lint` remains blocked before evaluating changed code by the repository's ESLint 9 / `@typescript-eslint/no-unused-expressions` rule-loading mismatch.
+
 - Branch: `codex/fix-homeowner-estimates-tile`
 - Files changed:
   - `src/App.tsx`

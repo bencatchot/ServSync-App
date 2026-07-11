@@ -71,7 +71,7 @@ test.describe('Guided Estimate Draft Builder Slice A-E', () => {
 
   test('saved template start path warns about copied pricing or structure-only templates', () => {
     const source = appSource();
-    const noticeSource = sourceBetween(source, 'function estimateTemplateHasCopiedPricing', 'function estimateDraftFromStarterTemplate');
+    const noticeSource = sourceBetween(source, 'function estimateTemplateHasCopiedPricing', 'function defaultEstimateTemplateName');
     const financialWorkspaceSource = sourceBetween(source, "{estimateComposerOpen && selectedJobsCustomerName && (", "{invoiceComposerOpen && selectedJobsCustomerName && (");
 
     expect(noticeSource).toContain('unit_price_cents !== null && line.unit_price_cents !== undefined');

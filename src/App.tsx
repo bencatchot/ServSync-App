@@ -3354,82 +3354,8 @@ function estimateTemplateStartNoticeForTemplate(template: EstimateTemplate) {
     : 'Prices were not saved with this template. Add pricing before sending.';
 }
 
-function invoiceDraftFromTemplate(
-  template: EstimateTemplate,
-  subjectName: string,
-  overrides: Partial<InvoiceDraftForm> = {},
-): InvoiceDraftForm {
-  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return createBlankInvoiceDraft(subjectName, {
-    title: `Invoice — ${template.name} — ${subjectName || 'Customer'} — ${dateLabel}`,
-    scope: template.scope || 'Completed work performed for the customer.',
-    notes: template.notes || 'Manual invoice draft from a saved work template. Confirm the work was performed and review all prices before sending.',
-    terms: template.terms || createBlankInvoiceDraft(subjectName).terms,
-    line_items: template.line_items?.length
-      ? [...template.line_items]
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map(line => createEstimateLineDraft({
-            line_type: normalizeEstimateLineType(line.line_type),
-            description: line.description,
-            line_title: line.line_title || line.description || '',
-            customer_description: line.customer_description || '',
-            model_spec: line.model_spec || '',
-            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
-            quantity: String(line.quantity),
-            unit: line.unit,
-            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
-            labor_hours: laborHoursInputFromValue(line.labor_hours),
-            editor_source_note: `Copied from saved work template: ${template.name}.`,
-          }))
-      : [createEstimateLineDraft()],
-    ...overrides,
-  });
-}
-
-function invoiceTemplateStartNoticeForTemplate(template: EstimateTemplate) {
-  const pricingNotice = estimateTemplateHasCopiedPricing(template)
-    ? 'Pricing copied from saved template. Review all prices before sending. New/current pricing has not been entered for this invoice yet.'
-    : 'Prices were not saved with this template. Add pricing before sending.';
-  return `Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice. ${pricingNotice}`;
-}
-
-function manualJobTemplateStartNoticeForTemplate() {
-  return 'Start Manual Job copies this template’s name and scope only. Use this only when the work is already approved or does not require estimate approval. This creates a job without sending an estimate for homeowner approval. Template line items and pricing are not copied to the job. Add job work items after creating the job if you want to track tasks for completion or invoicing. Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing. No invoice is created or sent.';
-}
-
 function defaultEstimateTemplateName(estimate: Pick<Estimate, 'title'>) {
   return estimate.title.replace(/^Estimate\s+—\s+/i, '').trim() || 'New estimate template';
-}
-
-function estimateDraftFromStarterTemplate(template: StarterEstimateTemplate, subjectName: string): EstimateDraft {
-  return {
-    title: `${template.name} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-    scope: template.scope,
-    notes: template.notes,
-    terms: template.terms || createBlankEstimateDraft().terms,
-    service_request_id: '',
-    inspection_id: '',
-    labor_mode: 'job_total',
-    labor_rate: '',
-    job_labor_hours: '',
-    line_items: template.line_items?.length
-      ? [...template.line_items]
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map(line => createEstimateLineDraft({
-            line_type: normalizeEstimateLineType(line.line_type),
-            description: line.description,
-            line_title: line.line_title || line.description || '',
-            customer_description: '',
-            model_spec: line.model_spec || '',
-            supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
-            quantity: String(line.quantity),
-            unit: line.unit,
-            unit_price: lineUnitPriceInputFromCents(line.unit_price_cents),
-            labor_hours: laborHoursInputFromValue(line.labor_hours),
-            editor_source_note: `Suggested by ${template.name} template.`,
-          }))
-      : [createEstimateLineDraft()],
-  };
 }
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -21464,7 +21390,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [sendingEstimateId, setSendingEstimateId] = useState<string | null>(null);
   const [savingEstimateTemplateId, setSavingEstimateTemplateId] = useState<string | null>(null);
   const [saveEstimateTemplateModal, setSaveEstimateTemplateModal] = useState<SaveEstimateTemplateModalState | null>(null);
-  const [expandedEstimateTemplateId, setExpandedEstimateTemplateId] = useState<string | null>(null);
   const [renamingEstimateTemplateId, setRenamingEstimateTemplateId] = useState<string | null>(null);
   const [deletingEstimateTemplateId, setDeletingEstimateTemplateId] = useState<string | null>(null);
   const [savedEstimateChargeDraft, setSavedEstimateChargeDraft] = useState<SavedEstimateChargeDraft>(() => createBlankSavedEstimateChargeDraft());
@@ -21477,7 +21402,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [showArchivedInspectionTemplates, setShowArchivedInspectionTemplates] = useState(false);
   const [convertingEstimateId, setConvertingEstimateId] = useState<string | null>(null);
   const convertingEstimateIdsRef = useRef<Set<string>>(new Set());
-  const [estimateTemplateSearch, setEstimateTemplateSearch] = useState('');
   const [estimateAssistantText, setEstimateAssistantText] = useState('');
   const [estimateDraftBuilderTrade, setEstimateDraftBuilderTrade] = useState<EstimateDraftBuilderTrade>('Other');
   const [estimateDraftBuilderJobType, setEstimateDraftBuilderJobType] = useState<EstimateDraftBuilderJobType>('repair');
@@ -23473,74 +23397,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setContractorTab('inspections');
   };
 
-  const applySavedEstimateTemplateInvoiceDraft = (
-    template: EstimateTemplate,
-    subjectName: string,
-    options: { homeId?: string | null; localHomeId?: string | null } = {},
-  ) => {
-    if (createInvoiceCapability.disabled) {
-      setError(createInvoiceCapability.reason);
-      return;
-    }
-    setContractorFinancialRecordKind('invoices');
-    setFocusedEstimateRecordId(null);
-    setEditingInvoiceId(null);
-    setInvoiceDraft(invoiceDraftFromTemplate(template, subjectName || 'Customer', {
-      home_id: options.homeId ?? defaultConnectedHomeId,
-      local_home_id: options.localHomeId ?? defaultLocalHomeId,
-      labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
-    }));
-    setInvoiceTemplateStartNotice(invoiceTemplateStartNoticeForTemplate(template));
-    setEstimateTemplateStartNotice('');
-    setInvoiceComposerOpen(true);
-    setEstimateComposerOpen(false);
-    setEstimateGuidedBuilderActive(false);
-    setHomeownerWorkspaceEstimateView('draft');
-    setContractorJobsView('new_financial');
-    setContractorTab('inspections');
-  };
-
-  const applySavedEstimateTemplateManualJobStart = (
-    template: EstimateTemplate,
-    subjectName: string,
-    options: {
-      connection?: ContractorConnectedHomeowner | null;
-      localContact?: ContractorLocalContact | null;
-      homeId?: string | null;
-      localHomeId?: string | null;
-    } = {},
-  ) => {
-    const safeSubjectName = subjectName || 'Customer';
-    const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    const jobName = `${template.name} — ${safeSubjectName} — ${dateLabel}`;
-    const jobOptions = {
-      name: jobName,
-      scope: template.scope || '',
-      workflowKind: 'work_order' as FieldWorkflowKind,
-      templateSource: 'blank' as FieldWorkTemplateSource,
-      manualJobTemplateStartNotice: manualJobTemplateStartNoticeForTemplate(),
-    };
-
-    setEstimateComposerOpen(false);
-    setInvoiceComposerOpen(false);
-    setEstimateTemplateStartNotice('');
-    setInvoiceTemplateStartNotice('');
-
-    if (options.connection) {
-      beginFieldWorkForHomeowner(options.connection, {
-        ...jobOptions,
-        homeId: options.homeId,
-      });
-      return;
-    }
-    if (options.localContact) {
-      beginFieldWorkForLocalContact(options.localContact, {
-        ...jobOptions,
-        localHomeId: options.localHomeId,
-      });
-    }
-  };
-
   const closeActiveInvoiceEditor = () => {
     const linkedJob = invoiceDraft.job_id ? inspections.find(item => item.id === invoiceDraft.job_id) ?? null : null;
     setInvoiceComposerOpen(false);
@@ -24819,7 +24675,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .eq('id', template.id);
       if (deleteError) throw deleteError;
       setNotice('Estimate template deleted.');
-      if (expandedEstimateTemplateId === template.id) setExpandedEstimateTemplateId(null);
       await loadContractor();
     } catch (err) {
       setError(readableError(err, 'Unable to delete estimate template.'));
@@ -33938,25 +33793,25 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         id: 'draft',
                         title: 'Drafts',
                         helper: 'Private estimates you can edit before sending.',
-                        estimates: estimateRecords.filter(estimate => estimate.status === 'draft'),
+                        estimates: subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'draft'),
                       },
                       {
                         id: 'sent',
                         title: 'Sent',
                         helper: 'Estimates waiting on homeowner review.',
-                        estimates: estimateRecords.filter(estimate => estimate.status === 'sent'),
+                        estimates: subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'sent'),
                       },
                       {
                         id: 'accepted',
                         title: 'Accepted',
                         helper: 'Approved estimates that are ready to schedule or turn into jobs.',
-                        estimates: estimateRecords.filter(estimate => estimate.status === 'accepted'),
+                        estimates: subjectEstimateRecordsAcrossProperties.filter(estimate => estimate.status === 'accepted'),
                       },
                       {
                         id: 'closed',
                         title: 'Closed',
                         helper: 'Declined, expired, or revised estimates.',
-                        estimates: estimateRecords.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)),
+                        estimates: subjectEstimateRecordsAcrossProperties.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status)),
                       },
                     ];
                     const invoiceSections: Array<{ id: HomeownerWorkspaceEstimateView; title: string; helper: string; estimates: Estimate[] }> = [
@@ -33987,31 +33842,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     ];
                     const selectedEstimateSection = estimateSections.find(section => section.id === homeownerWorkspaceEstimateView) ?? estimateSections[0];
                     const selectedInvoiceSection = invoiceSections.find(section => section.id === homeownerWorkspaceEstimateView) ?? invoiceSections[0];
-                    const estimateTemplateSearchTerms = normalizeText(estimateTemplateSearch).split(' ').filter(Boolean);
-                    const visibleEstimateTemplates = estimateTemplates.filter(template => {
-                      if (estimateTemplateSearchTerms.length === 0) return true;
-                      const haystack = normalizeText([
-                        template.name,
-                        template.trade,
-                        template.scope,
-                        template.notes,
-                        template.terms,
-                        ...(template.line_items || []).map(line => `${lineDisplayTitle(line)} ${lineCustomerDescription(line)} ${line.line_type} ${line.unit}`),
-                      ].filter(Boolean).join(' '));
-                      return estimateTemplateSearchTerms.every(term => haystack.includes(term));
-                    });
-                    const visibleStarterEstimateTemplates = sortedStarterEstimateTemplates.filter(template => {
-                      if (estimateTemplateSearchTerms.length === 0) return true;
-                      const haystack = normalizeText([
-                        template.name,
-                        template.trade,
-                        template.scope,
-                        template.notes,
-                        template.terms,
-                        ...(template.line_items || []).map(line => `${lineDisplayTitle(line)} ${lineCustomerDescription(line)} ${line.line_type} ${line.unit}`),
-                      ].filter(Boolean).join(' '));
-                      return estimateTemplateSearchTerms.every(term => haystack.includes(term));
-                    });
                     const fwDraftCount = workOrderDraftCount;
                     const fwFinalCount = workOrderFinalCount;
                     const activeReqs = connReqs.filter(r => !['closed', 'declined'].includes(r.status));
@@ -34197,7 +34027,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       },
                     ];
                     const isInvoiceWorkspaceTab = activeTabId === 'invoices';
-                    const activeDocumentRecords = isInvoiceWorkspaceTab ? invoiceRecords : estimateRecords;
+                    const activeDocumentRecords = isInvoiceWorkspaceTab ? invoiceRecords : subjectEstimateRecordsAcrossProperties;
                     const activeDocumentSections = isInvoiceWorkspaceTab ? invoiceSections : estimateSections;
                     const selectedDocumentSection = isInvoiceWorkspaceTab ? selectedInvoiceSection : selectedEstimateSection;
                     const renderLocalCustomerProperties = () => {
@@ -35784,255 +35614,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     )}
                                   </div>
                                 )}
-
-                                {!isInvoiceWorkspaceTab && (
-                                <div className="mt-5 space-y-2">
-                                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3">
-                                    <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_18rem] lg:items-end">
-                                      <div>
-                                        <p className="text-sm font-bold text-slate-950">ServSync estimate starters</p>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                          Recommended starters match the service categories checked in your Business Profile. Search all ServSync starters when the scope crosses trades.
-                                        </p>
-                                      </div>
-                                      <Field label="Search estimate templates">
-                                        <input
-                                          className={inputClass()}
-                                          value={estimateTemplateSearch}
-                                          onChange={event => setEstimateTemplateSearch(event.target.value)}
-                                          placeholder="Search trade, scope, line item..."
-                                        />
-                                      </Field>
-                                    </div>
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                                        {visibleStarterEstimateTemplates.length} starter{visibleStarterEstimateTemplates.length === 1 ? '' : 's'}
-                                      </span>
-                                      {estimateTemplateSearch && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setEstimateTemplateSearch('')}
-                                          className="text-xs font-semibold text-blue-700 hover:text-blue-800"
-                                        >
-                                          Clear search
-                                        </button>
-                                      )}
-                                    </div>
-                                    {visibleStarterEstimateTemplates.length === 0 ? (
-                                      <EmptyState text="No starter estimate templates match that search." />
-                                    ) : (
-                                      <div className="grid gap-2 md:grid-cols-2">
-                                        {visibleStarterEstimateTemplates.map(template => {
-                                          const recommended = starterTemplateRecommendedForContractor(template.trade);
-                                          return (
-                                            <div key={template.id} className="rounded-xl border border-blue-100 bg-white p-3 shadow-sm">
-                                              <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                  <p className="font-semibold text-slate-950">{template.name}</p>
-                                                  <p className="mt-1 text-xs text-slate-500">
-                                                    {template.line_items.length} starter line item{template.line_items.length === 1 ? '' : 's'}
-                                                  </p>
-                                                </div>
-                                                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${recommended ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                                  {recommended ? 'Recommended' : template.trade}
-                                                </span>
-                                              </div>
-                                              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{template.scope}</p>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                                  const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                  setEditingEstimateId(null);
-                                                  setEstimateDraft({
-                                                    ...estimateDraftFromStarterTemplate(template, subjectName),
-                                                    home_id: workspaceNewRecordHomeId,
-                                                    local_home_id: workspaceNewRecordLocalHomeId,
-                                                    labor_rate: laborRateInputFromCents(contractor?.default_labor_rate_cents),
-                                                  });
-                                                  setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
-                                                  setEstimateAssistantText('');
-                                                  setEstimateDraftBuilderTrade('Other');
-                                                  setEstimateDraftBuilderJobType('repair');
-                                                  setEstimateDraftBuilderLaborMode('job_total');
-                                                  setEstimateDraftBuilderLastOutput(null);
-                                                  setEstimateStartMode('draft');
-                                                  setEstimateGuidedBuilderActive(false);
-                                                  setEstimateLineSourcePanel(null);
-                                                  setEstimateAssistantNotice('');
-                                                  setEstimateTemplateStartNotice('');
-                                                  setEstimateHelperNotice('');
-                                                  setEstimateHelperExpanded(false);
-                                                  setSavedChargeQuickPickNotice('');
-                                                  setEstimateComposerOpen(true);
-                                                }}
-                                                className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                                              >
-                                                Use starter
-                                              </button>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {estimateTemplates.length > 0 && (
-                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                      <div className="mb-3">
-                                        <div>
-                                          <p className="text-sm font-bold text-slate-950">Saved Work Templates</p>
-                                          <p className="mt-1 text-xs text-slate-500">Start faster with a reusable scope, terms, and line-item structure.</p>
-                                          <p className="mt-1 text-xs leading-5 text-amber-700">
-                                            Create Manual Invoice Draft uses the selected customer context only. Creates a draft invoice from this template. Confirm the work was performed and review all prices before sending. This does not create a job or estimate and does not send the invoice.
-                                          </p>
-                                          <p className="mt-1 text-xs leading-5 text-amber-700">
-                                            Start Manual Job uses the selected customer context only. Start Manual Job copies this template’s name and scope only. Template line items and pricing are not copied to the job. Add job work items after creating the job if you want to track tasks for completion or invoicing. Copying template line items into job work items is future design work because job work items affect completion, billability, and invoicing.
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <div className="mb-3 flex items-center justify-between gap-2">
-                                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                                          {visibleEstimateTemplates.length} shown of {estimateTemplates.length}
-                                        </span>
-                                        {estimateTemplateSearch && (
-                                          <button
-                                            type="button"
-                                            onClick={() => setEstimateTemplateSearch('')}
-                                            className="text-xs font-semibold text-blue-700 hover:text-blue-800"
-                                          >
-                                            Clear search
-                                          </button>
-                                        )}
-                                      </div>
-                                      {visibleEstimateTemplates.length === 0 ? (
-                                        <EmptyState text="No saved templates match that search." />
-                                      ) : (
-                                      <div className="space-y-2">
-                                        {visibleEstimateTemplates.map(template => (
-                                          <div key={template.id} className="rounded-xl border border-slate-200 bg-white">
-                                            <button
-                                              type="button"
-                                              onClick={() => setExpandedEstimateTemplateId(expandedEstimateTemplateId === template.id ? null : template.id)}
-                                              className="flex w-full items-start justify-between gap-3 p-3 text-left transition hover:bg-blue-50"
-                                            >
-                                              <div>
-                                                <p className="font-semibold text-slate-950">{template.name}</p>
-                                                <p className="mt-1 text-xs text-slate-500">
-                                                  {template.line_items?.length ?? 0} line item{(template.line_items?.length ?? 0) === 1 ? '' : 's'}
-                                                  {template.trade ? ` · ${template.trade}` : ''}
-                                                  {' · '}Updated {formatDateTime(template.updated_at)}
-                                                </p>
-                                              </div>
-                                              {expandedEstimateTemplateId === template.id ? <ChevronUp size={16} className="shrink-0 text-slate-400" /> : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
-                                            </button>
-                                            {expandedEstimateTemplateId === template.id && (
-                                              <div className="border-t border-slate-200 p-3">
-                                                {template.scope && (
-                                                  <p className="line-clamp-3 text-sm text-slate-600">{template.scope}</p>
-                                                )}
-                                                {template.line_items?.length > 0 && (
-                                                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                                                    {template.line_items
-                                                      .slice()
-                                                      .sort((a, b) => a.sort_order - b.sort_order)
-                                                      .slice(0, 4)
-                                                      .map((line, index) => (
-                                                        <div key={`${template.id}-${index}`} className="grid gap-2 border-b border-slate-200 px-3 py-2 text-xs last:border-b-0 sm:grid-cols-[1fr_5rem_6rem]">
-                                                          <div className="min-w-0">
-                                                            <p className="font-medium text-slate-800">{lineDisplayTitle(line)}</p>
-                                                            {lineDisplayDetailRows(line).map(detail => (
-                                                              <p key={detail} className="mt-0.5 text-[11px] leading-4 text-slate-500">{detail}</p>
-                                                            ))}
-                                                          </div>
-                                                          <span className="text-slate-500">{line.quantity} {line.unit}</span>
-                                                          <span className="font-semibold text-slate-900 sm:text-right">{persistedLineTotalLabel(line)}</span>
-                                                        </div>
-                                                      ))}
-                                                    {template.line_items.length > 4 && (
-                                                      <p className="px-3 py-2 text-xs font-medium text-slate-500">+ {template.line_items.length - 4} more line item{template.line_items.length - 4 === 1 ? '' : 's'}</p>
-                                                    )}
-                                                  </div>
-                                                )}
-                                                <div className="mt-3 flex flex-wrap gap-2">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                      applySavedEstimateTemplateStart(template, subjectName, {
-                                                        homeId: workspaceNewRecordHomeId,
-                                                        localHomeId: workspaceNewRecordLocalHomeId,
-                                                      });
-                                                    }}
-                                                    className={buttonClass('primary')}
-                                                  >
-                                                    <ArrowRight size={15} />
-                                                    Use for Estimate
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                      applySavedEstimateTemplateInvoiceDraft(template, subjectName, {
-                                                        homeId: workspaceNewRecordHomeId,
-                                                        localHomeId: workspaceNewRecordLocalHomeId,
-                                                      });
-                                                    }}
-                                                    disabled={createInvoiceCapability.disabled}
-                                                    title={createInvoiceCapability.disabled ? createInvoiceCapability.reason : undefined}
-                                                    className={buttonClass('secondary')}
-                                                  >
-                                                    <Receipt size={15} />
-                                                    Create Manual Invoice Draft
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      if (localCustomer && requireLocalPropertyForNewRecord()) return;
-                                                      const subjectName = conn?.display_name || localCustomer?.display_name || 'Customer';
-                                                      applySavedEstimateTemplateManualJobStart(template, subjectName, {
-                                                        connection: conn,
-                                                        localContact: localCustomer,
-                                                        homeId: workspaceNewRecordHomeId,
-                                                        localHomeId: workspaceNewRecordLocalHomeId,
-                                                      });
-                                                    }}
-                                                    className={buttonClass('secondary')}
-                                                  >
-                                                    <ClipboardCheck size={15} />
-                                                    Start Manual Job
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void renameEstimateTemplate(template)}
-                                                    disabled={renamingEstimateTemplateId === template.id || deletingEstimateTemplateId === template.id}
-                                                    className={buttonClass('secondary')}
-                                                  >
-                                                    {renamingEstimateTemplateId === template.id ? 'Renaming...' : 'Rename'}
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => void deleteEstimateTemplate(template)}
-                                                    disabled={deletingEstimateTemplateId === template.id || renamingEstimateTemplateId === template.id}
-                                                    className={buttonClass('danger')}
-                                                  >
-                                                    <Trash2 size={15} />
-                                                    {deletingEstimateTemplateId === template.id ? 'Deleting...' : 'Delete'}
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                                )}
                                   {activeDocumentRecords.length === 0 ? (
-                                    <EmptyState text={`No ${isInvoiceWorkspaceTab ? 'invoices' : 'estimates'} have been created for this workspace yet.`} />
+                                    <EmptyState text={isInvoiceWorkspaceTab ? 'No invoices have been created for this workspace yet.' : noSubjectEstimateCopy} />
                                   ) : (
                                     <>
                                       <div className="grid gap-2 sm:grid-cols-4">
