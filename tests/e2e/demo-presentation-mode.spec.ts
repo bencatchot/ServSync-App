@@ -190,6 +190,59 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(jobsListSource).toContain('{renderDemoPresentationJobsCheckpointStory()}');
   });
 
+  test('contractor Jobs capture surfaces hide mutation labels only in presentation mode', () => {
+    const app = sourceFile('src/App.tsx');
+    const jobsListSource = sourceBetween(
+      app,
+      "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (",
+      "{showLocalContactForm && (",
+    );
+    const recentJobsSource = sourceBetween(
+      app,
+      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'templates' && (",
+    );
+
+    expect(jobsListSource).toContain("{!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft'");
+    expect(jobsListSource).toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
+    expect(jobsListSource).toContain("? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'");
+    expect(jobsListSource).toContain(": checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'");
+    expect(jobsListSource).toContain('{demoPresentationBadgeLabelForJob(insp)}');
+    expect(jobsListSource).toContain('{subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : \'\'}');
+
+    expect(recentJobsSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === \'draft\'');
+    expect(recentJobsSource).toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
+    expect(recentJobsSource).toContain("? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'");
+    expect(recentJobsSource).toContain(": checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'");
+    expect(recentJobsSource).toContain('{demoPresentationBadgeLabelForJob(insp)}');
+    expect(recentJobsSource).toContain('{subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : \'\'}');
+  });
+
+  test('homeowner dashboard hides reminder and Home History capture clutter only in presentation mode', () => {
+    const app = sourceFile('src/App.tsx');
+    const homeownerDashboardSource = sourceBetween(
+      app,
+      '<Card title="My contractors" icon={<Users size={18} />}>',
+      '<Card title="Documents" icon={<FolderOpen size={18} />}>',
+    );
+
+    expect(homeownerDashboardSource).toContain('{!SERVSYNC_DEMO_PRESENTATION_MODE && (');
+    expect(homeownerDashboardSource).toContain('<Card title="Recent home history"');
+    expect(homeownerDashboardSource).toContain('Open Home History');
+    expect(homeownerDashboardSource).toContain('<Card title="Upcoming reminders"');
+    expect(homeownerDashboardSource).toContain('Add reminder');
+    expect(homeownerDashboardSource).toContain('openDashboardHomeReminders.map(reminder =>');
+
+    const activeWorkSource = sourceBetween(
+      app,
+      '<Card title="Active work" icon={<ClipboardCheck size={18} />}>',
+      '<Card title="My contractors" icon={<Users size={18} />}>',
+    );
+    expect(activeWorkSource).toContain('activeServiceRequests.map(request =>');
+    expect(activeWorkSource).toContain('dashboardAcceptedWorkEstimates.map(estimate =>');
+    expect(activeWorkSource).toContain('Job created from this estimate.');
+  });
+
   test('PR 279 template-free selected-homeowner estimate behavior remains intact', () => {
     const app = sourceFile('src/App.tsx');
     const selectedCustomerEstimatePanelSource = sourceBetween(

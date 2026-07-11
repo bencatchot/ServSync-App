@@ -6,6 +6,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-presentation-cleanup-slice-2c-a`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/demo-presentation-mode.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Cleaned up the remaining Demo Mode Slice 2C-A live capture surfaces by hiding contractor Jobs deletion/continuation mutation controls and hiding homeowner dashboard reminder/Home History cards while presentation mode is active. Read-only contractor job details, checkpoint story copy, homeowner property/request/estimate/job visibility, and normal non-presentation behavior are preserved.
+- Reason for change: Post-merge live presentation validation showed that the dedicated demo capture surfaces still exposed contractor job mutation affordances and homeowner reminder/Home History sections that distract from the Slice 2C-A recording story.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-presentation-mode.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Frontend/docs/test slice only. No SQL, demo runner, reset allowlist, auth, Supabase/Vercel settings, production/shared-sandbox data, browser checkpoint controls, role switching, invoice, Home History creation, report/PDF, media, reminder mutation, payment, notification delivery, deployment, or external-effect changes are included.
+  - Presentation capture still requires manual live review against the dedicated demo deployment after the PR is merged and the demo Vercel project is rebuilt.
+
 - Branch: `codex/demo-presentation-followup-2c-a`
 - Files changed:
   - `src/App.tsx`

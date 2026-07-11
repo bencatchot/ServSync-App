@@ -17742,59 +17742,63 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               </div>
             </Card>
 
-            <Card title="Recent home history" icon={<ClipboardList size={18} />}>
-              <div className="space-y-3">
-                {recentLogEntries.length === 0 ? (
-                  <EmptyState text="No home history yet." />
-                ) : (
-                  recentLogEntries.map(entry => (
-                    <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <p className="text-sm font-semibold text-slate-800">{entry.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(entry.performed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {entry.contractor_name ? ` · ${entry.contractor_name}` : ''}
-                      </p>
-                    </div>
-                  ))
-                )}
-                <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-                  Open Home History
-                </button>
-              </div>
-            </Card>
-
-            <Card title="Upcoming reminders" icon={<Bell size={18} />}>
-              <div className="space-y-3">
-                {openDashboardHomeReminders.length === 0 ? (
-                  <EmptyState text="No open Home Reminders yet." />
-                ) : (
-                  openDashboardHomeReminders.map(reminder => {
-                    const dueState = reminderDueState(reminder);
-                    const roomChip = renderReminderRoomChip(reminder);
-                    return (
-                      <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="min-w-0 text-sm font-semibold text-slate-800">{reminder.title}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
-                        </div>
+            {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+              <Card title="Recent home history" icon={<ClipboardList size={18} />}>
+                <div className="space-y-3">
+                  {recentLogEntries.length === 0 ? (
+                    <EmptyState text="No home history yet." />
+                  ) : (
+                    recentLogEntries.map(entry => (
+                      <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-sm font-semibold text-slate-800">{entry.title}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {new Date(entry.performed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {entry.contractor_name ? ` · ${entry.contractor_name}` : ''}
                         </p>
-                        {roomChip && <div className="mt-2 flex flex-wrap gap-2">{roomChip}</div>}
                       </div>
-                    );
-                  })
-                )}
-                <div className="flex flex-wrap gap-3">
+                    ))
+                  )}
                   <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
                     Open Home History
                   </button>
-                  <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); openHomeReminderComposer(); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-                    Add reminder
-                  </button>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            )}
+
+            {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+              <Card title="Upcoming reminders" icon={<Bell size={18} />}>
+                <div className="space-y-3">
+                  {openDashboardHomeReminders.length === 0 ? (
+                    <EmptyState text="No open Home Reminders yet." />
+                  ) : (
+                    openDashboardHomeReminders.map(reminder => {
+                      const dueState = reminderDueState(reminder);
+                      const roomChip = renderReminderRoomChip(reminder);
+                      return (
+                        <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="min-w-0 text-sm font-semibold text-slate-800">{reminder.title}</p>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                          {roomChip && <div className="mt-2 flex flex-wrap gap-2">{roomChip}</div>}
+                        </div>
+                      );
+                    })
+                  )}
+                  <div className="flex flex-wrap gap-3">
+                    <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                      Open Home History
+                    </button>
+                    <button type="button" onClick={() => { setHomeownerMaintenancePropertyScope('selected'); setHomeownerTab('log'); openHomeReminderComposer(); }} className="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                      Add reminder
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             <Card title="Documents" icon={<FolderOpen size={18} />}>
               <div className="space-y-3">
@@ -37878,7 +37882,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   </button>
                                 )}
                                 <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
-                                  {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
+                                  {SERVSYNC_DEMO_PRESENTATION_MODE
+                                    ? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'
+                                    : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                                 </button>
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && !checklistStyle && inspectionIsOpenJob(insp) && (
                                   <button type="button" onClick={() => void completeSimpleServiceJob(insp)} className={mobileButtonClass('primary')}>
@@ -39311,13 +39317,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </p>
                             {!checklistStyle && insp.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>}
                           </div>
-                          {inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
+                          {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
                             <button type="button" onClick={() => void deleteInspection(insp)} className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors" title="Delete job">
                               Delete
                             </button>
                           )}
                           <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
-                            {checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
+                            {SERVSYNC_DEMO_PRESENTATION_MODE
+                              ? checklistStyle && !inspectionIsClosedJob(insp) ? 'View report' : 'View Job'
+                              : checklistStyle ? (insp.status === 'draft' ? 'Continue' : 'View report') : inspectionIsClosedJob(insp) ? 'View Job' : 'Continue Job'}
                           </button>
                         </div>
                       );
