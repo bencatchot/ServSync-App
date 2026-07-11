@@ -6,6 +6,7 @@ const scriptPath = resolve(process.cwd(), 'scripts/demo/seed-demo-scenario.mjs')
 const manifestPath = resolve(process.cwd(), 'scripts/demo/scenarios/water-heater-core-loop.mjs');
 const appPath = resolve(process.cwd(), 'src/App.tsx');
 const packagePath = resolve(process.cwd(), 'package.json');
+const connectionSharedPropertiesSqlPath = resolve(process.cwd(), 'servsync-connection-shared-properties.sql');
 
 function read(path: string) {
   return readFileSync(path, 'utf8');
@@ -18,6 +19,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(manifest.scenarioKey).toBe('water_heater_core_loop');
     expect(manifest.defaultCheckpointKey).toBe('job_created');
     expect(manifest.supportedCheckpointKeys).toEqual([
+      'contractor_discovery_ready',
       'request_ready',
       'contractor_review_ready',
       'estimate_draft',
@@ -34,6 +36,21 @@ test.describe('Demo Mode checkpoint source checks', () => {
     );
     expect(manifest.deferredCheckpointKeys).not.toEqual(expect.arrayContaining(['job_in_progress', 'job_completed']));
     expect(manifest.checkpointDefinitions.map((checkpoint: { key: string }) => checkpoint.key)).toEqual(manifest.supportedCheckpointKeys);
+    expect(manifest.checkpointByKey.contractor_discovery_ready.requiredSteps).toEqual([
+      'identities',
+      'profilesAndCompany',
+      'property',
+      'contractorDiscovery',
+    ]);
+    expect(manifest.checkpointByKey.contractor_discovery_ready.expected).toMatchObject({
+      connectionCount: 0,
+      requestCount: 0,
+      estimateCount: 0,
+      jobCount: 0,
+      visitEventCount: 0,
+      invoiceCount: 0,
+      homeHistoryCount: 0,
+    });
     expect(manifest.checkpointByKey.job_completed.requiredSteps).toEqual([
       'identities',
       'profilesAndCompany',
@@ -74,6 +91,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     const module = await import('../../scripts/demo/seed-demo-scenario.mjs');
 
     expect(module.parseCheckpointKey([])).toBe('job_created');
+    expect(module.parseCheckpointKey(['--checkpoint=contractor_discovery_ready'])).toBe('contractor_discovery_ready');
     expect(module.parseCheckpointKey(['--checkpoint=request_ready'])).toBe('request_ready');
     expect(module.parseCheckpointKey(['--checkpoint', 'estimate_sent'])).toBe('estimate_sent');
     expect(module.parseCheckpointKey(['--checkpoint=job_completed'])).toBe('job_completed');
@@ -128,6 +146,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/required_steps: checkpoint\.requiredSteps/);
     expect(script).toMatch(/executed_steps: executedSteps/);
     expect(script).toMatch(/p_checkpoint: checkpoint/);
+    expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'contractorDiscovery'\)\)/);
     expect(script).toMatch(/registerCreatedRecord\(service, runId, 'service_requests'[\s\S]*'request_ready'/);
     expect(script).toMatch(/registerCreatedRecord\(service, runId, 'estimates'[\s\S]*'estimate_draft'/);
     expect(script).toMatch(/registerRecord\(service, runId, 'workflow_activity_events'[\s\S]*'estimate_accepted'/);
@@ -141,6 +160,10 @@ test.describe('Demo Mode checkpoint source checks', () => {
     const script = read(scriptPath);
 
     expect(script).toMatch(/Requested checkpoint \$\{requestedCheckpointKey\} does not match active run checkpoint/);
+    expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have homeowner-to-Gulf Coast connection rows/);
+    expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have water-heater service requests/);
+    expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have water-heater estimates/);
+    expect(script).toMatch(/Contractor discovery checkpoint requires a public Gulf Coast profile searchable by demo ZIP and plumbing\/water-heater trade/);
     expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have an estimate/);
     expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have a job/);
     expect(script).toMatch(/Checkpoint \$\{checkpointKey\} should not have estimate approval workflow events/);
@@ -161,10 +184,29 @@ test.describe('Demo Mode checkpoint source checks', () => {
     const script = read(scriptPath);
 
     expect(script).toMatch(/const previousReset = await resetNonResetRuns\(service, scenarioKey, 'pre-seed-reconciliation'\)/);
+    expect(script).toMatch(/async function reconcileDiscoveryRecordingConnection/);
+    expect(script).toMatch(/eq\('status', 'pending'\)[\s\S]*eq\('source', 'homeowner_request'\)/);
+    expect(script).toMatch(/'demo_recording_connection_request'/);
+    expect(script).toMatch(/reconciled_from: 'presentation_recording'/);
     expect(script).toMatch(/ensureAuthUser\(service, homeownerEmail, homeownerPassword, scenarioKey, 'homeowner'\)/);
     expect(script).toMatch(/ensureAuthUser\(service, contractorEmail, contractorPassword, scenarioKey, 'contractor_owner'\)/);
     expect(script).toMatch(/assertDistinctDemoIdentities/);
     expect(script).not.toMatch(/in-place rollback|rollbackCheckpoint|deleteByCheckpoint/);
+  });
+
+  test('discovery recording connection requests use the real pending connection RPC and reset reconciliation registers the exact row', () => {
+    const script = read(scriptPath);
+    const sql = read(connectionSharedPropertiesSqlPath);
+
+    expect(sql).toMatch(/create function public\.servsync_submit_contextual_connection_request/);
+    expect(sql).toMatch(/insert into public\.homeowner_contractor_connections[\s\S]*'pending'[\s\S]*'homeowner_request'/);
+    expect(sql).toMatch(/return jsonb_build_object\([\s\S]*'status', 'pending'/);
+    expect(script).toMatch(/async function reconcileDiscoveryRecordingConnection/);
+    expect(script).toMatch(/\.eq\('status', 'pending'\)[\s\S]*\.eq\('source', 'homeowner_request'\)/);
+    expect(script).toMatch(/registerRecord\(service, run\.id, 'homeowner_contractor_connections', connection\.id, 'demo_recording_connection_request'/);
+    expect(script).toMatch(/registerRecord\(service, run\.id, 'connection_permissions', permissions\.connection_id, 'demo_recording_connection_permissions'/);
+    expect(script).toMatch(/registerRecord\(service, run\.id, 'connection_audit_events', event\.id, 'demo_recording_connection_audit_event'/);
+    expect(script).toMatch(/const removed = await resetRun\(service, run\.id\)/);
   });
 
   test('production, shared sandbox, and external-effect guards still apply', async () => {

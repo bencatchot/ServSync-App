@@ -98,6 +98,27 @@ test.describe('Demo presentation mode guard and source wiring', () => {
     expect(app).toContain('Set up your workflow');
   });
 
+  test('presentation mode leaves homeowner contractor-discovery connection CTAs available for the approved capture surface', () => {
+    const app = sourceFile('src/App.tsx');
+    const findContractorSource = sourceBetween(
+      app,
+      '<Card title="Find a contractor"',
+      '{requestingConnectionId && selectedRequestConnection && (',
+    );
+    const publicProfileCtaSource = sourceBetween(
+      app,
+      '{/* CTA */}',
+      '{publicContractorTarget && connectionModalOpen && (',
+    );
+
+    expect(findContractorSource).toContain('Request connection');
+    expect(findContractorSource).toContain('openContextualConnectionRequest(contractorTargetFromProfile(contractor))');
+    expect(findContractorSource).not.toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
+    expect(publicProfileCtaSource).toContain('Request connection with ${data.business_name}');
+    expect(publicProfileCtaSource).toContain('setConnectionModalOpen(true)');
+    expect(publicProfileCtaSource).not.toContain('SERVSYNC_DEMO_PRESENTATION_MODE');
+  });
+
   test('checkpoint presentation labels are distinct and do not create product statuses', () => {
     expect(demoPresentationJobCheckpointLabel({ status: 'draft', totalWorkItems: 5, completedWorkItems: 0 })).toBe('Draft job created from accepted estimate');
     expect(demoPresentationJobCheckpointLabel({ status: 'scheduled', totalWorkItems: 5, completedWorkItems: 0 })).toBe('Contractor visit scheduled');

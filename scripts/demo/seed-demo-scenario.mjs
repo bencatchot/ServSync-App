@@ -510,11 +510,17 @@ async function resetNonResetRuns(service, scenarioKey, reason) {
   const considered = [];
   for (const run of runs) {
     try {
+      const reconciledRecordingConnections = await reconcileDiscoveryRecordingConnection(service, run);
+      if (reconciledRecordingConnections.length > 0) {
+        run.records = await getRegisteredRecordsForRun(service, run.id);
+        run.recordCount = run.records.length;
+      }
       const removed = await resetRun(service, run.id);
       considered.push({
         runId: run.id,
         previousStatus: run.status,
         registeredRecords: run.recordCount,
+        reconciledRecordingConnections,
         removed,
         action: 'reset',
         reason,
@@ -558,6 +564,75 @@ async function registerCreatedRecord(service, runId, tableName, recordId, record
     }
     throw new Error(`${error.message}. Exact compensation removed just-created record ${tableName}.${recordId}.`);
   }
+}
+
+async function reconcileDiscoveryRecordingConnection(service, run) {
+  if ((run.checkpoint || run.metadata?.selected_checkpoint) !== 'contractor_discovery_ready') {
+    return [];
+  }
+
+  const homeownerId = run.metadata?.homeowner_user_id;
+  const contractorId = run.metadata?.contractor_id;
+  if (!homeownerId || !contractorId) {
+    return [];
+  }
+
+  const pendingConnections = await ensureOk(
+    await service
+      .from('homeowner_contractor_connections')
+      .select('id, status, source')
+      .eq('homeowner_user_id', homeownerId)
+      .eq('contractor_id', contractorId)
+      .eq('status', 'pending')
+      .eq('source', 'homeowner_request'),
+    'Unable to inspect discovery recording connection request residue'
+  );
+
+  if (pendingConnections.length > 1) {
+    throw new Error(
+      `Discovery checkpoint ${run.id} has multiple pending recording-created connection rows and cannot be reset safely.`
+    );
+  }
+  const connection = pendingConnections[0] || null;
+  if (!connection) {
+    return [];
+  }
+
+  await registerRecord(service, run.id, 'homeowner_contractor_connections', connection.id, 'demo_recording_connection_request', 'contractor_discovery_ready', {
+    source: 'homeowner_request',
+    reconciled_from: 'presentation_recording',
+  });
+
+  const permissions = await maybeSingle(
+    await service
+      .from('connection_permissions')
+      .select('connection_id')
+      .eq('connection_id', connection.id)
+      .maybeSingle(),
+    'Unable to inspect discovery recording connection permissions'
+  );
+  if (permissions?.connection_id) {
+    await registerRecord(service, run.id, 'connection_permissions', permissions.connection_id, 'demo_recording_connection_permissions', 'contractor_discovery_ready', {
+      source: 'homeowner_request',
+      reconciled_from: 'presentation_recording',
+    });
+  }
+
+  const auditEvents = await ensureOk(
+    await service
+      .from('connection_audit_events')
+      .select('id, event_type')
+      .eq('connection_id', connection.id),
+    'Unable to inspect discovery recording connection audit events'
+  );
+  for (const event of auditEvents) {
+    await registerRecord(service, run.id, 'connection_audit_events', event.id, 'demo_recording_connection_audit_event', 'contractor_discovery_ready', {
+      event_type: event.event_type,
+      reconciled_from: 'presentation_recording',
+    });
+  }
+
+  return [connection.id];
 }
 
 async function findRegisteredRecord(service, tableName, recordId) {
@@ -1602,6 +1677,8 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const requiresEstimate = checkpointRequires(checkpointKey, 'estimateDraft');
   const requiresSent = checkpointRequires(checkpointKey, 'estimateSent');
   const requiresAccepted = checkpointRequires(checkpointKey, 'estimateAccepted');
+  const requiresConnection = checkpointRequires(checkpointKey, 'connection');
+  const requiresRequest = checkpointRequires(checkpointKey, 'request');
   const requiresJob = checkpointRequires(checkpointKey, 'jobCreated');
   const requiresJobScheduled = checkpointRequires(checkpointKey, 'jobScheduled');
   const requiresJobInProgress = checkpointRequires(checkpointKey, 'jobInProgress');
@@ -1611,6 +1688,12 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const records = run.records;
   const counts = countBy(records, 'table_name');
   const requiredTables = REQUIRED_SCENARIO_TABLES.filter((tableName) => {
+    if (['homeowner_contractor_connections', 'connection_permissions'].includes(tableName)) {
+      return requiresConnection;
+    }
+    if (tableName === 'service_requests') {
+      return requiresRequest;
+    }
     if (['estimates', 'estimate_line_items', 'estimate_payment_schedule_items'].includes(tableName)) {
       return requiresEstimate;
     }
@@ -1673,7 +1756,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     ? await ensureOk(
         await service
           .from('contractor_profiles')
-          .select('id, owner_user_id, business_name, slug, account_status')
+          .select('id, owner_user_id, business_name, slug, account_status, public_profile_enabled, service_categories, service_zip_codes, zip_code, city, state')
           .eq('owner_user_id', contractorUser.id),
         'Unable to inspect contractor profile'
       )
@@ -1685,10 +1768,36 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   if (contractor && (contractor.business_name !== DEMO_CONTRACTOR.businessName || contractor.account_status !== 'active')) {
     issues.push('Contractor company/profile does not match the expected active demo contractor.');
   }
+  if (
+    contractor &&
+    (!contractor.public_profile_enabled ||
+      contractor.slug !== DEMO_CONTRACTOR.slug ||
+      !contractor.service_categories?.includes('Plumbing') ||
+      !contractor.service_categories?.includes('Water heaters') ||
+      !contractor.service_zip_codes?.includes(DEMO_PROPERTY.zip_code))
+  ) {
+    issues.push('Contractor discovery checkpoint requires a public Gulf Coast profile searchable by demo ZIP and plumbing/water-heater trade.');
+  }
 
   const homeId = requireExactlyOneId(issues, records, 'homes', 'demo_home', 'demo home');
-  const connectionId = requireExactlyOneId(issues, records, 'homeowner_contractor_connections', 'demo_connection', 'demo connection');
-  const requestId = requireExactlyOneId(issues, records, 'service_requests', 'demo_service_request', 'demo service request');
+  const registeredConnectionIds = records
+    .filter((record) => record.table_name === 'homeowner_contractor_connections')
+    .map((record) => record.record_id);
+  const registeredRequestIds = records
+    .filter((record) => record.table_name === 'service_requests')
+    .map((record) => record.record_id);
+  const connectionId = requiresConnection
+    ? requireExactlyOneId(issues, records, 'homeowner_contractor_connections', 'demo_connection', 'demo connection')
+    : null;
+  const requestId = requiresRequest
+    ? requireExactlyOneId(issues, records, 'service_requests', 'demo_service_request', 'demo service request')
+    : null;
+  if (!requiresConnection && registeredConnectionIds.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have registered connection records, found ${registeredConnectionIds.length}.`);
+  }
+  if (!requiresRequest && registeredRequestIds.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have registered service request records, found ${registeredRequestIds.length}.`);
+  }
   const estimateIds = recordIds(records, 'estimates', 'demo_estimate');
   const jobIds = recordIds(records, 'inspections', 'demo_job');
   const visitEventIds = recordIds(records, 'contractor_visit_events', 'demo_contractor_visit_event');
@@ -1800,9 +1909,53 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
           'Unable to inspect deferred demo Home History rows'
         )
       : [];
+  const scenarioConnections = homeownerUser && contractor
+    ? await ensureOk(
+        await service
+          .from('homeowner_contractor_connections')
+          .select('id, status, source')
+          .eq('homeowner_user_id', homeownerUser.id)
+          .eq('contractor_id', contractor.id),
+        'Unable to inspect direct demo homeowner-contractor connections'
+      )
+    : [];
+  const scenarioRequests = homeownerUser && contractor
+    ? await ensureOk(
+        await service
+          .from('service_requests')
+          .select('id, connection_id, title, status')
+          .eq('homeowner_user_id', homeownerUser.id)
+          .eq('contractor_id', contractor.id)
+          .eq('title', 'Replace leaking water heater'),
+        'Unable to inspect direct demo service requests'
+      )
+    : [];
+  const scenarioEstimates = homeownerUser && contractor
+    ? await ensureOk(
+        await service
+          .from('estimates')
+          .select('id, title, status')
+          .eq('homeowner_user_id', homeownerUser.id)
+          .eq('contractor_id', contractor.id)
+          .eq('title', 'Water heater replacement estimate'),
+        'Unable to inspect direct demo estimates'
+      )
+    : [];
 
   if (home && homeownerUser && (home.homeowner_user_id !== homeownerUser.id || home.nickname !== DEMO_PROPERTY.nickname)) {
     issues.push('Demo home is not linked to the expected homeowner or property marker.');
+  }
+  if (!requiresConnection && scenarioConnections.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have homeowner-to-Gulf Coast connection rows, found ${scenarioConnections.length}.`);
+  }
+  if (requiresConnection && scenarioConnections.length !== 1) {
+    issues.push(`Expected exactly one homeowner-to-Gulf Coast connection row, found ${scenarioConnections.length}.`);
+  }
+  if (!requiresRequest && scenarioRequests.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have water-heater service requests, found ${scenarioRequests.length}.`);
+  }
+  if (!requiresEstimate && scenarioEstimates.length !== 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have water-heater estimates, found ${scenarioEstimates.length}.`);
   }
   if (
     connection &&
@@ -1815,7 +1968,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   ) {
     issues.push('Demo connection does not link the expected homeowner, contractor, and active demo source.');
   }
-  if (!permissions || !permissions.share_contact || !permissions.share_home_overview || !permissions.share_address) {
+  if (requiresConnection && (!permissions || !permissions.share_contact || !permissions.share_home_overview || !permissions.share_address)) {
     issues.push('Demo connection permissions are missing required workflow sharing.');
   }
   if (
@@ -2121,6 +2274,10 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       const { homeId } = await createProperty(service, runId, homeownerUser.id, dates);
       created.homeId = homeId;
       executedSteps.push('property');
+    }
+
+    if (checkpointRequires(checkpointKey, 'contractorDiscovery')) {
+      executedSteps.push('contractorDiscovery');
     }
 
     if (checkpointRequires(checkpointKey, 'connection')) {

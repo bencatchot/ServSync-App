@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-contractor-discovery-checkpoint`
+- Files changed:
+  - `scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-checkpoints.spec.ts`
+  - `tests/e2e/demo-presentation-mode.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added the private Demo Mode `contractor_discovery_ready` checkpoint for recording the homeowner contractor-search/profile opening story before a connection exists. The checkpoint seeds the demo homeowner, Demo Bay Home, and public/searchable Gulf Coast contractor profile, verifies no connection or downstream workflow records exist, and allows the next guarded reset to register and remove the exact pending Sarah-to-Gulf-Coast connection request created by an intentional recording click.
+- Reason for change: Marketing capture needs a polished "Find and connect with a contractor" opening clip before the existing connected water-heater workflow begins, without adding Discover posts, browser checkpoint controls, public Demo Mode, SQL, or new product lifecycle behavior.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `node scripts/demo/seed-demo-scenario.mjs checkpoints`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-presentation-mode.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts tests/e2e/demo-presentation-mode.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Source/docs/test slice only. No SQL, Supabase/Vercel setting changes, production/shared-sandbox access, auth provisioning changes, Discover post/media seeding, invoices, Home History, reports/PDFs, reminders, payments, notification delivery, external effects, deployment, public Demo Mode, role switching, or browser seed/reset/checkpoint controls are included.
+  - Dedicated-demo live validation should seed `contractor_discovery_ready`, record the connection-request click, reset, and restore `job_created` before capture is considered complete.
+
 - Branch: `codex/demo-presentation-homeowner-estimate-cleanup`
 - Files changed:
   - `src/App.tsx`
