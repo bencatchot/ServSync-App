@@ -133,7 +133,7 @@ Important guardrails:
 | FB-031 | Contractor Beta Billing-Readiness / Entitlement Readiness | Contractor billing readiness, entitlements, admin visibility, future subscription prep | Started / Readiness Only | High | DB billing accounts, entitlement RPCs, admin read-only visibility, contractor entitlement loading, labels, and limited read-only UI support are merged/applied. Beta contractors remain free; no Stripe, checkout, payment collection, paywalls, billing enforcement, or editable billing controls are live. |
 | FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Foundation Loop Complete / Closeout Polish Pending | Medium-High | The core foundation loop is complete: Slice 2 SQL/RLS/RPC foundation is merged and production-applied, Slice 3A adds contractor-side template/offer UI, and Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
 | FB-033 | Project Collaboration | Multi-contractor project coordination, project parties, authority, events, job grouping | Hidden Foundation In Progress | Later / Future | Slice 1 adds only a hidden SQL/RLS/RPC/types/test/docs foundation for durable project identity, property association, commercial parties, individual memberships, Project Lead authority, project events, and one-project-per-job association. Runtime mutation gate defaults disabled and profile allowlisting is required. No UI, Beta exposure, Project Board, assignments, invitations, financial sharing, project billing, production SQL application, production allowlist activation, or estimate/invoice permission changes are included. |
-| FB-034 | Demo Mode / Marketing Capture Environment | Demo data, screenshots, recordings, QA/onboarding support | Checkpoints In Progress | Medium | Slice 1 adds the dedicated-demo foundation. Slice 2A adds private runner checkpoints for the existing water-heater scenario through `job_created`: `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`. Checkpoints remain private seed/reset/verify operations only; no browser controls, public Demo Mode, role switching, presentation mode, job completion, invoice/Home History/reminder demo data, production SQL, shared sandbox use, deployment, external notifications, payments, or production data actions are included. |
+| FB-034 | Demo Mode / Marketing Capture Environment | Demo data, screenshots, recordings, QA/onboarding support | Checkpoints In Progress | Medium | Slice 1 adds the dedicated-demo foundation. Slice 2A adds private runner checkpoints for the existing water-heater scenario through `job_created`: `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints: `job_scheduled`, `job_in_progress`, `job_review_ready`, and `job_completed`. Checkpoints remain private seed/reset/verify operations only; no browser controls, public Demo Mode, role switching, presentation mode, invoices, Home History, report finalization, reminder demo data, production SQL, shared sandbox use, deployment, external notifications, payments, or production data actions are included. |
 
 ## Detailed feature notes
 
@@ -1432,7 +1432,7 @@ Product goal:
 Demo Mode should provide a reusable, presentation-safe environment for showing real ServSync workflows without confusing demo records with real customer data. It should use dedicated demo identities, realistic fictional data, repeatable scenarios, and deterministic current-looking dates while preserving normal permissions and lifecycle behavior.
 
 Current status:
-Slice 1 adds a hidden foundation for a dedicated demo Supabase/Vercel environment. It creates private registry tables for demo scenarios, runs, and resettable records; adds a private Node seed/reset/verify runner; provisions dedicated demo auth identities when run against the dedicated demo project; and seeds a water-heater scenario through homeowner request, contractor estimate, homeowner approval, and accepted-estimate job creation. Slice 2A adds deterministic private checkpoint restore/verify for that same scenario through `job_created`, covering `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`. The runner refuses the known production project and the existing shared sandbox project by default and does not print secrets.
+Slice 1 adds a hidden foundation for a dedicated demo Supabase/Vercel environment. It creates private registry tables for demo scenarios, runs, and resettable records; adds a private Node seed/reset/verify runner; provisions dedicated demo auth identities when run against the dedicated demo project; and seeds a water-heater scenario through homeowner request, contractor estimate, homeowner approval, and accepted-estimate job creation. Slice 2A adds deterministic private checkpoint restore/verify for that same scenario through `job_created`, covering `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`. Slice 2B extends checkpoint restore/verify through lightweight job lifecycle states: `job_scheduled`, `job_in_progress`, `job_review_ready`, and `job_completed`, while leaving invoices, Home History, finalized reports, reminders, media, browser controls, and presentation mode deferred. The runner refuses the known production project and the existing shared sandbox project by default and does not print secrets.
 
 MVP guardrails:
 
@@ -1441,18 +1441,19 @@ MVP guardrails:
 - No broad `is_demo` columns are added to core product tables.
 - No service-role key may appear in browser code.
 - Demo identities and data must be fictional and presentation-safe.
-- Production, shared sandbox, external delivery, payments, webhooks, AI, geocoding, media uploads, presentation mode, browser controls, and deployment are out of scope for Slice 2A.
+- Production, shared sandbox, external delivery, payments, webhooks, AI, geocoding, media uploads, presentation mode, browser controls, and deployment are out of scope for Slice 2A and Slice 2B.
 - Demo Mode is not a public user feature and must not be marketed as live user-facing functionality.
 
 Recommended implementation sequence:
 
 1. Slice 1: dedicated demo registry foundation, private seed/reset/verify runner, water-heater core scenario through job creation, tests, and runbook.
 2. Slice 2A: private deterministic checkpoints through job creation, using reset/rebuild behavior and checkpoint-aware verification.
-3. Future Slice 2B: richer scenario/presentation controls after checkpoint validation, without exposing service-role actions in the browser.
+3. Slice 2B: private deterministic job lifecycle checkpoints through lightweight completion, using existing lifecycle behavior where available and no invoice/Home History/report finalization.
+4. Future Slice 2C: richer scenario/presentation controls after checkpoint validation, without exposing service-role actions in the browser.
 4. Future Slice 3: completed job, invoice, Home History, reminder, documents/media, and presentation/capture tooling after separate audit.
 
 Current next step:
-Audit and validate Slice 2A checkpoints in the dedicated demo environment only, leaving the final state seeded at `job_created`. Do not apply SQL to production or the existing shared sandbox, do not deploy, and do not add browser checkpoint controls.
+Audit and validate Slice 2B checkpoints in the dedicated demo environment only, leaving the final state seeded at the approved checkpoint. Do not apply SQL to production or the existing shared sandbox, do not deploy, and do not add browser checkpoint controls.
 
 ## Current next recommended focus
 

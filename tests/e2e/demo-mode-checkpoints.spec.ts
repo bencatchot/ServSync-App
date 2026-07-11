@@ -12,7 +12,7 @@ function read(path: string) {
 }
 
 test.describe('Demo Mode checkpoint source checks', () => {
-  test('manifest defines only the Slice 2A supported checkpoints and deferred future states', async () => {
+  test('manifest defines Slice 2A plus Slice 2B job lifecycle checkpoints and deferred future states', async () => {
     const manifest = await import('../../scripts/demo/scenarios/water-heater-core-loop.mjs');
 
     expect(manifest.scenarioKey).toBe('water_heater_core_loop');
@@ -24,12 +24,17 @@ test.describe('Demo Mode checkpoint source checks', () => {
       'estimate_sent',
       'estimate_accepted',
       'job_created',
+      'job_scheduled',
+      'job_in_progress',
+      'job_review_ready',
+      'job_completed',
     ]);
     expect(manifest.deferredCheckpointKeys).toEqual(
-      expect.arrayContaining(['estimate_viewed', 'job_in_progress', 'job_completed', 'invoice_draft', 'invoice_sent', 'invoice_paid', 'home_history_updated'])
+      expect.arrayContaining(['estimate_viewed', 'invoice_draft', 'invoice_sent', 'invoice_paid', 'home_history_updated'])
     );
+    expect(manifest.deferredCheckpointKeys).not.toEqual(expect.arrayContaining(['job_in_progress', 'job_completed']));
     expect(manifest.checkpointDefinitions.map((checkpoint: { key: string }) => checkpoint.key)).toEqual(manifest.supportedCheckpointKeys);
-    expect(manifest.checkpointByKey.job_created.requiredSteps).toEqual([
+    expect(manifest.checkpointByKey.job_completed.requiredSteps).toEqual([
       'identities',
       'profilesAndCompany',
       'property',
@@ -40,7 +45,29 @@ test.describe('Demo Mode checkpoint source checks', () => {
       'estimateSent',
       'estimateAccepted',
       'jobCreated',
+      'jobScheduled',
+      'jobInProgress',
+      'jobReviewReady',
+      'jobCompleted',
     ]);
+    expect(manifest.checkpointByKey.job_scheduled.expected).toMatchObject({
+      jobStatus: 'scheduled',
+      visitEventCount: 1,
+      visitEventStatus: 'scheduled',
+      visitSharedWithHomeowner: false,
+      invoiceCount: 0,
+      homeHistoryCount: 0,
+    });
+    expect(manifest.checkpointByKey.job_completed.expected).toMatchObject({
+      jobStatus: 'completed',
+      jobCompletedAt: true,
+      jobClosedAt: false,
+      visitEventStatus: 'completed',
+      completedWorkItemCount: 5,
+      openWorkItemCount: 0,
+      invoiceCount: 0,
+      homeHistoryCount: 0,
+    });
   });
 
   test('checkpoint parser rejects unknown, malformed, and deferred checkpoints before target validation', async () => {
@@ -49,6 +76,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(module.parseCheckpointKey([])).toBe('job_created');
     expect(module.parseCheckpointKey(['--checkpoint=request_ready'])).toBe('request_ready');
     expect(module.parseCheckpointKey(['--checkpoint', 'estimate_sent'])).toBe('estimate_sent');
+    expect(module.parseCheckpointKey(['--checkpoint=job_completed'])).toBe('job_completed');
     expect(() => module.parseCheckpointKey(['--checkpoint=estimate_viewed'])).toThrow(/Deferred demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--checkpoint=job'])).toThrow(/Unsupported demo checkpoint/);
     expect(() => module.parseCheckpointKey(['--checkpoint='])).toThrow(/checkpoint key is required|Unsupported demo checkpoint/);
@@ -76,10 +104,18 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/async function sendEstimate/);
     expect(script).toMatch(/async function acceptEstimate/);
     expect(script).toMatch(/async function createJobFromEstimate/);
+    expect(script).toMatch(/async function scheduleJobVisit/);
+    expect(script).toMatch(/async function advanceJobInProgress/);
+    expect(script).toMatch(/async function advanceJobReviewReady/);
+    expect(script).toMatch(/async function completeDemoJob/);
     expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'estimateDraft'\)\)/);
     expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'estimateSent'\)\)/);
     expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'estimateAccepted'\)\)/);
     expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'jobCreated'\)\)/);
+    expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'jobScheduled'\)\)/);
+    expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'jobInProgress'\)\)/);
+    expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'jobReviewReady'\)\)/);
+    expect(script).toMatch(/if \(checkpointRequires\(checkpointKey, 'jobCompleted'\)\)/);
     expect(script).not.toMatch(/async function seedRequestReady|async function seedEstimateDraft|async function seedJobCreated/);
   });
 
@@ -96,6 +132,9 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/registerCreatedRecord\(service, runId, 'estimates'[\s\S]*'estimate_draft'/);
     expect(script).toMatch(/registerRecord\(service, runId, 'workflow_activity_events'[\s\S]*'estimate_accepted'/);
     expect(script).toMatch(/registerCreatedRecord\(service, runId, 'inspections'[\s\S]*'job_created'/);
+    expect(script).toMatch(/registerCreatedRecord\([\s\S]*'contractor_visit_events'[\s\S]*'job_scheduled'/);
+    expect(script).toMatch(/job_work_items_completed: created\.completedWorkItemCount/);
+    expect(script).toMatch(/visit_event_id: created\.visitEventId/);
   });
 
   test('verification is checkpoint-aware and forbids records beyond the selected checkpoint', () => {
@@ -110,6 +149,12 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(script).toMatch(/Sent or later estimate checkpoint is missing sent timestamp evidence/);
     expect(script).toMatch(/verifyEstimateApprovalWorkflowEvent\(issues, \{ estimate, events: workflowEvents \}\)/);
     expect(script).toMatch(/verifyAcceptedEstimateWorkflowEvents\(issues, \{ estimate, job, events: workflowEvents \}\)/);
+    expect(script).toMatch(/Expected \$\{checkpoint\.expected\.completedWorkItemCount\} completed job work items/);
+    expect(script).toMatch(/Expected \$\{checkpoint\.expected\.openWorkItemCount\} open job work items/);
+    expect(script).toMatch(/Demo job scheduling must not create homeowner appointment proposals/);
+    expect(script).toMatch(/Demo Slice 2B must not create invoices/);
+    expect(script).toMatch(/Demo Slice 2B must not file Home History rows/);
+    expect(script).toMatch(/Demo Slice 2B must not fabricate job_completed workflow events/);
   });
 
   test('lower-checkpoint reseed uses reset and rebuild, preserving auth identity handling', () => {

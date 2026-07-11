@@ -6,6 +6,36 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-11
 
+- Branch: `codex/demo-mode-job-checkpoints-slice-2b`
+- Files changed:
+  - `servsync-demo-mode-foundation.sql`
+  - `scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `scripts/demo/seed-demo-scenario.mjs`
+  - `tests/e2e/demo-mode-checkpoints.spec.ts`
+  - `tests/e2e/demo-mode-foundation.spec.ts`
+  - `tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+- Summary of change: Added Demo Mode Slice 2B source support for private water-heater job lifecycle checkpoints: `job_scheduled`, `job_in_progress`, `job_review_ready`, and `job_completed`. The runner keeps `job_created` as the default checkpoint, uses the existing accepted-estimate-to-job and visit-scheduling RPCs where available, uses controlled fixture transitions for in-progress/review-ready states where no dedicated product RPC exists, verifies work-item counts and private visit-event state, and blocks invoices, Home History rows, finalized reports, and fabricated `job_completed` workflow events.
+- Reason for change: Internal capture and QA need repeatable job-lifecycle states beyond accepted-estimate job creation without adding browser controls, public Demo Mode, or later-slice invoice/Home History/report behavior.
+- Tests/checks run:
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `node scripts/demo/seed-demo-scenario.mjs checkpoints`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope guard
+  - credential-shaped secret scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Source support only until final PR review and separate approved live dedicated-demo validation. No production/shared-sandbox access, deployment, Vercel setting change, auth provisioning change, browser checkpoint control, media seeding, invoice, Home History, report finalization, external notification, payment, or public Demo Mode change is included.
+  - `job_in_progress` and `job_review_ready` are controlled demo fixture transitions because the current app does not expose dedicated start-job or review-ready RPCs.
+  - `job_completed` intentionally models lightweight current-product completion only; invoice, Home History, report/PDF storage, reminders, and public capture tooling remain future slices.
+
 - Branch: `codex/fix-homeowner-estimates-panel`
 - Files changed:
   - `src/App.tsx`

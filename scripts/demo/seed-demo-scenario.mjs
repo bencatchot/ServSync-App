@@ -48,6 +48,7 @@ const NON_RESET_RUN_STATUSES = ['started', 'failed', 'succeeded'];
 const WORKFLOW_EVENT_TYPES = {
   estimateApproved: 'estimate_approved',
   jobCreated: 'job_created',
+  jobCompleted: 'job_completed',
 };
 const WORKFLOW_EVENT_SOURCES = {
   estimateResponse: 'servsync_homeowner_respond_to_estimate',
@@ -61,6 +62,7 @@ const DEMO_AUTH_METADATA = {
 const RESETTABLE_PRIMARY_KEYS = {
   workflow_activity_events: 'id',
   notifications: 'id',
+  contractor_visit_events: 'id',
   job_work_items: 'id',
   estimate_payment_schedule_items: 'id',
   estimate_line_items: 'id',
@@ -86,6 +88,7 @@ const REQUIRED_SCENARIO_TABLES = [
   'estimate_line_items',
   'estimate_payment_schedule_items',
   'inspections',
+  'contractor_visit_events',
 ];
 
 const DEMO_HOMEOWNER = personas.homeowner;
@@ -259,6 +262,10 @@ export function buildDatePlan(anchorInput = new Date()) {
     estimateSentAt: hours(dateOffsets.estimateSentAtHours),
     estimateAcceptedAt: hours(dateOffsets.estimateAcceptedAtHours),
     jobCreatedAt: hours(dateOffsets.jobCreatedAtHours),
+    jobScheduledAt: hours(dateOffsets.jobScheduledAtHours),
+    jobInProgressAt: hours(dateOffsets.jobInProgressAtHours),
+    jobReviewReadyAt: hours(dateOffsets.jobReviewReadyAtHours),
+    jobCompletedAt: hours(dateOffsets.jobCompletedAtHours),
     visitWindowStart: days(dateOffsets.visitWindowStartDays),
     waterHeaterInstallDate: days(dateOffsets.waterHeaterInstallDateDays).slice(0, 10),
     waterHeaterWarrantyDate: days(dateOffsets.waterHeaterWarrantyDateDays).slice(0, 10),
@@ -1025,6 +1032,239 @@ async function createJobFromEstimate(contractorClient, service, runId, estimateI
   return { jobId, workItemCount: workItems?.length || 0 };
 }
 
+async function fetchJobWorkItems(service, jobId) {
+  return ensureOk(
+    await service
+      .from('job_work_items')
+      .select('id, title, completion_status, completed_at, completed_by, billing_status, sort_order, source_estimate_line_item_id')
+      .eq('inspection_id', jobId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true }),
+    'Unable to inspect demo job work items'
+  );
+}
+
+function inProgressCompletedWorkItemCount(totalCount) {
+  if (totalCount <= 1) {
+    return totalCount;
+  }
+  return Math.max(1, Math.min(2, totalCount - 1));
+}
+
+async function syncJobRoomsForWorkItems(service, jobId, completedTitles, summary, updatedAt) {
+  const job = await fetchOneByPrimaryKey(service, 'inspections', 'id', jobId, 'id, rooms_with_findings');
+  const rooms = Array.isArray(job?.rooms_with_findings) ? job.rooms_with_findings : [];
+  const completed = new Set(completedTitles);
+  const nextRooms = rooms.map((room) => ({
+    ...room,
+    findings: Array.isArray(room.findings)
+      ? room.findings.map((finding) => {
+          const title = finding?.title || '';
+          if (!completed.has(title)) {
+            return {
+              ...finding,
+              status: finding?.status === 'Fixed On Site' ? 'Monitor' : finding?.status || 'Monitor',
+            };
+          }
+          return {
+            ...finding,
+            status: 'Fixed On Site',
+            action: finding?.action || 'Completed as part of the demo water-heater replacement.',
+            notes: finding?.notes || 'Demo checkpoint progress note.',
+          };
+        })
+      : [],
+  }));
+
+  await ensureOk(
+    await service.from('inspections').update({ rooms_with_findings: nextRooms, summary, updated_at: updatedAt }).eq('id', jobId),
+    'Unable to update demo job scope snapshot'
+  );
+
+  return nextRooms;
+}
+
+async function setJobWorkItemProgress(service, jobId, completedCount, completedAt, completedBy) {
+  const workItems = await fetchJobWorkItems(service, jobId);
+  const completedIds = workItems.slice(0, completedCount).map((item) => item.id);
+  const openIds = workItems.slice(completedCount).map((item) => item.id);
+  const completedTitles = workItems.slice(0, completedCount).map((item) => item.title);
+
+  if (completedIds.length > 0) {
+    await ensureOk(
+      await service
+        .from('job_work_items')
+        .update({
+          completion_status: 'completed',
+          completed_at: completedAt,
+          completed_by: completedBy,
+          billing_status: 'unbilled',
+          updated_at: completedAt,
+        })
+        .in('id', completedIds),
+      'Unable to mark demo job work items complete'
+    );
+  }
+
+  if (openIds.length > 0) {
+    await ensureOk(
+      await service
+        .from('job_work_items')
+        .update({
+          completion_status: 'open',
+          completed_at: null,
+          completed_by: null,
+          billing_status: 'unbilled',
+          updated_at: completedAt,
+        })
+        .in('id', openIds),
+      'Unable to keep demo job work items open'
+    );
+  }
+
+  return {
+    totalCount: workItems.length,
+    completedCount: completedIds.length,
+    openCount: openIds.length,
+    completedTitles,
+  };
+}
+
+async function scheduleJobVisit(contractorClient, service, runId, jobId, dates) {
+  const result = await ensureOk(
+    await contractorClient.rpc('servsync_schedule_visit_event', {
+      p_inspection_id: jobId,
+      p_scheduled_at: dates.visitWindowStart,
+      p_notes: 'Demo contractor-only visit for the water-heater replacement workflow.',
+      p_share_with_homeowner: false,
+    }),
+    'Unable to schedule demo job visit through contractor RPC'
+  );
+  const visitEventId = result?.visit_event_id;
+  if (!visitEventId) {
+    throw new Error('Demo visit scheduling did not return a visit_event_id.');
+  }
+
+  await registerCreatedRecord(
+    service,
+    runId,
+    'contractor_visit_events',
+    visitEventId,
+    'demo_contractor_visit_event',
+    'job_scheduled'
+  );
+
+  await ensureOk(
+    await service
+      .from('contractor_visit_events')
+      .update({ scheduled_at: dates.jobScheduledAt, updated_at: dates.jobScheduledAt })
+      .eq('id', visitEventId),
+    'Unable to set deterministic demo visit event dates'
+  );
+  await ensureOk(
+    await service.from('inspections').update({ job_status: 'scheduled', updated_at: dates.jobScheduledAt }).eq('id', jobId),
+    'Unable to set deterministic demo scheduled job date'
+  );
+
+  return { visitEventId };
+}
+
+async function advanceJobInProgress(service, jobId, contractorUserId, dates) {
+  const currentItems = await fetchJobWorkItems(service, jobId);
+  const progress = await setJobWorkItemProgress(
+    service,
+    jobId,
+    inProgressCompletedWorkItemCount(currentItems.length),
+    dates.jobInProgressAt,
+    contractorUserId
+  );
+  await syncJobRoomsForWorkItems(
+    service,
+    jobId,
+    progress.completedTitles,
+    'Demo job in progress. Initial water-heater replacement tasks are underway.',
+    dates.jobInProgressAt
+  );
+  await ensureOk(
+    await service
+      .from('inspections')
+      .update({
+        job_status: 'in_progress',
+        completed_at: null,
+        closed_at: null,
+        report_storage_path: null,
+        report_file_name: null,
+        updated_at: dates.jobInProgressAt,
+      })
+      .eq('id', jobId),
+    'Unable to mark demo job in progress'
+  );
+  return progress;
+}
+
+async function advanceJobReviewReady(service, jobId, contractorUserId, dates) {
+  const currentItems = await fetchJobWorkItems(service, jobId);
+  const progress = await setJobWorkItemProgress(service, jobId, currentItems.length, dates.jobReviewReadyAt, contractorUserId);
+  await syncJobRoomsForWorkItems(
+    service,
+    jobId,
+    progress.completedTitles,
+    'Demo job work is complete and ready for contractor review.',
+    dates.jobReviewReadyAt
+  );
+  await ensureOk(
+    await service
+      .from('inspections')
+      .update({
+        job_status: 'in_progress',
+        completed_at: null,
+        closed_at: null,
+        report_storage_path: null,
+        report_file_name: null,
+        updated_at: dates.jobReviewReadyAt,
+      })
+      .eq('id', jobId),
+    'Unable to mark demo job review ready'
+  );
+  return progress;
+}
+
+async function completeDemoJob(contractorClient, service, jobId, contractorUserId, dates) {
+  const currentItems = await fetchJobWorkItems(service, jobId);
+  const progress = await setJobWorkItemProgress(service, jobId, currentItems.length, dates.jobCompletedAt, contractorUserId);
+  await syncJobRoomsForWorkItems(
+    service,
+    jobId,
+    progress.completedTitles,
+    'Demo job completed. Invoice and Home History steps are intentionally deferred to a later Demo Mode slice.',
+    dates.jobCompletedAt
+  );
+  await ensureOk(
+    await service
+      .from('inspections')
+      .update({
+        job_status: 'completed',
+        completed_at: dates.jobCompletedAt,
+        closed_at: null,
+        status: 'draft',
+        report_storage_path: null,
+        report_file_name: null,
+        updated_at: dates.jobCompletedAt,
+      })
+      .eq('id', jobId),
+    'Unable to complete demo job'
+  );
+  await ensureOk(
+    await contractorClient.rpc('servsync_complete_visit_event_for_job', { p_inspection_id: jobId }),
+    'Unable to complete demo visit event through contractor RPC'
+  );
+  await ensureOk(
+    await service.from('contractor_visit_events').update({ status: 'completed', updated_at: dates.jobCompletedAt }).eq('inspection_id', jobId),
+    'Unable to set deterministic demo visit completion date'
+  );
+  return progress;
+}
+
 function notificationHandlingDecision() {
   return 'Slice 1 leaves incidental in-app notifications untouched and does not register them for reset.';
 }
@@ -1247,6 +1487,10 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const requiresSent = checkpointRequires(checkpointKey, 'estimateSent');
   const requiresAccepted = checkpointRequires(checkpointKey, 'estimateAccepted');
   const requiresJob = checkpointRequires(checkpointKey, 'jobCreated');
+  const requiresJobScheduled = checkpointRequires(checkpointKey, 'jobScheduled');
+  const requiresJobInProgress = checkpointRequires(checkpointKey, 'jobInProgress');
+  const requiresJobReviewReady = checkpointRequires(checkpointKey, 'jobReviewReady');
+  const requiresJobCompleted = checkpointRequires(checkpointKey, 'jobCompleted');
 
   const records = run.records;
   const counts = countBy(records, 'table_name');
@@ -1257,6 +1501,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
     if (tableName === 'inspections') {
       return requiresJob;
     }
+    if (tableName === 'contractor_visit_events') {
+      return requiresJobScheduled;
+    }
     return true;
   });
   if (requiresAccepted && !counts.workflow_activity_events) {
@@ -1264,6 +1511,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   }
   if (requiresJob && !counts.job_work_items) {
     issues.push('Job-created checkpoint requires registered job work items.');
+  }
+  if (requiresJobScheduled && !counts.contractor_visit_events) {
+    issues.push('Job-scheduled checkpoint requires a registered contractor visit event.');
   }
   for (const tableName of requiredTables) {
     if (!counts[tableName]) {
@@ -1325,6 +1575,7 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   const requestId = requireExactlyOneId(issues, records, 'service_requests', 'demo_service_request', 'demo service request');
   const estimateIds = recordIds(records, 'estimates', 'demo_estimate');
   const jobIds = recordIds(records, 'inspections', 'demo_job');
+  const visitEventIds = recordIds(records, 'contractor_visit_events', 'demo_contractor_visit_event');
   let estimateId = null;
   let jobId = null;
   if (requiresEstimate) {
@@ -1381,18 +1632,55 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         'inspections',
         'id',
         jobId,
-        'id, contractor_id, homeowner_user_id, home_id, service_request_id, estimate_id, status, job_status, created_at'
+        'id, contractor_id, homeowner_user_id, home_id, service_request_id, estimate_id, status, job_status, created_at, updated_at, completed_at, closed_at, report_storage_path, report_file_name'
       )
     : null;
+  const workflowEventClauses = [estimateId ? `estimate_id.eq.${estimateId}` : null, jobId ? `inspection_id.eq.${jobId}` : null].filter(Boolean);
   const workflowEvents =
-    estimateId
+    workflowEventClauses.length > 0
       ? await ensureOk(
           await service
             .from('workflow_activity_events')
             .select('id, event_type, estimate_id, inspection_id, created_at, metadata')
-            .eq('estimate_id', estimateId)
-            .in('event_type', [WORKFLOW_EVENT_TYPES.estimateApproved, WORKFLOW_EVENT_TYPES.jobCreated]),
+            .in('event_type', [
+              WORKFLOW_EVENT_TYPES.estimateApproved,
+              WORKFLOW_EVENT_TYPES.jobCreated,
+              WORKFLOW_EVENT_TYPES.jobCompleted,
+            ])
+            .or(workflowEventClauses.join(',')),
           'Unable to inspect demo workflow activity events'
+        )
+      : [];
+  const jobWorkItems = jobId ? await fetchJobWorkItems(service, jobId) : [];
+  const visitEvents = jobId
+    ? await ensureOk(
+        await service
+          .from('contractor_visit_events')
+          .select('id, inspection_id, service_request_id, homeowner_user_id, scheduled_at, share_with_homeowner, status, homeowner_response_status, updated_at')
+          .eq('inspection_id', jobId),
+        'Unable to inspect demo contractor visit events'
+      )
+    : [];
+  const appointmentRows = requestId
+    ? await ensureOk(
+        await service.from('service_request_appointments').select('id, request_id, visit_event_id, status').eq('request_id', requestId),
+        'Unable to inspect demo appointment proposals'
+      )
+    : [];
+  const invoiceClauses = [jobId ? `job_id.eq.${jobId}` : null, estimateId ? `estimate_id.eq.${estimateId}` : null, requestId ? `service_request_id.eq.${requestId}` : null].filter(Boolean);
+  const scenarioInvoices =
+    invoiceClauses.length > 0
+      ? await ensureOk(
+          await service.from('invoices').select('id, job_id, estimate_id, service_request_id, status').or(invoiceClauses.join(',')),
+          'Unable to inspect deferred demo invoices'
+        )
+      : [];
+  const homeHistoryClauses = [jobId ? `inspection_id.eq.${jobId}` : null, requestId ? `service_request_id.eq.${requestId}` : null].filter(Boolean);
+  const homeHistoryRows =
+    homeHistoryClauses.length > 0
+      ? await ensureOk(
+          await service.from('home_maintenance_log').select('id, inspection_id, service_request_id').or(homeHistoryClauses.join(',')),
+          'Unable to inspect deferred demo Home History rows'
         )
       : [];
 
@@ -1445,9 +1733,9 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       job.homeowner_user_id !== homeownerUser.id ||
       job.contractor_id !== contractor.id ||
       job.home_id !== homeId ||
-      !['draft', 'scheduled'].includes(job.job_status))
+      job.job_status !== checkpoint.expected.jobStatus)
   ) {
-    issues.push('Demo job is not linked to the accepted estimate and expected scenario records.');
+    issues.push(`Demo job is not linked to the accepted estimate and expected scenario records or does not have status ${checkpoint.expected.jobStatus}.`);
   }
   if (estimate && job && estimate.inspection_id !== job.id) {
     issues.push('Accepted estimate does not point to the linked demo job.');
@@ -1490,6 +1778,78 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
   }
   if (!requiresJob && duplicateJobs.length !== 0) {
     issues.push(`Checkpoint ${checkpointKey} should not have a job linked to the demo estimate, found ${duplicateJobs.length}.`);
+  }
+
+  if (requiresJob && job) {
+    const completedItems = jobWorkItems.filter((item) => item.completion_status === 'completed');
+    const openItems = jobWorkItems.filter((item) => item.completion_status === 'open');
+    if (jobWorkItems.length !== estimateLines().length) {
+      issues.push(`Expected ${estimateLines().length} demo job work items, found ${jobWorkItems.length}.`);
+    }
+    if (jobWorkItems.some((item) => !item.source_estimate_line_item_id)) {
+      issues.push('Demo job work items must remain estimate-derived; manual work items are not part of Slice 2B.');
+    }
+    if (checkpoint.expected.completedWorkItemCount !== undefined && completedItems.length !== checkpoint.expected.completedWorkItemCount) {
+      issues.push(`Expected ${checkpoint.expected.completedWorkItemCount} completed job work items, found ${completedItems.length}.`);
+    }
+    if (checkpoint.expected.openWorkItemCount !== undefined && openItems.length !== checkpoint.expected.openWorkItemCount) {
+      issues.push(`Expected ${checkpoint.expected.openWorkItemCount} open job work items, found ${openItems.length}.`);
+    }
+    if ((requiresJobInProgress || requiresJobReviewReady || requiresJobCompleted) && completedItems.some((item) => !item.completed_at || !item.completed_by)) {
+      issues.push('Completed demo job work items must include completed_at and completed_by evidence.');
+    }
+    if (!requiresJobCompleted && job.completed_at) {
+      issues.push(`Checkpoint ${checkpointKey} should not have a completed_at value.`);
+    }
+    if (requiresJobCompleted && !job.completed_at) {
+      issues.push('Completed demo job checkpoint requires completed_at.');
+    }
+    if (job.closed_at) {
+      issues.push('Demo job lifecycle checkpoints must not close the job.');
+    }
+    if (job.report_storage_path || job.report_file_name) {
+      issues.push('Demo job lifecycle checkpoints must not create or attach finalized report files.');
+    }
+  } else if (jobWorkItems.length > 0 || visitEvents.length > 0) {
+    issues.push(`Checkpoint ${checkpointKey} should not have job work items or visit events.`);
+  }
+
+  if (requiresJobScheduled) {
+    if (visitEventIds.length !== 1) {
+      issues.push(`Expected 1 registered contractor visit event, found ${visitEventIds.length}.`);
+    }
+    if (visitEvents.length !== 1) {
+      issues.push(`Expected exactly one contractor visit event for the demo job, found ${visitEvents.length}.`);
+    }
+    const visitEvent = visitEvents[0] || null;
+    if (
+      visitEvent &&
+      (visitEvent.inspection_id !== jobId ||
+        visitEvent.service_request_id !== requestId ||
+        visitEvent.homeowner_user_id !== homeownerUser?.id ||
+        visitEvent.status !== checkpoint.expected.visitEventStatus ||
+        visitEvent.share_with_homeowner !== false ||
+        visitEvent.homeowner_response_status !== 'not_shared')
+    ) {
+      issues.push('Demo contractor visit event is not linked, private, or in the expected lifecycle status.');
+    }
+  } else {
+    if (visitEventIds.length !== 0) {
+      issues.push(`Checkpoint ${checkpointKey} should not have registered contractor visit events.`);
+    }
+    if (visitEvents.length !== 0) {
+      issues.push(`Checkpoint ${checkpointKey} should not have contractor visit events.`);
+    }
+  }
+
+  if (appointmentRows.length > 0) {
+    issues.push('Demo job scheduling must not create homeowner appointment proposals.');
+  }
+  if (scenarioInvoices.length !== 0) {
+    issues.push(`Demo Slice 2B must not create invoices, found ${scenarioInvoices.length}.`);
+  }
+  if (homeHistoryRows.length !== 0) {
+    issues.push(`Demo Slice 2B must not file Home History rows, found ${homeHistoryRows.length}.`);
   }
 
   const requestEstimates = requestId
@@ -1541,6 +1901,20 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
       issues.push(`Checkpoint ${checkpointKey} should not have job-created workflow events.`);
     }
   }
+  const jobCompletedEvents = filterScenarioWorkflowEvents(workflowEvents, {
+    eventType: WORKFLOW_EVENT_TYPES.jobCompleted,
+    estimateId,
+    inspectionId: jobId,
+  });
+  if (jobCompletedEvents.length > 0) {
+    issues.push('Demo Slice 2B must not fabricate job_completed workflow events.');
+  }
+  if (requiresJobScheduled && job && visitEvents[0]) {
+    assertOrderedTimestamps(issues, 'Job creation before scheduled visit', job.created_at, visitEvents[0].scheduled_at);
+  }
+  if (requiresJobCompleted && job && visitEvents[0]) {
+    assertOrderedTimestamps(issues, 'Scheduled visit before job completion', visitEvents[0].scheduled_at, job.completed_at);
+  }
 
   return {
     ok: issues.length === 0,
@@ -1571,8 +1945,13 @@ async function verifyScenario(service, scenarioKey, env = process.env, requested
         requestId,
         estimateId,
         jobId,
+        visitEventId: visitEvents[0]?.id || null,
         estimateStatus: estimate?.status || null,
         jobStatus: job?.job_status || null,
+        completedWorkItems: jobWorkItems.filter((item) => item.completion_status === 'completed').length,
+        openWorkItems: jobWorkItems.filter((item) => item.completion_status === 'open').length,
+        invoices: scenarioInvoices.length,
+        homeHistoryRows: homeHistoryRows.length,
       },
       registry: {
         tables: counts,
@@ -1615,8 +1994,11 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       requestId: null,
       estimateId: null,
       jobId: null,
+      visitEventId: null,
       estimateTotalCents: null,
       jobWorkItemCount: 0,
+      completedWorkItemCount: 0,
+      openWorkItemCount: 0,
       approvalEventCount: 0,
     };
     const executedSteps = ['identities', 'profilesAndCompany'];
@@ -1677,7 +2059,35 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       const { jobId, workItemCount } = await createJobFromEstimate(contractorClient, service, runId, created.estimateId);
       created.jobId = jobId;
       created.jobWorkItemCount = workItemCount;
+      created.openWorkItemCount = workItemCount;
       executedSteps.push('jobCreated');
+    }
+
+    if (checkpointRequires(checkpointKey, 'jobScheduled')) {
+      const { visitEventId } = await scheduleJobVisit(contractorClient, service, runId, created.jobId, dates);
+      created.visitEventId = visitEventId;
+      executedSteps.push('jobScheduled');
+    }
+
+    if (checkpointRequires(checkpointKey, 'jobInProgress')) {
+      const progress = await advanceJobInProgress(service, created.jobId, contractorUser.id, dates);
+      created.completedWorkItemCount = progress.completedCount;
+      created.openWorkItemCount = progress.openCount;
+      executedSteps.push('jobInProgress');
+    }
+
+    if (checkpointRequires(checkpointKey, 'jobReviewReady')) {
+      const progress = await advanceJobReviewReady(service, created.jobId, contractorUser.id, dates);
+      created.completedWorkItemCount = progress.completedCount;
+      created.openWorkItemCount = progress.openCount;
+      executedSteps.push('jobReviewReady');
+    }
+
+    if (checkpointRequires(checkpointKey, 'jobCompleted')) {
+      const progress = await completeDemoJob(contractorClient, service, created.jobId, contractorUser.id, dates);
+      created.completedWorkItemCount = progress.completedCount;
+      created.openWorkItemCount = progress.openCount;
+      executedSteps.push('jobCompleted');
     }
 
     await finishRun(service, runId, 'succeeded', {
@@ -1692,9 +2102,12 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
       service_request_id: created.requestId,
       estimate_id: created.estimateId,
       job_id: created.jobId,
+      visit_event_id: created.visitEventId,
       estimate_total_cents: created.estimateTotalCents,
       estimate_approval_events_created: created.approvalEventCount,
       job_work_items_created: created.jobWorkItemCount,
+      job_work_items_completed: created.completedWorkItemCount,
+      job_work_items_open: created.openWorkItemCount,
     });
 
     const verification = await verifyScenario(service, scenarioKey, env, checkpointKey);
@@ -1720,7 +2133,10 @@ async function seedScenario(env, target, scenarioKey, checkpointKey = DEFAULT_CH
         requestId: created.requestId,
         estimateId: created.estimateId,
         jobId: created.jobId,
+        visitEventId: created.visitEventId,
         workItemCount: created.jobWorkItemCount,
+        completedWorkItemCount: created.completedWorkItemCount,
+        openWorkItemCount: created.openWorkItemCount,
       },
       checkpoint: checkpointKey,
       verification,
