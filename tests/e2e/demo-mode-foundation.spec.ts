@@ -43,6 +43,7 @@ test.describe('Demo Mode hidden foundation source checks', () => {
       'estimate_line_items',
       'estimate_payment_schedule_items',
       'inspections',
+      'contractor_visit_events',
       'job_work_items',
       'notifications',
       'workflow_activity_events',

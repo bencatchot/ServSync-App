@@ -20,7 +20,7 @@ Slice 1 excludes:
 - Shared sandbox use.
 - User-facing Demo Mode UI.
 - Role switching, impersonation, or browser-side privileged reset tools.
-- Job progress, job completion, invoice creation/sending, Home History filing, reminders, messages beyond required workflow records, media, documents, storage uploads, presentation mode, screenshots, or screen recording automation.
+- Invoice creation/sending/payment, Home History filing, finalized job reports, report PDFs, reminders, messages beyond required workflow records, media, documents, storage uploads, presentation mode, screenshots, or screen recording automation.
 - Email, SMS, push, payment, webhook, accounting sync, AI, geocoding, or external calendar activity.
 
 ## Dedicated Environment Requirement
@@ -81,7 +81,7 @@ DEMO_RESET_ACKNOWLEDGE=reset-water_heater_core_loop npm run demo:reset
 npm run demo:checkpoints
 ```
 
-By default, `demo:seed` restores the `job_created` checkpoint. Slice 2A also supports explicit checkpoint restoration through argument forwarding:
+By default, `demo:seed` restores the backward-compatible `job_created` checkpoint. Slice 2A and Slice 2B also support explicit checkpoint restoration through argument forwarding:
 
 ```bash
 npm run demo:seed -- --checkpoint=request_ready
@@ -92,9 +92,9 @@ The canonical documented form is `--checkpoint=<key>`. The runner also accepts `
 
 The command output reports safe identifiers, run reconciliation summaries, verification categories, and record counts. It must not print passwords, tokens, access keys, or full sensitive environment values.
 
-## Supported Slice 2A Checkpoints
+## Supported Slice 2A and Slice 2B Checkpoints
 
-Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation only.
+Slice 2A adds deterministic checkpoint restoration for the existing `water_heater_core_loop` scenario through accepted-estimate job creation. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints, without invoice creation, Home History filing, report finalization, media, storage, public controls, or presentation mode.
 
 | Checkpoint | Primary role | Purpose | Expected records |
 | --- | --- | --- | --- |
@@ -104,8 +104,12 @@ Slice 2A adds deterministic checkpoint restoration for the existing `water_heate
 | `estimate_sent` | Homeowner | Homeowner review state for a sent estimate. | One sent estimate with sent evidence; no approval event or job. |
 | `estimate_accepted` | Contractor | Accepted-estimate handoff before job creation. | One accepted estimate and exact `estimate_approved` workflow event; no job. |
 | `job_created` | Contractor | Final Slice 1 state with accepted estimate and linked draft job. | Accepted estimate, exact `estimate_approved` event, linked draft job, exact `job_created` event. |
+| `job_scheduled` | Contractor | Job scheduled with the real visit scheduling RPC. | Linked job status `scheduled`, one private contractor visit event, no homeowner appointment proposal. |
+| `job_in_progress` | Contractor | Controlled demo fixture state for active work. | Linked job status `in_progress`; some estimate-derived work items complete and at least one still open. |
+| `job_review_ready` | Contractor | All seeded work items completed before lightweight completion. | Linked job remains `in_progress`; all estimate-derived work items complete; no completed-at timestamp. |
+| `job_completed` | Contractor | Lightweight current-product completion. | Linked job status `completed`, completed timestamp present, visit event completed, no closed timestamp, invoice, Home History row, report file, or fabricated `job_completed` workflow event. |
 
-Deferred checkpoints are not supported in Slice 2A and must not be claimed as available: `estimate_viewed`, `job_in_progress`, `job_completed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, and `home_history_updated`.
+Deferred checkpoints are not supported in Slice 2B and must not be claimed as available: `estimate_viewed`, `invoice_draft`, `invoice_sent`, `invoice_paid`, and `home_history_updated`.
 
 ## Checkpoint Reset and Restore Behavior
 
@@ -119,7 +123,7 @@ Before any seed, the runner resets all non-reset seed runs for the scenario, inc
 - With `--checkpoint=<key>`, it requires the requested checkpoint, the active run metadata, and the database graph to match.
 - Lower checkpoints explicitly require later records to be absent. For example, `request_ready` fails if an estimate or job remains, and `estimate_accepted` fails if a linked job or `job_created` event exists.
 
-Registry rows record the creation step/checkpoint for each resettable row, and every resettable row remains tied to the exact run that created it. No `is_demo` fields are added to product tables, and the reset allowlist is unchanged.
+Registry rows record the creation step/checkpoint for each resettable row, and every resettable row remains tied to the exact run that created it. No `is_demo` fields are added to product tables. Slice 2B extends the reset allowlist only for registered `contractor_visit_events` rows created by the demo scheduling checkpoint.
 
 ## Scenario Contents
 
@@ -165,6 +169,9 @@ The runner uses a reset-time anchor timestamp. Relative dates are regenerated fr
 - Estimate appears after the request.
 - Estimate approval is verified through the durable `estimate_approved` workflow activity event created by the homeowner response RPC. The runner does not treat trigger-managed `estimates.updated_at` as a dedicated acceptance timestamp.
 - Job creation is verified through the durable `job_created` workflow activity event and the linked job record created by the accepted-estimate-to-job RPC.
+- Job scheduling uses the product `servsync_schedule_visit_event` RPC with `share_with_homeowner=false`, then normalizes the registered visit event timestamp from the anchor so recordings remain current-looking.
+- Job progress and review-ready checkpoints use controlled fixture transitions because ServSync does not yet expose dedicated start-job or review-ready RPCs.
+- Lightweight job completion mirrors the current simple job completion boundary: it marks the job completed and completes the linked visit event without finalizing a report, creating an invoice, uploading storage, filing Home History, or notifying the homeowner.
 
 Use `DEMO_ANCHOR_TIMESTAMP` only when a recording needs a deterministic timestamp. Otherwise the runner uses the current time.
 
@@ -202,6 +209,10 @@ Checkpoint-specific verification includes:
 - `estimate_sent`: requires one sent estimate with sent evidence, and forbids approval events and jobs.
 - `estimate_accepted`: requires one accepted estimate and the exact current-estimate `estimate_approved` event, and forbids jobs and `job_created` events.
 - `job_created`: requires the accepted estimate, exact current-estimate approval event, linked draft job, exact current-job `job_created` event, and valid event ordering.
+- `job_scheduled`: requires the linked job to be `scheduled`, one registered private contractor visit event, and no homeowner appointment proposal.
+- `job_in_progress`: requires the linked job to be `in_progress`, completed evidence for the first subset of estimate-derived job work items, at least one open estimate-derived work item, and no manual work items.
+- `job_review_ready`: requires the linked job to remain `in_progress`, all seeded estimate-derived work items completed, and no job completed timestamp.
+- `job_completed`: requires lightweight job completion with `completed_at`, no `closed_at`, completed private visit event, all seeded work items completed, and no invoice, Home History row, finalized report, storage path, or durable `job_completed` workflow event.
 
 All checkpoint verifications also require:
 
@@ -213,7 +224,7 @@ All checkpoint verifications also require:
 - Matching public profiles, homeowner profile, and contractor profile/company.
 - One intended demo home, active connection, required connection permissions, and the records required by that checkpoint.
 - Registry rows that point to real supported records with no duplicate registry target.
-- Valid date ordering for every stage present in that checkpoint. The full accepted-estimate-plus-linked-job graph applies only to `job_created`.
+- Valid date ordering for every stage present in that checkpoint, including scheduled visit before lightweight completion where present.
 
 `verify` exits non-zero if any required check fails.
 
@@ -229,7 +240,7 @@ Recommended recording order:
 
 Slice 1 does not include presentation-safe mode, automatic screenshot capture, or public demo links.
 
-Slice 2A still does not add browser checkpoint controls, role switching, a presentation-mode URL flag, reset buttons, screenshot automation, or public demo controls. Checkpoint selection remains a private local/server-side runner operation. Presentation-safe UI controls are deferred because adding frontend behavior would materially expand scope beyond deterministic checkpoint restore and verification.
+Slice 2A and Slice 2B still do not add browser checkpoint controls, role switching, a presentation-mode URL flag, reset buttons, screenshot automation, or public demo controls. Checkpoint selection remains a private local/server-side runner operation. Presentation-safe UI controls are deferred because adding frontend behavior would materially expand scope beyond deterministic checkpoint restore and verification.
 
 ## Troubleshooting
 
