@@ -65,6 +65,7 @@ test.describe('contractor estimate creation UI structure', () => {
     const source = appSource();
     const lineSourceSource = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
     const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
+    const groupedRendererSource = sourceBetween(source, 'const renderEstimateDraftLineGroups = () => {', 'const renderEstimateLineItemSources =');
     const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
 
     expect(source).not.toContain('renderEstimateReferenceTools');
@@ -87,12 +88,13 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(lineEditorSource).toContain('modelSpecField');
     expect(lineEditorSource).toContain('supplyStatusField');
     expect(lineEditorSource).toContain('Source note');
-    expect(jobsEstimateComposerSource).toContain('compactAdvanced: true');
-    expect(jobsEstimateComposerSource).toContain('renderEstimateLineItemSources()');
-    expect(jobsEstimateComposerSource).toContain('renderEstimateLineItemSources({ empty: true })');
+    expect(jobsEstimateComposerSource).toContain('renderEstimateDraftLineGroups()');
+    expect(groupedRendererSource).toContain('compactAdvanced: true');
+    expect(groupedRendererSource).toContain('renderEstimateLineItemSources()');
+    expect(groupedRendererSource).toContain('renderEstimateLineItemSources({ empty: true })');
     expect(jobsEstimateComposerSource).toContain('Back to estimate options');
     expect(jobsEstimateComposerSource).toContain('Discard draft');
-    expect(jobsEstimateComposerSource.indexOf('estimateDraft.line_items.map')).toBeLessThan(jobsEstimateComposerSource.indexOf('renderEstimateLineItemSources()'));
+    expect(jobsEstimateComposerSource).not.toContain('estimateDraft.line_items.map');
   });
 
   test('contractor draft estimates include a structured payment schedule editor without invoice generation', () => {
