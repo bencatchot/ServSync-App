@@ -1,22 +1,12 @@
 import type { ServiceRequestStatus } from '../../types';
+import { requestStatusPresentation, statusToneClass } from '../status/statusPresentation';
 
 export function serviceRequestStatusLabel(status: ServiceRequestStatus) {
-  const labels: Record<ServiceRequestStatus, string> = {
-    open: 'Open',
-    contractor_responded: 'Responded',
-    homeowner_replied: 'Replied',
-    declined: 'Declined',
-    closed: 'Closed',
-  };
-  return labels[status] || status;
+  return requestStatusPresentation(status).label;
 }
 
 export function serviceRequestStatusClass(status: ServiceRequestStatus) {
-  if (status === 'open') return 'bg-slate-100 text-slate-700';
-  if (status === 'contractor_responded') return 'bg-blue-50 text-blue-700';
-  if (status === 'homeowner_replied') return 'bg-amber-50 text-amber-700';
-  if (status === 'closed') return 'bg-emerald-50 text-emerald-700';
-  return 'bg-red-50 text-red-700';
+  return statusToneClass(requestStatusPresentation(status).tone);
 }
 
 export function serviceRequestStatusAccent(status: ServiceRequestStatus) {
