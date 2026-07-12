@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-12
 
+- Branch: `codex/invoice-payment-presentation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/invoices/InvoicePaymentSummary.tsx`
+  - `src/features/invoices/paymentPresentation.ts`
+  - `tests/e2e/invoice-payment-presentation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2C Invoice Payment Presentation. Contractor and homeowner invoice card/detail surfaces now use reusable invoice payment summaries for Paid, Partially Paid, Overdue, and Void states, with display-safe amount paid and balance due copy derived from existing invoice fields only.
+- Reason for change: Invoice surfaces needed clearer payment-state presentation after the shared status badge and date-helper foundations, without adding online payment, payment history, PDF changes, invoice lifecycle changes, action eligibility changes, SQL/RLS/RPCs, Supabase/Vercel settings, or infrastructure behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/invoice-payment-presentation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts --project=chromium`
+  - Existing invoice-focused Playwright suites attempted as documented in the implementation report.
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated.
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 2C is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2D Remaining Status Cleanup remains future work.
+  - PDF paid-stamp/payment-date display, payment history, online payment collection, payment methods/notes, days-overdue calculations, specialty/admin status cleanup, and authenticated rendered desktop/mobile invoice-payment coverage remain separate follow-ups.
+
 - Branch: `codex/date-presentation-helpers-v1`
 - Files changed:
   - `src/App.tsx`
