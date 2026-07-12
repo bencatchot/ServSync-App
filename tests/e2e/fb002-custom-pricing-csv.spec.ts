@@ -123,10 +123,9 @@ test.describe('FB-002 Custom Pricing CSV preview regression', () => {
       'function createBlankInvoiceDraft',
     );
 
-    expect(source).toContain('{!isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');
-    expect(source).toContain("{estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}");
-    expect(source).not.toContain('{isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');
-    expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderPriceBookQuickPick()");
+    expect(source).toContain("estimateLineSourcePanel === 'saved' && renderEstimateSavedItemPicker()");
+    expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
+    expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderEstimateSavedItemPicker()");
 
     expect(mapperSource).toContain("quantity: '1'");
     expect(mapperSource).toContain('Review quantity, price, and scope before sending.');
@@ -156,7 +155,7 @@ test.describe('FB-002 Custom Pricing CSV preview regression', () => {
     expect(customPricingSource).toContain('do not automatically load into estimates, invoices, homeowner-facing screens, or suggestions');
     expect(homeownerSource).not.toContain('contractor_price_book_items');
     expect(homeownerSource).not.toContain('contractorPriceBookItems');
-    expect(homeownerSource).not.toContain('renderPriceBookQuickPick');
+    expect(homeownerSource).not.toContain('renderEstimateSavedItemPicker');
     expect(homeownerSource).not.toContain('internal_notes');
     expect(homeownerSource).not.toContain('sku');
   });

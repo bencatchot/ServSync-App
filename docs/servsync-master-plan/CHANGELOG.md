@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-12
 
+- Branch: `codex/estimate-item-reuse-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/estimate-item-reuse-polish.spec.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/fb002-custom-pricing-csv.spec.ts`
+  - `tests/e2e/fb024-price-book-quickpick.spec.ts`
+  - `tests/e2e/fb032-service-agreements-contractor-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 1 Slice 1B-2 Estimate Item Reuse Polish. Contractor estimate drafts now use one estimate-only `Add saved item` picker that searches active Price Book items and active saved charges, shows source labels and a copied-price review reminder, inserts independent editable draft lines, and preserves grouped-section focus behavior.
+- Reason for change: Contractors building estimates need a faster way to reuse contractor-owned saved items without historical estimate queries, template-item selection, current-draft reuse, room association, new backend access, calculation changes, lifecycle changes, homeowner visibility changes, or invoice workflow changes.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-item-reuse-polish.spec.ts tests/e2e/fb024-price-book-quickpick.spec.ts tests/e2e/fb002-custom-pricing-csv.spec.ts tests/e2e/fb032-service-agreements-contractor-ui.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "contractor estimate creation UI structure"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts tests/e2e/estimate-collapsible-sections.spec.ts tests/e2e/estimate-template-save-modal.spec.ts tests/e2e/template-taxonomy.spec.ts tests/e2e/multiple-invoices-foundation.spec.ts --project=chromium` attempted; the estimate/template/invoice coverage passed except the known broad `home_map` forbidden-string assertion in `template-taxonomy.spec.ts`, which reproduces from strings already present on `origin/main`.
+  - broader `contractor-create-estimate.spec.ts` attempted; authenticated mutation cases remain blocked locally by missing `TEST_CONTRACTOR_EMAIL`.
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated.
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 1B-2 is frontend/test/docs only. No SQL, RPC, RLS, Supabase/Vercel settings, production deployment, historical estimate retrieval, current-draft reuse picker, template-item picker, room association, materials catalog, estimate lifecycle changes, homeowner visibility changes, or invoice composer changes are included.
+  - Core coverage is source-regression focused because this repository's authenticated estimate-builder fixtures are limited; authenticated rendered desktop/mobile picker coverage remains a useful follow-up.
+
 - Branch: `codex/estimate-collapsible-sections-v1`
 - Files changed:
   - `src/App.tsx`

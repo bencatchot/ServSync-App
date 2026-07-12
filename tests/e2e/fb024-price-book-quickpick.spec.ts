@@ -69,22 +69,22 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     }
   });
 
-  test('quick-pick copy explains quantity, review, and private metadata boundaries', () => {
+  test('unified saved-item picker copy explains quantity, review, and private metadata boundaries', () => {
     const source = appSource();
-    const quickPickSource = sourceBetween(source, 'const renderPriceBookQuickPick = () => (', 'const renderEstimateHelperPanel = () => {');
+    const quickPickSource = sourceBetween(source, 'const renderEstimateSavedItemPicker = () => {', 'const addEstimateHelperSuggestionToDraft =');
 
     expect(quickPickSource).toContain('Price Book');
+    expect(quickPickSource).toContain('Saved charges');
     expect(quickPickSource).toContain('editable estimate lines');
-    expect(quickPickSource).toContain('Quantity starts at 1');
-    expect(quickPickSource).toContain('review quantity, price, and scope before sending');
-    expect(quickPickSource).toContain('Internal notes stay private');
-    expect(quickPickSource).toContain('Category/tax stays in Price Book');
-    expect(quickPickSource).toContain('Private notes and tax/category metadata are not copied.');
+    expect(quickPickSource).toContain('Copied price — review before sending.');
+    expect(quickPickSource).toContain('Search saved items');
+    expect(quickPickSource).toContain('Internal notes, tax/category metadata, and source records stay private.');
+    expect(quickPickSource).toContain('Adds title, customer description, unit, price, and labor hours only.');
     expect(quickPickSource).toContain('className="inline-flex min-h-10 w-full');
     expect(quickPickSource).toContain('sm:w-auto');
   });
 
-  test('Price Book quick-pick remains excluded from invoice composer paths', () => {
+  test('unified saved-item picker remains excluded from invoice composer paths', () => {
     const source = appSource();
     const lineSourcePanel = sourceBetween(
       source,
@@ -107,15 +107,16 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
       "{contractorJobsView === 'templates' && (",
     );
 
-    expect(lineSourcePanel).toContain("estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()");
+    expect(lineSourcePanel).toContain("estimateLineSourcePanel === 'saved' && renderEstimateSavedItemPicker()");
+    expect(lineSourcePanel).not.toContain('Add from Price Book');
     expect(estimateComposerSource).toContain('renderEstimateDraftLineGroups');
     expect(groupedRendererSource).toContain('renderEstimateLineItemSources');
     expect(invoiceComposerSource).not.toContain('renderEstimateLineItemSources');
     expect(invoiceComposerSource).not.toContain('renderEstimateDraftLineGroups');
-    expect(invoiceComposerSource).not.toContain('renderPriceBookQuickPick');
+    expect(invoiceComposerSource).not.toContain('renderEstimateSavedItemPicker');
     expect(invoiceComposerSource).not.toContain('estimateLineSourcePanel');
-    expect(source).not.toContain('{isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');
-    expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderPriceBookQuickPick()");
+    expect(source).not.toContain('{isInvoiceWorkspaceTab && renderEstimateSavedItemPicker()}');
+    expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderEstimateSavedItemPicker()");
   });
 
   test('homeowner-facing dashboard does not load Price Book quick-pick or private metadata', () => {
@@ -123,6 +124,7 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     const homeownerSource = sourceBetween(source, 'function HomeownerDashboard', 'function ContractorDashboard');
 
     expect(homeownerSource).not.toContain('renderPriceBookQuickPick');
+    expect(homeownerSource).not.toContain('renderEstimateSavedItemPicker');
     expect(homeownerSource).not.toContain('contractor_price_book_items');
     expect(homeownerSource).not.toContain('contractorPriceBookItems');
     expect(homeownerSource).not.toContain('internal_notes');
