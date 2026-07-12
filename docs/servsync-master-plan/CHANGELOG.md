@@ -4,6 +4,32 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-12
+
+- Branch: `codex/estimate-editing-basics-polish-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/estimate-editing-basics.spec.ts`
+  - `tests/e2e/fb024-price-book-quickpick.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 1 Slice 1A Estimate Editing Basics. Contractor estimate drafts now support duplicating an estimate line into a fresh manual draft row, desktop focus moves predictably to newly added or duplicated estimate lines, draft copy clearly states the estimate has not been sent to the homeowner, and same-session scroll restoration is scoped to the active estimate draft.
+- Reason for change: Contractors building longer estimates need fewer repetitive actions, clearer draft-state context, and a less jarring editing flow without changing estimate calculations, lifecycle status, homeowner visibility, send behavior, invoice behavior, SQL/RLS/RPCs, or infrastructure.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "contractor estimate creation UI structure"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts tests/e2e/fb024-price-book-quickpick.spec.ts tests/e2e/estimate-template-save-modal.spec.ts --project=chromium`
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated.
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 1A is frontend/test/docs only. No SQL, RPC, RLS, Supabase/Vercel settings, production deployment, estimate lifecycle changes, homeowner visibility changes, invoice-line duplication, collapsible sections, recent materials, historical estimate retrieval, recent rooms, or estimate room association are included.
+  - Bundle 1 Slice 1B should be split: collapsible estimate sections can be a narrow frontend slice, while estimate item reuse, historical recent materials, and room association need separate data/privacy review.
+
 ## 2026-07-11
 
 - Branch: `codex/demo-contractor-discovery-checkpoint`
