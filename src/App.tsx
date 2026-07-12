@@ -140,10 +140,20 @@ import {
   urgencyLabel,
 } from './features/requests/status';
 import {
+  formatDateOnly,
   formatDateTime,
+  formatLongDate,
+  formatLongWeekdayMonthDay,
+  formatMonthYear,
   formatMoney,
   formatPhoneInputValue,
   formatPhoneNumber,
+  formatShortDate,
+  formatShortMonthDay,
+  formatShortMonthDayAtTime,
+  formatShortWeekdayDateTime,
+  formatTime,
+  formatWeekday,
   storageSizeLabel,
   supportAttachmentSizeLabel,
 } from './utils/format';
@@ -2016,7 +2026,7 @@ function estimateLineDraftFromPriceBookItem(item: ContractorPriceBookItem): Esti
 }
 
 function createBlankInvoiceDraft(subjectName = 'Customer', overrides: Partial<InvoiceDraftForm> = {}): InvoiceDraftForm {
-  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dateLabel = formatShortMonthDay();
   const defaultLineItems = [
     createEstimateLineDraft({ line_type: 'labor', description: 'Labor for completed work', quantity: '1', unit: 'job' }),
     createEstimateLineDraft({ line_type: 'material', description: 'Materials and supplies', quantity: '1', unit: 'lot' }),
@@ -3180,7 +3190,7 @@ function buildEstimateDraftFromLibraryBundle({
   subjectName: string;
   savedCharges: ContractorSavedEstimateCharge[];
 }) {
-  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dateLabel = formatShortMonthDay();
   const builtLines = estimateDraftLibraryBundleItems(bundle)
     .map(item => estimateDraftLibrarySeedFromItem(bundle, item))
     .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
@@ -3216,7 +3226,7 @@ function buildRuleBasedEstimateDraft({
   savedCharges: ContractorSavedEstimateCharge[];
 }) {
   const rulePack = ESTIMATE_DRAFT_BUILDER_RULE_PACKS[trade];
-  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dateLabel = formatShortMonthDay();
   const cleanScope = customerFacingRoughScope(roughScope);
   const builtLines = estimateDraftBuilderSeeds({ trade, roughScope })
     .map(seed => estimateBuilderLineFromSeed(seed, savedCharges, jobType));
@@ -3351,7 +3361,7 @@ function invoiceDraftFromInvoice(invoice: Invoice): InvoiceDraftForm {
 
 function estimateDraftFromTemplate(template: EstimateTemplate, subjectName: string): EstimateDraft {
   return {
-    title: `${template.name} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    title: `${template.name} — ${subjectName} — ${formatShortMonthDay()}`,
     scope: template.scope,
     notes: template.notes,
     terms: template.terms || createBlankEstimateDraft().terms,
@@ -6604,7 +6614,7 @@ function calendarEventRecurrenceSummary(event: Pick<ContractorCalendarEvent, 're
   if (!event.recurrence_ends_at) return `Repeats ${label}`;
   const endDate = new Date(event.recurrence_ends_at);
   if (Number.isNaN(endDate.getTime())) return `Repeats ${label}`;
-  return `Repeats ${label} until ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return `Repeats ${label} until ${formatShortDate(endDate)}`;
 }
 
 function calendarEventEndDateInputValue(value: string | null | undefined) {
@@ -14182,9 +14192,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     if (status === 'declined' || status === 'withdrawn' || status === 'cancelled') return 'bg-slate-100 text-slate-600';
     return 'bg-amber-50 text-amber-700';
   };
-  const homeownerServiceAgreementDateLabel = (value?: string | null) => (
-    value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
-  );
+  const homeownerServiceAgreementDateLabel = (value?: string | null) => formatDateOnly(value);
   const homeownerServiceAgreementDetailRows = (record: Pick<ServiceAgreementOffer | ServiceAgreement, 'price_cents' | 'duration_months' | 'included_visit_count' | 'starts_on' | 'ends_on'>) => [
     record.price_cents === null || record.price_cents === undefined ? null : `Price: ${formatMoney(record.price_cents)}`,
     record.duration_months === null || record.duration_months === undefined ? null : `Duration: ${record.duration_months} month${record.duration_months === 1 ? '' : 's'}`,
@@ -15394,9 +15402,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     asset.manufacturer,
     asset.model,
   ].filter(Boolean);
-  const homeAssetDateLabel = (value?: string | null) => value
-    ? new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
+  const homeAssetDateLabel = (value?: string | null) => formatDateOnly(value);
   const renderReminderRoomChip = (reminder: HomeReminder) => {
     const room = roomForReminder(reminder);
     if (!room) return null;
@@ -15595,7 +15601,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
-                        Due {reminder.due_on ? new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'not set'}
+                        Due {formatDateOnly(reminder.due_on, 'not set')}
                       </p>
                     </div>
                   );
@@ -15624,7 +15630,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <p className="break-words text-sm font-semibold text-slate-900">{doc.file_name}</p>
                       <p className="mt-1 text-xs text-slate-500">
                         {homeDocumentTypeLabel(doc.document_type)}
-                        {doc.created_at ? ` • ${new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                        {doc.created_at ? ` • ${formatShortDate(doc.created_at)}` : ''}
                         {sizeLabel ? ` • ${sizeLabel}` : ''}
                       </p>
                     </div>
@@ -16797,7 +16803,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                   <div className="min-w-0">
                                     <p className="break-words text-sm font-semibold text-slate-950">{reminder.title}</p>
                                     <p className="mt-1 text-xs text-slate-500">
-                                      Due {reminder.due_on ? new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'not set'}
+                                      Due {formatDateOnly(reminder.due_on, 'not set')}
                                     </p>
                                   </div>
                                   <div className="flex shrink-0 flex-wrap gap-1.5">
@@ -17812,7 +17818,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
                         <p className="text-sm font-semibold text-slate-800">{entry.title}</p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {new Date(entry.performed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatShortDate(entry.performed_at)}
                           {entry.contractor_name ? ` · ${entry.contractor_name}` : ''}
                         </p>
                       </div>
@@ -17841,7 +17847,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
                           </div>
                           <p className="mt-1 text-xs text-slate-500">
-                            Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            Due {formatDateOnly(reminder.due_on)}
                           </p>
                           {roomChip && <div className="mt-2 flex flex-wrap gap-2">{roomChip}</div>}
                         </div>
@@ -19458,7 +19464,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                               <MapPin size={12} className="shrink-0" />
                                               {[post.contractor_city, post.contractor_state].filter(Boolean).join(', ') || 'Location not listed'}
                                               <span className="text-slate-300">·</span>
-                                              <span>Posted {new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                              <span>Posted {formatShortDate(post.created_at)}</span>
                                             </p>
                                           </div>
                                           {post.avg_rating !== null && post.review_count > 0 && (
@@ -20573,7 +20579,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                 {renderReminderRoomChip(reminder)}
                               </div>
                               <p className="mt-1 text-xs text-slate-500">
-                                Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                Due {formatDateOnly(reminder.due_on)}
                                 {linkedEntry ? ` · ${linkedEntry.title}` : ''}
                               </p>
                               {reminder.notes && <p className="mt-1 text-xs leading-5 text-slate-500">{reminder.notes}</p>}
@@ -20647,7 +20653,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           ))}
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          {new Date(entry.performed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          {formatLongDate(entry.performed_at)}
                           {entry.contractor_name ? ` · ${entry.contractor_name}` : ''}
                           {entry.cost_cents ? ` · $${(entry.cost_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : ''}
                         </p>
@@ -20682,7 +20688,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                       {renderReminderRoomChip(reminder)}
                                     </div>
                                     <p className="mt-0.5 text-xs text-slate-500">
-                                      Due {new Date(`${reminder.due_on}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                      Due {formatDateOnly(reminder.due_on)}
                                       {reminder.notes ? ` · ${reminder.notes}` : ''}
                                     </p>
                                   </div>
@@ -21006,7 +21012,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           {renderDocumentRoomChip(doc)}
                         </div>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          {new Date(doc.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {formatShortDate(doc.created_at)}
                           {sizeLabel ? ` · ${sizeLabel}` : ''}
                           {doc.notes ? ` · ${doc.notes}` : ''}
                         </p>
@@ -23464,7 +23470,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
     setEstimateDraft(createBlankEstimateDraft({
-      title: `Estimate — ${subjectName || 'Customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      title: `Estimate — ${subjectName || 'Customer'} — ${formatShortMonthDay()}`,
       service_request_id: options.serviceRequestId ?? '',
       inspection_id: options.inspectionId ?? '',
       home_id: options.homeId ?? defaultConnectedHomeId,
@@ -28494,11 +28500,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     });
   };
   const resetDashboardScheduleWeek = () => setContractorDashboardWeekStart(contractorDashboardCurrentWeekStart().toISOString());
-  const scheduleTimeLabel = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const scheduleTimeLabel = (date: Date) => formatTime(date);
   const scheduleItemInSnapshot = (date: Date) => date.getTime() >= scheduleSnapshotStart.getTime() && date.getTime() < scheduleSnapshotEnd.getTime();
   const todayScheduleKey = scheduleDayKey(new Date());
   const isCurrentDashboardWeek = scheduleDayKey(scheduleSnapshotStart) === scheduleDayKey(dashboardCurrentWeekStart);
-  const scheduleWeekLabel = `${scheduleSnapshotStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(scheduleSnapshotEnd.getTime() - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const scheduleWeekLabel = `${formatShortMonthDay(scheduleSnapshotStart)} - ${formatShortMonthDay(new Date(scheduleSnapshotEnd.getTime() - 1))}`;
   const scheduleSnapshotDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(scheduleSnapshotStart);
     date.setDate(scheduleSnapshotStart.getDate() + index);
@@ -28506,8 +28512,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       date,
       key: scheduleDayKey(date),
       isToday: scheduleDayKey(date) === todayScheduleKey,
-      label: date.toLocaleDateString('en-US', { weekday: 'long' }),
-      dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      label: formatWeekday(date),
+      dateLabel: formatShortMonthDay(date),
     };
   });
   const scheduleItemToneClass = (tone: ContractorScheduleSnapshotItem['tone']) => ({
@@ -28894,13 +28900,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const jobMode: JobWorkflowMode = templateSource === 'blank' && kind === 'work_order' ? 'simple' : 'checklist';
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
     const homeownerName = connection.display_name || connection.home?.nickname || 'Homeowner';
-    return `${starter?.name || workflowLabel} — ${homeownerName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+    return `${starter?.name || workflowLabel} — ${homeownerName} — ${formatMonthYear()}`;
   };
   const buildLocalFieldWorkName = (contact: ContractorLocalContact, starterId: string, kind: FieldWorkflowKind, templateSource: FieldWorkTemplateSource = 'blank') => {
     const starter = templateSource === 'starter' ? SERVSYNC_FIELD_WORK_TEMPLATES.find(template => template.id === starterId) : null;
     const jobMode: JobWorkflowMode = templateSource === 'blank' && kind === 'work_order' ? 'simple' : 'checklist';
     const workflowLabel = workflowDisplayLabelForDraft(kind, jobMode, templateSource);
-    return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+    return `${starter?.name || workflowLabel} — ${contact.display_name || 'New customer'} — ${formatMonthYear()}`;
   };
   type BeginFieldWorkOptions = { templateId?: string; starterTemplateId?: string; templateSource?: FieldWorkTemplateSource; workflowKind?: FieldWorkflowKind; name?: string; scope?: string; serviceRequestId?: string; homeId?: string | null; localHomeId?: string | null; manualJobTemplateStartNotice?: string };
   const resolveFieldWorkTemplateSelection = (options?: BeginFieldWorkOptions) => {
@@ -31969,7 +31975,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         {formatMoney(charge.amount_cents)}{charge.charge_type === 'hourly' ? '/hr' : ''} · default {Number(charge.default_quantity)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')} · sort {charge.sort_order}
                       </p>
                       <p className="mt-1 text-xs text-[#223D67]/55">
-                        Updated {new Date(charge.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        Updated {formatShortDate(charge.updated_at)}
                       </p>
                     </div>
                     {canManageEstimateSettings && (
@@ -35664,7 +35670,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             ...d,
                                             workflow_kind: nextKind,
                                             starter_template_id: d.template_source === 'starter' ? nextStarter?.id ?? d.starter_template_id : d.starter_template_id,
-                                            name: `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
+                                            name: `${d.template_source === 'starter' ? nextStarter?.name || FIELD_WORK_KIND_LABEL[nextKind] : FIELD_WORK_KIND_LABEL[nextKind]} — ${subjectName} — ${formatMonthYear()}`,
                                           }));
                                         }}>
                                           {Object.entries(FIELD_WORK_KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -38619,7 +38625,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     </p>
                                   )}
                                   <p className="mt-2 text-xs text-slate-400">
-                                    Updated {new Date(item.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    Updated {formatShortDate(item.updated_at)}
                                   </p>
                                 </div>
                                 {canManageEstimateSettings && (
@@ -39593,7 +39599,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-semibold">{issueCount} Issues</span>}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {new Date(insp.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatShortDate(insp.created_at)}
                             </p>
                             {!checklistStyle && insp.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>}
                           </div>
@@ -39695,7 +39701,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           : null;
                         const workflowLabel = workflowDisplayLabelForDraft(inspectionNewDraft.workflow_kind, inspectionNewDraft.job_mode, inspectionNewDraft.template_source);
                         const subjectName = conn?.display_name || local?.display_name || '';
-                        const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '';
+                        const autoName = subjectName ? `${selectedTemplate?.name || workflowLabel} — ${subjectName} — ${formatMonthYear()}` : '';
                         setInspectionNewDraft(d => ({
                           ...d,
                           subject_type: subjectType,
@@ -41584,7 +41590,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="px-6 py-4">
                           <h2 className="font-bold text-slate-800 text-xl">{homeownerLabel}</h2>
                           {homeAddress && <p className="text-slate-500 text-sm">{homeAddress}</p>}
-                          <p className="text-slate-400 text-xs mt-1">Prepared: {new Date(activeInspection.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                          <p className="text-slate-400 text-xs mt-1">Prepared: {formatLongDate(activeInspection.created_at)}</p>
                           <div className="grid grid-cols-3 gap-3 mt-4">
                             <div className="bg-slate-50 rounded-xl px-4 py-3">
                               <p className="text-xs text-slate-400 font-medium">Completed by</p>
@@ -45269,10 +45275,7 @@ function ServiceRequestAppointmentCard({
             {proposedByLabel ?? 'Appointment'}
           </p>
           <p className="mt-1 text-base font-bold text-slate-950">
-            {new Date(appointment.proposed_at).toLocaleString('en-US', {
-              weekday: 'short', month: 'short', day: 'numeric',
-              year: 'numeric', hour: 'numeric', minute: '2-digit',
-            })}
+            {formatShortWeekdayDateTime(appointment.proposed_at)}
           </p>
           {appointment.notes && <p className="mt-1 text-sm text-slate-600">{appointment.notes}</p>}
           {nextActionLabel && <p className="mt-2 text-sm font-semibold text-slate-700">{nextActionLabel}</p>}
@@ -45298,7 +45301,7 @@ function formatAppointmentWindowRange(window: ServiceRequestAppointmentWindow) {
 
   const sameDay = startsAt.toDateString() === endsAt.toDateString();
   const endText = sameDay
-    ? endsAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    ? formatTime(endsAt)
     : formatDateTime(window.ends_at);
   return `${startText} - ${endText}`;
 }
@@ -45493,13 +45496,7 @@ function HomeownerCalendarEventDetail({
               <p className="mt-1 text-sm font-semibold text-slate-900">
                 {Number.isNaN(appointmentDate.getTime())
                   ? 'Appointment time unavailable'
-                  : appointmentDate.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
+                  : formatDateTime(appointment.proposed_at)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -47363,7 +47360,7 @@ function DiscoverFeed({
                   {[selectedPost.contractor_city, selectedPost.contractor_state].filter(Boolean).join(', ') || 'Location not listed'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  Posted {new Date(selectedPost.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  Posted {formatLongDate(selectedPost.created_at)}
                 </span>
               </div>
 
@@ -48047,16 +48044,10 @@ function CalendarEventComposer({
   const eventTimeOptions = calendarEventTimeOptions(eventTimeValue);
   const recurrenceSummary = draft.recurrence_frequency === 'none'
     ? 'Does not repeat'
-    : `${calendarEventRecurrenceLabel(draft.recurrence_frequency)}${recurrenceEndCondition === 'date' && draft.recurrence_ends_at ? ` until ${new Date(`${draft.recurrence_ends_at}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ' with no end date'}`;
+    : `${calendarEventRecurrenceLabel(draft.recurrence_frequency)}${recurrenceEndCondition === 'date' && draft.recurrence_ends_at ? ` until ${formatShortDate(`${draft.recurrence_ends_at}T12:00:00`)}` : ' with no end date'}`;
   const occurrenceDate = occurrenceStartsAt ? new Date(occurrenceStartsAt) : null;
   const selectedOccurrenceLabel = occurrenceDate && !Number.isNaN(occurrenceDate.getTime())
-    ? occurrenceDate.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
+    ? formatDateTime(occurrenceStartsAt)
     : '';
   const canCreateJobFromEvent = Boolean(isEditing && event && onCreateJob);
   const eventHasCustomer = Boolean(event?.local_contact_id || event?.homeowner_user_id);
@@ -48412,13 +48403,7 @@ function VisitCalendarEventDetail({
               <p className="mt-1 text-sm font-semibold text-slate-900">
                 {Number.isNaN(scheduledAt.getTime())
                   ? 'Scheduled time unavailable'
-                  : scheduledAt.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
+                  : formatDateTime(event.scheduled_at)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -48758,7 +48743,7 @@ function CalendarView({
                 <p className="font-semibold text-slate-950">{calendarEvent.title}</p>
               </div>
               <p className="mt-1 text-xs text-slate-600">
-                {calendarEventTypeLabel(calendarEvent.event_type)} · {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {calendarEventTypeLabel(calendarEvent.event_type)} · {formatShortMonthDayAtTime(date, '', [])}
                 {calendarEvent.duration_minutes ? ` · ${calendarEvent.duration_minutes} min` : ''}
               </p>
               {!compact && calendarEvent.notes && <p className="mt-1 text-xs text-slate-600">{calendarEvent.notes}</p>}
@@ -48793,7 +48778,7 @@ function CalendarView({
                 <p className="font-semibold text-slate-950">{title}</p>
               </div>
               <p className="mt-1 text-xs text-slate-600">
-                {subject} · {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {subject} · {formatShortMonthDayAtTime(date, '', [])}
               </p>
               {!compact && visitEvent.notes && <p className="mt-1 text-xs text-slate-600">{visitEvent.notes}</p>}
               <p className="mt-1 text-xs font-semibold text-slate-700">{visitResponseLabel(visitEvent)}</p>
@@ -48828,7 +48813,7 @@ function CalendarView({
               )}
             </div>
             <p className="mt-1 text-xs text-slate-600">
-              {otherParty} · {request.category} · {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              {otherParty} · {request.category} · {formatShortMonthDayAtTime(date, '', [])}
             </p>
             {!compact && appointment.notes && <p className="mt-1 text-xs text-slate-600">{appointment.notes}</p>}
             <p className="mt-1 text-xs font-semibold text-slate-700">{appointmentNextActionText(appointment, perspective)}</p>
@@ -48901,7 +48886,7 @@ function CalendarView({
                   </div>
                   <div className="space-y-1">
                     {dayAppts.slice(0, 3).map(entry => {
-                      const time = new Date(entryTime(entry)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                      const time = formatTime(entryTime(entry), '', []);
                       const title = entry.kind === 'visit'
                         ? entry.visitEvent.inspection?.name || entry.request?.title || 'Service visit'
                         : entry.kind === 'standalone'
@@ -48955,7 +48940,7 @@ function CalendarView({
             <p className="text-sm font-bold text-slate-950">Selected day</p>
             <p className="mt-0.5 text-xs text-slate-500">
               {selectedDate
-                ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                ? formatLongWeekdayMonthDay(`${selectedDate}T12:00:00`)
                 : 'Choose a day on the calendar.'}
             </p>
             <div className="mt-3 space-y-2">
