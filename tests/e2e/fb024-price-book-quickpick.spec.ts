@@ -91,6 +91,11 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
       'const renderEstimateLineItemSources =',
       'const startEstimateAssistantSpeech =',
     );
+    const groupedRendererSource = sourceBetween(
+      source,
+      'const renderEstimateDraftLineGroups = () => {',
+      'const renderEstimateLineItemSources =',
+    );
     const estimateComposerSource = sourceBetween(
       source,
       '{estimateComposerOpen && selectedJobsCustomerName && (',
@@ -103,8 +108,10 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
     );
 
     expect(lineSourcePanel).toContain("estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()");
-    expect(estimateComposerSource).toContain('renderEstimateLineItemSources');
+    expect(estimateComposerSource).toContain('renderEstimateDraftLineGroups');
+    expect(groupedRendererSource).toContain('renderEstimateLineItemSources');
     expect(invoiceComposerSource).not.toContain('renderEstimateLineItemSources');
+    expect(invoiceComposerSource).not.toContain('renderEstimateDraftLineGroups');
     expect(invoiceComposerSource).not.toContain('renderPriceBookQuickPick');
     expect(invoiceComposerSource).not.toContain('estimateLineSourcePanel');
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');

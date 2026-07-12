@@ -715,6 +715,16 @@ type EstimateLineDraft = {
   builderGenerated?: boolean;
   editor_source_note?: string;
 };
+type EstimateLineGroupKey = 'labor' | 'materials_other' | 'fees';
+type GroupedEstimateDraftLine = {
+  line: EstimateLineDraft;
+  index: number;
+};
+type EstimateLineVisualGroup = {
+  key: EstimateLineGroupKey;
+  label: string;
+  lines: GroupedEstimateDraftLine[];
+};
 type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry' | 'Other';
 type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
 type EstimateDraftBuilderLaborMode = 'job_total' | 'line_specific';
@@ -3523,6 +3533,11 @@ const ESTIMATE_LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
   fee: 'Fee',
   other: 'Other',
 };
+const ESTIMATE_LINE_VISUAL_GROUPS: Array<{ key: EstimateLineGroupKey; label: string }> = [
+  { key: 'labor', label: 'Labor' },
+  { key: 'materials_other', label: 'Materials / Other' },
+  { key: 'fees', label: 'Fees' },
+];
 function estimateLineTypeLabel(lineType: LegacyEstimateLineType | string | null | undefined) {
   return ESTIMATE_LINE_TYPE_LABELS[normalizeEstimateLineType(lineType)];
 }
@@ -6051,6 +6066,35 @@ function draftLineBucketTotal(lines: EstimateLineDraft[], bucket: 'material' | '
 function draftOtherLineTotal(lines: EstimateLineDraft[]) {
   const lineSubtotal = estimateTotalCents(lines);
   return Math.max(0, lineSubtotal - draftLineBucketTotal(lines, 'material') - draftLineBucketTotal(lines, 'labor') - draftLineBucketTotal(lines, 'fee'));
+}
+
+function estimateLineVisualGroup(line: Pick<EstimateLineDraft, 'line_type'>): EstimateLineGroupKey {
+  const type = normalizeEstimateLineType(line.line_type);
+  if (type === 'labor') return 'labor';
+  if (type === 'fee') return 'fees';
+  return 'materials_other';
+}
+
+function groupEstimateDraftLines(lines: EstimateLineDraft[]): EstimateLineVisualGroup[] {
+  const groupedLines: Record<EstimateLineGroupKey, GroupedEstimateDraftLine[]> = {
+    labor: [],
+    materials_other: [],
+    fees: [],
+  };
+  lines.forEach((line, index) => {
+    groupedLines[estimateLineVisualGroup(line)].push({ line, index });
+  });
+  return ESTIMATE_LINE_VISUAL_GROUPS
+    .map(group => ({ ...group, lines: groupedLines[group.key] }))
+    .filter(group => group.lines.length > 0);
+}
+
+function estimateLineGroupSubtotalCents(lines: EstimateLineDraft[]) {
+  return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
+}
+
+function estimateLineGroupUnpricedCount(lines: EstimateLineDraft[]) {
+  return lines.filter(draftLineIsUnpriced).length;
 }
 
 function draftSchemaLaborHours(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'job_labor_hours' | 'line_items'>) {
@@ -21449,6 +21493,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
   const [estimateLineFocusId, setEstimateLineFocusId] = useState<string | null>(null);
   const [estimateDraftSessionId, setEstimateDraftSessionId] = useState(() => crypto.randomUUID());
+  const [estimateLineGroupCollapseState, setEstimateLineGroupCollapseState] = useState<{
+    identity: string;
+    groups: Partial<Record<EstimateLineGroupKey, true>>;
+  }>({ identity: '', groups: {} });
   const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
@@ -21673,6 +21721,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const estimateComposerScrollStorageKey = estimateComposerOpen
     ? `servsync.estimateComposer.scroll:${profile.id}:${editingEstimateId ? `estimate:${editingEstimateId}` : `draft:${estimateDraftSessionId}`}`
     : '';
+  const estimateComposerCollapseIdentity = estimateComposerOpen
+    ? `${profile.id}:${editingEstimateId ? `estimate:${editingEstimateId}` : `draft:${estimateDraftSessionId}`}`
+    : '';
+  const collapsedEstimateLineGroups = estimateLineGroupCollapseState.identity === estimateComposerCollapseIdentity
+    ? estimateLineGroupCollapseState.groups
+    : {};
   const clearEstimateComposerScrollPosition = () => {
     if (estimateComposerScrollStorageKey) window.sessionStorage.removeItem(estimateComposerScrollStorageKey);
   };
@@ -21714,6 +21768,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     window.addEventListener('scroll', saveScrollPosition, { passive: true });
     return () => window.removeEventListener('scroll', saveScrollPosition);
   }, [estimateComposerScrollStorageKey]);
+
+  useEffect(() => {
+    setEstimateLineGroupCollapseState({ identity: estimateComposerCollapseIdentity, groups: {} });
+  }, [estimateComposerCollapseIdentity]);
 
   useEffect(() => {
     setNotice('');
@@ -23588,11 +23646,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
     const draftUnpricedCount = usableLines.filter(draftLineIsUnpriced).length;
     if (draftUnpricedCount > 0) {
+      expandEstimateLineGroupsForLines(usableLines.filter(draftLineIsUnpriced));
       const confirmed = window.confirm(`${priceRequiredWarningText(draftUnpricedCount)}\n\nChoose OK to continue anyway, or Cancel to go back and edit pricing.`);
       if (!confirmed) return;
     }
     const draftForTotals = { ...estimateDraft, line_items: usableLines };
     if (draftHasLaborHoursWithoutRate(draftForTotals)) {
+      expandEstimateLineGroupsForLines(
+        estimateDraft.labor_mode === 'line_specific'
+          ? usableLines.filter(line => draftLineCanTrackLaborHours(line) && (parseLaborHoursValue(line.labor_hours) ?? 0) > 0)
+          : usableLines,
+      );
       const confirmed = window.confirm('This estimate has labor hours but no labor rate. Labor hours will be saved, but labor price will be excluded from totals until a labor rate is added.\n\nChoose OK to continue anyway, or Cancel to add a labor rate.');
       if (!confirmed) return;
     }
@@ -25302,8 +25366,48 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     }
   };
 
+  const expandEstimateLineGroup = (groupKey: EstimateLineGroupKey) => {
+    setEstimateLineGroupCollapseState(prev => {
+      const groups = prev.identity === estimateComposerCollapseIdentity ? prev.groups : {};
+      if (!groups[groupKey]) return { identity: estimateComposerCollapseIdentity, groups };
+      const next = { ...groups };
+      delete next[groupKey];
+      return { identity: estimateComposerCollapseIdentity, groups: next };
+    });
+  };
+
+  const expandEstimateLineGroupsForLines = (lines: EstimateLineDraft[]) => {
+    const groupKeys = new Set(lines.map(estimateLineVisualGroup));
+    if (groupKeys.size === 0) return;
+    setEstimateLineGroupCollapseState(prev => {
+      const groups = prev.identity === estimateComposerCollapseIdentity ? prev.groups : {};
+      const next = { ...groups };
+      let changed = false;
+      groupKeys.forEach(groupKey => {
+        if (next[groupKey]) {
+          delete next[groupKey];
+          changed = true;
+        }
+      });
+      return changed ? { identity: estimateComposerCollapseIdentity, groups: next } : { identity: estimateComposerCollapseIdentity, groups };
+    });
+  };
+
+  const toggleEstimateLineGroup = (groupKey: EstimateLineGroupKey) => {
+    setEstimateLineGroupCollapseState(prev => {
+      const groups = prev.identity === estimateComposerCollapseIdentity ? prev.groups : {};
+      if (groups[groupKey]) {
+        const next = { ...groups };
+        delete next[groupKey];
+        return { identity: estimateComposerCollapseIdentity, groups: next };
+      }
+      return { identity: estimateComposerCollapseIdentity, groups: { ...groups, [groupKey]: true } };
+    });
+  };
+
   const addSavedChargeToEstimateDraft = (charge: ContractorSavedEstimateCharge) => {
     const nextLine = estimateLineDraftFromSavedCharge(charge);
+    expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
     setEstimateDraft(draft => {
       const usableLines = draft.line_items.filter(draftLineHasContent);
       return {
@@ -25317,6 +25421,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const addPriceBookItemToEstimateDraft = (item: ContractorPriceBookItem) => {
     const nextLine = estimateLineDraftFromPriceBookItem(item);
+    expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
     setEstimateDraft(draft => {
       const usableLines = draft.line_items.filter(draftLineHasContent);
       return {
@@ -25330,6 +25435,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const addBlankEstimateLineToDraft = () => {
     const nextLine = createEstimateLineDraft();
+    expandEstimateLineGroup(estimateLineVisualGroup(nextLine));
     setEstimateLineSourcePanel(null);
     setEstimateDraft(draft => ({
       ...draft,
@@ -25340,6 +25446,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
   const duplicateEstimateLineInDraft = (line: EstimateLineDraft) => {
     const duplicateLine = duplicateEstimateLineDraft(line);
+    expandEstimateLineGroup(estimateLineVisualGroup(duplicateLine));
     setEstimateDraft(draft => {
       const sourceIndex = draft.line_items.findIndex(item => item.id === line.id);
       if (sourceIndex < 0) return draft;
@@ -25353,6 +25460,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
     });
     setEstimateLineFocusId(duplicateLine.id);
+  };
+
+  const updateEstimateLineInDraft = (line: EstimateLineDraft, updates: Partial<EstimateLineDraft>) => {
+    if (updates.line_type !== undefined) {
+      expandEstimateLineGroup(estimateLineVisualGroup({ ...line, ...updates }));
+    }
+    setEstimateDraft(draft => ({
+      ...draft,
+      line_items: draft.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
+    }));
   };
 
   const removeEstimateLineFromDraft = (lineId: string) => {
@@ -26745,6 +26862,69 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             {estimateAssistantNotice}
           </p>
         )}
+      </div>
+    );
+  };
+
+  const renderEstimateDraftLineGroups = () => {
+    const groups = groupEstimateDraftLines(estimateDraft.line_items);
+    if (groups.length === 0) return renderEstimateLineItemSources({ empty: true });
+    const safeIdentity = (estimateComposerCollapseIdentity || 'draft')
+      .replace(/[^A-Za-z0-9_-]/g, '-')
+      .slice(0, 80);
+    return (
+      <div className="space-y-3" data-testid="estimate-line-visual-groups">
+        {groups.map(group => {
+          const collapsed = Boolean(collapsedEstimateLineGroups[group.key]);
+          const groupLines = group.lines.map(item => item.line);
+          const unpricedCount = estimateLineGroupUnpricedCount(groupLines);
+          const regionId = `estimate-line-group-${safeIdentity}-${group.key}`;
+          const itemCountLabel = `${group.lines.length} item${group.lines.length === 1 ? '' : 's'}`;
+          const subtotalLabel = formatMoney(estimateLineGroupSubtotalCents(groupLines));
+          return (
+            <section key={group.key} className="rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid={`estimate-line-group-${group.key}`}>
+              <button
+                type="button"
+                className="flex min-h-11 w-full flex-col gap-2 rounded-2xl px-3 py-3 text-left transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:flex-row sm:items-center sm:justify-between"
+                aria-expanded={!collapsed}
+                aria-controls={regionId}
+                aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.label} section`}
+                onClick={() => toggleEstimateLineGroup(group.key)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {collapsed ? <ChevronRight size={16} className="shrink-0 text-slate-500" /> : <ChevronDown size={16} className="shrink-0 text-slate-500" />}
+                  <span className="min-w-0 text-sm font-bold text-slate-950">{group.label}</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-500">{itemCountLabel}</span>
+                </span>
+                <span className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                  <span>Line subtotal {subtotalLabel}</span>
+                  {unpricedCount > 0 && (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
+                      {unpricedCount} item{unpricedCount === 1 ? '' : 's'} require{unpricedCount === 1 ? 's' : ''} pricing
+                    </span>
+                  )}
+                </span>
+              </button>
+              {!collapsed && (
+                <div id={regionId} className="space-y-3 border-t border-slate-100 p-3">
+                  {group.lines.map(({ line, index }) => (
+                    renderStructuredLineDraftEditor({
+                      line,
+                      index,
+                      itemLabel: 'estimate',
+                      laborMode: estimateDraft.labor_mode,
+                      compactAdvanced: true,
+                      onChange: updates => updateEstimateLineInDraft(line, updates),
+                      onRemove: () => removeEstimateLineFromDraft(line.id),
+                      onDuplicate: () => duplicateEstimateLineInDraft(line),
+                    })
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+        {renderEstimateLineItemSources()}
       </div>
     );
   };
@@ -35798,28 +35978,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div className="flex flex-wrap items-center justify-between gap-3">
                                         <p className="text-sm font-bold text-slate-950">Line items</p>
                                       </div>
-                                      {estimateDraft.line_items.length === 0 ? (
-                                        renderEstimateLineItemSources({ empty: true })
-                                      ) : (
-                                        <>
-                                          {estimateDraft.line_items.map((line, index) => (
-                                            renderStructuredLineDraftEditor({
-                                              line,
-                                              index,
-                                              itemLabel: 'estimate',
-                                              laborMode: estimateDraft.labor_mode,
-                                              compactAdvanced: true,
-                                              onChange: updates => setEstimateDraft(d => ({
-                                                ...d,
-                                                line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                                              })),
-                                              onRemove: () => removeEstimateLineFromDraft(line.id),
-                                              onDuplicate: () => duplicateEstimateLineInDraft(line),
-                                            })
-                                          ))}
-                                          {renderEstimateLineItemSources()}
-                                        </>
-                                      )}
+                                      {renderEstimateDraftLineGroups()}
                                     </div>
 
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -36890,28 +37049,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-sm font-bold text-slate-950">Line items</p>
                           </div>
-                          {estimateDraft.line_items.length === 0 ? (
-                            renderEstimateLineItemSources({ empty: true })
-                          ) : (
-                            <>
-                              {estimateDraft.line_items.map((line, index) => (
-                                renderStructuredLineDraftEditor({
-                                  line,
-                                  index,
-                                  itemLabel: 'estimate',
-                                  laborMode: estimateDraft.labor_mode,
-                                  compactAdvanced: true,
-                                  onChange: updates => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
-                                  })),
-                                  onRemove: () => removeEstimateLineFromDraft(line.id),
-                                  onDuplicate: () => duplicateEstimateLineInDraft(line),
-                                })
-                              ))}
-                              {renderEstimateLineItemSources()}
-                            </>
-                          )}
+                          {renderEstimateDraftLineGroups()}
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">

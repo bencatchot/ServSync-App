@@ -81,15 +81,22 @@ test.describe('Estimate Editing Basics polish', () => {
       '{estimateComposerOpen && selectedJobsCustomerName && (',
       '{invoiceComposerOpen && selectedJobsCustomerName && (',
     );
+    const groupedRendererSource = sourceBetween(
+      source,
+      'const renderEstimateDraftLineGroups = () => {',
+      'const renderEstimateLineItemSources =',
+    );
     const invoiceComposerSource = sourceBetween(
       source,
       '{invoiceComposerOpen && selectedJobsCustomerName && (',
       "{contractorJobsView === 'templates' && (",
     );
 
-    expect(estimateComposerSource).toContain('onDuplicate: () => duplicateEstimateLineInDraft(line)');
+    expect(estimateComposerSource).toContain('{renderEstimateDraftLineGroups()}');
+    expect(groupedRendererSource).toContain('onDuplicate: () => duplicateEstimateLineInDraft(line)');
     expect(invoiceComposerSource).toContain("itemLabel: 'invoice'");
     expect(invoiceComposerSource).not.toContain('onDuplicate');
+    expect(invoiceComposerSource).not.toContain('renderEstimateDraftLineGroups');
     expect(invoiceComposerSource).not.toContain('renderEstimateDraftStateNotice');
     expect(invoiceComposerSource).not.toContain('estimateComposer.scroll');
   });

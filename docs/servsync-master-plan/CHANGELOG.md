@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-12
 
+- Branch: `codex/estimate-collapsible-sections-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/estimate-collapsible-sections.spec.ts`
+  - `tests/e2e/estimate-editing-basics.spec.ts`
+  - `tests/e2e/fb024-price-book-quickpick.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 1 Slice 1B-1 Collapsible Estimate Sections. Contractor estimate drafts now visually group line items by normalized type into Labor, Materials / Other, and Fees sections with local expand/collapse controls, compact counts/subtotals, and textual unpriced warnings.
+- Reason for change: Longer contractor estimates need easier scanning and navigation without adding persisted section records, changing underlying line order, mutating saved `sort_order`, changing calculations, changing estimate lifecycle/send behavior, altering homeowner visibility, or affecting invoice composer behavior.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-collapsible-sections.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "contractor estimate creation UI structure"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb024-price-book-quickpick.spec.ts tests/e2e/estimate-template-save-modal.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/multiple-invoices-foundation.spec.ts --project=chromium`
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated.
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 1B-1 is frontend/test/docs only. No SQL, RPC, RLS, Supabase/Vercel settings, production deployment, persisted estimate sections, line-order mutation, calculation changes, invoice composer changes, recent materials, historical estimate retrieval, recent rooms, or room association are included.
+  - Core coverage is currently source-regression focused because this repository's authenticated estimate-builder fixtures are limited; final review should decide whether an additional rendered authenticated fixture is warranted before broad release.
+
 - Branch: `codex/estimate-editing-basics-polish-v1`
 - Files changed:
   - `src/App.tsx`
