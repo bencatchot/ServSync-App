@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Compass,
+  Copy,
   CreditCard,
   Download,
   EyeOff,
@@ -1346,6 +1347,22 @@ function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): Es
   if (!draft.description.trim() && draft.line_title.trim()) draft.description = draft.line_title;
   draft.supply_status = normalizeEstimateLineSupplyStatus(draft.supply_status);
   return draft;
+}
+
+function duplicateEstimateLineDraft(line: EstimateLineDraft): EstimateLineDraft {
+  return createEstimateLineDraft({
+    line_type: normalizeEstimateLineType(line.line_type),
+    description: line.description,
+    line_title: line.line_title,
+    customer_description: line.customer_description,
+    model_spec: line.model_spec,
+    supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
+    quantity: line.quantity,
+    unit: line.unit,
+    unit_price: line.unit_price,
+    labor_hours: line.labor_hours,
+    builderGenerated: false,
+  });
 }
 
 function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): EstimateDraft {
@@ -21431,6 +21448,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
   const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
   const [estimateLineFocusId, setEstimateLineFocusId] = useState<string | null>(null);
+  const [estimateDraftSessionId, setEstimateDraftSessionId] = useState(() => crypto.randomUUID());
   const [expandedEstimateLineDetails, setExpandedEstimateLineDetails] = useState<Record<string, boolean>>({});
   const [estimateAssistantListening, setEstimateAssistantListening] = useState(false);
   const [estimateAssistantNotice, setEstimateAssistantNotice] = useState('');
@@ -21490,6 +21508,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
   const [updatingServiceRequestId, setUpdatingServiceRequestId] = useState<string | null>(null);
   const [showQrForInvite, setShowQrForInvite] = useState<string | null>(null);
+  const estimateAddBlankLineButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Inspection system state
   const [inspectionTemplates, setInspectionTemplates] = useState<InspectionTemplate[]>([]);
@@ -21646,17 +21665,55 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  const shouldAutoFocusEstimateLine = () => (
+    typeof window !== 'undefined'
+    && window.matchMedia('(min-width: 768px) and (pointer: fine)').matches
+  );
+
+  const estimateComposerScrollStorageKey = estimateComposerOpen
+    ? `servsync.estimateComposer.scroll:${profile.id}:${editingEstimateId ? `estimate:${editingEstimateId}` : `draft:${estimateDraftSessionId}`}`
+    : '';
+  const clearEstimateComposerScrollPosition = () => {
+    if (estimateComposerScrollStorageKey) window.sessionStorage.removeItem(estimateComposerScrollStorageKey);
+  };
+
   useEffect(() => {
     if (!estimateLineFocusId) return;
     const frame = window.requestAnimationFrame(() => {
       const target = Array.from(document.querySelectorAll<HTMLInputElement>('[data-estimate-line-description-id]'))
         .find(element => element.dataset.estimateLineDescriptionId === estimateLineFocusId);
       target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      target?.focus();
+      if (shouldAutoFocusEstimateLine()) target?.focus();
       setEstimateLineFocusId(null);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [estimateDraft.line_items.length, estimateLineFocusId]);
+
+  useEffect(() => {
+    if (!estimateComposerScrollStorageKey || error) return;
+    const frame = window.requestAnimationFrame(() => {
+      const storedPosition = Number(window.sessionStorage.getItem(estimateComposerScrollStorageKey));
+      if (!Number.isFinite(storedPosition) || storedPosition <= 0) return;
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ top: Math.min(Math.max(0, storedPosition), maxScroll), behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    estimateComposerScrollStorageKey,
+    error,
+    estimateDraft.line_items.length,
+    estimateStartMode,
+    estimateGuidedBuilderActive,
+  ]);
+
+  useEffect(() => {
+    if (!estimateComposerScrollStorageKey) return;
+    const saveScrollPosition = () => {
+      window.sessionStorage.setItem(estimateComposerScrollStorageKey, String(Math.round(window.scrollY)));
+    };
+    window.addEventListener('scroll', saveScrollPosition, { passive: true });
+    return () => window.removeEventListener('scroll', saveScrollPosition);
+  }, [estimateComposerScrollStorageKey]);
 
   useEffect(() => {
     setNotice('');
@@ -23348,6 +23405,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       return;
     }
     const defaultBuilderTrade = defaultEstimateDraftBuilderTrade();
+    setEstimateDraftSessionId(crypto.randomUUID());
     setContractorFinancialRecordKind('estimates');
     setFocusedEstimateRecordId(null);
     setEditingEstimateId(null);
@@ -23650,10 +23708,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       const savedEstimate = savedEstimateData as Estimate;
       setEstimates(prev => [savedEstimate, ...prev.filter(item => item.id !== savedEstimate.id)]);
       setNotice(currentEditingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved. Opened the saved estimate actions.`);
+      clearEstimateComposerScrollPosition();
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
       setEstimateDraft(createBlankEstimateDraft());
       setEstimatePaymentScheduleDraft(createDefaultEstimatePaymentScheduleDraft());
+      setEstimateDraftSessionId(crypto.randomUUID());
       setEstimateAssistantText('');
       setEstimateDraftBuilderTrade('Other');
       setEstimateDraftBuilderJobType('repair');
@@ -25278,6 +25338,42 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateLineFocusId(nextLine.id);
   };
 
+  const duplicateEstimateLineInDraft = (line: EstimateLineDraft) => {
+    const duplicateLine = duplicateEstimateLineDraft(line);
+    setEstimateDraft(draft => {
+      const sourceIndex = draft.line_items.findIndex(item => item.id === line.id);
+      if (sourceIndex < 0) return draft;
+      return {
+        ...draft,
+        line_items: [
+          ...draft.line_items.slice(0, sourceIndex + 1),
+          duplicateLine,
+          ...draft.line_items.slice(sourceIndex + 1),
+        ],
+      };
+    });
+    setEstimateLineFocusId(duplicateLine.id);
+  };
+
+  const removeEstimateLineFromDraft = (lineId: string) => {
+    const sourceIndex = estimateDraft.line_items.findIndex(item => item.id === lineId);
+    const remainingLines = estimateDraft.line_items.filter(item => item.id !== lineId);
+    const nextFocusLine = sourceIndex >= 0 && remainingLines.length > 0
+      ? remainingLines[Math.min(sourceIndex, remainingLines.length - 1)]
+      : null;
+    setEstimateDraft(draft => ({
+      ...draft,
+      line_items: draft.line_items.filter(item => item.id !== lineId),
+    }));
+    if (nextFocusLine) {
+      setEstimateLineFocusId(nextFocusLine.id);
+      return;
+    }
+    if (shouldAutoFocusEstimateLine()) {
+      window.requestAnimationFrame(() => estimateAddBlankLineButtonRef.current?.focus());
+    }
+  };
+
   const renderStructuredLineDraftEditor = ({
     line,
     index,
@@ -25286,6 +25382,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     compactAdvanced = false,
     onChange,
     onRemove,
+    onDuplicate,
   }: {
     line: EstimateLineDraft;
     index: number;
@@ -25294,6 +25391,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     compactAdvanced?: boolean;
     onChange: (updates: Partial<EstimateLineDraft>) => void;
     onRemove: () => void;
+    onDuplicate?: () => void;
   }) => {
     const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
     const showSupplyStatus = Boolean(line.supply_status);
@@ -25376,6 +25474,22 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <Trash2 size={15} />
       </button>
     );
+    const duplicateButton = itemLabel === 'estimate' && onDuplicate ? (
+      <button
+        type="button"
+        onClick={onDuplicate}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+        aria-label={`Duplicate estimate line item ${index + 1}`}
+      >
+        <Copy size={15} />
+      </button>
+    ) : null;
+    const actionButtons = (
+      <div className="flex items-center gap-2">
+        {duplicateButton}
+        {removeButton}
+      </div>
+    );
     const lineTypeField = (
       <Field label="Type">
         <select
@@ -25438,7 +25552,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             {unitField}
             {unitPriceField}
             {totalBlock}
-            {removeButton}
+            {actionButtons}
           </div>
           <div className="mt-3 border-t border-slate-100 pt-3">
             <button
@@ -25482,7 +25596,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           {unitPriceField}
           {totalBlock}
           {laborHoursField}
-          {removeButton}
+          {actionButtons}
         </div>
         {hasSecondaryRow ? (
           <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
@@ -25633,6 +25747,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <span className={row.bold ? 'text-slate-950' : 'font-semibold text-slate-900'}>{formatMoney(row.amount)}</span>
         </div>
       ))}
+    </div>
+  );
+
+  const renderEstimateDraftStateNotice = () => (
+    <div className="mt-3 rounded-xl border border-blue-200 bg-white/80 px-3 py-2" data-testid="estimate-draft-state-notice">
+      <div className="flex flex-wrap items-start gap-2">
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-blue-800">
+          Draft
+        </span>
+        <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-blue-900">
+          Not sent to the homeowner yet. Save the draft, then send when ready.
+        </p>
+      </div>
     </div>
   );
 
@@ -26637,6 +26764,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       )}
       <div className="flex flex-wrap items-center gap-2">
         <button
+          ref={estimateAddBlankLineButtonRef}
           type="button"
           onClick={addBlankEstimateLineToDraft}
           className={buttonClass('secondary')}
@@ -35548,6 +35676,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                           </p>
                                         )}
                                         <p className="mt-2 text-sm text-blue-900">Use line items for labor, materials, demo, disposal, fees, or any completed work. Templates can build on this later.</p>
+                                        {!isInvoiceWorkspaceTab && renderEstimateDraftStateNotice()}
                                       </div>
                                       <div className="flex flex-wrap items-center gap-2">
                                         {!isInvoiceWorkspaceTab && estimateStartMode !== 'choose' && (
@@ -35684,10 +35813,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                 ...d,
                                                 line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
                                               })),
-                                              onRemove: () => setEstimateDraft(d => ({
-                                                ...d,
-                                                line_items: d.line_items.filter(item => item.id !== line.id),
-                                              })),
+                                              onRemove: () => removeEstimateLineFromDraft(line.id),
+                                              onDuplicate: () => duplicateEstimateLineInDraft(line),
                                             })
                                           ))}
                                           {renderEstimateLineItemSources()}
@@ -36653,6 +36780,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {selectedJobsCustomerAddress && (
                               <p className="mt-0.5 text-xs text-blue-800">{selectedJobsCustomerAddress}</p>
                             )}
+                            {renderEstimateDraftStateNotice()}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             {estimateStartMode !== 'choose' && (
@@ -36777,10 +36905,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     ...d,
                                     line_items: d.line_items.map(item => item.id === line.id ? { ...item, ...updates } : item),
                                   })),
-                                  onRemove: () => setEstimateDraft(d => ({
-                                    ...d,
-                                    line_items: d.line_items.filter(item => item.id !== line.id),
-                                  })),
+                                  onRemove: () => removeEstimateLineFromDraft(line.id),
+                                  onDuplicate: () => duplicateEstimateLineInDraft(line),
                                 })
                               ))}
                               {renderEstimateLineItemSources()}

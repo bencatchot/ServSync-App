@@ -86,9 +86,27 @@ test.describe('FB-024 Price Book estimate quick-pick', () => {
 
   test('Price Book quick-pick remains excluded from invoice composer paths', () => {
     const source = appSource();
+    const lineSourcePanel = sourceBetween(
+      source,
+      'const renderEstimateLineItemSources =',
+      'const startEstimateAssistantSpeech =',
+    );
+    const estimateComposerSource = sourceBetween(
+      source,
+      '{estimateComposerOpen && selectedJobsCustomerName && (',
+      '{invoiceComposerOpen && selectedJobsCustomerName && (',
+    );
+    const invoiceComposerSource = sourceBetween(
+      source,
+      '{invoiceComposerOpen && selectedJobsCustomerName && (',
+      "{contractorJobsView === 'templates' && (",
+    );
 
-    expect(source).toContain('{!isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');
-    expect(source).toContain("{estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) !== 'Invoice' && renderPriceBookQuickPick()}");
+    expect(lineSourcePanel).toContain("estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()");
+    expect(estimateComposerSource).toContain('renderEstimateLineItemSources');
+    expect(invoiceComposerSource).not.toContain('renderEstimateLineItemSources');
+    expect(invoiceComposerSource).not.toContain('renderPriceBookQuickPick');
+    expect(invoiceComposerSource).not.toContain('estimateLineSourcePanel');
     expect(source).not.toContain('{isInvoiceWorkspaceTab && renderPriceBookQuickPick()}');
     expect(source).not.toContain("estimateDocumentLabel({ title: estimateDraft.title, scope: estimateDraft.scope, notes: estimateDraft.notes }) === 'Invoice' && renderPriceBookQuickPick()");
   });
