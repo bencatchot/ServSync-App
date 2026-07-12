@@ -129,6 +129,7 @@ import {
   invoiceCanVoid,
   invoiceStatusLabel,
 } from './features/invoices/status';
+import { InvoicePaymentSummary } from './features/invoices/InvoicePaymentSummary';
 import {
   demoPresentationJobCheckpointLabel,
   demoPresentationWorkItemProgress,
@@ -14415,6 +14416,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               {invoice.due_at ? ` · Due ${formatDateTime(invoice.due_at)}` : ''}
             </p>
             {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+            <InvoicePaymentSummary invoice={invoice} className="mt-2" />
           </div>
           <p className="text-xl font-bold text-slate-950 sm:text-2xl md:text-right">{formatMoney(invoice.total_cents)}</p>
         </div>
@@ -14496,6 +14498,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </span>
               </div>
             )}
+            <InvoicePaymentSummary invoice={invoice} variant="detail" showStatus />
             {invoice.scope && <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{invoice.scope}</p>}
             {invoice.line_items && invoice.line_items.length > 0 && (
               <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -14528,7 +14531,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 <span className="text-slate-500">Tax <strong className="text-slate-950">{formatMoney(totals.taxCents)}</strong></span>
                 <span className="text-slate-500">Total <strong className="text-slate-950">{formatMoney(invoice.total_cents)}</strong></span>
                 <span className="text-slate-500">Discount <strong className="text-slate-950">{formatMoney(invoice.discount_cents)}</strong></span>
-                <span className="text-slate-500">Paid <strong className="text-slate-950">{formatMoney(invoice.amount_paid_cents)}</strong></span>
               </div>
             </div>
             {(invoice.notes || invoice.terms) && (
@@ -15228,6 +15230,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                   <div>
                     <p className="text-sm font-semibold text-slate-950">{isPaid ? 'Invoice paid' : 'Invoice available'}</p>
                     <p className="text-xs text-slate-500">{invoice.title || 'Invoice'} · {formatMoney(invoice.total_cents)}</p>
+                    <InvoicePaymentSummary invoice={invoice} className="mt-1" />
                   </div>
                   <button
                     type="button"
@@ -37680,6 +37683,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <p className="mt-2 font-semibold text-slate-950">{invoice.title || 'Invoice draft'}</p>
                                         <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
                                         {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
+                                        <InvoicePaymentSummary invoice={invoice} className="mt-2" />
                                         {invoice.scope && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{invoice.scope}</p>}
                                         {invoice.backlog_items && invoice.backlog_items.length > 0 && (
                                           <p className="mt-2 text-xs font-semibold text-amber-700">
@@ -37694,6 +37698,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                         <InvoiceBacklogSection invoice={invoice} compact />
                                       </div>
                                     )}
+                                    <InvoicePaymentSummary invoice={invoice} variant="detail" showStatus className="mt-3" />
                                     <div className={`mt-3 ${mobileActionRowClass()}`}>
                                       <button
                                         type="button"
@@ -40197,9 +40202,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                   )}
                   {linkedInvoiceForJob && (
-                    <p className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-                      Invoice linked: {invoiceStatusLabel(linkedInvoiceForJob.status)}.
-                    </p>
+                    <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                      <p>Invoice linked.</p>
+                      <InvoicePaymentSummary invoice={linkedInvoiceForJob} className="mt-1 text-emerald-800" />
+                    </div>
                   )}
                 </div>
               </div>
