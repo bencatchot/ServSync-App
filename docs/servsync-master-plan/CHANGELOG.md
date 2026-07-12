@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-12
 
+- Branch: `codex/date-presentation-helpers-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/utils/datePresentation.ts`
+  - `src/utils/format.ts`
+  - `tests/e2e/date-presentation-helpers.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2B Date Presentation Helpers. User-facing date and time labels now flow through shared date-presentation helpers, and `src/App.tsx` no longer owns duplicated inline `toLocaleDateString` / `toLocaleTimeString` display calls.
+- Reason for change: ServSync needed the same low-risk presentation extraction used by Slice 2A so date/time display conventions can be reused without changing routing, permissions, queries, lifecycle behavior, statuses, notification behavior, styling, SQL/RLS/RPCs, infrastructure, or rendered output.
+- Tests/checks run:
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/date-presentation-helpers.spec.ts --project=chromium`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/standalone-calendar-event.spec.ts tests/e2e/fb021-scheduling-foundation.spec.ts --project=chromium` attempted; source-level scheduling checks passed/skipped as configured, while the authenticated standalone-calendar event test remains blocked locally by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/home-document-room-ui.spec.ts --project=chromium` attempted; the source checks relevant to these older slices passed except existing source/scope assertions that are intentionally tied to their original branch scope and now flag unrelated current-branch files or broad contractor source text.
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`, before changed code was evaluated.
+  - `git diff --check`
+  - changed-file scope scan
+  - added-line credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 2B is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2C Invoice Payment Presentation and Slice 2D Remaining Status Cleanup remain future work.
+  - Broader relative-date redesign, invoice paid-stamp/payment-date display, specialty/admin status cleanup, PDF date cleanup, and authenticated rendered desktop/mobile date-display coverage remain separate follow-ups.
+
 - Branch: `codex/status-badge-foundation-v1`
 - Files changed:
   - `src/App.tsx`
