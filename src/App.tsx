@@ -95,15 +95,20 @@ import {
   type EstimateDraftLibraryWorkCategory,
 } from './data/estimateDraftLibrary';
 import {
-  estimateStatusClass,
   estimateStatusLabel,
 } from './features/estimates/status';
+import { StatusBadge } from './features/status/StatusBadge';
+import {
+  estimateStatusPresentation,
+  invoiceStatusPresentation,
+  jobStatusPresentation,
+  requestStatusPresentation,
+} from './features/status/statusPresentation';
 import {
   CLOSED_JOB_STATUSES,
   inspectionCanSaveProgress,
   inspectionIsClosedJob,
   inspectionIsOpenJob,
-  inspectionJobBadgeClass,
   inspectionJobStatus,
   inspectionJobStatusLabel,
   OPEN_JOB_STATUSES,
@@ -122,7 +127,6 @@ import { WorkflowMessageThread } from './features/workflow/WorkflowMessageThread
 import {
   invoiceCanMarkPaid,
   invoiceCanVoid,
-  invoiceStatusClass,
   invoiceStatusLabel,
 } from './features/invoices/status';
 import {
@@ -132,7 +136,6 @@ import {
 } from './demoPresentation';
 import {
   serviceRequestStatusAccent,
-  serviceRequestStatusClass,
   serviceRequestStatusLabel,
   urgencyLabel,
 } from './features/requests/status';
@@ -14396,9 +14399,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 break-words font-bold text-slate-950">{invoice.title || 'Invoice'}</p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>
-                {invoiceStatusLabel(invoice.status)}
-              </span>
+              <StatusBadge {...invoiceStatusPresentation(invoice.status)} />
             </div>
             <p className="mt-1 text-xs text-slate-500">
               {contractorName}
@@ -14573,9 +14574,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 break-words font-bold text-slate-950">{estimate.title}</p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>
-                {estimateStatusLabel(estimate.status)}
-              </span>
+              <StatusBadge {...estimateStatusPresentation(estimate.status)} />
               {estimateFiled && (
                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
                   Filed
@@ -17731,9 +17730,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <p className="mt-1 text-xs text-slate-500">{request.contractor_name} · {request.category}</p>
                             {propertyLabel && <p className="mt-0.5 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
                           </div>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
-                            {serviceRequestStatusLabel(request.status)}
-                          </span>
+                          <StatusBadge {...requestStatusPresentation(request.status)} className="shrink-0" />
                         </div>
                       </button>
                     );
@@ -24206,9 +24203,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
                         {estimatePaymentScheduleInvoiceTypeCustomerLabel(row.invoice_type)}
                       </span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${rowInvoice ? invoiceStatusClass(rowInvoice.status) : 'bg-slate-100 text-slate-600'}`}>
-                        {linkedStatus}
-                      </span>
+                      <StatusBadge
+                        label={linkedStatus}
+                        tone={rowInvoice ? invoiceStatusPresentation(rowInvoice.status).tone : 'muted'}
+                      />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {formatMoney(row.calculated_amount_cents)} · {row.due_trigger?.trim() || 'Due date to be confirmed'}
@@ -28853,9 +28851,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             )}
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:min-w-[190px]">
-            <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${inspectionJobBadgeClass(demoPresentationCurrentContractorJob)}`}>
-              {demoPresentationCurrentContractorJobCopy === 'Ready for contractor review' ? 'Ready for review' : demoPresentationBadgeLabelForJob(demoPresentationCurrentContractorJob)}
-            </span>
+            <StatusBadge
+              label={demoPresentationCurrentContractorJobCopy === 'Ready for contractor review' ? 'Ready for review' : demoPresentationBadgeLabelForJob(demoPresentationCurrentContractorJob)}
+              tone={jobStatusPresentation(inspectionJobStatus(demoPresentationCurrentContractorJob)).tone}
+              size="md"
+              className="w-fit"
+            />
             <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-900 shadow-sm">
               {demoPresentationCurrentContractorJobProgress}
             </span>
@@ -32352,9 +32353,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-slate-950">{request.title}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${serviceRequestStatusClass(request.status)}`}>
-                            {serviceRequestStatusLabel(request.status)}
-                          </span>
+                          <StatusBadge {...requestStatusPresentation(request.status)} className="shrink-0" />
                           {needsFollowUp && !isClosedCard && (
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
                               Follow-up
@@ -32376,9 +32375,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             </span>
                           )}
                           {linkedRequestEstimate && (
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${estimateStatusClass(linkedRequestEstimate.status)}`}>
-                              Estimate {estimateStatusLabel(linkedRequestEstimate.status)}
-                            </span>
+                            <StatusBadge
+                              label={`Estimate ${estimateStatusLabel(linkedRequestEstimate.status)}`}
+                              tone={estimateStatusPresentation(linkedRequestEstimate.status).tone}
+                            />
                           )}
                           {homeMapDraft && (
                             <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${contractorHomeMapDraftStatusClass(homeMapDraft.status)}`} data-testid="contractor-home-map-draft-card-status">
@@ -34359,9 +34359,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               )}
                             </div>
                             <div className="flex shrink-0 flex-col gap-2 sm:min-w-[190px]">
-                              <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${inspectionJobBadgeClass(presentationCurrentJob)}`}>
-                                {presentationCurrentJobCopy === 'Ready for contractor review' ? 'Ready for review' : demoPresentationBadgeLabelForJob(presentationCurrentJob)}
-                              </span>
+                              <StatusBadge
+                                label={presentationCurrentJobCopy === 'Ready for contractor review' ? 'Ready for review' : demoPresentationBadgeLabelForJob(presentationCurrentJob)}
+                                tone={jobStatusPresentation(inspectionJobStatus(presentationCurrentJob)).tone}
+                                size="md"
+                                className="w-fit"
+                              />
                               <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                                 {presentationCurrentJobProgress}
                               </span>
@@ -35736,9 +35739,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                                  {demoPresentationBadgeLabelForJob(insp)}
-                                                </span>
+                                                <StatusBadge
+                                                  label={demoPresentationBadgeLabelForJob(insp)}
+                                                  tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
+                                                />
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(insp.updated_at)}</p>
@@ -35789,9 +35793,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 truncate">{insp.name}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                                  {demoPresentationBadgeLabelForJob(insp)}
-                                                </span>
+                                                <StatusBadge
+                                                  label={demoPresentationBadgeLabelForJob(insp)}
+                                                  tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
+                                                />
                                                 {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(insp.updated_at)}</p>
@@ -36076,9 +36081,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div>
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-950">{estimate.title}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>
-                                                  {estimateStatusLabel(estimate.status)}
-                                                </span>
+                                                <StatusBadge {...estimateStatusPresentation(estimate.status)} />
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">
                                                 {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(estimate.updated_at)}
@@ -36278,9 +36281,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div className="min-w-0">
                                               <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900">{request.title}</p>
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(request.status)}`}>
-                                                  {serviceRequestStatusLabel(request.status)}
-                                                </span>
+                                                <StatusBadge {...requestStatusPresentation(request.status)} />
                                                 {needsFollowUp && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Follow-up</span>}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">{request.category} · {urgencyLabel(request.urgency)} · Updated {formatDateTime(request.updated_at)}</p>
@@ -36310,9 +36311,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <div>
                                       <div className="flex flex-wrap items-center gap-2">
                                         <h3 className="font-bold text-slate-950">{selectedWorkspaceRequest.title}</h3>
-                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceRequestStatusClass(selectedWorkspaceRequest.status)}`}>
-                                          {serviceRequestStatusLabel(selectedWorkspaceRequest.status)}
-                                        </span>
+                                        <StatusBadge {...requestStatusPresentation(selectedWorkspaceRequest.status)} />
                                         {contractorRequestNeedsFollowUp(selectedWorkspaceRequest) && (
                                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Follow-up</span>
                                         )}
@@ -37670,7 +37669,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
                                           <span className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">Invoice</span>
-                                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${invoiceStatusClass(invoice.status)}`}>{invoiceStatusLabel(invoice.status)}</span>
+                                          <StatusBadge {...invoiceStatusPresentation(invoice.status)} />
                                         </div>
                                         <p className="mt-2 font-semibold text-slate-950">{invoice.title || 'Invoice draft'}</p>
                                         <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · {lineCount} line item{lineCount === 1 ? '' : 's'} · Updated {formatDateTime(invoice.updated_at)}</p>
@@ -37811,7 +37810,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isInvoice ? 'bg-slate-900 text-white' : 'bg-blue-100 text-blue-700'}`}>{isInvoice ? 'Invoice' : 'Estimate'}</span>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estimateStatusClass(estimate.status)}`}>{estimateStatusLabel(estimate.status)}</span>
+                                    <StatusBadge {...estimateStatusPresentation(estimate.status)} />
                                   </div>
                                   <p className="mt-2 font-semibold text-slate-950">{estimate.title}</p>
                                   <p className="mt-1 text-xs text-slate-500">{customerName}{customerAddress ? ` · ${customerAddress}` : ''} · Updated {formatDateTime(estimate.updated_at)}</p>
@@ -38106,9 +38105,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="truncate text-sm font-medium text-slate-950">{insp.name}</p>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                      {demoPresentationBadgeLabelForJob(insp)}
-                                    </span>
+                                    <StatusBadge
+                                      label={demoPresentationBadgeLabelForJob(insp)}
+                                      tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
+                                    />
                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{jobTypeLabel(insp)}</span>
                                     {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
                                     {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
@@ -39584,9 +39584,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium text-slate-950 truncate">{insp.name}</p>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${inspectionJobBadgeClass(insp)}`}>
-                                {demoPresentationBadgeLabelForJob(insp)}
-                              </span>
+                              <StatusBadge
+                                label={demoPresentationBadgeLabelForJob(insp)}
+                                tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
+                              />
                               <span className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs font-semibold">{jobTypeLabel(insp)}</span>
                               {urgentCount > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-xs font-semibold">{urgentCount} Urgent</span>}
                               {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-semibold">{issueCount} Issues</span>}
@@ -40149,9 +40150,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{jobTypeLabel(activeInspection)}</span>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inspectionJobBadgeClass(activeInspection)}`}>
-                        {demoPresentationBadgeLabelForJob(activeInspection)}
-                      </span>
+                      <StatusBadge
+                        label={demoPresentationBadgeLabelForJob(activeInspection)}
+                        tone={jobStatusPresentation(inspectionJobStatus(activeInspection)).tone}
+                        size="md"
+                      />
                       {activeJobWorkItemBadge && (
                         <span
                           data-testid="job-work-item-summary-badge"

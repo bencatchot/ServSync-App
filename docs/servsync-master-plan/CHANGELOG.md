@@ -6,6 +6,37 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-12
 
+- Branch: `codex/status-badge-foundation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/status/StatusBadge.tsx`
+  - `src/features/status/statusPresentation.ts`
+  - `src/features/estimates/status.ts`
+  - `src/features/jobs/status.ts`
+  - `src/features/invoices/status.ts`
+  - `src/features/requests/status.ts`
+  - `tests/e2e/status-badge-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2A Status Badge Foundation. Core estimate, job, invoice, and service-request statuses now share one presentation mapping and a reusable non-interactive `StatusBadge`, with targeted primary homeowner and contractor surfaces migrated to the shared badge treatment.
+- Reason for change: ServSync core workflow cards and detail surfaces needed consistent status labels, tones, spacing, and accessible text without changing persisted status values, lifecycle transitions, action availability, dates, invoice payment presentation, specialty/admin statuses, SQL/RLS/RPCs, or infrastructure.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --grep "contractor estimate creation UI structure"`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-estimate-schedule-invoice-ui.spec.ts tests/e2e/contractor-homeowner-estimates-tile.spec.ts tests/e2e/demo-presentation-mode.spec.ts --project=chromium` attempted; the Demo/selected-homeowner coverage passed, while the existing schedule-invoice source test still expects an unguarded `{canUseGenericEstimateInvoiceAction && (` substring even though `origin/main` already includes the dedicated-demo presentation guard.
+  - broader `contractor-create-invoice.spec.ts` attempted; one source assertion still has the existing `servsync_create_invoice_from_estimate_schedule_item` substring collision and the mutating invoice test remains blocked locally by missing `TEST_CONTRACTOR_EMAIL`.
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated.
+  - `git diff --check`
+  - changed-file scope scan
+  - added-line credential-pattern scan
+  - added-line forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 2A is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2B Date Presentation Helpers, Slice 2C Invoice Payment Presentation, and Slice 2D Remaining Status Cleanup remain future work.
+  - Broader specialty/admin status cleanup, PDF status cleanup, paid-stamp/payment-date display, dark-mode polish, and stronger authenticated rendered desktop/mobile coverage remain separate follow-ups.
+
 - Branch: `codex/estimate-item-reuse-polish-v1`
 - Files changed:
   - `src/App.tsx`

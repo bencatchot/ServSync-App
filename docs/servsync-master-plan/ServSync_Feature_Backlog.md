@@ -70,6 +70,11 @@ Important guardrails:
 - Do not claim formal compliance certifications are live.
 - Do not claim guaranteed leads or rankings.
 
+Current presentation-polish sequencing:
+
+- Bundle 1 — Estimate Builder Efficiency Polish is implemented from an approved slice-order standpoint: Slice 1A Estimate Editing Basics, Slice 1B-1 Collapsible Estimate Sections, and Slice 1B-2 Estimate Item Reuse Polish are complete. Historical recent materials, current-draft searchable reuse, single template-item reuse, estimate room association, and stronger authenticated rendered desktop/mobile estimate-builder coverage remain separate follow-ups rather than unfinished Bundle 1 blockers.
+- Bundle 2 — Status and Date Presentation Polish is split into Slice 2A Status Badge Foundation, Slice 2B Date Presentation Helpers, Slice 2C Invoice Payment Presentation, and Slice 2D Remaining Status Cleanup. Slice 2A adds the shared status-badge foundation and standardizes primary estimate, job, invoice, and request status badge presentation only. Date formatting, paid-stamp/payment-date treatment, specialty/admin statuses, PDFs, lifecycle behavior, permissions, and business rules remain future or out of scope.
+
 ## Status definitions
 
 | Status | Meaning |
