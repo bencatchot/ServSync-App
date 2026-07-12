@@ -29,7 +29,7 @@ test.describe('FB-032 contractor Service Agreements UI source guardrails', () =>
 
     expect(source).toContain("type ContractorJobsView = 'overview'");
     expect(source).toContain("'service_agreements'");
-    expect(overviewSource).toContain("setContractorJobsView('service_agreements')");
+    expect(overviewSource).toContain("setContractorJobsViewAndScroll('service_agreements')");
     expect(overviewSource).toContain('Service Agreements');
     expect(serviceAgreementSource).toContain('<Card title="Service Agreements"');
     expect(serviceAgreementSource).toContain('Draft agreement offers are not visible to the homeowner until sent.');
@@ -91,7 +91,7 @@ test.describe('FB-032 contractor Service Agreements UI source guardrails', () =>
     const derivedSource = sourceBetween(
       source,
       'const activeServiceAgreementTemplates = serviceAgreementTemplates',
-      'const estimatePriceBookQuickPickSearchText = normalizeText(estimatePriceBookQuickPickSearch);',
+      'const estimateSavedItemSearchText = normalizeText(estimateSavedItemSearch.trim());',
     );
     const uiSource = sourceBetween(
       source,

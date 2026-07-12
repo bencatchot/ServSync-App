@@ -21490,7 +21490,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [estimateDraftBuilderLastOutput, setEstimateDraftBuilderLastOutput] = useState<EstimateDraftBuilderLastOutput | null>(null);
   const [estimateStartMode, setEstimateStartMode] = useState<EstimateStartMode>('draft');
   const [estimateGuidedBuilderActive, setEstimateGuidedBuilderActive] = useState(false);
-  const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | 'priceBook' | null>(null);
+  const [estimateLineSourcePanel, setEstimateLineSourcePanel] = useState<'saved' | null>(null);
   const [estimateLineFocusId, setEstimateLineFocusId] = useState<string | null>(null);
   const [estimateDraftSessionId, setEstimateDraftSessionId] = useState(() => crypto.randomUUID());
   const [estimateLineGroupCollapseState, setEstimateLineGroupCollapseState] = useState<{
@@ -21505,9 +21505,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [manualJobTemplateStartNotice, setManualJobTemplateStartNotice] = useState('');
   const [estimateHelperNotice, setEstimateHelperNotice] = useState('');
   const [estimateHelperExpanded, setEstimateHelperExpanded] = useState(false);
-  const [savedChargeQuickPickNotice, setSavedChargeQuickPickNotice] = useState('');
-  const [estimatePriceBookQuickPickSearch, setEstimatePriceBookQuickPickSearch] = useState('');
-  const [estimatePriceBookQuickPickNotice, setEstimatePriceBookQuickPickNotice] = useState('');
+  const [estimateSavedItemSearch, setEstimateSavedItemSearch] = useState('');
+  const [estimateSavedItemNotice, setEstimateSavedItemNotice] = useState('');
   const [connectionHistory, setConnectionHistory] = useState<Record<string, ConnectionAuditEvent[]>>({});
   const [contractorResponseDrafts, setContractorResponseDrafts] = useState<Record<string, string>>({});
   const [contractorQuoteDrafts, setContractorQuoteDrafts] = useState<Record<string, { enabled: boolean; amount: string; scope: string }>>({});
@@ -23489,7 +23488,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setInvoiceTemplateStartNotice('');
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
-    setSavedChargeQuickPickNotice('');
+    setEstimateSavedItemNotice('');
     setEstimateComposerOpen(true);
     setInvoiceComposerOpen(false);
     setHomeownerWorkspaceEstimateView('draft');
@@ -23524,7 +23523,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     setEstimateTemplateStartNotice(estimateTemplateStartNoticeForTemplate(template));
     setEstimateHelperNotice('');
     setEstimateHelperExpanded(false);
-    setSavedChargeQuickPickNotice('');
+    setEstimateSavedItemNotice('');
     setEstimateComposerOpen(true);
     setInvoiceComposerOpen(false);
     setInvoiceTemplateStartNotice('');
@@ -24062,7 +24061,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setEstimateTemplateStartNotice('');
       setEstimateHelperNotice('');
       setEstimateHelperExpanded(false);
-      setSavedChargeQuickPickNotice('');
+      setEstimateSavedItemNotice('');
       setEstimateComposerOpen(true);
       setContractorJobsView('new_financial');
       return;
@@ -25416,7 +25415,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
     });
     setEstimateLineFocusId(nextLine.id);
-    setSavedChargeQuickPickNotice(`Added "${charge.name}" as an editable estimate line item.`);
+    setEstimateSavedItemNotice(`Added saved charge "${charge.name}" as an editable estimate line item. Copied price — review before sending.`);
   };
 
   const addPriceBookItemToEstimateDraft = (item: ContractorPriceBookItem) => {
@@ -25430,7 +25429,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       };
     });
     setEstimateLineFocusId(nextLine.id);
-    setEstimatePriceBookQuickPickNotice(`Added "${item.title}" from Price Book as an editable estimate line item.`);
+    setEstimateSavedItemNotice(`Added Price Book item "${item.title}" as an editable estimate line item. Copied price — review before sending.`);
   };
 
   const addBlankEstimateLineToDraft = () => {
@@ -26172,141 +26171,153 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     );
   };
 
-  const renderSavedChargeQuickPick = () => (
-    <div className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-bold text-slate-950">Saved charges</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Optional shortcuts from Business Profile. Adding one copies it into this draft as a normal editable line item.
-          </p>
-        </div>
-        <span className="w-fit rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-          {activeSavedEstimateCharges.length} active
-        </span>
-      </div>
-      {activeSavedEstimateCharges.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
-          No saved charges yet. Add them in Business Profile -&gt; Estimate Settings.
-        </p>
-      ) : (
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {activeSavedEstimateCharges.map(charge => (
-            <button
-              key={charge.id}
-              type="button"
-              onClick={() => addSavedChargeToEstimateDraft(charge)}
-              className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">{charge.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]} · {formatMoney(charge.amount_cents)}
-                    {charge.charge_type === 'hourly' ? '/hr' : ''}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Default {Number(charge.default_quantity || 1)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')}
-                  </p>
-                </div>
-                <span className="inline-flex w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white sm:w-auto">
-                  <Plus size={13} />
-                  Add
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-      {savedChargeQuickPickNotice && (
-        <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
-          {savedChargeQuickPickNotice}
-        </p>
-      )}
-    </div>
-  );
-
-  const renderPriceBookQuickPick = () => (
-    <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-bold text-slate-950">Price Book</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Add active Price Book items as editable estimate lines. Quantity starts at 1; review quantity, price, and scope before sending. Internal notes stay private.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600">
-            <span className="rounded-full bg-slate-100 px-2 py-1">Qty starts at 1</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">Review price and scope</span>
-            <span className="rounded-full bg-slate-100 px-2 py-1">Category/tax stays in Price Book</span>
-          </div>
-        </div>
-        <span className="w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-          {activeContractorPriceBookItems.length} active
-        </span>
-      </div>
-      {activeContractorPriceBookItems.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
-          No active Price Book items yet. Add or import them from Jobs -&gt; Custom Pricing.
-        </p>
-      ) : (
-        <div className="mt-3 space-y-3">
-          <Field label="Search Price Book">
-            <input
-              className={inputClass()}
-              value={estimatePriceBookQuickPickSearch}
-              onChange={event => setEstimatePriceBookQuickPickSearch(event.target.value)}
-              placeholder="Search title, trade, category, or description"
-            />
-          </Field>
-          {estimatePriceBookQuickPickItems.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
-              No active Price Book items match this search.
+  const renderEstimateSavedItemPicker = () => {
+    const hasSavedItems = activeContractorPriceBookItems.length > 0 || activeSavedEstimateCharges.length > 0;
+    const hasSearchMatches = estimatePriceBookQuickPickItems.length > 0 || estimateSavedChargeQuickPickItems.length > 0;
+    return (
+      <div id="estimate-saved-item-picker" className="rounded-2xl border border-blue-100 bg-white p-3 shadow-sm" data-testid="estimate-saved-item-picker">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Add saved item</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Reuse active Price Book items and saved charges as normal editable estimate lines. Internal notes, tax/category metadata, and source records stay private.
             </p>
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2">
-              {estimatePriceBookQuickPickItems.map(item => (
-                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1 text-xs font-medium text-slate-600">
-                        {estimateLineTypeLabel(item.line_type)} · {contractorPriceBookPriceLabel(item)}
-                        {item.unit ? ` / ${item.unit}` : ''}
-                      </p>
-                      {(item.trade || item.category) && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {[item.trade, item.category].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {item.customer_description && (
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.customer_description}</p>
-                      )}
-                      <p className="mt-2 text-[11px] font-medium leading-4 text-slate-500">
-                        Adds title, customer description, unit, price, and labor hours only. Private notes and tax/category metadata are not copied.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addPriceBookItemToEstimateDraft(item)}
-                      className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 sm:w-auto"
-                    >
-                      <Plus size={13} />
-                      Add
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            <p className="mt-2 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              Copied price — review before sending.
+            </p>
+          </div>
+          <span className="w-fit rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            {activeContractorPriceBookItems.length + activeSavedEstimateCharges.length} active
+          </span>
         </div>
-      )}
-      {estimatePriceBookQuickPickNotice && (
-        <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
-          {estimatePriceBookQuickPickNotice}
-        </p>
-      )}
-    </div>
-  );
+
+        {hasSavedItems ? (
+          <div className="mt-3 space-y-3">
+            <Field label="Search saved items">
+              <input
+                aria-label="Search saved items"
+                className={inputClass()}
+                value={estimateSavedItemSearch}
+                onChange={event => setEstimateSavedItemSearch(event.target.value)}
+                placeholder="Search saved items"
+              />
+            </Field>
+
+            {!hasSearchMatches ? (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
+                No saved items match your search.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {estimatePriceBookQuickPickItems.length > 0 && (
+                  <section className="space-y-2" aria-label="Price Book saved items">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Price Book</p>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        {estimatePriceBookQuickPickItems.length} item{estimatePriceBookQuickPickItems.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {estimatePriceBookQuickPickItems.map(item => (
+                        <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="min-w-0 break-words text-sm font-semibold text-slate-950">{item.title}</p>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700">Price Book</span>
+                              </div>
+                              <p className="mt-1 text-xs font-medium text-slate-600">
+                                {estimateLineTypeLabel(item.line_type)} · {contractorPriceBookPriceLabel(item)}
+                                {item.unit ? ` / ${item.unit}` : ''}
+                              </p>
+                              {(item.trade || item.category) && (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {[item.trade, item.category].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                              {item.customer_description && (
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.customer_description}</p>
+                              )}
+                              <p className="mt-2 text-[11px] font-medium leading-4 text-slate-500">
+                                Adds title, customer description, unit, price, and labor hours only.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              aria-label={`Add Price Book item ${item.title}`}
+                              onClick={() => addPriceBookItemToEstimateDraft(item)}
+                              className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 sm:w-auto"
+                            >
+                              <Plus size={13} />
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {estimateSavedChargeQuickPickItems.length > 0 && (
+                  <section className="space-y-2" aria-label="Saved charge items">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Saved charges</p>
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                        {estimateSavedChargeQuickPickItems.length} item{estimateSavedChargeQuickPickItems.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {estimateSavedChargeQuickPickItems.map(charge => (
+                        <div key={charge.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="min-w-0 break-words text-sm font-semibold text-slate-950">{charge.name}</p>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-blue-700">Saved charge</span>
+                              </div>
+                              <p className="mt-1 text-xs font-medium text-slate-600">
+                                {estimateLineTypeLabel(charge.line_type)} · {ESTIMATE_CHARGE_TYPE_LABELS[charge.charge_type]} · {formatMoney(charge.amount_cents)}
+                                {charge.charge_type === 'hourly' ? '/hr' : ''}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Default {Number(charge.default_quantity || 1)} {charge.unit || (charge.charge_type === 'hourly' ? 'hour' : 'each')}
+                              </p>
+                              {charge.description && (
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{charge.description}</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              aria-label={`Add saved charge ${charge.name}`}
+                              onClick={() => addSavedChargeToEstimateDraft(charge)}
+                              className="inline-flex min-h-10 w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 sm:w-auto"
+                            >
+                              <Plus size={13} />
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs font-medium text-slate-600">
+            No saved items yet. Add items to your Price Book or saved charges to reuse them here.
+          </p>
+        )}
+
+        {estimateSavedItemNotice && (
+          <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+            {estimateSavedItemNotice}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const addEstimateHelperSuggestionToDraft = (suggestion: EstimateHelperSuggestion) => {
     const nextLine = createEstimateLineDraft({
@@ -26938,7 +26949,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <div className="mb-3">
           <p className="text-sm font-bold text-slate-950">No line items yet</p>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Start with a blank row, a saved item, or an active Price Book item. At least one line item is required before saving.
+            Start with a blank row or a saved item from your active Price Book and saved charges. At least one line item is required before saving.
           </p>
         </div>
       )}
@@ -26957,22 +26968,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           onClick={() => setEstimateLineSourcePanel(current => current === 'saved' ? null : 'saved')}
           className={buttonClass(estimateLineSourcePanel === 'saved' ? 'primary' : 'secondary')}
           aria-expanded={estimateLineSourcePanel === 'saved'}
+          aria-controls="estimate-saved-item-picker"
         >
           <Plus size={14} />
           Add saved item
         </button>
-        <button
-          type="button"
-          onClick={() => setEstimateLineSourcePanel(current => current === 'priceBook' ? null : 'priceBook')}
-          className={buttonClass(estimateLineSourcePanel === 'priceBook' ? 'primary' : 'secondary')}
-          aria-expanded={estimateLineSourcePanel === 'priceBook'}
-        >
-          <Plus size={14} />
-          Add from Price Book
-        </button>
       </div>
-      {estimateLineSourcePanel === 'saved' && renderSavedChargeQuickPick()}
-      {estimateLineSourcePanel === 'priceBook' && renderPriceBookQuickPick()}
+      {estimateLineSourcePanel === 'saved' && renderEstimateSavedItemPicker()}
     </div>
   );
 
@@ -28157,17 +28159,28 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const selectedServiceAgreementOfferHomes = selectedServiceAgreementOfferConnection
     ? connectedHomeList(selectedServiceAgreementOfferConnection).filter(home => Boolean(home.id))
     : [];
-  const estimatePriceBookQuickPickSearchText = normalizeText(estimatePriceBookQuickPickSearch);
+  const estimateSavedItemSearchText = normalizeText(estimateSavedItemSearch.trim());
+  const estimateSavedChargeQuickPickItems = activeSavedEstimateCharges
+    .filter(charge => {
+      if (!estimateSavedItemSearchText) return true;
+      return normalizeText([
+        charge.name,
+        charge.description,
+        estimateLineTypeLabel(charge.line_type),
+        charge.unit || '',
+      ].join(' ')).includes(estimateSavedItemSearchText);
+    });
   const estimatePriceBookQuickPickItems = activeContractorPriceBookItems
     .filter(item => {
-      if (!estimatePriceBookQuickPickSearchText) return true;
+      if (!estimateSavedItemSearchText) return true;
       return normalizeText([
         item.title,
         item.customer_description,
+        estimateLineTypeLabel(item.line_type),
         item.trade,
         item.category,
         item.unit || '',
-      ].join(' ')).includes(estimatePriceBookQuickPickSearchText);
+      ].join(' ')).includes(estimateSavedItemSearchText);
     });
   const archivedContractorPriceBookItems = contractorPriceBookItems
     .filter(item => !item.active || Boolean(item.archived_at))
@@ -36162,7 +36175,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                         setEstimateTemplateStartNotice('');
                                                         setEstimateHelperNotice('');
                                                         setEstimateHelperExpanded(false);
-                                                        setSavedChargeQuickPickNotice('');
+                                                        setEstimateSavedItemNotice('');
                                                         setEstimateComposerOpen(true);
                                                       }}
                                                       className={buttonClass('secondary')}
@@ -37890,7 +37903,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             setEstimateTemplateStartNotice('');
                                             setEstimateHelperNotice('');
                                             setEstimateHelperExpanded(false);
-                                            setSavedChargeQuickPickNotice('');
+                                            setEstimateSavedItemNotice('');
                                             setEstimateComposerOpen(true);
                                             setContractorJobsView('new_financial');
                                           }}

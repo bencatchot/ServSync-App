@@ -72,11 +72,9 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(source).not.toContain('Optional tools');
     expect(lineSourceSource).toContain('Add blank line');
     expect(lineSourceSource).toContain('Add saved item');
-    expect(lineSourceSource).toContain('Add from Price Book');
     expect(lineSourceSource).toContain('estimate-line-empty-state');
     expect(lineSourceSource).toContain('addBlankEstimateLineToDraft');
-    expect(lineSourceSource).toContain('renderSavedChargeQuickPick()');
-    expect(lineSourceSource).toContain('renderPriceBookQuickPick()');
+    expect(lineSourceSource).toContain('renderEstimateSavedItemPicker()');
     expect(lineSourceSource).not.toContain('renderEstimateHelperPanel()');
     expect(lineSourceSource).not.toContain('renderSavedEstimateTemplateStartPicker');
     expect(source).toContain('line_items: []');
@@ -270,7 +268,7 @@ test.describe('contractor mutating estimate creation', () => {
     await expect(main.getByRole('textbox', { name: /^Estimate line item 1 description$/i })).toHaveCount(0);
     await expect(main.getByRole('button', { name: /^Add blank line$/i })).toBeVisible();
     await expect(main.getByRole('button', { name: /^Add saved item$/i })).toBeVisible();
-    await expect(main.getByRole('button', { name: /^Add from Price Book$/i })).toBeVisible();
+    await expect(main.getByRole('button', { name: /^Add from Price Book$/i })).toHaveCount(0);
 
     await main.getByRole('button', { name: /^Add blank line$/i }).click();
     const lineDescriptionField = main.getByRole('textbox', { name: /^Estimate line item 1 description$/i });
