@@ -4,6 +4,36 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-13
+
+- Branch: `codex/secondary-status-migration-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/access/statusPresentation.ts`
+  - `src/features/referrals/statusPresentation.ts`
+  - `src/features/reviews/statusPresentation.ts`
+  - `src/features/serviceAgreements/statusPresentation.ts`
+  - `src/features/support/statusPresentation.ts`
+  - `tests/e2e/status-secondary-migration.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2D-1 Secondary Status Migration. Low-risk secondary display badges for service agreements, support, referrals/invites, review moderation, and display-only access/team invite statuses now use focused presentation helpers and the shared `StatusBadge` foundation.
+- Reason for change: Secondary status surfaces needed consistent wording, tones, spacing, and accessible text while preserving persisted statuses, lifecycle rules, forms, actions, dates, invoice payment presentation, PDFs, SQL/RLS/RPCs, Supabase/Vercel settings, and infrastructure behavior.
+- Tests/checks run:
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-secondary-migration.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts tests/e2e/invoice-payment-presentation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-contractor-ui.spec.ts tests/e2e/contractor-referral-submit-ui.spec.ts tests/e2e/fb026-review-trust-boundaries.spec.ts --project=chromium`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code was evaluated, and reproduced on clean `origin/main`.
+- Known risks or follow-ups:
+  - Slice 2D-1 is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2D-2 appointment/calendar statuses, Slice 2D-3 project/work-item statuses, and Slice 2D-4 findings/reminders/severity remain future work.
+  - Authenticated rendered desktop/mobile coverage for the migrated secondary surfaces remains a useful follow-up.
+
 ## 2026-07-12
 
 - Branch: `codex/invoice-payment-presentation-v1`

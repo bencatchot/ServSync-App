@@ -105,6 +105,29 @@ import {
   requestStatusPresentation,
 } from './features/status/statusPresentation';
 import {
+  contractorTeamInviteStatusPresentation,
+  contractorTeamStatusPresentation,
+  homeAccessStatusPresentation,
+  localClaimInviteStatusPresentation,
+} from './features/access/statusPresentation';
+import {
+  adminInviteLeadStatusPresentation,
+  contractorReferralAdminStatusPresentation,
+  contractorReferralInviteStatusPresentation,
+  homeownerContractorInviteStatusPresentation,
+  inviteStatusPresentation,
+  referralRewardStatusPresentation,
+  universalReferralRewardStatusPresentation,
+  universalReferralStatusPresentation,
+} from './features/referrals/statusPresentation';
+import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
+import {
+  serviceAgreementOfferStatusPresentation,
+  serviceAgreementStatusPresentation,
+  serviceAgreementTemplateStatusPresentation,
+} from './features/serviceAgreements/statusPresentation';
+import { supportStatusPresentation } from './features/support/statusPresentation';
+import {
   CLOSED_JOB_STATUSES,
   inspectionCanSaveProgress,
   inspectionIsClosedJob,
@@ -1201,23 +1224,15 @@ const ADMIN_INVITE_LEAD_SELECT = [
   'updated_at',
 ].join(', ');
 
-const HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS: Record<HomeownerContractorInviteLeadStatus, string> = {
-  submitted: 'Submitted',
-  invite_sent: 'Invite sent',
-  contractor_joined: 'Contractor joined',
-  contractor_declined: 'Contractor declined',
-  no_response_30_days: 'No response after 30 days',
-};
-
 const ADMIN_INVITE_LEAD_STATUS_OPTIONS: { value: AdminInviteLeadStatus; label: string }[] = [
   { value: 'new', label: 'New' },
   { value: 'researching', label: 'Researching' },
   { value: 'contacted', label: 'Contacted' },
-  { value: 'followed_up', label: 'Followed up' },
+  { value: 'followed_up', label: 'Followed Up' },
   { value: 'joined', label: 'Joined' },
   { value: 'declined', label: 'Declined' },
-  { value: 'no_response', label: 'No response' },
-  { value: 'bad_contact_info', label: 'Bad contact info' },
+  { value: 'no_response', label: 'No Response' },
+  { value: 'bad_contact_info', label: 'Bad Contact Info' },
   { value: 'duplicate', label: 'Duplicate' },
 ];
 
@@ -1225,32 +1240,22 @@ const CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS: { value: ContractorReferralInvit
   { value: 'new', label: 'New' },
   { value: 'reviewing', label: 'Reviewing' },
   { value: 'contacted', label: 'Contacted' },
-  { value: 'followed_up', label: 'Followed up' },
+  { value: 'followed_up', label: 'Followed Up' },
   { value: 'joined', label: 'Joined' },
   { value: 'duplicate', label: 'Duplicate' },
-  { value: 'bad_contact_info', label: 'Bad contact info' },
+  { value: 'bad_contact_info', label: 'Bad Contact Info' },
   { value: 'declined', label: 'Declined' },
-  { value: 'no_response', label: 'No response' },
+  { value: 'no_response', label: 'No Response' },
   { value: 'archived', label: 'Archived' },
 ];
 
 const HOMEOWNER_CONTRACTOR_INVITE_STATUS_OPTIONS: { value: HomeownerContractorInviteLeadStatus; label: string }[] = [
   { value: 'submitted', label: 'Submitted' },
-  { value: 'invite_sent', label: 'Invite sent' },
-  { value: 'contractor_joined', label: 'Contractor joined' },
-  { value: 'contractor_declined', label: 'Contractor declined' },
-  { value: 'no_response_30_days', label: 'No response after 30 days' },
+  { value: 'invite_sent', label: 'Invite Sent' },
+  { value: 'contractor_joined', label: 'Contractor Joined' },
+  { value: 'contractor_declined', label: 'Contractor Declined' },
+  { value: 'no_response_30_days', label: 'No Response After 30 Days' },
 ];
-
-const ADMIN_INVITE_LEAD_STATUS_LABELS = ADMIN_INVITE_LEAD_STATUS_OPTIONS.reduce<Record<AdminInviteLeadStatus, string>>((labels, option) => {
-  labels[option.value] = option.label;
-  return labels;
-}, {} as Record<AdminInviteLeadStatus, string>);
-
-const CONTRACTOR_REFERRAL_ADMIN_STATUS_LABELS = CONTRACTOR_REFERRAL_ADMIN_STATUS_OPTIONS.reduce<Record<ContractorReferralInviteAdminStatus, string>>((labels, option) => {
-  labels[option.value] = option.label;
-  return labels;
-}, {} as Record<ContractorReferralInviteAdminStatus, string>);
 
 type StoredFieldWorkDraft = {
   inspectionId: string;
@@ -6354,14 +6359,7 @@ const REVIEW_MODERATION_FILTER_OPTIONS: { value: AdminReviewModerationFilter; la
 ];
 
 function reviewModerationStatusLabel(status?: ReviewModerationStatus | string | null) {
-  return REVIEW_MODERATION_STATUS_OPTIONS.find(option => option.value === status)?.label ?? 'Unknown';
-}
-
-function reviewModerationStatusClass(status?: ReviewModerationStatus | string | null) {
-  if (status === 'approved') return 'bg-emerald-900/40 text-emerald-300';
-  if (status === 'hidden') return 'bg-amber-900/40 text-amber-300';
-  if (status === 'rejected') return 'bg-red-900/40 text-red-300';
-  return 'bg-blue-900/40 text-blue-300';
+  return reviewModerationStatusPresentation(status).label;
 }
 
 function reviewModerationDraftFromRow(row: AdminReviewModerationRow): AdminReviewModerationDraft {
@@ -6652,11 +6650,11 @@ function recurringCalendarEventOccurrences(event: ContractorCalendarEvent, range
 }
 
 const LOCAL_CLAIM_INVITE_STATUS_LABELS: Record<LocalCustomerClaimInviteStatus, string> = {
-  pending: 'Invite pending',
-  claimed: 'Claimed by homeowner',
-  declined: 'Invite declined',
-  expired: 'Invite expired',
-  revoked: 'Invite revoked',
+  pending: localClaimInviteStatusPresentation('pending').label,
+  claimed: localClaimInviteStatusPresentation('claimed').label,
+  declined: localClaimInviteStatusPresentation('declined').label,
+  expired: localClaimInviteStatusPresentation('expired').label,
+  revoked: localClaimInviteStatusPresentation('revoked').label,
 };
 
 function effectiveLocalClaimInviteStatus(invite?: LocalCustomerClaimInvite | null): LocalCustomerClaimInviteStatus | null {
@@ -7324,18 +7322,7 @@ function supportCategoryLabel(category: SupportInquiryCategory | string) {
 }
 
 function supportStatusLabel(status: SupportInquiryStatus | string, perspective: 'user' | 'admin' = 'user') {
-  if (perspective === 'user' && status === 'waiting_on_admin') return 'Waiting on ServSync';
-  if (perspective === 'user' && status === 'waiting_on_user') return 'Waiting on you';
-  return SUPPORT_STATUS_OPTIONS.find(option => option.value === status)?.label ?? status;
-}
-
-function supportStatusClass(status: SupportInquiryStatus | string) {
-  if (status === 'new') return 'bg-blue-100 text-blue-700';
-  if (status === 'in_progress') return 'bg-amber-100 text-amber-700';
-  if (status === 'waiting_on_user') return 'bg-purple-100 text-purple-700';
-  if (status === 'waiting_on_admin') return 'bg-sky-100 text-sky-700';
-  if (status === 'resolved') return 'bg-emerald-100 text-emerald-700';
-  return 'bg-slate-100 text-slate-700';
+  return supportStatusPresentation(status, perspective).label;
 }
 
 function groupConnectionHistory(events: ConnectionAuditEvent[]) {
@@ -14174,25 +14161,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     return `relative overflow-hidden rounded-xl border p-3 transition before:absolute before:inset-y-0 before:left-0 before:w-1.5 sm:p-4 ${tones[tone]}`;
   };
 
-  const homeownerServiceAgreementOfferStatusLabel = (status: ServiceAgreementOffer['status']) => ({
-    sent: 'Sent',
-    accepted: 'Accepted',
-    declined: 'Declined',
-    expired: 'Expired',
-    withdrawn: 'Withdrawn',
-    draft: 'Draft',
-  }[status] || status);
-  const homeownerServiceAgreementStatusLabel = (status: ServiceAgreement['status']) => ({
-    active: 'Active',
-    cancelled: 'Cancelled',
-    expired: 'Expired',
-  }[status] || status);
-  const homeownerServiceAgreementStatusClass = (status: ServiceAgreementOffer['status'] | ServiceAgreement['status']) => {
-    if (status === 'sent') return 'bg-blue-50 text-blue-700';
-    if (status === 'accepted' || status === 'active') return 'bg-emerald-50 text-emerald-700';
-    if (status === 'declined' || status === 'withdrawn' || status === 'cancelled') return 'bg-slate-100 text-slate-600';
-    return 'bg-amber-50 text-amber-700';
-  };
   const homeownerServiceAgreementDateLabel = (value?: string | null) => formatDateOnly(value);
   const homeownerServiceAgreementDetailRows = (record: Pick<ServiceAgreementOffer | ServiceAgreement, 'price_cents' | 'duration_months' | 'included_visit_count' | 'starts_on' | 'ends_on'>) => [
     record.price_cents === null || record.price_cents === undefined ? null : `Price: ${formatMoney(record.price_cents)}`,
@@ -14234,9 +14202,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 break-words font-bold text-slate-950">{offer.title}</p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeownerServiceAgreementStatusClass(offer.status)}`}>
-                {homeownerServiceAgreementOfferStatusLabel(offer.status)}
-              </span>
+              <StatusBadge {...serviceAgreementOfferStatusPresentation(offer.status)} />
             </div>
             <p className="mt-1 text-xs text-slate-500">
               {contractorName}
@@ -14330,9 +14296,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 break-words font-bold text-slate-950">{agreement.title}</p>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeownerServiceAgreementStatusClass(agreement.status)}`}>
-                {homeownerServiceAgreementStatusLabel(agreement.status)}
-              </span>
+              <StatusBadge {...serviceAgreementStatusPresentation(agreement.status)} />
             </div>
             <p className="mt-1 text-xs text-slate-500">{contractorName}</p>
             {propertyLabel && <p className="mt-1 text-xs font-medium text-slate-500">Property: {propertyLabel}</p>}
@@ -15356,22 +15320,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     member: 'Member',
     viewer: 'Viewer',
   }[role]);
-  const homeAccessStatusLabel = (status: HomeMembershipStatus | HomeMembershipEmailInviteStatus) => ({
-    invited: 'Invited',
-    active: 'Active',
-    removed: 'Removed',
-    declined: 'Declined',
-    pending: 'Pending',
-    accepted: 'Accepted',
-    revoked: 'Revoked',
-    expired: 'Expired',
-  }[status]);
-  const homeAccessStatusClass = (status: HomeMembershipStatus | HomeMembershipEmailInviteStatus) => {
-    if (status === 'active' || status === 'accepted') return 'bg-emerald-50 text-emerald-700';
-    if (status === 'pending' || status === 'invited') return 'bg-amber-50 text-amber-700';
-    if (status === 'removed' || status === 'revoked') return 'bg-slate-100 text-slate-600';
-    return 'bg-rose-50 text-rose-700';
-  };
   const homeAccessRoleClass = (role: HomeMembershipRole) => {
     if (role === 'owner') return 'bg-slate-900 text-white';
     if (role === 'admin') return 'bg-blue-50 text-blue-700';
@@ -16748,7 +16696,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="min-w-0 flex-1 truncate text-sm font-bold text-slate-950">{label}</p>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(shell.role)}`}>{homeAccessRoleLabel(shell.role)}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(shell.membership_status)}`}>{homeAccessStatusLabel(shell.membership_status)}</span>
+                      <StatusBadge {...homeAccessStatusPresentation(shell.membership_status)} />
                     </div>
                     <div className="space-y-0.5 text-xs text-slate-500">
                       {streetLine1 && <p>{streetLine1}</p>}
@@ -16867,7 +16815,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-slate-950">{homeLabel}</p>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                          <StatusBadge {...homeAccessStatusPresentation(invite.status)} />
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           Created {formatDateTime(invite.created_at)}
@@ -16927,7 +16875,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-semibold text-slate-950">{isPrimaryOwner ? 'Primary homeowner' : 'Household member'}</p>
                               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(membership.role)}`}>{homeAccessRoleLabel(membership.role)}</span>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(membership.status)}`}>{homeAccessStatusLabel(membership.status)}</span>
+                              <StatusBadge {...homeAccessStatusPresentation(membership.status)} />
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
                               {membership.accepted_at ? `Accepted ${formatDateTime(membership.accepted_at)}` : `Created ${formatDateTime(membership.created_at)}`}
@@ -16957,7 +16905,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <div key={membership.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                             <span>{membership.user_id === selectedHome.homeowner_user_id ? 'Primary homeowner' : 'Household member'}</span>
                             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(membership.role)}`}>{homeAccessRoleLabel(membership.role)}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(membership.status)}`}>{homeAccessStatusLabel(membership.status)}</span>
+                            <StatusBadge {...homeAccessStatusPresentation(membership.status)} />
                           </div>
                         ))}
                       </div>
@@ -17025,7 +16973,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="break-all font-semibold text-slate-950">{invite.invited_email}</p>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                          <StatusBadge {...homeAccessStatusPresentation(invite.status)} />
                         </div>
                         <p className="mt-1 text-xs text-slate-500">Created {formatDateTime(invite.created_at)}</p>
                       </div>
@@ -17049,7 +16997,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         <div key={invite.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                           <span className="break-all">{invite.invited_email}</span>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessRoleClass(invite.role)}`}>{homeAccessRoleLabel(invite.role)}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${homeAccessStatusClass(invite.status)}`}>{homeAccessStatusLabel(invite.status)}</span>
+                          <StatusBadge {...homeAccessStatusPresentation(invite.status)} />
                         </div>
                       ))}
                     </div>
@@ -18787,9 +18735,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       )}
                       <p className="mt-2 text-xs text-slate-400">Submitted {formatDateTime(inviteLead.created_at)}</p>
                     </div>
-                    <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                      {HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS[inviteLead.homeowner_status] ?? 'Submitted'}
-                    </span>
+                    <StatusBadge {...homeownerContractorInviteStatusPresentation(inviteLead.homeowner_status)} className="w-fit" />
                   </div>
                 </div>
               ))}
@@ -28204,20 +28150,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     months === null || months === undefined ? 'Duration not set' : `${months} month${months === 1 ? '' : 's'}`;
   const serviceAgreementVisitCountLabel = (count?: number | null) =>
     count === null || count === undefined ? 'Visits not set' : `${count} visit${count === 1 ? '' : 's'}`;
-  const serviceAgreementOfferStatusLabel = (status: ServiceAgreementOffer['status']) => ({
-    draft: 'Draft',
-    sent: 'Sent',
-    accepted: 'Accepted',
-    declined: 'Declined',
-    expired: 'Expired',
-    withdrawn: 'Withdrawn',
-  }[status] || status);
-  const serviceAgreementOfferStatusClass = (status: ServiceAgreementOffer['status']) => {
-    if (status === 'draft') return 'bg-amber-50 text-amber-700';
-    if (status === 'sent') return 'bg-blue-50 text-blue-700';
-    if (status === 'accepted') return 'bg-emerald-50 text-emerald-700';
-    return 'bg-slate-100 text-slate-600';
-  };
   const serviceAgreementConnectionLabel = (connectionId: string) => {
     const connection = connections.find(item => item.connection_id === connectionId);
     return connection?.display_name || 'Connected homeowner';
@@ -31733,9 +31665,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <p className="mt-0.5 text-xs text-[#223D67]/70">{member.email}</p>
                           <p className="mt-1 text-xs text-[#223D67]">{CONTRACTOR_TEAM_ROLE_HELPER[member.role]}</p>
                         </div>
-                        <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${member.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                          {member.status}
-                        </span>
+                        <StatusBadge {...contractorTeamStatusPresentation(member.status)} className="w-fit" />
                       </div>
                       {(teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id) && (
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -31781,7 +31711,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="mt-0.5 text-xs text-[#223D67]/70">{invite.email} · {CONTRACTOR_TEAM_ROLE_LABELS[invite.role]}</p>
                             <p className="mt-1 break-all rounded bg-[#F7F9FC] px-2 py-1 text-xs text-[#223D67]">{inviteUrl}</p>
                           </div>
-                          <span className="w-fit rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Pending</span>
+                          <StatusBadge {...contractorTeamInviteStatusPresentation(invite.status)} className="w-fit" />
                         </div>
                         {(teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id) && (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -33644,12 +33574,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${invite.invite_type === 'permanent_qr' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'}`}>
                             {invite.invite_type === 'permanent_qr' ? 'QR' : 'Manual'}
                           </span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${invite.status === 'used' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-                            {invite.status}
-                          </span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                            {invite.reward_status || 'not_eligible'}
-                          </span>
+                          <StatusBadge {...inviteStatusPresentation(invite.status)} />
+                          <StatusBadge {...referralRewardStatusPresentation(invite.reward_status || 'not_eligible')} />
                           {invite.status === 'active' && (
                             <button
                               type="button"
@@ -35279,17 +35205,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               Send this customer a link or QR code to create their ServSync account and review the profile/home information you entered.
                                             </p>
                                           </div>
-                                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-                                            localClaimStatus === 'claimed'
-                                              ? 'bg-emerald-100 text-emerald-700'
-                                              : localClaimStatus === 'pending'
-                                                ? 'bg-amber-100 text-amber-700'
-                                                : localClaimStatus === 'revoked'
-                                                  ? 'bg-red-100 text-red-700'
-                                                  : 'bg-slate-100 text-slate-600'
-                                          }`}>
-                                            {localClaimStatus ? LOCAL_CLAIM_INVITE_STATUS_LABELS[localClaimStatus] : 'Not invited'}
-                                          </span>
+                                          {localClaimStatus ? (
+                                            <StatusBadge {...localClaimInviteStatusPresentation(localClaimStatus)} size="md" />
+                                          ) : (
+                                            <StatusBadge label="Not Invited" tone="muted" size="md" />
+                                          )}
                                         </div>
 
                                         {localCustomerIsClaimed ? (
@@ -38957,9 +38877,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                       <p className="text-sm font-bold text-slate-950">{template.name}</p>
-                                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
-                                        {archived ? 'Archived' : 'Active'}
-                                      </span>
+                                      <StatusBadge {...serviceAgreementTemplateStatusPresentation(archived ? 'archived' : 'active')} />
                                     </div>
                                     {template.description && <p className="mt-2 text-sm leading-5 text-slate-700">{template.description}</p>}
                                     <p className="mt-2 text-xs leading-5 text-slate-500">
@@ -39025,9 +38943,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="text-sm font-bold text-slate-950">{offer.title}</p>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${serviceAgreementOfferStatusClass(offer.status)}`}>
-                                      {serviceAgreementOfferStatusLabel(offer.status)}
-                                    </span>
+                                    <StatusBadge {...serviceAgreementOfferStatusPresentation(offer.status)} />
                                   </div>
                                   <p className="mt-2 text-xs leading-5 text-slate-500">
                                     {serviceAgreementConnectionLabel(offer.connection_id)} · {serviceAgreementHomeLabel(offer.connection_id, offer.home_id)}
@@ -43855,12 +43771,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">
-                        {HOMEOWNER_CONTRACTOR_INVITE_STATUS_LABELS[lead.homeowner_status] ?? 'Submitted'}
-                      </span>
-                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
-                        {ADMIN_INVITE_LEAD_STATUS_LABELS[lead.admin_status] ?? 'New'}
-                      </span>
+                      <StatusBadge {...homeownerContractorInviteStatusPresentation(lead.homeowner_status)} />
+                      <StatusBadge {...adminInviteLeadStatusPresentation(lead.admin_status)} />
                       {lead.admin_status === 'new' && (
                         <button
                           type="button"
@@ -44096,10 +44008,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{referral.status}</span>
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
-                          {CONTRACTOR_REFERRAL_ADMIN_STATUS_LABELS[referral.admin_status] ?? 'New'}
-                        </span>
+                        <StatusBadge {...contractorReferralInviteStatusPresentation(referral.status)} />
+                        <StatusBadge {...contractorReferralAdminStatusPresentation(referral.admin_status)} />
                       </div>
                     </div>
 
@@ -44207,8 +44117,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         <p className="mt-2 font-mono text-xs font-bold text-slate-300">Code {referral.referral_code}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-400">{draft.status}</span>
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{draft.reward_status}</span>
+                        <StatusBadge {...universalReferralStatusPresentation(draft.status)} />
+                        <StatusBadge {...universalReferralRewardStatusPresentation(draft.reward_status)} />
                       </div>
                     </div>
 
@@ -44286,7 +44196,6 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                 const contractor = contractors.find(item => item.id === invite.contractor_id);
                 const draft = inviteDrafts[invite.id] || inviteDraftFromInvite(invite);
                 const isSaving = savingInviteId === invite.id;
-                const used = invite.status === 'used' || Boolean(invite.used_by_homeowner_id);
 
                 return (
                   <div key={invite.id} className="rounded-xl border border-slate-700 bg-slate-700 p-4">
@@ -44297,12 +44206,8 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                         <p className="mt-1 font-mono text-sm font-bold text-slate-300">{invite.invite_code}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${used ? 'bg-green-900/30 text-green-400' : 'bg-blue-900/30 text-blue-400'}`}>
-                          {invite.status}
-                        </span>
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
-                          {draft.reward_status}
-                        </span>
+                        <StatusBadge {...inviteStatusPresentation(invite.status)} />
+                        <StatusBadge {...referralRewardStatusPresentation(draft.reward_status)} />
                       </div>
                     </div>
 
@@ -44393,7 +44298,6 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                 {adminReviewQueue.map(review => {
                   const draft = adminReviewDrafts[review.review_id] || reviewModerationDraftFromRow(review);
                   const isSaving = savingReviewId === review.review_id;
-                  const statusLabel = reviewModerationStatusLabel(review.moderation_status);
                   const reviewerDetails = [
                     review.reviewer_display_name || 'No display name',
                     review.reviewer_location || 'No location',
@@ -44404,9 +44308,7 @@ function PlatformAdminDashboard({ onSignOut }: { onSignOut: () => Promise<void> 
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${reviewModerationStatusClass(review.moderation_status)}`}>
-                              {statusLabel}
-                            </span>
+                            <StatusBadge {...reviewModerationStatusPresentation(review.moderation_status)} />
                             <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-300">
                               {review.rating}/5 rating
                             </span>
@@ -44951,9 +44853,7 @@ function SupportInboxPanel({
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold text-slate-950">{inquiry.title}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${supportStatusClass(inquiry.status)}`}>
-                          {supportStatusLabel(inquiry.status)}
-                        </span>
+                        <StatusBadge {...supportStatusPresentation(inquiry.status)} />
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {supportCategoryLabel(inquiry.category)} · Opened {formatDateTime(inquiry.created_at)} · Updated {formatDateTime(inquiry.updated_at)}
@@ -45115,9 +45015,7 @@ function AdminSupportInbox({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-white">{inquiry.title}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${supportStatusClass(inquiry.status)}`}>
-                        {supportStatusLabel(inquiry.status, 'admin')}
-                      </span>
+                      <StatusBadge {...supportStatusPresentation(inquiry.status, 'admin')} />
                     </div>
                     <p className="mt-1 text-sm text-slate-300">
                       {requester?.full_name || requester?.email || inquiry.requester_user_id.slice(0, 8)} · {inquiry.requester_role}
