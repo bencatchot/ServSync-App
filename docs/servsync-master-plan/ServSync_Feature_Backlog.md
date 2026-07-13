@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 Last reconciled through PR #198 / merge commit `1f721ae10fb92de9a76b9f30bf2eeeeab83330bc`.
 
@@ -73,7 +73,7 @@ Important guardrails:
 Current presentation-polish sequencing:
 
 - Bundle 1 — Estimate Builder Efficiency Polish is implemented from an approved slice-order standpoint: Slice 1A Estimate Editing Basics, Slice 1B-1 Collapsible Estimate Sections, and Slice 1B-2 Estimate Item Reuse Polish are complete. Historical recent materials, current-draft searchable reuse, single template-item reuse, estimate room association, and stronger authenticated rendered desktop/mobile estimate-builder coverage remain separate follow-ups rather than unfinished Bundle 1 blockers.
-- Bundle 2 — Status and Date Presentation Polish is split into Slice 2A Status Badge Foundation, Slice 2B Date Presentation Helpers, Slice 2C Invoice Payment Presentation, and Slice 2D Remaining Status Cleanup. Slice 2A adds the shared status-badge foundation and standardizes primary estimate, job, invoice, and request status badge presentation only. Slice 2B centralizes existing user-facing date/time formatting behind shared presentation helpers while preserving current output. Slice 2C adds reusable invoice payment summaries for Paid, Partially Paid, Overdue, and Void presentation on targeted contractor/homeowner invoice card and detail surfaces using existing invoice fields only. Online payment, payment history, payment methods/notes, PDF changes, specialty/admin statuses, lifecycle behavior, permissions, and business rules remain future or out of scope.
+- Bundle 2 — Status and Date Presentation Polish is split into Slice 2A Status Badge Foundation, Slice 2B Date Presentation Helpers, Slice 2C Invoice Payment Presentation, and Slice 2D Remaining Status Cleanup. Slice 2A adds the shared status-badge foundation and standardizes primary estimate, job, invoice, and request status badge presentation only. Slice 2B centralizes existing user-facing date/time formatting behind shared presentation helpers while preserving current output. Slice 2C adds reusable invoice payment summaries for Paid, Partially Paid, Overdue, and Void presentation on targeted contractor/homeowner invoice card and detail surfaces using existing invoice fields only. Slice 2D-1 migrates low-risk secondary display badges for service agreements, support, referrals/invites, review moderation, and display-only access/team invite statuses to shared `StatusBadge` presentation helpers. Online payment, payment history, payment methods/notes, PDF changes, appointment/calendar statuses, project/work-item statuses, finding/reminder severity, billing/subscription statuses, lifecycle behavior, permissions, and business rules remain future or out of scope.
 
 ## Status definitions
 
