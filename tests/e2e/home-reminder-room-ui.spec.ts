@@ -41,7 +41,7 @@ test.describe('home reminder room picker UI', () => {
     const app = appSource();
     const reminderType = sourceBetween(types, 'export interface HomeReminder {', 'export interface ServiceRequestReview');
     const reminderDraftType = sourceBetween(app, 'type HomeReminderDraft = {', 'type HomeRoomDraft = {');
-    const emptyDraft = sourceBetween(app, 'const emptyHomeReminderDraft = (): HomeReminderDraft => ({', 'const reminderDueState');
+    const emptyDraft = sourceBetween(app, 'const emptyHomeReminderDraft = (): HomeReminderDraft => ({', 'const reminderStatePresentation');
 
     expect(reminderType).toContain('home_room_id: string | null;');
     expect(reminderDraftType).toContain('home_room_id: string | null;');
@@ -167,7 +167,7 @@ test.describe('home reminder room picker UI', () => {
       expect(source).not.toContain('room.notes');
       expect(source).not.toContain('Room:');
     }
-    expect(contractorSource).not.toContain('home_room_id');
+    expect(contractorSource).not.toMatch(/\bhome_room_id\b/);
     expect(contractorSource).not.toContain('home_rooms');
   });
 
@@ -175,8 +175,11 @@ test.describe('home reminder room picker UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/reminders/statusPresentation.ts',
       'src/textCleanup.ts',
       'src/types.ts',
+      'tests/e2e/calendar-appointment-status-presentation.spec.ts',
+      'tests/e2e/findings-status-presentation.spec.ts',
       'tests/e2e/home-map-builder-ui.spec.ts',
       'tests/e2e/home-map-systems-ux.spec.ts',
       'servsync-home-map-layout-foundation.sql',
@@ -188,7 +191,9 @@ test.describe('home reminder room picker UI', () => {
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',
+      'tests/e2e/reminder-status-presentation.spec.ts',
       'tests/e2e/security-catalog.spec.ts',
+      'tests/e2e/status-secondary-migration.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',

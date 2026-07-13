@@ -109,7 +109,7 @@ test.describe('Findings condition/status presentation', () => {
     const pdfSource = sourceFile('src/utils/pdfDocuments.ts');
 
     expect(appSource).not.toContain('const FINDING_STATUS_CONFIG');
-    expect(appSource).not.toContain("from './features/reminders/statusPresentation'");
+    expect(appSource).toContain("from './features/reminders/statusPresentation';");
     expect(appSource).not.toContain("from './features/projects/statusPresentation'");
     expect(appSource).not.toContain('SeverityBadge');
     expect(appSource).not.toContain('resolved_at');
