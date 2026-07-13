@@ -105,6 +105,12 @@ import {
   requestStatusPresentation,
 } from './features/status/statusPresentation';
 import {
+  FINDING_STATUS_ORDER,
+  findingStatusBorderColor,
+  findingStatusPresentation,
+  findingStatusSelectedButtonClass,
+} from './features/findings/statusPresentation';
+import {
   contractorTeamInviteStatusPresentation,
   contractorTeamStatusPresentation,
   homeAccessStatusPresentation,
@@ -3844,16 +3850,6 @@ const KUDOS_OPTIONS = [
   'Problem solved',
   'Would recommend',
 ];
-
-const FINDING_STATUSES: FindingStatus[] = ['Pass', 'Monitor', 'Fixed On Site', 'Needs Repair', 'Urgent'];
-
-const FINDING_STATUS_CONFIG: Record<FindingStatus, { color: string; dot: string }> = {
-  'Pass':         { color: 'bg-emerald-50 text-emerald-700 border border-emerald-200', dot: 'bg-emerald-500' },
-  'Monitor':      { color: 'bg-blue-50 text-blue-700 border border-blue-200',         dot: 'bg-blue-500' },
-  'Fixed On Site':{ color: 'bg-violet-50 text-violet-700 border border-violet-200',   dot: 'bg-violet-500' },
-  'Needs Repair': { color: 'bg-amber-50 text-amber-700 border border-amber-200',      dot: 'bg-amber-500' },
-  'Urgent':       { color: 'bg-red-50 text-red-700 border border-red-200',            dot: 'bg-red-500' },
-};
 
 const DEFAULT_INSPECTION_ROOMS: InspectionTemplateRoom[] = [
   { room: 'Exterior', items: [
@@ -35678,7 +35674,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   label={demoPresentationBadgeLabelForJob(insp)}
                                                   tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
                                                 />
-                                                {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
+                                                {issues > 0 && <StatusBadge label={`${issues} open`} tone={findingStatusPresentation('Urgent').tone} />}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(insp.updated_at)}</p>
                                             </div>
@@ -35732,7 +35728,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                                   label={demoPresentationBadgeLabelForJob(insp)}
                                                   tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
                                                 />
-                                                {issues > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{issues} open</span>}
+                                                {issues > 0 && <StatusBadge label={`${issues} open`} tone={findingStatusPresentation('Urgent').tone} />}
                                               </div>
                                               <p className="mt-1 text-xs text-slate-500">Updated {formatDateTime(insp.updated_at)}</p>
                                             </div>
@@ -38047,8 +38043,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                       tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
                                     />
                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{jobTypeLabel(insp)}</span>
-                                    {urgentCount > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{urgentCount} urgent</span>}
-                                    {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{issueCount} issues</span>}
+                                    {urgentCount > 0 && <StatusBadge label={`${urgentCount} urgent`} tone={findingStatusPresentation('Urgent').tone} />}
+                                    {issueCount > 0 && urgentCount === 0 && <StatusBadge label={`${issueCount} issues`} tone={findingStatusPresentation('Needs Repair').tone} />}
                                     {!checklistStyle && linkedEstimate && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Estimate linked</span>}
                                     {!checklistStyle && linkedInvoice && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Invoice linked</span>}
                                     {messageIndicator && (
@@ -39522,8 +39518,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 tone={jobStatusPresentation(inspectionJobStatus(insp)).tone}
                               />
                               <span className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-xs font-semibold">{jobTypeLabel(insp)}</span>
-                              {urgentCount > 0 && <span className="rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-xs font-semibold">{urgentCount} Urgent</span>}
-                              {issueCount > 0 && urgentCount === 0 && <span className="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-xs font-semibold">{issueCount} Issues</span>}
+                              {urgentCount > 0 && <StatusBadge label={`${urgentCount} Urgent`} tone={findingStatusPresentation('Urgent').tone} />}
+                              {issueCount > 0 && urgentCount === 0 && <StatusBadge label={`${issueCount} Issues`} tone={findingStatusPresentation('Needs Repair').tone} />}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {subjectLabel}{subjectAddress ? ` · ${subjectAddress}` : ''} · {formatShortDate(insp.created_at)}
@@ -40100,8 +40096,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       {linkedEstimateForJob && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">Estimate linked</span>}
                       {linkedInvoiceForJob && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Invoice linked</span>}
                       {(linkedStandaloneCalendarEventForJob || linkedVisitEventForJob) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">Calendar linked</span>}
-                      {urgentCountFin > 0 && <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"><AlertTriangle size={10}/>{urgentCountFin} urgent</span>}
-                      {issueCountFin > 0 && urgentCountFin === 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">{issueCountFin} open</span>}
+                      {urgentCountFin > 0 && <StatusBadge label={`${urgentCountFin} urgent`} tone={findingStatusPresentation('Urgent').tone} icon={<AlertTriangle size={10} />} size="md" />}
+                      {issueCountFin > 0 && urgentCountFin === 0 && <StatusBadge label={`${issueCountFin} open`} tone={findingStatusPresentation('Needs Repair').tone} size="md" />}
                     </div>
                   </div>
                 </div>
@@ -41066,16 +41062,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     key={item}
                                     data-testid="inspection-finding-card"
                                     className={`rounded-2xl border bg-white overflow-hidden transition-colors ${status !== 'Pass' ? `border-2` : ''}`}
-                                    style={{ borderColor: status === 'Urgent' ? '#dc2626' : status === 'Needs Repair' ? '#d97706' : status === 'Monitor' ? '#2563eb' : status === 'Fixed On Site' ? '#0f766e' : '#e2e8f0' }}
+                                    style={{ borderColor: status === 'Pass' ? '#e2e8f0' : findingStatusBorderColor(status) }}
                                   >
                                     <div className="p-4">
                                       <div className="flex items-start justify-between gap-2 mb-3">
                                         <p className="font-semibold text-slate-800 text-sm">{item}</p>
                                       </div>
                                       <div className="flex gap-2 flex-wrap">
-                                        {FINDING_STATUSES.map(st => {
+                                        {FINDING_STATUS_ORDER.map(st => {
                                           const isActive = current.status === st;
-                                          const stCfg = FINDING_STATUS_CONFIG[st];
+                                          const statusPresentation = findingStatusPresentation(st);
                                           return (
                                             <button
                                               key={st}
@@ -41084,10 +41080,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                               data-testid={st === 'Needs Repair' ? 'inspection-finding-status-needs-repair' : undefined}
                                               onClick={() => setLocalFindings(prev => ({ ...prev, [key]: { ...current, status: st } }))}
                                               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                                                isActive ? stCfg.color : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600 hover:border-slate-300'
+                                                isActive ? findingStatusSelectedButtonClass(st) : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600 hover:border-slate-300'
                                               }`}
                                             >
-                                              {st}
+                                              {statusPresentation.label}
                                             </button>
                                           );
                                         })}
@@ -41200,8 +41196,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     {singleNoteText.trim() && (() => {
                                       const suggested = localDraftFromNote(singleNoteText);
                                       return (
-                                        <div className={`rounded-lg px-3 py-2 text-xs font-semibold ${FINDING_STATUS_CONFIG[suggested].color}`}>
-                                          Suggested: {suggested}
+                                        <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${findingStatusSelectedButtonClass(suggested)}`}>
+                                          Suggested: {findingStatusPresentation(suggested).label}
                                         </div>
                   );
                 })()}
@@ -41311,7 +41307,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                             <div key={s.id} className={`bg-white border rounded-xl p-3 space-y-2 text-xs ${s.accepted === true ? 'border-emerald-300 bg-emerald-50/40' : s.accepted === false ? 'border-slate-200 opacity-40' : 'border-slate-200'}`}>
                                               <p className="text-slate-700 leading-relaxed">{s.rawText}</p>
                                               <div className="flex flex-wrap items-center gap-1.5">
-                                                <span className={`rounded-full px-1.5 py-0.5 font-semibold ${FINDING_STATUS_CONFIG[s.suggestedStatus].color}`}>{s.suggestedStatus}</span>
+                                                <StatusBadge {...findingStatusPresentation(s.suggestedStatus)} />
                                                 {s.detectedRoom && <span className="text-slate-500">{s.detectedRoom}{s.detectedItem ? ` › ${s.detectedItem.slice(0, 22)}…` : ''}</span>}
                                                 {s.needsNewChecklistItem ? (
                                                   <span className="rounded-full bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700">Suggested new item</span>
@@ -41432,7 +41428,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                   }));
                   const allReportFindings = reportRooms.flatMap(r => r.findings);
                   const reportSummary = buildProfessionalReportSummary(reportRooms);
-                  const statusCounts = Object.fromEntries(FINDING_STATUSES.map(s => [s, allReportFindings.filter(f => f.status === s).length])) as Record<FindingStatus, number>;
+                  const statusCounts = Object.fromEntries(FINDING_STATUS_ORDER.map(s => [s, allReportFindings.filter(f => f.status === s).length])) as Record<FindingStatus, number>;
                   const openReportFindings = statusCounts.Urgent + statusCounts['Needs Repair'] + statusCounts.Monitor;
                   const clearedReportFindings = statusCounts.Pass + statusCounts['Fixed On Site'];
                   const reportPhotoCount = allReportFindings.reduce((count, finding) => count + (finding.photos?.length ?? 0), 0);
@@ -41505,13 +41501,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </div>
                           <div className="text-right">
                             {statusCounts.Urgent > 0 ? (
-                              <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-red-500 text-white">{statusCounts.Urgent} Urgent</span>
+                              <StatusBadge label={`${statusCounts.Urgent} Urgent`} tone={findingStatusPresentation('Urgent').tone} size="md" />
                             ) : (statusCounts['Needs Repair'] + statusCounts.Monitor) > 0 ? (
-                              <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-amber-400 text-amber-900">{statusCounts['Needs Repair'] + statusCounts.Monitor} Issues</span>
+                              <StatusBadge label={`${statusCounts['Needs Repair'] + statusCounts.Monitor} Issues`} tone={findingStatusPresentation('Needs Repair').tone} size="md" />
                             ) : meaningfulReportFindingCount > 0 ? (
-                              <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-green-400 text-green-900">All Clear</span>
+                              <StatusBadge label="All Clear" tone={findingStatusPresentation('Pass').tone} size="md" />
                             ) : (
-                              <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-slate-100 text-slate-700">No findings added yet</span>
+                              <StatusBadge label="No findings added yet" tone="neutral" size="md" />
                             )}
                           </div>
                         </div>
@@ -41776,7 +41772,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-xs text-slate-400 mt-0.5">Summary of findings, on-site work, follow-ups, and preventative value.</p>
                           </div>
                           {urgentFindings.length > 0 && (
-                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-600 shrink-0">Urgent Items Included</span>
+                            <StatusBadge label="Urgent Items Included" tone={findingStatusPresentation('Urgent').tone} className="shrink-0" />
                           )}
                         </div>
 
@@ -41837,8 +41833,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         const fixed = roomData.findings.filter(f => f.status === 'Fixed On Site');
                         const hasUrgent = nonPass.some(f => f.status === 'Urgent');
                         const openCount = roomData.findings.filter(f => f.status === 'Urgent' || f.status === 'Needs Repair').length;
-                        const borderColorFor = (status: FindingStatus) =>
-                          status === 'Urgent' ? '#dc2626' : status === 'Needs Repair' ? '#d97706' : status === 'Monitor' ? '#2563eb' : status === 'Fixed On Site' ? '#0f766e' : '#16a34a';
                         return (
                           <div key={roomData.room} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -41852,20 +41846,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 </div>
                               </div>
                               {hasUrgent ? (
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">Urgent</span>
+                                <StatusBadge {...findingStatusPresentation('Urgent')} />
                               ) : openCount > 0 ? (
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Has Issues</span>
+                                <StatusBadge label="Has Issues" tone={findingStatusPresentation('Needs Repair').tone} />
                               ) : (
-                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Clear</span>
+                                <StatusBadge label="Clear" tone={findingStatusPresentation('Pass').tone} />
                               )}
                             </div>
                             <div className="p-5 space-y-3">
                               {[...nonPass, ...passWithNotes].map((f, i) => (
-                                <div key={i} className="border-l-4 rounded-r-xl overflow-hidden" style={{ borderLeftColor: borderColorFor(f.status) }}>
+                                <div key={i} className="border-l-4 rounded-r-xl overflow-hidden" style={{ borderLeftColor: findingStatusBorderColor(f.status) }}>
                                   <div className="pl-4 pr-4 py-3 bg-slate-50">
                                     <div className="flex items-center justify-between mb-2">
                                       <p className="font-semibold text-slate-800 text-sm">{f.title}</p>
-                                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${FINDING_STATUS_CONFIG[f.status].color}`}>{f.status}</span>
+                                      <StatusBadge {...findingStatusPresentation(f.status)} className="flex-shrink-0" />
                                     </div>
                                     {f.notes && (
                                       <div className="bg-slate-100 rounded-lg px-3 py-2 mb-2">
@@ -41921,9 +41915,9 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   {photoCount > 0 && <p className="text-xs text-slate-400">{photoCount} photo{photoCount !== 1 ? 's' : ''}</p>}
                                 </div>
                                 {rIssues > 0 ? (
-                                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${rUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{rIssues}</span>
+                                  <StatusBadge label={String(rIssues)} tone={findingStatusPresentation(rUrgent ? 'Urgent' : 'Needs Repair').tone} />
                                 ) : rFixed > 0 ? (
-                                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">{rFixed} fixed</span>
+                                  <StatusBadge label={`${rFixed} fixed`} tone={findingStatusPresentation('Fixed On Site').tone} />
                                 ) : (
                                   <span className="text-xs text-slate-400">—</span>
                                 )}
