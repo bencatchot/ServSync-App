@@ -32,6 +32,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Slice 3A is frontend/test/docs only. Bundle 3 remains incomplete: Slice 3B Draft Clarity Notices and Slice 3C Search, Filter & Permission Empty States remain future work.
   - Authenticated rendered desktop/mobile coverage for all migrated primary surfaces remains useful where fixture credentials are available.
 
+- Branch: `codex/demo-connected-request-ready-v1`
+- Files changed:
+  - `scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `tests/e2e/demo-mode-checkpoints.spec.ts`
+  - `docs/demo/ServSync_Demo_Mode_Runbook.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the private Demo Mode `connected_request_ready` checkpoint for recording Sarah starting a service request after the Gulf Coast Home Services connection is active but before any water-heater request exists.
+- Reason for change: The homeowner request screenshot flow needs a repeatable active-connection/no-request starting point without reusing the sent-request checkpoint, manually accepting a recorded pending connection, adding browser checkpoint controls, or seeding downstream workflow records.
+- Tests/checks run:
+  - `node --check scripts/demo/scenarios/water-heater-core-loop.mjs`
+  - `node --check scripts/demo/seed-demo-scenario.mjs`
+  - `node scripts/demo/seed-demo-scenario.mjs checkpoints`
+  - `git diff --check`
+  - `npm run typecheck`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/demo-mode-checkpoints.spec.ts tests/e2e/demo-mode-foundation.spec.ts tests/e2e/demo-mode-job-lifecycle-checkpoints.spec.ts --project=chromium --reporter=line`
+  - `npm run build`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts` before changed files were evaluated.
+- Known risks or follow-ups:
+  - Source/docs/test slice only. No SQL, RPC, RLS, Supabase/Vercel setting changes, production/shared-sandbox data, app UI, browser checkpoint controls, service request creation beyond later existing checkpoints, estimate/job/invoice/Home History/report/media/reminder/payment records, deployment, or external effects are included.
+  - Dedicated-demo live validation should seed and verify `connected_request_ready`, then record the homeowner new-request setup flow before capture is considered complete.
+
 - Branch: `codex/reminder-status-presentation-v1`
 - Files changed:
   - `src/App.tsx`

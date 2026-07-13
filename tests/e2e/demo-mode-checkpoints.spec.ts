@@ -20,6 +20,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
     expect(manifest.defaultCheckpointKey).toBe('job_created');
     expect(manifest.supportedCheckpointKeys).toEqual([
       'contractor_discovery_ready',
+      'connected_request_ready',
       'request_ready',
       'contractor_review_ready',
       'estimate_draft',
@@ -44,6 +45,21 @@ test.describe('Demo Mode checkpoint source checks', () => {
     ]);
     expect(manifest.checkpointByKey.contractor_discovery_ready.expected).toMatchObject({
       connectionCount: 0,
+      requestCount: 0,
+      estimateCount: 0,
+      jobCount: 0,
+      visitEventCount: 0,
+      invoiceCount: 0,
+      homeHistoryCount: 0,
+    });
+    expect(manifest.checkpointByKey.connected_request_ready.requiredSteps).toEqual([
+      'identities',
+      'profilesAndCompany',
+      'property',
+      'connection',
+    ]);
+    expect(manifest.checkpointByKey.connected_request_ready.expected).toMatchObject({
+      connectionCount: 1,
       requestCount: 0,
       estimateCount: 0,
       jobCount: 0,
@@ -92,6 +108,7 @@ test.describe('Demo Mode checkpoint source checks', () => {
 
     expect(module.parseCheckpointKey([])).toBe('job_created');
     expect(module.parseCheckpointKey(['--checkpoint=contractor_discovery_ready'])).toBe('contractor_discovery_ready');
+    expect(module.parseCheckpointKey(['--checkpoint=connected_request_ready'])).toBe('connected_request_ready');
     expect(module.parseCheckpointKey(['--checkpoint=request_ready'])).toBe('request_ready');
     expect(module.parseCheckpointKey(['--checkpoint', 'estimate_sent'])).toBe('estimate_sent');
     expect(module.parseCheckpointKey(['--checkpoint=job_completed'])).toBe('job_completed');

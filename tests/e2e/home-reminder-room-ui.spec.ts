@@ -175,6 +175,7 @@ test.describe('home reminder room picker UI', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/emptyStates/EmptyState.tsx',
       'src/features/reminders/statusPresentation.ts',
       'src/textCleanup.ts',
       'src/types.ts',
@@ -187,6 +188,7 @@ test.describe('home reminder room picker UI', () => {
       'tests/e2e/home-map-layout-foundation.spec.ts',
       'tests/e2e/home-map-ui.spec.ts',
       'tests/e2e/home-assets-ui.spec.ts',
+      'tests/e2e/empty-state-foundation.spec.ts',
       'tests/e2e/home-document-room-ui.spec.ts',
       'tests/e2e/home-room-detail-ui.spec.ts',
       'tests/e2e/home-rooms-ui.spec.ts',
