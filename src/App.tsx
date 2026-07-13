@@ -127,6 +127,7 @@ import {
   universalReferralStatusPresentation,
 } from './features/referrals/statusPresentation';
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
+import { EmptyState } from './features/emptyStates/EmptyState';
 import {
   serviceAgreementOfferStatusPresentation,
   serviceAgreementStatusPresentation,
@@ -14069,7 +14070,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       id: 'needs_review',
       title: 'Needs Review',
       helper: 'Awaiting your decision',
-      emptyText: 'No estimates need your review right now.',
+      emptyText: 'Estimates from your contractors will appear here when they are sent for your review.',
       count: needsReviewEstimates.length,
       totalCents: sumEstimateCents(needsReviewEstimates),
       tone: 'attention',
@@ -14087,7 +14088,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       id: 'open_invoices',
       title: 'Open Invoices',
       helper: 'Sent and unpaid',
-      emptyText: 'No open invoices right now.',
+      emptyText: 'Invoices sent by your contractors will appear here when payment or review is needed.',
       count: openInvoiceRecords.length,
       totalCents: sumInvoiceCents(openInvoiceRecords),
       tone: 'invoice',
@@ -14096,7 +14097,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       id: 'accepted',
       title: 'Accepted Estimates',
       helper: 'Approved; contractor creates or schedules the job next',
-      emptyText: 'No accepted estimates yet.',
+      emptyText: 'Accepted estimates can become jobs when the contractor creates or schedules the work.',
       count: acceptedEstimates.length,
       totalCents: sumEstimateCents(acceptedEstimates),
       tone: 'accepted',
@@ -14122,9 +14123,9 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   ];
   const selectedHomeownerRecordTile = homeownerRecordSectionTiles.find(tile => tile.id === selectedHomeownerRecordSection) ?? homeownerRecordSectionTiles[0];
   const selectedHomeownerRecordEmptyText = homeownerRecordPropertyScope === 'selected' && selectedHomeId && !homeownerHasAnyPropertyScopedRecords
-    ? 'No estimates or invoices for this property yet.'
+    ? 'Estimates, invoices, agreements, and completed records for this property will appear here after contractors send or update them.'
     : homeownerRecordPropertyScope === 'unassigned' && !homeownerHasAnyPropertyScopedRecords
-      ? 'No unassigned estimates or invoices.'
+      ? 'Unassigned records will appear here when older estimates or invoices are not tied to a property.'
       : selectedHomeownerRecordTile.emptyText;
   const homeownerRecordTileChrome = (tone: 'attention' | 'invoice' | 'accepted' | 'closed', active: boolean) => {
     const tones = {
@@ -14777,15 +14778,34 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       accepted: 'border-emerald-200 bg-emerald-50/70 text-emerald-950 before:bg-emerald-500',
       closed: 'border-slate-200 bg-slate-100/80 text-slate-950 before:bg-slate-400',
     }[tone];
+    const emptyTitle = title === 'Needs Review'
+      ? 'No estimates to review'
+      : title === 'Agreement Offers'
+        ? 'No agreement offers yet'
+        : title === 'Open Invoices'
+          ? 'No invoices yet'
+          : title === 'Accepted Estimates'
+            ? 'No accepted estimates yet'
+            : title === 'Agreements'
+              ? 'No service agreements yet'
+              : 'No paid or closed records yet';
 
     return (
-    <section className="space-y-5 border-t border-slate-200 pt-8 first:border-t-0 first:pt-0">
-      <div className={`relative overflow-hidden rounded-xl border px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
-        <p className="text-base font-bold leading-6 sm:text-lg">{title}</p>
-        <p className="mt-1 text-sm leading-5 text-slate-600">{helper}</p>
-      </div>
-      {children.length > 0 ? <div className="space-y-3">{children}</div> : <EmptyState text={emptyText} />}
-    </section>
+      <section className="space-y-5 border-t border-slate-200 pt-8 first:border-t-0 first:pt-0">
+        <div className={`relative overflow-hidden rounded-xl border px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 ${sectionTone}`}>
+          <p className="text-base font-bold leading-6 sm:text-lg">{title}</p>
+          <p className="mt-1 text-sm leading-5 text-slate-600">{helper}</p>
+        </div>
+        {children.length > 0 ? (
+          <div className="space-y-3">{children}</div>
+        ) : (
+          <EmptyState
+            icon={<Receipt size={18} />}
+            title={emptyTitle}
+            body={emptyText}
+          />
+        )}
+      </section>
     );
   };
   const selectedHomeownerRecordChildren = selectedHomeownerRecordSection === 'needs_review'
@@ -16675,7 +16695,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         )}
 
         {sharedHomeShells.length === 0 ? (
-          <EmptyState text="No homes have been shared with you yet." />
+          <EmptyState
+            icon={<Home size={18} />}
+            title="No shared homes yet"
+            body="Homes shared by another ServSync homeowner will appear here with only the safe details they have granted."
+          />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {sharedHomeShells.map(shell => {
@@ -16744,7 +16768,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       </div>
                       <div className="mt-3 space-y-2">
                         {sharedRemindersForHome.length === 0 ? (
-                          <p className="text-xs font-medium text-slate-500">No shared reminders for this home.</p>
+                          <EmptyState
+                            compact
+                            icon={<Bell size={14} />}
+                            title="No shared reminders for this home"
+                            body="Open reminder shells can appear here when the homeowner shares them. Notes and linked records stay private."
+                            className="bg-white"
+                          />
                         ) : (
                           sharedRemindersForHome.map(reminder => {
                             const reminderPresentation = sharedReminderStatePresentation(reminder);
@@ -17664,7 +17694,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Card title="Active work" icon={<ClipboardCheck size={18} />}>
               <div className="space-y-3">
                 {activeServiceRequests.length === 0 && dashboardAcceptedWorkEstimates.length === 0 ? (
-                  <EmptyState text="No active service requests or approved work yet." />
+                  <EmptyState
+                    compact
+                    icon={<ClipboardCheck size={16} />}
+                    title="No active work yet"
+                    body="Service requests and approved contractor work will appear here while they need attention."
+                  />
                 ) : (
                   <>
                   {activeServiceRequests.map(request => {
@@ -17742,7 +17777,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Card title="My contractors" icon={<Users size={18} />}>
               <div className="space-y-3">
                 {activeConnections.length === 0 ? (
-                  <EmptyState text="No active contractor connections yet." />
+                  <EmptyState
+                    compact
+                    icon={<Users size={16} />}
+                    title="No contractor connections yet"
+                    body="Connect with local contractors before sending work requests through ServSync."
+                    action={
+                      <button type="button" onClick={() => setHomeownerTab('contractors')} className={buttonClass('secondary')}>
+                        Search contractors
+                      </button>
+                    }
+                  />
                 ) : (
                   activeConnections.slice(0, 4).map(connection => (
                     <div key={connection.connection_id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -17762,7 +17807,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <Card title="Recent home history" icon={<ClipboardList size={18} />}>
                 <div className="space-y-3">
                   {recentLogEntries.length === 0 ? (
-                    <EmptyState text="No home history yet." />
+                    <EmptyState
+                      compact
+                      icon={<ClipboardList size={16} />}
+                      title="No Home History yet"
+                      body="Filed invoices, completed jobs, reports, and your own entries will build this record over time."
+                    />
                   ) : (
                     recentLogEntries.map(entry => (
                       <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -17785,7 +17835,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
               <Card title="Upcoming reminders" icon={<Bell size={18} />}>
                 <div className="space-y-3">
                   {openDashboardHomeReminders.length === 0 ? (
-                    <EmptyState text="No open Home Reminders yet." />
+                    <EmptyState
+                      compact
+                      icon={<Bell size={16} />}
+                      title="No open reminders yet"
+                      body="Manual follow-ups you create for this home will appear here."
+                    />
                   ) : (
                     openDashboardHomeReminders.map(reminder => {
                       const reminderPresentation = reminderStatePresentation(reminder);
@@ -17819,7 +17874,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             <Card title="Documents" icon={<FolderOpen size={18} />}>
               <div className="space-y-3">
                 {recentDocuments.length === 0 ? (
-                  <EmptyState text="No documents uploaded yet." />
+                  <EmptyState
+                    compact
+                    icon={<FolderOpen size={16} />}
+                    title="No documents yet"
+                    body="Private manuals, warranties, permits, and receipts you upload will appear here."
+                  />
                 ) : (
                   recentDocuments.map(doc => {
                     const roomChip = renderDocumentRoomChip(doc);
@@ -20049,12 +20109,6 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             };
             const selectedSection = homeownerRequestSections.find(section => section.id === homeownerRequestView) ?? homeownerRequestSections[0];
             const filteredRequests = selectedSection.requests.filter(request => serviceRequestMatchesSearch(request, homeownerRequestSearch));
-            const selectedRequestEmptyText = homeownerRequestPropertyScope === 'selected' && selectedHomeId && propertyScopedServiceRequests.length === 0
-              ? 'No service requests for this property yet.'
-              : homeownerRequestPropertyScope === 'unassigned' && propertyScopedServiceRequests.length === 0
-                ? 'No unassigned service requests.'
-                : 'No requests in this bucket.';
-
             return (
               <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -20086,7 +20140,27 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     )}
                   </div>
                   {filteredRequests.length === 0 ? (
-                    <EmptyState text={selectedSection.requests.length === 0 ? selectedRequestEmptyText : 'No requests match that search.'} />
+                    selectedSection.requests.length === 0 ? (
+                      <EmptyState
+                        icon={<MessageSquare size={18} />}
+                        title={homeownerRequestPropertyScope === 'selected' && selectedHomeId ? 'No service requests for this property yet' : 'No service requests yet'}
+                        body={
+                          homeownerRequestPropertyScope === 'unassigned'
+                            ? 'Unassigned requests will appear here when an older request is not tied to a property.'
+                            : 'Service requests help organize contractor outreach, issue details, estimates, jobs, and invoices in one place.'
+                        }
+                        action={
+                          homeownerRequestPropertyScope !== 'unassigned' ? (
+                            <button type="button" onClick={() => setHomeownerTab('overview')} className={buttonClass('primary')}>
+                              <MessageSquare size={16} />
+                              Start a request
+                            </button>
+                          ) : null
+                        }
+                      />
+                    ) : (
+                      <EmptyState text="No requests match that search." compact />
+                    )
                   ) : (
                     <div className="space-y-2">
                       {filteredRequests.map(renderRequestCard)}
@@ -20562,13 +20636,33 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
             {/* Log list */}
             {propertyScopedMaintenanceLog.length === 0 && !logFormOpen && (
-              <p className="mt-4 text-sm text-slate-500">
-                {homeownerMaintenancePropertyScope === 'selected' && selectedHomeId
-                  ? 'No home history records for this property yet.'
-                  : homeownerMaintenancePropertyScope === 'unassigned'
-                    ? 'No unassigned home history records.'
-                    : 'No home history entries yet. Add your first entry or save completed work from a closed service request.'}
-              </p>
+              <div className="mt-4">
+                <EmptyState
+                  icon={<ClipboardList size={18} />}
+                  title={homeownerMaintenancePropertyScope === 'selected' && selectedHomeId ? 'No Home History for this property yet' : 'No Home History yet'}
+                  body={
+                    homeownerMaintenancePropertyScope === 'unassigned'
+                      ? 'Unassigned entries will appear here when older records are not tied to a property.'
+                      : 'Completed jobs, reports, documents, filed invoices, and your own entries can build this home record over time.'
+                  }
+                  action={
+                    homeownerMaintenancePropertyScope !== 'unassigned' ? (
+                      <button type="button" onClick={() => setLogFormOpen(true)} className={buttonClass('primary')}>
+                        <Plus size={16} />
+                        Add history entry
+                      </button>
+                    ) : null
+                  }
+                  secondaryAction={
+                    homeownerMaintenancePropertyScope !== 'unassigned' ? (
+                      <button type="button" onClick={() => openHomeReminderComposer()} className={buttonClass('secondary')}>
+                        <Bell size={16} />
+                        Create reminder
+                      </button>
+                    ) : null
+                  }
+                />
+              </div>
             )}
             {propertyScopedMaintenanceLog.length > 0 && (
               <div className="mt-4 space-y-3">
@@ -20928,13 +21022,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
 
             {/* Document list */}
             {propertyScopedHomeDocuments.length === 0 ? (
-              <EmptyState text={
-                homeownerDocumentPropertyScope === 'selected' && selectedHomeId
-                  ? 'No documents stored for this property yet.'
-                  : homeownerDocumentPropertyScope === 'unassigned'
-                    ? 'No unassigned documents.'
-                    : 'No documents uploaded yet.'
-              } />
+              <EmptyState
+                icon={<FolderOpen size={18} />}
+                title={homeownerDocumentPropertyScope === 'selected' && selectedHomeId ? 'No documents for this property yet' : 'No documents yet'}
+                body={
+                  homeownerDocumentPropertyScope === 'unassigned'
+                    ? 'Unassigned documents will appear here when older uploads are not tied to a property.'
+                    : 'Upload private manuals, warranties, permits, receipts, and other home records you want to keep organized.'
+                }
+              />
             ) : (
               <div className="mt-4 space-y-2">
                 {propertyScopedHomeDocuments.map(doc => {
@@ -31436,7 +31532,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                       </button>
                     ))}
-                    {recentConnectedHomeowners.length === 0 && <EmptyState text="No connected homeowners yet. Invite homeowners or approve connection requests to start building your ServSync network." />}
+                    {recentConnectedHomeowners.length === 0 && (
+                      <EmptyState
+                        compact
+                        icon={<Users size={16} />}
+                        title="No connected homeowners yet"
+                        body="Approved connections and local customer relationships will appear here as your ServSync network grows."
+                        action={
+                          <button type="button" onClick={() => setContractorTab('invites')} className={buttonClass('secondary')}>
+                            Manage invites
+                          </button>
+                        }
+                      />
+                    )}
                   </div>
                 </Card>
 
@@ -33227,7 +33335,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                         <div className="space-y-2">
                           {followUpRequests.length === 0 ? (
-                            <EmptyState text="No open requests need follow-up right now." />
+                            <EmptyState
+                              compact
+                              icon={<ClipboardList size={16} />}
+                              title="No requests need follow-up"
+                              body="Open requests with homeowner replies, accepted quotes, or requested times will appear here."
+                            />
                           ) : (
                             followUpRequests.slice(0, 4).map(request => renderContractorRequestCard(request, false))
                           )}
@@ -33246,7 +33359,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                         <div className="space-y-2">
                           {(requestSections.find(s => s.id === 'new')?.requests.length ?? 0) === 0 ? (
-                            <EmptyState text="No new service requests right now." />
+                            <EmptyState
+                              compact
+                              icon={<MessageSquare size={16} />}
+                              title="No new service requests yet"
+                              body="Homeowner requests and direct requests will appear here when they need an initial response."
+                            />
                           ) : (
                             requestSections.find(s => s.id === 'new')!.requests.slice(0, 4).map(request => renderContractorRequestCard(request, false))
                           )}
@@ -33281,7 +33399,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                     )}
                   </div>
                   {filteredRequests.length === 0 ? (
-                    <EmptyState text={selectedSection.requests.length === 0 ? 'No requests in this queue.' : 'No requests match that search.'} />
+                    selectedSection.requests.length === 0 ? (
+                      <EmptyState
+                        icon={<MessageSquare size={18} />}
+                        title="No service requests yet"
+                        body="Homeowner requests and direct requests will appear in the matching queue when they are ready for your response."
+                      />
+                    ) : (
+                      <EmptyState text="No requests match that search." compact />
+                    )
                   ) : (
                     <div className="space-y-2">
                       {filteredRequests.map(request => renderContractorRequestCard(request, ['closed', 'declined'].includes(request.status)))}
@@ -37561,11 +37687,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
 
                         {visibleEstimateRecords.length === 0 && visibleInvoiceRecords.length === 0 ? (
-                          <EmptyState text={
-                            showingEstimates
-                              ? 'No estimate records match these filters.'
-                              : 'No invoice records match these filters.'
-                          } />
+                          showingEstimates && estimateRecordsForView.length === 0 && !estimateFilterActive ? (
+                            <EmptyState
+                              icon={<Receipt size={18} />}
+                              title="No estimates yet"
+                              body="Create estimate drafts for connected homeowners or local customers, then send them when they are ready."
+                            />
+                          ) : !showingEstimates && invoiceRecordsForView.length === 0 && !invoiceFilterActive ? (
+                            <EmptyState
+                              icon={<Receipt size={18} />}
+                              title="No invoices yet"
+                              body="Invoices you create for selected customers or completed work will appear here."
+                            />
+                          ) : (
+                            <EmptyState
+                              compact
+                              text={showingEstimates ? 'No estimate records match these filters.' : 'No invoice records match these filters.'}
+                            />
+                          )
                         ) : (
                         <div className="space-y-2">
                         {visibleInvoiceRecords.length > 0 && (
@@ -38005,7 +38144,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
 
                         {records.length === 0 ? (
-                          <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} />
+                          baseRecords.length === 0 && !jobsListDateFilter && jobsListStatusFilter === 'all' && jobsListTypeFilter === 'all' && !jobsCustomerFilterSubjectId ? (
+                            <EmptyState
+                              icon={<ClipboardCheck size={18} />}
+                              title={contractorJobsView === 'open_jobs' ? 'No open jobs yet' : 'No completed jobs yet'}
+                              body={
+                                contractorJobsView === 'open_jobs'
+                                  ? 'Jobs created from accepted estimates or supported job creation paths will appear here while work is active.'
+                                  : 'Completed, closed, and cancelled jobs will appear here after field work is wrapped up.'
+                              }
+                            />
+                          ) : (
+                            <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} compact />
+                          )
                         ) : (
                           <div className="space-y-2">
                             {records.map(insp => {
@@ -39496,7 +39647,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               {contractorJobsView === 'overview' && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {inspections.length === 0 ? (
-                  <EmptyState text="No jobs yet. Create a service job for repairs or installs, or use a checklist/report workflow for inspections and maintenance visits." />
+                  <EmptyState
+                    icon={<ClipboardCheck size={18} />}
+                    title="No jobs yet"
+                    body="Jobs created from accepted estimates or existing job creation paths will appear here for repairs, installs, inspections, and maintenance visits."
+                  />
                 ) : (
                   <div className="space-y-2">
                     {inspections.slice(0, 5).map(insp => {
@@ -47818,14 +47973,6 @@ function Notice({ tone, text }: { tone: 'success' | 'error' | 'info'; text: stri
   }[tone];
 
   return <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${style}`}>{text}</div>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-[#E1E3E7] bg-[#F7F9FC] px-4 py-6 text-center text-sm font-medium text-[#223D67]/75">
-      {text}
-    </div>
-  );
 }
 
 const CALENDAR_EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string }[] = [

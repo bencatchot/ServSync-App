@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-13
 
+- Branch: `codex/empty-state-foundation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/emptyStates/EmptyState.tsx`
+  - `tests/e2e/empty-state-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 3 Slice 3A Empty State Foundation + Primary No-Data Surfaces. ServSync now has a shared reusable empty-state component with standard and compact variants, and primary homeowner/contractor true no-data surfaces use contextual titles, descriptions, and existing-action CTAs where appropriate.
+- Reason for change: High-traffic blank states needed consistent, accessible guidance that explains what is missing, why the surface may be empty, and the safe next action without changing loading, error, search/filter, permission, draft, workflow, routing, SQL/RLS/RPC, Supabase/Vercel, or infrastructure behavior.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with the existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/empty-state-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/calendar-appointment-status-presentation.spec.ts tests/e2e/findings-status-presentation.spec.ts tests/e2e/reminder-status-presentation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/shared-home-reminders-ui.spec.ts tests/e2e/home-history.spec.ts tests/e2e/homeowner-invoice-home-history-next-step.spec.ts --project=chromium --reporter=line` had Home Reminder Room source checks and Home History source checks pass; one old slice-specific changed-file scope assertion flagged the new `src/features/emptyStates/EmptyState.tsx`, and shared-home rendered checks were blocked by missing `VITE_SUPABASE_URL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts tests/e2e/contractor-create-invoice.spec.ts tests/e2e/contractor-create-job.spec.ts tests/e2e/contractor-service-requests.spec.ts --project=chromium --reporter=line` had source checks pass where reached, while mutating rendered checks were blocked by missing `TEST_CONTRACTOR_EMAIL`; one existing invoice source assertion remains stale because it captures the adjacent schedule-item RPC.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_HOMEOWNER_EMAIL` / `TEST_CONTRACTOR_EMAIL`.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan passed.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` mismatch, reproduced on a clean detached `origin/main` worktree before changed code was evaluated.
+- Known risks or follow-ups:
+  - Slice 3A is frontend/test/docs only. Bundle 3 remains incomplete: Slice 3B Draft Clarity Notices and Slice 3C Search, Filter & Permission Empty States remain future work.
+  - Authenticated rendered desktop/mobile coverage for all migrated primary surfaces remains useful where fixture credentials are available.
+
 - Branch: `codex/reminder-status-presentation-v1`
 - Files changed:
   - `src/App.tsx`
