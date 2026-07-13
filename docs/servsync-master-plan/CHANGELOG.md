@@ -6,6 +6,32 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-13
 
+- Branch: `codex/findings-status-presentation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/findings/statusPresentation.ts`
+  - `tests/e2e/findings-status-presentation.spec.ts`
+  - `tests/e2e/status-secondary-migration.spec.ts`
+  - `tests/e2e/calendar-appointment-status-presentation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2D-4A Findings Condition/Status Presentation. The five existing finding condition/status values now use a focused presentation resolver, and the app-side finding editor, finding cards, report header, professional summary, room summaries, and job/overview count chips consume shared status labels, tones, badges, and accents.
+- Reason for change: Finding presentation was still driven by local duplicated label/color maps even though the values are mixed condition, attention, and resolution states that should remain distinct from generic lifecycle status and from a future reminder due-state pass.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/findings-status-presentation.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-secondary-migration.spec.ts tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts tests/e2e/calendar-appointment-status-presentation.spec.ts --project=chromium`
+  - Existing finding/report/estimate-from-findings/work-item focused checks attempted as documented in the implementation report.
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch before changed code is evaluated, and reproduced on clean `origin/main`.
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+- Known risks or follow-ups:
+  - Slice 2D-4A is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2D-4B Reminder Lifecycle/Due-State Presentation remains future work, Slice 2D-4C Dashboard Summary/Attention Indicators is only if still needed, and Slice 2D-3 Project & Work Item Status Presentation remains deferred until Project UI is live.
+  - Authenticated rendered desktop/mobile coverage for finding editor/report surfaces remains useful where fixture credentials are available.
+
 - Branch: `codex/calendar-appointment-status-presentation-v1`
 - Files changed:
   - `src/App.tsx`

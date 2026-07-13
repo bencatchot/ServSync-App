@@ -137,6 +137,6 @@ test.describe('Calendar and appointment status presentation', () => {
     expect(source).toContain('normalizeServiceRequestAppointmentWindows(windows)');
     expect(source).not.toContain("from './features/projects/statusPresentation'");
     expect(source).not.toContain("from './features/reminders/statusPresentation'");
-    expect(source).not.toContain("from './features/findings/statusPresentation'");
+    expect(source).toContain("from './features/findings/statusPresentation';");
   });
 });
