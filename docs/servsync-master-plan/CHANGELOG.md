@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-13
 
+- Branch: `codex/calendar-appointment-status-presentation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/appointments/statusPresentation.ts`
+  - `tests/e2e/calendar-appointment-status-presentation.spec.ts`
+  - `tests/e2e/status-secondary-migration.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2D-2 Calendar & Appointment Status Presentation. Appointment lifecycle, appointment-window lifecycle, contractor visit lifecycle, and visit homeowner-response labels now use shared presentation resolvers, with appointment cards, detail panels, calendar rows, and the calendar legend migrated while preserving compact month-grid event chips.
+- Reason for change: Calendar and appointment surfaces had duplicated label, tone, dot, and card-class mappings that needed to align with the Bundle 2 status-presentation foundation without changing scheduling behavior or calendar density.
+- Tests/checks run:
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/calendar-appointment-status-presentation.spec.ts tests/e2e/status-secondary-migration.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts --project=chromium`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb021-scheduling-foundation.spec.ts tests/e2e/standalone-calendar-event.spec.ts tests/e2e/mobile-smoke.spec.ts --project=chromium` attempted; source-level scheduling checks passed, sandbox mutation probes skipped as configured, and authenticated standalone/mobile rendered checks remain blocked locally by missing `TEST_*` credentials.
+  - `npm run typecheck`
+  - `npm run build`
+  - `git diff --check`
+  - changed-file scope scan
+  - credential-pattern scan
+  - forbidden-scope scan
+  - `npm run lint` attempted; blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting unchanged `playwright.config.ts` before changed code was evaluated.
+- Known risks or follow-ups:
+  - Bundle 2 remains incomplete: Slice 2D-3 project/work-item status presentation is deferred until Project UI is live, and Slice 2D-4 findings/reminders/severity review remains future work.
+  - Authenticated rendered desktop/mobile coverage for appointment and calendar status presentation remains useful where fixture credentials are available.
+
 - Branch: `codex/secondary-status-migration-v1`
 - Files changed:
   - `src/App.tsx`

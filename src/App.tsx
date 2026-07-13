@@ -128,6 +128,12 @@ import {
 } from './features/serviceAgreements/statusPresentation';
 import { supportStatusPresentation } from './features/support/statusPresentation';
 import {
+  appointmentStatusPresentation,
+  appointmentWindowStatusPresentation,
+  visitEventStatusPresentation,
+  visitHomeownerResponsePresentation,
+} from './features/appointments/statusPresentation';
+import {
   CLOSED_JOB_STATUSES,
   inspectionCanSaveProgress,
   inspectionIsClosedJob,
@@ -45145,24 +45151,7 @@ function ServiceRequestAppointmentCard({
   proposedByLabel?: string;
   nextActionLabel?: string;
 }) {
-  const statusStyle: Record<AppointmentStatus, string> = {
-    proposed:  'border-amber-200 bg-amber-50',
-    confirmed: 'border-emerald-200 bg-emerald-50',
-    completed: 'border-slate-200 bg-slate-50',
-    cancelled: 'border-slate-200 bg-slate-50',
-  };
-  const badgeStyle: Record<AppointmentStatus, string> = {
-    proposed:  'bg-amber-100 text-amber-700',
-    confirmed: 'bg-emerald-100 text-emerald-700',
-    completed: 'bg-slate-200 text-slate-600',
-    cancelled: 'bg-slate-200 text-slate-600',
-  };
-  const statusLabel: Record<AppointmentStatus, string> = {
-    proposed:  'Proposed',
-    confirmed: 'Confirmed',
-    completed: 'Completed',
-    cancelled: 'Cancelled',
-  };
+  const appointmentPresentation = appointmentStatusPresentation(appointment.status);
   const statusHelper: Record<AppointmentStatus, string> = {
     proposed: 'Waiting for the proposed appointment time to be reviewed.',
     confirmed: 'This appointment is confirmed. Changes stay in Service Requests; no external calendar sync or automated reminders are implied.',
@@ -45171,7 +45160,7 @@ function ServiceRequestAppointmentCard({
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${statusStyle[appointment.status]}`}>
+    <div className={`rounded-xl border p-4 ${appointmentPresentation.cardClass}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -45187,9 +45176,7 @@ function ServiceRequestAppointmentCard({
             {statusHelper[appointment.status]}
           </p>
         </div>
-        <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-semibold ${badgeStyle[appointment.status]}`}>
-          {statusLabel[appointment.status]}
-        </span>
+        <StatusBadge {...appointmentPresentation} className="w-fit" />
       </div>
     </div>
   );
@@ -45234,6 +45221,7 @@ function ServiceRequestAppointmentWindowsCard({
   const proposedWindows = normalizeServiceRequestAppointmentWindows(windows);
   if (proposedWindows.length === 0) return null;
 
+  const windowPresentation = appointmentWindowStatusPresentation('proposed');
   const canRespond = perspective === 'homeowner' && Boolean(onAcceptWindow && onDeclineWindow);
   const heading = hasConfirmedAppointment ? 'New visit times proposed' : 'Proposed visit times';
   const helperText = perspective === 'contractor'
@@ -45246,7 +45234,7 @@ function ServiceRequestAppointmentWindowsCard({
     <div
       data-testid="service-request-appointment-windows"
       data-record-id={requestId}
-      className="rounded-xl border border-blue-200 bg-blue-50 p-4"
+      className={`rounded-xl border p-4 ${windowPresentation.cardClass}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -45256,7 +45244,7 @@ function ServiceRequestAppointmentWindowsCard({
           </p>
           <p className="mt-1 text-sm font-medium text-blue-900">{helperText}</p>
         </div>
-        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-blue-700">
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${windowPresentation.chipClass}`}>
           {proposedWindows.length} option{proposedWindows.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -45335,12 +45323,7 @@ function HomeownerCalendarEventDetail({
   const appointmentDate = new Date(appointment.proposed_at);
   const linkedEstimate = estimates.find(estimate => ['sent', 'accepted'].includes(estimate.status)) ?? estimates[0] ?? null;
   const linkedInvoice = invoices.find(invoice => ['sent', 'viewed', 'overdue', 'partially_paid'].includes(invoice.status)) ?? invoices[0] ?? null;
-  const statusLabel: Record<AppointmentStatus, string> = {
-    proposed: 'Proposed',
-    confirmed: 'Confirmed',
-    completed: 'Completed',
-    cancelled: 'Cancelled',
-  };
+  const appointmentPresentation = appointmentStatusPresentation(appointment.status);
   const requestStatusLabel: Record<ServiceRequestStatus, string> = {
     open: 'Open',
     contractor_responded: 'Contractor responded',
@@ -45405,7 +45388,7 @@ function HomeownerCalendarEventDetail({
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{statusLabel[appointment.status]}</p>
+              <StatusBadge {...appointmentPresentation} className="mt-1" />
               <p className="mt-1 text-xs text-slate-500">{proposedByLabel}</p>
             </div>
           </div>
@@ -48248,20 +48231,8 @@ function VisitCalendarEventDetail({
   const scheduledAt = new Date(event.scheduled_at);
   const title = inspection?.name || request?.title || 'Scheduled service visit';
   const subject = request?.homeowner_name || (event.local_contact_id ? 'Local customer' : 'Customer');
-  const statusLabel = event.status === 'scheduled'
-    ? 'Scheduled'
-    : event.status === 'completed'
-      ? 'Completed'
-      : 'Cancelled';
-  const responseLabel = event.homeowner_response_status === 'not_shared'
-    ? 'Contractor calendar only'
-    : event.homeowner_response_status === 'shared_waiting'
-      ? 'Shared — waiting for homeowner'
-      : event.homeowner_response_status === 'accepted'
-        ? 'Homeowner accepted'
-        : event.homeowner_response_status === 'declined'
-          ? 'Homeowner declined'
-          : 'New time suggested';
+  const visitPresentation = visitEventStatusPresentation(event.status);
+  const responsePresentation = visitHomeownerResponsePresentation(event.homeowner_response_status);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -48311,9 +48282,10 @@ function VisitCalendarEventDetail({
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{statusLabel}</p>
-              <p className="mt-1 text-xs text-slate-500">{responseLabel}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Visit status</p>
+              <StatusBadge {...visitPresentation} className="mt-1" />
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Homeowner response</p>
+              <p className="mt-1 text-xs font-semibold text-slate-600">{responsePresentation.label}</p>
             </div>
           </div>
 
@@ -48569,52 +48541,11 @@ function CalendarView({
     if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1);
   };
 
-  const appointmentStatusClass = (status: AppointmentStatus) => {
-    if (status === 'confirmed') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    if (status === 'completed') return 'border-blue-200 bg-blue-50 text-blue-800';
-    if (status === 'cancelled') return 'border-red-200 bg-red-50 text-red-800';
-    return 'border-amber-200 bg-amber-50 text-amber-800';
-  };
-
-  const appointmentDotClass = (status: AppointmentStatus) => {
-    if (status === 'confirmed') return 'bg-emerald-500';
-    if (status === 'completed') return 'bg-blue-500';
-    if (status === 'cancelled') return 'bg-red-400';
-    return 'bg-amber-500';
-  };
-
-  const statusLabel: Record<AppointmentStatus, string> = {
-    proposed: 'Proposed',
-    confirmed: 'Confirmed',
-    completed: 'Completed',
-    cancelled: 'Cancelled',
-  };
-
-  const visitEventStatusClass = (event: ContractorVisitEvent) => {
-    if (event.status === 'completed') return 'border-blue-200 bg-blue-50 text-blue-800';
-    if (event.status === 'cancelled') return 'border-red-200 bg-red-50 text-red-800';
-    if (event.homeowner_response_status === 'accepted') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    if (event.homeowner_response_status === 'declined' || event.homeowner_response_status === 'countered') return 'border-amber-200 bg-amber-50 text-amber-800';
-    return 'border-sky-200 bg-sky-50 text-sky-800';
-  };
-
-  const visitEventDotClass = (event: ContractorVisitEvent) => {
-    if (event.status === 'completed') return 'bg-blue-500';
-    if (event.status === 'cancelled') return 'bg-red-400';
-    if (event.homeowner_response_status === 'accepted') return 'bg-emerald-500';
-    if (event.homeowner_response_status === 'declined' || event.homeowner_response_status === 'countered') return 'bg-amber-500';
-    return 'bg-sky-500';
-  };
-
-  const visitResponseLabel = (event: ContractorVisitEvent) => {
-    if (event.status === 'completed') return 'Completed';
-    if (event.status === 'cancelled') return 'Cancelled';
-    if (event.homeowner_response_status === 'not_shared') return 'Contractor calendar';
-    if (event.homeowner_response_status === 'shared_waiting') return 'Shared — waiting for homeowner';
-    if (event.homeowner_response_status === 'accepted') return 'Homeowner accepted';
-    if (event.homeowner_response_status === 'declined') return 'Homeowner declined';
-    return 'New time suggested';
-  };
+  const visitCalendarPresentation = (event: ContractorVisitEvent) =>
+    event.status === 'scheduled'
+      ? visitHomeownerResponsePresentation(event.homeowner_response_status)
+      : visitEventStatusPresentation(event.status);
+  const calendarLegendItems = (['proposed', 'confirmed', 'completed', 'cancelled'] as const).map(status => appointmentStatusPresentation(status));
 
   const openCalendarEntry = (entry: CalendarEntry) => {
     if (entry.kind === 'standalone') {
@@ -48668,24 +48599,25 @@ function CalendarView({
       const inspection = visitEvent.inspection;
       const title = inspection?.name || request?.title || 'Service visit';
       const subject = request?.homeowner_name || (visitEvent.local_contact_id ? 'Local customer' : 'Customer');
+      const presentation = visitCalendarPresentation(visitEvent);
       return (
         <button
           key={`visit-${visitEvent.id}`}
           type="button"
           onClick={() => onOpenVisitEvent?.(visitEvent)}
-          className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${visitEventStatusClass(visitEvent)}`}
+          className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${presentation.chipClass}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${visitEventDotClass(visitEvent)}`} />
+                <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${presentation.dotClass}`} />
                 <p className="font-semibold text-slate-950">{title}</p>
               </div>
               <p className="mt-1 text-xs text-slate-600">
                 {subject} · {formatShortMonthDayAtTime(date, '', [])}
               </p>
               {!compact && visitEvent.notes && <p className="mt-1 text-xs text-slate-600">{visitEvent.notes}</p>}
-              <p className="mt-1 text-xs font-semibold text-slate-700">{visitResponseLabel(visitEvent)}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-700">{presentation.label}</p>
             </div>
             <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-700">
               Visit
@@ -48698,17 +48630,18 @@ function CalendarView({
     const date = new Date(appointment.proposed_at);
     const otherParty = perspective === 'homeowner' ? request.contractor_name : (request.homeowner_name || 'Homeowner');
     const needsResponse = appointment.status === 'proposed' && appointment.proposed_by !== perspective;
+    const presentation = appointmentStatusPresentation(appointment.status);
     return (
       <button
         key={`appointment-${request.id}-${appointment.id}`}
         type="button"
         onClick={() => onOpenRequest?.(request)}
-        className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${appointmentStatusClass(appointment.status)}`}
+        className={`w-full rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50 ${presentation.chipClass}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`h-2.5 w-2.5 rounded-full ${appointmentDotClass(appointment.status)}`} />
+              <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${presentation.dotClass}`} />
               <p className="font-semibold text-slate-950">{request.title}</p>
               {needsResponse && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
@@ -48723,7 +48656,7 @@ function CalendarView({
             <p className="mt-1 text-xs font-semibold text-slate-700">{appointmentNextActionText(appointment, perspective)}</p>
           </div>
           <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-700">
-            {statusLabel[appointment.status]}
+            {presentation.compactLabel}
           </span>
         </div>
       </button>
@@ -48797,10 +48730,15 @@ function CalendarView({
                           ? entry.calendarEvent.title
                           : entry.request.title;
                       const className = entry.kind === 'visit'
-                        ? visitEventStatusClass(entry.visitEvent)
+                        ? visitCalendarPresentation(entry.visitEvent).chipClass
                         : entry.kind === 'standalone'
                           ? 'border-violet-200 bg-violet-50 text-violet-800'
-                          : appointmentStatusClass(entry.appointment.status);
+                          : appointmentStatusPresentation(entry.appointment.status).chipClass;
+                      const statusText = entry.kind === 'visit'
+                        ? visitCalendarPresentation(entry.visitEvent).label
+                        : entry.kind === 'standalone'
+                          ? calendarEventTypeLabel(entry.calendarEvent.event_type)
+                          : appointmentStatusPresentation(entry.appointment.status).label;
                       const entryId = entry.kind === 'visit'
                         ? entry.visitEvent.id
                         : entry.kind === 'standalone'
@@ -48814,6 +48752,7 @@ function CalendarView({
                             event.stopPropagation();
                             openCalendarEntry(entry);
                           }}
+                          aria-label={`${time} ${title} ${statusText}`}
                           className={`block w-full rounded border px-1 py-0.5 text-left text-xs leading-tight transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
                         >
                           <span className="font-semibold">{time}</span>
@@ -48831,11 +48770,13 @@ function CalendarView({
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-500" /> Proposed</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" /> Confirmed</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-500" /> Completed</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-400" /> Cancelled</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-violet-500" /> Event (no job)</span>
+            {calendarLegendItems.map(item => (
+              <span key={item.label} className="flex items-center gap-1.5">
+                <span aria-hidden="true" className={`h-3 w-3 rounded ${item.dotClass}`} />
+                {item.label}
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded bg-violet-500" /> Event (no job)</span>
           </div>
         </div>
 
