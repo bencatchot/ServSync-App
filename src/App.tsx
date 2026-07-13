@@ -140,6 +140,12 @@ import {
   visitHomeownerResponsePresentation,
 } from './features/appointments/statusPresentation';
 import {
+  deriveHomeReminderDueState,
+  deriveSharedHomeReminderState,
+  homeReminderDerivedStatePresentation,
+  sharedHomeReminderStatePresentation,
+} from './features/reminders/statusPresentation';
+import {
   CLOSED_JOB_STATUSES,
   inspectionCanSaveProgress,
   inspectionIsClosedJob,
@@ -11803,18 +11809,10 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     notes: '',
     due_on: defaultHomeReminderDueDate(),
   });
-  const reminderDueState = (reminder: HomeReminder) => {
-    if (reminder.status === 'completed') return { label: 'Completed', className: 'bg-emerald-100 text-emerald-700' };
-    if (reminder.status === 'dismissed') return { label: 'Dismissed', className: 'bg-slate-100 text-slate-600' };
-    const today = dateInputValue(new Date());
-    if (reminder.due_on < today) return { label: 'Overdue', className: 'bg-red-100 text-red-700' };
-    if (reminder.due_on === today) return { label: 'Due today', className: 'bg-amber-100 text-amber-700' };
-    return { label: 'Upcoming', className: 'bg-blue-50 text-blue-700' };
-  };
-  const sharedReminderDueState = (reminder: SharedHomeReminderShell) => {
-    if (reminder.is_overdue) return { label: 'Overdue', className: 'bg-red-100 text-red-700' };
-    return { label: 'Open', className: 'bg-blue-50 text-blue-700' };
-  };
+  const reminderStatePresentation = (reminder: HomeReminder) =>
+    homeReminderDerivedStatePresentation(deriveHomeReminderDueState(reminder, dateInputValue(new Date())));
+  const sharedReminderStatePresentation = (reminder: SharedHomeReminderShell) =>
+    sharedHomeReminderStatePresentation(deriveSharedHomeReminderState(reminder.is_overdue));
   const openHomeReminderComposer = (options: Partial<HomeReminderDraft> = {}) => {
     setHomeReminderDraft({ ...emptyHomeReminderDraft(), ...options });
     setReminderFormOpen(true);
@@ -15546,12 +15544,12 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             ) : (
               <div className="mt-3 space-y-2">
                 {linkedReminders.slice(0, 5).map(reminder => {
-                  const dueState = reminderDueState(reminder);
+                  const reminderPresentation = reminderStatePresentation(reminder);
                   return (
                     <div key={reminder.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="min-w-0 flex-1 break-words text-sm font-semibold text-slate-900">{reminder.title}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                        <StatusBadge {...reminderPresentation} />
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         Due {formatDateOnly(reminder.due_on, 'not set')}
@@ -16749,7 +16747,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <p className="text-xs font-medium text-slate-500">No shared reminders for this home.</p>
                         ) : (
                           sharedRemindersForHome.map(reminder => {
-                            const dueState = sharedReminderDueState(reminder);
+                            const reminderPresentation = sharedReminderStatePresentation(reminder);
                             return (
                               <div key={reminder.reminder_id} className="rounded-lg border border-blue-100 bg-white px-3 py-2" data-testid="shared-home-reminder-card">
                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -16759,9 +16757,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                                       Due {formatDateOnly(reminder.due_on, 'not set')}
                                     </p>
                                   </div>
-                                  <div className="flex shrink-0 flex-wrap gap-1.5">
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{reminder.status}</span>
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                  <div className="flex flex-wrap gap-1.5 sm:justify-end">
+                                    <StatusBadge {...reminderPresentation} />
                                   </div>
                                 </div>
                               </div>
@@ -17791,13 +17788,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                     <EmptyState text="No open Home Reminders yet." />
                   ) : (
                     openDashboardHomeReminders.map(reminder => {
-                      const dueState = reminderDueState(reminder);
+                      const reminderPresentation = reminderStatePresentation(reminder);
                       const roomChip = renderReminderRoomChip(reminder);
                       return (
                         <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="min-w-0 text-sm font-semibold text-slate-800">{reminder.title}</p>
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="min-w-0 flex-1 break-words text-sm font-semibold text-slate-800">{reminder.title}</p>
+                            <StatusBadge {...reminderPresentation} />
                           </div>
                           <p className="mt-1 text-xs text-slate-500">
                             Due {formatDateOnly(reminder.due_on)}
@@ -20517,7 +20514,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       return a.status === 'open' ? -1 : 1;
                     })
                     .map(reminder => {
-                      const dueState = reminderDueState(reminder);
+                      const reminderPresentation = reminderStatePresentation(reminder);
                       const linkedEntry = reminder.maintenance_log_id ? maintenanceLog.find(entry => entry.id === reminder.maintenance_log_id) : null;
                       return (
                         <div key={reminder.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -20525,7 +20522,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-semibold text-slate-950">{reminder.title}</p>
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                <StatusBadge {...reminderPresentation} />
                                 {linkedEntry && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Linked to Home History</span>}
                                 {renderReminderRoomChip(reminder)}
                               </div>
@@ -20629,13 +20626,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                           <div className="mt-2 space-y-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Linked Home Reminders</p>
                             {entryReminders.map(reminder => {
-                              const dueState = reminderDueState(reminder);
+                              const reminderPresentation = reminderStatePresentation(reminder);
                               return (
                                 <div key={reminder.id} className="flex flex-col gap-2 rounded-lg border border-blue-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                       <p className="text-sm font-semibold text-slate-900">{reminder.title}</p>
-                                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dueState.className}`}>{dueState.label}</span>
+                                      <StatusBadge {...reminderPresentation} />
                                       {renderReminderRoomChip(reminder)}
                                     </div>
                                     <p className="mt-0.5 text-xs text-slate-500">

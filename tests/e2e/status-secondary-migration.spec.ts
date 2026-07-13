@@ -108,7 +108,7 @@ test.describe('Secondary status migration', () => {
     expect(source).not.toContain('ADMIN_INVITE_LEAD_STATUS_LABELS');
   });
 
-  test('preserves explicit scope exclusions for later 2D slices after calendar and finding migration', () => {
+  test('preserves explicit scope exclusions for later 2D slices after calendar, finding, and reminder migration', () => {
     const source = sourceFile('src/App.tsx');
 
     expect(source).toContain("from './features/appointments/statusPresentation';");
@@ -117,10 +117,12 @@ test.describe('Secondary status migration', () => {
     expect(source).toContain('function calendarEventTypeLabel(type: string)');
     expect(source).toContain("from './features/findings/statusPresentation';");
     expect(source).toContain('findingStatusPresentation(f.status)');
-    expect(source).toContain("if (reminder.status === 'completed') return { label: 'Completed', className:");
+    expect(source).toContain("from './features/reminders/statusPresentation';");
+    expect(source).toContain('deriveHomeReminderDueState(reminder, dateInputValue(new Date()))');
+    expect(source).toContain("reminder.status === 'open' && (");
     expect(source).toContain('const contractorHomeMapDraftStatusLabel = (status: HomeMapDraftStatus)');
     expect(source).not.toContain("from './features/projects/statusPresentation'");
-    expect(source).not.toContain("from './features/reminders/statusPresentation'");
+    expect(source).not.toContain('ReminderStateBadge');
   });
 
   test('keeps secondary status helpers presentation-only', () => {

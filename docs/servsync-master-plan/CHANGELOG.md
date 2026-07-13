@@ -6,6 +6,34 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-13
 
+- Branch: `codex/reminder-status-presentation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/reminders/statusPresentation.ts`
+  - `tests/e2e/reminder-status-presentation.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/status-secondary-migration.spec.ts`
+  - `tests/e2e/calendar-appointment-status-presentation.spec.ts`
+  - `tests/e2e/findings-status-presentation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 2 Slice 2D-4B Reminder Lifecycle/Due-State Presentation. Owner reminder lifecycle and due-state labels now use focused presentation helpers, the existing owner due-state derivation is centralized without behavior changes, shared reminder shell display keeps using the RPC-provided overdue flag, and dashboard, room, Home History, linked-reminder, and shared reminder cards use the shared `StatusBadge` presentation treatment.
+- Reason for change: Reminder cards still had local duplicated label/color logic after the status-badge, calendar, finding, and date presentation foundations, and needed consistent presentation while preserving reminder scheduling, due-date semantics, actions, counts, shared-home privacy, notifications, calendar behavior, PDFs, SQL/RLS/RPCs, Supabase/Vercel settings, and infrastructure behavior.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with the existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/reminder-status-presentation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-secondary-migration.spec.ts tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/calendar-appointment-status-presentation.spec.ts tests/e2e/findings-status-presentation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-ui.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/homeowner-invoice-home-history-next-step.spec.ts tests/e2e/mobile-smoke.spec.ts --project=chromium --reporter=line` had the Home History source checks pass, then mobile smoke was blocked by missing `TEST_HOMEOWNER_EMAIL` / `TEST_CONTRACTOR_EMAIL` credentials.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/home-reminder-room-foundation.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/shared-home-reminders-shell.spec.ts tests/e2e/shared-home-reminders-ui.spec.ts --project=chromium --reporter=line` had source/UI checks pass after updating the active UI regression, while the SQL foundation scope assertion remains old-slice-specific and shared-home rendered checks were blocked by missing `VITE_SUPABASE_URL`.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` mismatch, reproduced on a clean detached `origin/main` worktree before changed code was evaluated.
+- Known risks or follow-ups:
+  - Slice 2D-4B is frontend/test/docs only. Bundle 2 remains incomplete: Slice 2D-4C Dashboard Summary/Attention Indicators is optional/future only if still needed, and Slice 2D-3 Project & Work Item Status Presentation remains deferred until Project UI is live.
+  - Authenticated rendered desktop/mobile reminder coverage remains useful where fixture credentials are available.
+
 - Branch: `codex/findings-status-presentation-v1`
 - Files changed:
   - `src/App.tsx`
