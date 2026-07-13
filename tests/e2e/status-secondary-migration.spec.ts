@@ -108,16 +108,17 @@ test.describe('Secondary status migration', () => {
     expect(source).not.toContain('ADMIN_INVITE_LEAD_STATUS_LABELS');
   });
 
-  test('preserves explicit scope exclusions for later 2D slices', () => {
+  test('preserves explicit scope exclusions for later 2D slices after calendar migration', () => {
     const source = sourceFile('src/App.tsx');
 
-    expect(source).toContain('const statusLabel: Record<AppointmentStatus, string>');
+    expect(source).toContain("from './features/appointments/statusPresentation';");
+    expect(source).toContain('appointmentStatusPresentation(appointment.status)');
+    expect(source).toContain('visitHomeownerResponsePresentation(event.homeowner_response_status)');
     expect(source).toContain('function calendarEventTypeLabel(type: string)');
     expect(source).toContain('const FINDING_STATUS_CONFIG: Record<FindingStatus');
     expect(source).toContain("if (reminder.status === 'completed') return { label: 'Completed', className:");
     expect(source).toContain('const contractorHomeMapDraftStatusLabel = (status: HomeMapDraftStatus)');
     expect(source).not.toContain("from './features/projects/statusPresentation'");
-    expect(source).not.toContain("from './features/calendar/statusPresentation'");
     expect(source).not.toContain("from './features/reminders/statusPresentation'");
     expect(source).not.toContain("from './features/findings/statusPresentation'");
   });
