@@ -105,7 +105,7 @@ test.describe('FB-032 homeowner Service Agreements UI source guardrails', () => 
     expect(homeownerSource).toContain('This is not a legal e-signature flow.');
     expect(homeownerSource).toContain('Your contractor will still coordinate scheduling and billing separately.');
     expect(agreementCardSource).toContain('data-testid="homeowner-service-agreement-card"');
-    expect(agreementCardSource).toContain('This is a read-only agreement snapshot.');
+    expect(agreementCardSource).toContain('This agreement was accepted and is now read-only.');
     expect(agreementCardSource).not.toContain('respondToServiceAgreementOffer');
   });
 

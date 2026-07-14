@@ -6,6 +6,44 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-14
 
+- Branch: `codex/service-report-homemap-notices-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/VisibilityNotice.tsx`
+  - `src/features/homeMap/statusPresentation.ts`
+  - `tests/e2e/service-report-homemap-notices.spec.ts`
+  - `tests/e2e/draft-clarity-notices.spec.ts`
+  - `tests/e2e/status-secondary-migration.spec.ts`
+  - `tests/e2e/contractor-home-map-drafts-ui.spec.ts`
+  - `tests/e2e/fb032-service-agreements-contractor-ui.spec.ts`
+  - `tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 3 Slice 3B-2 Service Agreement, Report/Finalization & Home Map Notices. ServSync now has a presentation-only `VisibilityNotice` component for non-draft visibility/finalization states, service agreement sent/active states and report review/finalization/file/send helpers use clearer notices, and contractor Home Map draft review statuses use a focused presentation resolver while draft/private states continue using `DraftNotice`.
+- Reason for change: Remaining 3B draft-adjacent surfaces needed clearer wording for private drafts, homeowner-visible sent states, read-only accepted agreements, report finalization/send/file boundaries, and contractor Home Map proposals without changing lifecycle, approval, finalization, PDF, permission, notification, payment, SQL/RLS/RPC, Supabase, or Vercel behavior.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with the existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/service-report-homemap-notices.spec.ts tests/e2e/draft-clarity-notices.spec.ts tests/e2e/status-secondary-migration.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb032-service-agreements-contractor-ui.spec.ts tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts tests/e2e/contractor-home-map-drafts-ui.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/empty-state-foundation.spec.ts tests/e2e/calendar-appointment-status-presentation.spec.ts tests/e2e/findings-status-presentation.spec.ts tests/e2e/reminder-status-presentation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-finalize-report.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_HOMEOWNER_EMAIL` / `TEST_CONTRACTOR_EMAIL`.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan found only existing documentation references to environment variable names and the app's `PASSWORD_RECOVERY` auth event; no credential values were found in changed files.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch, reproduced on a clean detached `origin/main` worktree before changed code was evaluated.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel settings, service agreement lifecycle, report finalization/send behavior, PDF generation/output, Home Map approval behavior, connected-property proposal behavior, permissions, homeowner visibility, notifications, payments, production data, Bundle 3B-3, Bundle 3C, or Bundle 4 work is included.
+  - Authenticated rendered report/finalization/Home Map/mobile coverage remains blocked until local test credentials are available.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Bundle 3 sequencing now records Slice 3B-2 as implemented and keeps 3B-3 and 3C future-scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing Bundle 3 presentation polish without changing product strategy, roadmap structure, workflows, permissions, backend behavior, or implementation strategy.
+
 - Branch: `codex/draft-notice-estimate-invoice-v1`
 - Files changed:
   - `src/App.tsx`

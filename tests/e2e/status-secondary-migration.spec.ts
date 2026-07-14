@@ -25,6 +25,7 @@ import {
   serviceAgreementTemplateStatusPresentation,
 } from '../../src/features/serviceAgreements/statusPresentation';
 import { supportStatusPresentation } from '../../src/features/support/statusPresentation';
+import { homeMapDraftStatusPresentation } from '../../src/features/homeMap/statusPresentation';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -52,6 +53,7 @@ test.describe('Secondary status migration', () => {
     expect(localClaimInviteStatusPresentation('claimed')).toEqual({ label: 'Claimed by Homeowner', tone: 'success' });
     expect(contractorTeamStatusPresentation('disabled')).toEqual({ label: 'Disabled', tone: 'muted' });
     expect(contractorTeamInviteStatusPresentation('pending')).toEqual({ label: 'Pending', tone: 'warning' });
+    expect(homeMapDraftStatusPresentation('submitted')).toEqual({ label: 'Submitted for Homeowner Review', tone: 'info' });
   });
 
   test('falls back safely for unknown secondary status values', () => {
@@ -59,6 +61,7 @@ test.describe('Secondary status migration', () => {
     expect(supportStatusPresentation('needs-admin-review')).toEqual({ label: 'Needs Admin Review', tone: 'neutral' });
     expect(homeownerContractorInviteStatusPresentation(null)).toEqual({ label: 'Unknown', tone: 'neutral' });
     expect(reviewModerationStatusPresentation(undefined)).toEqual({ label: 'Unknown', tone: 'neutral' });
+    expect(homeMapDraftStatusPresentation('awaiting_review')).toEqual({ label: 'Awaiting Review', tone: 'neutral' });
   });
 
   test('migrates secondary status surfaces to StatusBadge without changing workflow controls', () => {
@@ -120,7 +123,8 @@ test.describe('Secondary status migration', () => {
     expect(source).toContain("from './features/reminders/statusPresentation';");
     expect(source).toContain('deriveHomeReminderDueState(reminder, dateInputValue(new Date()))');
     expect(source).toContain("reminder.status === 'open' && (");
-    expect(source).toContain('const contractorHomeMapDraftStatusLabel = (status: HomeMapDraftStatus)');
+    expect(source).toContain("from './features/homeMap/statusPresentation';");
+    expect(source).toContain('homeMapDraftStatusPresentation(draft.status)');
     expect(source).not.toContain("from './features/projects/statusPresentation'");
     expect(source).not.toContain('ReminderStateBadge');
   });
@@ -132,6 +136,7 @@ test.describe('Secondary status migration', () => {
       'src/features/referrals/statusPresentation.ts',
       'src/features/reviews/statusPresentation.ts',
       'src/features/access/statusPresentation.ts',
+      'src/features/homeMap/statusPresentation.ts',
     ]) {
       const source = sourceFile(path);
       expect(source).not.toContain('supabase');

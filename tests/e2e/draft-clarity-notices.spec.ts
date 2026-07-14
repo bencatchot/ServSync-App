@@ -88,7 +88,10 @@ test.describe('Bundle 3B-1 draft clarity notices', () => {
     expect(homeownerEstimateFetch).toContain(".neq('status', 'draft')");
     expect(invoiceSaveSource).toContain("status: 'draft'");
     expect(invoiceSaveSource).not.toContain('sendInvoiceToHomeowner');
-    expect(app).not.toMatch(/DraftNotice[\s\S]{0,120}(service agreement|Home Map|finalize|report)/i);
+    expect(app).toContain('title="Draft service agreement"');
+    expect(app).toContain('title="Draft report"');
+    expect(app).toContain('title="Draft Home Map update"');
+    expect(app).not.toMatch(/DraftNotice[\s\S]{0,160}(Sent to homeowner|Active agreement|Accepted|Declined|Expired|Withdrawn|Closed for review|Report sent|Filed to Documents|Submitted for homeowner review|Approved by homeowner|Proposal revoked)/i);
     expect(app).not.toMatch(/CREATE POLICY|ALTER TABLE|CREATE FUNCTION|SECURITY DEFINER|rpc definition/i);
   });
 });
