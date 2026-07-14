@@ -125,8 +125,9 @@ test.describe('Estimate Editing Basics polish', () => {
       'const renderEstimateDraftTotals = () => {',
     );
 
-    expect(draftNoticeSource).toContain('data-testid="estimate-draft-state-notice"');
-    expect(draftNoticeSource).toContain('Draft');
+    expect(draftNoticeSource).toContain('testId="estimate-draft-state-notice"');
+    expect(draftNoticeSource).toContain('<DraftNotice');
+    expect(draftNoticeSource).toContain('Draft estimate');
     expect(draftNoticeSource).toContain('Not sent to the homeowner yet. Save the draft, then send when ready.');
     expect(draftNoticeSource).not.toContain('last saved');
     expect(draftNoticeSource).not.toContain('unsaved');

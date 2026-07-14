@@ -109,7 +109,7 @@ test.describe('invoice_sent in-app notification', () => {
     await main.getByRole('spinbutton', { name: /^(Invoice line item 1 quantity|Qty)$/i }).fill('1');
     await main.getByRole('textbox', { name: /^(Invoice line item 1 unit price|Unit price)$/i }).fill('150');
 
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save Invoice$/i });
+    const saveInvoiceButton = main.getByRole('button', { name: /^Save draft invoice$/i });
     await expect(saveInvoiceButton).toBeEnabled();
     await saveInvoiceButton.click();
     await waitForInvoiceDraftSave(main, saveInvoiceButton);

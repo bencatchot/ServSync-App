@@ -4,6 +4,45 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-14
+
+- Branch: `codex/draft-notice-estimate-invoice-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/DraftNotice.tsx`
+  - `tests/e2e/draft-clarity-notices.spec.ts`
+  - `tests/e2e/estimate-editing-basics.spec.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/invoice-notification.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 3 Slice 3B-1 Draft Notice Foundation + Estimate/Invoice Draft Clarity. ServSync now has a shared presentation-only `DraftNotice` component, contractor estimate and invoice composers use explicit draft/visibility notices, invoice save/send labels distinguish saving a draft from sending to the homeowner, and the estimate payment schedule copy now says homeowner-approved schedule items can create draft invoices without sending automatically.
+- Reason for change: Contractor estimate and invoice workflows needed clearer copy around local draft work, saved draft records, homeowner visibility, and send actions without adding dirty-state tracking or changing lifecycle behavior.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed after hydrating the fresh worktree dependencies.
+  - `npm run build` passed with the existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/draft-clarity-notices.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/empty-state-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts tests/e2e/contractor-create-estimate.spec.ts tests/e2e/contractor-create-invoice.spec.ts tests/e2e/contractor-estimate-schedule-invoice-ui.spec.ts --project=chromium --reporter=line` had source and non-credentialed checks pass where reached; mutating rendered checks were blocked by missing `TEST_CONTRACTOR_EMAIL`, and two stale source assertions were reproduced on clean `origin/main`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/rls-privacy-expanded.spec.ts --project=chromium --reporter=line` was blocked by missing `VITE_SUPABASE_URL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/invoice-notification.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_HOMEOWNER_EMAIL` / `TEST_CONTRACTOR_EMAIL`.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan passed.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch, reproduced on a clean detached `origin/main` worktree before changed code was evaluated.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel settings, estimate lifecycle, invoice lifecycle, save/send handlers, payment schedule behavior, invoice creation behavior, notifications, homeowner visibility, payment behavior, PDFs, dirty-state tracking, production data, Bundle 3B-2, Bundle 3B-3, Bundle 3C, or Bundle 4 work is included.
+  - Bundle 3 remains incomplete: service agreement/report/finalization/Home Map notices, templates/admin/support copy if still needed, and search/filter/permission empty states remain future slices.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Bundle 3 sequencing now records Slice 3B-1 as implemented and keeps 3B-2, 3B-3, and 3C future-scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing Bundle 3 presentation polish without changing product strategy, roadmap structure, workflows, permissions, backend behavior, or implementation strategy.
+
 ## 2026-07-13
 
 - Branch: `codex/empty-state-foundation-v1`

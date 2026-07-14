@@ -128,6 +128,7 @@ import {
 } from './features/referrals/statusPresentation';
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
+import { DraftNotice } from './features/drafts/DraftNotice';
 import {
   serviceAgreementOfferStatusPresentation,
   serviceAgreementStatusPresentation,
@@ -25915,16 +25916,21 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   );
 
   const renderEstimateDraftStateNotice = () => (
-    <div className="mt-3 rounded-xl border border-blue-200 bg-white/80 px-3 py-2" data-testid="estimate-draft-state-notice">
-      <div className="flex flex-wrap items-start gap-2">
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-blue-800">
-          Draft
-        </span>
-        <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-blue-900">
-          Not sent to the homeowner yet. Save the draft, then send when ready.
-        </p>
-      </div>
-    </div>
+    <DraftNotice
+      title="Draft estimate"
+      body="Not sent to the homeowner yet. Save the draft, then send when ready."
+      className="mt-3"
+      testId="estimate-draft-state-notice"
+    />
+  );
+
+  const renderInvoiceDraftStateNotice = () => (
+    <DraftNotice
+      title="Draft invoice"
+      body="Not sent to the homeowner yet. Save the draft, then send when ready."
+      className="mt-3"
+      testId="invoice-draft-state-notice"
+    />
   );
 
   const renderEstimateDraftTotals = () => {
@@ -26119,7 +26125,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           <div>
             <p className="text-sm font-bold text-slate-950">Payment schedule</p>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
-              Use this to plan billing for the estimate. Customer-facing display and invoice generation will be added in a later step.
+              Use this to plan billing for the estimate. After homeowner approval, accepted schedule items can be used to create draft invoices; creating a draft does not send it automatically.
             </p>
           </div>
           <div className="rounded-lg bg-white px-3 py-2 text-right text-xs shadow-sm">
@@ -37159,6 +37165,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {selectedJobsCustomerAddress && (
                               <p className="mt-0.5 text-xs text-slate-600">{selectedJobsCustomerAddress}</p>
                             )}
+                            {renderInvoiceDraftStateNotice()}
                           </div>
                           <button type="button" onClick={closeActiveInvoiceEditor} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
                             Cancel
@@ -37308,7 +37315,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <div className="mt-4 flex flex-wrap gap-2">
                           <button type="button" onClick={() => void saveInvoiceDraft(selectedJobsSubject)} disabled={savingInvoice} className={buttonClass('primary')}>
                             <Receipt size={15} />
-                            {savingInvoice ? 'Saving...' : 'Save Invoice'}
+                            {savingInvoice ? 'Saving...' : editingInvoiceId ? 'Update draft invoice' : 'Save draft invoice'}
                           </button>
                           <button
                             type="button"
@@ -37343,7 +37350,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {invoiceDraftSendInProgress
                               ? 'Sending...'
                               : invoiceDraftCanSendToHomeowner
-                                ? 'Save Invoice and Send to Homeowner'
+                                ? 'Send to homeowner'
                                 : 'Connect homeowner to send'}
                           </button>
                           {invoiceDraft.job_id && (

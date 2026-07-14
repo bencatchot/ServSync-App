@@ -109,12 +109,18 @@ test.describe('contractor estimate-to-invoice draft source', () => {
       'disabled={savingInvoice || invoiceDraftSendInProgress',
       '{invoiceDraft.job_id && (',
     );
+    const invoiceComposerSource = sourceBetween(
+      source,
+      '{invoiceComposerOpen && selectedJobsCustomerName && (',
+      "{contractorJobsView === 'templates' && (",
+    );
 
     expect(invoiceStateSource).toContain('const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId))');
     expect(invoiceComposerActionsSource).toContain('|| !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}');
     expect(invoiceComposerActionsSource).toContain('{invoiceDraftSendInProgress');
     expect(invoiceComposerActionsSource).toContain("? 'Sending...'");
-    expect(invoiceComposerActionsSource).toContain("? 'Save Invoice and Send to Homeowner'");
+    expect(invoiceComposerActionsSource).toContain("? 'Send to homeowner'");
+    expect(invoiceComposerSource).toContain("editingInvoiceId ? 'Update draft invoice' : 'Save draft invoice'");
     expect(invoiceComposerActionsSource).not.toContain('savingInvoice || updatingInvoiceId === editingInvoiceId');
     expect(invoiceComposerActionsSource).not.toContain("savingInvoice ? 'Sending...'");
   });
@@ -223,7 +229,7 @@ test.describe('contractor mutating invoice creation', () => {
     await expect(invoiceTitleField).toHaveValue(invoiceTitle);
     await expect(lineDescriptionField).toHaveValue(invoiceTitle);
 
-    const saveInvoiceButton = main.getByRole('button', { name: /^Save Invoice$/i });
+    const saveInvoiceButton = main.getByRole('button', { name: /^Save draft invoice$/i });
     await expect(saveInvoiceButton).toBeEnabled();
     await saveInvoiceButton.click();
     await waitForInvoiceDraftSave(main, saveInvoiceButton);
