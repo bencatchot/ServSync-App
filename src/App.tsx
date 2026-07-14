@@ -129,6 +129,8 @@ import {
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { DraftNotice } from './features/drafts/DraftNotice';
+import { VisibilityNotice } from './features/drafts/VisibilityNotice';
+import { homeMapDraftStatusPresentation } from './features/homeMap/statusPresentation';
 import {
   serviceAgreementOfferStatusPresentation,
   serviceAgreementStatusPresentation,
@@ -14231,7 +14233,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
-            {canRespond && <Notice tone="info" text="Review this service agreement offer, then accept or decline when you are ready." />}
+            {canRespond && (
+              <VisibilityNotice
+                title="Sent to homeowner"
+                body="Review this service agreement offer, then accept or decline when you are ready."
+                tone="info"
+                variant="compact"
+                testId="homeowner-service-agreement-sent-notice"
+              />
+            )}
             {renderServiceAgreementGuardrailCopy()}
             {details.length > 0 && (
               <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -14270,10 +14280,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                 </button>
               </div>
             )}
-            {offer.status === 'accepted' && <Notice tone="success" text="You accepted this agreement. Active agreement details appear in the Agreements section." />}
-            {offer.status === 'declined' && <Notice tone="info" text="You declined this agreement offer." />}
-            {offer.status === 'expired' && <Notice tone="info" text="This agreement offer has expired." />}
-            {offer.status === 'withdrawn' && <Notice tone="info" text="This agreement offer was withdrawn by the contractor." />}
+            {offer.status === 'accepted' && (
+              <VisibilityNotice
+                title="Accepted"
+                body="You accepted this agreement. Active agreement details appear in the Agreements section."
+                tone="success"
+                variant="compact"
+              />
+            )}
+            {offer.status === 'declined' && <VisibilityNotice title="Declined" body="You declined this agreement offer." tone="info" variant="compact" />}
+            {offer.status === 'expired' && <VisibilityNotice title="Expired" body="This agreement offer has expired." tone="info" variant="compact" />}
+            {offer.status === 'withdrawn' && <VisibilityNotice title="Withdrawn" body="This agreement offer was withdrawn by the contractor." tone="info" variant="compact" />}
           </div>
         )}
       </div>
@@ -14322,9 +14339,13 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
         </div>
         {isOpen && (
           <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm leading-6 text-emerald-900">
-              This is a read-only agreement snapshot. Your contractor still coordinates scheduling and billing separately.
-            </div>
+            <VisibilityNotice
+              title="Active agreement"
+              body="This agreement was accepted and is now read-only. Your contractor still coordinates scheduling and billing separately."
+              tone="success"
+              variant="compact"
+              testId="homeowner-service-agreement-active-notice"
+            />
             {renderServiceAgreementGuardrailCopy()}
             {details.length > 0 && (
               <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -22054,22 +22075,6 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     };
   };
 
-  const contractorHomeMapDraftStatusLabel = (status: HomeMapDraftStatus) => ({
-    draft: 'Draft',
-    submitted: 'Submitted for homeowner review',
-    accepted: 'Approved by homeowner',
-    declined: 'Declined by homeowner',
-    revoked: 'Revoked',
-  }[status]);
-
-  const contractorHomeMapDraftStatusClass = (status: HomeMapDraftStatus) => ({
-    draft: 'bg-blue-100 text-blue-800',
-    submitted: 'bg-amber-100 text-amber-800',
-    accepted: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
-    revoked: 'bg-slate-100 text-slate-700',
-  }[status]);
-
   const contractorHomeMapDraftCanCreateForRequest = (request: ServiceRequestSummary) =>
     Boolean(request.home_id) && !['closed', 'declined'].includes(request.status);
 
@@ -27148,8 +27153,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-bold text-slate-950">Home Map draft</p>
               {draft ? (
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${contractorHomeMapDraftStatusClass(draft.status)}`} data-testid="contractor-home-map-draft-status">
-                  {contractorHomeMapDraftStatusLabel(draft.status)}
+                <span data-testid="contractor-home-map-draft-status">
+                  <StatusBadge {...homeMapDraftStatusPresentation(draft.status)} />
                 </span>
               ) : (
                 <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-indigo-700">Request-scoped</span>
@@ -27214,6 +27219,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         {draft && (
           <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0">
+              {draft.status === 'draft' && (
+                <DraftNotice
+                  title="Draft Home Map update"
+                  body="Private to your company until you submit it for homeowner review. It cannot update the permanent Home Map in draft state."
+                  variant="compact"
+                  className="mb-3 bg-white/80"
+                  testId="contractor-home-map-draft-private-notice"
+                />
+              )}
               <p className="mb-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600" data-testid="contractor-home-map-draft-copy">
                 Grid: ~1 ft. Approximate proposal only. This draft does not update the homeowner’s permanent Home Map until approved.
               </p>
@@ -27470,9 +27484,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       </button>
                     </div>
                   ) : (
-                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                      This draft is read-only in its current status.
-                    </p>
+                    <VisibilityNotice
+                      title="Read-only draft"
+                      body="This draft is read-only in its current status."
+                      tone="neutral"
+                      variant="compact"
+                      testId="contractor-home-map-draft-read-only-notice"
+                    />
                   )}
                 </div>
               ) : (
@@ -27518,24 +27536,44 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         )}
 
         {draft?.status === 'submitted' && (
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-            Submitted for homeowner review. You can revoke it before approval if the draft should not be used.
-          </p>
+          <VisibilityNotice
+            title="Submitted for homeowner review"
+            body="The proposed changes will not update the permanent Home Map unless the homeowner approves them. You can revoke it before approval if needed."
+            tone="info"
+            variant="compact"
+            className="mt-3"
+            testId="contractor-home-map-draft-submitted-notice"
+          />
         )}
         {draft?.status === 'accepted' && (
-          <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
-            Approved by homeowner. Permanent map updates are controlled by the homeowner approval RPC, not contractor direct table access.
-          </p>
+          <VisibilityNotice
+            title="Approved by homeowner"
+            body="The homeowner approved this proposal. Permanent map updates are handled by the homeowner approval workflow, not contractor direct table access."
+            tone="success"
+            variant="compact"
+            className="mt-3"
+            testId="contractor-home-map-draft-approved-notice"
+          />
         )}
         {draft?.status === 'declined' && (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
-            Declined by homeowner{draft.review_note ? `: ${draft.review_note}` : '.'}
-          </p>
+          <VisibilityNotice
+            title="Declined by homeowner"
+            body={draft.review_note ? `The proposed changes were not applied: ${draft.review_note}` : 'The proposed changes were not applied.'}
+            tone="danger"
+            variant="compact"
+            className="mt-3"
+            testId="contractor-home-map-draft-declined-notice"
+          />
         )}
         {draft?.status === 'revoked' && (
-          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-            This draft was revoked and is no longer editable.
-          </p>
+          <VisibilityNotice
+            title="Proposal revoked"
+            body="This proposal is no longer awaiting homeowner review and did not change permanent Home Map data."
+            tone="neutral"
+            variant="compact"
+            className="mt-3"
+            testId="contractor-home-map-draft-revoked-notice"
+          />
         )}
       </div>
     );
@@ -32433,8 +32471,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             />
                           )}
                           {homeMapDraft && (
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${contractorHomeMapDraftStatusClass(homeMapDraft.status)}`} data-testid="contractor-home-map-draft-card-status">
-                              Home Map {contractorHomeMapDraftStatusLabel(homeMapDraft.status)}
+                            <span data-testid="contractor-home-map-draft-card-status">
+                              <StatusBadge
+                                label={`Home Map ${homeMapDraftStatusPresentation(homeMapDraft.status).label}`}
+                                tone={homeMapDraftStatusPresentation(homeMapDraft.status).tone}
+                              />
                             </span>
                           )}
                         </div>
@@ -32515,7 +32556,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           {homeMapDraft
                             ? homeMapDraft.status === 'draft'
                               ? 'Continue Home Map draft'
-                              : contractorHomeMapDraftStatusLabel(homeMapDraft.status)
+                              : homeMapDraftStatusPresentation(homeMapDraft.status).label
                             : 'Use Home Map for this job'}
                         </button>
                       )}
@@ -38743,7 +38784,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Contractor-side foundation</p>
                         <h3 className="mt-1 text-lg font-bold text-slate-950">Create maintenance plan templates and draft offers.</h3>
                         <p className="mt-1 max-w-3xl text-sm leading-6 text-blue-900">
-                          Draft agreement offers are not visible to the homeowner until sent. Choose one explicitly shared property for this offer. Homeowners can now review and respond to sent offers, and accepted agreements stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
+                          Choose one explicitly shared property for each offer. Homeowners can review and respond after an offer is sent, and accepted agreements stay read-only. Scheduling and billing are coordinated separately. This does not create jobs, schedule visits, create invoices, set up autopay, send reminders or notifications, or run automation.
                         </p>
                       </div>
                       <button type="button" onClick={() => setContractorJobsViewAndScroll('overview')} className={buttonClass('secondary')}>
@@ -38860,6 +38901,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             <p className="text-sm font-bold text-slate-950">Draft an offer</p>
                             <p className="mt-1 text-xs leading-5 text-slate-500">Start from an active template, then choose one connected homeowner and one explicitly shared property.</p>
                           </div>
+                          <DraftNotice
+                            title="Draft service agreement"
+                            body="Not visible to the homeowner yet. Save the draft, then send when ready."
+                            className="mt-3"
+                            testId="service-agreement-draft-offer-notice"
+                          />
                           <div className="mt-4 grid gap-3 lg:grid-cols-2">
                             <Field label="Template">
                               <select
@@ -41691,25 +41738,26 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         </div>
                       </div>
 
-                      {/* Close / Reopen status banner */}
                       {activeInspection.status === 'draft' && (
-                        <div className={`rounded-2xl border p-4 ${inspectionClosedForReview ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className={`text-sm font-bold ${inspectionClosedForReview ? 'text-emerald-800' : 'text-amber-800'}`}>
-                                {inspectionClosedForReview ? 'Job closed for review' : 'Job still open'}
-                              </p>
-                              <p className={`text-xs mt-1 leading-relaxed ${inspectionClosedForReview ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                {inspectionClosedForReview
-                                  ? 'You can preview the PDF, edit the homeowner summary below, or finalize this job report. The homeowner sees nothing until you finalize.'
-                                  : 'Close the job for review when you are done entering findings. Closing does not send anything yet; it locks the work and enables PDF preview and the summary editor.'}
-                              </p>
-                            </div>
-                            {inspectionClosedForReview ? (
+                        inspectionClosedForReview ? (
+                          <VisibilityNotice
+                            title="Closed for review"
+                            body="Preview the PDF, edit the homeowner summary, or finalize this job report. The homeowner sees nothing until you finalize."
+                            tone="success"
+                            testId="report-closed-for-review-notice"
+                            action={(
                               <button type="button" onClick={() => setInspectionClosedForReview(false)} className="text-xs font-semibold border border-emerald-200 text-emerald-700 bg-white px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors flex-shrink-0">
                                 Reopen
                               </button>
-                            ) : (
+                            )}
+                          />
+                        ) : (
+                          <DraftNotice
+                            title="Draft report"
+                            body="Close the job for review when you are done entering findings. Closing does not send anything yet; it locks the work and enables PDF preview and the summary editor."
+                            tone="warning"
+                            testId="report-draft-notice"
+                            action={(
                               <button type="button" onClick={() => {
                                 if (allReportFindings.length === 0) {
                                   setError('There are no checklist items yet. Add items in Checklist first.');
@@ -41722,8 +41770,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                 Close for Review
                               </button>
                             )}
-                          </div>
-                        </div>
+                          />
+                        )
                       )}
 
                       {/* Repair estimate draft */}
@@ -42088,17 +42136,14 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
                       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
                         {reportSentAndCompleted ? (
-                          <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-                            <div className="flex items-center justify-center gap-2">
-                              <CheckCircle2 size={15} className="text-emerald-600" />
-                              <span className="text-sm font-semibold text-emerald-700">Report sent · Job complete</span>
-                            </div>
-                            {linkedServiceRequest && (
-                              <p className="mt-1 text-center text-[11px] leading-5 text-emerald-700">
-                                The linked service request is closed for the homeowner.
-                              </p>
-                            )}
-                          </div>
+                          <VisibilityNotice
+                            title="Report sent · Job complete"
+                            body={linkedServiceRequest ? 'The linked service request is closed for the homeowner.' : 'The finalized report has been sent to the homeowner.'}
+                            tone="success"
+                            variant="compact"
+                            icon={<CheckCircle2 size={15} />}
+                            testId="report-sent-job-complete-notice"
+                          />
                         ) : !SERVSYNC_DEMO_PRESENTATION_MODE ? (
                           <button
                             type="button"
@@ -42117,9 +42162,13 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                           </button>
                         ) : null}
                         {!reportSentAndCompleted && !SERVSYNC_DEMO_PRESENTATION_MODE && (
-                          <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                            {reportSendHelperText}
-                          </p>
+                          <VisibilityNotice
+                            title="Send after finalization"
+                            body={reportSendHelperText}
+                            tone="neutral"
+                            variant="compact"
+                            testId="report-send-visibility-notice"
+                          />
                         )}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && (activeInspection.status === 'draft' ? (
@@ -42133,14 +42182,24 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                             {finalizingInspection ? 'Finalizing…' : 'Finalize Report'}
                           </button>
                         ) : (
-                          <div className="w-full rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex items-center justify-center gap-2">
-                            <CheckCircle2 size={14} className="text-emerald-600" />
-                            <span className="text-sm font-semibold text-emerald-700">Filed to Documents</span>
-                          </div>
+                          <VisibilityNotice
+                            title="Filed to Documents"
+                            body="The finalized report PDF is stored with the job records. Sending it to the homeowner remains a separate action."
+                            tone="success"
+                            variant="compact"
+                            icon={<CheckCircle2 size={14} />}
+                            testId="report-filed-notice"
+                          />
                         ))}
-                        {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                          {finalizeReportHelperText}
-                        </p>}
+                        {!SERVSYNC_DEMO_PRESENTATION_MODE && (
+                          <VisibilityNotice
+                            title={activeInspection.status === 'finalized' ? 'Report finalized' : inspectionClosedForReview ? 'Finalize report' : 'Close for review first'}
+                            body={finalizeReportHelperText}
+                            tone={activeInspection.status === 'finalized' ? 'success' : inspectionClosedForReview ? 'info' : 'neutral'}
+                            variant="compact"
+                            testId="report-finalization-notice"
+                          />
+                        )}
 
                         {!SERVSYNC_DEMO_PRESENTATION_MODE && <p className="text-[11px] leading-relaxed text-slate-400 px-1">
                           Finalize saves the PDF. Complete job & send report notifies the homeowner and closes the linked service request.

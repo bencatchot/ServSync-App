@@ -47,6 +47,8 @@ test.describe('Contractor Home Map Draft UI source guardrails', () => {
     expect(requestSource).toContain('data-testid="contractor-home-map-draft-open"');
     expect(requestSource).toContain('Use Home Map for this job');
     expect(requestSource).toContain('Continue Home Map draft');
+    expect(source).toContain("from './features/homeMap/statusPresentation';");
+    expect(source).toContain('homeMapDraftStatusPresentation(homeMapDraft.status)');
     expect(source).toContain('Submitted for homeowner review');
     expect(source).toContain('Approved by homeowner');
     expect(source).toContain('Declined by homeowner');
@@ -163,6 +165,13 @@ test.describe('Contractor Home Map Draft UI source guardrails', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/drafts/VisibilityNotice.tsx',
+      'src/features/homeMap/statusPresentation.ts',
+      'tests/e2e/service-report-homemap-notices.spec.ts',
+      'tests/e2e/draft-clarity-notices.spec.ts',
+      'tests/e2e/status-secondary-migration.spec.ts',
+      'tests/e2e/fb032-service-agreements-contractor-ui.spec.ts',
+      'tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts',
       'tests/e2e/contractor-home-map-drafts-ui.spec.ts',
       'tests/e2e/home-map-drafts-foundation.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
