@@ -95,7 +95,7 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(jobsEstimateComposerSource).not.toContain('estimateDraft.line_items.map');
   });
 
-  test('contractor draft estimates include a structured payment schedule editor without invoice generation', () => {
+  test('contractor draft estimates include a structured payment schedule editor with draft-invoice clarity', () => {
     const source = appSource();
     const pdfSource = pdfDocumentsSource();
     const scheduleSource = sourceBetween(source, 'const renderEstimatePaymentScheduleEditor =', 'const renderInvoiceDraftTotals =');
@@ -103,7 +103,8 @@ test.describe('contractor estimate creation UI structure', () => {
     const jobsEstimateComposerSource = sourceBetween(source, '{estimateComposerOpen && selectedJobsCustomerName && (', '{invoiceComposerOpen && selectedJobsCustomerName && (');
 
     expect(scheduleSource).toContain('Payment schedule');
-    expect(scheduleSource).toContain('Use this to plan billing for the estimate. Customer-facing display and invoice generation will be added in a later step.');
+    expect(scheduleSource).toContain('After homeowner approval, accepted schedule items can be used to create draft invoices; creating a draft does not send it automatically.');
+    expect(scheduleSource).not.toContain('Customer-facing display and invoice generation will be added in a later step.');
     expect(scheduleSource).toContain('Full invoice on completion');
     expect(scheduleSource).toContain('Deposit + final');
     expect(scheduleSource).toContain('Custom schedule');
