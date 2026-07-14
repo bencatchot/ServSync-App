@@ -149,8 +149,10 @@ test.describe('Bundle 3B-2 service agreement, report, and Home Map notices', () 
     const files = changedFiles();
     const allowedFiles = new Set([
       'src/App.tsx',
+      'src/features/feedback/ActionFeedback.tsx',
       'src/features/drafts/VisibilityNotice.tsx',
       'src/features/homeMap/statusPresentation.ts',
+      'tests/e2e/action-feedback-confirmation.spec.ts',
       'tests/e2e/service-report-homemap-notices.spec.ts',
       'tests/e2e/draft-clarity-notices.spec.ts',
       'tests/e2e/status-secondary-migration.spec.ts',

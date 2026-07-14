@@ -6,6 +6,44 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-14
 
+- Branch: `codex/action-feedback-confirmation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/feedback/ActionFeedback.tsx`
+  - `tests/e2e/action-feedback-confirmation.spec.ts`
+  - `tests/e2e/contractor-home-map-drafts-ui.spec.ts`
+  - `tests/e2e/service-report-homemap-notices.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 4 Slice 4A Action Feedback and Confirmation. ServSync now has a shared presentation-only `ActionFeedback` component and representative high-traffic homeowner and contractor action outcomes use clearer success/error feedback for service requests, connection requests, estimate responses, appointment responses, estimate save/send, invoice save/send/paid/void actions, report finalize/send, simple job completion, Home Map proposals, and service agreement offers.
+- Reason for change: Core workflows needed clearer confirmation of what changed, who can now see a record, what remains private, and what should happen next without adding a global toast system or changing business rules, lifecycles, routing, permissions, notifications, payments, PDFs, SQL/RLS/RPC, Supabase, Vercel, production data, or backend behavior.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with the existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/action-feedback-confirmation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/draft-clarity-notices.spec.ts tests/e2e/service-report-homemap-notices.spec.ts tests/e2e/status-badge-foundation.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/empty-state-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts tests/e2e/fb032-service-agreements-contractor-ui.spec.ts tests/e2e/fb032-service-agreements-homeowner-ui.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-home-map-drafts-ui.spec.ts --project=chromium --reporter=line` passed after narrowly updating its changed-file allowlist for the shared feedback component and focused 4A test.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts --project=chromium --reporter=line` had source checks pass; mutating rendered actions were blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-invoice.spec.ts --project=chromium --reporter=line` had three source checks pass; one stale source assertion was reproduced against clean `origin/main`, and the mutating rendered action was blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-finalize-report.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-smoke.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_HOMEOWNER_EMAIL` / `TEST_CONTRACTOR_EMAIL`.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan passed.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch, reproduced on a clean detached `origin/main` worktree before changed code was evaluated.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel settings, lifecycle changes, routing redesign, search/filter work, permission changes, notification behavior, payment behavior, PDF output, production data, Bundle 4B/4C/4D, Bundle 5, or Bundle 3 implementation work is included.
+  - Authenticated rendered desktop/mobile coverage for migrated action workflows remains useful once local credentials are available.
+  - Some lower-traffic `setNotice` and `setError` call sites remain intentionally deferred.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Bundle 3 closure was recorded by owner decision, Bundle 4 was started with Slice 4A, and future Bundle 4 slices remain scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; Bundle 4A is a frontend presentation refinement that does not change roadmap strategy, workflows, permissions, backend behavior, or implementation strategy.
+
 - Branch: `codex/service-report-homemap-notices-v1`
 - Files changed:
   - `src/App.tsx`

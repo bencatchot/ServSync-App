@@ -104,6 +104,7 @@ import {
   jobStatusPresentation,
   requestStatusPresentation,
 } from './features/status/statusPresentation';
+import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from './features/feedback/ActionFeedback';
 import {
   FINDING_STATUS_ORDER,
   findingStatusBorderColor,
@@ -8950,8 +8951,8 @@ function ContractorReferralInvitePage({
   const [signupConfirmation, setSignupConfirmation] = useState<{ email: string; nextStepHint?: string } | null>(null);
   const [permissions, setPermissions] = useState<SharingPermissions>(EMPTY_PERMISSIONS);
   const [acceptBusy, setAcceptBusy] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState<NoticeContent | ''>('');
+  const [error, setError] = useState<NoticeContent | ''>('');
   const [existingConnection, setExistingConnection] = useState<HomeownerConnection | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(false);
 
@@ -10194,8 +10195,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
     phone: '',
     notes: '',
   });
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState<NoticeContent | ''>('');
+  const [error, setError] = useState<NoticeContent | ''>('');
   const [loading, setLoading] = useState(true);
   const [workflowJobMessageIndicators, setWorkflowJobMessageIndicators] = useState<Record<string, WorkflowJobMessageIndicator>>({});
 
@@ -12393,12 +12394,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       });
       if (submitError) throw submitError;
       const result = Array.isArray(data) ? data[0] as ContextualConnectionRequestResult | undefined : data as ContextualConnectionRequestResult | null;
-      setNotice(`Connection request sent to ${contextualConnectionTarget.business_name}${result?.property_count ? ` for ${result.property_count} ${result.property_count === 1 ? 'property' : 'properties'}` : ''}.`);
+      setNotice(actionFeedbackMessage(
+        'Connection request sent',
+        `${contextualConnectionTarget.business_name} can review your message${result?.property_count ? ` and the ${result.property_count === 1 ? 'property' : 'properties'} you selected` : ''}. They need to accept before shared-home permissions are active.`,
+        'homeowner-connection-request-feedback',
+      ));
       setContextualConnectionTarget(null);
       setContextualConnectionInitialHomeId('');
       await loadHomeowner();
     } catch (err) {
-      setContextualConnectionError(readableError(err, 'Unable to send connection request.'));
+      setContextualConnectionError(readableError(err, 'Check the contractor and property details, then try sending the request again.'));
     } finally {
       setSubmittingContextualConnection(false);
     }
@@ -12905,10 +12910,18 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       setRequestComposerOpen(false);
       setRequestComposerStep('issue');
       resetRequestContractorFilters();
-      setNotice('Service request sent. Your contractor can review the details, reply, schedule time, or send an estimate.');
+      setNotice(actionFeedbackMessage(
+        'Service request submitted',
+        'Your contractor can now review the details, reply, schedule time, or send an estimate. No response time is guaranteed.',
+        'homeowner-service-request-feedback',
+      ));
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to create service request.'));
+      setError(actionFeedbackMessage(
+        'Service request could not be submitted',
+        readableError(err, 'Your request details are still in the form. Check the property, contractor, and required fields, then try again.'),
+        'homeowner-service-request-error',
+      ));
     } finally {
       setSavingServiceRequest(false);
     }
@@ -12983,12 +12996,16 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       });
       if (estimateError) throw estimateError;
       setNotice(action === 'accept'
-        ? 'Estimate accepted. Your contractor can now create or schedule the job from this approval.'
-        : 'Estimate declined. The contractor can revise it if needed.'
+        ? actionFeedbackMessage('Estimate accepted', 'Your contractor can use the accepted estimate to create or continue the job.', 'homeowner-estimate-response-feedback')
+        : actionFeedbackMessage('Estimate declined', 'The contractor can revise it if more discussion is needed.', 'homeowner-estimate-response-feedback')
       );
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to respond to estimate.'));
+      setError(actionFeedbackMessage(
+        'Estimate response could not be saved',
+        readableError(err, 'Your response was not recorded. Review the estimate and try again.'),
+        'homeowner-estimate-response-error',
+      ));
     } finally {
       setUpdatingEstimateId(null);
     }
@@ -13006,13 +13023,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       });
       if (responseError) throw responseError;
       setNotice(response === 'accepted'
-        ? 'Service agreement accepted. Your contractor will still coordinate scheduling and billing separately.'
-        : 'Service agreement offer declined.'
+        ? actionFeedbackMessage('Service agreement accepted', 'The agreement is active. Scheduling and billing still happen separately with the contractor.', 'homeowner-service-agreement-response-feedback')
+        : actionFeedbackMessage('Service agreement declined', 'The contractor can follow up or send a different offer if needed.', 'homeowner-service-agreement-response-feedback')
       );
       setViewingServiceAgreementOfferId(null);
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to respond to this service agreement offer.'));
+      setError(actionFeedbackMessage(
+        'Service agreement response could not be saved',
+        readableError(err, 'Your response was not recorded. Review the offer and try again.'),
+        'homeowner-service-agreement-response-error',
+      ));
     } finally {
       setRespondingServiceAgreementOfferId(null);
     }
@@ -13202,14 +13223,25 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       const { error: apptError } = await supabase.rpc('servsync_homeowner_respond_to_appointment', params);
       if (apptError) throw apptError;
       if (action === 'counter') {
-        setNotice('Your counter-proposal has been sent. Waiting for the contractor to confirm.');
+        setNotice(actionFeedbackMessage(
+          'New time suggested',
+          'Your counter-proposal was sent. The contractor still needs to confirm before the appointment changes.',
+          'homeowner-appointment-response-feedback',
+        ));
         setCounterProposeDrafts(current => ({ ...current, [request.id]: { open: false, proposedAt: '', notes: '' } }));
       } else {
-        setNotice(action === 'confirm' ? 'Appointment confirmed.' : 'Appointment declined.');
+        setNotice(action === 'confirm'
+          ? actionFeedbackMessage('Appointment confirmed', 'The visit time is confirmed for this request.', 'homeowner-appointment-response-feedback')
+          : actionFeedbackMessage('Appointment declined', 'The visit time was declined. The contractor may propose another time.', 'homeowner-appointment-response-feedback')
+        );
       }
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, 'Unable to respond to appointment.'));
+      setError(actionFeedbackMessage(
+        'Appointment response could not be saved',
+        readableError(err, 'Your response was not recorded. Check the visit details and try again.'),
+        'homeowner-appointment-response-error',
+      ));
     } finally {
       setUpdatingAppointmentRequestId(null);
     }
@@ -13234,9 +13266,17 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
           });
       if (appointmentWindowError) throw appointmentWindowError;
       if (action === 'accept') {
-        setNotice('Visit time confirmed.');
+        setNotice(actionFeedbackMessage(
+          'Visit time confirmed',
+          'The contractor visit is now confirmed for the selected time.',
+          'homeowner-visit-response-feedback',
+        ));
       } else {
-        setNotice('Visit time declined.');
+        setNotice(actionFeedbackMessage(
+          'Visit time declined',
+          'The contractor can review the response and follow up with another option if needed.',
+          'homeowner-visit-response-feedback',
+        ));
         setAppointmentWindowDeclineNotes(current => {
           const next = { ...current };
           delete next[window.id];
@@ -13245,7 +13285,11 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       }
       await loadHomeowner();
     } catch (err) {
-      setError(readableError(err, action === 'accept' ? 'Unable to accept visit time.' : 'Unable to decline visit time.'));
+      setError(actionFeedbackMessage(
+        action === 'accept' ? 'Visit time could not be accepted' : 'Visit time could not be declined',
+        readableError(err, 'Your response was not recorded. Review the visit details and try again.'),
+        'homeowner-visit-response-error',
+      ));
     } finally {
       setRespondingAppointmentWindowId(null);
     }
@@ -21762,8 +21806,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [customRoomInput, setCustomRoomInput] = useState('');
   const [showAddRoom, setShowAddRoom] = useState(false);
 
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useState<NoticeContent | ''>('');
+  const [error, setError] = useState<NoticeContent | ''>('');
   const contractorProfileSetupStorageKey = `${STORAGE_KEYS.contractorProfileSetupSkipped}:${profile.id}`;
   const [contractorProfileSetupSkipped, setContractorProfileSetupSkipped] = useState(
     () => window.localStorage.getItem(contractorProfileSetupStorageKey) === 'true',
@@ -23194,9 +23238,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (submitError) throw submitError;
       const updatedDraft = data as ContractorHomeMapDraft;
       setContractorHomeMapDraftsByRequestId(current => ({ ...current, [updatedDraft.service_request_id]: updatedDraft }));
-      setNotice('Home Map draft submitted for homeowner review.');
+      setNotice(actionFeedbackMessage(
+        'Home Map update submitted',
+        'The homeowner can now review the proposed changes. The permanent Home Map is unchanged until they approve it.',
+        'contractor-home-map-submit-feedback',
+      ));
     } catch (err) {
-      setError(readableError(err, 'Unable to submit Home Map draft.'));
+      setError(actionFeedbackMessage(
+        'Home Map update could not be submitted',
+        readableError(err, 'The draft remains private. Review the draft and try submitting again.'),
+        'contractor-home-map-submit-error',
+      ));
     } finally {
       setContractorHomeMapBusyKey(null);
     }
@@ -23214,9 +23266,17 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (revokeError) throw revokeError;
       const updatedDraft = data as ContractorHomeMapDraft;
       setContractorHomeMapDraftsByRequestId(current => ({ ...current, [updatedDraft.service_request_id]: updatedDraft }));
-      setNotice('Home Map draft revoked.');
+      setNotice(actionFeedbackMessage(
+        'Home Map update revoked',
+        'The proposal is no longer available for homeowner review. The permanent Home Map was not changed.',
+        'contractor-home-map-revoke-feedback',
+      ));
     } catch (err) {
-      setError(readableError(err, 'Unable to revoke Home Map draft.'));
+      setError(actionFeedbackMessage(
+        'Home Map update could not be revoked',
+        readableError(err, 'The proposal was not changed. Try again from the Home Map draft controls.'),
+        'contractor-home-map-revoke-error',
+      ));
     } finally {
       setContractorHomeMapBusyKey(null);
     }
@@ -23823,7 +23883,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (savedEstimateError) throw savedEstimateError;
       const savedEstimate = savedEstimateData as Estimate;
       setEstimates(prev => [savedEstimate, ...prev.filter(item => item.id !== savedEstimate.id)]);
-      setNotice(currentEditingEstimateId ? `${draftDocumentLabel} draft updated.` : `${draftDocumentLabel} draft saved. Opened the saved estimate actions.`);
+      setNotice(actionFeedbackMessage(
+        currentEditingEstimateId ? 'Draft estimate updated' : 'Draft estimate saved',
+        'It has not been sent to the homeowner. Open the saved estimate actions when you are ready to send or continue work.',
+        'contractor-estimate-save-feedback',
+      ));
       clearEstimateComposerScrollPosition();
       setEstimateComposerOpen(false);
       setEditingEstimateId(null);
@@ -23846,7 +23910,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       await loadContractor();
       focusSavedEstimateActions(savedEstimate);
     } catch (err) {
-      setError(readableError(err, `Unable to save ${draftDocumentLabel.toLowerCase()}. If this is the first estimate or invoice, run the ServSync estimates SQL first.`));
+      setError(actionFeedbackMessage(
+        'Estimate could not be saved',
+        readableError(err, 'Your changes are still in the form. Check the estimate details and try saving again.'),
+        'contractor-estimate-save-error',
+      ));
     } finally {
       setSavingEstimate(false);
     }
@@ -23960,7 +24028,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (linesError) throw linesError;
 
       const savedInvoice = await loadInvoiceById(invoiceId);
-      setNotice(editingInvoiceId ? 'Invoice draft updated.' : 'Invoice draft saved.');
+      setNotice(actionFeedbackMessage(
+        editingInvoiceId ? 'Draft invoice updated' : 'Draft invoice saved',
+        'It remains private until you send it to the homeowner.',
+        'contractor-invoice-save-feedback',
+      ));
       if (options?.closeComposer === false) {
         setEditingInvoiceId(invoiceId);
         setInvoiceDraft(invoiceDraftFromInvoice(savedInvoice));
@@ -23983,7 +24055,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       await loadContractor();
       return savedInvoice;
     } catch (err) {
-      setError(readableError(err, 'Unable to save invoice draft. Make sure the ServSync invoices SQL has been applied.'));
+      setError(actionFeedbackMessage(
+        'Invoice could not be saved',
+        readableError(err, 'Your changes are still in the form. Check the invoice details and try saving again.'),
+        'contractor-invoice-save-error',
+      ));
       return null;
     } finally {
       setSavingInvoice(false);
@@ -24004,11 +24080,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_invoice_id: invoice.id,
       });
       if (sendError) throw sendError;
-      setNotice('Invoice sent to homeowner.');
+      setNotice(actionFeedbackMessage(
+        'Invoice sent',
+        'The homeowner can now view it. Payment is handled directly with the contractor.',
+        'contractor-invoice-send-feedback',
+      ));
       await loadContractor();
       return true;
     } catch (err) {
-      setError(readableError(err, 'Unable to send invoice.'));
+      setError(actionFeedbackMessage(
+        'Invoice could not be sent',
+        readableError(err, 'Check the homeowner connection and invoice details, then try sending again.'),
+        'contractor-invoice-send-error',
+      ));
       return false;
     } finally {
       setUpdatingInvoiceId(null);
@@ -24025,10 +24109,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_invoice_id: invoice.id,
       });
       if (paidError) throw paidError;
-      setNotice('Invoice marked paid.');
+      setNotice(actionFeedbackMessage(
+        'Invoice marked paid',
+        'The invoice balance is now shown as paid. This records payment status only; ServSync did not process a payment.',
+        'contractor-invoice-paid-feedback',
+      ));
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to mark invoice paid.'));
+      setError(actionFeedbackMessage(
+        'Invoice could not be marked paid',
+        readableError(err, 'The invoice payment status was not changed. Review the invoice and try again.'),
+        'contractor-invoice-paid-error',
+      ));
     } finally {
       setUpdatingInvoiceId(null);
     }
@@ -24045,10 +24137,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_invoice_id: invoice.id,
       });
       if (voidError) throw voidError;
-      setNotice('Invoice voided.');
+      setNotice(actionFeedbackMessage(
+        'Invoice voided',
+        'The invoice is no longer active for billing lists.',
+        'contractor-invoice-void-feedback',
+      ));
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to void invoice.'));
+      setError(actionFeedbackMessage(
+        'Invoice could not be voided',
+        readableError(err, 'The invoice was not changed. Review the invoice and try again.'),
+        'contractor-invoice-void-error',
+      ));
     } finally {
       setUpdatingInvoiceId(null);
     }
@@ -24694,10 +24794,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         .update({ status: 'sent' })
         .eq('id', estimate.id);
       if (sendError) throw sendError;
-      setNotice('Estimate sent to homeowner.');
+      setNotice(actionFeedbackMessage(
+        'Estimate sent',
+        'The homeowner can now review and respond to it.',
+        'contractor-estimate-send-feedback',
+      ));
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to send estimate.'));
+      setError(actionFeedbackMessage(
+        'Estimate could not be sent',
+        readableError(err, 'Check the homeowner connection and estimate details, then try sending again.'),
+        'contractor-estimate-send-error',
+      ));
     } finally {
       setSendingEstimateId(null);
     }
@@ -24715,7 +24823,11 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     const existingJob = jobForEstimate(estimate);
     if (existingJob) {
       openInspection(existingJob);
-      setNotice('Opened the job linked to this accepted estimate.');
+      setNotice(actionFeedbackMessage(
+        'Linked job opened',
+        'This accepted estimate already has a job. Continue from the job workspace.',
+        'contractor-estimate-job-feedback',
+      ));
       return;
     }
     if (estimate.inspection_id) {
@@ -24753,12 +24865,16 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
       openInspection(job);
       setNotice(result.created
-        ? 'Job created from accepted estimate.'
-        : 'This estimate already had a linked job. Opening it now.'
+        ? actionFeedbackMessage('Job created', 'The accepted estimate is now linked to this job.', 'contractor-estimate-job-feedback')
+        : actionFeedbackMessage('Linked job opened', 'This estimate already had a linked job. Continue from the job workspace.', 'contractor-estimate-job-feedback')
       );
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to create job from accepted estimate. Make sure the estimate-to-job SQL has been applied.'));
+      setError(actionFeedbackMessage(
+        'Job could not be created',
+        readableError(err, 'The estimate was not converted to a job. Review the accepted estimate and try again.'),
+        'contractor-estimate-job-error',
+      ));
     } finally {
       convertingEstimateIdsRef.current.delete(estimate.id);
       setConvertingEstimateId(null);
@@ -25269,11 +25385,19 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
     try {
       const { error: createError } = await supabase.rpc('servsync_create_service_agreement_offer', parsed.payload);
       if (createError) throw createError;
-      setNotice('Draft service agreement offer saved. Draft offers are not visible to the homeowner until sent.');
+      setNotice(actionFeedbackMessage(
+        'Draft service agreement saved',
+        'It remains private until you send it to the homeowner for review.',
+        'contractor-service-agreement-save-feedback',
+      ));
       setServiceAgreementOfferDraft(createBlankServiceAgreementOfferDraft());
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to save this service agreement offer.'));
+      setError(actionFeedbackMessage(
+        'Service agreement offer could not be saved',
+        readableError(err, 'Your draft details are still in the form. Check the offer and try saving again.'),
+        'contractor-service-agreement-save-error',
+      ));
     } finally {
       setSavingServiceAgreementOffer(false);
     }
@@ -25297,10 +25421,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         p_offer_id: offer.id,
       });
       if (sendError) throw sendError;
-      setNotice('Service agreement offer sent for homeowner review. Homeowner response controls are planned for a later slice.');
+      setNotice(actionFeedbackMessage(
+        'Service agreement offer sent',
+        'The homeowner can now review and respond to the offer.',
+        'contractor-service-agreement-send-feedback',
+      ));
       await loadContractor();
     } catch (err) {
-      setError(readableError(err, 'Unable to send this service agreement offer.'));
+      setError(actionFeedbackMessage(
+        'Service agreement offer could not be sent',
+        readableError(err, 'The offer was not sent. Review the homeowner, property, and offer details, then try again.'),
+        'contractor-service-agreement-send-error',
+      ));
     } finally {
       setSendingServiceAgreementOfferId(null);
     }
@@ -29688,11 +29820,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       }
       setNotice(insp.homeowner_user_id
-        ? 'Job report finalized, saved to homeowner Documents, and added to Home History.'
-        : 'New customer job report finalized.'
+        ? actionFeedbackMessage('Report finalized', 'The final report was saved to homeowner Documents and added to Home History. It is ready to send when you choose.', 'contractor-report-finalize-feedback')
+        : actionFeedbackMessage('Report finalized', 'The final report was stored with this customer record. It has not been sent to a ServSync homeowner.', 'contractor-report-finalize-feedback')
       );
     } catch (err) {
-      setError(readableError(err, 'Failed to finalize job report.'));
+      setError(actionFeedbackMessage(
+        'Report could not be finalized',
+        readableError(err, 'The report was not finalized. Review the job details and try again.'),
+        'contractor-report-finalize-error',
+      ));
     } finally {
       setFinalizingInspection(false);
     }
@@ -29739,11 +29875,15 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       setContractorTab('inspections');
       persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'report', selectedRoom: null });
       setNotice(insp.service_request_id
-        ? 'Job completed, report sent, and linked service request closed for the homeowner.'
-        : 'Homeowner notified. The report is available in their Documents and Home History.'
+        ? actionFeedbackMessage('Report sent', 'The homeowner can view the finalized report, and the linked service request was closed by the existing workflow.', 'contractor-report-send-feedback')
+        : actionFeedbackMessage('Report sent', 'The homeowner can view the finalized report in Documents and Home History.', 'contractor-report-send-feedback')
       );
     } catch (err) {
-      setError(readableError(err, 'Unable to send report notification to homeowner.'));
+      setError(actionFeedbackMessage(
+        'Report could not be sent',
+        readableError(err, 'The finalized report is still saved. Check the homeowner connection and try sending again.'),
+        'contractor-report-send-error',
+      ));
     } finally {
       setSendingInspectionReportId(null);
     }
@@ -29802,14 +29942,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       if (syncedWorkItems.length > 0) {
         const readyCount = syncedWorkItems.filter(jobWorkItemCanInvoice).length;
         setNotice(readyCount > 0
-          ? 'Job completed. Create an invoice from completed, priced work items when ready.'
-          : 'Job completed. Use item-based invoicing once completed work items are priced.'
+          ? actionFeedbackMessage('Job completed', 'Completed, priced work items are ready to invoice when you choose.', 'contractor-complete-job-feedback')
+          : actionFeedbackMessage('Job completed', 'Price completed work items before creating an item-based invoice.', 'contractor-complete-job-feedback')
         );
         return;
       }
       await createInvoiceFromJob(completedJob);
     } catch (err) {
-      setError(readableError(err, 'Unable to complete this job.'));
+      setError(actionFeedbackMessage(
+        'Job could not be completed',
+        readableError(err, 'The job was not completed. Review the work items and try again.'),
+        'contractor-complete-job-error',
+      ));
     }
   };
 
@@ -48031,14 +48175,34 @@ function Field({ label, children, labelClassName = 'text-[#223D67]/75' }: { labe
   );
 }
 
-function Notice({ tone, text }: { tone: 'success' | 'error' | 'info'; text: string }) {
-  const style = {
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    error: 'border-red-200 bg-red-50 text-red-700',
-    info: 'border-[#B7D7FF] bg-blue-50 text-[#005FD6]',
-  }[tone];
+type NoticeContent = string | ActionFeedbackMessage;
 
-  return <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${style}`}>{text}</div>;
+function actionFeedbackMessage(title: string, body?: string, testId?: string): ActionFeedbackMessage {
+  return { title, body, testId };
+}
+
+function noticeContentTitle(text: NoticeContent) {
+  return typeof text === 'string' ? text : text.title;
+}
+
+function noticeContentBody(text: NoticeContent) {
+  return typeof text === 'string' ? undefined : text.body;
+}
+
+function noticeContentTestId(text: NoticeContent) {
+  return typeof text === 'string' ? undefined : text.testId;
+}
+
+function Notice({ tone, text }: { tone: ActionFeedbackTone; text: NoticeContent }) {
+  return (
+    <ActionFeedback
+      tone={tone}
+      title={noticeContentTitle(text)}
+      body={noticeContentBody(text)}
+      testId={noticeContentTestId(text)}
+      compact
+    />
+  );
 }
 
 const CALENDAR_EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string }[] = [
