@@ -97,7 +97,8 @@ test.describe('Unified Start New Job foundation slice', () => {
     expect(directJobSource).toContain('startNewInspection');
     expect(directJobSource).not.toContain('Create Estimate');
     expect(directJobSource).not.toContain('Create Invoice');
-    expect(directJobSource).not.toContain('Draft Job');
+    expect(directJobSource).toContain('Open Draft Job composer');
+    expect(directJobSource).not.toContain('Save Draft');
     expect(sourceFile('src/features/work-composer/types.ts')).not.toContain('DraftJob');
   });
 });

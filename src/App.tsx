@@ -185,6 +185,20 @@ import {
   inspectionJobStatusLabel,
   OPEN_JOB_STATUSES,
 } from './features/jobs/status';
+import { DraftJobComposer, type DraftJobCustomerOption } from './features/jobs/DraftJobComposer';
+import { DraftJobList } from './features/jobs/DraftJobList';
+import { createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
+import {
+  applyDraftJobScopeResult,
+  createBlankDraftJobComposerDraft,
+  draftJobComposerDraftFromRecords,
+  draftJobMetadataPayload,
+  draftJobScopePayload,
+  draftJobUserFacingError,
+  isComposerDraftJob,
+  validateDraftJobComposerDraft,
+  type DraftJobComposerDraft,
+} from './features/jobs/draftJobMappings';
 import { JobWorkItemSummaryStrip } from './features/jobs/WorkItemSummaryStrip';
 import {
   getJobWorkItemSummary,
@@ -752,7 +766,7 @@ type ContractorEstimateRecordStatusFilter = 'all' | 'draft' | 'sent' | 'approved
 type ContractorInvoiceRecordStatusFilter = 'all' | 'draft' | 'sent' | 'viewed' | 'overdue' | 'partially_paid' | 'paid' | 'void';
 type ContractorEstimateRecordSort = 'updated_newest' | 'created_newest' | 'amount_high' | 'amount_low' | 'customer_az';
 type ContractorInvoiceRecordSort = ContractorEstimateRecordSort | 'due_date';
-type InspectionView = 'list' | 'new' | 'detail';
+type InspectionView = 'list' | 'new' | 'detail' | 'draft_job';
 type InspectionSubTab = 'checklist' | 'inspect' | 'report';
 type ServiceAgreementTemplateDraft = {
   name: string;
@@ -1377,7 +1391,7 @@ function storedInspectionViewForJobsView(jobsView: ContractorJobsView): Inspecti
   if ((jobsView === 'open_jobs' || jobsView === 'closed_jobs') && fieldWorkState?.view === 'detail' && fieldWorkState.inspectionId) {
     return 'detail';
   }
-  return jobsView === 'new_jobs' ? 'new' : 'list';
+  return jobsView === 'new_jobs' ? 'draft_job' : 'list';
 }
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
@@ -21670,6 +21684,11 @@ function ContractorDashboard({
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
+  const [draftJobDraft, setDraftJobDraft] = useState<DraftJobComposerDraft>(() => createBlankDraftJobComposerDraft());
+  const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
+  const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
+  const [savingDraftJob, setSavingDraftJob] = useState(false);
+  const [draftJobFeedback, setDraftJobFeedback] = useState<(ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null>(null);
 
   useEffect(() => {
     setAccountNameDraft(profile.full_name || '');
@@ -28071,9 +28090,13 @@ function ContractorDashboard({
       .filter(contact => contact.homeowner_user_id === homeownerUserId)
       .map(contact => contact.id)
   );
+  const composerDraftJobs = inspections
+    .filter(isComposerDraftJob)
+    .sort((a, b) => new Date(b.draft_saved_at || b.updated_at).getTime() - new Date(a.draft_saved_at || a.updated_at).getTime());
+  const operationalInspections = inspections.filter(insp => !isComposerDraftJob(insp));
   const fieldWorkForHomeowner = (homeownerUserId: string) => {
     const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
-    return inspections
+    return operationalInspections
       .filter(insp => insp.homeowner_user_id === homeownerUserId || (insp.local_contact_id ? linkedLocalContactIds.has(insp.local_contact_id) : false))
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   };
@@ -28089,7 +28112,7 @@ function ContractorDashboard({
       .filter(invoice => invoice.homeowner_user_id === homeownerUserId || (invoice.local_contact_id ? linkedLocalContactIds.has(invoice.local_contact_id) : false))
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   };
-  const fieldWorkForLocalContact = (localContactId: string) => inspections
+  const fieldWorkForLocalContact = (localContactId: string) => operationalInspections
     .filter(insp => insp.local_contact_id === localContactId)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   const selectedJobsConnection = jobsCustomerFilterSubjectId
@@ -28113,7 +28136,12 @@ function ContractorDashboard({
     ? fieldWorkForHomeowner(selectedJobsConnection.homeowner_user_id)
     : selectedJobsLocalContact
       ? fieldWorkForLocalContact(selectedJobsLocalContact.id)
-      : inspections;
+      : operationalInspections;
+  const selectedJobsCustomerDrafts = selectedJobsConnection
+    ? composerDraftJobs.filter(draft => draft.homeowner_user_id === selectedJobsConnection.homeowner_user_id)
+    : selectedJobsLocalContact
+      ? composerDraftJobs.filter(draft => draft.local_contact_id === selectedJobsLocalContact.id)
+      : composerDraftJobs;
   const selectedJobsCustomerEstimates = selectedJobsConnection
     ? estimatesForHomeowner(selectedJobsConnection.homeowner_user_id)
     : selectedJobsLocalContact
@@ -28289,8 +28317,8 @@ function ContractorDashboard({
     setContractorEstimateRecordStatusFilter('approved');
     setContractorEstimateRecordSort('updated_newest');
   };
-  const openJobs = inspections.filter(inspectionIsOpenJob);
-  const closedJobs = inspections.filter(inspectionIsClosedJob);
+  const openJobs = operationalInspections.filter(inspectionIsOpenJob);
+  const closedJobs = operationalInspections.filter(inspectionIsClosedJob);
   const completedJobsReadyToInvoice = closedJobs.filter(jobReadyForInvoiceFollowUp);
   const openFinancialRecords = estimates.filter(estimate => !['declined', 'expired', 'revised'].includes(estimate.status));
   const closedFinancialRecords = estimates.filter(estimate => ['declined', 'expired', 'revised'].includes(estimate.status));
@@ -28342,7 +28370,7 @@ function ContractorDashboard({
   const openJobsOnboardingWorkspace = () => {
     setContractorTab('inspections');
     setContractorJobsView('new_jobs');
-    setInspectionView('new');
+    setInspectionView('draft_job');
   };
   const openFinancialOnboardingWorkspace = (kind: ContractorFinancialRecordKind = 'estimates') => {
     setContractorTab('inspections');
@@ -28374,7 +28402,7 @@ function ContractorDashboard({
   const openReportOnboardingWorkspace = () => {
     setContractorTab('inspections');
     setContractorJobsView(openJobs.length > 0 ? 'open_jobs' : 'new_jobs');
-    setInspectionView(openJobs.length > 0 ? 'list' : 'new');
+    setInspectionView(openJobs.length > 0 ? 'list' : 'draft_job');
   };
   const contractorOnboardingItems: Array<{
     label: string;
@@ -28800,6 +28828,30 @@ function ContractorDashboard({
   const invoiceDraftSendInProgress = Boolean(updatingInvoiceId && (!editingInvoiceId || updatingInvoiceId === editingInvoiceId));
   const connectedHomesForPropertyLabels = connections.flatMap(connection => connectedHomeList(connection));
   const localHomesForPropertyLabels = localContacts.flatMap(contact => contact.homes ?? []);
+  const draftJobConnectedCustomerOptions: DraftJobCustomerOption[] = connections
+    .filter(connection => connection.status === 'active')
+    .map(connection => ({
+      id: connection.homeowner_user_id,
+      label: connection.display_name || 'ServSync homeowner',
+      helper: 'Connected homeowner',
+      properties: connectedHomeList(connection)
+        .filter((home): home is ContractorConnectedHomeownerHome & { id: string } => Boolean(home.id))
+        .map(home => ({
+          id: home.id,
+          label: [home.nickname || home.address_line1 || 'Shared property', [home.city, home.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+        })),
+    }));
+  const draftJobLocalCustomerOptions: DraftJobCustomerOption[] = localContacts.map(contact => ({
+    id: contact.id,
+    label: contact.display_name || 'Local customer',
+    helper: 'Local customer',
+    properties: sortedLocalHomes(contact.homes)
+      .filter(home => Boolean(home.id))
+      .map((home, index) => ({
+        id: home.id,
+        label: localHomeOptionLabel(home, index),
+      })),
+  }));
   const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
   const defaultLocalHomeId = singleLocalHomeId(selectedJobsLocalContact);
   const recordPropertyLabelForContractor = (record: PropertyContextRecord) => propertyRecordLabel(record, {
@@ -28993,6 +29045,118 @@ function ContractorDashboard({
       [jobId]: items,
     }));
     return items;
+  };
+
+  const fetchDraftJobRecord = async (jobId: string) => {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('inspections')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+    if (error) throw error;
+    const draft = data as Inspection;
+    setInspections(prev => [draft, ...prev.filter(item => item.id !== draft.id)]);
+    return draft;
+  };
+
+  const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {
+    setDraftJobDraft(createBlankDraftJobComposerDraft({
+      subject_type: selectedJobsLocalContact ? 'local' : 'connected',
+      homeowner_user_id: selectedJobsConnection?.homeowner_user_id ?? '',
+      home_id: selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? '' : '',
+      local_contact_id: selectedJobsLocalContact?.id ?? '',
+      local_home_id: selectedJobsLocalContact ? singleLocalHomeId(selectedJobsLocalContact) : '',
+      ...overrides,
+    }));
+    setActiveDraftJobId(null);
+    setRemovedDraftJobWorkItemIds([]);
+    setDraftJobFeedback(null);
+    setInspectionView('draft_job');
+    setContractorJobsView('new_jobs');
+    setContractorTab('inspections');
+  };
+
+  const continueDraftJob = async (draft: Inspection) => {
+    if (!isComposerDraftJob(draft)) {
+      setError('This record is not a contractor Draft Job.');
+      return;
+    }
+    try {
+      const items = await refreshJobWorkItemsForJob(draft.id);
+      setDraftJobDraft(draftJobComposerDraftFromRecords(draft, items));
+      setActiveDraftJobId(draft.id);
+      setRemovedDraftJobWorkItemIds([]);
+      setDraftJobFeedback(null);
+      setInspectionView('draft_job');
+      setContractorJobsView('new_jobs');
+      setContractorTab('inspections');
+    } catch (err) {
+      setError(readableError(err, 'Unable to load this Draft Job.'));
+    }
+  };
+
+  const saveDraftJobComposer = async () => {
+    if (!supabase || !contractor) return;
+    if (!canManageDraftJobs) {
+      setDraftJobFeedback({ tone: 'error', title: draftJobRoleDeniedReason, testId: 'draft-job-save-feedback' });
+      return;
+    }
+    const validationMessage = validateDraftJobComposerDraft(draftJobDraft);
+    if (validationMessage) {
+      setDraftJobFeedback({ tone: 'error', title: validationMessage, testId: 'draft-job-save-feedback' });
+      return;
+    }
+
+    setSavingDraftJob(true);
+    setDraftJobFeedback(null);
+
+    let draftId = activeDraftJobId;
+    let metadataSaved = false;
+    try {
+      const metadataPayload = draftJobMetadataPayload(draftJobDraft);
+      if (!draftId) {
+        draftId = await createDraftJob(supabase, metadataPayload);
+        setActiveDraftJobId(draftId);
+        metadataSaved = true;
+        await fetchDraftJobRecord(draftId);
+      } else {
+        const updated = await updateDraftJob(supabase, draftId, metadataPayload);
+        metadataSaved = true;
+        setInspections(prev => [updated, ...prev.filter(item => item.id !== updated.id)]);
+      }
+
+      const scopeResult = await upsertDraftJobScope(
+        supabase,
+        draftId,
+        draftJobScopePayload(draftJobDraft, removedDraftJobWorkItemIds),
+      );
+      const nextDraft = applyDraftJobScopeResult(draftJobDraft, scopeResult);
+      setDraftJobDraft(nextDraft);
+      setRemovedDraftJobWorkItemIds([]);
+      await refreshJobWorkItemsForJob(draftId);
+      await fetchDraftJobRecord(draftId);
+      setDraftJobFeedback({
+        tone: 'success',
+        title: 'Draft Job saved.',
+        body: 'This contractor-only draft is ready to resume from the Jobs area.',
+        testId: 'draft-job-save-feedback',
+      });
+    } catch (err) {
+      const title = metadataSaved
+        ? 'Draft details saved, but scope changes did not save.'
+        : draftId
+          ? 'Draft Job could not be updated.'
+          : 'Draft Job could not be created.';
+      setDraftJobFeedback({
+        tone: 'error',
+        title,
+        body: draftJobUserFacingError(err, 'Review the draft details and try Save Draft again.'),
+        testId: 'draft-job-save-feedback',
+      });
+    } finally {
+      setSavingDraftJob(false);
+    }
   };
 
   const syncSimpleJobWorkItems = async (insp: Inspection) => {
@@ -30169,6 +30333,14 @@ function ContractorDashboard({
   const contractorCanSendWorkflowMessages = currentContractorTeamRole === 'owner'
     || currentContractorTeamRole === 'admin'
     || currentContractorTeamRole === 'office';
+  const canManageDraftJobs = currentContractorTeamRole === 'owner'
+    || currentContractorTeamRole === 'admin'
+    || currentContractorTeamRole === 'office';
+  const draftJobRoleDeniedReason = currentContractorTeamRole === 'field_tech'
+    ? 'Field techs cannot create contractor Draft Jobs in this workflow yet.'
+    : currentContractorTeamRole === 'viewer'
+      ? 'Viewers can review the Jobs workspace, but cannot save Draft Jobs.'
+      : 'Only the contractor owner, admin, or office role can save Draft Jobs.';
   const contractorWorkflowReadOnlyReason = currentContractorTeamRole === 'field_tech'
     ? 'Field techs can view this job thread, but owner, admin, or office roles send customer-visible job messages in v1.'
     : currentContractorTeamRole === 'viewer'
@@ -36714,7 +36886,7 @@ function ContractorDashboard({
                     <div data-testid="contractor-jobs-overview-tile-grid" className="grid grid-cols-2 gap-2 md:grid-cols-3">
                       {([
                         ...(!SERVSYNC_DEMO_PRESENTATION_MODE ? [{ id: 'new_jobs' as const, label: 'New Jobs', value: '+', helper: 'Service or checklist work', icon: <Plus size={15} />, mobileTileClassName: 'order-2 md:order-none' }] : []),
-                        { id: 'open_jobs' as const, label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Draft and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
+                        { id: 'open_jobs' as const, label: 'Open Jobs', value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length), helper: 'Scheduled and active work', icon: <ClipboardCheck size={15} />, mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1' },
                         { id: 'closed_jobs' as const, label: 'Completed / Closed Jobs', value: String(jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer.length : closedJobs.length), helper: 'Completed work', icon: <CheckCircle2 size={15} />, mobileTileClassName: 'order-3 md:order-none' },
                       ] as Array<{ id: ContractorJobsView; label: string; value: string; helper: string; icon: React.ReactNode; mobileTileClassName: string }>).map(item => {
                         const active = contractorJobsView === item.id;
@@ -36724,7 +36896,7 @@ function ContractorDashboard({
                             type="button"
                             onClick={() => {
                               setContractorJobsViewAndScroll(item.id);
-                              if (item.id === 'new_jobs') setInspectionView('new');
+                              if (item.id === 'new_jobs') setInspectionView('draft_job');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
 	                            className={`${item.mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3 ${
@@ -38137,7 +38309,7 @@ function ContractorDashboard({
                     const records = contractorJobsView === 'closed_jobs' ? filteredRecords.slice(0, 10) : filteredRecords;
                     const listTitle = contractorJobsView === 'open_jobs' ? 'Open Jobs' : 'Completed / Closed Jobs';
                     const listDescription = contractorJobsView === 'open_jobs'
-                      ? 'Draft, scheduled, and in-progress jobs that still need work.'
+                      ? 'Scheduled and in-progress jobs that still need work.'
                       : 'Completed, closed, and cancelled jobs.';
                     const jobTypeFilterOptions = [
                       { value: 'all', label: 'All job types' },
@@ -38177,6 +38349,15 @@ function ContractorDashboard({
 	                    ].filter((label): label is string => Boolean(label));
 	                    return (
                       <div className="space-y-4">
+                        {contractorJobsView === 'open_jobs' && (
+                          <DraftJobList
+                            drafts={selectedJobsCustomerDrafts}
+                            workItemsByJobId={jobWorkItemsByJobId}
+                            customerLabel={fieldWorkSubjectLabel}
+                            propertyLabel={fieldWorkSubjectAddress}
+                            onContinue={draft => void continueDraftJob(draft)}
+                          />
+                        )}
                         {renderDemoPresentationJobsCheckpointStory()}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -39827,10 +40008,47 @@ function ContractorDashboard({
             </>
           )}
 
+          {/* ── DRAFT JOB COMPOSER VIEW ── */}
+          {inspectionView === 'draft_job' && (
+            <Card title="Start New Job" icon={<Plus size={18} />}>
+              <DraftJobComposer
+                draft={draftJobDraft}
+                connectedOptions={draftJobConnectedCustomerOptions}
+                localOptions={draftJobLocalCustomerOptions}
+                currentDraftId={activeDraftJobId}
+                canSave={canManageDraftJobs && !savingDraftJob}
+                saving={savingDraftJob}
+                feedback={draftJobFeedback}
+                onChange={setDraftJobDraft}
+                onSave={() => void saveDraftJobComposer()}
+                onCancel={() => {
+                  setInspectionView('list');
+                  setContractorJobsViewAndScroll('open_jobs');
+                }}
+                onLegacyJob={() => {
+                  setInspectionView('new');
+                  setContractorJobsView('new_jobs');
+                }}
+                onRemovePersistedLine={id => setRemovedDraftJobWorkItemIds(prev => prev.includes(id) ? prev : [...prev, id])}
+              />
+              {!canManageDraftJobs && (
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                  {draftJobRoleDeniedReason}
+                </p>
+              )}
+            </Card>
+          )}
+
           {/* ── NEW VIEW ── */}
           {inspectionView === 'new' && (
             <Card title="Create Job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
+                  <p className="font-semibold">Need a contractor-only draft first?</p>
+                  <button type="button" onClick={() => startDraftJobComposer()} className="mt-2 text-sm font-bold text-blue-700 hover:text-blue-900">
+                    Open Draft Job composer
+                  </button>
+                </div>
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Choose job workflow</p>
                   <div className="grid gap-3 md:grid-cols-2">

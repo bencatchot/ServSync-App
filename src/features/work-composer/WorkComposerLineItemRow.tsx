@@ -24,7 +24,7 @@ type WritingAssistInputProps = {
 type WorkComposerLineItemRowProps = {
   line: WorkComposerLineDraft;
   index: number;
-  itemLabel: 'estimate' | 'invoice';
+  itemLabel: 'estimate' | 'invoice' | 'draft job';
   laborMode?: EstimateLaborMode;
   compactAdvanced?: boolean;
   advancedDetailsOpen?: boolean;
@@ -69,8 +69,8 @@ export function WorkComposerLineItemRow({
   const hasSecondaryRow = showModelSpec || showSupplyStatus;
   const showLaborHours = laborMode === 'line_specific' && workComposerLineCanTrackLaborHours(line);
   const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
-  const inputPrefix = itemLabel === 'invoice' ? 'Invoice' : 'Estimate';
-  const moreDetailsLabel = itemLabel === 'invoice' ? 'invoice' : 'estimate';
+  const inputPrefix = itemLabel === 'invoice' ? 'Invoice' : itemLabel === 'draft job' ? 'Draft job' : 'Estimate';
+  const moreDetailsLabel = itemLabel;
   const setAdvancedDetailsOpen = (open: boolean) => {
     onAdvancedDetailsOpenChange?.(open);
   };
@@ -213,6 +213,41 @@ export function WorkComposerLineItemRow({
       </select>
     </WorkComposerField>
   );
+  const roomField = itemLabel === 'draft job' ? (
+    <WorkComposerField label="Room">
+      <input
+        aria-label={`${inputPrefix} line item ${index + 1} room`}
+        className={INPUT_CLASS}
+        value={line.room_label ?? ''}
+        onChange={event => onChange({ room_label: event.target.value })}
+        placeholder="Kitchen, hallway, exterior..."
+      />
+    </WorkComposerField>
+  ) : null;
+  const locationField = itemLabel === 'draft job' ? (
+    <WorkComposerField label="Location">
+      <input
+        aria-label={`${inputPrefix} line item ${index + 1} location`}
+        className={INPUT_CLASS}
+        value={line.location_label ?? ''}
+        onChange={event => onChange({ location_label: event.target.value })}
+        placeholder="Optional detail"
+      />
+    </WorkComposerField>
+  ) : null;
+  const internalNotesField = itemLabel === 'draft job' ? (
+    <div className="lg:col-span-2">
+      <WorkComposerField label="Internal notes">
+        <input
+          aria-label={`${inputPrefix} line item ${index + 1} internal notes`}
+          className={INPUT_CLASS}
+          value={line.internal_notes ?? ''}
+          onChange={event => onChange({ internal_notes: event.target.value })}
+          placeholder="Private notes for your team"
+        />
+      </WorkComposerField>
+    </div>
+  ) : null;
 
   if (compactAdvanced) {
     return (
@@ -242,6 +277,9 @@ export function WorkComposerLineItemRow({
               {laborHoursField}
               {modelSpecField}
               {supplyStatusField}
+              {roomField}
+              {locationField}
+              {internalNotesField}
               {sourceNote ? (
                 <div className="lg:col-span-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Source note</p>
@@ -269,16 +307,24 @@ export function WorkComposerLineItemRow({
         {laborHoursField}
         {actionButtons}
       </div>
-      {hasSecondaryRow ? (
-        <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
-          <div className="space-y-2">
-            {showModelSpec ? (
-              modelSpecField
-            ) : null}
-          </div>
-          {showSupplyStatus ? (
-            supplyStatusField
-          ) : null}
+      {hasSecondaryRow || itemLabel === 'draft job' ? (
+        <div className={`mt-3 grid gap-3 border-t border-slate-100 pt-3 ${itemLabel === 'draft job' ? 'lg:grid-cols-4' : 'lg:grid-cols-[minmax(0,1fr)_14rem]'}`}>
+          {itemLabel === 'draft job' ? (
+            <>
+              {showModelSpec ? modelSpecField : null}
+              {showSupplyStatus ? supplyStatusField : null}
+              {roomField}
+              {locationField}
+              {internalNotesField}
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {showModelSpec ? modelSpecField : null}
+              </div>
+              {showSupplyStatus ? supplyStatusField : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>
