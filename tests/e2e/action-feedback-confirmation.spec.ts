@@ -153,6 +153,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
       'src/features/feedback/ActionFeedback.tsx',
       'src/features/search/FilterSummary.tsx',
       'tests/e2e/action-feedback-confirmation.spec.ts',
+      'tests/e2e/contractor-sidebar-account-identity.spec.ts',
       'tests/e2e/search-filter-recovery.spec.ts',
       'tests/e2e/empty-state-foundation.spec.ts',
       'tests/e2e/home-reminder-room-ui.spec.ts',

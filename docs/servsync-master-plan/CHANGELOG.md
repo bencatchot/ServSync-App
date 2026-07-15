@@ -4,6 +4,37 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-15
+
+- Branch: `codex/contractor-sidebar-account-identity-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `tests/e2e/action-feedback-confirmation.spec.ts`
+  - `tests/e2e/contractor-sidebar-account-identity.spec.ts`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Corrected contractor sidebar account identity so the top-left contractor brand remains the business/workspace name while the bottom-left account area uses the signed-in person's `profiles.full_name` with email fallback and a contractor owner/team-role subtitle. Added a small Business Profile control for contractors to update their signed-in account name without changing the business profile contact name or company identity.
+- Reason for change: Contractor Business Name changes were correctly updating company branding, but the account area needed clearer signed-in-person identity and role presentation so company/contact metadata is not mistaken for the current user.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-sidebar-account-identity.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/action-feedback-confirmation.spec.ts tests/e2e/empty-state-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/signout-local-storage.spec.ts --project=chromium --reporter=line` was blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/mobile-role-shell-navigation.spec.ts tests/e2e/role-tour-removal.spec.ts --project=chromium --reporter=line` exposed existing stale mobile source assertions unrelated to this branch; the expected old source markers are already absent on clean `origin/main`.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan passed.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`; the same failure was reproduced on clean `origin/main`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel settings, contractor team permissions, routing, lifecycle behavior, notifications, payment behavior, PDF output, production data, logo/avatar behavior, or contact-name semantics are changed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: NO
+  - REASON: Backlog was reviewed; this is a narrow sidebar identity correction and does not change feature status, roadmap sequencing, guardrails, or backlog priority.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this frontend-only correction does not change product strategy, roadmap structure, workflows, permissions, backend behavior, or implementation strategy.
+
 ## 2026-07-14
 
 - Branch: `codex/search-filter-recovery-v1`
