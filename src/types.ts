@@ -101,8 +101,18 @@ export type ProjectEventVisibilityScope =
   | 'assigned_contractor_and_lead'
   | 'platform_admin_only';
 export type JobLifecycleStatus = 'draft' | 'scheduled' | 'in_progress' | 'completed' | 'closed' | 'cancelled';
+export type JobOrigin = 'direct' | 'estimate' | 'draft_composer' | 'invoice_direct' | 'imported' | 'other';
 export type JobWorkItemCompletionStatus = 'open' | 'completed' | 'declined' | 'removed';
 export type JobWorkItemBillingStatus = 'unbilled' | 'drafted' | 'invoiced' | 'not_billable';
+export type JobWorkItemWorkState = 'draft' | 'open' | 'in_progress' | 'completed' | 'removed' | 'non_billable';
+export type JobWorkItemApprovalStatus =
+  | 'not_required'
+  | 'required'
+  | 'requested'
+  | 'approved_servsync'
+  | 'approved_offline'
+  | 'declined'
+  | 'proceeded_without_recorded_approval';
 export type SupportInquiryStatus = 'new' | 'in_progress' | 'waiting_on_user' | 'waiting_on_admin' | 'resolved' | 'closed';
 export type SupportInquiryCategory = 'feature_request' | 'tweak' | 'bug' | 'question' | 'billing' | 'other';
 
@@ -354,6 +364,18 @@ export interface JobWorkItem {
   billable: boolean;
   completion_status: JobWorkItemCompletionStatus;
   billing_status: JobWorkItemBillingStatus;
+  work_state: JobWorkItemWorkState;
+  approval_required: boolean;
+  approval_status: JobWorkItemApprovalStatus;
+  approval_contact_name?: string | null;
+  approval_method?: string | null;
+  approval_note?: string | null;
+  approval_decided_at?: string | null;
+  approval_recorded_by?: string | null;
+  approval_recorded_at?: string | null;
+  room_id?: string | null;
+  room_label?: string | null;
+  location_label?: string | null;
   completed_at?: string | null;
   completed_by?: string | null;
   sort_order: number;
@@ -1410,7 +1432,13 @@ export interface Inspection {
   status: 'draft' | 'finalized';
   job_type?: string;
   job_status?: JobLifecycleStatus;
+  job_origin?: JobOrigin | null;
   estimate_id?: string | null;
+  draft_created_by?: string | null;
+  draft_updated_by?: string | null;
+  draft_saved_at?: string | null;
+  activated_at?: string | null;
+  activated_by?: string | null;
   project_id?: string | null;
   completed_at?: string | null;
   closed_at?: string | null;
