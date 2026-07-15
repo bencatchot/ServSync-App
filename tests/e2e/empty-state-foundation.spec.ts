@@ -85,9 +85,9 @@ test.describe('Bundle 3A empty-state foundation', () => {
     const app = read(appPath);
 
     expect(app).toContain('<EmptyState text="No requests match that search." compact />');
-    expect(app).toContain('<EmptyState text="No records match your filters." />');
-    expect(app).toContain("text={showingEstimates ? 'No estimate records match these filters.' : 'No invoice records match these filters.'}");
-    expect(app).toContain("text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} compact");
+    expect(app).toContain('title="No matching records"');
+    expect(app).toContain('title={showingEstimates ? \'No matching estimates\' : \'No matching invoices\'}');
+    expect(app).toContain("title={contractorJobsView === 'open_jobs' ? 'No matching open jobs' : 'No matching closed jobs'}");
   });
 
   test('scope remains frontend presentation only', () => {

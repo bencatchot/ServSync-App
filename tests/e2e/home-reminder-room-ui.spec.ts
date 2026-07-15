@@ -139,7 +139,8 @@ test.describe('home reminder room picker UI', () => {
     expect(reminderList).toContain('Filter reminders by the room they are tagged to. Rooms are for organization only and do not change reminder delivery or sharing.');
     expect(reminderList).toContain('Add rooms in Properties before filtering reminders by room.');
     expect(reminderList).toContain('roomFilteredHomeReminders.length === 0');
-    expect(reminderList).toContain('No Home Reminders match this room filter.');
+    expect(reminderList).toContain('No reminders in this room');
+    expect(reminderList).toContain('Show all rooms');
     expect(reminderList).toContain('roomFilteredHomeReminders');
 
     expect(dashboardReminderPreview).not.toContain('Filter by room');
@@ -176,9 +177,14 @@ test.describe('home reminder room picker UI', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/features/emptyStates/EmptyState.tsx',
+      'src/features/feedback/ActionFeedback.tsx',
+      'src/features/search/FilterSummary.tsx',
       'src/features/reminders/statusPresentation.ts',
       'src/textCleanup.ts',
       'src/types.ts',
+      'tests/e2e/action-feedback-confirmation.spec.ts',
+      'tests/e2e/search-filter-recovery.spec.ts',
+      'tests/e2e/service-report-homemap-notices.spec.ts',
       'tests/e2e/calendar-appointment-status-presentation.spec.ts',
       'tests/e2e/findings-status-presentation.spec.ts',
       'tests/e2e/home-map-builder-ui.spec.ts',
