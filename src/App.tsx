@@ -7611,7 +7611,13 @@ function AppContent() {
   return (
     <>
       {profile.role === 'homeowner' && <HomeownerDashboard profile={profile} onSignOut={signOut} />}
-      {profile.role === 'contractor' && <ContractorDashboard profile={profile} onSignOut={signOut} />}
+      {profile.role === 'contractor' && (
+        <ContractorDashboard
+          profile={profile}
+          onProfileUpdated={updatedProfile => setProfile(updatedProfile)}
+          onSignOut={signOut}
+        />
+      )}
       {profile.role === 'platform_admin' && <PlatformAdminDashboard onSignOut={signOut} />}
     </>
   );
@@ -21552,7 +21558,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   );
 }
 
-function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignOut: () => Promise<void> }) {
+function ContractorDashboard({
+  profile,
+  onProfileUpdated,
+  onSignOut,
+}: {
+  profile: Profile;
+  onProfileUpdated: (profile: Profile) => void;
+  onSignOut: () => Promise<void>;
+}) {
   const [contractor, setContractor] = useState<ContractorProfile | null>(null);
   const [contractorServiceAreas, setContractorServiceAreas] = useState<ContractorServiceArea[]>([]);
   const [connections, setConnections] = useState<ContractorConnectedHomeowner[]>([]);
@@ -21709,6 +21723,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [contractorResponseFiles, setContractorResponseFiles] = useState<Record<string, File[]>>({});
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [uploadingContractorLogo, setUploadingContractorLogo] = useState(false);
+  const [accountNameDraft, setAccountNameDraft] = useState(profile.full_name || '');
+  const [savingAccountName, setSavingAccountName] = useState(false);
   const [teamAccess, setTeamAccess] = useState<ContractorTeamAccess | null>(null);
   const [teamInviteDraft, setTeamInviteDraft] = useState<{ email: string; display_name: string; role: ContractorTeamRole }>({
     email: '',
@@ -21771,6 +21787,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
+
+  useEffect(() => {
+    setAccountNameDraft(profile.full_name || '');
+  }, [profile.full_name]);
   const [inspectionNewDraft, setInspectionNewDraft] = useState({
     subject_type: 'connected' as 'connected' | 'local',
     homeowner_user_id: '',
@@ -22790,6 +22810,35 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       }
     } catch (err) {
       setError(readableError(err, 'Unable to save contractor profile.'));
+    }
+  };
+
+  const saveContractorAccountName = async () => {
+    if (!supabase) return;
+    const nextAccountName = accountNameDraft.trim();
+    setNotice('');
+    setError('');
+    if (!nextAccountName) {
+      setError('Enter your name before saving.');
+      return;
+    }
+    setSavingAccountName(true);
+    try {
+      const { data, error: updateError } = await supabase
+        .from('profiles')
+        .update({ full_name: nextAccountName })
+        .eq('id', profile.id)
+        .select('*')
+        .single();
+      if (updateError) throw updateError;
+      const updatedProfile = (data as Profile | null) || { ...profile, full_name: nextAccountName };
+      onProfileUpdated(updatedProfile);
+      setAccountNameDraft(updatedProfile.full_name || '');
+      setNotice('Account name saved.');
+    } catch (err) {
+      setError(readableError(err, 'Unable to save account name.'));
+    } finally {
+      setSavingAccountName(false);
     }
   };
 
@@ -30434,6 +30483,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
   const canManageEstimateSettings = teamAccess?.can_manage || contractorDraft.owner_user_id === profile.id;
   const currentContractorTeamMember = teamAccess?.members.find(member => member.user_id === profile.id && member.status === 'active') ?? null;
   const currentContractorTeamRole = contractorDraft.owner_user_id === profile.id ? 'owner' : currentContractorTeamMember?.role ?? null;
+  const contractorAccountName = profile.full_name.trim() || profile.email;
+  const contractorAccountSubtitle = currentContractorTeamRole === 'owner'
+    ? 'Owner'
+    : currentContractorTeamRole
+      ? CONTRACTOR_TEAM_ROLE_LABELS[currentContractorTeamRole]
+      : 'Contractor';
   const canManageServiceAgreements = userCanManageServiceAgreementUi(contractorDraft, teamAccess, profile.id);
   const canSubmitContractorReferral = userCanSubmitContractorReferralUi(contractorDraft, teamAccess, profile.id);
   const contractorReferralRoleDeniedReason = 'Only the contractor owner, admin, or office role can submit contractor referrals.';
@@ -31288,6 +31343,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
       profile={profile}
       profileLogoUrl={contractorDraft.logo_url}
       profileLogoFit="contain"
+      accountName={contractorAccountName}
+      accountSubtitle={contractorAccountSubtitle}
       onSignOut={onSignOut}
     >
       {loading && <Notice tone="info" text="Loading contractor workspace..." />}
@@ -31929,6 +31986,37 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
         <div className="mb-5 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
+              <p className="text-sm font-bold text-[#02132D]">Signed-in account</p>
+              <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
+                This is the person shown in the lower sidebar account area. Your business name above remains the company identity homeowners see.
+              </p>
+              <p className="mt-1 text-xs text-[#223D67]/70">{profile.email} · {contractorAccountSubtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveContractorAccountName()}
+              disabled={savingAccountName || !accountNameDraft.trim() || accountNameDraft.trim() === (profile.full_name || '').trim()}
+              className={buttonClass('primary')}
+            >
+              {savingAccountName ? 'Saving...' : 'Save account name'}
+            </button>
+          </div>
+          <div className="mt-4 max-w-xl">
+            <Field label="Your name">
+              <input
+                className={inputClass()}
+                value={accountNameDraft}
+                onChange={event => setAccountNameDraft(event.target.value)}
+                placeholder={profile.email}
+                autoComplete="name"
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="mb-5 rounded-xl border border-[#E1E3E7] bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
               <p className="text-sm font-bold text-[#02132D]">Team access</p>
               <p className="mt-1 max-w-2xl text-sm leading-5 text-[#223D67]">
                 Add staff users to this contractor account. The first owner seat is included; extra active seats are tracked here for future add-on billing.
@@ -31943,7 +32031,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 
           <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Current owner</p>
-            <p className="mt-1 text-sm font-semibold text-blue-950">{profile.full_name || contractorDraft.contact_name || profile.email}</p>
+            <p className="mt-1 text-sm font-semibold text-blue-950">{profile.full_name || profile.email}</p>
             <p className="mt-0.5 text-xs text-blue-800">{profile.email} · Owner seat</p>
           </div>
 
@@ -47999,6 +48087,8 @@ function SidebarLayout({
   profile,
   profileLogoUrl,
   profileLogoFit = 'contain',
+  accountName,
+  accountSubtitle,
   onSignOut,
 }: {
   tabs: { id: string; label: string; icon: React.ReactNode; badge?: number; group?: string }[];
@@ -48011,11 +48101,15 @@ function SidebarLayout({
   profile: Profile;
   profileLogoUrl?: string | null;
   profileLogoFit?: 'contain' | 'cover';
+  accountName?: string | null;
+  accountSubtitle?: string | null;
   onSignOut: () => Promise<void>;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeTabMeta = tabs.find(tab => tab.id === activeTab);
   const visibleMobileNavItems = mobileNavItems.slice(0, 5);
+  const resolvedAccountName = accountName?.trim() || profile.full_name || profile.email;
+  const resolvedAccountSubtitle = accountSubtitle?.trim() || profile.role.replace('_', ' ');
   const groupedTabs = tabs.reduce<Array<{ group: string; tabs: typeof tabs }>>((groups, tab) => {
     const groupName = tab.group || 'Navigation';
     const existing = groups.find(group => group.group === groupName);
@@ -48084,12 +48178,12 @@ function SidebarLayout({
                 className={profileLogoFit === 'cover' ? 'h-full w-full object-cover' : 'h-full w-full bg-white object-contain p-1'}
               />
             ) : (
-              (profile.full_name || profile.email || '?').charAt(0).toUpperCase()
+              (resolvedAccountName || '?').charAt(0).toUpperCase()
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-white truncate leading-tight">{profile.full_name || profile.email}</p>
-            <p className="text-xs text-blue-100/70 capitalize truncate">{profile.role.replace('_', ' ')}</p>
+            <p className="text-sm font-medium text-white truncate leading-tight">{resolvedAccountName}</p>
+            <p className="text-xs text-blue-100/70 capitalize truncate">{resolvedAccountSubtitle}</p>
           </div>
           <button
             type="button"
