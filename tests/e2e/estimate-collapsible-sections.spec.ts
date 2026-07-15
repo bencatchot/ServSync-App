@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const workComposerDraftSource = () => sourceFile('src/features/work-composer/workComposerDrafts.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -16,9 +17,10 @@ function sourceBetween(source: string, start: string, end: string) {
 test.describe('Estimate collapsible visual sections', () => {
   test('declares the approved estimate-only visual groups and normalized grouping rules', () => {
     const source = appSource();
-    const typeSource = sourceBetween(source, "type EstimateLineGroupKey = 'labor'", 'type EstimateDraftBuilderTrade');
-    const metadataSource = sourceBetween(source, 'const ESTIMATE_LINE_VISUAL_GROUPS', 'function estimateLineTypeLabel');
-    const groupingSource = sourceBetween(source, 'function estimateLineVisualGroup', 'function draftSchemaLaborHours');
+    const workComposerSource = workComposerDraftSource();
+    const typeSource = sourceFile('src/features/work-composer/types.ts');
+    const metadataSource = sourceBetween(workComposerSource, 'export const WORK_COMPOSER_LINE_VISUAL_GROUPS', 'export const WORK_COMPOSER_LINE_SUPPLY_STATUS_LABELS');
+    const groupingSource = sourceBetween(workComposerSource, 'export function workComposerLineVisualGroup', 'export function groupWorkComposerDraftLines');
 
     expect(typeSource).toContain("'labor' | 'materials_other' | 'fees'");
     expect(metadataSource).toContain("{ key: 'labor', label: 'Labor' }");
@@ -27,18 +29,17 @@ test.describe('Estimate collapsible visual sections', () => {
     expect(groupingSource).toContain("if (type === 'labor') return 'labor';");
     expect(groupingSource).toContain("if (type === 'fee') return 'fees';");
     expect(groupingSource).toContain("return 'materials_other';");
-    expect(groupingSource).toContain('normalizeEstimateLineType(line.line_type)');
-    expect(source).toContain("if (lineType === 'equipment') return 'material';");
-    expect(source).toContain("return 'other';");
+    expect(groupingSource).toContain('normalizeWorkComposerLineType(line.line_type)');
+    expect(workComposerSource).toContain("if (lineType === 'equipment') return 'material';");
+    expect(source).toContain('return normalizeWorkComposerLineType(lineType);');
   });
 
   test('groups lines in fixed visual order while preserving draft-array order within each group', () => {
-    const source = appSource();
-    const groupingSource = sourceBetween(source, 'function groupEstimateDraftLines', 'function estimateLineGroupSubtotalCents');
+    const groupingSource = sourceBetween(workComposerDraftSource(), 'export function groupWorkComposerDraftLines', 'export function workComposerLineGroupSubtotalCents');
 
     expect(groupingSource).toContain('lines.forEach((line, index) => {');
-    expect(groupingSource).toContain('groupedLines[estimateLineVisualGroup(line)].push({ line, index });');
-    expect(groupingSource).toContain('ESTIMATE_LINE_VISUAL_GROUPS');
+    expect(groupingSource).toContain('groupedLines[workComposerLineVisualGroup(line)].push({ line, index });');
+    expect(groupingSource).toContain('WORK_COMPOSER_LINE_VISUAL_GROUPS');
     expect(groupingSource).toContain('.filter(group => group.lines.length > 0)');
     expect(groupingSource).not.toContain('sort(');
     expect(groupingSource).not.toContain('line_items:');
@@ -138,8 +139,8 @@ test.describe('Estimate collapsible visual sections', () => {
 
   test('does not add persisted estimate sections, SQL, or backend dependencies', () => {
     const source = appSource();
-    const typeSurface = sourceBetween(source, 'type EstimateLineGroupKey =', 'type EstimateDraftBuilderTrade');
-    const groupingSurface = sourceBetween(source, 'function estimateLineVisualGroup', 'function draftSchemaLaborHours');
+    const typeSurface = sourceFile('src/features/work-composer/types.ts');
+    const groupingSurface = sourceBetween(workComposerDraftSource(), 'export function workComposerLineVisualGroup', 'export function workComposerDraftSchemaLaborHours');
     const rendererSurface = sourceBetween(source, 'const renderEstimateDraftLineGroups = () => {', 'const renderEstimateLineItemSources =');
     const changedSurface = [typeSurface, groupingSurface, rendererSurface].join('\n');
 

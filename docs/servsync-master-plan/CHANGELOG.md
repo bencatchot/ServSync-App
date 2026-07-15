@@ -6,6 +6,45 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-15
 
+- Branch: `codex/unified-start-job-composer-foundation-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/work-composer/types.ts`
+  - `src/features/work-composer/workComposerDrafts.ts`
+  - `src/features/work-composer/WorkComposerLineItemRow.tsx`
+  - `src/features/work-composer/WorkComposerTotals.tsx`
+  - `tests/e2e/unified-start-job-composer-foundation.spec.ts`
+  - `tests/e2e/contractor-create-estimate.spec.ts`
+  - `tests/e2e/contractor-create-invoice.spec.ts`
+  - `tests/e2e/estimate-editing-basics.spec.ts`
+  - `tests/e2e/estimate-collapsible-sections.spec.ts`
+  - `tests/e2e/estimate-item-reuse-polish.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented the first Unified Start New Job foundation slice by extracting behavior-preserving shared work-composer presentation/types from the existing estimate builder. The estimate builder now consumes neutral frontend line-draft types, shared line-item row presentation, shared line-item/totals helpers, and shared totals presentation while preserving existing estimate draft, save/send, template, recipe, payment-schedule, PDF, and homeowner behavior.
+- Reason for change: The workflow-redesign audit found the future unified Start New Job experience should proceed in stages. This slice prepares reusable frontend composer architecture and guardrail tests before any schema/RPC/RLS, Draft Job, direct-job replacement, or outcome-button work.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/unified-start-job-composer-foundation.spec.ts tests/e2e/estimate-editing-basics.spec.ts tests/e2e/estimate-collapsible-sections.spec.ts tests/e2e/estimate-item-reuse-polish.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-estimate.spec.ts tests/e2e/contractor-create-invoice.spec.ts tests/e2e/contractor-create-job.spec.ts tests/e2e/partial-invoicing-data-foundation.spec.ts tests/e2e/multiple-invoices-foundation.spec.ts tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium --reporter=line` had 13 source/guardrail tests pass; mutating rendered estimate/invoice/job tests were blocked by missing `TEST_CONTRACTOR_EMAIL`, and the first sandbox partial-invoicing data test was blocked by missing `VITE_SUPABASE_URL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/action-feedback-confirmation.spec.ts --project=chromium --reporter=line --grep-invert "Bundle 4A does not start search/filter"` passed. The full 4A file-scope guardrail is intentionally not applicable to this non-4A branch.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/empty-state-foundation.spec.ts tests/e2e/status-badge-foundation.spec.ts tests/e2e/invoice-payment-presentation.spec.ts --project=chromium --reporter=line` passed.
+  - Changed-file scope scan passed.
+  - Credential-pattern scan passed.
+  - Forbidden-scope scan passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No SQL/RLS/RPC, Supabase/Vercel settings, schema changes, job work-item model changes, direct-job workflow changes, Draft Job persistence, unified outcome buttons, estimate/job/invoice lifecycle changes, permission changes, notification behavior, payment behavior, PDF output, production data, or production configuration changes are included.
+  - Next approved slice should address the canonical job-scope and Draft Job backend foundation before the unified composer becomes a production source of truth.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Added FB-035 Unified Start New Job Workflow with the approved product direction, foundation-slice status, guardrails, and next backend-foundation step.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this foundation slice is behavior-preserving frontend architecture and test coverage only and does not change live workflows, permissions, backend behavior, or production strategy.
+
 - Branch: `codex/contractor-sidebar-account-identity-v1`
 - Files changed:
   - `src/App.tsx`

@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const workComposerDraftSource = () => sourceFile('src/features/work-composer/workComposerDrafts.ts');
+const workComposerLineItemRowSource = () => sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -15,20 +17,20 @@ function sourceBetween(source: string, start: string, end: string) {
 
 test.describe('Estimate Editing Basics polish', () => {
   test('duplicate estimate line helper copies only safe editable estimating fields', () => {
-    const source = appSource();
+    const source = workComposerDraftSource();
     const duplicateSource = sourceBetween(
       source,
-      'function duplicateEstimateLineDraft',
-      'function createBlankEstimateDraft',
+      'export function duplicateWorkComposerLineDraft',
+      'export function workComposerDraftForEstimate',
     );
 
     for (const copiedField of [
-      'line_type: normalizeEstimateLineType(line.line_type)',
+      'line_type: normalizeWorkComposerLineType(line.line_type)',
       'description: line.description',
       'line_title: line.line_title',
       'customer_description: line.customer_description',
       'model_spec: line.model_spec',
-      'supply_status: normalizeEstimateLineSupplyStatus(line.supply_status)',
+      'supply_status: normalizeWorkComposerLineSupplyStatus(line.supply_status)',
       'quantity: line.quantity',
       'unit: line.unit',
       'unit_price: line.unit_price',
@@ -37,7 +39,7 @@ test.describe('Estimate Editing Basics polish', () => {
       expect(duplicateSource).toContain(copiedField);
     }
 
-    expect(duplicateSource).toContain('createEstimateLineDraft({');
+    expect(duplicateSource).toContain('createWorkComposerLineDraft({');
     expect(duplicateSource).toContain('builderGenerated: false');
     expect(duplicateSource).not.toContain('id: line.id');
     expect(duplicateSource).not.toContain('job_work_item_id');
@@ -68,10 +70,13 @@ test.describe('Estimate Editing Basics polish', () => {
     expect(handlerSource).toContain('...draft.line_items.slice(sourceIndex + 1)');
     expect(handlerSource).toContain('setEstimateLineFocusId(duplicateLine.id)');
 
-    expect(editorSource).toContain("itemLabel === 'estimate' && onDuplicate");
-    expect(editorSource).toContain('aria-label={`Duplicate estimate line item ${index + 1}`}');
-    expect(editorSource).toContain('<Copy size={15} />');
-    expect(editorSource).toContain('actionButtons');
+    const rowSource = workComposerLineItemRowSource();
+    expect(rowSource).toContain("itemLabel === 'estimate' && onDuplicate");
+    expect(rowSource).toContain('aria-label={`Duplicate estimate line item ${index + 1}`}');
+    expect(rowSource).toContain('<Copy size={15} />');
+    expect(rowSource).toContain('actionButtons');
+    expect(editorSource).toContain('<WorkComposerLineItemRow');
+    expect(editorSource).toContain('onDuplicate={onDuplicate}');
   });
 
   test('estimate-only boundary leaves invoice line editor calls without duplicate controls', () => {
