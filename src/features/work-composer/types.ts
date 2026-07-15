@@ -1,4 +1,4 @@
-import type { EstimateLaborMode, EstimateLineSupplyStatus, EstimateLineType } from '../../types';
+import type { EstimateLaborMode, EstimateLineSupplyStatus, EstimateLineType, JobWorkItemWorkState } from '../../types';
 
 export type WorkComposerLineDraft = {
   id: string;
@@ -13,6 +13,11 @@ export type WorkComposerLineDraft = {
   unit: string;
   unit_price: string;
   labor_hours: string;
+  work_state?: JobWorkItemWorkState;
+  room_id?: string | null;
+  room_label?: string;
+  location_label?: string;
+  internal_notes?: string;
   builderGenerated?: boolean;
   editor_source_note?: string;
 };

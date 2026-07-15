@@ -6,6 +6,46 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-15
 
+- Branch: `codex/draft-job-ui-persistence-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/DraftJobComposer.tsx`
+  - `src/features/jobs/DraftJobList.tsx`
+  - `src/features/jobs/draftJobApi.ts`
+  - `src/features/jobs/draftJobAvailability.ts`
+  - `src/features/jobs/draftJobMappings.ts`
+  - `src/features/work-composer/WorkComposerLineItemRow.tsx`
+  - `src/features/work-composer/types.ts`
+  - `tests/e2e/draft-job-ui-persistence.spec.ts`
+  - `tests/e2e/unified-start-job-composer-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the approved Draft Job UI persistence and resume slice for the Unified Start New Job workflow behind an explicit `VITE_DRAFT_JOB_UI_ENABLED=true` availability gate. When the gate is enabled, the existing `Start New Job` entry opens a contractor-only Draft Job composer backed by the shared work-composer foundation, supports explicit `Save Draft`, preserves backend Draft Job and scope-item IDs across saves/retries, and adds a separate Draft Jobs section with `Continue Draft` while keeping legacy operational job creation available as a clearly labeled fallback. When the gate is missing, false, or malformed, the existing legacy operational job creation path remains the default.
+- Reason for change: After the Draft Job backend foundation was validated in sandbox, contractors needed a narrow UI slice to persist and resume Draft Jobs without launching the future Create Estimate/Create Job/Create Invoice outcome flow or replacing existing direct-job creation.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-ui-persistence.spec.ts tests/e2e/unified-start-job-composer-foundation.spec.ts` passed, including explicit Draft Job UI gate and save-failure phase coverage.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/estimate-editing-basics.spec.ts` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/status-secondary-migration.spec.ts` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/contractor-create-job.spec.ts` blocked on missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts` blocked on missing `VITE_SUPABASE_URL`.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+  - Initial Playwright run without `TEST_APP_URL` was blocked by repository config before test execution.
+- Known risks or follow-ups:
+  - Production SQL is still not applied; production Draft Job UI use remains disabled by default until the separate production SQL/RPC/RLS rollout is explicitly approved and the public Vite gate is enabled.
+  - This slice does not add Create Estimate/Create Job/Create Invoice outcome buttons, Draft Job activation UI, estimate-from-job, invoice allocation redesign, final reconciliation, reopening, autosave, production SQL, production data changes, or Vercel configuration changes.
+  - Authenticated sandbox-rendered workflow coverage and cleanup still need a credential-backed validation pass before production rollout.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records Slice 3 as Draft Job UI persistence/resume while keeping the overall unified Start New Job workflow incomplete.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The job workflow status now distinguishes sandbox-backed Draft Job UI persistence from future outcome actions and production SQL rollout.
+
 - Branch: `codex/draft-job-scope-backend-foundation-v1`
 - Files changed:
   - `servsync-draft-job-scope-backend-foundation.sql`
