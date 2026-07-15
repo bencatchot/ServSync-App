@@ -122,10 +122,14 @@ test.describe('Bundle 4B-1 search and filter recovery', () => {
     const financialSource = sourceBetween(contractorSource, "{(contractorJobsView === 'open_financial' || contractorJobsView === 'closed_financial') && (", "{(contractorJobsView === 'open_jobs' || contractorJobsView === 'closed_jobs') && (");
     const jobsSource = sourceBetween(contractorSource, "<Card title={contractorJobsView === 'open_jobs' ? 'Open jobs' : 'Closed jobs'}", "{contractorJobsView === 'custom_pricing' && (");
 
+    expect(customerSource).toContain('Customers and contacts');
+    expect(customerSource).toContain('aria-label="Search customers and contacts"');
+    expect(customerSource).toContain('placeholder="Search customers, contacts, city, or address"');
     expect(customerSource).toContain('testId="contractor-customer-filter-summary"');
     expect(customerSource).toContain('No matching customers or contacts');
     expect(customerSource).toContain('Clear search and show active');
     expect(customerSource).toContain('subjectMatchesSearch');
+    expect(customerSource).not.toContain('placeholder="Search homeowner, city, address..."');
 
     expect(financialSource).toContain('const estimateFilterLabels = [');
     expect(financialSource).toContain('const invoiceFilterLabels = [');
@@ -141,6 +145,9 @@ test.describe('Bundle 4B-1 search and filter recovery', () => {
     expect(jobsSource).toContain('Customer: ${selectedJobsCustomerName');
     expect(jobsSource).toContain('Clear job filters');
     expect(jobsSource).toContain('testId="contractor-job-filter-summary"');
+    expect(jobsSource).toContain('resultCount={records.length}');
+    expect(jobsSource).toContain('totalCount={baseRecords.length}');
+    expect(jobsSource).not.toContain("totalCount={contractorJobsView === 'open_jobs' ? openJobs.length : closedJobs.length}");
     expect(jobsSource).toContain('No matching open jobs');
     expect(jobsSource).toContain('No matching closed jobs');
     expect(jobsSource).toContain('const filteredRecords = baseRecords.filter');

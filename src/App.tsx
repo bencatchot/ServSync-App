@@ -34066,7 +34066,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
               <div className={`${showHomeownerMobileDetail ? 'hidden md:block' : 'block'} border-b border-slate-200 bg-white md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:border-b-0 md:border-r`}>
                 <div className="px-4 py-4 border-b border-slate-100">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-semibold text-slate-800 text-sm">Homeowners</h2>
+                    <h2 className="font-semibold text-slate-800 text-sm">Customers and contacts</h2>
                     {!SERVSYNC_DEMO_PRESENTATION_MODE && (
                       <button type="button" onClick={() => { setShowLocalContactForm(true); setSelectedHomeownerSubjectId(null); setHomeownerMobileDetailOpen(true); }} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
                         <Plus size={14} /> Add
@@ -34100,7 +34100,8 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       value={homeownerWorkspaceSearch}
                       onChange={event => setHomeownerWorkspaceSearch(event.target.value)}
-                      placeholder="Search homeowner, city, address..."
+                      aria-label="Search customers and contacts"
+                      placeholder="Search customers, contacts, city, or address"
                     />
 	                    {homeownerWorkspaceSearch && (
 	                      <button
@@ -38500,7 +38501,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
 	                              className="mt-3"
 	                              compact
 	                              resultCount={records.length}
-	                              totalCount={contractorJobsView === 'open_jobs' ? openJobs.length : closedJobs.length}
+	                              totalCount={baseRecords.length}
 	                              activeLabels={jobFilterLabels}
 	                              onClear={clearAllJobFilters}
 	                              clearLabel="Clear job filters"
