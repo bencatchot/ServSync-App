@@ -129,6 +129,7 @@ import {
 } from './features/referrals/statusPresentation';
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
+import { FilterSummary } from './features/search/FilterSummary';
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
 import { homeMapDraftStatusPresentation } from './features/homeMap/statusPresentation';
@@ -13574,6 +13575,15 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
   const selectedHomeReminderRooms = selectedHomeId ? (homeRoomsByHomeId[selectedHomeId] || []) : [];
   const selectedHomeReminderRoomIds = new Set(selectedHomeReminderRooms.map(room => room.id));
   const canFilterHomeRemindersByRoom = homeownerMaintenancePropertyScope === 'selected' && Boolean(selectedHomeId);
+  const selectedHomeReminderRoom = selectedHomeReminderRooms.find(room => room.id === homeownerReminderRoomFilter) ?? null;
+  const selectedHomeReminderRoomLabel = homeownerReminderRoomFilter === 'none'
+    ? 'No room'
+    : selectedHomeReminderRoom
+      ? [
+        selectedHomeReminderRoom.name,
+        [selectedHomeReminderRoom.floor_label, selectedHomeReminderRoom.area_label].filter(Boolean).join(' / '),
+      ].filter(Boolean).join(' - ')
+      : '';
   const roomFilteredHomeReminders = propertyScopedHomeReminders.filter(reminder => {
     if (!canFilterHomeRemindersByRoom || homeownerReminderRoomFilter === 'all') return true;
     const activeRoomId = reminder.home_room_id && selectedHomeReminderRoomIds.has(reminder.home_room_id)
@@ -14890,6 +14900,19 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             ];
   const homeownerRecordFiltersActive = Boolean(homeownerRecordSearch || homeownerRecordContractorFilter !== 'all');
   const homeownerRecordControlsDirty = homeownerRecordFiltersActive || homeownerRecordSort !== 'newest';
+  const homeownerRecordFilterLabels = [
+    homeownerRecordContractorFilter !== 'all'
+      ? `Contractor: ${homeownerRecordContractorName(homeownerRecordContractorFilter)}`
+      : null,
+    homeownerRecordSort !== 'newest'
+      ? 'Sort: Oldest first'
+      : null,
+  ].filter((label): label is string => Boolean(label));
+  const clearHomeownerRecordControls = () => {
+    setHomeownerRecordSearch('');
+    setHomeownerRecordContractorFilter('all');
+    setHomeownerRecordSort('newest');
+  };
 
   const renderHomeownerEstimatesInvoicesPage = () => (
     <Card title="Estimates / Invoices" icon={<Receipt size={18} />}>
@@ -15005,22 +15028,31 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
             </Field>
           </div>
           {homeownerRecordControlsDirty && (
-            <button
-              type="button"
-              onClick={() => {
-                setHomeownerRecordSearch('');
-                setHomeownerRecordContractorFilter('all');
-                setHomeownerRecordSort('newest');
-              }}
-              className="mt-3 text-sm font-semibold text-blue-700 hover:text-blue-800"
-            >
-              Clear filters
-            </button>
+            <FilterSummary
+              className="mt-3"
+              compact
+              resultCount={selectedHomeownerRecordCount}
+              totalCount={selectedHomeownerRecordTile.count}
+              activeLabels={homeownerRecordFilterLabels}
+              searchTerm={homeownerRecordSearch}
+              onClear={clearHomeownerRecordControls}
+              clearLabel={homeownerRecordSearch ? 'Clear search and filters' : 'Clear filters'}
+              testId="homeowner-record-filter-summary"
+            />
           )}
         </div>
 
         {homeownerHasAnyPropertyScopedRecords && homeownerRecordFiltersActive && selectedHomeownerRecordCount === 0 ? (
-          <EmptyState text="No records match your filters." />
+          <EmptyState
+            compact
+            title="No matching records"
+            body="Try a different search or clear the active filters to see these records."
+            action={
+              <button type="button" onClick={clearHomeownerRecordControls} className={buttonClass('secondary')}>
+                Clear search and filters
+              </button>
+            }
+          />
         ) : (
           renderHomeownerRecordsSection(
             selectedHomeownerRecordTile.title,
@@ -18875,8 +18907,8 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
       {homeownerTab === 'requests' && (
         <div className="space-y-5">
           {(() => {
-            return (
-              <div className="space-y-4">
+	                    return (
+	                      <div className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-950">Service Requests</h2>
@@ -20186,7 +20218,7 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                         {homeownerHasMultipleProperties ? `Showing ${homeownerRequestScopeLabel}` : `Requests for ${homeownerRequestScopeLabel}`}
                       </p>
                     </div>
-                    <Field label="Search this bucket">
+	                    <Field label="Search requests">
                       <input
                         className={inputClass()}
                         value={homeownerRequestSearch}
@@ -20639,14 +20671,41 @@ function HomeownerDashboard({ profile, onSignOut }: { profile: Profile; onSignOu
                       <p className="text-xs leading-5 text-emerald-800">
                         Add rooms in Properties before filtering reminders by room.
                       </p>
-                    )}
-                  </div>
-                )}
-                <div className="mt-3 space-y-2">
+	                    )}
+	                  </div>
+	                )}
+	                {homeownerReminderRoomFilter !== 'all' && (
+	                  <FilterSummary
+	                    className="mt-3"
+	                    compact
+	                    resultCount={roomFilteredHomeReminders.length}
+	                    totalCount={propertyScopedHomeReminders.length}
+	                    activeLabels={[`Room: ${selectedHomeReminderRoomLabel || 'Selected room'}`]}
+	                    onClear={() => setHomeownerReminderRoomFilter('all')}
+	                    clearLabel="Show all rooms"
+	                    testId="home-reminder-room-filter-summary"
+	                  />
+	                )}
+	                <div className="mt-3 space-y-2">
                   {roomFilteredHomeReminders.length === 0 ? (
-                    <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
-                      No Home Reminders match this room filter.
-                    </p>
+                    homeownerReminderRoomFilter === 'all' ? (
+                      <EmptyState
+                        compact
+                        title="No Home Reminders yet"
+                        body="Reminders saved for this Home History scope will appear here."
+                      />
+                    ) : (
+                      <EmptyState
+                        compact
+                        title="No reminders in this room"
+                        body={`No reminders match ${selectedHomeReminderRoomLabel || 'the selected room'}. Show all rooms to see every reminder for this scope.`}
+                        action={
+                          <button type="button" onClick={() => setHomeownerReminderRoomFilter('all')} className={buttonClass('secondary')}>
+                            Show all rooms
+                          </button>
+                        }
+                      />
+                    )
                   ) : roomFilteredHomeReminders
                     .slice()
                     .sort((a, b) => {
@@ -33570,7 +33629,7 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       <p className="text-sm font-bold text-slate-950">{selectedSection.title}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{selectedSection.helper}</p>
                     </div>
-                    <Field label="Search this queue">
+	                    <Field label="Search requests">
                       <input
                         className={inputClass()}
                         value={contractorRequestSearch}
@@ -33991,10 +34050,12 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
           const haystack = subjectSearchText(subject);
           return homeownerSearchTerms.every(term => haystack.includes(term));
         };
-        const visibleSubjects = (homeownerFilter === 'active' ? activeSubjects : inactiveSubjects)
-          .filter(subjectMatchesSearch)
-          .sort((a, b) => subjectAttentionScore(b) - subjectAttentionScore(a));
-        const allSubjects = [...activeSubjects, ...inactiveSubjects];
+	        const visibleSubjects = (homeownerFilter === 'active' ? activeSubjects : inactiveSubjects)
+	          .filter(subjectMatchesSearch)
+	          .sort((a, b) => subjectAttentionScore(b) - subjectAttentionScore(a));
+	        const visibleSubjectTotalCount = homeownerFilter === 'active' ? activeSubjects.length : inactiveSubjects.length;
+	        const customerSidebarLabels = homeownerFilter === 'inactive' ? ['View: Inactive customers and contacts'] : [];
+	        const allSubjects = [...activeSubjects, ...inactiveSubjects];
         const selectedSubject = allSubjects.find(s => s.id === selectedHomeownerSubjectId) ?? null;
         const showHomeownerMobileDetail = homeownerMobileDetailOpen || showLocalContactForm;
 
@@ -34041,23 +34102,59 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       onChange={event => setHomeownerWorkspaceSearch(event.target.value)}
                       placeholder="Search homeowner, city, address..."
                     />
-                    {homeownerWorkspaceSearch && (
-                      <button
-                        type="button"
+	                    {homeownerWorkspaceSearch && (
+	                      <button
+	                        type="button"
                         onClick={() => setHomeownerWorkspaceSearch('')}
                         className="mt-1 text-xs font-semibold text-blue-700 hover:text-blue-800"
                       >
                         Clear search
                       </button>
-                    )}
-                  </div>
-                </div>
-                <div className="divide-y divide-slate-100 md:max-h-[calc(100vh-17rem)] md:overflow-y-auto">
-                  {visibleSubjects.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-8 px-4">
-                      {homeownerWorkspaceSearch ? 'No homeowners match that search.' : `No ${homeownerFilter} homeowners yet.`}
-                    </p>
-                  ) : visibleSubjects.map(subject => {
+	                    )}
+	                  </div>
+	                  {(homeownerWorkspaceSearch || homeownerFilter === 'inactive') && (
+	                    <FilterSummary
+	                      className="mt-3"
+	                      compact
+	                      resultCount={visibleSubjects.length}
+	                      totalCount={visibleSubjectTotalCount}
+	                      activeLabels={customerSidebarLabels}
+	                      searchTerm={homeownerWorkspaceSearch}
+	                      onClear={() => {
+	                        setHomeownerWorkspaceSearch('');
+	                        if (homeownerFilter === 'inactive') setHomeownerFilter('active');
+	                      }}
+	                      clearLabel={homeownerWorkspaceSearch && homeownerFilter === 'inactive' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
+	                      testId="contractor-customer-filter-summary"
+	                    />
+	                  )}
+	                </div>
+	                <div className="divide-y divide-slate-100 md:max-h-[calc(100vh-17rem)] md:overflow-y-auto">
+	                  {visibleSubjects.length === 0 ? (
+	                    <div className="p-3">
+	                      <EmptyState
+	                        compact
+	                        title={homeownerWorkspaceSearch ? 'No matching customers or contacts' : `No ${homeownerFilter} customers or contacts yet`}
+	                        body={homeownerWorkspaceSearch
+	                          ? 'Try a different search or clear it to see customers and contacts in this view.'
+	                          : homeownerFilter === 'inactive'
+	                            ? 'Inactive customers and local contacts appear here after they are archived or no longer active.'
+	                            : 'Active ServSync homeowners and local contacts will appear here when they are available.'}
+	                        action={homeownerWorkspaceSearch || homeownerFilter === 'inactive' ? (
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              setHomeownerWorkspaceSearch('');
+	                              if (homeownerFilter === 'inactive') setHomeownerFilter('active');
+	                            }}
+	                            className={buttonClass('secondary')}
+	                          >
+	                            {homeownerWorkspaceSearch && homeownerFilter === 'inactive' ? 'Clear search and show active' : homeownerWorkspaceSearch ? 'Clear search' : 'Show active'}
+	                          </button>
+	                        ) : null}
+	                      />
+	                    </div>
+	                  ) : visibleSubjects.map(subject => {
                     const isSelected = selectedHomeownerSubjectId === subject.id;
                     let rowName = '';
                     let subtitle = '';
@@ -37674,15 +37771,63 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                       : showingEstimates
                         ? 'Search, filter, and sort estimate records without mixing in invoice cards.'
                         : 'Search, filter, and sort invoice records without mixing in estimate cards.';
-                    const estimateFilterActive = Boolean(contractorEstimateRecordSearch.trim())
-                      || contractorEstimateRecordStatusFilter !== 'all'
-                      || contractorEstimateRecordSort !== 'updated_newest'
-                      || Boolean(jobsCustomerFilterSubjectId);
-                    const invoiceFilterActive = Boolean(contractorInvoiceRecordSearch.trim())
-                      || contractorInvoiceRecordStatusFilter !== 'all'
-                      || contractorInvoiceRecordSort !== 'updated_newest'
-                      || Boolean(jobsCustomerFilterSubjectId);
-                    return (
+	                    const estimateFilterActive = Boolean(contractorEstimateRecordSearch.trim())
+	                      || contractorEstimateRecordStatusFilter !== 'all'
+	                      || contractorEstimateRecordSort !== 'updated_newest'
+	                      || Boolean(jobsCustomerFilterSubjectId);
+	                    const invoiceFilterActive = Boolean(contractorInvoiceRecordSearch.trim())
+	                      || contractorInvoiceRecordStatusFilter !== 'all'
+	                      || contractorInvoiceRecordSort !== 'updated_newest'
+	                      || Boolean(jobsCustomerFilterSubjectId);
+	                    const estimateStatusFilterLabels: Record<ContractorEstimateRecordStatusFilter, string> = {
+	                      all: 'All',
+	                      draft: 'Draft',
+	                      sent: 'Sent',
+	                      approved: 'Approved',
+	                      invoiced: 'Invoiced',
+	                      closed: 'Closed',
+	                    };
+	                    const invoiceStatusFilterLabels: Record<ContractorInvoiceRecordStatusFilter, string> = {
+	                      all: 'All',
+	                      draft: 'Draft',
+	                      sent: 'Sent',
+	                      viewed: 'Viewed',
+	                      overdue: 'Overdue',
+	                      partially_paid: 'Partially paid',
+	                      paid: 'Paid',
+	                      void: 'Void',
+	                    };
+	                    const recordSortLabels: Record<string, string> = {
+	                      updated_newest: 'Updated newest',
+	                      created_newest: 'Created newest',
+	                      amount_high: 'Amount high',
+	                      amount_low: 'Amount low',
+	                      customer_az: 'Customer A-Z',
+	                      due_date: 'Due date',
+	                    };
+	                    const clearEstimateRecordFilters = () => {
+	                      setJobsCustomerFilterSubjectId(null);
+	                      setContractorEstimateRecordSearch('');
+	                      setContractorEstimateRecordStatusFilter('all');
+	                      setContractorEstimateRecordSort('updated_newest');
+	                    };
+	                    const clearInvoiceRecordFilters = () => {
+	                      setJobsCustomerFilterSubjectId(null);
+	                      setContractorInvoiceRecordSearch('');
+	                      setContractorInvoiceRecordStatusFilter('all');
+	                      setContractorInvoiceRecordSort('updated_newest');
+	                    };
+	                    const estimateFilterLabels = [
+	                      jobsCustomerFilterSubjectId ? `Customer: ${selectedJobsCustomerName || 'Selected customer'}` : null,
+	                      contractorEstimateRecordStatusFilter !== 'all' ? `Status: ${estimateStatusFilterLabels[contractorEstimateRecordStatusFilter]}` : null,
+	                      contractorEstimateRecordSort !== 'updated_newest' ? `Sort: ${recordSortLabels[contractorEstimateRecordSort]}` : null,
+	                    ].filter((label): label is string => Boolean(label));
+	                    const invoiceFilterLabels = [
+	                      jobsCustomerFilterSubjectId ? `Customer: ${selectedJobsCustomerName || 'Selected customer'}` : null,
+	                      contractorInvoiceRecordStatusFilter !== 'all' ? `Status: ${invoiceStatusFilterLabels[contractorInvoiceRecordStatusFilter]}` : null,
+	                      contractorInvoiceRecordSort !== 'updated_newest' ? `Sort: ${recordSortLabels[contractorInvoiceRecordSort]}` : null,
+	                    ].filter((label): label is string => Boolean(label));
+	                    return (
                       <div className="space-y-4">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -37799,15 +37944,10 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <option value="customer_az">Customer A-Z</option>
                                   </select>
                                 </Field>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setJobsCustomerFilterSubjectId(null);
-                                    setContractorEstimateRecordSearch('');
-                                    setContractorEstimateRecordStatusFilter('all');
-                                    setContractorEstimateRecordSort('updated_newest');
-                                  }}
-                                  disabled={!estimateFilterActive}
+	                                <button
+	                                  type="button"
+	                                  onClick={clearEstimateRecordFilters}
+	                                  disabled={!estimateFilterActive}
                                   className={`${buttonClass('secondary')} justify-center disabled:opacity-50`}
                                 >
                                   Clear filters
@@ -37859,24 +37999,33 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                     <option value="customer_az">Customer A-Z</option>
                                   </select>
                                 </Field>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setJobsCustomerFilterSubjectId(null);
-                                    setContractorInvoiceRecordSearch('');
-                                    setContractorInvoiceRecordStatusFilter('all');
-                                    setContractorInvoiceRecordSort('updated_newest');
-                                  }}
-                                  disabled={!invoiceFilterActive}
+	                                <button
+	                                  type="button"
+	                                  onClick={clearInvoiceRecordFilters}
+	                                  disabled={!invoiceFilterActive}
                                   className={`${buttonClass('secondary')} justify-center disabled:opacity-50`}
                                 >
                                   Clear filters
                                 </button>
                               </>
                             )}
-                          </div>
-                          )}
-                        </div>
+	                          </div>
+	                          )}
+	                          {!focusedEstimateRecord && (showingEstimates ? estimateFilterActive : invoiceFilterActive) && (
+	                            <FilterSummary
+	                              className="mt-3"
+	                              resultCount={showingEstimates ? visibleEstimateRecords.length : visibleInvoiceRecords.length}
+	                              totalCount={showingEstimates ? estimateRecordsForView.length : invoiceRecordsForView.length}
+	                              activeLabels={showingEstimates ? estimateFilterLabels : invoiceFilterLabels}
+	                              searchTerm={showingEstimates ? contractorEstimateRecordSearch : contractorInvoiceRecordSearch}
+	                              onClear={showingEstimates ? clearEstimateRecordFilters : clearInvoiceRecordFilters}
+	                              clearLabel={showingEstimates
+	                                ? contractorEstimateRecordSearch ? 'Clear search and filters' : 'Clear filters'
+	                                : contractorInvoiceRecordSearch ? 'Clear search and filters' : 'Clear filters'}
+	                              testId={showingEstimates ? 'contractor-estimate-filter-summary' : 'contractor-invoice-filter-summary'}
+	                            />
+	                          )}
+	                        </div>
 
                         {visibleEstimateRecords.length === 0 && visibleInvoiceRecords.length === 0 ? (
                           showingEstimates && estimateRecordsForView.length === 0 && !estimateFilterActive ? (
@@ -37891,12 +38040,20 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               title="No invoices yet"
                               body="Invoices you create for selected customers or completed work will appear here."
                             />
-                          ) : (
-                            <EmptyState
-                              compact
-                              text={showingEstimates ? 'No estimate records match these filters.' : 'No invoice records match these filters.'}
-                            />
-                          )
+	                          ) : (
+	                            <EmptyState
+	                              compact
+	                              title={showingEstimates ? 'No matching estimates' : 'No matching invoices'}
+	                              body={showingEstimates ? 'Try a different search or clear the active filters to see estimate records.' : 'Try a different search or clear the active filters to see invoice records.'}
+	                              action={
+	                                <button type="button" onClick={showingEstimates ? clearEstimateRecordFilters : clearInvoiceRecordFilters} className={buttonClass('secondary')}>
+	                                  {showingEstimates
+	                                    ? contractorEstimateRecordSearch ? 'Clear search and filters' : 'Clear filters'
+	                                    : contractorInvoiceRecordSearch ? 'Clear search and filters' : 'Clear filters'}
+	                                </button>
+	                              }
+	                            />
+	                          )
                         ) : (
                         <div className="space-y-2">
                         {visibleInvoiceRecords.length > 0 && (
@@ -38250,12 +38407,27 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                         label: inspectionJobStatusLabel({ status: status === 'completed' ? 'finalized' : 'draft', job_status: status }),
                       })),
                     ];
-                    const clearJobFilters = () => {
-                      setJobsListDateFilter('');
-                      setJobsListStatusFilter('all');
-                      setJobsListTypeFilter('all');
-                    };
-                    return (
+	                    const clearJobFilters = () => {
+	                      setJobsListDateFilter('');
+	                      setJobsListStatusFilter('all');
+	                      setJobsListTypeFilter('all');
+	                    };
+	                    const clearAllJobFilters = () => {
+	                      setJobsCustomerFilterSubjectId(null);
+	                      clearJobFilters();
+	                    };
+	                    const jobFiltersActive = Boolean(jobsListDateFilter || jobsListStatusFilter !== 'all' || jobsListTypeFilter !== 'all' || jobsCustomerFilterSubjectId);
+	                    const jobFilterLabels = [
+	                      jobsCustomerFilterSubjectId ? `Customer: ${selectedJobsCustomerName || 'Selected customer'}` : null,
+	                      jobsListDateFilter ? `Updated: ${formatDateOnly(jobsListDateFilter)}` : null,
+	                      jobsListStatusFilter !== 'all'
+	                        ? `Status: ${jobStatusFilterOptions.find(option => option.value === jobsListStatusFilter)?.label || jobsListStatusFilter}`
+	                        : null,
+	                      jobsListTypeFilter !== 'all'
+	                        ? `Type: ${jobTypeFilterOptions.find(option => option.value === jobsListTypeFilter)?.label || jobsListTypeFilter}`
+	                        : null,
+	                    ].filter((label): label is string => Boolean(label));
+	                    return (
                       <div className="space-y-4">
                         {renderDemoPresentationJobsCheckpointStory()}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -38323,16 +38495,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                               </select>
                             </Field>
                           </div>
-                          {(jobsListDateFilter || jobsListStatusFilter !== 'all' || jobsListTypeFilter !== 'all' || jobsCustomerFilterSubjectId) && (
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                              <p className="text-xs font-medium text-slate-500">
-                                Showing {records.length} matching job{records.length === 1 ? '' : 's'}.
-                              </p>
-                              <button type="button" onClick={clearJobFilters} className="text-xs font-semibold text-blue-700 hover:text-blue-800">
-                                Clear date/status/type filters
-                              </button>
-                            </div>
-                          )}
+	                          {jobFiltersActive && (
+	                            <FilterSummary
+	                              className="mt-3"
+	                              compact
+	                              resultCount={records.length}
+	                              totalCount={contractorJobsView === 'open_jobs' ? openJobs.length : closedJobs.length}
+	                              activeLabels={jobFilterLabels}
+	                              onClear={clearAllJobFilters}
+	                              clearLabel="Clear job filters"
+	                              testId="contractor-job-filter-summary"
+	                            />
+	                          )}
                         </div>
 
                         {records.length === 0 ? (
@@ -38346,9 +38520,18 @@ function ContractorDashboard({ profile, onSignOut }: { profile: Profile; onSignO
                                   : 'Completed, closed, and cancelled jobs will appear here after field work is wrapped up.'
                               }
                             />
-                          ) : (
-                            <EmptyState text={contractorJobsView === 'open_jobs' ? 'No open jobs match this view.' : 'No recently closed jobs match this view.'} compact />
-                          )
+	                          ) : (
+	                            <EmptyState
+	                              compact
+	                              title={contractorJobsView === 'open_jobs' ? 'No matching open jobs' : 'No matching closed jobs'}
+	                              body="Adjust the filters or clear them to see jobs in this view."
+	                              action={
+	                                <button type="button" onClick={clearAllJobFilters} className={buttonClass('secondary')}>
+	                                  Clear job filters
+	                                </button>
+	                              }
+	                            />
+	                          )
                         ) : (
                           <div className="space-y-2">
                             {records.map(insp => {
@@ -46955,13 +47138,16 @@ function DiscoverFeed({
     }
   };
 
-  const loadFeed = async () => {
-    if (!supabase) return;
-    setFeedLoading(true);
-    try {
-      let searchLat: number | null = null;
-      let searchLng: number | null = null;
-      const locationQuery = filterLocation.trim();
+	  const loadFeed = async (overrides: { category?: string; location?: string; radiusMiles?: string } = {}) => {
+	    if (!supabase) return;
+	    setFeedLoading(true);
+	    try {
+	      let searchLat: number | null = null;
+	      let searchLng: number | null = null;
+	      const categoryFilter = overrides.category ?? filterCategory;
+	      const locationFilter = overrides.location ?? filterLocation;
+	      const radiusFilter = overrides.radiusMiles ?? filterRadiusMiles;
+	      const locationQuery = locationFilter.trim();
       if (perspective === 'homeowner' && locationQuery) {
         setDiscoverLocationStatus('loading');
         setDiscoverLocationMessage('');
@@ -46984,15 +47170,15 @@ function DiscoverFeed({
         setDiscoverLocationStatus('idle');
         setDiscoverLocationMessage('');
       }
-      const { data, error } = perspective === 'contractor'
-        ? await supabase.rpc('servsync_my_discover_posts')
-        : await supabase.rpc('servsync_discover_feed', {
-          p_category: filterCategory || null,
-          p_location: filterLocation || null,
-          p_radius_miles: filterLocation.trim() ? Number(filterRadiusMiles) : null,
-          p_search_lat: searchLat,
-          p_search_lng: searchLng,
-        });
+	      const { data, error } = perspective === 'contractor'
+	        ? await supabase.rpc('servsync_my_discover_posts')
+	        : await supabase.rpc('servsync_discover_feed', {
+	          p_category: categoryFilter || null,
+	          p_location: locationFilter || null,
+	          p_radius_miles: locationFilter.trim() ? Number(radiusFilter) : null,
+	          p_search_lat: searchLat,
+	          p_search_lng: searchLng,
+	        });
       if (error) throw error;
       setFeed((data || []) as DiscoverFeedItem[]);
     } catch {
@@ -47160,6 +47346,33 @@ function DiscoverFeed({
   const selectedPostSlug = selectedPost ? contractorSlugs[selectedPost.contractor_id] : undefined;
   const selectedPostExternalReviewLinks = selectedPost ? normalizeExternalReviewLinks(selectedPost.external_review_links) : [];
   const selectedPostServiceAreas = selectedPost?.service_areas || [];
+  const discoverFiltersActive = Boolean(
+    filterKeyword.trim()
+    || filterCategory
+    || filterLocation.trim()
+    || (filterLocation.trim() && filterRadiusMiles !== String(DEFAULT_CONTRACTOR_SERVICE_RADIUS))
+    || (perspective === 'homeowner' && feedView === 'saved')
+  );
+  const discoverFilterLabels = [
+    filterCategory ? `Category: ${filterCategory}` : null,
+    filterLocation.trim() ? `Location: ${filterLocation.trim()}` : null,
+    filterLocation.trim() ? `Within ${filterRadiusMiles} miles` : null,
+    perspective === 'homeowner' && feedView === 'saved' ? 'View: Saved posts' : null,
+  ].filter((label): label is string => Boolean(label));
+  const clearDiscoverFilters = () => {
+    setFilterKeyword('');
+    setFilterCategory('');
+    setFilterLocation('');
+    setFilterRadiusMiles(String(DEFAULT_CONTRACTOR_SERVICE_RADIUS));
+    setFeedView('all');
+    setDiscoverLocationStatus('idle');
+    setDiscoverLocationMessage('');
+    void loadFeed({
+      category: '',
+      location: '',
+      radiusMiles: String(DEFAULT_CONTRACTOR_SERVICE_RADIUS),
+    });
+  };
 
   const openPostDetail = (item: DiscoverFeedItem) => {
     setSelectedPostId(item.post_id);
@@ -47215,6 +47428,7 @@ function DiscoverFeed({
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Search Discover posts"
                 placeholder="Search work, contractor, keyword"
                 value={filterKeyword}
                 onChange={e => setFilterKeyword(e.target.value)}
@@ -47232,6 +47446,7 @@ function DiscoverFeed({
               <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                aria-label="Search by ZIP or city"
                 placeholder="ZIP or city"
                 value={filterLocation}
                 onChange={e => setFilterLocation(e.target.value)}
@@ -47271,6 +47486,18 @@ function DiscoverFeed({
                     ? 'Confirming that location...'
                     : 'Mileage is a guide for now. Results are based on contractor-listed service areas and matching locations.'}
             </p>
+          )}
+          {discoverFiltersActive && (
+            <FilterSummary
+              className="mt-3"
+              resultCount={visibleFeed.length}
+              totalCount={filterKeyword.trim() ? feedForView.length : undefined}
+              activeLabels={discoverFilterLabels}
+              searchTerm={filterKeyword}
+              onClear={clearDiscoverFilters}
+              clearLabel="Clear Discover filters"
+              testId="discover-filter-summary"
+            />
           )}
         </div>
       )}
@@ -47395,16 +47622,28 @@ function DiscoverFeed({
         </div>
       )}
 
-      {/* Feed */}
-      {!feedLoading && visibleFeed.length === 0 && (
-        <EmptyState text={perspective === 'homeowner' && feedView === 'saved' && savedFeedCount === 0
-          ? 'No saved posts yet. Save helpful contractor posts to revisit later.'
-          : feed.length === 0
-            ? perspective === 'homeowner'
-              ? 'Contractor posts will appear here as local pros start sharing updates, services, and availability.'
-              : 'No posts yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
-            : 'No posts match those filters yet.'} />
-      )}
+	      {/* Feed */}
+	      {!feedLoading && visibleFeed.length === 0 && (
+	        perspective === 'homeowner' && discoverFiltersActive ? (
+	          <EmptyState
+	            title={feedView === 'saved' && savedFeedCount === 0 ? 'No saved posts yet' : 'No matching contractor posts'}
+	            body={feedView === 'saved' && savedFeedCount === 0
+	              ? 'Save helpful contractor posts to revisit them later, or clear Discover filters to browse all posts.'
+	              : 'Try a different search or clear the active filters to browse contractor posts.'}
+	            action={
+	              <button type="button" onClick={clearDiscoverFilters} className={buttonClass('secondary')}>
+	                Clear Discover filters
+	              </button>
+	            }
+	          />
+	        ) : (
+	          <EmptyState text={feed.length === 0
+	            ? perspective === 'homeowner'
+	              ? 'Contractor posts will appear here as local pros start sharing updates, services, and availability.'
+	              : 'No posts yet. Post recent work, seasonal advice, or maintenance tips to help homeowners understand what you do.'
+	            : 'No posts match those filters yet.'} />
+	        )
+	      )}
 
       {visibleFeed.map(item => {
         const isOwnPost = item.contractor_id === contractorId;

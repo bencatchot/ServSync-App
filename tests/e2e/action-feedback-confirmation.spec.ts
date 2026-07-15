@@ -151,7 +151,11 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     const allowedFiles = new Set([
       'src/App.tsx',
       'src/features/feedback/ActionFeedback.tsx',
+      'src/features/search/FilterSummary.tsx',
       'tests/e2e/action-feedback-confirmation.spec.ts',
+      'tests/e2e/search-filter-recovery.spec.ts',
+      'tests/e2e/empty-state-foundation.spec.ts',
+      'tests/e2e/home-reminder-room-ui.spec.ts',
       'tests/e2e/contractor-home-map-drafts-ui.spec.ts',
       'tests/e2e/service-report-homemap-notices.spec.ts',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
@@ -172,7 +176,7 @@ test.describe('Bundle 4A action feedback and confirmation', () => {
     expect(files.some(file => file.includes('pdfDocuments'))).toBe(false);
 
     expect(app).toContain('<EmptyState text="No requests match that search." compact />');
-    expect(app).toContain("text={showingEstimates ? 'No estimate records match these filters.' : 'No invoice records match these filters.'}");
+    expect(app).toContain("import { FilterSummary } from './features/search/FilterSummary';");
     expect(app).not.toMatch(/Quick Duplicate Job|Project Activity Feed|Bundle 5|Stripe checkout|Pay Now/);
     expect(app).not.toMatch(/CREATE POLICY|ALTER TABLE|CREATE FUNCTION|SECURITY DEFINER|rpc definition/i);
   });

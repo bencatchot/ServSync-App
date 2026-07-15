@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-14
 
+- Branch: `codex/search-filter-recovery-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/search/FilterSummary.tsx`
+  - `tests/e2e/search-filter-recovery.spec.ts`
+  - `tests/e2e/action-feedback-confirmation.spec.ts`
+  - `tests/e2e/empty-state-foundation.spec.ts`
+  - `tests/e2e/home-reminder-room-ui.spec.ts`
+  - `tests/e2e/service-report-homemap-notices.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Bundle 4 Slice 4B-1 Search/Filter Recovery Foundation + Primary Workflow Surfaces. ServSync now has a shared presentation-only `FilterSummary` component and primary homeowner/contractor search and filter experiences show clearer active-filter context, result counts, and recovery actions for Discover, homeowner Records, Home History reminder room filtering, contractor customers/contacts, contractor estimate/invoice records, contractor Jobs, and request-search terminology.
+- Reason for change: Primary search and filter surfaces needed clearer distinction between true empty data and no-results states so users can understand which search or filters are active and recover without navigating away.
+- Tests/checks run:
+  - `git diff --check`
+  - `npm run typecheck`
+  - `npm run build`
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/search-filter-recovery.spec.ts --project=chromium --reporter=line` (7 passed)
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/empty-state-foundation.spec.ts tests/e2e/home-reminder-room-ui.spec.ts tests/e2e/action-feedback-confirmation.spec.ts --project=chromium --reporter=line` (20 passed)
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/date-presentation-helpers.spec.ts tests/e2e/invoice-payment-presentation.spec.ts tests/e2e/calendar-appointment-status-presentation.spec.ts tests/e2e/findings-status-presentation.spec.ts tests/e2e/reminder-status-presentation.spec.ts tests/e2e/draft-clarity-notices.spec.ts tests/e2e/service-report-homemap-notices.spec.ts --project=chromium --reporter=line` (49 passed)
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/homeowner-invoice-home-history-next-step.spec.ts --project=chromium --reporter=line` (4 passed)
+  - Credential-gated rendered suites were attempted and blocked by missing local test credentials: Discover geocoding/radius, contractor customer/job mutating flows, contractor estimate/invoice mutating flows, and mobile smoke.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` mismatch while linting `playwright.config.ts`; the same failure was reproduced on clean `origin/main`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only. No search algorithm changes, filter formula changes, backend search, indexes, pagination, routing redesign, permissions, lifecycle behavior, notification behavior, payment behavior, PDF output, SQL/RLS/RPC, Supabase/Vercel settings, production data, Bundle 4B-2, Bundle 4C, Bundle 4D, or Bundle 5 work is included.
+  - Secondary library/admin polish for Price Book, templates, support, referrals, and admin tables remains deferred to 4B-2 only if still needed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: Bundle 4 sequencing now records Slice 4B-1 as implemented and keeps 4B-2, 4C, and 4D future-scoped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: NO
+  - REASON: The master plan was reviewed; this slice supports existing Bundle 4 presentation polish without changing product strategy, roadmap structure, workflows, permissions, backend behavior, or implementation strategy.
+
 - Branch: `codex/action-feedback-confirmation-v1`
 - Files changed:
   - `src/App.tsx`
