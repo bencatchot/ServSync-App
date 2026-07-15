@@ -22815,9 +22815,13 @@ function ContractorDashboard({
 
   const saveContractorAccountName = async () => {
     if (!supabase) return;
+    const nextAccountName = accountNameDraft.trim();
     setNotice('');
     setError('');
-    const nextAccountName = accountNameDraft.trim();
+    if (!nextAccountName) {
+      setError('Enter your name before saving.');
+      return;
+    }
     setSavingAccountName(true);
     try {
       const { data, error: updateError } = await supabase
@@ -22830,7 +22834,7 @@ function ContractorDashboard({
       const updatedProfile = (data as Profile | null) || { ...profile, full_name: nextAccountName };
       onProfileUpdated(updatedProfile);
       setAccountNameDraft(updatedProfile.full_name || '');
-      setNotice(nextAccountName ? 'Account name saved.' : 'Account name cleared. The sidebar will use your email.');
+      setNotice('Account name saved.');
     } catch (err) {
       setError(readableError(err, 'Unable to save account name.'));
     } finally {
@@ -31991,7 +31995,7 @@ function ContractorDashboard({
             <button
               type="button"
               onClick={() => void saveContractorAccountName()}
-              disabled={savingAccountName || accountNameDraft.trim() === (profile.full_name || '').trim()}
+              disabled={savingAccountName || !accountNameDraft.trim() || accountNameDraft.trim() === (profile.full_name || '').trim()}
               className={buttonClass('primary')}
             >
               {savingAccountName ? 'Saving...' : 'Save account name'}

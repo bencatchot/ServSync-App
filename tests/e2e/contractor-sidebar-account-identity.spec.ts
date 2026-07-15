@@ -75,11 +75,20 @@ test.describe('contractor sidebar account identity', () => {
       '  const saveContractorAccountName = async () => {',
       '  const uploadContractorLogo = async',
     );
+    const validationIndex = saveSource.indexOf('if (!nextAccountName)');
+    const savingIndex = saveSource.indexOf('setSavingAccountName(true)');
+    const updateIndex = saveSource.indexOf(".from('profiles')");
 
+    expect(saveSource).toContain("if (!nextAccountName) {\n      setError('Enter your name before saving.');\n      return;\n    }");
+    expect(validationIndex).toBeGreaterThanOrEqual(0);
+    expect(validationIndex).toBeLessThan(savingIndex);
+    expect(validationIndex).toBeLessThan(updateIndex);
     expect(saveSource).toContain(".from('profiles')");
     expect(saveSource).toContain('.update({ full_name: nextAccountName })');
     expect(saveSource).toContain(".eq('id', profile.id)");
     expect(saveSource).toContain('onProfileUpdated(updatedProfile)');
+    expect(saveSource).toContain("setNotice('Account name saved.');");
+    expect(saveSource).not.toContain('Account name cleared');
     expect(saveSource).not.toContain(".from('contractor_profiles')");
     expect(saveSource).not.toContain('contractorDraft.contact_name');
     expect(saveSource).not.toContain('contractorDraft.business_name');
@@ -102,6 +111,7 @@ test.describe('contractor sidebar account identity', () => {
     expect(accountCardSource).toContain('This is the person shown in the lower sidebar account area.');
     expect(accountCardSource).toContain('value={accountNameDraft}');
     expect(accountCardSource).toContain('placeholder={profile.email}');
+    expect(accountCardSource).toContain('!accountNameDraft.trim()');
     expect(accountCardSource).not.toContain('contact_name');
     expect(ownerCardSource).toContain('{profile.full_name || profile.email}');
     expect(ownerCardSource).not.toContain('contractorDraft.contact_name');
