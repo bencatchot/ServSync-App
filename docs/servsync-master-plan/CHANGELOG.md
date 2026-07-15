@@ -6,6 +6,42 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-15
 
+- Branch: `codex/draft-job-scope-backend-foundation-v1`
+- Files changed:
+  - `servsync-draft-job-scope-backend-foundation.sql`
+  - `src/types.ts`
+  - `tests/e2e/draft-job-scope-backend-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the approved Unified Start New Job backend foundation SQL patch for contractor-only Draft Job persistence on `public.inspections` and canonical scope foundation fields on `public.job_work_items`. The patch adds Draft Job metadata, additive work-state/approval/location scope fields, authenticated SECURITY DEFINER RPCs for creating/updating Draft Jobs, transactional Draft Job scope upserts with soft-remove behavior, and Draft Job activation to existing operational statuses while preserving job and scope IDs.
+- Reason for change: The canonical job-scope/Draft Job audit recommended evolving existing `inspections` and `job_work_items` rather than introducing competing `draft_jobs`, `work_records`, or `job_scope_items` tables. This slice creates the reviewable backend foundation before any unified composer UI, estimate-from-job, invoice-allocation, final-reconciliation, reopening, or direct-job replacement work.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/draft-job-scope-backend-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/unified-start-job-composer-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/multiple-invoices-foundation.spec.ts tests/e2e/fb020-immutable-invoice-probes.spec.ts --project=chromium --reporter=line` passed the source-only multiple-invoices checks; sandbox immutable-invoice probes skipped without configured sandbox fixtures.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/fb020-role-boundary-money-probes.spec.ts --project=chromium --reporter=line` skipped because role-boundary sandbox fixtures are not configured locally.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium --reporter=line` blocked on missing `VITE_SUPABASE_URL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium --reporter=line` blocked on missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:5173 npx playwright test tests/e2e/rls-cross-user.spec.ts tests/e2e/rls-privacy-expanded.spec.ts --project=chromium --reporter=line` blocked on missing `VITE_SUPABASE_URL`.
+  - Changed-file scope scan passed.
+  - Changed-file credential-pattern scan passed.
+  - Forbidden-scope source scan passed; documentation references future out-of-scope work only to state it remains excluded.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - SQL was added for review only and was not applied to any Supabase environment.
+  - The unified Start New Job UI is not live. No Drafts grouping, autosave, Create Estimate/Create Job/Create Invoice outcome buttons, estimate-from-job, invoice allocation table, payment ledger, final invoice reconciliation, job reopening, homeowner approval UI, production configuration, production data change, or deployment is included.
+  - Future slices still need Draft Job UI persistence, estimate/job/invoice outcome wiring, estimate-from-existing-job/additional-work application, invoice allocation/payment ledger design, final reconciliation, reopening/audit history, and production SQL application after separate approval.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records Backend Slice 2 as the Draft Job/canonical-scope SQL/RPC/RLS foundation step while keeping the unified workflow incomplete.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The master plan job-workflow context now distinguishes the reviewable backend foundation from live user-facing Draft Job or unified composer behavior.
+
 - Branch: `codex/unified-start-job-composer-foundation-v1`
 - Files changed:
   - `src/App.tsx`
