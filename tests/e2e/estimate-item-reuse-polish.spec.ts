@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
+const workComposerDraftSource = () => sourceFile('src/features/work-composer/workComposerDrafts.ts');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -132,7 +133,7 @@ test.describe('Estimate item reuse polish', () => {
 
   test('remains compatible with collapsible sections and existing duplicate behavior', () => {
     const source = appSource();
-    const groupingSource = sourceBetween(source, 'function estimateLineVisualGroup', 'function draftSchemaLaborHours');
+    const groupingSource = sourceBetween(workComposerDraftSource(), 'export function workComposerLineVisualGroup', 'export function groupWorkComposerDraftLines');
     const insertionSource = sourceBetween(source, 'const addSavedChargeToEstimateDraft =', 'const renderStructuredLineDraftEditor =');
     const groupedRendererSource = sourceBetween(source, 'const renderEstimateDraftLineGroups = () => {', 'const renderEstimateLineItemSources =');
 

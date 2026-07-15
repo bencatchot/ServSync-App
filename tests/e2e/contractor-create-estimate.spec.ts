@@ -15,6 +15,7 @@ import { requireApprovedSandboxForMutation } from './helpers/guards';
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const appSource = () => sourceFile('src/App.tsx');
 const pdfDocumentsSource = () => sourceFile('src/utils/pdfDocuments.ts');
+const workComposerLineItemRowSource = () => sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -63,6 +64,7 @@ test.describe('contractor estimate creation UI structure', () => {
 
   test('line item sources replace the broad optional tools drawer and More details stays available', () => {
     const source = appSource();
+    const lineItemRowSource = workComposerLineItemRowSource();
     const lineSourceSource = sourceBetween(source, 'const renderEstimateLineItemSources =', 'const startEstimateAssistantSpeech =');
     const lineEditorSource = sourceBetween(source, 'const renderStructuredLineDraftEditor =', 'const renderLaborModeButton =');
     const groupedRendererSource = sourceBetween(source, 'const renderEstimateDraftLineGroups = () => {', 'const renderEstimateLineItemSources =');
@@ -80,12 +82,13 @@ test.describe('contractor estimate creation UI structure', () => {
     expect(source).toContain('line_items: []');
 
     expect(lineEditorSource).toContain('compactAdvanced = false');
-    expect(lineEditorSource).toContain('More details');
-    expect(lineEditorSource).toContain('lineTypeField');
-    expect(lineEditorSource).toContain('laborHoursField');
-    expect(lineEditorSource).toContain('modelSpecField');
-    expect(lineEditorSource).toContain('supplyStatusField');
-    expect(lineEditorSource).toContain('Source note');
+    expect(lineEditorSource).toContain('<WorkComposerLineItemRow');
+    expect(lineItemRowSource).toContain('More details');
+    expect(lineItemRowSource).toContain('lineTypeField');
+    expect(lineItemRowSource).toContain('laborHoursField');
+    expect(lineItemRowSource).toContain('modelSpecField');
+    expect(lineItemRowSource).toContain('supplyStatusField');
+    expect(lineItemRowSource).toContain('Source note');
     expect(jobsEstimateComposerSource).toContain('renderEstimateDraftLineGroups()');
     expect(groupedRendererSource).toContain('compactAdvanced: true');
     expect(groupedRendererSource).toContain('renderEstimateLineItemSources()');

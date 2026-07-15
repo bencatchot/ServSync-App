@@ -39,7 +39,7 @@ async function waitForInvoiceDraftSave(main: Locator, saveInvoiceButton: Locator
 test.describe('contractor estimate-to-invoice draft source', () => {
   test('saved estimate actions can open an editable invoice draft without the accepted-only RPC', () => {
     const source = appSource();
-    const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromJob =');
+    const directDraftSource = sourceBetween(source, 'const beginInvoiceDraftFromEstimate =', 'const createInvoiceFromEstimateScheduleItem =');
     const selectedWorkspaceEstimateCards = sourceBetween(
       source,
       'selectedDocumentSection.estimates.map(estimate => {',

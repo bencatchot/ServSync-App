@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Compass,
-  Copy,
   CreditCard,
   Download,
   EyeOff,
@@ -132,6 +131,32 @@ import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
+import { WorkComposerLineItemRow } from './features/work-composer/WorkComposerLineItemRow';
+import { WorkComposerTotalsPanel, type WorkComposerTotalsRow } from './features/work-composer/WorkComposerTotals';
+import type {
+  WorkComposerLineDraft,
+  WorkComposerLineGroupKey,
+  WorkComposerLineVisualGroup,
+} from './features/work-composer/types';
+import {
+  WORK_COMPOSER_LINE_TYPE_LABELS,
+  WORK_COMPOSER_LINE_TYPE_OPTIONS,
+  createWorkComposerLineDraft,
+  duplicateWorkComposerLineDraft,
+  groupWorkComposerDraftLines,
+  normalizeWorkComposerLineSupplyStatus,
+  normalizeWorkComposerLineType,
+  parseWorkComposerLaborHours,
+  workComposerDraftFinancialBreakdown,
+  workComposerDraftHasLaborHoursWithoutRate,
+  workComposerLineBucket,
+  workComposerLineCanTrackLaborHours,
+  workComposerLineGroupSubtotalCents,
+  workComposerLineGroupUnpricedCount,
+  workComposerLineIsUnpriced,
+  workComposerLineVisualGroup,
+  workComposerPriceInputIsBlank,
+} from './features/work-composer/workComposerDrafts';
 import { homeMapDraftStatusPresentation } from './features/homeMap/statusPresentation';
 import {
   serviceAgreementOfferStatusPresentation,
@@ -760,32 +785,9 @@ type ContractorReferralSubmitDraft = {
   location: string;
   note: string;
 };
-type EstimateLineDraft = {
-  id: string;
-  job_work_item_id?: string | null;
-  line_type: EstimateLineType;
-  description: string;
-  line_title: string;
-  customer_description: string;
-  model_spec: string;
-  supply_status: EstimateLineSupplyStatus | '';
-  quantity: string;
-  unit: string;
-  unit_price: string;
-  labor_hours: string;
-  builderGenerated?: boolean;
-  editor_source_note?: string;
-};
-type EstimateLineGroupKey = 'labor' | 'materials_other' | 'fees';
-type GroupedEstimateDraftLine = {
-  line: EstimateLineDraft;
-  index: number;
-};
-type EstimateLineVisualGroup = {
-  key: EstimateLineGroupKey;
-  label: string;
-  lines: GroupedEstimateDraftLine[];
-};
+type EstimateLineDraft = WorkComposerLineDraft;
+type EstimateLineGroupKey = WorkComposerLineGroupKey;
+type EstimateLineVisualGroup = WorkComposerLineVisualGroup;
 type EstimateDraftBuilderTrade = 'HVAC' | 'Plumbing' | 'Electrical' | 'Carpentry' | 'Other';
 type EstimateDraftBuilderJobType = 'service_diagnostic' | 'repair' | 'replacement' | 'install' | 'maintenance' | 'custom_other';
 type EstimateDraftBuilderLaborMode = 'job_total' | 'line_specific';
@@ -994,9 +996,7 @@ const ESTIMATE_PAYMENT_SCHEDULE_TYPE_DEFAULTS: Record<EstimatePaymentScheduleInv
 };
 
 function normalizeEstimateLineType(lineType: LegacyEstimateLineType | string | null | undefined): EstimateLineType {
-  if (lineType === 'labor' || lineType === 'material' || lineType === 'fee' || lineType === 'other') return lineType;
-  if (lineType === 'equipment') return 'material';
-  return 'other';
+  return normalizeWorkComposerLineType(lineType);
 }
 
 const ESTIMATE_LINE_SUPPLY_STATUS_LABELS: Record<EstimateLineSupplyStatus, string> = {
@@ -1006,8 +1006,7 @@ const ESTIMATE_LINE_SUPPLY_STATUS_LABELS: Record<EstimateLineSupplyStatus, strin
 };
 
 function normalizeEstimateLineSupplyStatus(value: string | null | undefined): EstimateLineSupplyStatus | '' {
-  if (value === 'contractor_supplied' || value === 'customer_supplied' || value === 'to_be_confirmed') return value;
-  return '';
+  return normalizeWorkComposerLineSupplyStatus(value);
 }
 
 type StructuredLineDisplay = {
@@ -1382,40 +1381,14 @@ function storedInspectionViewForJobsView(jobsView: ContractorJobsView): Inspecti
 }
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
-  const draft: EstimateLineDraft = {
-    id: crypto.randomUUID(),
-    line_type: 'labor',
-    description: '',
-    line_title: '',
-    customer_description: '',
-    model_spec: '',
-    supply_status: '',
-    quantity: '1',
-    unit: 'each',
-    unit_price: '',
-    labor_hours: '',
-    ...overrides,
-  };
+  const draft = createWorkComposerLineDraft(overrides);
   if (!draft.line_title.trim() && draft.description.trim()) draft.line_title = draft.description;
   if (!draft.description.trim() && draft.line_title.trim()) draft.description = draft.line_title;
-  draft.supply_status = normalizeEstimateLineSupplyStatus(draft.supply_status);
   return draft;
 }
 
 function duplicateEstimateLineDraft(line: EstimateLineDraft): EstimateLineDraft {
-  return createEstimateLineDraft({
-    line_type: normalizeEstimateLineType(line.line_type),
-    description: line.description,
-    line_title: line.line_title,
-    customer_description: line.customer_description,
-    model_spec: line.model_spec,
-    supply_status: normalizeEstimateLineSupplyStatus(line.supply_status),
-    quantity: line.quantity,
-    unit: line.unit,
-    unit_price: line.unit_price,
-    labor_hours: line.labor_hours,
-    builderGenerated: false,
-  });
+  return duplicateWorkComposerLineDraft(line);
 }
 
 function createBlankEstimateDraft(overrides: Partial<EstimateDraft> = {}): EstimateDraft {
@@ -3569,18 +3542,8 @@ const UNIVERSAL_REFERRAL_STATUS_OPTIONS: UniversalReferralStatus[] = ['pending',
 const UNIVERSAL_REFERRAL_REWARD_STATUS_OPTIONS: UniversalReferralRewardStatus[] = ['pending', 'approved', 'denied', 'paid', 'not_eligible'];
 const SERVICE_REQUEST_URGENCY_OPTIONS: ServiceRequestUrgency[] = ['low', 'normal', 'urgent'];
 const SERVICE_REQUEST_CATEGORIES = [...TRADE_OPTIONS, 'Other'];
-const ESTIMATE_LINE_TYPE_OPTIONS: EstimateLineType[] = ['labor', 'material', 'fee', 'other'];
-const ESTIMATE_LINE_TYPE_LABELS: Record<EstimateLineType, string> = {
-  labor: 'Labor',
-  material: 'Material',
-  fee: 'Fee',
-  other: 'Other',
-};
-const ESTIMATE_LINE_VISUAL_GROUPS: Array<{ key: EstimateLineGroupKey; label: string }> = [
-  { key: 'labor', label: 'Labor' },
-  { key: 'materials_other', label: 'Materials / Other' },
-  { key: 'fees', label: 'Fees' },
-];
+const ESTIMATE_LINE_TYPE_OPTIONS = WORK_COMPOSER_LINE_TYPE_OPTIONS;
+const ESTIMATE_LINE_TYPE_LABELS = WORK_COMPOSER_LINE_TYPE_LABELS;
 function estimateLineTypeLabel(lineType: LegacyEstimateLineType | string | null | undefined) {
   return ESTIMATE_LINE_TYPE_LABELS[normalizeEstimateLineType(lineType)];
 }
@@ -6001,11 +5964,11 @@ function dollarsToCents(value: string) {
 }
 
 function priceInputIsBlank(value: string) {
-  return value.replace(/[$,]/g, '').trim() === '';
+  return workComposerPriceInputIsBlank(value);
 }
 
 function draftLineIsUnpriced(line: Pick<EstimateLineDraft, 'unit_price'>) {
-  return priceInputIsBlank(line.unit_price);
+  return workComposerLineIsUnpriced(line);
 }
 
 function persistedLineIsUnpriced(line: Pick<EstimateLineItem | InvoiceLineItem, 'unit_price_cents'>) {
@@ -6025,12 +5988,7 @@ function normalizeEstimateLaborMode(value: string | null | undefined): EstimateL
 }
 
 function parseLaborHoursValue(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return null;
-  const cleaned = typeof value === 'number' ? value : String(value).replace(/,/g, '').trim();
-  if (cleaned === '') return null;
-  const numeric = typeof cleaned === 'number' ? cleaned : Number(cleaned);
-  if (!Number.isFinite(numeric) || numeric < 0) return null;
-  return numeric;
+  return parseWorkComposerLaborHours(value);
 }
 
 function laborHoursInputFromValue(value: number | null | undefined) {
@@ -6064,8 +6022,7 @@ function formatLaborHours(value: number) {
 }
 
 function draftLineCanTrackLaborHours(line: Pick<EstimateLineDraft, 'line_type'>) {
-  const type = normalizeEstimateLineType(line.line_type);
-  return type === 'material' || type === 'other';
+  return workComposerLineCanTrackLaborHours(line);
 }
 
 function persistedLineCanShowLaborHours(line: Pick<EstimateLineItem | InvoiceLineItem, 'line_type'>) {
@@ -6073,102 +6030,32 @@ function persistedLineCanShowLaborHours(line: Pick<EstimateLineItem | InvoiceLin
   return type === 'material' || type === 'other';
 }
 
-function estimateLineTotalCents(line: EstimateLineDraft) {
-  if (draftLineIsUnpriced(line)) return 0;
-  const quantity = Number(line.quantity);
-  const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
-  return Math.round(safeQuantity * dollarsToCents(line.unit_price));
-}
-
-function estimateTotalCents(lines: EstimateLineDraft[] = []) {
-  return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
-}
-
 function estimateLineBucket(lineType: LegacyEstimateLineType | EstimateLineType | string | null | undefined) {
-  const type = normalizeEstimateLineType(lineType);
-  if (type === 'fee') return 'fee';
-  if (type === 'labor') return 'labor';
-  if (type === 'material' || type === 'other') return 'material';
-  return 'other';
-}
-
-function draftLineBucketTotal(lines: EstimateLineDraft[], bucket: 'material' | 'labor' | 'fee') {
-  return lines.reduce((sum, line) => estimateLineBucket(line.line_type) === bucket ? sum + estimateLineTotalCents(line) : sum, 0);
-}
-
-function draftOtherLineTotal(lines: EstimateLineDraft[]) {
-  const lineSubtotal = estimateTotalCents(lines);
-  return Math.max(0, lineSubtotal - draftLineBucketTotal(lines, 'material') - draftLineBucketTotal(lines, 'labor') - draftLineBucketTotal(lines, 'fee'));
+  return workComposerLineBucket(lineType);
 }
 
 function estimateLineVisualGroup(line: Pick<EstimateLineDraft, 'line_type'>): EstimateLineGroupKey {
-  const type = normalizeEstimateLineType(line.line_type);
-  if (type === 'labor') return 'labor';
-  if (type === 'fee') return 'fees';
-  return 'materials_other';
+  return workComposerLineVisualGroup(line);
 }
 
 function groupEstimateDraftLines(lines: EstimateLineDraft[]): EstimateLineVisualGroup[] {
-  const groupedLines: Record<EstimateLineGroupKey, GroupedEstimateDraftLine[]> = {
-    labor: [],
-    materials_other: [],
-    fees: [],
-  };
-  lines.forEach((line, index) => {
-    groupedLines[estimateLineVisualGroup(line)].push({ line, index });
-  });
-  return ESTIMATE_LINE_VISUAL_GROUPS
-    .map(group => ({ ...group, lines: groupedLines[group.key] }))
-    .filter(group => group.lines.length > 0);
+  return groupWorkComposerDraftLines(lines);
 }
 
 function estimateLineGroupSubtotalCents(lines: EstimateLineDraft[]) {
-  return lines.reduce((sum, line) => sum + estimateLineTotalCents(line), 0);
+  return workComposerLineGroupSubtotalCents(lines);
 }
 
 function estimateLineGroupUnpricedCount(lines: EstimateLineDraft[]) {
-  return lines.filter(draftLineIsUnpriced).length;
-}
-
-function draftSchemaLaborHours(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'job_labor_hours' | 'line_items'>) {
-  if (draft.labor_mode === 'line_specific') {
-    return (draft.line_items ?? []).reduce((sum, line) => {
-      if (!draftLineCanTrackLaborHours(line)) return sum;
-      return sum + (parseLaborHoursValue(line.labor_hours) ?? 0);
-    }, 0);
-  }
-  return parseLaborHoursValue(draft.job_labor_hours) ?? 0;
+  return workComposerLineGroupUnpricedCount(lines);
 }
 
 function draftHasLaborHoursWithoutRate(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
-  return priceInputIsBlank(draft.labor_rate) && draftSchemaLaborHours(draft) > 0;
-}
-
-function draftSchemaLaborTotalCents(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
-  if (draftHasLaborHoursWithoutRate(draft)) return 0;
-  return Math.round(draftSchemaLaborHours(draft) * dollarsToCents(draft.labor_rate));
+  return workComposerDraftHasLaborHoursWithoutRate(draft);
 }
 
 function draftFinancialBreakdown(draft: Pick<EstimateDraft | InvoiceDraftForm, 'labor_mode' | 'labor_rate' | 'job_labor_hours' | 'line_items'>) {
-  const lines = draft.line_items ?? [];
-  const materialTotalCents = draftLineBucketTotal(lines, 'material');
-  const laborLineTotalCents = draftLineBucketTotal(lines, 'labor');
-  const schemaLaborTotalCents = draftSchemaLaborTotalCents(draft);
-  const laborTotalCents = laborLineTotalCents + schemaLaborTotalCents;
-  const feeTotalCents = draftLineBucketTotal(lines, 'fee');
-  const otherTotalCents = draftOtherLineTotal(lines);
-  const subtotalCents = materialTotalCents + laborTotalCents + feeTotalCents + otherTotalCents;
-  return {
-    materialTotalCents,
-    laborLineTotalCents,
-    schemaLaborTotalCents,
-    laborTotalCents,
-    feeTotalCents,
-    otherTotalCents,
-    subtotalCents,
-    laborHours: draftSchemaLaborHours(draft),
-    missingLaborRate: draftHasLaborHoursWithoutRate(draft),
-  };
+  return workComposerDraftFinancialBreakdown(draft);
 }
 
 function persistedLineTotalCents(line: Pick<EstimateLineItem | InvoiceLineItem, 'quantity' | 'unit_price_cents'>) {
@@ -6232,10 +6119,6 @@ function unpricedLineCount(lines: Array<Pick<EstimateLineItem | InvoiceLineItem,
 
 function priceRequiredWarningText(lineCount: number) {
   return `${lineCount} line item${lineCount === 1 ? '' : 's'} ${lineCount === 1 ? 'has' : 'have'} no pricing. The estimate total will not include ${lineCount === 1 ? 'that item' : 'those items'}, and homeowners will see "Price to be confirmed."`;
-}
-
-function draftLineTotalLabel(line: EstimateLineDraft) {
-  return draftLineIsUnpriced(line) ? 'Price Required' : formatMoney(estimateLineTotalCents(line));
 }
 
 function parsePercentValue(value: string) {
@@ -25803,224 +25686,25 @@ function ContractorDashboard({
     onRemove: () => void;
     onDuplicate?: () => void;
   }) => {
-    const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
-    const showSupplyStatus = Boolean(line.supply_status);
-    const sourceNote = line.editor_source_note?.trim();
-    const hasSecondaryRow = showModelSpec || showSupplyStatus;
-    const showLaborHours = laborMode === 'line_specific' && draftLineCanTrackLaborHours(line);
-    const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
     const advancedDetailsOpen = !compactAdvanced || Boolean(expandedEstimateLineDetails[line.id]);
     const setAdvancedDetailsOpen = (open: boolean) => {
       setExpandedEstimateLineDetails(prev => ({ ...prev, [line.id]: open }));
     };
-    const descriptionField = (
-      <Field label="Description">
-        <div className="space-y-2">
-          <input
-            aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} description`}
-            data-estimate-line-description-id={line.id}
-            className={inputClass()}
-            {...writingAssistProps}
-            value={line.line_title}
-            onChange={event => onChange({ line_title: event.target.value, description: event.target.value })}
-            placeholder="Labor, material, trip fee..."
-          />
-          {!compactAdvanced && sourceNote ? (
-            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-              {sourceNote}
-            </p>
-          ) : null}
-        </div>
-      </Field>
-    );
-    const quantityField = (
-      <Field label="Qty">
-        <input
-          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} quantity`}
-          className={inputClass()}
-          type="number"
-          min="0"
-          step="0.01"
-          value={line.quantity}
-          onChange={event => onChange({ quantity: event.target.value })}
-        />
-      </Field>
-    );
-    const unitField = (
-      <Field label="Unit">
-        <input
-          className={inputClass()}
-          value={line.unit}
-          onChange={event => onChange({ unit: event.target.value })}
-        />
-      </Field>
-    );
-    const unitPriceField = (
-      <Field label="Unit price">
-        <input
-          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} unit price`}
-          className={inputClass()}
-          value={line.unit_price}
-          onChange={event => onChange({ unit_price: event.target.value })}
-          placeholder="$0.00"
-        />
-      </Field>
-    );
-    const totalBlock = (
-      <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-        <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-950">
-          {draftLineTotalLabel(line)}
-        </p>
-      </div>
-    );
-    const removeButton = (
-      <button
-        type="button"
-        onClick={onRemove}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:text-red-600"
-        aria-label={`Remove ${itemLabel} line ${index + 1}`}
-      >
-        <Trash2 size={15} />
-      </button>
-    );
-    const duplicateButton = itemLabel === 'estimate' && onDuplicate ? (
-      <button
-        type="button"
-        onClick={onDuplicate}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-600 hover:border-blue-300 hover:bg-blue-50"
-        aria-label={`Duplicate estimate line item ${index + 1}`}
-      >
-        <Copy size={15} />
-      </button>
-    ) : null;
-    const actionButtons = (
-      <div className="flex items-center gap-2">
-        {duplicateButton}
-        {removeButton}
-      </div>
-    );
-    const lineTypeField = (
-      <Field label="Type">
-        <select
-          className={inputClass()}
-          value={line.line_type}
-          onChange={event => onChange({ line_type: event.target.value as EstimateLineType })}
-        >
-          {ESTIMATE_LINE_TYPE_OPTIONS.map(type => (
-            <option key={type} value={type}>{ESTIMATE_LINE_TYPE_LABELS[type]}</option>
-          ))}
-        </select>
-      </Field>
-    );
-    const laborHoursField = showLaborHours ? (
-      <Field label="Labor hrs">
-        <input
-          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} labor hours`}
-          className={inputClass()}
-          type="number"
-          min="0"
-          step="0.25"
-          value={line.labor_hours}
-          onChange={event => onChange({ labor_hours: event.target.value })}
-          placeholder="0"
-        />
-      </Field>
-    ) : null;
-    const modelSpecField = (
-      <Field label="Model/spec">
-        <input
-          aria-label={`${itemLabel === 'invoice' ? 'Invoice' : 'Estimate'} line item ${index + 1} model or specification`}
-          className={inputClass()}
-          value={line.model_spec}
-          onChange={event => onChange({ model_spec: event.target.value })}
-          placeholder="Optional model, size, brand, or spec"
-        />
-      </Field>
-    );
-    const supplyStatusField = (
-      <Field label="Supply status">
-        <select
-          className={inputClass()}
-          value={line.supply_status}
-          onChange={event => onChange({ supply_status: normalizeEstimateLineSupplyStatus(event.target.value) })}
-        >
-          <option value="">Not specified</option>
-          {Object.entries(ESTIMATE_LINE_SUPPLY_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </Field>
-    );
-
-    if (compactAdvanced) {
-      return (
-        <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_5rem_5rem_7rem_6rem_auto] lg:items-end">
-            {descriptionField}
-            {quantityField}
-            {unitField}
-            {unitPriceField}
-            {totalBlock}
-            {actionButtons}
-          </div>
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={() => setAdvancedDetailsOpen(!advancedDetailsOpen)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50"
-              aria-expanded={advancedDetailsOpen}
-              aria-label={`${advancedDetailsOpen ? 'Hide' : 'Show'} estimate line item ${index + 1} more details`}
-            >
-              {advancedDetailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              More details
-            </button>
-            {advancedDetailsOpen && (
-              <div className="mt-3 grid gap-3 lg:grid-cols-4">
-                {lineTypeField}
-                {laborHoursField}
-                {modelSpecField}
-                {supplyStatusField}
-                {sourceNote ? (
-                  <div className="lg:col-span-4">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Source note</p>
-                    <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">
-                      {sourceNote}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className={`grid gap-3 ${priceColumnClass} lg:items-end`}>
-          {lineTypeField}
-          {descriptionField}
-          {quantityField}
-          {unitField}
-          {unitPriceField}
-          {totalBlock}
-          {laborHoursField}
-          {actionButtons}
-        </div>
-        {hasSecondaryRow ? (
-          <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
-            <div className="space-y-2">
-              {showModelSpec ? (
-                modelSpecField
-              ) : null}
-            </div>
-            {showSupplyStatus ? (
-              supplyStatusField
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+      <WorkComposerLineItemRow
+        key={line.id}
+        line={line}
+        index={index}
+        itemLabel={itemLabel}
+        laborMode={laborMode}
+        compactAdvanced={compactAdvanced}
+        advancedDetailsOpen={advancedDetailsOpen}
+        onAdvancedDetailsOpenChange={setAdvancedDetailsOpen}
+        onChange={onChange}
+        onRemove={onRemove}
+        onDuplicate={onDuplicate}
+        writingAssistProps={writingAssistProps}
+      />
     );
   };
 
@@ -26146,20 +25830,6 @@ function ContractorDashboard({
     );
   };
 
-  const renderDraftTotalsRows = (rows: Array<{ label: string; amount: number; bold?: boolean; helper?: string }>) => (
-    <div className="space-y-1 text-sm">
-      {rows.map(row => (
-        <div key={row.label} className={`flex items-start justify-between gap-3 ${row.bold ? 'border-t border-slate-200 pt-2 text-base font-bold text-slate-950' : 'text-slate-600'}`}>
-          <span>
-            {row.label}
-            {row.helper ? <span className="ml-1 text-xs font-medium text-slate-500">{row.helper}</span> : null}
-          </span>
-          <span className={row.bold ? 'text-slate-950' : 'font-semibold text-slate-900'}>{formatMoney(row.amount)}</span>
-        </div>
-      ))}
-    </div>
-  );
-
   const renderEstimateDraftStateNotice = () => (
     <DraftNotice
       title="Draft estimate"
@@ -26181,29 +25851,21 @@ function ContractorDashboard({
   const renderEstimateDraftTotals = () => {
     const totals = draftFinancialBreakdown(estimateDraft);
     const taxCents = 0;
+    const rows: WorkComposerTotalsRow[] = [
+      { label: 'Material total', amount: totals.materialTotalCents },
+      { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
+      { label: 'Subtotal', amount: totals.subtotalCents },
+      { label: 'Fees', amount: totals.feeTotalCents },
+      { label: 'Tax', amount: taxCents },
+      { label: 'Total', amount: totals.subtotalCents + taxCents, bold: true },
+    ];
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-600">Draft total</p>
-            {estimateDraft.line_items.some(draftLineIsUnpriced) && (
-              <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
-            )}
-            {totals.laborHours > 0 && (
-              <p className="mt-1 text-xs text-slate-500">Labor hours: {formatLaborHours(totals.laborHours)}</p>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-slate-950">{formatMoney(totals.subtotalCents + taxCents)}</p>
-        </div>
-        {renderDraftTotalsRows([
-          { label: 'Material total', amount: totals.materialTotalCents },
-          { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
-          { label: 'Subtotal', amount: totals.subtotalCents },
-          { label: 'Fees', amount: totals.feeTotalCents },
-          { label: 'Tax', amount: taxCents },
-          { label: 'Total', amount: totals.subtotalCents + taxCents, bold: true },
-        ])}
-      </div>
+      <WorkComposerTotalsPanel
+        totalLabel={formatMoney(totals.subtotalCents + taxCents)}
+        rows={rows}
+        priceRequired={estimateDraft.line_items.some(draftLineIsUnpriced)}
+        laborHoursLabel={totals.laborHours > 0 ? formatLaborHours(totals.laborHours) : undefined}
+      />
     );
   };
 
@@ -26448,25 +26110,22 @@ function ContractorDashboard({
     const totals = draftFinancialBreakdown(invoiceDraft);
     const discountCents = invoiceDiscountCentsFromDraft(invoiceDraft);
     const taxCents = invoiceTaxCents(invoiceDraft);
+    const rows: WorkComposerTotalsRow[] = [
+      { label: 'Material total', amount: totals.materialTotalCents },
+      { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
+      { label: 'Subtotal', amount: totals.subtotalCents },
+      { label: 'Fees', amount: totals.feeTotalCents },
+      ...(discountCents > 0 ? [{ label: 'Discount', amount: -discountCents }] : []),
+      { label: 'Tax', amount: taxCents },
+      { label: 'Total', amount: invoiceTotalCents(invoiceDraft), bold: true },
+    ];
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Draft total</p>
-        <p className="mt-1 text-2xl font-bold text-slate-950">{formatMoney(invoiceTotalCents(invoiceDraft))}</p>
-        {(invoiceDraft.line_items ?? []).some(draftLineIsUnpriced) && (
-          <p className="mt-1 text-xs font-medium text-amber-700">Total excludes Price Required items.</p>
-        )}
-        <div className="mt-3">
-          {renderDraftTotalsRows([
-            { label: 'Material total', amount: totals.materialTotalCents },
-            { label: 'Labor total', amount: totals.laborTotalCents, helper: totals.laborHours > 0 ? `${formatLaborHours(totals.laborHours)} hrs` : undefined },
-            { label: 'Subtotal', amount: totals.subtotalCents },
-            { label: 'Fees', amount: totals.feeTotalCents },
-            ...(discountCents > 0 ? [{ label: 'Discount', amount: -discountCents }] : []),
-            { label: 'Tax', amount: taxCents },
-            { label: 'Total', amount: invoiceTotalCents(invoiceDraft), bold: true },
-          ])}
-        </div>
-      </div>
+      <WorkComposerTotalsPanel
+        totalLabel={formatMoney(invoiceTotalCents(invoiceDraft))}
+        rows={rows}
+        priceRequired={(invoiceDraft.line_items ?? []).some(draftLineIsUnpriced)}
+        laborHoursLabel={totals.laborHours > 0 ? formatLaborHours(totals.laborHours) : undefined}
+      />
     );
   };
 

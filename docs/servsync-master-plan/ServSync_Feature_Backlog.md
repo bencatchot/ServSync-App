@@ -1,6 +1,6 @@
 # ServSync Feature Backlog
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
 
 Last reconciled through PR #198 / merge commit `1f721ae10fb92de9a76b9f30bf2eeeeab83330bc`.
 
@@ -141,6 +141,7 @@ Current presentation-polish sequencing:
 | FB-032 | Service Agreements Foundation | Contractor maintenance plans, connected homes, agreement offers, renewals | Foundation Loop Complete / Closeout Polish Pending | Medium-High | The core foundation loop is complete: Slice 2 SQL/RLS/RPC foundation is merged and production-applied, Slice 3A adds contractor-side template/offer UI, and Slice 4A adds homeowner offer review, accept/decline, and read-only active agreement display. Service Agreements remain separate from requests, estimates, jobs, invoices, scheduling, reminders, notifications, payments, renewals, and external delivery. |
 | FB-033 | Project Collaboration | Multi-contractor project coordination, project parties, authority, events, job grouping | Hidden Foundation In Progress | Later / Future | Slice 1 adds only a hidden SQL/RLS/RPC/types/test/docs foundation for durable project identity, property association, commercial parties, individual memberships, Project Lead authority, project events, and one-project-per-job association. Runtime mutation gate defaults disabled and profile allowlisting is required. No UI, Beta exposure, Project Board, assignments, invitations, financial sharing, project billing, production SQL application, production allowlist activation, or estimate/invoice permission changes are included. |
 | FB-034 | Demo Mode / Marketing Capture Environment | Demo data, screenshots, recordings, QA/onboarding support | Presentation Controls In Progress | Medium | Slice 1 adds the dedicated-demo foundation. Slice 2A adds private runner checkpoints for the existing water-heater scenario through `job_created`: `contractor_discovery_ready`, `connected_request_ready`, `request_ready`, `contractor_review_ready`, `estimate_draft`, `estimate_sent`, `estimate_accepted`, and `job_created`. The discovery checkpoint is a pre-connection opening state for recording the existing homeowner contractor search/profile connection request path without adding Discover posts or browser controls, and `connected_request_ready` provides an active-connection/no-request state for recording homeowner new-request setup. Slice 2B extends the same private runner through lightweight job lifecycle checkpoints: `job_scheduled`, `job_in_progress`, `job_review_ready`, and `job_completed`. Slice 2C-A adds frontend-only presentation controls that can activate only for the dedicated demo project and hide capture clutter/mutating controls without adding browser checkpoint or reset controls. No public Demo Mode, role switching, invoices, Home History, report finalization, reminder demo data, production SQL, shared sandbox use, deployment, external notifications, payments, or production data actions are included. |
+| FB-035 | Unified Start New Job Workflow | Estimates, jobs, invoices, job scope, approvals, billing history | Foundation Slice In Progress | High | Slice 1 extracts behavior-preserving shared frontend work-composer presentation/types from the existing estimate builder and adds lifecycle guardrail tests for accepted-estimate-to-job duplicate prevention, estimate line editing/totals, partial-invoice protections, and future unified-workflow boundaries. The future direction is one Start New Job composer with Create Estimate, Create Job, and Create Invoice outcomes, preferably evolving `job_work_items` into the canonical job-scope model. This slice does not add Draft Job persistence, outcome buttons, direct-job replacement, schema/RPC/RLS changes, invoice allocation changes, approval bypass, offline approval attachments, history tables, job reopening, progress/deposit/final billing changes, paid-invoice behavior changes, or production configuration changes. Next: canonical job-scope and Draft Job backend foundation only after separate approval. |
 
 ## Detailed feature notes
 
@@ -1461,6 +1462,57 @@ Recommended implementation sequence:
 
 Current next step:
 Review the Slice 2C-A presentation-controls implementation in a dedicated demo preview, then validate that normal production/shared-sandbox behavior remains unchanged and the demo app hides capture clutter only when the strict dedicated-demo presentation guard passes.
+
+### FB-035 — Unified Start New Job Workflow
+
+Status: Foundation Slice In Progress
+
+Priority: High
+
+Product area:
+
+- Contractor job start workflow
+- Estimates, direct jobs, and invoices
+- Job scope and work items
+- Approval and billing history
+- Future draft jobs and invoice allocations
+
+Product goal:
+Contractors should eventually enter job scope once in a unified Start New Job composer, then choose the intended outcome at the bottom: Create Estimate, Create Job, or Create Invoice. Outcome-specific validation should happen at the action boundary while the form remains shared. The goal is to reduce duplicated entry and inconsistent direct-job behavior without weakening approval, billing, duplicate prevention, or homeowner visibility rules.
+
+Current status:
+Slice 1 is a behavior-preserving frontend foundation only. It extracts neutral work-composer draft types, shared line-item row presentation, line-item/totals helpers, and totals presentation from the existing estimate builder while keeping estimate save/send/draft loading, templates, recipe behavior, payment schedules, PDFs, and homeowner behavior unchanged. It also adds source-level regression guardrails around accepted-estimate-to-job duplicate prevention, partial-invoicing protections, estimate line editing, and the boundary that the future unified Start New Job outcome flow is not active yet.
+
+Product decisions:
+
+- Prefer evolving the existing `job_work_items` model into the canonical job-scope model instead of introducing a competing `job_scope_items` table unless later backend analysis proves reuse unsafe.
+- Offline approval attachments are not required for the first version; record approver, time, method, and optional note.
+- Billing incomplete line items is allowed with explicit confirmation; work status and billing action history must remain separate.
+- Draft Jobs are contractor-only until an estimate is sent, a job is activated/shared, or an invoice is sent.
+- Owner/admin/office can create, revise, and send estimates and invoices and record payments. Field techs can edit scope/work status/notes/photos/checklists, but should not send financial documents or mark invoices paid without explicit company permission. Viewers remain read-only.
+- Work state, approval state, and billing state should remain separate. Billing state should be derived primarily from invoice allocations and payment records rather than maintained as a freely editable scope-item status.
+
+Guardrails:
+
+- Do not add SQL, migrations, RPCs, RLS changes, Draft Job persistence, outcome buttons, direct-job replacement, estimate-from-existing-job, additional-work approval, deposit/progress/final billing changes, amount-only progress invoices, invoice allocation rewrites, revision history, reopening, audit-history tables, paid-invoice changes, or production configuration changes without separate approval.
+- Do not claim the unified Start New Job workflow is live until the production composer, backend model, and outcome actions ship.
+- Existing accepted-estimate-to-job duplicate prevention is a critical protected behavior.
+- Existing direct job creation remains live until an approved removal slice.
+
+Recommended implementation sequence:
+
+1. Add regression and lifecycle guardrails, extract reusable composer presentation, and introduce neutral draft types.
+2. Finalize the canonical job-scope schema, allocation model, RPCs, and RLS.
+3. Add persistent contractor-only Draft Jobs.
+4. Launch the unified Start New Job composer with Create Estimate and Create Job.
+5. Add Create Invoice from the shared composer.
+6. Add estimate-from-existing-job and additional-work approval.
+7. Add deposit, itemized progress, amount-only progress, and final reconciliation.
+8. Add document revisions, comprehensive history, and explicit reopening.
+9. Remove the legacy direct-job creation experience.
+
+Current next step:
+Review Slice 1 foundation PR, then plan the canonical job-scope and Draft Job backend foundation as a separate SQL/RPC/RLS-focused slice. Do not ship the unified composer, Draft Jobs, invoice allocation changes, or direct-job replacement from the frontend foundation alone.
 
 ## Current next recommended focus
 
