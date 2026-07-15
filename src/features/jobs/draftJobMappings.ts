@@ -260,3 +260,34 @@ export function draftJobUserFacingError(error: unknown, fallback = 'This draft c
   if (normalized.includes('scope') || normalized.includes('quantity') || normalized.includes('price') || normalized.includes('labor')) return message;
   return fallback;
 }
+
+export type DraftJobSaveFailureContext = {
+  draftId: string | null;
+  metadataSaved: boolean;
+  scopeSaved: boolean;
+  error: unknown;
+};
+
+export function draftJobSaveFailureFeedback({
+  draftId,
+  metadataSaved,
+  scopeSaved,
+  error,
+}: DraftJobSaveFailureContext) {
+  if (scopeSaved) {
+    return {
+      title: 'Draft Job saved, but the latest saved data could not be reloaded.',
+      body: 'Refresh to confirm the changes.',
+    };
+  }
+  if (metadataSaved) {
+    return {
+      title: 'Draft details saved, but scope changes did not save.',
+      body: draftJobUserFacingError(error, 'Review the draft scope and try Save Draft again.'),
+    };
+  }
+  return {
+    title: draftId ? 'Draft Job could not be updated.' : 'Draft Job could not be created.',
+    body: draftJobUserFacingError(error, 'Review the draft details and try Save Draft again.'),
+  };
+}

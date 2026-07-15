@@ -188,13 +188,14 @@ import {
 import { DraftJobComposer, type DraftJobCustomerOption } from './features/jobs/DraftJobComposer';
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
+import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
+  draftJobSaveFailureFeedback,
   draftJobScopePayload,
-  draftJobUserFacingError,
   isComposerDraftJob,
   validateDraftJobComposerDraft,
   type DraftJobComposerDraft,
@@ -1391,7 +1392,7 @@ function storedInspectionViewForJobsView(jobsView: ContractorJobsView): Inspecti
   if ((jobsView === 'open_jobs' || jobsView === 'closed_jobs') && fieldWorkState?.view === 'detail' && fieldWorkState.inspectionId) {
     return 'detail';
   }
-  return jobsView === 'new_jobs' ? 'draft_job' : 'list';
+  return jobsView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';
 }
 
 function createEstimateLineDraft(overrides: Partial<EstimateLineDraft> = {}): EstimateLineDraft {
@@ -28370,7 +28371,7 @@ function ContractorDashboard({
   const openJobsOnboardingWorkspace = () => {
     setContractorTab('inspections');
     setContractorJobsView('new_jobs');
-    setInspectionView('draft_job');
+    setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new');
   };
   const openFinancialOnboardingWorkspace = (kind: ContractorFinancialRecordKind = 'estimates') => {
     setContractorTab('inspections');
@@ -28402,7 +28403,7 @@ function ContractorDashboard({
   const openReportOnboardingWorkspace = () => {
     setContractorTab('inspections');
     setContractorJobsView(openJobs.length > 0 ? 'open_jobs' : 'new_jobs');
-    setInspectionView(openJobs.length > 0 ? 'list' : 'draft_job');
+    setInspectionView(openJobs.length > 0 ? 'list' : (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new'));
   };
   const contractorOnboardingItems: Array<{
     label: string;
@@ -29061,6 +29062,12 @@ function ContractorDashboard({
   };
 
   const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {
+    if (!DRAFT_JOB_UI_ENABLED) {
+      setInspectionView('new');
+      setContractorJobsView('new_jobs');
+      setContractorTab('inspections');
+      return;
+    }
     setDraftJobDraft(createBlankDraftJobComposerDraft({
       subject_type: selectedJobsLocalContact ? 'local' : 'connected',
       homeowner_user_id: selectedJobsConnection?.homeowner_user_id ?? '',
@@ -29078,6 +29085,12 @@ function ContractorDashboard({
   };
 
   const continueDraftJob = async (draft: Inspection) => {
+    if (!DRAFT_JOB_UI_ENABLED) {
+      setError('Draft Job UI is not enabled in this environment.');
+      setInspectionView('list');
+      setContractorJobsViewAndScroll('open_jobs');
+      return;
+    }
     if (!isComposerDraftJob(draft)) {
       setError('This record is not a contractor Draft Job.');
       return;
@@ -29098,6 +29111,10 @@ function ContractorDashboard({
 
   const saveDraftJobComposer = async () => {
     if (!supabase || !contractor) return;
+    if (!DRAFT_JOB_UI_ENABLED) {
+      setDraftJobFeedback({ tone: 'error', title: 'Draft Job UI is not enabled in this environment.', testId: 'draft-job-save-feedback' });
+      return;
+    }
     if (!canManageDraftJobs) {
       setDraftJobFeedback({ tone: 'error', title: draftJobRoleDeniedReason, testId: 'draft-job-save-feedback' });
       return;
@@ -29113,27 +29130,35 @@ function ContractorDashboard({
 
     let draftId = activeDraftJobId;
     let metadataSaved = false;
+    let scopeSaved = false;
+    let savePhase: 'creating_draft' | 'updating_metadata' | 'saving_scope' | 'refreshing_saved_data' = draftId
+      ? 'updating_metadata'
+      : 'creating_draft';
     try {
       const metadataPayload = draftJobMetadataPayload(draftJobDraft);
       if (!draftId) {
+        savePhase = 'creating_draft';
         draftId = await createDraftJob(supabase, metadataPayload);
         setActiveDraftJobId(draftId);
         metadataSaved = true;
-        await fetchDraftJobRecord(draftId);
       } else {
+        savePhase = 'updating_metadata';
         const updated = await updateDraftJob(supabase, draftId, metadataPayload);
         metadataSaved = true;
         setInspections(prev => [updated, ...prev.filter(item => item.id !== updated.id)]);
       }
 
+      savePhase = 'saving_scope';
       const scopeResult = await upsertDraftJobScope(
         supabase,
         draftId,
         draftJobScopePayload(draftJobDraft, removedDraftJobWorkItemIds),
       );
+      scopeSaved = true;
       const nextDraft = applyDraftJobScopeResult(draftJobDraft, scopeResult);
       setDraftJobDraft(nextDraft);
       setRemovedDraftJobWorkItemIds([]);
+      savePhase = 'refreshing_saved_data';
       await refreshJobWorkItemsForJob(draftId);
       await fetchDraftJobRecord(draftId);
       setDraftJobFeedback({
@@ -29143,15 +29168,12 @@ function ContractorDashboard({
         testId: 'draft-job-save-feedback',
       });
     } catch (err) {
-      const title = metadataSaved
-        ? 'Draft details saved, but scope changes did not save.'
-        : draftId
-          ? 'Draft Job could not be updated.'
-          : 'Draft Job could not be created.';
+      console.error('Draft Job save failed during phase:', savePhase, err);
+      const feedback = draftJobSaveFailureFeedback({ draftId, metadataSaved, scopeSaved, error: err });
       setDraftJobFeedback({
         tone: 'error',
-        title,
-        body: draftJobUserFacingError(err, 'Review the draft details and try Save Draft again.'),
+        title: feedback.title,
+        body: feedback.body,
         testId: 'draft-job-save-feedback',
       });
     } finally {
@@ -36896,7 +36918,7 @@ function ContractorDashboard({
                             type="button"
                             onClick={() => {
                               setContractorJobsViewAndScroll(item.id);
-                              if (item.id === 'new_jobs') setInspectionView('draft_job');
+                              if (item.id === 'new_jobs') setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new');
                               if (item.id !== 'new_jobs') setInspectionView('list');
                             }}
 	                            className={`${item.mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3 ${
@@ -38349,7 +38371,7 @@ function ContractorDashboard({
 	                    ].filter((label): label is string => Boolean(label));
 	                    return (
                       <div className="space-y-4">
-                        {contractorJobsView === 'open_jobs' && (
+                        {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && (
                           <DraftJobList
                             drafts={selectedJobsCustomerDrafts}
                             workItemsByJobId={jobWorkItemsByJobId}
@@ -40009,7 +40031,7 @@ function ContractorDashboard({
           )}
 
           {/* ── DRAFT JOB COMPOSER VIEW ── */}
-          {inspectionView === 'draft_job' && (
+          {DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job' && (
             <Card title="Start New Job" icon={<Plus size={18} />}>
               <DraftJobComposer
                 draft={draftJobDraft}
@@ -40040,15 +40062,17 @@ function ContractorDashboard({
           )}
 
           {/* ── NEW VIEW ── */}
-          {inspectionView === 'new' && (
+          {(inspectionView === 'new' || (!DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job')) && (
             <Card title="Create Job" icon={<ClipboardList size={18} />}>
               <div className="space-y-4">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
-                  <p className="font-semibold">Need a contractor-only draft first?</p>
-                  <button type="button" onClick={() => startDraftJobComposer()} className="mt-2 text-sm font-bold text-blue-700 hover:text-blue-900">
-                    Open Draft Job composer
-                  </button>
-                </div>
+                {DRAFT_JOB_UI_ENABLED && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
+                    <p className="font-semibold">Need a contractor-only draft first?</p>
+                    <button type="button" onClick={() => startDraftJobComposer()} className="mt-2 text-sm font-bold text-blue-700 hover:text-blue-900">
+                      Open Draft Job composer
+                    </button>
+                  </div>
+                )}
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Choose job workflow</p>
                   <div className="grid gap-3 md:grid-cols-2">

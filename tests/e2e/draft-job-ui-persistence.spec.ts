@@ -5,10 +5,12 @@ import {
   applyDraftJobScopeResult,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
+  draftJobSaveFailureFeedback,
   draftJobScopePayload,
   isComposerDraftJob,
   validateDraftJobComposerDraft,
 } from '../../src/features/jobs/draftJobMappings';
+import { isDraftJobUiEnabled } from '../../src/features/jobs/draftJobAvailability';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -21,6 +23,23 @@ function sourceBetween(source: string, start: string, end: string) {
 }
 
 test.describe('Draft Job UI persistence and resume', () => {
+  test('Draft Job UI gate is explicit and defaults to the legacy Start New Job route', () => {
+    expect(isDraftJobUiEnabled({})).toBe(false);
+    expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: '' })).toBe(false);
+    expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: 'false' })).toBe(false);
+    expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: 'TRUE' })).toBe(false);
+    expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: '1' })).toBe(false);
+    expect(isDraftJobUiEnabled({ VITE_DRAFT_JOB_UI_ENABLED: 'true' })).toBe(true);
+
+    const appSource = sourceFile('src/App.tsx');
+    expect(appSource).toContain("return jobsView === 'new_jobs' ? (DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new') : 'list';");
+    expect(appSource).toContain("setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new')");
+    expect(appSource).toContain("DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs'");
+    expect(appSource).toContain("DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job'");
+    expect(appSource).toContain("(!DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job')");
+    expect(appSource).toContain('Draft Job UI is not enabled in this environment.');
+  });
+
   test('identifies only new composer Draft Jobs, not historical generic inspection drafts', () => {
     expect(isComposerDraftJob({ job_origin: 'draft_composer', status: 'draft', job_status: 'draft' } as any)).toBe(true);
     expect(isComposerDraftJob({ job_origin: null, status: 'draft', job_status: 'draft' } as any)).toBe(false);
@@ -195,15 +214,47 @@ test.describe('Draft Job UI persistence and resume', () => {
 
     expect(saveSource).toContain('draftId = await createDraftJob');
     expect(saveSource).toContain('setActiveDraftJobId(draftId)');
-    expect(saveSource).toContain('await fetchDraftJobRecord(draftId)');
+    expect(saveSource).toContain("savePhase = 'saving_scope'");
+    expect(saveSource).toContain("savePhase = 'refreshing_saved_data'");
     expect(saveSource).toContain('await upsertDraftJobScope');
-    expect(saveSource).toContain('Draft details saved, but scope changes did not save.');
+    expect(saveSource).toContain('draftJobSaveFailureFeedback');
     expect(saveSource).not.toContain('servsync_activate_draft_job');
 
     expect(composerSource).toContain('Save Draft');
     expect(composerSource).toContain('Customer type is fixed after the first save');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Invoice');
+  });
+
+  test('save failure feedback distinguishes scope failures from post-save refresh failures', () => {
+    expect(draftJobSaveFailureFeedback({
+      draftId: 'draft-1',
+      metadataSaved: true,
+      scopeSaved: false,
+      error: new Error('scope rejected'),
+    })).toMatchObject({
+      title: 'Draft details saved, but scope changes did not save.',
+    });
+
+    expect(draftJobSaveFailureFeedback({
+      draftId: 'draft-1',
+      metadataSaved: true,
+      scopeSaved: true,
+      error: new Error('network reload failed'),
+    })).toEqual({
+      title: 'Draft Job saved, but the latest saved data could not be reloaded.',
+      body: 'Refresh to confirm the changes.',
+    });
+
+    expect(draftJobSaveFailureFeedback({
+      draftId: null,
+      metadataSaved: false,
+      scopeSaved: false,
+      error: new Error('permission denied'),
+    })).toMatchObject({
+      title: 'Draft Job could not be created.',
+      body: 'You do not have permission to save this Draft Job.',
+    });
   });
 
   test('Drafts section is separate from operational job status presentation', () => {
