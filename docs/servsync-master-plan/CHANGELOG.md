@@ -4,6 +4,40 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-16
+
+- Branch: `codex/draft-job-operational-list-filter-fix-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/draftJobMappings.ts`
+  - `src/features/jobs/jobRecordSelectors.ts`
+  - `tests/e2e/draft-job-operational-filtering.spec.ts`
+  - `tests/e2e/draft-job-ui-persistence.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added a narrow production-rollout correction for Draft Job operational-list leakage after the production Draft Job UI enablement attempt was rolled back. Composer Draft Jobs are now classified centrally, excluded from operational job derivations such as Recent jobs and operational counts/actions, and still routed only through Draft-specific presentation when the Draft Job UI gate is enabled. Operational open/delete handling now defensively refuses composer Draft Jobs and adds a pending-delete guard for the ordinary job delete path.
+- Reason for change: The production enablement gate found that a valid composer Draft Job could appear in the Jobs overview Recent jobs collection as an ordinary planning/service job with operational actions. The fix removes composer Draft Jobs before operational cards, counts, and actions are derived instead of patching only the visible card.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-operational-filtering.spec.ts tests/e2e/draft-job-ui-persistence.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/status-secondary-migration.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/unified-start-job-composer-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Production Draft Job backend SQL remains installed, but the production Draft Job UI flag is absent/default-off after the rolled-back enablement attempt.
+  - The accidentally deleted `Service Job — Joan Ark — Jul 2026` record was investigated read-only. Surviving evidence confirms the related Joan Ark local contact/home fixture, but no authoritative deleted inspection snapshot was found; restoration was not performed and should require owner approval or authoritative backup/audit evidence.
+  - A separate final audit and another deliberate production UI enablement gate are still required before turning `VITE_DRAFT_JOB_UI_ENABLED=true` back on.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the failed/rolled-back production UI enablement attempt, the operational-list leakage correction, and the need for another rollout gate.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The job workflow status now distinguishes the production-applied backend, default-off UI flag, and operational-list exclusion requirement.
+
 ## 2026-07-15
 
 - Branch: `codex/draft-job-ui-persistence-v1`
