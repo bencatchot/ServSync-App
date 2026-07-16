@@ -6,6 +6,43 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-16
 
+- Branch: `codex/draft-resume-persistence-fix-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/DraftJobComposer.tsx`
+  - `src/features/jobs/DraftJobList.tsx`
+  - `src/features/jobs/draftJobMappings.ts`
+  - `src/features/work-composer/WorkComposerLineItemRow.tsx`
+  - `tests/e2e/draft-job-ui-persistence.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Fixed the Draft resume contract so `Continue Draft` refetches the canonical Draft inspection row and related `job_work_items` before opening the composer, validates the record is still an exact composer Draft, preserves persisted scope IDs, and avoids falling back to blank Draft state on load failure. The Draft composer now preserves saved connected/local customer selections with safe fallback options when the active selector list does not contain the saved IDs, and its supported scope advanced fields (`room`, `location`, and internal line notes) are usable and visible after resume.
+- Reason for change: Production validation found that saved Draft data could appear blank after reopening. The follow-up audit traced the issue to frontend resume/display gaps rather than unsupported backend persistence for the currently supported Draft metadata and scope fields.
+- Tests/checks run:
+  - Sandbox rollback-only RPC transaction confirmed existing Draft Job backend stores local customer/property metadata plus two scope rows with quantity, unit, price, room, location, and internal line notes; transaction rolled back and a follow-up count confirmed zero QA rows remained.
+  - `git diff --check` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-ui-persistence.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-operational-filtering.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/status-secondary-migration.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/unified-start-job-composer-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/contractor-create-customer.spec.ts --project=chromium --reporter=line` blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium --reporter=line` blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium --reporter=line` blocked by missing `VITE_SUPABASE_URL`.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Top-level Draft notes still have no backend/RPC persistence contract and remain unsupported in this slice; durable Draft-level notes require a separately approved backend extension.
+  - This slice does not add Create Estimate/Create Job/Create Invoice outcome buttons, Draft activation UI, contextual `Start New Draft` entry points, Jobs landing-page redesign, SQL/RLS/RPC changes, Supabase/Vercel configuration changes, production data changes, final reconciliation, invoice allocation, payment ledger, reopening, or Joan Ark restoration.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the blank-resume corrective slice and keeps direct outcome transitions as the next separately planned work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The job workflow status now distinguishes supported Draft save/resume restoration from unsupported top-level Draft notes and future outcome actions.
+
 - Branch: `codex/draft-first-product-principle-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`

@@ -7,6 +7,7 @@ type DraftJobListProps = {
   workItemsByJobId: Record<string, JobWorkItem[]>;
   customerLabel: (draft: Inspection) => string;
   propertyLabel: (draft: Inspection) => string;
+  loadingDraftId?: string | null;
   onContinue: (draft: Inspection) => void;
 };
 
@@ -15,6 +16,7 @@ export function DraftJobList({
   workItemsByJobId,
   customerLabel,
   propertyLabel,
+  loadingDraftId,
   onContinue,
 }: DraftJobListProps) {
   if (drafts.length === 0) return null;
@@ -53,8 +55,13 @@ export function DraftJobList({
                   </p>
                   {draft.summary ? <p className="mt-2 line-clamp-2 text-sm text-slate-600">{draft.summary}</p> : null}
                 </div>
-                <button type="button" onClick={() => onContinue(draft)} className="shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">
-                  Continue Draft
+                <button
+                  type="button"
+                  onClick={() => onContinue(draft)}
+                  disabled={loadingDraftId === draft.id}
+                  className="shrink-0 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loadingDraftId === draft.id ? 'Loading...' : 'Continue Draft'}
                 </button>
               </div>
             </article>

@@ -63,8 +63,9 @@ export function WorkComposerLineItemRow({
   onDuplicate,
   writingAssistProps,
 }: WorkComposerLineItemRowProps) {
-  const showModelSpec = line.line_type === 'material' || Boolean(line.model_spec.trim());
-  const showSupplyStatus = Boolean(line.supply_status);
+  const supportsCatalogDetails = itemLabel !== 'draft job';
+  const showModelSpec = supportsCatalogDetails && (line.line_type === 'material' || Boolean(line.model_spec.trim()));
+  const showSupplyStatus = supportsCatalogDetails && Boolean(line.supply_status);
   const sourceNote = line.editor_source_note?.trim();
   const hasSecondaryRow = showModelSpec || showSupplyStatus;
   const showLaborHours = laborMode === 'line_specific' && workComposerLineCanTrackLaborHours(line);
