@@ -28098,6 +28098,10 @@ function ContractorDashboard({
   );
   const composerDraftJobs = composerDraftJobsFrom(inspections);
   const operationalInspections = operationalJobsFrom(inspections);
+  const activeServiceVisitForRequest = (serviceRequestId: string) => operationalInspections.find(inspection =>
+    inspection.service_request_id === serviceRequestId
+    && inspectionIsOpenJob(inspection)
+  ) ?? null;
   const fieldWorkForHomeowner = (homeownerUserId: string) => {
     const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
     return operationalInspections
@@ -32573,10 +32577,7 @@ function ContractorDashboard({
                 connection.connection_id === request.connection_id
                 || connection.homeowner_user_id === request.homeowner_user_id
               );
-              const activeRequestVisit = inspections.find(inspection =>
-                inspection.service_request_id === request.id
-                && inspectionIsOpenJob(inspection)
-              ) ?? null;
+              const activeRequestVisit = activeServiceVisitForRequest(request.id);
               const linkedRequestEstimate = estimates.find(estimate =>
                 estimate.service_request_id === request.id
                 && estimateDocumentLabel(estimate) !== 'Invoice'
@@ -36631,10 +36632,7 @@ function ContractorDashboard({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const activeRequestVisit = inspections.find(inspection =>
-                                          inspection.service_request_id === selectedWorkspaceRequest.id
-                                          && inspectionIsOpenJob(inspection)
-                                        ) ?? null;
+                                        const activeRequestVisit = activeServiceVisitForRequest(selectedWorkspaceRequest.id);
                                         if (activeRequestVisit) {
                                           openInspection(activeRequestVisit, { stayInHomeownerWorkspace: true });
                                           return;
@@ -36650,7 +36648,7 @@ function ContractorDashboard({
                                       className={buttonClass('secondary')}
                                     >
                                       <ClipboardCheck size={15} />
-                                      {inspections.some(inspection => inspection.service_request_id === selectedWorkspaceRequest.id && inspectionIsOpenJob(inspection)) ? 'View service visit' : 'Create service visit'}
+                                      {activeServiceVisitForRequest(selectedWorkspaceRequest.id) ? 'View service visit' : 'Create service visit'}
                                     </button>
                                   </div>
                                   <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
@@ -36695,10 +36693,7 @@ function ContractorDashboard({
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            const activeRequestVisit = inspections.find(inspection =>
-                                              inspection.service_request_id === selectedWorkspaceRequest.id
-                                              && inspectionIsOpenJob(inspection)
-                                            ) ?? null;
+                                            const activeRequestVisit = activeServiceVisitForRequest(selectedWorkspaceRequest.id);
                                             if (activeRequestVisit) {
                                               openInspection(activeRequestVisit, { stayInHomeownerWorkspace: true });
                                               return;
@@ -36713,7 +36708,7 @@ function ContractorDashboard({
                                           }}
                                           className={buttonClass('secondary')}
                                         >
-                                          {inspections.some(inspection => inspection.service_request_id === selectedWorkspaceRequest.id && inspectionIsOpenJob(inspection)) ? 'View service visit' : 'Create service visit'}
+                                          {activeServiceVisitForRequest(selectedWorkspaceRequest.id) ? 'View service visit' : 'Create service visit'}
                                         </button>
                                       </div>
                                     </div>

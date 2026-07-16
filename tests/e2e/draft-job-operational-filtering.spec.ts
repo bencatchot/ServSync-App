@@ -111,6 +111,7 @@ test.describe('Draft Job operational filtering', () => {
       status: 'draft',
       job_status: 'draft',
       local_contact_id: 'local-1',
+      service_request_id: 'request-1',
       updated_at: '2026-07-15T12:15:00.000Z',
       draft_saved_at: '2026-07-15T12:15:00.000Z',
     });
@@ -121,6 +122,7 @@ test.describe('Draft Job operational filtering', () => {
       status: 'draft',
       job_status: 'scheduled',
       local_contact_id: 'local-1',
+      service_request_id: 'request-1',
       updated_at: '2026-07-15T12:20:00.000Z',
     });
 
@@ -131,6 +133,7 @@ test.describe('Draft Job operational filtering', () => {
     const closedJobs = operationalJobs.filter(inspectionIsClosedJob);
     const selectedCustomerWork = operationalJobs.filter(job => job.local_contact_id === 'local-1');
     const searchResults = operationalJobs.filter(job => `${job.name} ${job.summary ?? ''}`.toLowerCase().includes('job'));
+    const activeServiceVisit = operationalJobs.find(job => job.service_request_id === 'request-1' && inspectionIsOpenJob(job));
 
     expect(composerDraftJobsFrom(allJobs).map(job => job.id)).toEqual(['composer-draft']);
     expect(operationalJobs.map(job => job.id)).toEqual(['activated-composer-job', 'normal-open', 'normal-closed']);
@@ -139,6 +142,7 @@ test.describe('Draft Job operational filtering', () => {
     expect(closedJobs.map(job => job.id)).toEqual(['normal-closed']);
     expect(selectedCustomerWork.map(job => job.id)).not.toContain('composer-draft');
     expect(searchResults.map(job => job.id)).not.toContain('composer-draft');
+    expect(activeServiceVisit?.id).toBe('activated-composer-job');
   });
 
   test('keeps the Jobs overview incident path on operational records only', () => {
@@ -161,6 +165,34 @@ test.describe('Draft Job operational filtering', () => {
     expect(overviewRecentJobs).not.toContain('inspections.slice(0, 5)');
     expect(focusedJobsList).toContain('jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer : openJobs');
     expect(focusedJobsList).toContain('jobsCustomerFilterSubjectId ? closedJobsForSelectedCustomer : closedJobs');
+  });
+
+  test('keeps request-linked service visits on operational records only', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const serviceVisitHelper = sourceBetween(
+      appSource,
+      'const activeServiceVisitForRequest =',
+      'const fieldWorkForHomeowner =',
+    );
+    const serviceRequestCard = sourceBetween(
+      appSource,
+      'const renderContractorRequestCard =',
+      'const appointmentWindowDraft =',
+    );
+    const customerWorkspaceRequestActions = sourceBetween(
+      appSource,
+      '<h3 className="font-bold text-slate-950">{selectedWorkspaceRequest.title}</h3>',
+      '{selectedWorkspaceRequest.quote && (',
+    );
+
+    expect(serviceVisitHelper).toContain('operationalInspections.find');
+    expect(serviceVisitHelper).toContain('inspection.service_request_id === serviceRequestId');
+    expect(serviceVisitHelper).toContain('inspectionIsOpenJob(inspection)');
+    expect(serviceRequestCard).toContain('const activeRequestVisit = activeServiceVisitForRequest(request.id);');
+    expect(serviceRequestCard).not.toContain('inspections.find(inspection =>');
+    expect(customerWorkspaceRequestActions).toContain('activeServiceVisitForRequest(selectedWorkspaceRequest.id)');
+    expect(customerWorkspaceRequestActions).not.toContain('inspections.some(inspection => inspection.service_request_id');
+    expect(customerWorkspaceRequestActions).not.toContain('inspections.find(inspection =>');
   });
 
   test('prevents composer Draft Jobs from receiving ordinary operational actions defensively', () => {
