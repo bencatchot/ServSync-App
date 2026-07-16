@@ -37,6 +37,17 @@ type WorkComposerLineItemRowProps = {
 
 const INPUT_CLASS = 'w-full rounded-xl border border-[#E1E3E7] bg-white px-3 py-2 text-base text-[#02132D] placeholder:text-slate-400 outline-none transition focus:border-[#0078FF] focus:ring-2 focus:ring-[#0078FF]/15 md:text-sm';
 
+export function workComposerLineItemRowAdvancedVisibility(
+  itemLabel: WorkComposerLineItemRowProps['itemLabel'],
+  line: Pick<WorkComposerLineDraft, 'line_type' | 'model_spec' | 'supply_status'>,
+) {
+  const supportsCatalogDetails = itemLabel !== 'draft job';
+  return {
+    showModelSpec: supportsCatalogDetails && (line.line_type === 'material' || Boolean(line.model_spec.trim())),
+    showSupplyStatus: supportsCatalogDetails && Boolean(line.supply_status),
+  };
+}
+
 function WorkComposerField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -63,9 +74,7 @@ export function WorkComposerLineItemRow({
   onDuplicate,
   writingAssistProps,
 }: WorkComposerLineItemRowProps) {
-  const supportsCatalogDetails = itemLabel !== 'draft job';
-  const showModelSpec = supportsCatalogDetails && (line.line_type === 'material' || Boolean(line.model_spec.trim()));
-  const showSupplyStatus = supportsCatalogDetails && Boolean(line.supply_status);
+  const { showModelSpec, showSupplyStatus } = workComposerLineItemRowAdvancedVisibility(itemLabel, line);
   const sourceNote = line.editor_source_note?.trim();
   const hasSecondaryRow = showModelSpec || showSupplyStatus;
   const showLaborHours = laborMode === 'line_specific' && workComposerLineCanTrackLaborHours(line);
@@ -276,8 +285,8 @@ export function WorkComposerLineItemRow({
             <div className="mt-3 grid gap-3 lg:grid-cols-4">
               {lineTypeField}
               {laborHoursField}
-              {modelSpecField}
-              {supplyStatusField}
+              {showModelSpec ? modelSpecField : null}
+              {showSupplyStatus ? supplyStatusField : null}
               {roomField}
               {locationField}
               {internalNotesField}

@@ -13,6 +13,8 @@ import {
 } from '../../src/features/jobs/draftJobMappings';
 import { isDraftJobUiEnabled } from '../../src/features/jobs/draftJobAvailability';
 import { composerDraftJobsFrom } from '../../src/features/jobs/jobRecordSelectors';
+import { workComposerLineItemRowAdvancedVisibility } from '../../src/features/work-composer/WorkComposerLineItemRow';
+import { createWorkComposerLineDraft } from '../../src/features/work-composer/workComposerDrafts';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -362,13 +364,51 @@ test.describe('Draft Job UI persistence and resume', () => {
   test('Draft composer exposes only supported durable advanced fields for Draft scope rows', () => {
     const composerSource = sourceFile('src/features/jobs/DraftJobComposer.tsx');
     const rowSource = sourceFile('src/features/work-composer/WorkComposerLineItemRow.tsx');
+    const compactBranch = sourceBetween(
+      rowSource,
+      'if (compactAdvanced) {',
+      '  return (\n    <div key={line.id} className="rounded-xl border border-slate-200 bg-white p-3">',
+    );
+    const draftLine = createWorkComposerLineDraft({
+      line_type: 'material',
+      line_title: 'Replace valve',
+      description: 'Replace valve',
+      model_spec: '',
+      supply_status: '',
+      room_label: 'Laundry',
+      location_label: 'Utility sink',
+      internal_notes: 'Use quarter-turn shutoff',
+    });
+    const estimateLine = createWorkComposerLineDraft({
+      line_type: 'material',
+      line_title: 'Replace valve',
+      description: 'Replace valve',
+      model_spec: 'Moen 1225',
+      supply_status: 'contractor_supplied',
+    });
 
     expect(composerSource).toContain('advancedDetailsOpen={expandedLineIds.has(line.id)}');
     expect(composerSource).toContain('onAdvancedDetailsOpenChange');
     expect(composerSource).toContain('line.room_label?.trim() || line.location_label?.trim() || line.internal_notes?.trim()');
-    expect(rowSource).toContain("const supportsCatalogDetails = itemLabel !== 'draft job';");
-    expect(rowSource).toContain('const showModelSpec = supportsCatalogDetails');
-    expect(rowSource).toContain('const showSupplyStatus = supportsCatalogDetails');
+    expect(workComposerLineItemRowAdvancedVisibility('draft job', draftLine)).toEqual({
+      showModelSpec: false,
+      showSupplyStatus: false,
+    });
+    expect(workComposerLineItemRowAdvancedVisibility('estimate', estimateLine)).toEqual({
+      showModelSpec: true,
+      showSupplyStatus: true,
+    });
+    expect(workComposerLineItemRowAdvancedVisibility('invoice', estimateLine)).toEqual({
+      showModelSpec: true,
+      showSupplyStatus: true,
+    });
+    expect(compactBranch).toContain('{showModelSpec ? modelSpecField : null}');
+    expect(compactBranch).toContain('{showSupplyStatus ? supplyStatusField : null}');
+    expect(compactBranch).not.toContain('\n              {modelSpecField}\n');
+    expect(compactBranch).not.toContain('\n              {supplyStatusField}\n');
+    expect(compactBranch).toContain('{roomField}');
+    expect(compactBranch).toContain('{locationField}');
+    expect(compactBranch).toContain('{internalNotesField}');
   });
 
   test('save failure feedback distinguishes scope failures from post-save refresh failures', () => {
