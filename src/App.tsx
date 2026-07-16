@@ -187,17 +187,19 @@ import {
 } from './features/jobs/status';
 import { DraftJobComposer, type DraftJobCustomerOption } from './features/jobs/DraftJobComposer';
 import { DraftJobList } from './features/jobs/DraftJobList';
-import { createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
+import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
+  draftJobCreateJobFailureFeedback,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
   draftJobOptionsWithSavedSelection,
   draftJobSaveFailureFeedback,
   draftJobScopePayload,
   validateDraftJobComposerDraft,
+  validateDraftJobComposerDraftForCreateJob,
   type DraftJobComposerDraft,
 } from './features/jobs/draftJobMappings';
 import {
@@ -21694,6 +21696,8 @@ function ContractorDashboard({
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
   const [savingDraftJob, setSavingDraftJob] = useState(false);
+  const [creatingJobFromDraft, setCreatingJobFromDraft] = useState(false);
+  const creatingJobFromDraftRef = useRef(false);
   const [loadingDraftJobId, setLoadingDraftJobId] = useState<string | null>(null);
   const [draftJobFeedback, setDraftJobFeedback] = useState<(ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null>(null);
 
@@ -29216,6 +29220,102 @@ function ContractorDashboard({
       });
     } finally {
       setSavingDraftJob(false);
+    }
+  };
+
+  const createJobFromDraftComposer = async () => {
+    if (!supabase || !contractor) return;
+    if (!DRAFT_JOB_UI_ENABLED) {
+      setDraftJobFeedback({ tone: 'error', title: 'Draft Job UI is not enabled in this environment.', testId: 'draft-job-create-job-feedback' });
+      return;
+    }
+    if (!canManageDraftJobs) {
+      setDraftJobFeedback({ tone: 'error', title: draftJobRoleDeniedReason, testId: 'draft-job-create-job-feedback' });
+      return;
+    }
+    if (creatingJobFromDraftRef.current || creatingJobFromDraft || savingDraftJob) return;
+
+    const validationMessage = validateDraftJobComposerDraftForCreateJob(draftJobDraft);
+    if (validationMessage) {
+      setDraftJobFeedback({ tone: 'error', title: validationMessage, testId: 'draft-job-create-job-feedback' });
+      return;
+    }
+
+    creatingJobFromDraftRef.current = true;
+    setCreatingJobFromDraft(true);
+    setDraftJobFeedback(null);
+    setNotice('');
+    setError('');
+
+    let draftId = activeDraftJobId;
+    let metadataSaved = false;
+    let scopeSaved = false;
+    let activated = false;
+    let activatedJob: Inspection | null = null;
+    let createJobPhase: 'metadata_save' | 'scope_save' | 'activation' | 'post_activation_refresh' | 'navigation' = 'metadata_save';
+
+    try {
+      const metadataPayload = draftJobMetadataPayload(draftJobDraft);
+      createJobPhase = 'metadata_save';
+      if (!draftId) {
+        draftId = await createDraftJob(supabase, metadataPayload);
+        setActiveDraftJobId(draftId);
+      } else {
+        const updated = await updateDraftJob(supabase, draftId, metadataPayload);
+        setInspections(prev => [updated, ...prev.filter(item => item.id !== updated.id)]);
+      }
+      metadataSaved = true;
+
+      createJobPhase = 'scope_save';
+      const scopeResult = await upsertDraftJobScope(
+        supabase,
+        draftId,
+        draftJobScopePayload(draftJobDraft, removedDraftJobWorkItemIds),
+      );
+      scopeSaved = true;
+      const nextDraft = applyDraftJobScopeResult(draftJobDraft, scopeResult);
+      setDraftJobDraft(nextDraft);
+      setRemovedDraftJobWorkItemIds([]);
+
+      createJobPhase = 'activation';
+      activatedJob = await activateDraftJob(supabase, draftId);
+      activated = true;
+      setInspections(prev => [activatedJob as Inspection, ...prev.filter(item => item.id !== activatedJob?.id)]);
+
+      createJobPhase = 'post_activation_refresh';
+      await refreshJobWorkItemsForJob(draftId);
+      const refreshedJob = await fetchDraftJobRecord(draftId);
+      if (!refreshedJob || isComposerDraftJob(refreshedJob)) {
+        throw new Error('The Job was created, but the activated record could not be loaded.');
+      }
+      setInspections(prev => [refreshedJob, ...prev.filter(item => item.id !== refreshedJob.id)]);
+      setActiveDraftJobId(null);
+      setDraftJobFeedback(null);
+
+      createJobPhase = 'navigation';
+      openInspection(refreshedJob, { subTab: 'inspect' });
+      setNotice(actionFeedbackMessage('Job created from Draft.', 'The same Draft record is now open as an operational Job.', 'draft-job-create-job-success'));
+    } catch (err) {
+      console.error('Draft Job Create Job failed during phase:', createJobPhase, err);
+      const feedback = draftJobCreateJobFailureFeedback({ draftId, metadataSaved, scopeSaved, activated, error: err });
+      if (activated && activatedJob) {
+        setInspections(prev => [activatedJob as Inspection, ...prev.filter(item => item.id !== activatedJob?.id)]);
+        setActiveDraftJobId(null);
+        setDraftJobFeedback(null);
+        setNotice(actionFeedbackMessage(feedback.title, feedback.body, 'draft-job-create-job-refresh-warning'));
+        setInspectionView('list');
+        setContractorJobsViewAndScroll('open_jobs');
+      } else {
+        setDraftJobFeedback({
+          tone: feedback.tone,
+          title: feedback.title,
+          body: feedback.body,
+          testId: 'draft-job-create-job-feedback',
+        });
+      }
+    } finally {
+      creatingJobFromDraftRef.current = false;
+      setCreatingJobFromDraft(false);
     }
   };
 
@@ -40100,11 +40200,14 @@ function ContractorDashboard({
                 connectedOptions={draftJobConnectedOptionsForComposer}
                 localOptions={draftJobLocalOptionsForComposer}
                 currentDraftId={activeDraftJobId}
-                canSave={canManageDraftJobs && !savingDraftJob}
+                canSave={canManageDraftJobs && !savingDraftJob && !creatingJobFromDraft}
+                canCreateJob={canManageDraftJobs && !savingDraftJob && !creatingJobFromDraft}
                 saving={savingDraftJob}
+                creatingJob={creatingJobFromDraft}
                 feedback={draftJobFeedback}
                 onChange={setDraftJobDraft}
                 onSave={() => void saveDraftJobComposer()}
+                onCreateJob={() => void createJobFromDraftComposer()}
                 onCancel={() => {
                   setInspectionView('list');
                   setContractorJobsViewAndScroll('open_jobs');

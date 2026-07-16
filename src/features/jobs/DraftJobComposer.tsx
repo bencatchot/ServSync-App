@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Save, X } from 'lucide-react';
+import { Briefcase, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
 import { WorkComposerTotalsPanel } from '../work-composer/WorkComposerTotals';
@@ -26,10 +26,13 @@ type DraftJobComposerProps = {
   localOptions: DraftJobCustomerOption[];
   currentDraftId?: string | null;
   canSave: boolean;
+  canCreateJob: boolean;
   saving: boolean;
+  creatingJob: boolean;
   feedback?: (ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null;
   onChange: (draft: DraftJobComposerDraft) => void;
   onSave: () => void;
+  onCreateJob: () => void;
   onCancel: () => void;
   onLegacyJob: () => void;
   onRemovePersistedLine: (id: string) => void;
@@ -54,10 +57,13 @@ export function DraftJobComposer({
   localOptions,
   currentDraftId,
   canSave,
+  canCreateJob,
   saving,
+  creatingJob,
   feedback,
   onChange,
   onSave,
+  onCreateJob,
   onCancel,
   onLegacyJob,
   onRemovePersistedLine,
@@ -69,6 +75,7 @@ export function DraftJobComposer({
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
   const subjectTypeLocked = Boolean(currentDraftId);
+  const actionBusy = saving || creatingJob;
   useEffect(() => {
     setExpandedLineIds(prev => {
       const next = new Set(prev);
@@ -111,7 +118,7 @@ export function DraftJobComposer({
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Start New Job</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">{currentDraftId ? 'Continue Draft Job' : 'Draft Job'}</h2>
             <p className="mt-1 text-sm leading-6 text-blue-950">
-              Save shared job details now. Estimate, Job, and Invoice outcomes are intentionally not available in this slice.
+              Save this work for later, or create an operational Job directly from the information currently entered here.
             </p>
           </div>
           <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">Draft</span>
@@ -254,15 +261,19 @@ export function DraftJobComposer({
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onSave} disabled={!canSave || saving} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" onClick={onCreateJob} disabled={!canCreateJob || actionBusy} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" data-testid="draft-job-create-job-button">
+          <Briefcase size={16} />
+          {creatingJob ? 'Creating Job...' : 'Create Job'}
+        </button>
+        <button type="button" onClick={onSave} disabled={!canSave || actionBusy} className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
           <Save size={16} />
           {saving ? 'Saving...' : 'Save Draft'}
         </button>
-        <button type="button" onClick={onCancel} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={onCancel} disabled={actionBusy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
           Return to Jobs
         </button>
-        <button type="button" onClick={onLegacyJob} className="text-sm font-bold text-slate-500 hover:text-slate-800">
+        <button type="button" onClick={onLegacyJob} disabled={actionBusy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           Create operational job now
         </button>
       </div>

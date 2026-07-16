@@ -269,6 +269,25 @@ export function validateDraftJobComposerDraft(draft: DraftJobComposerDraft): str
   return '';
 }
 
+export function validateDraftJobComposerDraftForCreateJob(draft: DraftJobComposerDraft): string {
+  if (!draft.title.trim()) return 'Enter a Draft Job title before creating the Job.';
+  if (draft.subject_type === 'connected' && !draft.homeowner_user_id) return 'Choose a homeowner before creating this Job.';
+  if (draft.subject_type === 'local' && !draft.local_contact_id) return 'Choose a local customer before creating this Job.';
+  if (draft.line_items.length === 0) return 'Add at least one scope line before creating the Job.';
+  const invalidLine = draft.line_items.find(line => {
+    const quantity = numericInput(line.quantity, Number.NaN);
+    const unitPrice = moneyInputToCents(line.unit_price);
+    const laborHours = nullableNumericInput(line.labor_hours);
+    return !line.line_title.trim()
+      || !Number.isFinite(quantity)
+      || quantity < 0
+      || (line.unit_price.trim() !== '' && unitPrice === null)
+      || (line.labor_hours.trim() !== '' && laborHours === null);
+  });
+  if (invalidLine) return 'Review scope line descriptions, quantities, prices, and labor hours before creating the Job.';
+  return '';
+}
+
 export function draftJobTotalsRows(draft: DraftJobComposerDraft) {
   const totals = workComposerDraftFinancialBreakdown(draft);
   return [
@@ -320,5 +339,48 @@ export function draftJobSaveFailureFeedback({
   return {
     title: draftId ? 'Draft Job could not be updated.' : 'Draft Job could not be created.',
     body: draftJobUserFacingError(error, 'Review the draft details and try Save Draft again.'),
+  };
+}
+
+export type DraftJobCreateJobFailureContext = {
+  draftId: string | null;
+  metadataSaved: boolean;
+  scopeSaved: boolean;
+  activated: boolean;
+  error: unknown;
+};
+
+export function draftJobCreateJobFailureFeedback({
+  draftId,
+  metadataSaved,
+  scopeSaved,
+  activated,
+  error,
+}: DraftJobCreateJobFailureContext) {
+  if (activated) {
+    return {
+      tone: 'warning' as const,
+      title: 'Job created, but the latest Job data could not be reloaded.',
+      body: 'Return to Jobs and open the Job from active work if it does not open automatically.',
+    };
+  }
+  if (scopeSaved) {
+    return {
+      tone: 'error' as const,
+      title: 'Draft saved, but Job could not be created.',
+      body: draftJobUserFacingError(error, 'The Draft remains saved. Try Create Job again.'),
+    };
+  }
+  if (metadataSaved) {
+    return {
+      tone: 'error' as const,
+      title: 'Draft details saved, but scope changes did not save.',
+      body: draftJobUserFacingError(error, 'Review the draft scope and try Create Job again.'),
+    };
+  }
+  return {
+    tone: 'error' as const,
+    title: draftId ? 'Draft Job could not be updated.' : 'Draft Job could not be created.',
+    body: draftJobUserFacingError(error, 'Review the draft details and try Create Job again.'),
   };
 }
