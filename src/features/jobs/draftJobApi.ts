@@ -44,3 +44,15 @@ export async function upsertDraftJobScope(
   if (error) throw new Error(error.message || 'Unable to save Draft Job scope.');
   return data as DraftJobScopeUpsertResult;
 }
+
+export async function activateDraftJob(
+  client: DraftJobSupabaseClient,
+  inspectionId: string,
+) {
+  const { data, error } = await client.rpc('servsync_activate_draft_job', {
+    p_inspection_id: inspectionId,
+    p_job_status: null,
+  });
+  if (error) throw new Error(error.message || 'Unable to create Job from Draft.');
+  return data as Inspection;
+}

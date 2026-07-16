@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   applyDraftJobScopeResult,
+  draftJobCreateJobFailureFeedback,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
   draftJobOptionsWithSavedSelection,
@@ -10,6 +11,7 @@ import {
   draftJobScopePayload,
   isComposerDraftJob,
   validateDraftJobComposerDraft,
+  validateDraftJobComposerDraftForCreateJob,
 } from '../../src/features/jobs/draftJobMappings';
 import { isDraftJobUiEnabled } from '../../src/features/jobs/draftJobAvailability';
 import { composerDraftJobsFrom } from '../../src/features/jobs/jobRecordSelectors';
@@ -258,7 +260,7 @@ test.describe('Draft Job UI persistence and resume', () => {
     });
   });
 
-  test('builds create/update and scope payloads without activating or duplicating Draft Jobs', () => {
+  test('builds create/update and scope payloads before activation without duplicating Draft Jobs', () => {
     const draft = draftJobComposerDraftFromRecords({
       id: 'draft-1',
       homeowner_user_id: null,
@@ -323,9 +325,42 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(saved.line_items[0].job_work_item_id).toBe('persisted-line-1');
   });
 
-  test('save flow keeps partial-save retries on the same Draft Job and never exposes activation UI', () => {
+  test('Create Job validates active scope before activation', () => {
+    const draft = draftJobComposerDraftFromRecords({
+      id: 'draft-1',
+      homeowner_user_id: null,
+      home_id: null,
+      local_contact_id: 'local-1',
+      local_home_id: 'local-home-1',
+      service_request_id: null,
+      name: 'Fence repair',
+      summary: 'Replace loose panel.',
+      status: 'draft',
+      job_status: 'draft',
+      job_origin: 'draft_composer',
+      created_at: '',
+      updated_at: '',
+    } as any, []);
+
+    expect(validateDraftJobComposerDraft(draft)).toBe('');
+    expect(validateDraftJobComposerDraftForCreateJob(draft)).toBe('Add at least one scope line before creating the Job.');
+
+    draft.line_items = [createWorkComposerLineDraft({
+      id: 'line-1',
+      line_title: 'Repair fence panel',
+      description: 'Repair fence panel',
+      line_type: 'labor',
+      quantity: '1',
+      unit: 'hour',
+      unit_price: '',
+    })];
+    expect(validateDraftJobComposerDraftForCreateJob(draft)).toBe('');
+  });
+
+  test('save flow keeps partial-save retries on the same Draft Job while Create Job activates only after scope saves', () => {
     const appSource = sourceFile('src/App.tsx');
-    const saveSource = sourceBetween(appSource, 'const saveDraftJobComposer = async', 'const syncSimpleJobWorkItems = async');
+    const saveSource = sourceBetween(appSource, 'const saveDraftJobComposer = async', 'const createJobFromDraftComposer = async');
+    const createJobSource = sourceBetween(appSource, 'const createJobFromDraftComposer = async', 'const syncSimpleJobWorkItems = async');
     const composerSource = sourceFile('src/features/jobs/DraftJobComposer.tsx');
 
     expect(saveSource).toContain('draftId = await createDraftJob');
@@ -334,9 +369,25 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(saveSource).toContain("savePhase = 'refreshing_saved_data'");
     expect(saveSource).toContain('await upsertDraftJobScope');
     expect(saveSource).toContain('draftJobSaveFailureFeedback');
-    expect(saveSource).not.toContain('servsync_activate_draft_job');
+    expect(saveSource).not.toContain('activateDraftJob');
+
+    expect(createJobSource).toContain('validateDraftJobComposerDraftForCreateJob(draftJobDraft)');
+    expect(createJobSource).toContain('if (creatingJobFromDraftRef.current || creatingJobFromDraft || savingDraftJob) return;');
+    expect(createJobSource).toContain('creatingJobFromDraftRef.current = true;');
+    expect(createJobSource).toContain('creatingJobFromDraftRef.current = false;');
+    expect(createJobSource).toContain("createJobPhase = 'metadata_save'");
+    expect(createJobSource).toContain("createJobPhase = 'scope_save'");
+    expect(createJobSource).toContain("createJobPhase = 'activation'");
+    expect(createJobSource).toContain("createJobPhase = 'post_activation_refresh'");
+    expect(createJobSource).toContain('await upsertDraftJobScope');
+    expect(createJobSource).toContain('await activateDraftJob');
+    expect(createJobSource.indexOf('await activateDraftJob')).toBeGreaterThan(createJobSource.indexOf('await upsertDraftJobScope'));
+    expect(createJobSource).toContain('draftJobCreateJobFailureFeedback');
+    expect(createJobSource).toContain("openInspection(refreshedJob, { subTab: 'inspect' })");
 
     expect(composerSource).toContain('Save Draft');
+    expect(composerSource).toContain('Create Job');
+    expect(composerSource).toContain('data-testid="draft-job-create-job-button"');
     expect(composerSource).toContain('Customer type is fixed after the first save');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Invoice');
@@ -442,6 +493,42 @@ test.describe('Draft Job UI persistence and resume', () => {
     });
   });
 
+  test('Create Job failure feedback distinguishes scope, activation, and post-activation refresh failures', () => {
+    expect(draftJobCreateJobFailureFeedback({
+      draftId: 'draft-1',
+      metadataSaved: true,
+      scopeSaved: false,
+      activated: false,
+      error: new Error('scope rejected'),
+    })).toMatchObject({
+      tone: 'error',
+      title: 'Draft details saved, but scope changes did not save.',
+    });
+
+    expect(draftJobCreateJobFailureFeedback({
+      draftId: 'draft-1',
+      metadataSaved: true,
+      scopeSaved: true,
+      activated: false,
+      error: new Error('activation rejected'),
+    })).toMatchObject({
+      tone: 'error',
+      title: 'Draft saved, but Job could not be created.',
+    });
+
+    expect(draftJobCreateJobFailureFeedback({
+      draftId: 'draft-1',
+      metadataSaved: true,
+      scopeSaved: true,
+      activated: true,
+      error: new Error('reload failed'),
+    })).toEqual({
+      tone: 'warning',
+      title: 'Job created, but the latest Job data could not be reloaded.',
+      body: 'Return to Jobs and open the Job from active work if it does not open automatically.',
+    });
+  });
+
   test('Drafts section is separate from operational job status presentation', () => {
     const listSource = sourceFile('src/features/jobs/DraftJobList.tsx');
     const appSource = sourceFile('src/App.tsx');
@@ -456,7 +543,7 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(focusedListSource).toContain('Scheduled and in-progress jobs that still need work.');
   });
 
-  test('does not add SQL, production targeting, or future outcome actions in this UI slice', () => {
+  test('does not add SQL, production targeting, or Estimate/Invoice outcome actions in this UI slice', () => {
     const appSource = sourceFile('src/App.tsx');
     const apiSource = sourceFile('src/features/jobs/draftJobApi.ts');
     const composerSource = sourceFile('src/features/jobs/DraftJobComposer.tsx');
@@ -464,8 +551,9 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(apiSource).toContain('servsync_create_draft_job');
     expect(apiSource).toContain('servsync_update_draft_job');
     expect(apiSource).toContain('servsync_upsert_draft_job_scope');
-    expect(apiSource).not.toContain('servsync_activate_draft_job');
+    expect(apiSource).toContain('servsync_activate_draft_job');
     expect(appSource).not.toContain('uqgtheclhxqlnjpfmheq');
+    expect(composerSource).toContain('Create Job');
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Invoice');
   });

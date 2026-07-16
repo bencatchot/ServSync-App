@@ -6,6 +6,42 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-16
 
+- Branch: `codex/create-job-from-draft-v1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/jobs/DraftJobComposer.tsx`
+  - `src/features/jobs/draftJobApi.ts`
+  - `src/features/jobs/draftJobMappings.ts`
+  - `tests/e2e/draft-job-ui-persistence.spec.ts`
+  - `tests/e2e/unified-start-job-composer-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Draft-First Slice 4A so authorized contractor owner/admin/office users can choose `Create Job` directly from the current Draft composer state. The flow validates the current composer, saves unsaved or edited Draft metadata, upserts current scope, then activates the same Draft through the existing `servsync_activate_draft_job` RPC and opens the same inspection record as an operational Job. `Save Draft` remains the optional pause-and-return action, and the legacy operational job form fallback remains available with clearer secondary styling.
+- Reason for change: The approved Draft-First Work direction requires contractors to proceed directly from current Draft information to an outcome without saving, leaving, reopening, and then choosing the outcome.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - `npm ci` completed successfully.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-ui-persistence.spec.ts tests/e2e/unified-start-job-composer-foundation.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-operational-filtering.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/status-secondary-migration.spec.ts --project=chromium --reporter=line` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/contractor-create-job.spec.ts --project=chromium --reporter=line` blocked by missing `TEST_CONTRACTOR_EMAIL`.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/partial-invoicing-data-foundation.spec.ts --project=chromium --reporter=line` blocked by missing `VITE_SUPABASE_URL`.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` loading mismatch while linting `playwright.config.ts`.
+- Known risks or follow-ups:
+  - Frontend/test/docs only; no SQL/RLS/RPC changes, Supabase/Vercel configuration changes, environment changes, production deployment, production data changes, Joan Ark restoration, Create Estimate outcome, or Create Invoice outcome are included.
+  - The Create Job flow uses existing Draft RPCs in phases rather than a single all-in-one transaction. The UI prevents activation after metadata or scope failure and preserves the saved Draft for retry if activation fails.
+  - Production rollout remains a separate validation step after merge.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records Slice 4A as the first direct Draft outcome while keeping Create Estimate/Create Invoice and direct-job replacement as future work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The current Job workflow status now distinguishes implemented Create Job-from-Draft code from future Create Estimate/Create Invoice outcomes and production rollout.
+
 - Branch: `codex/draft-resume-persistence-fix-v1`
 - Files changed:
   - `src/App.tsx`

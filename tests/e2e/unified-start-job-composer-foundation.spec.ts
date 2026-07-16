@@ -89,8 +89,9 @@ test.describe('Unified Start New Job foundation slice', () => {
     expect(dataTestSource).toContain('Invoiced work item should not be double-invoiced');
   });
 
-  test('does not launch the future unified Start New Job outcome flow yet', () => {
+  test('keeps the legacy job path separate while the Draft composer exposes only the Create Job outcome', () => {
     const appSource = sourceFile('src/App.tsx');
+    const composerSource = sourceFile('src/features/jobs/DraftJobComposer.tsx');
     const directJobSource = sourceBetween(appSource, '<Card title="Create Job"', '{inspectionView ===');
 
     expect(directJobSource).toContain('Create Job');
@@ -99,6 +100,10 @@ test.describe('Unified Start New Job foundation slice', () => {
     expect(directJobSource).not.toContain('Create Invoice');
     expect(directJobSource).toContain('Open Draft Job composer');
     expect(directJobSource).not.toContain('Save Draft');
+    expect(composerSource).toContain('Create Job');
+    expect(composerSource).toContain('Save Draft');
+    expect(composerSource).not.toContain('Create Estimate');
+    expect(composerSource).not.toContain('Create Invoice');
     expect(sourceFile('src/features/work-composer/types.ts')).not.toContain('DraftJob');
   });
 });
