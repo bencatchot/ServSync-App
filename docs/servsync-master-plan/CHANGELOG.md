@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-16
 
+- Branch: `codex/draft-first-product-principle-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Formalized the approved Draft-First Work product principle in the master plan, documenting Draft as the neutral starting workspace for contractor work, contextual `Start New Draft` / `Start Similar Draft` guidance, no-side-effect guardrails, relationship/duplication guardrails, preferred user-facing naming, optional `Save Draft` / direct-outcome product direction, and the Draft / Job / Estimate / Invoice mental model.
+- Reason for change: Future Start New Job, contextual work-intake, Jobs landing-page, and outcome-action planning needs one authoritative product principle so Draft behavior is consistent rather than scattered across implementation notes.
+- Tests/checks run:
+  - `git diff --check` passed.
+- Known risks or follow-ups:
+  - Documentation only; no app behavior, SQL, Supabase, Vercel, production data, environment setting, or feature flag changed.
+  - Future contextual Draft entry points, Jobs landing-page redesign, Create Estimate/Create Job/Create Invoice outcome actions, estimate-from-job, invoice allocation, final reconciliation, and reopening remain separate approval-gated work.
+  - Production Draft Job UI is now enabled through `VITE_DRAFT_JOB_UI_ENABLED=true` after backend rollout, operational-list filtering fixes, and production validation, but the full Draft-first workflow is still incomplete because direct outcome actions are not implemented.
+  - A newly reported blank-resume defect means a reopened Draft can appear blank; this PR records the defect as open and does not claim it is fixed.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now references the Draft-First Work principle, optional `Save Draft` / direct-outcome direction, current production Draft UI enablement, the open blank-resume defect, contextual `Start New Draft` guidance, naming direction, no-side-effect guardrails, and the need to plan Jobs landing/contextual entries against the principle without claiming those UI changes are shipped.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Added a permanent Product Principles section for Draft-First Work near the beginning of the master plan.
+
 - Branch: `codex/draft-job-operational-list-filter-fix-v1`
 - Files changed:
   - `src/App.tsx`
