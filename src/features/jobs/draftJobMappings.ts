@@ -10,6 +10,7 @@ import {
   normalizeWorkComposerLineType,
   workComposerDraftFinancialBreakdown,
 } from '../work-composer/workComposerDrafts';
+export { isComposerDraftJob } from './jobRecordSelectors';
 
 export type DraftJobSubjectType = 'connected' | 'local';
 
@@ -62,12 +63,6 @@ export type DraftJobScopeUpsertResult = {
   updated_item_ids?: string[];
   removed_item_ids?: string[];
 };
-
-export function isComposerDraftJob(inspection: Pick<Inspection, 'job_origin' | 'status' | 'job_status'> | null | undefined) {
-  return inspection?.job_origin === 'draft_composer'
-    && inspection.status === 'draft'
-    && inspection.job_status === 'draft';
-}
 
 export function createBlankDraftJobComposerDraft(overrides: Partial<DraftJobComposerDraft> = {}): DraftJobComposerDraft {
   return {

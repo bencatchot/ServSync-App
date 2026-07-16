@@ -11,6 +11,7 @@ import {
   validateDraftJobComposerDraft,
 } from '../../src/features/jobs/draftJobMappings';
 import { isDraftJobUiEnabled } from '../../src/features/jobs/draftJobAvailability';
+import { composerDraftJobsFrom } from '../../src/features/jobs/jobRecordSelectors';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -47,9 +48,12 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(isComposerDraftJob({ job_origin: 'draft_composer', status: 'draft', job_status: 'in_progress' } as any)).toBe(false);
 
     const appSource = sourceFile('src/App.tsx');
-    expect(appSource).toContain('const composerDraftJobs = inspections');
-    expect(appSource).toContain('.filter(isComposerDraftJob)');
-    expect(appSource).toContain('const operationalInspections = inspections.filter(insp => !isComposerDraftJob(insp));');
+    expect(composerDraftJobsFrom([
+      { job_origin: 'draft_composer', status: 'draft', job_status: 'draft', updated_at: '2026-07-15T00:01:00.000Z' },
+      { job_origin: null, status: 'draft', job_status: 'draft', updated_at: '2026-07-15T00:02:00.000Z' },
+    ] as any[])).toHaveLength(1);
+    expect(appSource).toContain('const composerDraftJobs = composerDraftJobsFrom(inspections);');
+    expect(appSource).toContain('const operationalInspections = operationalJobsFrom(inspections);');
     expect(appSource).toContain('selectedJobsCustomerDrafts');
     expect(appSource).toContain('<DraftJobList');
   });

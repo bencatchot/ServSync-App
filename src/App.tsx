@@ -196,10 +196,14 @@ import {
   draftJobMetadataPayload,
   draftJobSaveFailureFeedback,
   draftJobScopePayload,
-  isComposerDraftJob,
   validateDraftJobComposerDraft,
   type DraftJobComposerDraft,
 } from './features/jobs/draftJobMappings';
+import {
+  composerDraftJobsFrom,
+  isComposerDraftJob,
+  operationalJobsFrom,
+} from './features/jobs/jobRecordSelectors';
 import { JobWorkItemSummaryStrip } from './features/jobs/WorkItemSummaryStrip';
 import {
   getJobWorkItemSummary,
@@ -21728,6 +21732,7 @@ function ContractorDashboard({
   const [includeReportValueAdd, setIncludeReportValueAdd] = useState(true);
   const [reportValueAddText, setReportValueAddText] = useState('');
   const [savingInspection, setSavingInspection] = useState(false);
+  const [deletingInspectionId, setDeletingInspectionId] = useState<string | null>(null);
   const [finalizingInspection, setFinalizingInspection] = useState(false);
   const [sendingInspectionReportId, setSendingInspectionReportId] = useState<string | null>(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
@@ -28091,10 +28096,8 @@ function ContractorDashboard({
       .filter(contact => contact.homeowner_user_id === homeownerUserId)
       .map(contact => contact.id)
   );
-  const composerDraftJobs = inspections
-    .filter(isComposerDraftJob)
-    .sort((a, b) => new Date(b.draft_saved_at || b.updated_at).getTime() - new Date(a.draft_saved_at || a.updated_at).getTime());
-  const operationalInspections = inspections.filter(insp => !isComposerDraftJob(insp));
+  const composerDraftJobs = composerDraftJobsFrom(inspections);
+  const operationalInspections = operationalJobsFrom(inspections);
   const fieldWorkForHomeowner = (homeownerUserId: string) => {
     const linkedLocalContactIds = localContactIdsForHomeowner(homeownerUserId);
     return operationalInspections
@@ -28229,7 +28232,7 @@ function ContractorDashboard({
     const location = [home.city, home.state].filter(Boolean).join(', ');
     return [label, location].filter(Boolean).join(' · ');
   };
-  const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => inspections.find(insp =>
+  const jobForEstimate = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => operationalInspections.find(insp =>
     insp.estimate_id === estimate.id || (estimate.inspection_id ? insp.id === estimate.inspection_id : false)
   ) ?? null;
   const estimateHasLinkedJob = (estimate: Pick<Estimate, 'id' | 'inspection_id'>) => Boolean(jobForEstimate(estimate) || estimate.inspection_id);
@@ -28367,7 +28370,7 @@ function ContractorDashboard({
   const onboardingCustomerCount = connections.length + localContacts.length;
   const onboardingSentEstimateCount = estimates.filter(estimate => estimate.status !== 'draft').length;
   const onboardingSentInvoiceCount = invoices.filter(invoice => invoice.status !== 'draft').length;
-  const onboardingFiledReportCount = inspections.filter(inspectionIsClosedJob).length;
+  const onboardingFiledReportCount = operationalInspections.filter(inspectionIsClosedJob).length;
   const openJobsOnboardingWorkspace = () => {
     setContractorTab('inspections');
     setContractorJobsView('new_jobs');
@@ -28429,7 +28432,7 @@ function ContractorDashboard({
     {
       label: 'Create your first job',
       helper: 'Start a service job or inspection workflow.',
-      complete: inspections.length > 0,
+      complete: operationalInspections.length > 0,
       actionLabel: 'Create job',
       onAction: openJobsOnboardingWorkspace,
     },
@@ -29912,30 +29915,51 @@ function ContractorDashboard({
 
   const deleteInspection = async (insp: Inspection) => {
     if (!supabase) return;
+    if (isComposerDraftJob(insp)) {
+      setError('Draft Jobs can only be managed from the Drafts section.');
+      return;
+    }
+    if (deletingInspectionId) return;
     const confirmed = window.confirm(`Delete "${insp.name}"? This job record will be permanently removed and the homeowner will not be notified.`);
     if (!confirmed) return;
-    const { error: delErr } = await supabase.rpc('servsync_delete_inspection', {
-      p_inspection_id: insp.id,
-    });
-    if (delErr) { setError(readableError(delErr, 'Failed to delete job.')); return; }
-    setInspections(prev => prev.filter(i => i.id !== insp.id));
-    if (activeInspection?.id === insp.id) {
-      setActiveInspection(null);
-      setLocalFindings({});
-      setActiveRooms([]);
-      setAvailableChecklistRooms([]);
-      setInspectionSummary('');
-      setIncludeReportSummary(true);
-      setIncludeReportValueAdd(true);
-      setReportValueAddText('');
-      setInspectionClosedForReview(false);
-      setInspectionView('list');
-      persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
+    setDeletingInspectionId(insp.id);
+    try {
+      const { error: delErr } = await supabase.rpc('servsync_delete_inspection', {
+        p_inspection_id: insp.id,
+      });
+      if (delErr) { setError(readableError(delErr, 'Failed to delete job.')); return; }
+      setInspections(prev => prev.filter(i => i.id !== insp.id));
+      if (activeInspection?.id === insp.id) {
+        setActiveInspection(null);
+        setLocalFindings({});
+        setActiveRooms([]);
+        setAvailableChecklistRooms([]);
+        setInspectionSummary('');
+        setIncludeReportSummary(true);
+        setIncludeReportValueAdd(true);
+        setReportValueAddText('');
+        setInspectionClosedForReview(false);
+        setInspectionView('list');
+        persistFieldWorkState({ inspectionId: null, view: 'list', subTab: 'checklist', selectedRoom: null });
+      }
+      setNotice('Job draft deleted.');
+    } finally {
+      setDeletingInspectionId(null);
     }
-    setNotice('Job draft deleted.');
   };
 
   const openInspection = (insp: Inspection, options?: { subTab?: InspectionSubTab; selectedRoom?: string | null; stayInHomeownerWorkspace?: boolean }) => {
+    if (isComposerDraftJob(insp)) {
+      if (DRAFT_JOB_UI_ENABLED) {
+        void continueDraftJob(insp);
+      } else {
+        setInspectionView('list');
+        setContractorJobsView('open_jobs');
+        setContractorTab('inspections');
+        setNotice('Draft Job UI is not enabled in this environment.');
+      }
+      return;
+    }
     let stored: StoredFieldWorkState | null = null;
     try {
       stored = JSON.parse(window.localStorage.getItem(STORAGE_KEYS.fieldWorkState) || 'null') as StoredFieldWorkState | null;
@@ -30380,7 +30404,7 @@ function ContractorDashboard({
   );
 
   useEffect(() => {
-    const inspectionIds = inspections
+    const inspectionIds = operationalJobsFrom(inspections)
       .filter(jobHasHomeownerVisibleWorkflowThread)
       .map(job => job.id);
     void loadWorkflowJobMessageIndicators(uniqueJobMessageInspectionIds(inspectionIds));
@@ -38563,8 +38587,13 @@ function ContractorDashboard({
                                   )}
                                 </div>
                                 {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
-                                  <button type="button" onClick={() => void deleteInspection(insp)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700">
-                                    Delete
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteInspection(insp)}
+                                    disabled={Boolean(deletingInspectionId)}
+                                    className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 transition-colors hover:border-red-300 hover:text-red-700 disabled:opacity-50"
+                                  >
+                                    {deletingInspectionId === insp.id ? 'Deleting...' : 'Delete'}
                                   </button>
                                 )}
                                 <button type="button" onClick={() => openInspection(insp)} className={mobileButtonClass('secondary')}>
@@ -39978,7 +40007,7 @@ function ContractorDashboard({
 
               {contractorJobsView === 'overview' && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
-                {inspections.length === 0 ? (
+                {operationalInspections.length === 0 ? (
                   <EmptyState
                     icon={<ClipboardCheck size={18} />}
                     title="No jobs yet"
@@ -39986,7 +40015,7 @@ function ContractorDashboard({
                   />
                 ) : (
                   <div className="space-y-2">
-                    {inspections.slice(0, 5).map(insp => {
+                    {operationalInspections.slice(0, 5).map(insp => {
                       const checklistStyle = isChecklistJob(insp);
                       const urgentCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status === 'Urgent').length : 0;
                       const issueCount = checklistStyle ? insp.rooms_with_findings.flatMap(r => r.findings).filter(f => f.status !== 'Pass' && f.status !== 'Fixed On Site').length : 0;
@@ -40011,8 +40040,14 @@ function ContractorDashboard({
                             {!checklistStyle && insp.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{insp.summary}</p>}
                           </div>
                           {!SERVSYNC_DEMO_PRESENTATION_MODE && inspectionJobStatus(insp) === 'draft' && insp.status === 'draft' && (
-                            <button type="button" onClick={() => void deleteInspection(insp)} className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors" title="Delete job">
-                              Delete
+                            <button
+                              type="button"
+                              onClick={() => void deleteInspection(insp)}
+                              disabled={Boolean(deletingInspectionId)}
+                              className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:border-red-300 transition-colors disabled:opacity-50"
+                              title="Delete job"
+                            >
+                              {deletingInspectionId === insp.id ? 'Deleting...' : 'Delete'}
                             </button>
                           )}
                           <button type="button" onClick={() => openInspection(insp)} className={buttonClass('secondary')}>
@@ -41035,8 +41070,13 @@ function ContractorDashboard({
                           </button>
                         )}
                         {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
-                          <button type="button" onClick={() => void deleteInspection(activeInspection)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 sm:w-auto">
-                            <Trash2 size={13} /> Delete
+                          <button
+                            type="button"
+                            onClick={() => void deleteInspection(activeInspection)}
+                            disabled={Boolean(deletingInspectionId)}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
+                          >
+                            <Trash2 size={13} /> {deletingInspectionId === activeInspection.id ? 'Deleting...' : 'Delete'}
                           </button>
                         )}
                       </div>
@@ -42610,8 +42650,13 @@ function ContractorDashboard({
                         Save as template
                       </button>
                       {inspectionJobStatus(activeInspection) === 'draft' && activeInspection.status === 'draft' && (
-                        <button type="button" onClick={() => void deleteInspection(activeInspection)} className="text-xs font-medium border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5">
-                          <Trash2 size={13} /> Delete
+                        <button
+                          type="button"
+                          onClick={() => void deleteInspection(activeInspection)}
+                          disabled={Boolean(deletingInspectionId)}
+                          className="text-xs font-medium border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Trash2 size={13} /> {deletingInspectionId === activeInspection.id ? 'Deleting...' : 'Delete'}
                         </button>
                       )}
                     </div>
