@@ -64,6 +64,42 @@ export type DraftJobScopeUpsertResult = {
   removed_item_ids?: string[];
 };
 
+export type DraftJobSelectableOption = {
+  id: string;
+  label: string;
+  helper?: string;
+  properties: Array<{ id: string; label: string }>;
+};
+
+export function draftJobOptionsWithSavedSelection<T extends DraftJobSelectableOption>(
+  options: T[],
+  savedCustomerId: string,
+  savedPropertyId: string,
+  fallbackLabels: { customer: string; helper: string; property: string },
+): T[] {
+  if (!savedCustomerId) return options;
+  const savedProperty = savedPropertyId
+    ? { id: savedPropertyId, label: fallbackLabels.property }
+    : null;
+  const existing = options.find(option => option.id === savedCustomerId);
+  if (existing) {
+    if (!savedProperty || existing.properties.some(property => property.id === savedProperty.id)) return options;
+    return options.map(option => option.id === existing.id
+      ? { ...option, properties: [...option.properties, savedProperty] }
+      : option
+    ) as T[];
+  }
+  return [
+    ...options,
+    {
+      id: savedCustomerId,
+      label: fallbackLabels.customer,
+      helper: fallbackLabels.helper,
+      properties: savedProperty ? [savedProperty] : [],
+    } as T,
+  ];
+}
+
 export function createBlankDraftJobComposerDraft(overrides: Partial<DraftJobComposerDraft> = {}): DraftJobComposerDraft {
   return {
     subject_type: 'connected',

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
@@ -61,12 +62,26 @@ export function DraftJobComposer({
   onLegacyJob,
   onRemovePersistedLine,
 }: DraftJobComposerProps) {
+  const [expandedLineIds, setExpandedLineIds] = useState<Set<string>>(() => new Set());
   const customerOptions = draft.subject_type === 'connected' ? connectedOptions : localOptions;
   const selectedCustomerId = draft.subject_type === 'connected' ? draft.homeowner_user_id : draft.local_contact_id;
   const selectedCustomer = customerOptions.find(option => option.id === selectedCustomerId) ?? null;
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
   const subjectTypeLocked = Boolean(currentDraftId);
+  useEffect(() => {
+    setExpandedLineIds(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      draft.line_items.forEach(line => {
+        if ((line.room_label?.trim() || line.location_label?.trim() || line.internal_notes?.trim()) && !next.has(line.id)) {
+          next.add(line.id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [draft.line_items]);
   const updateLine = (index: number, updates: Partial<WorkComposerLineDraft>) => {
     onChange({
       ...draft,
@@ -216,6 +231,13 @@ export function DraftJobComposer({
                 itemLabel="draft job"
                 laborMode={draft.labor_mode}
                 compactAdvanced
+                advancedDetailsOpen={expandedLineIds.has(line.id)}
+                onAdvancedDetailsOpenChange={open => setExpandedLineIds(prev => {
+                  const next = new Set(prev);
+                  if (open) next.add(line.id);
+                  else next.delete(line.id);
+                  return next;
+                })}
                 onChange={updates => updateLine(index, updates)}
                 onRemove={() => removeLine(index)}
               />

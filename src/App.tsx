@@ -194,6 +194,7 @@ import {
   createBlankDraftJobComposerDraft,
   draftJobComposerDraftFromRecords,
   draftJobMetadataPayload,
+  draftJobOptionsWithSavedSelection,
   draftJobSaveFailureFeedback,
   draftJobScopePayload,
   validateDraftJobComposerDraft,
@@ -21693,6 +21694,7 @@ function ContractorDashboard({
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
   const [savingDraftJob, setSavingDraftJob] = useState(false);
+  const [loadingDraftJobId, setLoadingDraftJobId] = useState<string | null>(null);
   const [draftJobFeedback, setDraftJobFeedback] = useState<(ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null>(null);
 
   useEffect(() => {
@@ -28860,6 +28862,26 @@ function ContractorDashboard({
         label: localHomeOptionLabel(home, index),
       })),
   }));
+  const draftJobConnectedOptionsForComposer = draftJobOptionsWithSavedSelection<DraftJobCustomerOption>(
+    draftJobConnectedCustomerOptions,
+    draftJobDraft.homeowner_user_id,
+    draftJobDraft.home_id,
+    {
+      customer: 'Saved connected homeowner',
+      helper: 'Saved on this Draft; not in the active selector list',
+      property: 'Saved property on this Draft',
+    },
+  );
+  const draftJobLocalOptionsForComposer = draftJobOptionsWithSavedSelection<DraftJobCustomerOption>(
+    draftJobLocalCustomerOptions,
+    draftJobDraft.local_contact_id,
+    draftJobDraft.local_home_id,
+    {
+      customer: 'Saved local customer',
+      helper: 'Saved on this Draft; not in the current selector list',
+      property: 'Saved property on this Draft',
+    },
+  );
   const defaultConnectedHomeId = selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? selectedJobsConnection.home?.id ?? '' : '';
   const defaultLocalHomeId = singleLocalHomeId(selectedJobsLocalContact);
   const recordPropertyLabelForContractor = (record: PropertyContextRecord) => propertyRecordLabel(record, {
@@ -29063,9 +29085,7 @@ function ContractorDashboard({
       .eq('id', jobId)
       .single();
     if (error) throw error;
-    const draft = data as Inspection;
-    setInspections(prev => [draft, ...prev.filter(item => item.id !== draft.id)]);
-    return draft;
+    return data as Inspection;
   };
 
   const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {
@@ -29102,10 +29122,18 @@ function ContractorDashboard({
       setError('This record is not a contractor Draft Job.');
       return;
     }
+    setLoadingDraftJobId(draft.id);
     try {
-      const items = await refreshJobWorkItemsForJob(draft.id);
-      setDraftJobDraft(draftJobComposerDraftFromRecords(draft, items));
-      setActiveDraftJobId(draft.id);
+      const [freshDraft, items] = await Promise.all([
+        fetchDraftJobRecord(draft.id),
+        refreshJobWorkItemsForJob(draft.id),
+      ]);
+      if (!freshDraft || !isComposerDraftJob(freshDraft)) {
+        throw new Error('This Draft is no longer available to continue.');
+      }
+      setInspections(prev => [freshDraft, ...prev.filter(item => item.id !== freshDraft.id)]);
+      setDraftJobDraft(draftJobComposerDraftFromRecords(freshDraft, items));
+      setActiveDraftJobId(freshDraft.id);
       setRemovedDraftJobWorkItemIds([]);
       setDraftJobFeedback(null);
       setInspectionView('draft_job');
@@ -29113,6 +29141,8 @@ function ContractorDashboard({
       setContractorTab('inspections');
     } catch (err) {
       setError(readableError(err, 'Unable to load this Draft Job.'));
+    } finally {
+      setLoadingDraftJobId(null);
     }
   };
 
@@ -29167,7 +29197,8 @@ function ContractorDashboard({
       setRemovedDraftJobWorkItemIds([]);
       savePhase = 'refreshing_saved_data';
       await refreshJobWorkItemsForJob(draftId);
-      await fetchDraftJobRecord(draftId);
+      const savedDraft = await fetchDraftJobRecord(draftId);
+      if (savedDraft) setInspections(prev => [savedDraft, ...prev.filter(item => item.id !== savedDraft.id)]);
       setDraftJobFeedback({
         tone: 'success',
         title: 'Draft Job saved.',
@@ -38396,6 +38427,7 @@ function ContractorDashboard({
                             workItemsByJobId={jobWorkItemsByJobId}
                             customerLabel={fieldWorkSubjectLabel}
                             propertyLabel={fieldWorkSubjectAddress}
+                            loadingDraftId={loadingDraftJobId}
                             onContinue={draft => void continueDraftJob(draft)}
                           />
                         )}
@@ -40065,8 +40097,8 @@ function ContractorDashboard({
             <Card title="Start New Job" icon={<Plus size={18} />}>
               <DraftJobComposer
                 draft={draftJobDraft}
-                connectedOptions={draftJobConnectedCustomerOptions}
-                localOptions={draftJobLocalCustomerOptions}
+                connectedOptions={draftJobConnectedOptionsForComposer}
+                localOptions={draftJobLocalOptionsForComposer}
                 currentDraftId={activeDraftJobId}
                 canSave={canManageDraftJobs && !savingDraftJob}
                 saving={savingDraftJob}
