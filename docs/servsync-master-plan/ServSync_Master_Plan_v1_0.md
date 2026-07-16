@@ -79,6 +79,31 @@ The vision is deliberately practical. ServSync should not sound like an inflated
 - For contractors: get discovered, receive contextual connection/service requests, estimate work, manage jobs, invoice customers, and retain long-term relationships.
 - For the platform: create a local service network where connection, work history, and practical tools reinforce each other over time.
 
+# Product Principles
+
+## Draft-First Work
+
+ServSync should treat a Draft as the universal starting point for contractor work. A Draft is the contractor's neutral workspace for capturing customer, property, source context, scope, labor, materials, notes, scheduling intent, and supported photos or attachments before the contractor chooses the final workflow outcome.
+
+A Draft may later become or produce an estimate, an active job, an invoice, or another explicitly approved work document. Starting work should not force the contractor to choose a document type prematurely. The standing design question for new work-intake proposals is: can this workflow begin from a Draft instead of introducing another competing creation path?
+
+Contextual product surfaces may offer `Start New Draft` when the screen has enough trusted context to help the contractor start faster. Good candidates include homeowner/customer profiles, property/home profiles, service requests, calendar appointments, prior jobs or work-history records, and lead/opportunity screens. The Draft should prefill only context already known and permitted from that surface, such as customer or property identity, request description, trade, photos, appointment date/time, visit notes, or selected prior scope for `Start Similar Draft`.
+
+Do not scatter Draft actions indiscriminately. Settings, generic reports, pricing administration, and unrelated configuration screens generally should not expose `Start New Draft`.
+
+Starting or saving a Draft must not automatically activate a job, create an estimate, create an invoice, request approval, create an appointment, send a notification, create customer-facing activity, create billing activity, finalize a report, or expose the Draft to a homeowner. A contextual Draft should preserve source context, reuse existing relationships, avoid duplicate customers/properties/requests/jobs/work records, support traceability and future analytics, and avoid asking the contractor to re-enter known information.
+
+User-facing naming should prefer `Start New Draft`, `Start Similar Draft`, `Drafts`, and `Continue Draft`. Avoid using `Draft Job` as the long-term general user-facing name when the record has not yet become a job, and avoid separate universal creation entry points such as `New Estimate`, `New Job`, or `New Invoice` when the intended workflow should begin from the shared Draft. Specialized document creation may still exist where explicitly justified, but new workflows should first be evaluated against the Draft-first model.
+
+The intended mental model is:
+
+- Draft: neutral editable starting workspace.
+- Job: live operational record after activation.
+- Estimate: customer-facing proposal snapshot.
+- Invoice: customer-facing billing snapshot.
+
+The current technical implementation may evolve incrementally, but future design should move toward this consistent mental model.
+
 # 3. Plain-Language Product Definition
 
 ServSync connects homeowners with local service contractors and keeps requests, estimates, jobs, invoices, communication, and home service history organized in one place.
