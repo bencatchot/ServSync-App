@@ -6,6 +6,30 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-17
 
+- Branch: `docs/product-information-architecture-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Product_Information_Architecture_v1.md`
+  - `docs/servsync-master-plan/README.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added ServSync Product Information Architecture v1 as the authoritative platform-structure document beneath Product Vision & Philosophy and above the Master Plan. The document defines homeowner and contractor portal mental models, major module ownership and boundaries, sidebar/navigation principles, subscription/access placement, cross-profile workflow ownership, and the placement of Draft-first Work inside the Contractor Work module.
+- Reason for change: ServSync needed a stable information-architecture layer before the next Draft-first Work redesign planning slice, so future module specifications, navigation changes, contextual Draft entry points, and subscription-gated capabilities have a shared product structure.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - Relative Markdown links in changed files were checked and resolved.
+  - Changed-file sensitive-value scan found no likely credential values.
+- Known risks or follow-ups:
+  - Documentation only; no application code, tests, SQL, Supabase configuration, Vercel configuration, environment variables, deployment, sandbox data, or production data changed.
+  - This document defines direction only. It does not implement the Work redesign, re-enable Production Draft UI, add Create Estimate/Create Invoice outcomes, change the legacy Jobs workflow, or add contextual Draft entry points.
+  - Next planning step is a Contractor Work Module Product Specification and Jobs landing/contextual Draft-entry plan based on this architecture.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now references Product Information Architecture v1 as complete and moves the next step to a Contractor Work Module Product Specification / Jobs landing plan before the next Draft-first implementation slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The documentation hierarchy now links Product Information Architecture v1 and clarifies that the Master Plan translates the vision and IA into implementation priorities and rollout state.
+
 - Branch: `docs/product-vision-philosophy-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Product_Vision_and_Philosophy_v1.md`
