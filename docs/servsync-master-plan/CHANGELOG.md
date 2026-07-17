@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-17
 
+- Branch: `docs/contractor-work-module-spec-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/README.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added ServSync Contractor Work Module Product Specification v1 as the authoritative contractor Work product blueprint beneath Product Information Architecture. The specification defines the Work mission, contractor mental model, Work Dashboard, Draft-first lifecycle, Draft composer, outcome model, operational Job Overview, Job History, Estimates, Invoices, Reports, Templates, scheduling, contextual Start New Draft rules, navigation/mobile requirements, permissions/entitlements, backend/data contract gaps, legacy migration boundaries, acceptance criteria, and future implementation-slice framing.
+- Reason for change: ServSync needed a detailed Work module product specification before any next Draft-first Jobs redesign implementation slice, so the Work Dashboard, contextual Draft entries, Job Overview, billing placement, mobile constraints, and legacy-retirement boundaries are agreed before coding.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - Relative Markdown links in changed files were checked and resolved.
+  - Markdown heading hierarchy and table formatting were reviewed.
+  - Changed-file sensitive-value scan found no likely credential values.
+- Known risks or follow-ups:
+  - Documentation only; no application code, tests, SQL, Supabase configuration, Vercel configuration, environment variables, deployment, sandbox data, or production data changed.
+  - This specification does not implement the Work redesign, re-enable Production Draft UI, add Create Estimate/Create Invoice outcomes, change the legacy Production Jobs workflow, add contextual Draft entry points, or retire legacy paths.
+  - Next step is to review/audit the draft specification, then separately audit the first Work Dashboard/navigation-shell implementation slice if approved.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the Contractor Work Module Product Specification as ready for review and moves the next step to specification audit plus first implementation-slice audit.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The documentation hierarchy now links the Contractor Work Module Product Specification and clarifies its role beneath Product Information Architecture.
+
 - Branch: `docs/product-information-architecture-v1`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Product_Information_Architecture_v1.md`
