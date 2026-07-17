@@ -818,6 +818,29 @@ ACCOUNT
 
 On mobile, these may collapse into fewer primary destinations, but the mental model should remain consistent. For example, Home, Contractors, Service, Records, and Account may be enough for bottom navigation, with Maintenance nested under Home or Records until usage justifies a persistent mobile item.
 
+### Current-to-target navigation map
+
+This table maps current navigation and product-area labels to the long-term information architecture. It is a planning bridge only; it does not rename current application navigation or require an immediate UI migration.
+
+| Current label / surface | Target IA owner | Notes |
+| --- | --- | --- |
+| Dashboard | Contractor Business / Homeowner Home depending on profile | Contractor Dashboard should summarize business health and next actions. Homeowner Dashboard should evolve toward the current-home overview and active next steps. |
+| Business Profile | Contractor Company | Canonical company/profile configuration belongs in Company, with contextual links from Business and Growth. |
+| Homeowners | Contractor Customers | Current contractor homeowner/customer management maps to Customers, including connected homeowners and local customers. |
+| Service Requests | Homeowner Service / Contractor Customers before work conversion / Contractor Work after planning starts | Requests begin as customer/service intake. When the contractor starts planning work from the request, Work owns the Draft/Estimate/Job/Invoice lifecycle. |
+| Calendar | Contractor Work | Calendar is operational scheduling. Business and Customers may show summaries or links, but Work owns scheduling and visits. |
+| Discover | Contractor Growth / Homeowner Contractors | Contractor-facing Discover profile visibility belongs in Growth. Homeowner Discover belongs under Contractors as the find/connect relationship path. |
+| Invites & Referrals | Contractor Growth / Homeowner Contractors where homeowner invites apply | Contractor referrals and acquisition belong in Growth. Homeowner contractor invites support the Contractors relationship path. |
+| Jobs | Contractor Work | Current Jobs is the implementation-era container for estimates, invoices, jobs/reports, templates, and Draft-first work. Future IA should consolidate this under Work while preserving current behavior until an approved redesign. |
+| Workspace | Contractor Work or module-specific workspace depending on context | Workspace should not become a permanent global concept unless it describes a clear user goal. Most work-execution workspace behavior belongs inside Work. |
+| Homeowner Work | Homeowner Service while active; Homeowner Records after completion | Homeowners should not inherit contractor work terminology. Active work should appear as service activity; completed artifacts should appear as records. |
+| Growth | Contractor Growth | Growth is a long-term contractor pillar for Discover, profile visibility, leads/opportunities, and relationship generation. |
+| Add-Ons | No long-term IA owner; redistribute by capability | `Add-Ons` is transitional subscription-era grouping. Each capability should move to its natural module owner. |
+| Trust & Safety | Help / Account depending on role and task | Global trust guidance belongs in Help. User-specific privacy/access choices belong in Account. |
+| Privacy & Data | Help / Account depending on role and task | Educational privacy/data content belongs in Help. User-specific privacy controls belong in Account. |
+| Support | Help | Support should remain a global help destination with contextual links from relevant modules. |
+| Help | Help | Help is a support/navigation utility area, not a product module competing with Business, Customers, Work, Growth, or Company. |
+
 ## 8. Subscription and Access Architecture
 
 Subscription and entitlement state should control access to capabilities, not the structure of the product.
@@ -1050,6 +1073,26 @@ Before adding a new creation action, ask:
 - Would this action create side effects before the user chooses an outcome?
 - Is this action role-appropriate?
 - Will it duplicate another creation path?
+
+### Future capability ownership map
+
+This table is non-binding planning guidance. It assigns future capabilities to likely IA owners so future planning does not create new global destinations prematurely. Each capability still requires a separate product specification, implementation approval, and validation before it becomes live.
+
+| Future capability | Likely IA owner | Planning note |
+| --- | --- | --- |
+| Dispatching | Contractor Work | Advanced dispatch extends scheduling and operational work. It should not redefine the whole contractor sidebar. |
+| Crew management | Contractor Company for team setup; Contractor Work for assignment/execution | Roles, users, and permissions belong in Company. Daily crew assignments belong in Work if implemented. |
+| Time tracking | Contractor Work | Time entries are operational work records. Company may own policy/settings later. |
+| Inventory | Contractor Work initially; Company for defaults/settings if needed | Inventory should support work execution and materials planning without forcing enterprise complexity on small contractors. |
+| Purchase orders | Contractor Work | Purchase orders support job/work fulfillment. Accounting export may reference them later but should not own the operational workflow. |
+| Expenses | Contractor Work for job-linked expenses; Company/Business for summaries | Job-linked expenses belong near Work. Business may summarize profitability when analytics mature. |
+| Service agreements | Contractor Work for offers/service execution; Homeowner Service/Records for homeowner review/history | Agreements are relationship-based recurring service commitments, but operational offer/review/work follow-through should align with Work and Service. |
+| AI assistant | Contextual within the module it assists | Avoid a generic global AI destination unless it becomes a primary user goal. Estimate help belongs in Work; home-care suggestions belong in Home or Maintenance. |
+| Accounting integrations | Contractor Company for integration setup; Contractor Work for export/action surfaces | Provider setup and credentials belong in Company. Invoice/export actions may appear in Work. |
+| Payment integrations | Contractor Company for setup; Contractor Work for invoice/payment actions | Payment provider configuration belongs in Company. Invoice payment state/actions belong in Work and homeowner Service/Records where visible. |
+| Reviews | Contractor Growth / Homeowner Service after eligible work | Public reputation belongs in Growth. Review capture should remain tied to completed eligible service context. |
+| Lead management | Contractor Growth until converted; Contractor Customers/Work after relationship or Draft starts | Leads/opportunities belong in Growth until they become customer relationships or planned work. |
+| Multiple properties | Homeowner Home / Homeowner Account / Contractor Customers | Home owns property overview, Account owns homeowner access/ownership settings, and Contractor Customers references permitted connected or local properties. |
 
 ## 12. Terminology Rules
 
