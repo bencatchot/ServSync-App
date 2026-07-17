@@ -4,6 +4,32 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-17
+
+- Branch: `docs/product-vision-philosophy-v1`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Product_Vision_and_Philosophy_v1.md`
+  - `docs/servsync-master-plan/README.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added the authoritative ServSync Product Vision & Philosophy v1 document, integrated it into the master-plan documentation hierarchy, and linked it from the existing master-plan README. The Master Plan now treats the new vision document as the source for product purpose, target users, guiding principles, and long-term direction, while the Master Plan remains the execution document for architecture, milestones, implementation priorities, rollout state, and future work.
+- Reason for change: ServSync needs a clear documentation hierarchy before the next Draft-first Jobs redesign planning work, so product direction, product information architecture, execution planning, backlog, and changelog each have a distinct role.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - Relative Markdown links in changed files were checked and resolved.
+  - Changed-file sensitive-value scan found no likely credential values.
+- Known risks or follow-ups:
+  - Documentation only; no application code, tests, SQL, Supabase configuration, Vercel configuration, environment variables, deployment, sandbox data, or production data changed.
+  - Current production state was corrected in planning docs: Production is serving the legacy Jobs workflow because `VITE_DRAFT_JOB_UI_ENABLED` is absent in Production, while the Draft backend remains installed and Draft-first Work-module development continues in sandbox/preview.
+  - The next planning milestone is ServSync Product Information Architecture v1, covering platform-level principles, contractor and homeowner portal architecture, sidebar/navigation structure, cross-profile workflows, and module ownership/boundaries.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the current production-disabled Draft UI state and the Product Information Architecture v1 planning milestone before the next Draft-first Jobs redesign implementation slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Added the documentation hierarchy and linked the Product Vision & Philosophy as the highest-level authoritative product document.
+
 ## 2026-07-16
 
 - Branch: `codex/create-job-from-draft-v1`
@@ -91,11 +117,11 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Known risks or follow-ups:
   - Documentation only; no app behavior, SQL, Supabase, Vercel, production data, environment setting, or feature flag changed.
   - Future contextual Draft entry points, Jobs landing-page redesign, Create Estimate/Create Job/Create Invoice outcome actions, estimate-from-job, invoice allocation, final reconciliation, and reopening remain separate approval-gated work.
-  - Production Draft Job UI is now enabled through `VITE_DRAFT_JOB_UI_ENABLED=true` after backend rollout, operational-list filtering fixes, and production validation, but the full Draft-first workflow is still incomplete because direct outcome actions are not implemented.
+  - Production Draft Job UI was later enabled for validation and then rolled back; current Production is serving the legacy Jobs workflow because `VITE_DRAFT_JOB_UI_ENABLED` is absent, while the Draft backend remains installed.
   - A newly reported blank-resume defect means a reopened Draft can appear blank; this PR records the defect as open and does not claim it is fixed.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-035 now references the Draft-First Work principle, optional `Save Draft` / direct-outcome direction, current production Draft UI enablement, the open blank-resume defect, contextual `Start New Draft` guidance, naming direction, no-side-effect guardrails, and the need to plan Jobs landing/contextual entries against the principle without claiming those UI changes are shipped.
+  - REASON: FB-035 now references the Draft-First Work principle, optional `Save Draft` / direct-outcome direction, the then-current production Draft UI state, the open blank-resume defect, contextual `Start New Draft` guidance, naming direction, no-side-effect guardrails, and the need to plan Jobs landing/contextual entries against the principle without claiming those UI changes are shipped.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
   - REASON: Added a permanent Product Principles section for Draft-First Work near the beginning of the master plan.
