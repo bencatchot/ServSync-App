@@ -155,6 +155,10 @@ Draft-first Work belongs here. The upcoming Draft-first Work redesign should be 
 
 Work owns the transformation from internal contractor planning into customer-facing and operational outcomes. It should not own contractor discovery, company settings, subscription administration, or homeowner property master data.
 
+Templates posture:
+
+Templates are an internal, secondary capability within Contractor Work. They should primarily start or prefill a Draft rather than become a competing creation system beside `Start New Draft`. Templates should not become a separate global mobile-navigation destination during the initial Draft-first redesign. Existing Templates may remain available during migration, but they should not dictate the new Work architecture. Template redesign should follow the Draft composer and Work landing experience once those surfaces are stable.
+
 ### Growth
 
 Purpose:
@@ -822,24 +826,24 @@ On mobile, these may collapse into fewer primary destinations, but the mental mo
 
 This table maps current navigation and product-area labels to the long-term information architecture. It is a planning bridge only; it does not rename current application navigation or require an immediate UI migration.
 
-| Current label / surface | Target IA owner | Notes |
-| --- | --- | --- |
-| Dashboard | Contractor Business / Homeowner Home depending on profile | Contractor Dashboard should summarize business health and next actions. Homeowner Dashboard should evolve toward the current-home overview and active next steps. |
-| Business Profile | Contractor Company | Canonical company/profile configuration belongs in Company, with contextual links from Business and Growth. |
-| Homeowners | Contractor Customers | Current contractor homeowner/customer management maps to Customers, including connected homeowners and local customers. |
-| Service Requests | Homeowner Service / Contractor Customers before work conversion / Contractor Work after planning starts | Requests begin as customer/service intake. When the contractor starts planning work from the request, Work owns the Draft/Estimate/Job/Invoice lifecycle. |
-| Calendar | Contractor Work | Calendar is operational scheduling. Business and Customers may show summaries or links, but Work owns scheduling and visits. |
-| Discover | Contractor Growth / Homeowner Contractors | Contractor-facing Discover profile visibility belongs in Growth. Homeowner Discover belongs under Contractors as the find/connect relationship path. |
-| Invites & Referrals | Contractor Growth / Homeowner Contractors where homeowner invites apply | Contractor referrals and acquisition belong in Growth. Homeowner contractor invites support the Contractors relationship path. |
-| Jobs | Contractor Work | Current Jobs is the implementation-era container for estimates, invoices, jobs/reports, templates, and Draft-first work. Future IA should consolidate this under Work while preserving current behavior until an approved redesign. |
-| Workspace | Contractor Work or module-specific workspace depending on context | Workspace should not become a permanent global concept unless it describes a clear user goal. Most work-execution workspace behavior belongs inside Work. |
-| Homeowner Work | Homeowner Service while active; Homeowner Records after completion | Homeowners should not inherit contractor work terminology. Active work should appear as service activity; completed artifacts should appear as records. |
-| Growth | Contractor Growth | Growth is a long-term contractor pillar for Discover, profile visibility, leads/opportunities, and relationship generation. |
-| Add-Ons | No long-term IA owner; redistribute by capability | `Add-Ons` is transitional subscription-era grouping. Each capability should move to its natural module owner. |
-| Trust & Safety | Help / Account depending on role and task | Global trust guidance belongs in Help. User-specific privacy/access choices belong in Account. |
-| Privacy & Data | Help / Account depending on role and task | Educational privacy/data content belongs in Help. User-specific privacy controls belong in Account. |
-| Support | Help | Support should remain a global help destination with contextual links from relevant modules. |
-| Help | Help | Help is a support/navigation utility area, not a product module competing with Business, Customers, Work, Growth, or Company. |
+| Current section or destination | Current location/group | Target module | Recommended treatment | Timing | Rationale |
+| --- | --- | --- | --- | --- | --- |
+| Workspace | Current grouping for Dashboard and Business Profile | Split conceptually into Contractor Business and Contractor Company | Treat as transitional grouping rather than a permanent module | Migrate after broader navigation redesign | Dashboard is business-health context; Business Profile is company configuration. |
+| Homeowner Work | Current grouping for Homeowners, Service Requests, and Calendar | Contractor Customers plus Contractor Work | Rename and redistribute after the Work redesign | After Work redesign is approved | Customer relationship intake belongs in Customers; operational scheduling and work lifecycle belong in Work. |
+| Growth | Current functional grouping | Contractor Growth | Retain as a functional grouping | Near-term and target | Discover and Invites & Referrals already align with growth and relationship generation. |
+| Add-Ons | Current transitional grouping inherited from subscription thinking | No long-term IA owner | Deprecate and replace with business-function navigation | Retire after Work and subscription navigation are separated | Subscription packaging should not define navigation. Capabilities should move to their natural module owner. |
+| Help | Current utility/support grouping | Help / support utility | Retain and refine without affecting core IA | Near-term | Trust, privacy, data, and support content should stay available without competing with product modules. |
+| Dashboard | Workspace | Contractor Business | Retain | Near-term | Dashboard should summarize business health and next actions. |
+| Business Profile | Workspace | Contractor Company | Relocate later; allow contextual links from Business and Growth | Later navigation redesign | Business Profile is company/profile configuration, not business-health reporting. |
+| Homeowners | Homeowner Work | Contractor Customers | Retain; rename only if future terminology requires it | Near-term | Homeowners/customer records are relationship and property-context management. |
+| Service Requests | Homeowner Work | Contractor Customers while intake is active; Contractor Work after work begins | Retain; hand off linked Work records when planning starts | Near-term, with Work handoff refined during redesign | Requests are intake and unmet-need context until a Draft, Estimate, Job, or Invoice is created from them. |
+| Calendar | Homeowner Work | Contractor Work | Relocate later; customer and request screens may still reference appointments | Later navigation redesign | Calendar is operational scheduling, while customer/request surfaces should show related appointment context. |
+| Discover | Growth | Contractor Growth | Retain | Near-term | Discover is profile visibility and relationship generation. |
+| Invites & Referrals | Growth | Contractor Growth | Retain | Near-term | Invites and referrals support contractor acquisition and network growth. |
+| Jobs | Current Jobs workspace | Contractor Work | Evolve into the broader Work module | After Work redesign is approved | Current Jobs is the implementation-era container for estimates, invoices, jobs/reports, templates, and Draft-first work. |
+| Trust & Safety | Help | Help / support-account utility | Retain | Near-term | Global trust guidance belongs in Help; user-specific access choices belong in Account/Company settings. |
+| Privacy & Data | Help | Help / support-account utility | Retain | Near-term | Educational privacy/data content belongs in Help; user-specific privacy controls belong in Account or Company. |
+| Support | Help | Help / support utility | Retain | Near-term | Support should remain a global help destination with contextual links from relevant modules. |
 
 ## 8. Subscription and Access Architecture
 
@@ -909,6 +913,10 @@ Owned by:
 - Homeowner Service
 - Contractor Customers for request relationship context
 - Contractor Work when the request becomes planned work
+
+Handoff rules:
+
+A Service Request and a Draft are distinct records. The Service Request remains the customer-intake and source-context record. A Draft, Estimate, Job, or Invoice created from a Service Request becomes a separate Work-owned record, and the source Service Request should remain linked to that resulting Work record. The handoff must reuse the existing homeowner/customer and property identity, must not create duplicate homeowner/customer records, must not create duplicate property records, and must not create a duplicate operational Job when one is already linked. Customers may show summaries or links to related Work, but Contractor Work owns the lifecycle after handoff. Homeowner-facing visibility must remain role-appropriate and permission-aware.
 
 ### Draft-first contractor planning
 
@@ -1076,23 +1084,23 @@ Before adding a new creation action, ask:
 
 ### Future capability ownership map
 
-This table is non-binding planning guidance. It assigns future capabilities to likely IA owners so future planning does not create new global destinations prematurely. Each capability still requires a separate product specification, implementation approval, and validation before it becomes live.
+This table is directional and non-binding planning guidance. It does not add these capabilities to the current roadmap, does not expand the initial Draft-first Work redesign, and does not approve final pricing or packaging. Later module specifications may refine ownership.
 
-| Future capability | Likely IA owner | Planning note |
-| --- | --- | --- |
-| Dispatching | Contractor Work | Advanced dispatch extends scheduling and operational work. It should not redefine the whole contractor sidebar. |
-| Crew management | Contractor Company for team setup; Contractor Work for assignment/execution | Roles, users, and permissions belong in Company. Daily crew assignments belong in Work if implemented. |
-| Time tracking | Contractor Work | Time entries are operational work records. Company may own policy/settings later. |
-| Inventory | Contractor Work initially; Company for defaults/settings if needed | Inventory should support work execution and materials planning without forcing enterprise complexity on small contractors. |
-| Purchase orders | Contractor Work | Purchase orders support job/work fulfillment. Accounting export may reference them later but should not own the operational workflow. |
-| Expenses | Contractor Work for job-linked expenses; Company/Business for summaries | Job-linked expenses belong near Work. Business may summarize profitability when analytics mature. |
-| Service agreements | Contractor Work for offers/service execution; Homeowner Service/Records for homeowner review/history | Agreements are relationship-based recurring service commitments, but operational offer/review/work follow-through should align with Work and Service. |
-| AI assistant | Contextual within the module it assists | Avoid a generic global AI destination unless it becomes a primary user goal. Estimate help belongs in Work; home-care suggestions belong in Home or Maintenance. |
-| Accounting integrations | Contractor Company for integration setup; Contractor Work for export/action surfaces | Provider setup and credentials belong in Company. Invoice/export actions may appear in Work. |
-| Payment integrations | Contractor Company for setup; Contractor Work for invoice/payment actions | Payment provider configuration belongs in Company. Invoice payment state/actions belong in Work and homeowner Service/Records where visible. |
-| Reviews | Contractor Growth / Homeowner Service after eligible work | Public reputation belongs in Growth. Review capture should remain tied to completed eligible service context. |
-| Lead management | Contractor Growth until converted; Contractor Customers/Work after relationship or Draft starts | Leads/opportunities belong in Growth until they become customer relationships or planned work. |
-| Multiple properties | Homeowner Home / Homeowner Account / Contractor Customers | Home owns property overview, Account owns homeowner access/ownership settings, and Contractor Customers references permitted connected or local properties. |
+| Capability | Likely canonical owner | Referenced modules | Capability type | Likely entitlement posture | Initial-scope status | Rationale |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dispatching | Contractor Work | Company/team, Customers, Calendar/scheduling | Advanced internal Work capability | Optional/advanced | Excluded | Dispatching is operational coordination for larger teams and unnecessary for many solo contractors. |
+| Crew management | Contractor Company | Work, scheduling, roles/permissions | Company administration | Optional/team-based | Excluded | Crew setup belongs with users, roles, and company permissions, while daily assignments may appear in Work. |
+| Time tracking | Contractor Work | Company/team, accounting/payroll integrations | Internal Work capability | Optional | Excluded | Time entries are operational work records and may later feed payroll/accounting integrations. |
+| Inventory | Provisional Contractor Company or future advanced Operations module | Work, estimating, purchase orders | Advanced operational capability | Optional/advanced | Excluded | Inventory may justify its own advanced module later and should not burden small contractors early. |
+| Purchase orders | Contractor Work for job-linked purchasing | Company, inventory, accounting integrations | Internal Work capability initially | Optional/advanced | Excluded | Job-linked purchasing supports work fulfillment; broader procurement may later become advanced operations. |
+| Expenses | Contractor Business | Work for job-linked expenses, accounting integrations | Business-financial capability | Optional | Excluded | Expenses support business understanding, but ServSync should not become a full accounting system. |
+| Service agreements | Contractor Work | Customers, homeowner Maintenance, billing | Recurring Work capability | Optional | Excluded | Agreements are recurring service commitments that should connect relationship context, future maintenance, and billing without becoming a separate core nav model. |
+| AI assistant | Cross-module contextual capability | Whichever module contains the active workflow | Contextual tool, not necessarily a global module | Potentially tiered or usage-controlled | Excluded from this IA implementation | AI should assist inside workflows rather than create another navigation destination. |
+| Accounting integrations | Contractor Company | Contractor Business and Work billing | Integration | Optional | Excluded | Provider setup belongs in Company; business summaries and billing actions may reference integration status. |
+| Payment integrations | Contractor Company for configuration | Work, Invoices, homeowner payment surfaces | Integration | Optional | Excluded | Payment setup belongs in Company, invoice/payment actions belong in Work, and ServSync does not become the payment processor. |
+| Reviews | Contractor Growth | Completed Work, Connections, contractor profile | Growth/reputation capability | Likely broadly available; packaging undecided | Excluded | Reviews support trust and reputation but should remain tied to eligible completed service context. |
+| Lead management | Contractor Growth | Customers and Work after qualification/acceptance | Growth pipeline capability | Optional | Excluded | Leads are growth opportunities until they become customer relationships or planned Work. |
+| Multiple-property homeowner support | Homeowner Home | Account, Records, Service, Maintenance, Contractors | Homeowner property-management capability | Homeowner packaging undecided | Future | Each property should keep its own records and relationships while Account owns access/ownership settings. |
 
 ## 12. Terminology Rules
 
