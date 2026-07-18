@@ -14,7 +14,7 @@ Prepared for Ben Catchot | June 15, 2026
 
 # Documentation Hierarchy
 
-The [ServSync Product Vision & Philosophy](ServSync_Product_Vision_and_Philosophy_v1.md) is the authoritative source for product purpose, target users, guiding principles, and long-term direction. The [ServSync Product Information Architecture](ServSync_Product_Information_Architecture_v1.md) translates that vision into platform structure, module ownership, navigation principles, cross-profile workflow boundaries, and expansion rules. This Master Plan translates those documents into milestones, implementation priorities, rollout state, and future work.
+The [ServSync Product Vision & Philosophy](ServSync_Product_Vision_and_Philosophy_v1.md) is the authoritative source for product purpose, target users, guiding principles, and long-term direction. The [ServSync Product Information Architecture](ServSync_Product_Information_Architecture_v1.md) translates that vision into platform structure, module ownership, navigation principles, cross-profile workflow boundaries, and expansion rules. The [ServSync Contractor Work Module Product Specification](ServSync_Contractor_Work_Module_Product_Specification_v1.md) defines the target contractor Work experience beneath that architecture. This Master Plan translates those documents into milestones, implementation priorities, rollout state, and future work.
 
 Future module specifications, backlog priorities, roadmap decisions, and implementation plans must align with the Product Vision & Philosophy and Product Information Architecture.
 
@@ -22,8 +22,9 @@ Current documentation hierarchy:
 
 1. [Product Vision & Philosophy](ServSync_Product_Vision_and_Philosophy_v1.md)
 2. [Product Information Architecture](ServSync_Product_Information_Architecture_v1.md)
-3. Master Plan
-4. Module specifications
+3. Module specifications
+   - [Contractor Work Module Product Specification](ServSync_Contractor_Work_Module_Product_Specification_v1.md)
+4. Master Plan
 5. Backlog
 6. Changelog
 
@@ -89,6 +90,8 @@ The automatic homeowner and contractor role-based onboarding tour has been remov
 The authoritative product vision, philosophy, mission statement, north star, target users, and long-term boundaries now live in [ServSync Product Vision & Philosophy v1](ServSync_Product_Vision_and_Philosophy_v1.md).
 
 The authoritative platform information architecture now lives in [ServSync Product Information Architecture v1](ServSync_Product_Information_Architecture_v1.md). It defines the long-term homeowner and contractor portal mental models, module ownership boundaries, sidebar/navigation principles, subscription/access placement, and Draft-first Work placement.
+
+The target contractor Work experience now lives in [ServSync Contractor Work Module Product Specification v1](ServSync_Contractor_Work_Module_Product_Specification_v1.md). It defines the Work mission, Work Dashboard, Draft-first lifecycle, Job Overview, Job History, Estimate and Invoice placement, Reports and Templates posture, scheduling relationships, contextual Start New Draft rules, permissions/entitlements, backend contract gaps, legacy migration boundaries, and future implementation-slice framing.
 
 This Master Plan keeps the execution-facing summary: ServSync is a shared home-service platform that helps homeowners find and work with trusted contractors while helping contractors manage relationships, requests, estimates, jobs, invoices, reports, and connected property records without unnecessary enterprise complexity.
 
