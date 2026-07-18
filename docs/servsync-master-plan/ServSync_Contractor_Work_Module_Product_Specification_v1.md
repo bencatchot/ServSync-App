@@ -671,7 +671,41 @@ Rules:
 - The final launch action validates the currently selected output.
 - If an alternate launch action is shown, it should switch intent and validate that outcome before launch.
 
-### Scope And Line Items
+### Work Format And Scope Body
+
+The shared Draft Composer architecture must not assume every Draft uses only standard priced line items.
+
+Separate these concepts:
+
+1. Intended output:
+   - Estimate
+   - Job
+   - later Invoice
+2. Work format:
+   - standard work
+   - inspection/checklist work
+
+An inspection is not a separate bypass around Draft.
+
+Approved conceptual model:
+
+`Start New Draft -> choose work format -> prepare work -> launch as Estimate or Job`
+
+For inspection/checklist work:
+
+- Job is likely the common intended output.
+- Estimate remains valid when inspection services require approval or pricing first.
+- Completed inspection Jobs may produce Reports.
+- Inspection findings may later create repair Estimates or Jobs.
+
+Architecture guardrails:
+
+- Keep the shared composer shell, intended output, customer/property/source context, title, scope, Save Draft, resume, and launch lifecycle independent from the specific scope body.
+- Allow alternate scope bodies later, including standard line-item scope and inspection/checklist scope.
+- Do not permanently lock the shared composer data model or component architecture to priced line items only.
+- Do not add inspection UI, checklist persistence, inspection templates, inspection SQL, or report-generation changes in Slice 2A-2C unless separately approved.
+
+### Standard Line-Item Scope
 
 Fields:
 
@@ -765,12 +799,36 @@ Rules:
 - Failed outcome creation must preserve recoverable Draft state.
 - Successful launch consumes the Draft and opens the created Estimate or Job workflow record.
 - A consumed Draft must not remain available as an active Draft that can repeatedly create unrelated outputs.
+- No visible unfinished launch action should be shown as product behavior. Do not expose a selectable Estimate outcome that cannot launch, disabled Create Estimate controls, or a Job-only shared composer that implies Estimate support is complete.
 
 Mobile:
 Outcome actions must remain reachable without burying the contractor under long forms.
 
 Desktop:
 Outcome area should be visually distinct from line-item editing.
+
+### Feature Gate And Preview Visibility
+
+Proposed shared launch gate:
+
+`VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED === 'true'`
+
+Gate rules:
+
+- Default off.
+- Preview/sandbox only during development.
+- Production remains unchanged.
+- Incomplete Slice 2A UI should remain inaccessible to ordinary Production users.
+- Work Dashboard and existing Draft gates remain separate.
+- Final gate behavior must avoid exposing mixed workflows.
+- Production activation occurs only after the full Draft launch workflow receives final end-to-end approval.
+
+Preview philosophy:
+
+- Small slices may merge hidden into `main`.
+- Users should not be asked to evaluate or use a half-complete shared Draft workflow.
+- The first coherent owner-facing Preview validation should include shared Draft Composer, Estimate intent, Job intent, Create Estimate, Create Job, Draft consumption, duplicate prevention, resume behavior, and workflow navigation.
+- Do not describe a Job-only shared composer as the completed first workflow.
 
 ## 10. Draft Launch Model
 
@@ -1502,22 +1560,18 @@ Do not mutate Production for implementation validation unless a separate product
 
 These slices are planning recommendations only. Each requires its own audit and owner approval.
 
-| Slice | User-visible behavior | Dependencies | Backend impact | Tests | Sandbox acceptance | Exclusions | Rollback risk |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1. Work Dashboard and navigation shell | New Work landing in preview/sandbox | Product spec approval | None expected | landing counts, mobile layout, feature gate | dashboard renders with legacy-safe fallback | no outcome work | Low-medium |
-| 2. Drafts list and clean state boundaries | Drafts internal destination and clean Start/Continue boundaries | Slice 1, existing Draft backend | None expected | canonical resume, no stale state | Drafts appear only in Drafts | no new outcomes | Medium |
-| 3. Shared Draft composer shell and intended output | Sections align to target composer and support Estimate/Job intent switching | Slice 2 | None expected if persistence is not expanded | supported-field round trip, intent switching | local/connected Drafts restore and shared data survives switching | no launch beyond current safe path | Medium |
-| 4. Operational Job Overview | Create/Continue Job opens operational-first overview | Slice 1, existing job data | None or minor | Job Overview, billing secondary | activated Job opens correctly | no billing redesign | Medium |
-| 5. Durable Draft launch foundation | Persist launch intent, supported shared fields, consumption state, and workflow linkage | Slice 3 | Likely required | atomic launch, duplicate launch probes | Draft can launch once and source is traceable | no new customer-facing outcome without approval | Medium-high |
-| 6. Draft -> Job launch parity | Create Job in redesigned Work flow | Slices 3-5 | Existing RPC may remain usable | create job, stable IDs, consumed Draft | Draft becomes operational Job | no Estimate/Invoice | Medium |
-| 7. Draft -> Estimate launch | Create Estimate from current Draft | Durable launch foundation | Likely required | snapshot, approvals, no Job activation, consumed Draft | Estimate created from Draft as first workflow record | no Invoice/payment | Medium-high |
-| 8. Accepted Estimate -> same Job/additional work | Additional-work path preserves Job identity | Slice 7 | Likely required | duplicate prevention | accepted estimate updates/links correctly | no broad revisions | High |
-| 9. Job/Estimate -> Invoice | Invoice from active workflow record | Billing contract | Likely required | invoice snapshots, paid/void guardrails | invoice created without unintended closeout | no payment ledger | High |
-| 10. Direct Draft -> Invoice launch | Direct Invoice launch exception | Separate product approval | Likely required | draft launch, billing rules, duplicate prevention | invoice created only when safe and approved | no payment ledger | High |
-| 11. Contextual Start New Draft | Trusted contexts can prefill Drafts | stable Draft routes/source context | Possible | source links, duplicate prevention | request/customer/property starts safe | no indiscriminate buttons | Medium-high |
-| 12. Templates prefill | Templates start/prefill Drafts | stable composer | Possible mapping work | template mapping | template starts Draft only | no competing creation | Medium |
-| 13. Scheduling/Calendar integration | Work schedule and Draft schedule intent | schedule contract | Possible | appointments, no side effects | schedule context visible | no dispatching | Medium-high |
-| 14. Legacy retirement | Remove/de-emphasize old paths after parity | all prior parity | None or cleanup | regression/full workflow | sandbox parity passed | no premature Production switch | High |
+Hidden code-integration slices may merge to `main`, but the shared Draft Composer should not be enabled for owner-facing Preview testing as a complete workflow until the backend launch foundation and both Estimate and Job launch outcomes are ready.
+
+| Slice | Behavior | Application impact | Tests | SQL/RPC/RLS impact | Feature gates | Sandbox validation | Rollback | Production exposure |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1. Work Dashboard and navigation shell | New Work landing in preview/sandbox | Work Dashboard shell only | landing counts, mobile layout, feature gate | None expected | Existing Work gate | dashboard renders with legacy-safe fallback | Disable gate | None |
+| 2. Drafts list and clean state boundaries | Drafts internal destination and clean Start/Continue boundaries | Draft list and routing boundaries | canonical resume, no stale state | None expected | Existing Draft gate | Drafts appear only in Drafts | Disable gate | None |
+| 2A. Shared Draft Composer UI foundation | Hidden shared composer shell with intended output selector, Estimate and Job intent options, shared customer/property/source, title/scope, shared work items, supported notes, Save Draft/resume, outcome-specific containers, and shared-data preservation while switching intent | New/updated Draft composer components and App wiring behind `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED` | source/behavior tests for gate default-off, intent switching, shared-field preservation, Save Draft/resume, no visible unfinished launch actions | None expected unless supported notes/intended output persistence is added here | New shared launch gate, default off; existing Work and Draft gates remain separate | May merge hidden; should not be used for owner-facing complete workflow validation | Disable/remove new gate wiring | None |
+| 2B. Durable Draft Launch Foundation | Backend foundation required for both launch outcomes: persisted intended output, supported notes, consumed state, launched output type/id, launched timestamp/user, source-Draft linkage, duplicate-launch prevention, idempotency, atomic transaction boundaries, rollback behavior, consumed Draft exclusion, RLS/grants/RPC contracts | API wrappers/types/selectors only as needed to consume new contracts | SQL/RPC probes, duplicate launch, consumed Draft filtering, idempotent retry, rollback behavior | Required; sandbox-first SQL deployment and validation | Keep shared launch gate off for ordinary Preview users until 2C | Validate SQL/RPC in sandbox before app exposure | Revert/disable app use; SQL rollback requires separately approved database plan | None |
+| 2C. Complete Estimate and Job launch experience | First coherent Preview-visible shared Draft launch workflow: intended output controls primary launch action, contractor may switch before launch, Create Estimate and Create Job both work, chosen-outcome validation runs, successful launch consumes Draft, duplicate launch is prevented, navigation opens launched record, client navigation failure does not duplicate | Connect shared composer to both approved launch paths | E2E for Create Estimate, Create Job, switch intent, resume, consumed Draft lists, duplicate retry, navigation failure recovery, Production fallback | Uses 2B launch contracts; Create Job may continue using/adapt current activation; Create Estimate uses atomic launch path | Enable only in approved Preview/sandbox after 2B passes; Production remains off | First coherent owner-facing Preview validation happens here | Disable shared launch gate and return to existing Draft/legacy paths | None until final rollout approval |
+| 2D. Contextual starts and workflow handoffs | Service Request -> Draft with Estimate default, accepted Estimate -> Job, Customer/Property -> clean Draft with trusted context, Calendar -> Draft, Template -> Draft, Job -> later Estimate, Estimate -> later Job | Contextual entry points and handoff routing | source-link, duplicate-prevention, default intent, no side effects | Possible source/linkage hardening | Shared launch gate plus context-specific gating | Validate each trusted context separately | Disable individual entry points | None |
+| 2E. Legacy path migration | Migrate existing Start New Draft paths and direct Job creation where appropriate; preserve valid direct paths until parity is proven; retire duplicate UI only after end-to-end approval | Replace/de-emphasize legacy surfaces | full regression, role/entitlement, mobile nav, Production fallback | None or cleanup unless data migration is approved | Final rollout gates only after approval | End-to-end parity validation | Restore legacy route emphasis/gates | Production remains legacy until final rollout |
+| Later. Invoice workflow integration | Job -> Invoice, Estimate -> Invoice where valid, direct Invoice exceptions, partial billing, payment schedules, workflow linkage, financial permissions | Billing workflow surfaces | invoice lifecycle and financial permission coverage | Likely required | Separate future approval | Validate billing separately | Disable invoice launch/handoff changes | None until approved |
 
 ## 28. Open Product Decisions
 
