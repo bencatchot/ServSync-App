@@ -6,6 +6,27 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-18
 
+- Branch: `codex/draft-launch-principle-docs`
+- Files changed:
+  - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Formalized the approved Draft Launch Principle in the Contractor Work product specification: a Draft is temporary contractor-only planning, a workflow begins when the Draft is launched, launching creates exactly one initial first-class Estimate or Job record, and the consumed Draft no longer remains an active Draft hub. The Master Plan and FB-035 backlog language now align with the same launch model, including flexible later workflow relationships such as Job -> Estimate and Estimate -> Job, while direct Draft-to-Invoice launch remains deferred until a later approved slice.
+- Reason for change: The shared Draft Composer planning direction needed an authoritative lifecycle decision before implementation planning, especially around intended output switching, Draft consumption, duplicate launch prevention, durable workflow linkage, and avoiding the incorrect model where one active Draft repeatedly creates unrelated permanent outputs.
+- Tests/checks run:
+  - `git diff --check` passed.
+  - Documentation diff reviewed for Draft launch, consumption, direct Invoice deferral, and legacy Production fallback language.
+- Known risks or follow-ups:
+  - Documentation/planning only; no application code, tests, SQL, Supabase configuration, Vercel configuration, environment variables, deployment, sandbox data, production data, feature gates, or Joan Ark changes are included.
+  - The first shared Draft Composer launch implementation still requires owner approval and a separate implementation prompt.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the Draft Launch Principle and moves the next step to implementation planning for the first shared Draft Composer launch slice.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first Work section now uses the approved launch/consumption model instead of implying Drafts remain permanent multi-output hubs.
+
 - Branch: `codex/contractor-work-dashboard-slice-1`
 - Files changed:
   - `src/App.tsx`
