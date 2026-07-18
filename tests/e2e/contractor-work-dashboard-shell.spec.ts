@@ -191,7 +191,7 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(overviewSource).toContain('<ContractorWorkDashboard');
     expect(overviewSource).toContain('canStartDraft={DRAFT_JOB_UI_ENABLED && canManageDraftJobs}');
     expect(overviewSource).toContain('draftsToContinue={DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}');
-    expect(overviewSource).toContain('onStartNewDraft={() => startDraftJobComposer()}');
+    expect(overviewSource).toContain('onStartNewDraft={startCleanDraftJobComposer}');
     expect(overviewSource).toContain('onContinueDraft={draft => void continueDraftJob(draft)}');
     expect(overviewSource).toContain('activeJobs={openJobs}');
     expect(overviewSource).toContain('workReadyToStart={acceptedEstimatesNeedingJobs}');
@@ -224,5 +224,52 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(dashboardSource).not.toContain('Templates');
     expect(dashboardSource).not.toContain('Recent Activity');
     expect(dashboardSource).not.toContain('Waiting on Customer');
+  });
+
+  test('starts dashboard Drafts clean while preserving contextual Draft starts elsewhere', () => {
+    const appSource = sourceFile('src/App.tsx');
+    const contextualStartSource = sourceBetween(
+      appSource,
+      'const startDraftJobComposer = (overrides: Partial<DraftJobComposerDraft> = {}) => {',
+      'const startCleanDraftJobComposer = () => {',
+    );
+    const cleanStartSource = sourceBetween(
+      appSource,
+      'const startCleanDraftJobComposer = () => {',
+      'const continueDraftJob = async',
+    );
+    const overviewSource = sourceBetween(
+      appSource,
+      "{contractorJobsView === 'overview' && (",
+      "{contractorJobsView === 'new_financial' && (",
+    );
+    const legacyDraftPromptSource = sourceBetween(
+      appSource,
+      'Need a contractor-only draft first?',
+      'Choose job workflow',
+    );
+
+    expect(contextualStartSource).toContain("subject_type: selectedJobsLocalContact ? 'local' : 'connected'");
+    expect(contextualStartSource).toContain("homeowner_user_id: selectedJobsConnection?.homeowner_user_id ?? ''");
+    expect(contextualStartSource).toContain("home_id: selectedJobsConnection ? connectedHomeList(selectedJobsConnection)[0]?.id ?? '' : ''");
+    expect(contextualStartSource).toContain("local_contact_id: selectedJobsLocalContact?.id ?? ''");
+    expect(contextualStartSource).toContain("local_home_id: selectedJobsLocalContact ? singleLocalHomeId(selectedJobsLocalContact) : ''");
+
+    expect(cleanStartSource).toContain('setJobsCustomerFilterSubjectId(null)');
+    expect(cleanStartSource).toContain('startDraftJobComposer({');
+    expect(cleanStartSource).toContain("subject_type: 'connected'");
+    expect(cleanStartSource).toContain("homeowner_user_id: ''");
+    expect(cleanStartSource).toContain("home_id: ''");
+    expect(cleanStartSource).toContain("local_contact_id: ''");
+    expect(cleanStartSource).toContain("local_home_id: ''");
+    expect(cleanStartSource).toContain("service_request_id: ''");
+    expect(cleanStartSource).toContain("title: ''");
+    expect(cleanStartSource).toContain("scope: ''");
+    expect(cleanStartSource).toContain("notes: ''");
+    expect(cleanStartSource).toContain('line_items: []');
+
+    expect(overviewSource).toContain('onStartNewDraft={startCleanDraftJobComposer}');
+    expect(overviewSource).not.toContain('onStartNewDraft={() => startDraftJobComposer()}');
+    expect(legacyDraftPromptSource).toContain('onClick={() => startDraftJobComposer()}');
   });
 });

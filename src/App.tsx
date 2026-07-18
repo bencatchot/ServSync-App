@@ -29117,6 +29117,22 @@ function ContractorDashboard({
     setContractorTab('inspections');
   };
 
+  const startCleanDraftJobComposer = () => {
+    setJobsCustomerFilterSubjectId(null);
+    startDraftJobComposer({
+      subject_type: 'connected',
+      homeowner_user_id: '',
+      home_id: '',
+      local_contact_id: '',
+      local_home_id: '',
+      service_request_id: '',
+      title: '',
+      scope: '',
+      notes: '',
+      line_items: [],
+    });
+  };
+
   const continueDraftJob = async (draft: Inspection) => {
     if (!DRAFT_JOB_UI_ENABLED) {
       setError('Draft Job UI is not enabled in this environment.');
@@ -37010,7 +37026,7 @@ function ContractorDashboard({
                     readyToInvoiceJobs={completedJobsReadyToInvoice}
                     invoicesNeedingAttention={invoiceAttentionRecords}
                     upcomingWorkCount={scheduleSnapshotCount}
-                    onStartNewDraft={() => startDraftJobComposer()}
+                    onStartNewDraft={startCleanDraftJobComposer}
                     onViewDrafts={() => {
                       setContractorJobsViewAndScroll('open_jobs');
                       setInspectionView('list');
