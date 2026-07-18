@@ -100,8 +100,8 @@ test.describe('mobile role shell navigation source guardrails', () => {
     const contractorCalendarTabSource = sourceBetween(contractorTabsSource, "id: 'calendar'", "id: 'invites'");
     const contractorJobsTabSource = sourceBetween(contractorTabsSource, "id: 'inspections'", "id: 'trust'");
 
-    expect(appSource).toContain('const contractorHomeownersBadgeCount = connectionRequests.length;');
-    expect(appSource).toContain('const contractorServiceRequestsBadgeCount = contractorFollowUpCount || openServiceRequestCount;');
+    expect(appSource).toContain('const contractorHomeownersBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : connectionRequests.length;');
+    expect(appSource).toContain('const contractorServiceRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : contractorFollowUpCount || openServiceRequestCount;');
     expect(appSource).not.toContain('const contractorJobsAttentionCount =');
     expect(appSource).not.toContain('const contractorCalendarBadgeCount =');
     expect(appSource).not.toContain('badge: contractorJobsAttentionCount');
@@ -115,8 +115,8 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(contractorNavSource).toContain('badge: contractorHomeownersBadgeCount');
     expect(contractorNavSource).not.toContain('badge: actionReviewCount');
 
-    expect(appSource).toContain('const homeownerRequestsBadgeCount = homeownerActionRequestCount;');
-    expect(appSource).toContain('const homeownerEstimatesInvoicesBadgeCount = homeownerFinancialBadgeCount;');
+    expect(appSource).toContain('const homeownerRequestsBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : homeownerActionRequestCount;');
+    expect(appSource).toContain('const homeownerEstimatesInvoicesBadgeCount = SERVSYNC_DEMO_PRESENTATION_MODE ? 0 : homeownerFinancialBadgeCount;');
     expect(appSource).toContain("{ id: 'requests',     label: 'Service Requests',  icon: <MessageSquare size={17} />, badge: homeownerRequestsBadgeCount");
     expect(appSource).toContain("{ id: 'estimates',    label: 'Estimates / Invoices', icon: <Receipt size={17} />, badge: homeownerEstimatesInvoicesBadgeCount");
     expect(homeownerNavSource).toContain('badge: homeownerRequestsBadgeCount');
@@ -200,25 +200,25 @@ test.describe('mobile role shell navigation source guardrails', () => {
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview"');
     expect(jobsOverviewSource).toContain('data-testid="contractor-jobs-overview-tile-grid"');
     expect(jobsOverviewSource).toContain('grid grid-cols-2 gap-2 md:grid-cols-3');
-    expect(jobsOverviewSource).toContain("id: 'new_jobs', label: 'New Jobs'");
-    expect(jobsOverviewSource).toContain("id: 'open_jobs', label: 'Open Jobs'");
+    expect(jobsOverviewSource).toContain("id: 'new_jobs' as const, label: 'New Jobs'");
+    expect(jobsOverviewSource).toContain("id: 'open_jobs' as const, label: 'Open Jobs'");
     expect(jobsOverviewSource).toContain("value: String(jobsCustomerFilterSubjectId ? openJobsForSelectedCustomer.length : openJobs.length)");
-    expect(jobsOverviewSource).toContain("id: 'closed_jobs', label: 'Completed / Closed Jobs'");
-    expect(jobsOverviewSource.indexOf("id: 'new_jobs', label: 'New Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'"));
-    expect(jobsOverviewSource.indexOf("id: 'open_jobs', label: 'Open Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'closed_jobs', label: 'Completed / Closed Jobs'"));
+    expect(jobsOverviewSource).toContain("id: 'closed_jobs' as const, label: 'Completed / Closed Jobs'");
+    expect(jobsOverviewSource.indexOf("id: 'new_jobs' as const, label: 'New Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'open_jobs' as const, label: 'Open Jobs'"));
+    expect(jobsOverviewSource.indexOf("id: 'open_jobs' as const, label: 'Open Jobs'")).toBeLessThan(jobsOverviewSource.indexOf("id: 'closed_jobs' as const, label: 'Completed / Closed Jobs'"));
     expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1'");
     expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-2 md:order-none'");
     expect(jobsOverviewSource).toContain("mobileTileClassName: 'order-3 md:order-none'");
     expect(jobsOverviewSource).toContain('${item.mobileTileClassName} rounded-xl border p-2.5 text-left transition sm:p-3');
     expect(jobsOverviewSource).toContain('line-clamp-2');
     expect(jobsOverviewSource).toContain('setContractorJobsViewAndScroll(item.id)');
-    expect(jobsOverviewSource).toContain("if (item.id === 'new_jobs') setInspectionView('new')");
+    expect(jobsOverviewSource).toContain("if (item.id === 'new_jobs') setInspectionView(DRAFT_JOB_UI_ENABLED ? 'draft_job' : 'new')");
     expect(jobsOverviewSource).toContain("if (item.id !== 'new_jobs') setInspectionView('list')");
     expect(jobsOverviewSource).not.toContain('overflow-x-auto');
 
-    expect(financialOverviewSource).toContain("id: 'new_financial', label: 'New Estimate/Invoice'");
-    expect(financialOverviewSource).toContain("id: 'open_financial', label: 'Open Estimates / Invoices'");
-    expect(financialOverviewSource).toContain("id: 'closed_financial', label: 'Closed / Billed Records'");
+    expect(financialOverviewSource).toContain("id: 'new_financial' as const, label: 'New Estimate/Invoice'");
+    expect(financialOverviewSource).toContain("id: 'open_financial' as const, label: 'Open Estimates / Invoices'");
+    expect(financialOverviewSource).toContain("id: 'closed_financial' as const, label: 'Closed / Billed Records'");
     expect(financialOverviewSource).toContain("mobileTileClassName: 'order-1 col-span-2 md:order-none md:col-span-1'");
     expect(financialOverviewSource).toContain("index === 0 ? 'order-2 md:order-none' : 'order-3 md:order-none'");
     expect(financialOverviewSource).toContain('setContractorJobsViewAndScroll(item.id)');

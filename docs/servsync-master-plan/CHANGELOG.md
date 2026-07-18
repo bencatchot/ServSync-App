@@ -4,6 +4,41 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-18
+
+- Branch: `codex/contractor-work-dashboard-slice-1`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/work/ContractorWorkDashboard.tsx`
+  - `src/features/work/contractorWorkAvailability.ts`
+  - `src/features/work/contractorWorkSelectors.ts`
+  - `tests/e2e/contractor-work-dashboard-shell.spec.ts`
+  - `tests/e2e/mobile-role-shell-navigation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Contractor Work Dashboard Slice 1 as a frontend-only, strict-gated shell inside the existing Jobs overview surface. The new `VITE_CONTRACTOR_WORK_UI_ENABLED=true` gate replaces only the Jobs overview with a Work page header, attention-first mission copy, authorized secondary `Start New Draft` action, true empty state, Drafts to Continue, Active Jobs, Work Ready to Start, Billing Attention, compact Upcoming Work, and Job History access while preserving the global `Jobs` label, current mobile navigation, existing Jobs routes, and legacy Jobs fallback when the gate is absent or false.
+- Reason for change: The approved Contractor Work Module Specification calls for the first implementation slice to introduce a sandbox/preview Work Dashboard/navigation shell without prematurely replacing Production Jobs, adding a global Work route, or expanding into outcome actions.
+- Tests/checks run:
+  - `npm ci` completed successfully.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `VITE_CONTRACTOR_WORK_UI_ENABLED=true VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed with existing Browserslist/chunk-size warnings.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/contractor-work-dashboard-shell.spec.ts --project=chromium --reporter=line` passed: 5/5.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/draft-job-operational-filtering.spec.ts tests/e2e/draft-job-ui-persistence.spec.ts tests/e2e/mobile-role-shell-navigation.spec.ts --project=chromium --reporter=dot` passed: 26/26.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/status-badge-foundation.spec.ts tests/e2e/status-secondary-migration.spec.ts tests/e2e/unified-start-job-composer-foundation.spec.ts tests/e2e/fb027-contractor-pipeline-summary.spec.ts --project=chromium --reporter=dot` passed: 24/24.
+  - `npm run lint` remains blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` tooling mismatch while linting `playwright.config.ts`.
+  - `git diff --check` passed.
+- Known risks or follow-ups:
+  - Frontend/test/docs only; no SQL/RLS/RPC changes, Supabase/Vercel configuration changes, Production environment changes, manual deployment, sandbox data mutation, production data mutation, Create Estimate outcome, Create Invoice outcome, contextual Draft entry points, global navigation rename, new global route, new mobile bottom-navigation item, Reports redesign, Templates redesign, or Joan Ark changes are included.
+  - The new Work shell remains disabled by default and requires a Preview/sandbox `VITE_CONTRACTOR_WORK_UI_ENABLED=true` environment variable before it renders. Draft-specific dashboard behavior also requires the existing `VITE_DRAFT_JOB_UI_ENABLED=true` gate and authorized owner/admin/office role.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the first gated Work Dashboard/navigation-shell implementation slice and moves the next step to focused read-only PR audit plus preview-gate validation planning.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Job workflow status now distinguishes the new default-off Work Dashboard shell from the unchanged Production legacy Jobs workflow.
+
 ## 2026-07-17
 
 - Branch: `docs/contractor-work-module-spec-v1`

@@ -189,6 +189,8 @@ import { DraftJobComposer, type DraftJobCustomerOption } from './features/jobs/D
 import { DraftJobList } from './features/jobs/DraftJobList';
 import { activateDraftJob, createDraftJob, updateDraftJob, upsertDraftJobScope } from './features/jobs/draftJobApi';
 import { DRAFT_JOB_UI_ENABLED } from './features/jobs/draftJobAvailability';
+import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';
+import { ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';
 import {
   applyDraftJobScopeResult,
   createBlankDraftJobComposerDraft,
@@ -36997,6 +36999,45 @@ function ContractorDashboard({
               })()}
 
               {contractorJobsView === 'overview' && (
+                CONTRACTOR_WORK_UI_ENABLED ? (
+                  <ContractorWorkDashboard
+                    loading={loading}
+                    loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
+                    canStartDraft={DRAFT_JOB_UI_ENABLED && canManageDraftJobs}
+                    draftsToContinue={DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}
+                    activeJobs={openJobs}
+                    workReadyToStart={acceptedEstimatesNeedingJobs}
+                    readyToInvoiceJobs={completedJobsReadyToInvoice}
+                    invoicesNeedingAttention={invoiceAttentionRecords}
+                    upcomingWorkCount={scheduleSnapshotCount}
+                    onStartNewDraft={() => startDraftJobComposer()}
+                    onViewDrafts={() => {
+                      setContractorJobsViewAndScroll('open_jobs');
+                      setInspectionView('list');
+                    }}
+                    onContinueDraft={draft => void continueDraftJob(draft)}
+                    onViewOpenJobs={() => {
+                      setContractorJobsViewAndScroll('open_jobs');
+                      setInspectionView('list');
+                    }}
+                    onOpenJob={job => openInspection(job)}
+                    onReviewAcceptedEstimates={openAcceptedEstimatesNeedingJobs}
+                    onReviewBilling={() => {
+                      if (completedJobsReadyToInvoice.length > 0) {
+                        openCompletedJobsReadyToInvoice();
+                        return;
+                      }
+                      setContractorFinancialRecordKind('invoices');
+                      setContractorJobsViewAndScroll('open_financial');
+                      setInspectionView('list');
+                    }}
+                    onViewUpcomingWork={() => setContractorTab('calendar')}
+                    onViewJobHistory={() => {
+                      setContractorJobsViewAndScroll('closed_jobs');
+                      setInspectionView('list');
+                    }}
+                  />
+                ) : (
               <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
@@ -37192,6 +37233,7 @@ function ContractorDashboard({
                   </div>
                 </div>
               </section>
+                )
               )}
 
               {contractorJobsView === 'new_financial' && (
@@ -40132,7 +40174,7 @@ function ContractorDashboard({
               </>
               )}
 
-              {contractorJobsView === 'overview' && (
+              {contractorJobsView === 'overview' && !CONTRACTOR_WORK_UI_ENABLED && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {operationalInspections.length === 0 ? (
                   <EmptyState
