@@ -76,15 +76,41 @@ Work does not own:
 
 ## 3. Contractor Work Mental Model
 
-The Work module begins from contractor goals, not document types.
+The Work module begins from contractor intent, not document types.
 
-### Plan Work
+Contractors usually enter Work with one of two different intentions:
+
+1. Start something new.
+2. Continue, manage, finish, or review existing Work.
+
+These intentions should remain distinct. Starting new Work is a deliberate creation action into the lifecycle. The Work destination primarily manages records once they exist.
+
+### Start New Work
+
+Start New Work is the contractor's deliberate creation intention.
+
+Examples:
+
+- Start New Draft.
+- Start from a Service Request.
+- Start from customer or property context.
+- Start from a Template.
+- Start similar work from a prior Job.
+- Start from Job History.
+- Capture new scope after a customer call.
+
+Start New Work should create no side effects until the contractor intentionally chooses an outcome. Trusted context may prefill the Draft, but Start New Draft must initialize clean state unless that context is intentionally supplied.
+
+### Manage Existing Work
+
+Manage Existing Work is the contractor's continuation, attention, execution, closeout, and review intention. It contains the Plan, Perform, Finish, and Review modes below.
+
+#### Plan Existing Work
 
 Plan Work is where the contractor captures intent before the final outcome is known.
 
 Examples:
 
-- Start New Draft.
 - Continue Draft.
 - Review future or upcoming work.
 - Build an Estimate.
@@ -92,7 +118,7 @@ Examples:
 
 Plan Work should keep side effects low. Starting or saving planning information should not notify a homeowner, create an appointment, activate a Job, create an Estimate, create an Invoice, or expose contractor-only details.
 
-### Perform Work
+#### Perform Work
 
 Perform Work is where the contractor executes operational work.
 
@@ -107,7 +133,7 @@ Examples:
 
 Perform Work should keep the operational next action obvious. Billing may be visible, but it must not dominate the first experience after a Job is opened.
 
-### Finish Work
+#### Finish Work
 
 Finish Work is where the contractor closes the loop.
 
@@ -121,7 +147,7 @@ Examples:
 
 Finish Work should separate operational closeout from billing. A Job can be operationally complete before every billing or payment workflow is finished.
 
-### Review Past Work
+#### Review Past Work
 
 Review Past Work is where the contractor finds prior work and starts from known context.
 
@@ -140,7 +166,24 @@ Review Past Work should preserve the home and customer relationship context whil
 
 Actions should be broad only when they are common, safe, and meaningful from many places.
 
-Potential broad or global actions:
+`Start New Draft` is an action, not a destination.
+
+Approved placement hierarchy:
+
+1. Trusted contextual actions.
+2. Work header shortcut.
+3. Work empty-state primary action.
+4. Possible command or quick-action menu later.
+
+Initial redesign should not introduce:
+
+- a separate global Draft navigation item,
+- a separate bottom-navigation item,
+- an indiscriminate application-wide floating action button,
+- equal `Start New Draft` placement on every screen,
+- `Start New Draft` as the first Work Dashboard content section.
+
+Potential broad actions:
 
 - Start New Draft.
 - Search.
@@ -158,7 +201,7 @@ Work-only actions:
 - Finalize reports.
 - Start Similar Draft from prior Work.
 
-`Start New Draft` may become more broadly available later, but it should not automatically become a global action. A global or contextual Draft action is justified only when:
+`Start New Draft` may be reachable from more than one place, but it should not automatically become a global destination. A contextual Draft action is justified only when:
 
 - the current screen has trusted context,
 - prefilled values reduce contractor effort,
@@ -166,6 +209,14 @@ Work-only actions:
 - mobile presentation remains simple,
 - the resulting Draft has a clear source relationship,
 - duplicate customer, property, request, Draft, Estimate, Invoice, or Job records are avoided.
+
+Availability depends on:
+
+- Work entitlement,
+- user role,
+- write permission,
+- valid trusted context where context is supplied,
+- duplicate-prevention rules.
 
 Mobile rule:
 
@@ -197,6 +248,8 @@ This specification does not make the Work redesign live.
 ## 6. Target Work Architecture
 
 Work should initially remain one global navigation destination.
+
+Work Dashboard manages and surfaces existing Work. Creation enters Work through controlled actions.
 
 Primary internal destinations:
 
@@ -233,31 +286,46 @@ Destination types:
 
 The Work module should prioritize attention and next actions, not six equal folders.
 
+Starting a Draft should not require first navigating through the Work Dashboard when a trusted contextual action is available. The Work Dashboard may still retain a secondary header shortcut for convenience.
+
 ## 7. Work Dashboard
 
 The Work Dashboard is not a folder menu. It answers:
 
-`What needs my attention today?`
+`What existing work needs my attention, and what should happen next?`
 
-### Primary Start New Draft
+The dashboard should prioritize:
+
+- Drafts needing continuation.
+- Active Jobs.
+- Upcoming work.
+- Waiting on customer.
+- Ready-to-invoice work.
+- Overdue or action-required records.
+- Recent activity.
+- Job History access.
+
+When ongoing Work exists, the largest visual priority should be existing Work needing attention, not creation.
+
+### Creation Shortcut
 
 Purpose:
-Start a clean contractor-only Draft.
+Provide a deliberate shortcut into Start New Draft without making creation the dashboard's primary content.
 
 Inclusion:
-Always available to authorized Work users when Draft-first Work is enabled.
+Available to authorized Work users when Draft-first Work is enabled, role permissions allow Draft creation, and duplicate-prevention rules are satisfied.
 
 Action:
 Open a blank Draft composer. It must not reuse stale state.
 
 Empty state:
-If there is no work yet, this becomes the primary setup action.
+If there is no Work yet, Start New Draft may become the primary empty-state action.
 
 Mobile:
-Prominent action, but not so sticky that it crowds every Work subview.
+Compact Work-header action or future approved Work-scoped control. It should not crowd every Work subview.
 
 Desktop:
-Primary action near the top of the dashboard.
+Secondary Work-header action when existing Work is present.
 
 Initial Work redesign:
 Required.
@@ -450,6 +518,10 @@ Required Draft behavior:
 - Drafts should support search/filter after the list grows.
 - Drafts should avoid indefinite clutter through user-facing discard/archive behavior.
 - Draft discard/archive should be explicit and safe. Automated cleanup is not required unless separately approved.
+- Converted Drafts should be distinguishable from active Drafts through linked outcome state, not left as competing active planning records.
+- Where practical, warn that a similar unfinished Draft already exists for the same source request, customer, property, or work context.
+- Similar-Draft warnings should guide reuse or continuation. They should not intrusively block creation without evidence.
+- When an appropriate linked Draft already exists, the contractor may intentionally choose to continue or reuse it.
 
 Expected Draft lifecycle:
 
@@ -1006,6 +1078,8 @@ Rule:
 
 `Only offer Start New Draft where trusted context helps the contractor begin work faster without creating side effects or duplicate records.`
 
+Contextual Start New Draft is preferred when the contractor's intent and source context are clear. It should prefill only trusted data. The resulting Draft is a separate Work-owned record, source linkage is preserved, customer and property identities are reused, and duplicate operational records are prohibited.
+
 | Surface | Trusted context | Prefill candidates | Source relationship | Initial scope |
 | --- | --- | --- | --- | --- |
 | Customer profile | customer, local/connected identity, property list | customer, default/selected property | customer source | Initial |
@@ -1024,6 +1098,8 @@ Duplicate prevention:
 - Reuse existing property identity.
 - Preserve source request/source record.
 - Do not create duplicate operational Jobs when one is already linked.
+- Do not create duplicate customer or property records.
+- Do not turn a Service Request into a Draft by mutating the request itself.
 - Do not create customer-facing activity until an outcome requires it.
 
 Resulting route:
@@ -1037,9 +1113,11 @@ Contractor-only until an outcome creates homeowner-visible state.
 Target navigation:
 
 - One global Work entry.
-- Work Dashboard as the default landing.
+- Work Dashboard as the default landing for managing existing Work.
 - Internal Work destinations for Drafts, Open Jobs, Job History, Estimates, and Invoices.
 - Reports, Templates, and Scheduling as secondary or contextual Work areas.
+- Start New Draft as an action, not a global destination.
+- Authorized contractors may invoke Start New Draft from trusted shortcuts without first viewing the Work Dashboard.
 
 Routes and deep links should support:
 
@@ -1053,10 +1131,10 @@ Routes and deep links should support:
 
 State rules:
 
-- Start New Draft always begins clean.
-- Continue Draft always loads one persisted Draft.
+- Start New Draft always begins clean unless trusted context is intentionally supplied.
+- Continue Draft always loads one canonical persisted Draft.
 - Continue Job always loads one operational Job.
-- These actions must not share stale in-memory composer state.
+- Creation, continuation, and operational state must not share stale in-memory composer state.
 - Browser refresh must not blank resumed Drafts or Jobs.
 - Back behavior should return to the meaningful prior Work or Customer context.
 - Feature gating must keep production legacy-safe until approved.
@@ -1067,6 +1145,11 @@ Mobile:
 - Keep Work as one mobile destination.
 - Use internal tabs, segmented controls, or drill-in views only when they stay readable.
 - Do not create global mobile destinations for Drafts, Jobs, Estimates, Invoices, and Templates during initial redesign.
+- Do not create a separate global mobile navigation item for Start New Draft.
+- Do not create a global Drafts bottom-navigation destination.
+- Allow a compact Work-header action.
+- Allow trusted contextual actions.
+- A Work-scoped floating action button may be evaluated during screen design, but it is not approved by this specification.
 
 Desktop:
 
@@ -1084,7 +1167,9 @@ Contractor roles:
 
 - Owner/admin/office users can manage Drafts and financial outcomes where current permissions allow.
 - Field technicians should focus on operational execution, notes, photos, checklist/work completion, and similar non-financial work unless explicit company permission is approved later.
+- Field technician Draft creation and financial outcomes depend on future role permissions. Do not assume access to Estimates or Invoices.
 - Viewers remain read-only.
+- Viewers should not receive Draft creation actions.
 
 Connected versus local customers:
 
@@ -1097,8 +1182,11 @@ Entitlements:
 - Navigation remains coherent even when capabilities are locked.
 - Locked capabilities should appear where expected, with clear unavailable or upgrade states.
 - Discover-only contractors should not see an enterprise operations control panel.
+- Discover-only contractors should not encounter a dead-end Start New Draft flow. The action may be hidden or shown as a clear upgrade state according to later entitlement UX.
 - Work subscribers can receive operational Work access.
+- Work-enabled contractor roles can receive Start New Draft based on write permission.
 - Team and advanced operations capabilities may become optional/tiered later.
+- Future packages should not reorganize navigation. Entitlement controls action availability.
 
 Do not define prices or final plan names in this specification.
 
@@ -1162,6 +1250,8 @@ Mobile rules:
 
 - One global Work destination.
 - No global Drafts/Jobs/Estimates/Invoices/Templates overload.
+- No separate global mobile-navigation item for Start New Draft.
+- No global Drafts bottom-navigation destination.
 - Clear internal navigation.
 - Sticky primary actions only where justified.
 - Compact but readable cards.
@@ -1175,7 +1265,11 @@ Mobile Work Dashboard:
 
 - Show highest-priority attention cards first.
 - Keep Drafts and active Jobs scannable.
-- Make `Start New Draft` easy to find.
+- Allow a compact Work-header action.
+- Allow trusted contextual actions outside Work where context is safe.
+- Empty Work state may make Start New Draft visually primary.
+- When ongoing Work exists, attention and continuation remain visually primary.
+- A Work-scoped floating action button may be evaluated during screen design, but it is not approved by this specification.
 - Avoid long table layouts.
 
 Mobile Draft composer:
@@ -1194,7 +1288,14 @@ Mobile Job Overview:
 
 Complete redesigned Work module acceptance criteria:
 
-- Work Dashboard clearly communicates what needs attention.
+- Work Dashboard is attention and management first.
+- Work Dashboard clearly communicates what existing Work needs attention.
+- Start New Draft is reachable without becoming a separate global destination.
+- Start New Draft is not a dashboard content card when existing Work is present.
+- Empty Work state may use Start New Draft as its primary action.
+- Contextual creation appears only where trusted context exists.
+- Restricted or non-entitled users do not encounter dead-end creation flows.
+- Draft accumulation is manageable through visibility, age, and discard/archive behavior.
 - Start New Draft always starts clean.
 - Continue Draft loads canonical persisted data.
 - Drafts remain isolated from operational records.
@@ -1212,7 +1313,7 @@ Complete redesigned Work module acceptance criteria:
 - Invoices remain billing snapshots.
 - Reports/checklists remain tied to Work.
 - Templates prefill Drafts instead of competing with Draft creation.
-- Mobile navigation remains manageable.
+- Mobile navigation remains one Work destination and remains manageable.
 - Production legacy Jobs remains unaffected during sandbox development.
 - No Draft-first Production re-enable occurs until full approval.
 
@@ -1280,11 +1381,14 @@ These slices are planning recommendations only. Each requires its own audit and 
 | Question | Recommendation | Rationale | Blocks | Deferrable |
 | --- | --- | --- | --- | --- |
 | Should the final sidebar label be `Work` or another term? | Keep `Work` as working label through specification and preview. | IA already treats Work as the working module name. | Final navigation copy only. | Yes |
-| What is the first Work Dashboard priority order? | Start New Draft, Drafts needing attention, Active Jobs, accepted Estimates needing Jobs, completed Jobs ready to invoice. | Prioritizes contractor next action without making billing primary. | Work Dashboard implementation. | No for dashboard slice |
+| What is the first Work Dashboard priority order? | Drafts needing continuation, Active Jobs, accepted Estimates needing Jobs, completed Jobs ready to invoice, overdue/action-required items, upcoming work, recent activity, Job History access. | Prioritizes existing Work needing attention. Start New Draft is a controlled action, not the first dashboard content section when ongoing Work exists. | Work Dashboard implementation. | No for dashboard slice |
 | Should Draft discard/archive ship in the first Work implementation? | Include explicit discard/archive in spec, but implement only if safe backend/UI path is approved. | Drafts should not become permanent clutter. | Draft list maturity. | Yes |
 | Should Templates appear in the first Work Dashboard? | Keep as secondary access only, not a primary card. | Templates are useful but secondary until Drafts stabilize. | Dashboard density. | Yes |
 | Should Calendar move during the first Work redesign? | Reference schedule on dashboard first; relocate Calendar later if needed. | Reduces navigation churn while preserving IA direction. | Full sidebar migration. | Yes |
 | What happens to a Draft after Create Estimate or Create Invoice? | Preserve source linkage; decide archive/editability during the outcome-specific audit. | Needs backend snapshot/source design. | Create Estimate/Create Invoice slices. | Yes |
+| Should mobile Start New Draft use a header action, action menu, or Work-scoped floating action? | Defer to screen-design audit. | The specification approves the hybrid architecture, not the final visual control. | Screen design, not product specification. | Yes |
+| What is the exact visual treatment of the Work header Start New Draft action? | Defer to screen-design audit. | It must remain secondary when existing Work needs attention, but the exact placement and styling require layout design. | Screen design. | Yes |
+| Should similar-Draft warnings be informational, confirmatory, or source-linked only? | Defer until Draft list and contextual start behavior are designed. | Warnings should reduce duplicate clutter without becoming intrusive. | Draft guardrail implementation. | Yes |
 | When should Production Draft-first UI be re-enabled? | Only after cohesive Work redesign validation and explicit production gate. | Avoids another partial replacement. | Production rollout. | No for rollout |
 
 Settled decisions not reopened:
@@ -1331,6 +1435,13 @@ Approved product behavior:
 - Draft is the neutral contractor-only starting point for most Work workflows.
 - Save Draft is optional.
 - Contractors should be able to choose outcomes directly from current Draft state.
+- Starting new work and managing existing Work are distinct contractor intentions.
+- Work is primarily the management, continuation, attention, and history destination.
+- Start New Draft is a controlled creation action, not a separate global destination.
+- Work may expose a secondary Start New Draft shortcut.
+- Empty Work states may promote Start New Draft as the primary action.
+- Contextual Start New Draft is preferred where trusted context exists.
+- No separate global Draft destination is introduced.
 - Start New Draft starts clean.
 - Continue Draft loads one canonical persisted Draft.
 - Continue Job loads one operational Job.
@@ -1346,6 +1457,9 @@ Deferred decisions:
 
 - final user-facing module label,
 - exact first Work Dashboard layout,
+- exact mobile Start New Draft control,
+- exact Work header action visual treatment,
+- similar-Draft warning behavior,
 - Draft archive/discard implementation,
 - Calendar relocation timing,
 - template migration timing,
