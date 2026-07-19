@@ -296,6 +296,7 @@ export interface Estimate {
   local_contact_id: string | null;
   service_request_id: string | null;
   inspection_id: string | null;
+  source_work_draft_id?: string | null;
   home_id?: string | null;
   local_home_id?: string | null;
   home_label?: string | null;
@@ -1434,6 +1435,7 @@ export interface Inspection {
   job_status?: JobLifecycleStatus;
   job_origin?: JobOrigin | null;
   estimate_id?: string | null;
+  source_work_draft_id?: string | null;
   draft_created_by?: string | null;
   draft_updated_by?: string | null;
   draft_saved_at?: string | null;

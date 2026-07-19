@@ -6,6 +6,31 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-18
 
+- Branch: `codex/durable-draft-launch-2b`
+- Files changed:
+  - `servsync-durable-draft-launch-foundation.sql`
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `src/features/drafts/durableDraftLaunchTypes.ts`
+  - `src/types.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Packaged Slice 2B Durable Draft Launch Foundation for audit and sandbox-first approval. The SQL proposes dedicated contractor Draft, Draft item, and Draft launch ledger tables; durable nullable intended output; contractor-private Draft notes; consumed state; source-Draft links to launched Estimates and Jobs; one-Draft/one-successful-launch constraints; idempotency protection; canonical save/resume RPCs; an atomic launch RPC; private Estimate/Job launch helpers; and a non-destructive legacy inspection-backed Draft Job import bridge. Frontend additions are limited to hidden typed API wrappers for future integration.
+- Reason for change: The hidden shared Draft composer from Slice 2A needs a durable backend contract before a coherent Preview-visible Create Estimate/Create Job workflow can be implemented in Slice 2C.
+- Tests/checks run:
+  - SQL not applied; static validation only.
+  - Focused SQL/source tests were added for table definitions, constraints, RLS/grants, RPC signatures, save/resume behavior, launch/idempotency contracts, Estimate/Job launch mapping, legacy bridge, and hidden frontend scope.
+- Known risks or follow-ups:
+  - Slice 2B is hidden and unapplied until the SQL receives a separate focused audit and explicit sandbox-apply approval. It does not expose Create Estimate or Create Job actions in the shared Draft Composer, implement Invoice launch, apply SQL to Production, mutate Production data, change Vercel/Supabase settings, enable gates, deploy, redesign Jobs, or implement inspection/checklist UI.
+  - Slice 2C remains the first planned coherent owner-facing Preview workflow with both Create Estimate and Create Job launch actions.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the packaged durable launch foundation, SQL-not-applied state, legacy bridge, and next approval gate for sandbox SQL application.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Draft-first Work now distinguishes the packaged Slice 2B backend contract from the hidden frontend Slice 2A foundation and future Preview-visible Slice 2C workflow.
+
 - Branch: `codex/shared-draft-composer-2a`
 - Files changed:
   - `src/App.tsx`
