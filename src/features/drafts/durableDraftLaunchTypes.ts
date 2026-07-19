@@ -274,6 +274,7 @@ export type DurableDraftLaunchAttemptReadResult =
 
 export type DurableDraftLaunchAttemptWriteResult =
   | { status: 'success'; attempt: DurableDraftLaunchAttemptRecord }
+  | { status: 'invalid'; reason: 'canonical_result' | 'attempt_mismatch' }
   | { status: 'unavailable'; operation: 'read' | 'write' | 'verify' };
 
 export type DurableDraftLaunchAttemptClearResult =

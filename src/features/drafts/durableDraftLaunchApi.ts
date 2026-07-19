@@ -236,6 +236,7 @@ export function parseContractorWorkDraftLaunchResult(value: unknown): Contractor
     || !isNullableUuid(value.job_id)
     || !isDurableDraftUuid(value.output_id_snapshot)) return null;
   if (value.status === 'succeeded' && value.launch_id === null) return null;
+  if (value.status === 'already_consumed' && value.idempotent !== false) return null;
   const liveId = value.output_type === 'estimate' ? value.estimate_id : value.job_id;
   if (value.output_type === 'estimate' ? value.job_id !== null : value.estimate_id !== null) return null;
   if (value.output_available !== (liveId !== null)) return null;

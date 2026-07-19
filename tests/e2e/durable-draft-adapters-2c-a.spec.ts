@@ -8,6 +8,7 @@ import {
   launchContractorWorkDraft,
   listContractorWorkDrafts,
   normalizeDurableDraftError,
+  parseContractorWorkDraftLaunchResult,
   saveContractorWorkDraft,
   type DurableDraftSupabaseClient,
 } from '../../src/features/drafts/durableDraftLaunchApi';
@@ -646,7 +647,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       output_id_snapshot: JOB_ID,
       output_available: false,
       launch_id: LAUNCH_ID,
-      idempotent: true,
+      idempotent: false,
     });
     expect(success).toMatchObject({
       status: 'success',
@@ -802,7 +803,7 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     expect(createDurableDraftLaunchAttempt(storage, {
       contractorId: CONTRACTOR_ID, draftId: DRAFT_ID, outputType: 'job',
     }, { randomUUID: () => IDEMPOTENCY_ID }).status).toBe('success');
-    expect(() => recordDurableDraftLaunchSuccess(storage, CONTRACTOR_ID, DRAFT_ID, {
+    expect(recordDurableDraftLaunchSuccess(storage, CONTRACTOR_ID, DRAFT_ID, {
       draft_id: DRAFT_ID,
       status: 'succeeded',
       output_type: 'job',
@@ -812,13 +813,13 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       output_available: true,
       launch_id: LAUNCH_ID,
       idempotent: false,
-    })).toThrow('DRAFT_LAUNCH_ATTEMPT_RESULT_INVALID');
+    })).toEqual({ status: 'invalid', reason: 'canonical_result' });
     expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toMatchObject({
       status: 'found', attempt: { phase: 'prepared' },
     });
   });
 
-  test('launch response parser accepts canonical live/deleted results and rejects contradictions', async () => {
+  test('launch response parser enforces the complete status and idempotency matrix', async () => {
     const result = (overrides: Record<string, unknown> = {}) => ({
       draft_id: DRAFT_ID,
       status: 'succeeded',
@@ -835,16 +836,53 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       draft_id: DRAFT_ID, intended_output, idempotency_key: IDEMPOTENCY_ID,
     });
     await expect(launch(result())).resolves.toMatchObject({ output_type: 'job', job_id: JOB_ID });
-    await expect(launch(result({ status: 'already_consumed', job_id: null, output_available: false, idempotent: true })))
-      .resolves.toMatchObject({ status: 'already_consumed', output_available: false });
+    await expect(launch(result({ idempotent: true }))).resolves.toMatchObject({ status: 'succeeded', idempotent: true });
+    await expect(launch(result({ status: 'already_consumed', idempotent: false })))
+      .resolves.toMatchObject({ status: 'already_consumed', output_available: true, idempotent: false });
+    await expect(launch(result({ status: 'already_consumed', job_id: null, output_available: false, idempotent: false })))
+      .resolves.toMatchObject({ status: 'already_consumed', output_available: false, idempotent: false });
     await expect(launch(result({
       output_type: 'estimate', estimate_id: ESTIMATE_ID, job_id: null,
       output_id_snapshot: ESTIMATE_ID,
     }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', estimate_id: ESTIMATE_ID });
     await expect(launch(result({
+      output_type: 'estimate', estimate_id: ESTIMATE_ID, job_id: null,
+      output_id_snapshot: ESTIMATE_ID, idempotent: true,
+    }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', idempotent: true });
+    await expect(launch(result({
+      output_type: 'estimate', estimate_id: ESTIMATE_ID, job_id: null,
+      output_id_snapshot: ESTIMATE_ID, status: 'already_consumed', idempotent: false,
+    }), 'estimate')).resolves.toMatchObject({ status: 'already_consumed', output_available: true });
+    await expect(launch(result({
       output_type: 'estimate', estimate_id: null, job_id: null,
-      output_id_snapshot: ESTIMATE_ID, output_available: false, status: 'already_consumed', idempotent: true,
+      output_id_snapshot: ESTIMATE_ID, output_available: false, status: 'already_consumed', idempotent: false,
     }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', output_available: false });
+
+    const contradictory = [
+      result({ status: 'already_consumed', idempotent: true }),
+      result({ status: 'already_consumed', idempotent: true, launch_id: null }),
+      result({ status: 'already_consumed', idempotent: true, job_id: null, output_available: false }),
+      result({ status: 'already_consumed', idempotent: true, job_id: null, output_available: false, launch_id: null }),
+      result({
+        status: 'already_consumed', idempotent: true, output_type: 'estimate',
+        estimate_id: ESTIMATE_ID, job_id: null, output_id_snapshot: ESTIMATE_ID,
+      }),
+      result({
+        status: 'already_consumed', idempotent: true, output_type: 'estimate',
+        estimate_id: null, job_id: null, output_id_snapshot: ESTIMATE_ID, output_available: false, launch_id: null,
+      }),
+    ];
+    contradictory.forEach(value => expect(parseContractorWorkDraftLaunchResult(value)).toBeNull());
+    for (const value of contradictory.slice(0, 4)) {
+      await expect(launch(value)).rejects.toMatchObject({
+        applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'launch', safeMessage: 'DRAFT_RESPONSE_INVALID',
+      });
+    }
+    for (const value of contradictory.slice(4)) {
+      await expect(launch(value, 'estimate')).rejects.toMatchObject({
+        applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'launch', safeMessage: 'DRAFT_RESPONSE_INVALID',
+      });
+    }
 
     const invalid = [
       { output_type: 'job' },
@@ -859,6 +897,68 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     ];
     for (const value of invalid) {
       await expect(launch(value)).rejects.toMatchObject({ applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'launch' });
+    }
+  });
+
+  test('invalid canonical retry data cannot alter prepared or launching attempts', () => {
+    const contradictory = {
+      draft_id: DRAFT_ID,
+      status: 'already_consumed',
+      output_type: 'job',
+      estimate_id: null,
+      job_id: JOB_ID,
+      output_id_snapshot: JOB_ID,
+      output_available: true,
+      launch_id: LAUNCH_ID,
+      idempotent: true,
+    };
+    for (const phase of ['prepared', 'launching'] as const) {
+      const storage = new MemoryStorage();
+      createDurableDraftLaunchAttempt(storage, {
+        contractorId: CONTRACTOR_ID, draftId: DRAFT_ID, outputType: 'job',
+      }, { randomUUID: () => IDEMPOTENCY_ID, now: () => new Date('2026-07-19T12:00:00.000Z') });
+      if (phase === 'launching') {
+        updateDurableDraftLaunchAttemptPhase(storage, CONTRACTOR_ID, DRAFT_ID, phase, () => new Date('2026-07-19T12:01:00.000Z'));
+      }
+      const key = durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID);
+      const before = storage.getItem(key);
+      expect(recordDurableDraftLaunchSuccess(
+        storage, CONTRACTOR_ID, DRAFT_ID, contradictory, () => new Date('2026-07-19T12:02:00.000Z'),
+      )).toEqual({ status: 'invalid', reason: 'canonical_result' });
+      expect(storage.getItem(key)).toBe(before);
+      expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toMatchObject({
+        status: 'found', attempt: { phase, idempotencyKey: IDEMPOTENCY_ID },
+      });
+    }
+
+    const inaccessibleStorage = new ThrowingStorage();
+    inaccessibleStorage.failures.add('get');
+    expect(recordDurableDraftLaunchSuccess(
+      inaccessibleStorage, CONTRACTOR_ID, DRAFT_ID, contradictory,
+    )).toEqual({ status: 'invalid', reason: 'canonical_result' });
+  });
+
+  test('valid fresh, same-key, and already-consumed results remain persistable', () => {
+    const variants = [
+      { status: 'succeeded', idempotent: false },
+      { status: 'succeeded', idempotent: true },
+      { status: 'already_consumed', idempotent: false },
+    ] as const;
+    for (const variant of variants) {
+      const storage = new MemoryStorage();
+      createDurableDraftLaunchAttempt(storage, {
+        contractorId: CONTRACTOR_ID, draftId: DRAFT_ID, outputType: 'job',
+      }, { randomUUID: () => IDEMPOTENCY_ID });
+      expect(recordDurableDraftLaunchSuccess(storage, CONTRACTOR_ID, DRAFT_ID, {
+        draft_id: DRAFT_ID,
+        output_type: 'job',
+        estimate_id: null,
+        job_id: JOB_ID,
+        output_id_snapshot: JOB_ID,
+        output_available: true,
+        launch_id: LAUNCH_ID,
+        ...variant,
+      })).toMatchObject({ status: 'success', attempt: { phase: 'succeeded', jobId: JOB_ID } });
     }
   });
 

@@ -5,7 +5,6 @@ import {
 } from './durableDraftLaunchApi';
 import type {
   ContractorWorkDraftLaunchOutput,
-  ContractorWorkDraftLaunchResult,
   DurableDraftLaunchAttemptClearAllResult,
   DurableDraftLaunchAttemptClearResult,
   DurableDraftLaunchAttemptPhase,
@@ -225,16 +224,16 @@ export function recordDurableDraftLaunchSuccess(
   storage: DurableDraftLaunchAttemptStorage,
   contractorId: string,
   draftId: string,
-  result: ContractorWorkDraftLaunchResult,
+  result: unknown,
   now?: () => Date,
 ): DurableDraftLaunchAttemptWriteResult {
   const canonicalResult = parseContractorWorkDraftLaunchResult(result);
-  if (!canonicalResult) throw new Error('DRAFT_LAUNCH_ATTEMPT_RESULT_INVALID');
+  if (!canonicalResult) return { status: 'invalid', reason: 'canonical_result' };
   const readResult = readDurableDraftLaunchAttempt(storage, contractorId, draftId);
   if (readResult.status === 'unavailable') return readResult;
   if (readResult.status !== 'found'
     || readResult.attempt.outputType !== canonicalResult.output_type
-    || canonicalResult.draft_id !== draftId) throw new Error('DRAFT_LAUNCH_ATTEMPT_RESULT_MISMATCH');
+    || canonicalResult.draft_id !== draftId) return { status: 'invalid', reason: 'attempt_mismatch' };
   return persistAttempt(storage, {
     ...readResult.attempt,
     phase: 'succeeded',
