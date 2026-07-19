@@ -4,6 +4,31 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-19
+
+- Branch: `codex/durable-draft-launch-2b`
+- Files changed:
+  - `servsync-durable-draft-launch-foundation.sql`
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `src/features/drafts/durableDraftLaunchTypes.ts`
+  - `src/types.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Corrected the packaged Slice 2B contract before sandbox application. Launch authorization now precedes private-ledger lookup or retry disclosure; Draft-to-output linkage remains only in the private success ledger; launch revalidates connected/local subjects and source requests; historical actor deletion no longer cascades audit rows; idempotency keys are contractor-serialized; save input uses stable validation and full-snapshot metadata; legacy intent defaults to null; ordering and labor precision match downstream contracts; and Estimate totals match the normal composer buckets.
+- Reason for change: The focused audit found privacy, authorization-ordering, idempotency, validation, audit-retention, and mapping defects that made the first SQL package unsafe for sandbox execution.
+- Tests/checks run:
+  - SQL remains unapplied; static/build/source-contract validation only.
+  - See the PR handoff for exact final command results and remaining credential-backed runtime tests.
+- Known risks or follow-ups:
+  - A second focused read-only audit is required before any sandbox SQL application.
+  - Runtime RLS, transaction rollback, concurrency, permission parity, and Estimate/Job mapping tests remain approval-gated until sandbox application.
+  - Existing Estimate, Job, and Draft permission checks are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the corrected private-ledger, permission-compatibility, and re-audit-before-apply contract.
+
 ## 2026-07-18
 
 - Branch: `codex/durable-draft-launch-2b`

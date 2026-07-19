@@ -13,7 +13,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.contractor_work_drafts (
   id uuid primary key default gen_random_uuid(),
   contractor_id uuid not null references public.contractor_profiles(id) on delete cascade,
-  created_by_user_id uuid not null references public.profiles(id) on delete cascade,
+  created_by_user_id uuid references public.profiles(id) on delete set null,
   homeowner_user_id uuid references public.profiles(id) on delete set null,
   home_id uuid references public.homes(id) on delete set null,
   local_contact_id uuid references public.contractor_local_contacts(id) on delete set null,
@@ -26,12 +26,12 @@ create table if not exists public.contractor_work_drafts (
   work_format text not null default 'standard' check (work_format = 'standard'),
   labor_mode text check (labor_mode is null or labor_mode in ('job_total', 'line_specific')),
   labor_rate_cents integer check (labor_rate_cents is null or labor_rate_cents >= 0),
-  job_labor_hours numeric(10,2) check (job_labor_hours is null or job_labor_hours >= 0),
+  job_labor_hours numeric(8,2) check (job_labor_hours is null or job_labor_hours >= 0),
   status text not null default 'active' check (status in ('active', 'consumed', 'discarded')),
   legacy_inspection_id uuid references public.inspections(id) on delete set null,
   launched_output_type text check (launched_output_type is null or launched_output_type in ('estimate', 'job')),
-  launched_estimate_id uuid references public.estimates(id) on delete set null,
-  launched_job_id uuid references public.inspections(id) on delete set null,
+  launched_estimate_id uuid references public.estimates(id) on delete restrict,
+  launched_job_id uuid references public.inspections(id) on delete restrict,
   launched_at timestamptz,
   launched_by_user_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -58,7 +58,6 @@ create table if not exists public.contractor_work_drafts (
       status = 'consumed'
       and launched_output_type is not null
       and launched_at is not null
-      and launched_by_user_id is not null
       and (
         (launched_output_type = 'estimate' and launched_estimate_id is not null and launched_job_id is null)
         or (launched_output_type = 'job' and launched_job_id is not null and launched_estimate_id is null)
@@ -76,14 +75,14 @@ create table if not exists public.contractor_work_draft_items (
   customer_description text not null default '',
   internal_notes text not null default '',
   line_type text not null default 'labor' check (line_type in ('labor', 'material', 'fee', 'other')),
-  quantity numeric(12,2) not null default 1 check (quantity >= 0),
+  quantity numeric(12,2) not null default 1 check (quantity > 0),
   unit text not null default 'each',
   unit_price_cents integer check (unit_price_cents is null or unit_price_cents >= 0),
-  labor_hours numeric(10,2) check (labor_hours is null or labor_hours >= 0),
+  labor_hours numeric(8,2) check (labor_hours is null or labor_hours >= 0),
   room_id text,
   room_label text,
   location_label text,
-  sort_order integer not null default 0,
+  sort_order integer not null default 0 check (sort_order >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint contractor_work_draft_items_title_not_blank check (length(trim(title)) > 0),
@@ -99,31 +98,21 @@ create table if not exists public.contractor_work_draft_launches (
   contractor_id uuid not null references public.contractor_profiles(id) on delete cascade,
   idempotency_key uuid not null,
   requested_output text not null check (requested_output in ('estimate', 'job')),
-  status text not null check (status in ('succeeded', 'failed')),
-  launched_estimate_id uuid references public.estimates(id) on delete set null,
-  launched_job_id uuid references public.inspections(id) on delete set null,
-  requested_by_user_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'succeeded' check (status = 'succeeded'),
+  launched_estimate_id uuid references public.estimates(id) on delete restrict,
+  launched_job_id uuid references public.inspections(id) on delete restrict,
+  requested_by_user_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   completed_at timestamptz,
-  failure_code text,
   constraint contractor_work_draft_launches_contractor_match_fk
     foreign key (draft_id, contractor_id)
     references public.contractor_work_drafts(id, contractor_id)
     on delete cascade,
   constraint contractor_work_draft_launches_status_linkage_check check (
-    (
-      status = 'succeeded'
-      and completed_at is not null
-      and failure_code is null
-      and (
-        (requested_output = 'estimate' and launched_estimate_id is not null and launched_job_id is null)
-        or (requested_output = 'job' and launched_job_id is not null and launched_estimate_id is null)
-      )
-    )
-    or (
-      status = 'failed'
-      and launched_estimate_id is null
-      and launched_job_id is null
+    completed_at is not null
+    and (
+      (requested_output = 'estimate' and launched_estimate_id is not null and launched_job_id is null)
+      or (requested_output = 'job' and launched_job_id is not null and launched_estimate_id is null)
     )
   )
 );
@@ -153,51 +142,16 @@ create unique index if not exists contractor_work_draft_launches_one_success_idx
 create unique index if not exists contractor_work_draft_launches_idempotency_idx
   on public.contractor_work_draft_launches(contractor_id, idempotency_key);
 
+create unique index if not exists contractor_work_draft_launches_estimate_output_unique_idx
+  on public.contractor_work_draft_launches(launched_estimate_id)
+  where status = 'succeeded' and launched_estimate_id is not null;
+
+create unique index if not exists contractor_work_draft_launches_job_output_unique_idx
+  on public.contractor_work_draft_launches(launched_job_id)
+  where status = 'succeeded' and launched_job_id is not null;
+
 create index if not exists contractor_work_draft_launches_draft_created_idx
   on public.contractor_work_draft_launches(draft_id, created_at desc);
-
-alter table public.estimates
-  add column if not exists source_work_draft_id uuid;
-
-alter table public.inspections
-  add column if not exists source_work_draft_id uuid;
-
-do $$
-begin
-  if not exists (
-    select 1
-      from pg_constraint
-     where conname = 'estimates_source_work_draft_fk'
-       and conrelid = 'public.estimates'::regclass
-  ) then
-    alter table public.estimates
-      add constraint estimates_source_work_draft_fk
-      foreign key (source_work_draft_id)
-      references public.contractor_work_drafts(id)
-      on delete set null;
-  end if;
-
-  if not exists (
-    select 1
-      from pg_constraint
-     where conname = 'inspections_source_work_draft_fk'
-       and conrelid = 'public.inspections'::regclass
-  ) then
-    alter table public.inspections
-      add constraint inspections_source_work_draft_fk
-      foreign key (source_work_draft_id)
-      references public.contractor_work_drafts(id)
-      on delete set null;
-  end if;
-end $$;
-
-create unique index if not exists estimates_source_work_draft_unique_idx
-  on public.estimates(source_work_draft_id)
-  where source_work_draft_id is not null;
-
-create unique index if not exists inspections_source_work_draft_unique_idx
-  on public.inspections(source_work_draft_id)
-  where source_work_draft_id is not null;
 
 alter table public.job_work_items
   drop constraint if exists job_work_items_source_type_check;
@@ -278,6 +232,87 @@ revoke all on table public.contractor_work_draft_launches from anon;
 revoke all on table public.contractor_work_draft_launches from authenticated;
 grant select on public.contractor_work_draft_launches to authenticated;
 
+create or replace function public.servsync_private_work_draft_uuid(
+  p_value text,
+  p_error_code text default 'DRAFT_INVALID'
+)
+returns uuid
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_value text := nullif(trim(coalesce(p_value, '')), '');
+begin
+  if v_value is null then
+    return null;
+  end if;
+
+  if v_value !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+    raise exception using message = p_error_code;
+  end if;
+
+  return v_value::uuid;
+exception
+  when invalid_text_representation then
+    raise exception using message = p_error_code;
+end;
+$$;
+
+create or replace function public.servsync_private_work_draft_numeric(
+  p_value text,
+  p_error_code text default 'DRAFT_INVALID'
+)
+returns numeric
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_value text := nullif(trim(coalesce(p_value, '')), '');
+begin
+  if v_value is null then
+    return null;
+  end if;
+
+  if v_value !~ '^[+]?([0-9]+(\.[0-9]+)?|\.[0-9]+)$' then
+    raise exception using message = p_error_code;
+  end if;
+
+  return v_value::numeric;
+exception
+  when invalid_text_representation or numeric_value_out_of_range then
+    raise exception using message = p_error_code;
+end;
+$$;
+
+create or replace function public.servsync_private_work_draft_integer(
+  p_value text,
+  p_error_code text default 'DRAFT_INVALID'
+)
+returns integer
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_value text := nullif(trim(coalesce(p_value, '')), '');
+begin
+  if v_value is null then
+    return null;
+  end if;
+
+  if v_value !~ '^[+]?[0-9]+$' then
+    raise exception using message = p_error_code;
+  end if;
+
+  return v_value::integer;
+exception
+  when invalid_text_representation or numeric_value_out_of_range then
+    raise exception using message = p_error_code;
+end;
+$$;
+
 create or replace function public.servsync_get_work_draft(p_draft_id uuid)
 returns jsonb
 language plpgsql
@@ -289,6 +324,10 @@ declare
   v_items jsonb;
   v_launches jsonb;
 begin
+  if auth.uid() is null then
+    raise exception using message = 'DRAFT_PERMISSION_DENIED';
+  end if;
+
   if p_draft_id is null then
     raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
@@ -310,7 +349,7 @@ begin
   end if;
 
   select coalesce(
-    jsonb_agg(to_jsonb(item) order by item.sort_order asc, item.created_at asc),
+    jsonb_agg(to_jsonb(item) order by item.sort_order asc, item.created_at asc, item.id asc),
     '[]'::jsonb
   )
     into v_items
@@ -339,7 +378,7 @@ create or replace function public.servsync_save_work_draft(
   p_draft_id uuid default null,
   p_metadata jsonb default '{}'::jsonb,
   p_items jsonb default '[]'::jsonb,
-  p_removed_item_ids uuid[] default array[]::uuid[]
+  p_removed_item_ids jsonb default '[]'::jsonb
 )
 returns jsonb
 language plpgsql
@@ -354,25 +393,31 @@ declare
   v_local_home public.contractor_local_homes;
   v_legacy public.inspections;
   v_draft_id uuid := p_draft_id;
-  v_homeowner_user_id uuid := nullif(trim(coalesce(p_metadata->>'homeowner_user_id', '')), '')::uuid;
-  v_home_id uuid := nullif(trim(coalesce(p_metadata->>'home_id', '')), '')::uuid;
-  v_local_contact_id uuid := nullif(trim(coalesce(p_metadata->>'local_contact_id', '')), '')::uuid;
-  v_local_home_id uuid := nullif(trim(coalesce(p_metadata->>'local_home_id', '')), '')::uuid;
-  v_service_request_id uuid := nullif(trim(coalesce(p_metadata->>'service_request_id', '')), '')::uuid;
-  v_legacy_inspection_id uuid := nullif(trim(coalesce(p_metadata->>'legacy_inspection_id', '')), '')::uuid;
-  v_intended_output text := nullif(trim(coalesce(p_metadata->>'intended_output', '')), '');
-  v_work_format text := coalesce(nullif(trim(coalesce(p_metadata->>'work_format', '')), ''), 'standard');
-  v_labor_mode text := nullif(trim(coalesce(p_metadata->>'labor_mode', '')), '');
-  v_labor_rate_cents integer := nullif(trim(coalesce(p_metadata->>'labor_rate_cents', '')), '')::integer;
-  v_job_labor_hours numeric := nullif(trim(coalesce(p_metadata->>'job_labor_hours', '')), '')::numeric;
+  v_homeowner_user_id uuid;
+  v_home_id uuid;
+  v_local_contact_id uuid;
+  v_local_home_id uuid;
+  v_service_request_id uuid;
+  v_legacy_inspection_id uuid;
+  v_intended_output text;
+  v_work_format text;
+  v_labor_mode text;
+  v_labor_rate_cents integer;
+  v_job_labor_hours numeric;
   v_item jsonb;
   v_item_id uuid;
-  v_existing_item public.contractor_work_draft_items;
+  v_item_ids uuid[] := array[]::uuid[];
+  v_removed_ids uuid[] := array[]::uuid[];
+  v_removed_value jsonb;
+  v_removed_id uuid;
   v_title text;
   v_line_type text;
   v_quantity numeric;
   v_unit_price_cents integer;
   v_labor_hours numeric;
+  v_sort_order integer;
+  v_saved_line_total bigint := 0;
+  v_saved_schema_labor_total bigint := 0;
 begin
   if p_metadata is null or jsonb_typeof(p_metadata) <> 'object' then
     raise exception using message = 'DRAFT_INVALID';
@@ -381,6 +426,23 @@ begin
   if p_items is null or jsonb_typeof(p_items) <> 'array' then
     raise exception using message = 'DRAFT_INVALID';
   end if;
+
+  if p_removed_item_ids is null or jsonb_typeof(p_removed_item_ids) <> 'array' then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
+
+  -- Metadata is a complete Draft snapshot. Missing optional values clear to null/empty.
+  v_homeowner_user_id := public.servsync_private_work_draft_uuid(p_metadata->>'homeowner_user_id');
+  v_home_id := public.servsync_private_work_draft_uuid(p_metadata->>'home_id');
+  v_local_contact_id := public.servsync_private_work_draft_uuid(p_metadata->>'local_contact_id');
+  v_local_home_id := public.servsync_private_work_draft_uuid(p_metadata->>'local_home_id');
+  v_service_request_id := public.servsync_private_work_draft_uuid(p_metadata->>'service_request_id');
+  v_legacy_inspection_id := public.servsync_private_work_draft_uuid(p_metadata->>'legacy_inspection_id', 'LEGACY_DRAFT_INCOMPATIBLE');
+  v_intended_output := nullif(trim(coalesce(p_metadata->>'intended_output', '')), '');
+  v_work_format := coalesce(nullif(trim(coalesce(p_metadata->>'work_format', '')), ''), 'standard');
+  v_labor_mode := nullif(trim(coalesce(p_metadata->>'labor_mode', '')), '');
+  v_labor_rate_cents := public.servsync_private_work_draft_integer(p_metadata->>'labor_rate_cents');
+  v_job_labor_hours := public.servsync_private_work_draft_numeric(p_metadata->>'job_labor_hours');
 
   select id
     into v_contractor_id
@@ -403,6 +465,24 @@ begin
     raise exception using message = 'DRAFT_INVALID';
   end if;
 
+  if v_labor_rate_cents is not null and v_labor_rate_cents < 0 then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
+
+  if v_job_labor_hours is not null and (
+    v_job_labor_hours < 0
+    or v_job_labor_hours > 999999.99
+    or v_job_labor_hours <> round(v_job_labor_hours, 2)
+  ) then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
+
+  if v_job_labor_hours is not null
+    and v_labor_rate_cents is not null
+    and round(v_job_labor_hours * v_labor_rate_cents) > 2147483647 then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
+
   if p_draft_id is not null then
     select *
       into v_existing
@@ -421,6 +501,29 @@ begin
     if v_existing.status <> 'active' then
       raise exception using message = 'DRAFT_NOT_ACTIVE';
     end if;
+
+    if v_existing.legacy_inspection_id is not null then
+      if v_legacy_inspection_id is null then
+        v_legacy_inspection_id := v_existing.legacy_inspection_id;
+      elsif v_legacy_inspection_id <> v_existing.legacy_inspection_id then
+        raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+      end if;
+    end if;
+  end if;
+
+  if v_homeowner_user_id is not null and (
+    v_local_contact_id is not null
+    or v_local_home_id is not null
+  ) then
+    raise exception using message = 'CUSTOMER_INVALID';
+  end if;
+
+  if v_local_contact_id is not null and (
+    v_homeowner_user_id is not null
+    or v_home_id is not null
+    or v_service_request_id is not null
+  ) then
+    raise exception using message = 'CUSTOMER_INVALID';
   end if;
 
   if v_service_request_id is not null then
@@ -431,13 +534,21 @@ begin
        and contractor_id = v_contractor_id;
 
     if v_request.id is null then
-      raise exception using message = 'CUSTOMER_INVALID';
+      raise exception using message = 'SERVICE_REQUEST_INVALID';
     end if;
 
     if v_homeowner_user_id is null then
       v_homeowner_user_id := v_request.homeowner_user_id;
     elsif v_homeowner_user_id <> v_request.homeowner_user_id then
-      raise exception using message = 'CUSTOMER_INVALID';
+      raise exception using message = 'SERVICE_REQUEST_INVALID';
+    end if;
+
+    if v_request.home_id is not null then
+      if v_home_id is null then
+        v_home_id := v_request.home_id;
+      elsif v_home_id <> v_request.home_id then
+        raise exception using message = 'SERVICE_REQUEST_INVALID';
+      end if;
     end if;
   end if;
 
@@ -505,12 +616,22 @@ begin
       into v_legacy
       from public.inspections
      where id = v_legacy_inspection_id
-       and contractor_id = v_contractor_id;
+       and contractor_id = v_contractor_id
+     for update;
 
     if v_legacy.id is null
       or v_legacy.job_origin <> 'draft_composer'
       or v_legacy.status <> 'draft'
       or v_legacy.job_status <> 'draft' then
+      raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+    end if;
+
+    if exists (
+      select 1
+        from public.contractor_work_drafts draft
+       where draft.legacy_inspection_id = v_legacy_inspection_id
+         and draft.id <> coalesce(v_draft_id, '00000000-0000-0000-0000-000000000000'::uuid)
+    ) then
       raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
     end if;
   end if;
@@ -567,58 +688,86 @@ begin
            labor_mode = v_labor_mode,
            labor_rate_cents = v_labor_rate_cents,
            job_labor_hours = v_job_labor_hours,
-           legacy_inspection_id = coalesce(v_legacy_inspection_id, legacy_inspection_id),
+           legacy_inspection_id = v_legacy_inspection_id,
            updated_at = now()
      where id = v_draft_id;
   end if;
 
-  if coalesce(array_length(p_removed_item_ids, 1), 0) > 0 then
-    delete from public.contractor_work_draft_items
-     where draft_id = v_draft_id
-       and contractor_id = v_contractor_id
-       and id = any(p_removed_item_ids);
-  end if;
+  -- Validate all IDs before any item mutation so malformed or mixed requests fail atomically.
+  for v_removed_value in select value from jsonb_array_elements(p_removed_item_ids)
+  loop
+    if jsonb_typeof(v_removed_value) <> 'string' then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+    v_removed_id := public.servsync_private_work_draft_uuid(v_removed_value #>> '{}');
+    if v_removed_id is null or v_removed_id = any(v_removed_ids) then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+    v_removed_ids := array_append(v_removed_ids, v_removed_id);
+  end loop;
 
   for v_item in select value from jsonb_array_elements(p_items)
   loop
     if jsonb_typeof(v_item) <> 'object' then
       raise exception using message = 'DRAFT_INVALID';
     end if;
+    v_item_id := public.servsync_private_work_draft_uuid(v_item->>'id');
+    if v_item_id is not null then
+      if v_item_id = any(v_item_ids) or v_item_id = any(v_removed_ids) then
+        raise exception using message = 'DRAFT_INVALID';
+      end if;
+      v_item_ids := array_append(v_item_ids, v_item_id);
+    end if;
+  end loop;
 
-    v_item_id := nullif(trim(coalesce(v_item->>'id', '')), '')::uuid;
-    v_existing_item := null;
+  if cardinality(v_removed_ids) > 0 and (
+    select count(*)
+      from public.contractor_work_draft_items item
+     where item.draft_id = v_draft_id
+       and item.contractor_id = v_contractor_id
+       and item.id = any(v_removed_ids)
+  ) <> cardinality(v_removed_ids) then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
+
+  if cardinality(v_removed_ids) > 0 then
+    delete from public.contractor_work_draft_items
+     where draft_id = v_draft_id
+       and contractor_id = v_contractor_id
+       and id = any(v_removed_ids);
+  end if;
+
+  for v_item in select value from jsonb_array_elements(p_items)
+  loop
+    v_item_id := public.servsync_private_work_draft_uuid(v_item->>'id');
 
     if v_item_id is not null then
-      select *
-        into v_existing_item
-        from public.contractor_work_draft_items
+      if not exists (
+        select 1
+          from public.contractor_work_draft_items
        where id = v_item_id
          and draft_id = v_draft_id
          and contractor_id = v_contractor_id
-       for update;
-
-      if v_existing_item.id is null then
+      ) then
         raise exception using message = 'DRAFT_INVALID';
       end if;
     end if;
 
-    v_title := nullif(trim(coalesce(v_item->>'title', v_existing_item.title, '')), '');
-    v_line_type := coalesce(nullif(trim(coalesce(v_item->>'line_type', '')), ''), v_existing_item.line_type, 'labor');
-    v_quantity := coalesce(nullif(trim(coalesce(v_item->>'quantity', '')), '')::numeric, v_existing_item.quantity, 1);
-    v_unit_price_cents := case
-      when v_item ? 'unit_price_cents' then nullif(trim(coalesce(v_item->>'unit_price_cents', '')), '')::integer
-      else v_existing_item.unit_price_cents
-    end;
-    v_labor_hours := case
-      when v_item ? 'labor_hours' then nullif(trim(coalesce(v_item->>'labor_hours', '')), '')::numeric
-      else v_existing_item.labor_hours
-    end;
+    v_title := nullif(trim(coalesce(v_item->>'title', '')), '');
+    v_line_type := coalesce(nullif(trim(coalesce(v_item->>'line_type', '')), ''), 'labor');
+    v_quantity := coalesce(public.servsync_private_work_draft_numeric(v_item->>'quantity'), 1);
+    v_unit_price_cents := public.servsync_private_work_draft_integer(v_item->>'unit_price_cents');
+    v_labor_hours := public.servsync_private_work_draft_numeric(v_item->>'labor_hours');
+    v_sort_order := coalesce(public.servsync_private_work_draft_integer(v_item->>'sort_order'), 0);
 
     if v_title is null then
       raise exception using message = 'DRAFT_INVALID';
     end if;
 
-    if v_line_type not in ('labor', 'material', 'fee', 'other') or v_quantity < 0 then
+    if v_line_type not in ('labor', 'material', 'fee', 'other')
+      or v_quantity <= 0
+      or v_quantity > 9999999999.99
+      or v_quantity <> round(v_quantity, 2) then
       raise exception using message = 'DRAFT_INVALID';
     end if;
 
@@ -626,7 +775,33 @@ begin
       raise exception using message = 'DRAFT_INVALID';
     end if;
 
-    if v_labor_hours is not null and v_labor_hours < 0 then
+    if v_labor_hours is not null and (
+      v_labor_hours < 0
+      or v_labor_hours > 999999.99
+      or v_labor_hours <> round(v_labor_hours, 2)
+    ) then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+
+    if v_sort_order < 0 then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+
+    if v_unit_price_cents is not null
+      and round(v_quantity * v_unit_price_cents) > 2147483647 then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+
+    if v_labor_hours is not null
+      and v_labor_rate_cents is not null
+      and round(v_labor_hours * v_labor_rate_cents) > 2147483647 then
+      raise exception using message = 'DRAFT_INVALID';
+    end if;
+
+    if v_labor_mode = 'line_specific'
+      and v_labor_hours is not null
+      and v_labor_hours > 0
+      and v_line_type not in ('material', 'other') then
       raise exception using message = 'DRAFT_INVALID';
     end if;
 
@@ -662,35 +837,159 @@ begin
         nullif(trim(coalesce(v_item->>'room_id', '')), ''),
         nullif(trim(coalesce(v_item->>'room_label', '')), ''),
         nullif(trim(coalesce(v_item->>'location_label', '')), ''),
-        coalesce(nullif(trim(coalesce(v_item->>'sort_order', '')), '')::integer, 0)
+        v_sort_order
       );
     else
       update public.contractor_work_draft_items
          set title = v_title,
-             description = coalesce(v_item->>'description', v_existing_item.description, ''),
-             customer_description = coalesce(v_item->>'customer_description', v_existing_item.customer_description, ''),
-             internal_notes = coalesce(v_item->>'internal_notes', v_existing_item.internal_notes, ''),
+             description = coalesce(v_item->>'description', ''),
+             customer_description = coalesce(v_item->>'customer_description', ''),
+             internal_notes = coalesce(v_item->>'internal_notes', ''),
              line_type = v_line_type,
              quantity = v_quantity,
-             unit = coalesce(nullif(trim(coalesce(v_item->>'unit', '')), ''), v_existing_item.unit, 'each'),
+             unit = coalesce(nullif(trim(coalesce(v_item->>'unit', '')), ''), 'each'),
              unit_price_cents = v_unit_price_cents,
              labor_hours = v_labor_hours,
-             room_id = nullif(trim(coalesce(v_item->>'room_id', v_existing_item.room_id, '')), ''),
-             room_label = nullif(trim(coalesce(v_item->>'room_label', v_existing_item.room_label, '')), ''),
-             location_label = nullif(trim(coalesce(v_item->>'location_label', v_existing_item.location_label, '')), ''),
-             sort_order = coalesce(nullif(trim(coalesce(v_item->>'sort_order', '')), '')::integer, v_existing_item.sort_order, 0),
+             room_id = nullif(trim(coalesce(v_item->>'room_id', '')), ''),
+             room_label = nullif(trim(coalesce(v_item->>'room_label', '')), ''),
+             location_label = nullif(trim(coalesce(v_item->>'location_label', '')), ''),
+             sort_order = v_sort_order,
              updated_at = now()
-       where id = v_item_id;
+       where id = v_item_id
+         and draft_id = v_draft_id
+         and contractor_id = v_contractor_id;
     end if;
   end loop;
+
+  select coalesce(sum(round(item.quantity * coalesce(item.unit_price_cents, 0))), 0)::bigint
+    into v_saved_line_total
+    from public.contractor_work_draft_items item
+   where item.draft_id = v_draft_id
+     and item.contractor_id = v_contractor_id;
+
+  if v_labor_rate_cents is not null then
+    if v_labor_mode = 'job_total' then
+      v_saved_schema_labor_total := round(coalesce(v_job_labor_hours, 0) * v_labor_rate_cents)::bigint;
+    elsif v_labor_mode = 'line_specific' then
+      select coalesce(sum(round(coalesce(item.labor_hours, 0) * v_labor_rate_cents)), 0)::bigint
+        into v_saved_schema_labor_total
+        from public.contractor_work_draft_items item
+       where item.draft_id = v_draft_id
+         and item.contractor_id = v_contractor_id
+         and item.line_type in ('material', 'other');
+    end if;
+  end if;
+
+  if v_saved_line_total > 2147483647
+    or v_saved_schema_labor_total > 2147483647
+    or v_saved_line_total + v_saved_schema_labor_total > 2147483647 then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
 
   return public.servsync_get_work_draft(v_draft_id);
 end;
 $$;
 
+create or replace function public.servsync_private_validate_work_draft_relationships(
+  p_draft public.contractor_work_drafts
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_request public.service_requests;
+begin
+  if p_draft.homeowner_user_id is not null then
+    if p_draft.local_contact_id is not null or p_draft.local_home_id is not null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if not exists (
+      select 1 from public.profiles profile where profile.id = p_draft.homeowner_user_id
+    ) or not exists (
+      select 1
+        from public.homeowner_contractor_connections connection
+       where connection.contractor_id = p_draft.contractor_id
+         and connection.homeowner_user_id = p_draft.homeowner_user_id
+         and connection.status = 'active'
+    ) then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if p_draft.home_id is not null and not exists (
+      select 1
+        from public.homes home
+       where home.id = p_draft.home_id
+         and home.homeowner_user_id = p_draft.homeowner_user_id
+    ) then
+      raise exception using message = 'PROPERTY_INVALID';
+    end if;
+
+    if p_draft.service_request_id is not null then
+      select *
+        into v_request
+        from public.service_requests request
+       where request.id = p_draft.service_request_id
+         and request.contractor_id = p_draft.contractor_id;
+
+      if v_request.id is null
+        or v_request.homeowner_user_id <> p_draft.homeowner_user_id
+        or (v_request.home_id is not null and v_request.home_id is distinct from p_draft.home_id) then
+        raise exception using message = 'SERVICE_REQUEST_INVALID';
+      end if;
+    end if;
+  elsif p_draft.local_contact_id is not null then
+    if p_draft.home_id is not null or p_draft.service_request_id is not null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if not exists (
+      select 1
+        from public.contractor_local_contacts contact
+       where contact.id = p_draft.local_contact_id
+         and contact.contractor_id = p_draft.contractor_id
+    ) then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if p_draft.local_home_id is not null and not exists (
+      select 1
+        from public.contractor_local_homes home
+       where home.id = p_draft.local_home_id
+         and home.contractor_id = p_draft.contractor_id
+         and home.local_contact_id = p_draft.local_contact_id
+    ) then
+      raise exception using message = 'PROPERTY_INVALID';
+    end if;
+  else
+    raise exception using message = 'CUSTOMER_INVALID';
+  end if;
+end;
+$$;
+
+create or replace function public.servsync_private_can_create_work_draft_estimate(
+  p_contractor_id uuid
+)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  -- Compatibility boundary: mirrors the current owner-scoped normal Estimate insert policy.
+  select exists (
+    select 1
+      from public.contractor_profiles contractor
+     where contractor.id = p_contractor_id
+       and contractor.owner_user_id = auth.uid()
+  );
+$$;
+
 create or replace function public.servsync_import_legacy_draft_job(
   p_inspection_id uuid,
-  p_intended_output text default 'job'
+  p_intended_output text default null
 )
 returns uuid
 language plpgsql
@@ -736,6 +1035,27 @@ begin
     return v_existing_id;
   end if;
 
+  if exists (
+    select 1
+      from public.job_work_items item
+     where item.inspection_id = v_job.id
+       and item.contractor_id = v_job.contractor_id
+       and item.completion_status <> 'removed'
+       and item.work_state <> 'removed'
+       and (
+         length(trim(item.title)) = 0
+         or
+         item.line_type not in ('labor', 'material', 'fee', 'other')
+         or item.quantity <= 0
+         or item.unit_price_cents < 0
+         or item.labor_hours < 0
+         or item.labor_hours > 999999.99
+         or item.sort_order < 0
+       )
+  ) then
+    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+  end if;
+
   insert into public.contractor_work_drafts (
     contractor_id,
     created_by_user_id,
@@ -751,7 +1071,11 @@ begin
     legacy_inspection_id
   ) values (
     v_job.contractor_id,
-    coalesce(v_job.draft_created_by, auth.uid()),
+    case
+      when exists (select 1 from public.profiles profile where profile.id = v_job.draft_created_by)
+        then v_job.draft_created_by
+      else auth.uid()
+    end,
     v_job.homeowner_user_id,
     v_job.home_id,
     v_job.local_contact_id,
@@ -803,7 +1127,7 @@ begin
     and item.contractor_id = v_job.contractor_id
     and item.completion_status <> 'removed'
     and item.work_state <> 'removed'
-  order by item.sort_order asc, item.created_at asc;
+  order by item.sort_order asc, item.created_at asc, item.id asc;
 
   return v_draft_id;
 end;
@@ -819,40 +1143,44 @@ set search_path = public
 as $$
 declare
   v_estimate_id uuid;
-  v_material_total integer := 0;
-  v_labor_line_total integer := 0;
-  v_schema_labor_total integer := 0;
-  v_fee_total integer := 0;
-  v_other_total integer := 0;
-  v_subtotal integer := 0;
+  v_material_total bigint := 0;
+  v_labor_line_total bigint := 0;
+  v_schema_labor_total bigint := 0;
+  v_fee_total bigint := 0;
+  v_other_total bigint := 0;
+  v_subtotal bigint := 0;
 begin
-  if not public.current_user_can_manage_contractor_billing(p_draft.contractor_id) then
+  if not public.servsync_private_can_create_work_draft_estimate(p_draft.contractor_id) then
     raise exception using message = 'DRAFT_PERMISSION_DENIED';
   end if;
 
   select
-    coalesce(sum(case when line_type = 'material' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::integer,
-    coalesce(sum(case when line_type = 'labor' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::integer,
-    coalesce(sum(case when line_type = 'fee' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::integer,
-    coalesce(sum(case when line_type = 'other' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::integer
-    into v_material_total, v_labor_line_total, v_fee_total, v_other_total
+    coalesce(sum(case when line_type in ('material', 'other') then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::bigint,
+    coalesce(sum(case when line_type = 'labor' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::bigint,
+    coalesce(sum(case when line_type = 'fee' then round(quantity * coalesce(unit_price_cents, 0)) else 0 end), 0)::bigint
+    into v_material_total, v_labor_line_total, v_fee_total
     from public.contractor_work_draft_items
    where draft_id = p_draft.id
      and contractor_id = p_draft.contractor_id;
 
   if p_draft.labor_rate_cents is not null then
     if p_draft.labor_mode = 'job_total' and p_draft.job_labor_hours is not null then
-      v_schema_labor_total := round(p_draft.job_labor_hours * p_draft.labor_rate_cents)::integer;
+      v_schema_labor_total := round(p_draft.job_labor_hours * p_draft.labor_rate_cents)::bigint;
     elsif p_draft.labor_mode = 'line_specific' then
-      select coalesce(sum(round(coalesce(labor_hours, 0) * p_draft.labor_rate_cents)), 0)::integer
+      select coalesce(sum(round(coalesce(labor_hours, 0) * p_draft.labor_rate_cents)), 0)::bigint
         into v_schema_labor_total
         from public.contractor_work_draft_items
        where draft_id = p_draft.id
-         and contractor_id = p_draft.contractor_id;
+         and contractor_id = p_draft.contractor_id
+         and line_type in ('material', 'other');
     end if;
   end if;
 
   v_subtotal := v_material_total + v_labor_line_total + v_schema_labor_total + v_fee_total + v_other_total;
+
+  if greatest(v_material_total, v_labor_line_total + v_schema_labor_total, v_fee_total, v_other_total, v_subtotal) > 2147483647 then
+    raise exception using message = 'DRAFT_INVALID';
+  end if;
 
   insert into public.estimates (
     contractor_id,
@@ -862,7 +1190,6 @@ begin
     inspection_id,
     home_id,
     local_home_id,
-    source_work_draft_id,
     title,
     scope,
     notes,
@@ -887,7 +1214,6 @@ begin
     null,
     p_draft.home_id,
     p_draft.local_home_id,
-    p_draft.id,
     coalesce(nullif(trim(p_draft.title), ''), 'Draft estimate'),
     trim(coalesce(p_draft.scope_description, '')),
     '',
@@ -928,12 +1254,12 @@ begin
     item.quantity,
     item.unit,
     item.unit_price_cents,
-    item.labor_hours,
-    item.sort_order
+    case when item.line_type in ('material', 'other') then item.labor_hours else null end,
+    row_number() over (order by item.sort_order asc, item.created_at asc, item.id asc) - 1
   from public.contractor_work_draft_items item
   where item.draft_id = p_draft.id
     and item.contractor_id = p_draft.contractor_id
-  order by item.sort_order asc, item.created_at asc;
+  order by item.sort_order asc, item.created_at asc, item.id asc;
 
   return v_estimate_id;
 end;
@@ -967,7 +1293,6 @@ begin
     job_type,
     job_status,
     job_origin,
-    source_work_draft_id,
     rooms_with_findings
   ) values (
     p_draft.contractor_id,
@@ -982,7 +1307,6 @@ begin
     'service_visit',
     'draft',
     'direct',
-    p_draft.id,
     '[]'::jsonb
   )
   returning id into v_job_id;
@@ -1016,7 +1340,7 @@ begin
     v_job_id,
     item.contractor_id,
     'work_draft_item',
-    'work-draft-item:' || item.id::text,
+    'work-draft-item:' || (row_number() over (order by item.sort_order asc, item.created_at asc, item.id asc) - 1)::text,
     item.title,
     item.description,
     item.customer_description,
@@ -1035,11 +1359,11 @@ begin
     item.room_id,
     item.room_label,
     item.location_label,
-    item.sort_order
+    row_number() over (order by item.sort_order asc, item.created_at asc, item.id asc) - 1
   from public.contractor_work_draft_items item
   where item.draft_id = p_draft.id
     and item.contractor_id = p_draft.contractor_id
-  order by item.sort_order asc, item.created_at asc;
+  order by item.sort_order asc, item.created_at asc, item.id asc;
 
   return v_job_id;
 end;
@@ -1064,6 +1388,10 @@ declare
   v_job_id uuid;
   v_launch_id uuid;
 begin
+  if auth.uid() is null then
+    raise exception using message = 'DRAFT_PERMISSION_DENIED';
+  end if;
+
   if p_draft_id is null then
     raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
@@ -1089,6 +1417,19 @@ begin
   if v_draft.id is null then
     raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
+
+  -- Authorization must precede every launch-ledger lookup and consumed-output return.
+  if not (
+    public.current_user_can_access_contractor(v_draft.contractor_id)
+    or public.current_user_is_platform_admin()
+  ) then
+    raise exception using message = 'DRAFT_PERMISSION_DENIED';
+  end if;
+
+  -- Serialize contractor-scoped idempotency keys independently from Draft row locking.
+  perform pg_advisory_xact_lock(
+    hashtextextended(v_draft.contractor_id::text || ':' || p_idempotency_key::text, 0)
+  );
 
   select *
     into v_conflicting_launch
@@ -1123,18 +1464,26 @@ begin
     );
   end if;
 
-  if not (
-    public.current_user_can_access_contractor(v_draft.contractor_id)
-    or public.current_user_is_platform_admin()
-  ) then
-    raise exception using message = 'DRAFT_PERMISSION_DENIED';
-  end if;
-
   if v_draft.status = 'discarded' then
     raise exception using message = 'DRAFT_NOT_ACTIVE';
   end if;
 
   if v_draft.status = 'consumed' then
+    if v_draft.launched_output_type is not null
+      and (
+        (v_draft.launched_output_type = 'estimate' and v_draft.launched_estimate_id is not null and v_draft.launched_job_id is null)
+        or (v_draft.launched_output_type = 'job' and v_draft.launched_job_id is not null and v_draft.launched_estimate_id is null)
+      ) then
+      return jsonb_build_object(
+        'draft_id', v_draft.id,
+        'status', 'already_consumed',
+        'output_type', v_draft.launched_output_type,
+        'estimate_id', v_draft.launched_estimate_id,
+        'job_id', v_draft.launched_job_id,
+        'launch_id', null,
+        'idempotent', false
+      );
+    end if;
     raise exception using message = 'DRAFT_ALREADY_CONSUMED';
   end if;
 
@@ -1167,6 +1516,8 @@ begin
     raise exception using message = 'DRAFT_INVALID';
   end if;
 
+  perform public.servsync_private_validate_work_draft_relationships(v_draft);
+
   if v_output_type = 'job'
     and v_draft.service_request_id is not null
     and exists (
@@ -1182,7 +1533,7 @@ begin
   end if;
 
   if v_output_type = 'estimate' then
-    if not public.current_user_can_manage_contractor_billing(v_draft.contractor_id) then
+    if not public.servsync_private_can_create_work_draft_estimate(v_draft.contractor_id) then
       raise exception using message = 'DRAFT_PERMISSION_DENIED';
     end if;
     v_estimate_id := public.servsync_private_launch_work_draft_as_estimate(v_draft);
@@ -1235,9 +1586,6 @@ begin
     'launch_id', v_launch_id,
     'idempotent', false
   );
-exception
-  when unique_violation then
-    raise exception using message = 'LAUNCH_CONFLICT';
 end;
 $$;
 
@@ -1245,9 +1593,9 @@ revoke execute on function public.servsync_get_work_draft(uuid) from public;
 revoke execute on function public.servsync_get_work_draft(uuid) from anon;
 grant execute on function public.servsync_get_work_draft(uuid) to authenticated;
 
-revoke execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, uuid[]) from public;
-revoke execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, uuid[]) from anon;
-grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, uuid[]) to authenticated;
+revoke execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) from public;
+revoke execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) from anon;
+grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) to authenticated;
 
 revoke execute on function public.servsync_import_legacy_draft_job(uuid, text) from public;
 revoke execute on function public.servsync_import_legacy_draft_job(uuid, text) from anon;
@@ -1265,23 +1613,55 @@ revoke all on function public.servsync_private_launch_work_draft_as_job(public.c
 revoke all on function public.servsync_private_launch_work_draft_as_job(public.contractor_work_drafts) from anon;
 revoke all on function public.servsync_private_launch_work_draft_as_job(public.contractor_work_drafts) from authenticated;
 
+revoke all on function public.servsync_private_work_draft_uuid(text, text) from public;
+revoke all on function public.servsync_private_work_draft_uuid(text, text) from anon;
+revoke all on function public.servsync_private_work_draft_uuid(text, text) from authenticated;
+
+revoke all on function public.servsync_private_work_draft_numeric(text, text) from public;
+revoke all on function public.servsync_private_work_draft_numeric(text, text) from anon;
+revoke all on function public.servsync_private_work_draft_numeric(text, text) from authenticated;
+
+revoke all on function public.servsync_private_work_draft_integer(text, text) from public;
+revoke all on function public.servsync_private_work_draft_integer(text, text) from anon;
+revoke all on function public.servsync_private_work_draft_integer(text, text) from authenticated;
+
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from public;
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from anon;
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from authenticated;
+
+revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from public;
+revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from anon;
+revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from authenticated;
+
 comment on table public.contractor_work_drafts is
   'Contractor-only durable Draft planning records for the shared Work composer. Homeowners must not see these records.';
 
 comment on column public.contractor_work_drafts.private_notes is
   'Contractor-only Draft notes. These are not automatically copied to homeowner-visible Estimate or Job fields.';
 
+comment on column public.contractor_work_drafts.created_by_user_id is
+  'Historical actor reference. It becomes null rather than deleting the Draft when the profile is removed.';
+
+comment on column public.contractor_work_drafts.launched_by_user_id is
+  'Historical launch actor reference. It may become null while consumed Draft audit metadata remains valid.';
+
 comment on table public.contractor_work_draft_items is
   'Contractor-only durable Draft line items copied into the initial launched Estimate or Job workflow.';
+
+comment on column public.contractor_work_draft_items.sort_order is
+  'Presentation order. Duplicate values are allowed and resolved deterministically by sort_order, created_at, then id.';
 
 comment on table public.contractor_work_draft_launches is
   'Idempotent launch ledger enforcing one successful initial workflow output per contractor Work Draft.';
 
-comment on column public.estimates.source_work_draft_id is
-  'Private source Draft linkage for Estimate records created by durable Draft launch.';
+comment on column public.contractor_work_draft_launches.requested_by_user_id is
+  'Historical launch actor reference. It may become null without deleting the successful launch ledger row.';
 
-comment on column public.inspections.source_work_draft_id is
-  'Private source Draft linkage for Job records created by durable Draft launch.';
+comment on column public.contractor_work_draft_launches.launched_estimate_id is
+  'Private reverse linkage to the canonical launched Estimate. Deletion is restricted to preserve the audit relationship.';
+
+comment on column public.contractor_work_draft_launches.launched_job_id is
+  'Private reverse linkage to the canonical launched Job. Deletion is restricted to preserve the audit relationship.';
 
 notify pgrst, 'reload schema';
 
@@ -1291,8 +1671,8 @@ commit;
 -- 1. Apply only to sandbox ref zpzdkoaubyjtsomccxya after owner approval.
 -- 2. Create connected and local active Drafts with nullable and changed intended_output.
 -- 3. Save, reorder, and explicitly remove Draft items.
--- 4. Launch one Draft as Estimate and verify status=draft, source_work_draft_id, line copy, private_notes not copied.
--- 5. Launch one Draft as Job and verify source_work_draft_id, job_work_items copy, and no Estimate/Invoice.
+-- 4. Launch one Draft as Estimate and verify status=draft, private-ledger reverse linkage, line copy, and private_notes not copied.
+-- 5. Launch one Draft as Job and verify private-ledger reverse linkage, job_work_items copy, and no Estimate/Invoice.
 -- 6. Retry same idempotency key and verify no duplicate output.
 -- 7. Retry different key after success and verify canonical consumed output response.
 -- 8. Reuse same key on another Draft and verify IDEMPOTENCY_CONFLICT.
