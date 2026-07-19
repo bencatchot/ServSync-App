@@ -9,25 +9,26 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Branch: `codex/durable-draft-launch-2b`
 - Files changed:
   - `servsync-durable-draft-launch-foundation.sql`
+  - `servsync-durable-draft-launch-permission-parity-correction.sql`
   - `src/features/drafts/durableDraftLaunchApi.ts`
   - `src/features/drafts/durableDraftLaunchTypes.ts`
   - `tests/e2e/durable-draft-launch-foundation.spec.ts`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Corrected the packaged Slice 2B contract before sandbox application. Launch authorization uses a non-enumerating Draft lookup before private-ledger or consumed-output disclosure; connected Job launch matches the normal service-request/shared-property authorization boundary and locks relationship rows during revalidation; legacy import validates and locks connected/local relationships before reading private snapshots; and a shared inspections trigger plus partial unique index serializes non-cancelled operational Jobs per contractor/service request across direct creation, Estimate conversion, Draft launch, activation, restore, and reassignment paths. Output audit linkage now uses nullable `ON DELETE SET NULL` live FKs plus immutable contractor-private output-ID snapshots, preserving existing eligible draft Job deletion while keeping the Draft consumed and preventing replacement launch. Contractor deletion still cannot cascade-delete durable Draft history. The earlier corrections keep Draft-to-output linkage private, serialize idempotency keys, validate full-snapshot save input, default legacy intent to null, use deterministic ordering and downstream-compatible labor precision, and match normal Estimate totals.
-- Reason for change: The focused audit found privacy, authorization-ordering, idempotency, validation, audit-retention, and mapping defects that made the first SQL package unsafe for sandbox execution.
+- Summary of change: Corrected the packaged Slice 2B contract and its Draft-persistence permission boundary. The reviewed foundation was applied once to ServSync Sandbox and passed the completed runtime matrix except for a Job-workflow parity defect: a user with current Job-write authority could create a normal Job but could not persist the durable Draft required by Draft-first Job launch. The canonical foundation now allows Draft persistence through the union of the existing billing-management and Job-write capability helpers, without role-name checks. Estimate launch remains separately governed by the existing Estimate-creation boundary, and Job launch remains governed by Job-write authority. A narrow transaction-wrapped correction SQL file packages the same save RPC and private capability-union helper for environments that already installed foundation hash `cafa9260e379f561a12dbeff66d705685bb8200ebf39edc980935da5c25ae185`; fresh environments use only the corrected canonical foundation.
+- Reason for change: Sandbox runtime validation found that billing-only Draft persistence made Draft-to-Job narrower than normal Job creation for active users who have Job-write capability but not billing-management capability.
 - Tests/checks run:
-  - SQL remains unapplied; static/build/source-contract validation only.
+  - The prior foundation hash is installed in ServSync Sandbox. The permission-parity correction remains packaged and unapplied; this implementation performs static/build/source-contract validation only.
   - See the PR handoff for exact final command results and remaining credential-backed runtime tests.
 - Known risks or follow-ups:
-  - Another focused read-only audit is required before any sandbox SQL application.
-  - Runtime RLS, transaction rollback, concurrency, permission parity, and Estimate/Job mapping tests remain approval-gated until sandbox application.
+  - A focused read-only audit is required before applying the permission-parity correction to ServSync Sandbox.
+  - Focused sandbox permission-parity runtime testing remains required after separately approved correction application.
   - Typed UUID RPC arguments are validated by PostgREST/PostgreSQL before function execution; stable ServSync codes apply after successful argument coercion.
-  - Existing Estimate, Job, and Draft permission checks are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work.
+  - Existing Estimate, Job, and Draft permission helpers are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work. No universal field-technician Estimate restriction was added.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-035 now records the corrected private-ledger, permission-compatibility, and re-audit-before-apply contract.
+  - REASON: FB-035 now records the sandbox-discovered Draft-persistence parity defect, capability-union correction, separate sandbox patch gate, and unchanged output-specific launch permissions.
 
 ## 2026-07-18
 

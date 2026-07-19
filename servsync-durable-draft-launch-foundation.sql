@@ -519,6 +519,22 @@ begin
 end;
 $$;
 
+create or replace function public.servsync_private_can_persist_work_draft(
+  p_contractor_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_contractor_id is not null
+    and (
+      public.current_user_can_manage_contractor_billing(p_contractor_id)
+      or public.current_user_can_write_contractor_jobs(p_contractor_id)
+    );
+$$;
+
 create or replace function public.servsync_save_work_draft(
   p_draft_id uuid default null,
   p_metadata jsonb default '{}'::jsonb,
@@ -599,7 +615,7 @@ begin
     from public.servsync_current_contractor_profile()
    limit 1;
 
-  if v_contractor_id is null or not public.current_user_can_manage_contractor_billing(v_contractor_id) then
+  if not public.servsync_private_can_persist_work_draft(v_contractor_id) then
     raise exception using message = 'DRAFT_PERMISSION_DENIED';
   end if;
 
@@ -2107,6 +2123,10 @@ revoke all on function public.servsync_private_can_create_work_draft_estimate(uu
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from anon;
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from authenticated;
 
+revoke all on function public.servsync_private_can_persist_work_draft(uuid) from public;
+revoke all on function public.servsync_private_can_persist_work_draft(uuid) from anon;
+revoke all on function public.servsync_private_can_persist_work_draft(uuid) from authenticated;
+
 revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from public;
 revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from anon;
 revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from authenticated;
@@ -2168,6 +2188,9 @@ comment on column public.contractor_work_draft_launches.launched_job_id_snapshot
 
 comment on function public.servsync_guard_operational_job_service_request() is
   'Shared inspections guard for one non-cancelled operational Job per contractor/service request. Inactive draft_composer placeholders remain outside the operational uniqueness domain until activation.';
+
+comment on function public.servsync_private_can_persist_work_draft(uuid) is
+  'Compatibility capability union for contractor Draft planning. Persistence is allowed through existing billing-management or Job-write authority; output launch remains separately authorized.';
 
 comment on function public.servsync_get_work_draft(uuid) is
   'Typed UUID arguments are coerced by PostgREST/PostgreSQL before this function runs. ServSync error codes apply after successful argument coercion; missing and foreign Draft IDs return DRAFT_NOT_FOUND.';

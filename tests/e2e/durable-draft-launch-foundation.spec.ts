@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const sqlPath = resolve(process.cwd(), 'servsync-durable-draft-launch-foundation.sql');
+const permissionCorrectionSqlPath = resolve(
+  process.cwd(),
+  'servsync-durable-draft-launch-permission-parity-correction.sql',
+);
 
 function sourceFile(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -11,6 +15,10 @@ function sourceFile(path: string) {
 
 function sqlSource() {
   return readFileSync(sqlPath, 'utf8');
+}
+
+function permissionCorrectionSqlSource() {
+  return readFileSync(permissionCorrectionSqlPath, 'utf8');
 }
 
 function sourceBetween(source: string, start: string, end: string) {
@@ -130,6 +138,60 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(saveRpc).toContain('v_legacy_inspection_id <> v_existing.legacy_inspection_id');
     expect(saveRpc).toContain('LEGACY_DRAFT_INCOMPATIBLE');
     expect(saveRpc).not.toMatch(/->>'(?:id|quantity|unit_price_cents|labor_hours|sort_order)'[^\n]*::(?:uuid|numeric|integer)/);
+  });
+
+  test('Draft persistence uses the same capability union in canonical and correction SQL', () => {
+    const canonical = sqlSource();
+    const correction = permissionCorrectionSqlSource();
+    const helperStart = 'create or replace function public.servsync_private_can_persist_work_draft';
+    const saveStart = 'create or replace function public.servsync_save_work_draft';
+    const canonicalHelper = sourceBetween(canonical, helperStart, saveStart);
+    const correctionHelper = sourceBetween(correction, helperStart, saveStart);
+    const canonicalSave = sourceBetween(
+      canonical,
+      saveStart,
+      'create or replace function public.servsync_private_validate_work_draft_relationships',
+    );
+    const correctionSave = sourceBetween(
+      correction,
+      saveStart,
+      'revoke all on function public.servsync_private_can_persist_work_draft',
+    );
+
+    expect(correctionHelper.trim()).toBe(canonicalHelper.trim());
+    expect(correctionSave.trim()).toBe(canonicalSave.trim());
+    for (const helper of [canonicalHelper, correctionHelper]) {
+      expect(helper).toContain('current_user_can_manage_contractor_billing(p_contractor_id)');
+      expect(helper).toContain('current_user_can_write_contractor_jobs(p_contractor_id)');
+      expect(helper).toMatch(/manage_contractor_billing\(p_contractor_id\)\s+or\s+public\.current_user_can_write_contractor_jobs/s);
+      expect(helper).not.toMatch(/field_tech|office|admin|owner/i);
+      expect(helper).toContain('set search_path = public');
+    }
+    for (const saveRpc of [canonicalSave, correctionSave]) {
+      expect(saveRpc).toContain('public.servsync_private_can_persist_work_draft(v_contractor_id)');
+      expect(saveRpc).toContain("raise exception using message = 'DRAFT_PERMISSION_DENIED'");
+      expect(saveRpc).not.toMatch(/current_user_can_manage_contractor_billing\(v_contractor_id\)[^\n]*then/);
+    }
+  });
+
+  test('permission correction is function-only and preserves launch, import, RLS, and data', () => {
+    const correction = permissionCorrectionSqlSource();
+
+    expect(correction.trim().startsWith('-- ServSync durable Draft launch permission-parity correction.')).toBe(true);
+    expect(correction).toMatch(/\nbegin;\n/);
+    expect(correction.trim().endsWith('commit;')).toBe(true);
+    expect(correction).toContain("to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)')");
+    expect(correction).toContain('grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) to authenticated');
+    expect(correction).toContain('revoke all on function public.servsync_private_can_persist_work_draft(uuid) from authenticated');
+    expect(correction).toContain("notify pgrst, 'reload schema'");
+    expect(correction).not.toMatch(/\bcreate\s+table\b|\balter\s+table\b|\bdrop\s+table\b/i);
+    expect(Array.from(correction.matchAll(/create or replace function public\.([^(\s]+)/g), match => match[1])).toEqual([
+      'servsync_private_can_persist_work_draft',
+      'servsync_save_work_draft',
+    ]);
+    expect(correction).not.toContain('create or replace function public.servsync_launch_work_draft');
+    expect(correction).not.toContain('create or replace function public.servsync_import_legacy_draft_job');
+    expect(correction).not.toMatch(/create policy|drop policy|enable row level security/i);
   });
 
   test('resume and output copies use deterministic item ordering', () => {
@@ -392,6 +454,7 @@ test.describe('Durable Draft Launch foundation', () => {
     for (const helper of [
       'servsync_private_launch_work_draft_as_estimate',
       'servsync_private_launch_work_draft_as_job',
+      'servsync_private_can_persist_work_draft',
       'servsync_private_validate_work_draft_relationships',
       'servsync_private_validate_legacy_work_draft_relationships',
       'servsync_private_can_create_work_draft_estimate',
@@ -436,6 +499,7 @@ test.describe('Durable Draft Launch foundation', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'servsync-durable-draft-launch-foundation.sql',
+      'servsync-durable-draft-launch-permission-parity-correction.sql',
       'src/features/drafts/durableDraftLaunchApi.ts',
       'src/features/drafts/durableDraftLaunchTypes.ts',
       'tests/e2e/durable-draft-launch-foundation.spec.ts',
