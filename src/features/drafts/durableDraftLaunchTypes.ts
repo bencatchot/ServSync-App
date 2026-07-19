@@ -211,6 +211,7 @@ export type DurableDraftApplicationErrorCode =
   | 'DRAFT_NOT_ACTIVE'
   | 'DRAFT_ALREADY_CONSUMED'
   | 'DRAFT_INVALID'
+  | 'DRAFT_RESPONSE_INVALID'
   | 'INTENDED_OUTPUT_REQUIRED'
   | 'INTENDED_OUTPUT_MISMATCH'
   | 'UNSUPPORTED_OUTPUT'
@@ -264,3 +265,22 @@ export type DurableDraftLaunchAttemptRecord = {
   outputIdSnapshot?: string;
   outputAvailable?: boolean;
 };
+
+export type DurableDraftLaunchAttemptReadResult =
+  | { status: 'found'; attempt: DurableDraftLaunchAttemptRecord }
+  | { status: 'absent' }
+  | { status: 'invalid' }
+  | { status: 'unavailable'; operation: 'read' };
+
+export type DurableDraftLaunchAttemptWriteResult =
+  | { status: 'success'; attempt: DurableDraftLaunchAttemptRecord }
+  | { status: 'unavailable'; operation: 'read' | 'write' | 'verify' };
+
+export type DurableDraftLaunchAttemptClearResult =
+  | { status: 'success'; removed: boolean }
+  | { status: 'unavailable'; operation: 'read' | 'remove' };
+
+export type DurableDraftLaunchAttemptClearAllResult =
+  | { status: 'success'; removedCount: number; failedCount: 0 }
+  | { status: 'partial'; removedCount: number; failedCount: number }
+  | { status: 'unavailable'; operation: 'enumerate'; removedCount: 0; failedCount: 0 };

@@ -51,17 +51,27 @@ function sourceFile(path: string) {
 const DRAFT_ID = '00000000-0000-4000-8000-000000000001';
 const CONTRACTOR_ID = '00000000-0000-4000-8000-000000000002';
 const ITEM_ID = '00000000-0000-4000-8000-000000000003';
+const HOMEOWNER_ID = '00000000-0000-4000-8000-000000000004';
+const HOME_ID = '00000000-0000-4000-8000-000000000005';
+const REQUEST_ID = '00000000-0000-4000-8000-000000000006';
+const NEW_ITEM_ID = '00000000-0000-4000-8000-000000000007';
+const IDEMPOTENCY_ID = '00000000-0000-4000-8000-000000000008';
+const JOB_ID = '00000000-0000-4000-8000-000000000009';
+const ESTIMATE_ID = '00000000-0000-4000-8000-00000000000a';
+const LAUNCH_ID = '00000000-0000-4000-8000-00000000000b';
+const OTHER_DRAFT_ID = '00000000-0000-4000-8000-00000000000e';
+const OTHER_ITEM_ID = '00000000-0000-4000-8000-00000000000f';
 
 function draft(overrides: Partial<ContractorWorkDraft> = {}): ContractorWorkDraft {
   return {
     id: DRAFT_ID,
     contractor_id: CONTRACTOR_ID,
     created_by_user_id: null,
-    homeowner_user_id: 'homeowner-1',
-    home_id: 'home-1',
+    homeowner_user_id: HOMEOWNER_ID,
+    home_id: HOME_ID,
     local_contact_id: null,
     local_home_id: null,
-    service_request_id: 'request-1',
+    service_request_id: REQUEST_ID,
     subject_type: 'connected_homeowner',
     subject_display_name_snapshot: 'Private subject',
     property_display_snapshot: 'Private property',
@@ -161,6 +171,23 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string) { this.values.set(key, value); }
 }
 
+class ThrowingStorage implements Storage {
+  private readonly memory = new MemoryStorage();
+  readonly failures = new Set<'get' | 'set' | 'remove' | 'length' | 'key'>();
+  failVerificationRead = false;
+  private getCount = 0;
+  get length() { if (this.failures.has('length')) throw new Error('native length failure'); return this.memory.length; }
+  clear() { this.memory.clear(); }
+  getItem(key: string) {
+    this.getCount += 1;
+    if (this.failures.has('get') || (this.failVerificationRead && this.getCount > 1)) throw new Error('native get failure');
+    return this.memory.getItem(key);
+  }
+  key(index: number) { if (this.failures.has('key')) throw new Error('native key failure'); return this.memory.key(index); }
+  removeItem(key: string) { if (this.failures.has('remove')) throw new Error('native remove failure'); this.memory.removeItem(key); }
+  setItem(key: string, value: string) { if (this.failures.has('set')) throw new Error('native set failure'); this.memory.setItem(key, value); }
+}
+
 test.describe('Slice 2C-A durable Draft adapters', () => {
   test('save sends the exact full-snapshot RPC contract without mutating input', async () => {
     const { client, calls } = rpcClient(envelope());
@@ -223,10 +250,10 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       status: 'succeeded',
       output_type: 'job',
       estimate_id: null,
-      job_id: 'job-1',
-      output_id_snapshot: 'job-1',
+      job_id: JOB_ID,
+      output_id_snapshot: JOB_ID,
       output_available: true,
-      launch_id: 'launch-1',
+      launch_id: LAUNCH_ID,
       idempotent: false,
     };
     const launchMock = rpcClient(launchResult);
@@ -315,9 +342,9 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     const connected = durableDraftEnvelopeFromRpc(envelope()).draft;
     expect(connected.subject).toEqual({
       type: 'connected_homeowner',
-      homeownerUserId: 'homeowner-1',
-      homeId: 'home-1',
-      serviceRequestId: 'request-1',
+      homeownerUserId: HOMEOWNER_ID,
+      homeId: HOME_ID,
+      serviceRequestId: REQUEST_ID,
     });
     expect(canonicalDraftToSaveMetadata(connected).intended_output).toBeNull();
 
@@ -327,11 +354,15 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
         homeowner_user_id: null,
         home_id: null,
         service_request_id: null,
-        local_contact_id: 'contact-1',
-        local_home_id: 'local-home-1',
+        local_contact_id: '00000000-0000-4000-8000-00000000000c',
+        local_home_id: '00000000-0000-4000-8000-00000000000d',
       }),
     })).draft;
-    expect(local.subject).toEqual({ type: 'local_contact', localContactId: 'contact-1', localHomeId: 'local-home-1' });
+    expect(local.subject).toEqual({
+      type: 'local_contact',
+      localContactId: '00000000-0000-4000-8000-00000000000c',
+      localHomeId: '00000000-0000-4000-8000-00000000000d',
+    });
 
     const consumed = durableDraftEnvelopeFromRpc(envelope({
       draft: draft({
@@ -339,14 +370,14 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
         intended_output: 'job',
         launched_output_type: 'job',
         launched_job_id: null,
-        launched_job_id_snapshot: 'deleted-job-1',
+        launched_job_id_snapshot: JOB_ID,
         launched_at: '2026-07-19T11:00:00.000Z',
       }),
     })).draft;
     expect(consumed).toMatchObject({
       status: 'consumed',
       launchedJobId: null,
-      launchedJobIdSnapshot: 'deleted-job-1',
+      launchedJobIdSnapshot: JOB_ID,
     });
   });
 
@@ -370,11 +401,11 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
   });
 
   test('reordering preserves durable identities and emits canonical sequential sort order', () => {
-    const first = canonicalItem({ rowId: 'first', durableItemId: 'durable-1', sourceDraftId: DRAFT_ID });
-    const second = canonicalItem({ rowId: 'second', durableItemId: 'durable-2', sourceDraftId: DRAFT_ID });
+    const first = canonicalItem({ rowId: 'first', durableItemId: ITEM_ID, sourceDraftId: DRAFT_ID });
+    const second = canonicalItem({ rowId: 'second', durableItemId: NEW_ITEM_ID, sourceDraftId: DRAFT_ID });
     expect(canonicalItemsToSaveItems([second, first], DRAFT_ID).map(value => [value.id, value.sort_order])).toEqual([
-      ['durable-2', 0],
-      ['durable-1', 1],
+      [NEW_ITEM_ID, 0],
+      [ITEM_ID, 1],
     ]);
   });
 
@@ -392,13 +423,64 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
     ];
     const response = envelope({ items: [
       item({ id: ITEM_ID, sort_order: 0 }),
-      item({ id: 'new-durable-id', sort_order: 1, created_at: '2026-07-19T10:01:00.000Z' }),
+      item({
+        id: NEW_ITEM_ID,
+        sort_order: 1,
+        created_at: '2026-07-19T10:01:00.000Z',
+        updated_at: '2026-07-19T10:01:00.000Z',
+      }),
     ] });
-    const reconciled = reconcileCanonicalSaveResponse({ items: previousItems }, response);
+    const reconciled = reconcileCanonicalSaveResponse({
+      draft: durableDraftEnvelopeFromRpc(envelope()).draft,
+      items: previousItems,
+    }, response);
     expect(reconciled.items.map(value => [value.rowId, value.durableItemId])).toEqual([
       ['persisted-row', ITEM_ID],
-      ['new-row', 'new-durable-id'],
+      ['new-row', NEW_ITEM_ID],
     ]);
+  });
+
+  test('save reconciliation rejects malformed ownership, counts, IDs, removals, and ordering atomically', () => {
+    const submitted = {
+      draft: durableDraftEnvelopeFromRpc(envelope()).draft,
+      items: [
+        canonicalItem({ rowId: 'persisted-row', durableItemId: ITEM_ID, sourceDraftId: DRAFT_ID }),
+        canonicalItem({ rowId: 'new-row' }),
+      ],
+    };
+    const validItems = [item({ id: ITEM_ID, sort_order: 0 }), item({ id: NEW_ITEM_ID, sort_order: 1 })];
+    const rejects = (items: ContractorWorkDraftItem[], removed: string[] = []) => {
+      expect(() => reconcileCanonicalSaveResponse(submitted, envelope({ items }), removed)).toThrow('DRAFT_RESPONSE_INVALID');
+    };
+
+    rejects([item({ id: OTHER_ITEM_ID, sort_order: 0 }), validItems[1]]); // no positional fallback
+    rejects([validItems[0], item({ id: ITEM_ID, sort_order: 1 })]);
+    rejects([validItems[0], item({ id: NEW_ITEM_ID, sort_order: 0 })]);
+    rejects([validItems[1]]);
+    rejects([...validItems, item({ id: OTHER_ITEM_ID, sort_order: 2 })]);
+    rejects(validItems, [NEW_ITEM_ID]);
+    rejects([validItems[0], item({ id: NEW_ITEM_ID, draft_id: OTHER_DRAFT_ID, sort_order: 1 })]);
+    rejects([validItems[0], item({ id: NEW_ITEM_ID, contractor_id: OTHER_DRAFT_ID, sort_order: 1 })]);
+    rejects([validItems[0], item({ id: NEW_ITEM_ID, sort_order: 2 })]);
+    rejects([validItems[0], item({ id: 'not-a-uuid', sort_order: 1 })]);
+  });
+
+  test('two identical new rows reconcile by canonical sort order even when the server array is reordered', () => {
+    const first = canonicalItem({ rowId: 'new-a', title: 'Same content' });
+    const second = canonicalItem({ rowId: 'new-b', title: 'Same content' });
+    const submitted = {
+      draft: durableDraftEnvelopeFromRpc(envelope()).draft,
+      items: [second, first],
+    };
+    const reconciled = reconcileCanonicalSaveResponse(submitted, envelope({ items: [
+      item({ id: OTHER_ITEM_ID, title: 'Same content', sort_order: 1 }),
+      item({ id: NEW_ITEM_ID, title: 'Same content', sort_order: 0 }),
+    ] }));
+    expect(reconciled.items.map(value => [value.rowId, value.durableItemId, value.sortOrder])).toEqual([
+      ['new-b', NEW_ITEM_ID, 0],
+      ['new-a', OTHER_ITEM_ID, 1],
+    ]);
+    expect(new Set(reconciled.items.map(value => value.rowId)).size).toBe(2);
   });
 
   test('list presentation is deterministic and preserves status, legacy linkage, and deleted output', () => {
@@ -517,18 +599,23 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       outputType: 'job',
     }, {
       now: () => new Date('2026-07-19T12:00:00.000Z'),
-      randomUUID: () => 'attempt-key-1',
+      randomUUID: () => IDEMPOTENCY_ID,
     });
     expect(durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID)).toBe(
       `servsync.workDraftLaunch:${CONTRACTOR_ID}:${DRAFT_ID}`,
     );
-    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual(created);
-    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, 'another-draft')).toBeNull();
-    expect(createDurableDraftLaunchAttempt(storage, {
+    expect(created).toMatchObject({ status: 'success', attempt: { idempotencyKey: IDEMPOTENCY_ID } });
+    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual({
+      status: 'found',
+      attempt: created.status === 'success' ? created.attempt : null,
+    });
+    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, OTHER_DRAFT_ID)).toEqual({ status: 'absent' });
+    const reused = createDurableDraftLaunchAttempt(storage, {
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
       outputType: 'job',
-    }, { randomUUID: () => 'must-not-be-used' }).idempotencyKey).toBe('attempt-key-1');
+    }, { randomUUID: () => 'must-not-be-used' });
+    expect(reused).toMatchObject({ status: 'success', attempt: { idempotencyKey: IDEMPOTENCY_ID } });
     expect(() => createDurableDraftLaunchAttempt(storage, {
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
@@ -542,11 +629,13 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
       outputType: 'job',
-    }, { randomUUID: () => 'attempt-key-1' });
+    }, { randomUUID: () => IDEMPOTENCY_ID });
     updateDurableDraftLaunchAttemptPhase(storage, CONTRACTOR_ID, DRAFT_ID, 'launching');
     const ambiguous = retainAmbiguousDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID);
-    expect(ambiguous).toMatchObject({ phase: 'ambiguous', idempotencyKey: 'attempt-key-1' });
-    expect(clearDefinitiveFailedDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toBe(false);
+    expect(ambiguous).toMatchObject({ status: 'success', attempt: { phase: 'ambiguous', idempotencyKey: IDEMPOTENCY_ID } });
+    expect(clearDefinitiveFailedDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual({
+      status: 'success', removed: false,
+    });
 
     const success = recordDurableDraftLaunchSuccess(storage, CONTRACTOR_ID, DRAFT_ID, {
       draft_id: DRAFT_ID,
@@ -554,53 +643,59 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       output_type: 'job',
       estimate_id: null,
       job_id: null,
-      output_id_snapshot: 'deleted-job-1',
+      output_id_snapshot: JOB_ID,
       output_available: false,
-      launch_id: 'launch-1',
+      launch_id: LAUNCH_ID,
       idempotent: true,
     });
     expect(success).toMatchObject({
-      phase: 'succeeded',
-      jobId: null,
-      outputIdSnapshot: 'deleted-job-1',
-      outputAvailable: false,
+      status: 'success',
+      attempt: {
+        phase: 'succeeded',
+        jobId: null,
+        outputIdSnapshot: JOB_ID,
+        outputAvailable: false,
+      },
     });
   });
 
   test('attempt storage ignores malformed data, clears safely, and stores no sensitive Draft content', () => {
     const storage = new MemoryStorage();
     storage.setItem(durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID), '{bad json');
-    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toBeNull();
+    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual({ status: 'invalid' });
     storage.setItem(durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID), JSON.stringify({
       schemaVersion: 1,
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
       outputType: 'job',
-      idempotencyKey: 'attempt',
+      idempotencyKey: IDEMPOTENCY_ID,
       phase: 'prepared',
       createdAt: '2026-07-19T12:00:00.000Z',
       updatedAt: '2026-07-19T12:00:00.000Z',
       privateNotes: 'must not be retained',
     }));
-    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toBeNull();
+    const reconstructed = readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID);
+    expect(reconstructed).toMatchObject({ status: 'found', attempt: { idempotencyKey: IDEMPOTENCY_ID } });
+    expect(reconstructed).not.toHaveProperty('attempt.privateNotes');
+    clearDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID);
 
     createDurableDraftLaunchAttempt(storage, {
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
       outputType: 'estimate',
-    }, { randomUUID: () => 'attempt-key-2' });
+    }, { randomUUID: () => IDEMPOTENCY_ID });
     const raw = storage.getItem(durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID)) ?? '';
     expect(raw).not.toMatch(/homeowner|address|propertyDescription|privateNotes|lineItems|pricing|serviceRequest/i);
-    clearDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID);
+    expect(clearDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual({ status: 'success', removed: true });
     expect(storage.length).toBe(0);
 
     createDurableDraftLaunchAttempt(storage, {
       contractorId: CONTRACTOR_ID,
-      draftId: 'draft-a',
+      draftId: OTHER_DRAFT_ID,
       outputType: 'job',
-    }, { randomUUID: () => 'a' });
+    }, { randomUUID: () => IDEMPOTENCY_ID });
     storage.setItem('unrelated', 'keep');
-    clearAllDurableDraftLaunchAttempts(storage);
+    expect(clearAllDurableDraftLaunchAttempts(storage)).toEqual({ status: 'success', removedCount: 1, failedCount: 0 });
     expect(storage.getItem('unrelated')).toBe('keep');
     expect(storage.length).toBe(1);
 
@@ -609,9 +704,179 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       contractorId: CONTRACTOR_ID,
       draftId: DRAFT_ID,
       outputType: 'job',
-    }, { randomUUID: () => 'removable' });
-    expect(clearDefinitiveFailedDurableDraftLaunchAttempt(removableStorage, CONTRACTOR_ID, DRAFT_ID)).toBe(true);
+    }, { randomUUID: () => IDEMPOTENCY_ID });
+    expect(clearDefinitiveFailedDurableDraftLaunchAttempt(removableStorage, CONTRACTOR_ID, DRAFT_ID)).toEqual({
+      status: 'success', removed: true,
+    });
     expect(removableStorage.length).toBe(0);
+  });
+
+  test('throwing storage is fail-closed for reads, writes, verification, removal, and enumeration', () => {
+    const create = (storage: Storage) => createDurableDraftLaunchAttempt(storage, {
+      contractorId: CONTRACTOR_ID,
+      draftId: DRAFT_ID,
+      outputType: 'job',
+    }, { randomUUID: () => IDEMPOTENCY_ID });
+
+    const readFailure = new ThrowingStorage();
+    readFailure.failures.add('get');
+    expect(readDurableDraftLaunchAttempt(readFailure, CONTRACTOR_ID, DRAFT_ID)).toEqual({
+      status: 'unavailable', operation: 'read',
+    });
+    expect(create(readFailure)).toEqual({ status: 'unavailable', operation: 'read' });
+
+    const writeFailure = new ThrowingStorage();
+    writeFailure.failures.add('set');
+    expect(create(writeFailure)).toEqual({ status: 'unavailable', operation: 'write' });
+
+    const verifyFailure = new ThrowingStorage();
+    verifyFailure.failVerificationRead = true;
+    expect(create(verifyFailure)).toEqual({ status: 'unavailable', operation: 'verify' });
+
+    const removeFailure = new ThrowingStorage();
+    expect(create(removeFailure).status).toBe('success');
+    removeFailure.failures.add('remove');
+    expect(clearDurableDraftLaunchAttempt(removeFailure, CONTRACTOR_ID, DRAFT_ID)).toEqual({
+      status: 'unavailable', operation: 'remove',
+    });
+
+    const lengthFailure = new ThrowingStorage();
+    lengthFailure.failures.add('length');
+    expect(clearAllDurableDraftLaunchAttempts(lengthFailure)).toEqual({
+      status: 'unavailable', operation: 'enumerate', removedCount: 0, failedCount: 0,
+    });
+    const keyFailure = new ThrowingStorage();
+    expect(create(keyFailure).status).toBe('success');
+    keyFailure.failures.add('key');
+    expect(clearAllDurableDraftLaunchAttempts(keyFailure)).toEqual({
+      status: 'unavailable', operation: 'enumerate', removedCount: 0, failedCount: 0,
+    });
+    const partialFailure = new ThrowingStorage();
+    expect(create(partialFailure).status).toBe('success');
+    partialFailure.setItem('unrelated', 'keep');
+    partialFailure.failures.add('remove');
+    expect(clearAllDurableDraftLaunchAttempts(partialFailure)).toEqual({
+      status: 'partial', removedCount: 0, failedCount: 1,
+    });
+    partialFailure.failures.delete('remove');
+    expect(partialFailure.getItem('unrelated')).toBe('keep');
+  });
+
+  test('stored attempts reject malformed identity, time, phase, and output state', () => {
+    const storage = new MemoryStorage();
+    const key = durableDraftLaunchAttemptKey(CONTRACTOR_ID, DRAFT_ID);
+    const base = {
+      schemaVersion: 1,
+      contractorId: CONTRACTOR_ID,
+      draftId: DRAFT_ID,
+      outputType: 'job',
+      idempotencyKey: IDEMPOTENCY_ID,
+      phase: 'prepared',
+      createdAt: '2026-07-19T12:00:00.000Z',
+      updatedAt: '2026-07-19T12:01:00.000Z',
+    };
+    const rejects = (overrides: Record<string, unknown>) => {
+      storage.setItem(key, JSON.stringify({ ...base, ...overrides }));
+      expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toEqual({ status: 'invalid' });
+    };
+    rejects({ contractorId: 'bad' });
+    rejects({ draftId: 'bad' });
+    rejects({ idempotencyKey: 'bad' });
+    rejects({ outputType: 'invoice' });
+    rejects({ phase: 'unknown' });
+    rejects({ createdAt: 'not-a-date' });
+    rejects({ updatedAt: '2026-07-19T11:59:00.000Z' });
+    rejects({ phase: 'succeeded' });
+    rejects({ schemaVersion: 2 });
+    rejects({ outputAvailable: true });
+    rejects({
+      phase: 'succeeded', launchId: LAUNCH_ID, estimateId: ESTIMATE_ID, jobId: JOB_ID,
+      outputIdSnapshot: JOB_ID, outputAvailable: true,
+    });
+    rejects({
+      outputType: 'estimate', phase: 'succeeded', launchId: LAUNCH_ID, estimateId: null, jobId: null,
+      outputIdSnapshot: ESTIMATE_ID, outputAvailable: true,
+    });
+
+    clearDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID);
+    expect(createDurableDraftLaunchAttempt(storage, {
+      contractorId: CONTRACTOR_ID, draftId: DRAFT_ID, outputType: 'job',
+    }, { randomUUID: () => IDEMPOTENCY_ID }).status).toBe('success');
+    expect(() => recordDurableDraftLaunchSuccess(storage, CONTRACTOR_ID, DRAFT_ID, {
+      draft_id: DRAFT_ID,
+      status: 'succeeded',
+      output_type: 'job',
+      estimate_id: null,
+      job_id: 'bad',
+      output_id_snapshot: JOB_ID,
+      output_available: true,
+      launch_id: LAUNCH_ID,
+      idempotent: false,
+    })).toThrow('DRAFT_LAUNCH_ATTEMPT_RESULT_INVALID');
+    expect(readDurableDraftLaunchAttempt(storage, CONTRACTOR_ID, DRAFT_ID)).toMatchObject({
+      status: 'found', attempt: { phase: 'prepared' },
+    });
+  });
+
+  test('launch response parser accepts canonical live/deleted results and rejects contradictions', async () => {
+    const result = (overrides: Record<string, unknown> = {}) => ({
+      draft_id: DRAFT_ID,
+      status: 'succeeded',
+      output_type: 'job',
+      estimate_id: null,
+      job_id: JOB_ID,
+      output_id_snapshot: JOB_ID,
+      output_available: true,
+      launch_id: LAUNCH_ID,
+      idempotent: false,
+      ...overrides,
+    });
+    const launch = (value: unknown, intended_output: 'estimate' | 'job' = 'job') => launchContractorWorkDraft(rpcClient(value).client, {
+      draft_id: DRAFT_ID, intended_output, idempotency_key: IDEMPOTENCY_ID,
+    });
+    await expect(launch(result())).resolves.toMatchObject({ output_type: 'job', job_id: JOB_ID });
+    await expect(launch(result({ status: 'already_consumed', job_id: null, output_available: false, idempotent: true })))
+      .resolves.toMatchObject({ status: 'already_consumed', output_available: false });
+    await expect(launch(result({
+      output_type: 'estimate', estimate_id: ESTIMATE_ID, job_id: null,
+      output_id_snapshot: ESTIMATE_ID,
+    }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', estimate_id: ESTIMATE_ID });
+    await expect(launch(result({
+      output_type: 'estimate', estimate_id: null, job_id: null,
+      output_id_snapshot: ESTIMATE_ID, output_available: false, status: 'already_consumed', idempotent: true,
+    }), 'estimate')).resolves.toMatchObject({ output_type: 'estimate', output_available: false });
+
+    const invalid = [
+      { output_type: 'job' },
+      result({ draft_id: 'bad' }),
+      result({ job_id: 'bad' }),
+      result({ output_id_snapshot: 'bad' }),
+      result({ output_id_snapshot: undefined }),
+      result({ estimate_id: ESTIMATE_ID }),
+      result({ output_available: false }),
+      result({ status: 'pending' }),
+      result({ launch_id: null }),
+    ];
+    for (const value of invalid) {
+      await expect(launch(value)).rejects.toMatchObject({ applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'launch' });
+    }
+  });
+
+  test('save, get, and import reject malformed canonical responses before mapping', async () => {
+    const savePayload: ContractorWorkDraftSavePayload = {
+      draft_id: DRAFT_ID,
+      metadata: canonicalDraftToSaveMetadata(durableDraftEnvelopeFromRpc(envelope()).draft),
+      items: canonicalItemsToSaveItems([canonicalItem({ durableItemId: ITEM_ID, sourceDraftId: DRAFT_ID })], DRAFT_ID),
+      removed_item_ids: [],
+    };
+    const malformed = envelope({ items: [item({ id: 'bad' })] });
+    await expect(saveContractorWorkDraft(rpcClient(malformed).client, savePayload)).rejects.toMatchObject({
+      applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'save',
+    });
+    await expect(getContractorWorkDraft(rpcClient(envelope({ draft: draft({ status: 'unknown' as never }) })).client, DRAFT_ID))
+      .rejects.toMatchObject({ applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'get' });
+    await expect(importLegacyContractorWorkDraft(rpcClient('bad').client, { inspection_id: ITEM_ID }))
+      .rejects.toMatchObject({ applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'import' });
   });
 
   test('hidden adapters do not wire App, Composer, routes, or feature gates', () => {

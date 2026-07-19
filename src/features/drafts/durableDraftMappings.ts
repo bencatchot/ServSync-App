@@ -15,6 +15,11 @@ import type {
   ContractorWorkDraftSubjectType,
   ContractorWorkDraftWorkFormat,
 } from './durableDraftLaunchTypes';
+import {
+  isDurableDraftUuid,
+  normalizeDurableDraftError,
+  parseContractorWorkDraftEnvelope,
+} from './durableDraftLaunchApi';
 
 export type DurableDraftSubject =
   | {
@@ -262,27 +267,76 @@ export function reconcileRemovedDurableItemIds(
 }
 
 export function reconcileCanonicalSaveResponse(
-  previous: Pick<DurableDraftCanonicalState, 'items'>,
-  response: ContractorWorkDraftEnvelope,
+  submitted: Pick<DurableDraftCanonicalState, 'draft' | 'items'>,
+  response: unknown,
+  removedDurableItemIds: readonly string[] = [],
 ): DurableDraftCanonicalState {
-  const persistedRowsById = new Map(
-    previous.items.flatMap(item => item.durableItemId ? [[item.durableItemId, item] as const] : []),
-  );
-  const unsavedRows = previous.items.filter(item => !item.durableItemId);
-  let unsavedIndex = 0;
+  const reject = (): never => {
+    throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'save');
+  };
+  const parsed = parseContractorWorkDraftEnvelope(response);
+  if (!parsed) return reject();
+  if ((submitted.draft.draftId && parsed.draft.id !== submitted.draft.draftId)
+    || (submitted.draft.contractorId && parsed.draft.contractor_id !== submitted.draft.contractorId)) return reject();
 
-  const items = durableDraftItemsFromRpc(response.items).map(serverItem => {
-    const previousItem = serverItem.durableItemId
-      ? persistedRowsById.get(serverItem.durableItemId)
-      : undefined;
-    const matchedItem = previousItem ?? unsavedRows[unsavedIndex++];
-    return matchedItem ? { ...serverItem, rowId: matchedItem.rowId } : serverItem;
+  const removedIds = new Set<string>();
+  for (const id of removedDurableItemIds) {
+    if (!isDurableDraftUuid(id) || removedIds.has(id)) return reject();
+    removedIds.add(id);
+  }
+
+  const submittedRowIds = new Set<string>();
+  const submittedPersistedIds = new Set<string>();
+  const submittedBySortOrder = new Map<number, DurableDraftCanonicalItem>();
+  submitted.items.forEach((item, sortOrder) => {
+    if (!item.rowId.trim() || submittedRowIds.has(item.rowId)) return reject();
+    submittedRowIds.add(item.rowId);
+    if (item.durableItemId) {
+      if (!isDurableDraftUuid(item.durableItemId)
+        || submittedPersistedIds.has(item.durableItemId)
+        || removedIds.has(item.durableItemId)
+        || !submitted.draft.draftId
+        || item.sourceDraftId !== submitted.draft.draftId) return reject();
+      submittedPersistedIds.add(item.durableItemId);
+    }
+    submittedBySortOrder.set(sortOrder, item);
+  });
+
+  if (parsed.items.length !== submitted.items.length) return reject();
+  const returnedIds = new Set<string>();
+  const returnedSortOrders = new Set<number>();
+  const returnedPersistedIds = new Set<string>();
+  for (const item of parsed.items) {
+    if (returnedIds.has(item.id)
+      || returnedSortOrders.has(item.sort_order)
+      || removedIds.has(item.id)
+      || !submittedBySortOrder.has(item.sort_order)) return reject();
+    returnedIds.add(item.id);
+    returnedSortOrders.add(item.sort_order);
+    if (submittedPersistedIds.has(item.id)) returnedPersistedIds.add(item.id);
+    const submittedItem = submittedBySortOrder.get(item.sort_order);
+    if (!submittedItem) return reject();
+    if (submittedItem.durableItemId && item.id !== submittedItem.durableItemId) return reject();
+    if (!submittedItem.durableItemId && submittedPersistedIds.has(item.id)) return reject();
+  }
+  if (returnedPersistedIds.size !== submittedPersistedIds.size
+    || [...submittedPersistedIds].some(id => !returnedPersistedIds.has(id))) return reject();
+  for (let sortOrder = 0; sortOrder < submitted.items.length; sortOrder += 1) {
+    if (!returnedSortOrders.has(sortOrder)) return reject();
+  }
+
+  const returnedBySortOrder = new Map(parsed.items.map(item => [item.sort_order, item]));
+  const items = submitted.items.map((submittedItem, sortOrder) => {
+    const returnedItem = returnedBySortOrder.get(sortOrder);
+    if (!returnedItem) return reject();
+    const canonical = durableDraftItemsFromRpc([returnedItem])[0];
+    return { ...canonical, rowId: submittedItem.rowId };
   });
 
   return {
-    draft: durableDraftFromRpc(response.draft),
+    draft: durableDraftFromRpc(parsed.draft),
     items,
-    launches: [...response.launches],
+    launches: [...parsed.launches],
   };
 }
 
