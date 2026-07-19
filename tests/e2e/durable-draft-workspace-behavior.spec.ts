@@ -524,6 +524,35 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await expect(page.getByTestId('adopted-output')).toBeVisible();
   });
 
+  test('an older same-key failure cannot clear a newer output lock or inject an error', async ({ page }) => {
+    await installWorkspaceHarness(page);
+    const openConsumed = async () => {
+      const priorGetCount = await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'));
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(priorGetCount + 1);
+      await page.evaluate(({ draftA, contractorA, estimateId }) => window.__durableHarness.completeLast('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed A', { status: 'consumed', intended_output: 'estimate', launched_output_type: 'estimate', launched_estimate_id: estimateId, launched_estimate_id_snapshot: estimateId, launched_at: '2026-07-19T11:00:00.000Z' })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, estimateId: ESTIMATE_ID });
+      await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+      await page.getByRole('button', { name: 'Open Estimate' }).click();
+    };
+
+    await openConsumed();
+    await page.evaluate(() => window.__durableHarness.showList());
+    await openConsumed();
+    expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
+
+    await page.evaluate(() => window.__durableHarness.reject('output', 'estimate'));
+    await expect(page.getByRole('button', { name: 'Opening…' })).toBeDisabled();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
+    expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
+
+    await page.evaluate(({ estimateId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await expect(page.getByTestId('adopted-output')).toHaveText(`estimate:${ESTIMATE_ID}`);
+    const snapshot = await page.evaluate(() => window.__durableHarness.snapshot());
+    expect(snapshot.adoptedOutputs).toEqual([`estimate:${ESTIMATE_ID}`]);
+    expect(snapshot.activeOutput).toBe(`estimate:${ESTIMATE_ID}`);
+  });
+
   for (const output of [{ type: 'estimate', label: 'Estimate', id: ESTIMATE_ID }, { type: 'job', label: 'Job', id: JOB_ID }] as const) {
     test(`keeps a consumed Draft visible when ${output.type} navigation fails and allows retry`, async ({ page }) => {
       await installWorkspaceHarness(page);
