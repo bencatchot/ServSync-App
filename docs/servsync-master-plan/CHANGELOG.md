@@ -6,6 +6,33 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-19
 
+- Branch: `codex/durable-draft-adapters-2c-a`
+- Files changed:
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `src/features/drafts/durableDraftLaunchTypes.ts`
+  - `src/features/drafts/durableDraftMappings.ts`
+  - `src/features/drafts/durableDraftCapabilities.ts`
+  - `src/features/drafts/durableDraftLaunchAttempt.ts`
+  - `tests/e2e/durable-draft-adapters-2c-a.spec.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Slice 2C-A as hidden durable Draft frontend contracts and pure utilities only. The adapter layer now provides strict save/get/list/import/launch types, structured RPC errors, canonical Draft/item mappings with separate local and durable item identities, current helper-derived capability modeling, and per-contractor/per-Draft idempotency-attempt storage that excludes customer and Draft content. The approved Slice 2C audit split the remaining work into 2C-A contracts, 2C-B canonical persistence/resume/list/import integration, 2C-C launch UX, and 2C-D Preview validation/closeout.
+- Reason for change: PR #317 is merged and the validated durable backend needs a coherent, testable frontend boundary before the current Composer or visible Work surfaces can adopt it safely.
+- Tests/checks run:
+  - Focused executable adapter tests cover exact RPC calls, structured errors, connected/local/consumed/deleted-output mappings, item identity and removal, deterministic reconciliation/listing, helper-derived capabilities, idempotency retention/cleanup, hidden scope, and SQL hash integrity.
+  - Typecheck, default and gated builds, existing durable foundation tests, shared Composer/Draft Job source regressions, diff/link/sensitive-value checks, SQL hashes, and unchanged App/Composer/gate checks passed. Lint remains blocked before project sources by the known ESLint 9 / TypeScript plugin incompatibility.
+- Known risks or follow-ups:
+  - Slice 2C-A is not wired into `App.tsx`, the current Composer, routes, Draft lists, or visible actions. It changes no SQL, Supabase state, feature gate, environment, Vercel configuration, or Production behavior.
+  - Slice 2C-B remains the next integration slice. Slice 2C-C remains the launch UX slice, and Slice 2C-D remains sandbox/Preview runtime, mobile, and documentation closeout. The user-visible Draft-first workflow is not complete.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records PR #317 as merged and Slice 2C-A as hidden contract work while keeping durable Composer integration, launch UX, validation, Production SQL, and rollout future.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first implementation sequence now records the approved Slice 2C split and the hidden, frontend-only boundary of 2C-A.
+
 - Branch: `codex/durable-draft-launch-2b`
 - Files changed:
   - `servsync-durable-draft-launch-foundation.sql`
@@ -23,7 +50,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - The owner/admin/office/field-technician/viewer/platform-admin compatibility matrix passed. Field-technician Draft save/update and Job launch now match existing Job-write authority; Estimate creation and launch authority remain unchanged.
   - All disposable auth and business fixtures, temporary instrumentation, and validation residue were removed; operational duplicate groups remain zero.
 - Known risks or follow-ups:
-  - PR #317 remains open and draft. No known Slice 2B sandbox runtime blocker remains; final merge-readiness audit and owner approval are still required before mark-ready or merge.
+  - PR #317 subsequently passed final merge-readiness audit and merged as `895d14c4f50435b079b02c34e63aa02238a2c755`. No known Slice 2B sandbox runtime blocker remains.
   - Production remains untouched on the legacy workflow; Slice 2B SQL is not installed there, no feature gate is enabled, and no visible Create Estimate or Create Job launch action is included.
   - Fresh environments, including Production only after separate approval, use corrected canonical foundation hash `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f` without the sandbox correction. Sandbox already has both required steps and must not reapply either SQL file.
   - Typed UUID RPC arguments are validated by PostgREST/PostgreSQL before function execution; stable ServSync codes apply after successful argument coercion.
@@ -50,7 +77,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Focused SQL/source tests were added for table definitions, constraints, RLS/grants, RPC signatures, save/resume behavior, launch/idempotency contracts, Estimate/Job launch mapping, legacy bridge, and hidden frontend scope.
 - Known risks or follow-ups:
   - Slice 2B is hidden and unapplied until the SQL receives a separate focused audit and explicit sandbox-apply approval. It does not expose Create Estimate or Create Job actions in the shared Draft Composer, implement Invoice launch, apply SQL to Production, mutate Production data, change Vercel/Supabase settings, enable gates, deploy, redesign Jobs, or implement inspection/checklist UI.
-  - Slice 2C remains the first planned coherent owner-facing Preview workflow with both Create Estimate and Create Job launch actions.
+  - The then-planned Slice 2C was subsequently split into hidden contracts, canonical integration, launch UX, and validation/closeout so the coherent owner-facing workflow is not exposed half-complete.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-035 now records the packaged durable launch foundation, SQL-not-applied state, legacy bridge, and next approval gate for sandbox SQL application.
