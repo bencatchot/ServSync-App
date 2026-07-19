@@ -16,20 +16,21 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Corrected the packaged Slice 2B contract and its Draft-persistence permission boundary. The reviewed foundation was applied once to ServSync Sandbox and passed the completed runtime matrix except for a Job-workflow parity defect: a user with current Job-write authority could create a normal Job but could not persist the durable Draft required by Draft-first Job launch. The canonical foundation now allows Draft persistence through the union of the existing billing-management and Job-write capability helpers, without role-name checks. Estimate launch remains separately governed by the existing Estimate-creation boundary, and Job launch remains governed by Job-write authority. A narrow transaction-wrapped correction SQL file packages the same save RPC and private capability-union helper for environments that already installed foundation hash `cafa9260e379f561a12dbeff66d705685bb8200ebf39edc980935da5c25ae185`; fresh environments use only the corrected canonical foundation. Its prerequisite guard fingerprints the exact reviewed predecessor, including public RPC default arguments, and verifies required functions, row types, columns, grants, and Slice 2B installation markers before replacing any function; default-expression drift blocks application.
+- Summary of change: Completed Slice 2B sandbox validation for PR #317. Corrected canonical foundation hash `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f` implements the hidden durable Draft, item, launch-ledger, save/get/import/launch, private linkage, rollback, idempotency, and operational Job-deduplication contracts. The foundation and permission correction were installed successfully in ServSync Sandbox `zpzdkoaubyjtsomccxya`; correction hash `b4a98f33acd99083bea4497268393f6277ef330cdcb31bdc5d253adb94b14c7f` was applied exactly once after the previously reviewed foundation. The correction restores Draft-persistence parity through the union of existing billing-management and Job-write capabilities without broadening output-specific Estimate authority or adding role-name policy.
 - Reason for change: Sandbox runtime validation found that billing-only Draft persistence made Draft-to-Job narrower than normal Job creation for active users who have Job-write capability but not billing-management capability.
 - Tests/checks run:
-  - The prior foundation hash is installed in ServSync Sandbox. The permission-parity correction remains packaged and unapplied; this implementation performs static/build/source-contract validation only.
-  - See the PR handoff for exact final command results and remaining credential-backed runtime tests.
+  - Full sandbox runtime validation passed, including save/resume, Estimate and Job launch mapping, one-Draft/one-launch, idempotency, deletion/retry, RLS, grants, privacy, tenant isolation, retention, PostgREST contracts, adversarial rollback injection, concurrency, relationship revocation, and property-unsharing locking.
+  - The owner/admin/office/field-technician/viewer/platform-admin compatibility matrix passed. Field-technician Draft save/update and Job launch now match existing Job-write authority; Estimate creation and launch authority remain unchanged.
+  - All disposable auth and business fixtures, temporary instrumentation, and validation residue were removed; operational duplicate groups remain zero.
 - Known risks or follow-ups:
-  - PR #317 remains open and draft. The sandbox permission correction is packaged but unapplied while its predecessor guard is hardened; another short read-only audit is required before any application approval.
-  - Focused sandbox permission-parity runtime testing remains required after separately approved correction application.
-  - Production remains untouched; Slice 2B SQL is not installed there.
+  - PR #317 remains open and draft. No known Slice 2B sandbox runtime blocker remains; final merge-readiness audit and owner approval are still required before mark-ready or merge.
+  - Production remains untouched on the legacy workflow; Slice 2B SQL is not installed there, no feature gate is enabled, and no visible Create Estimate or Create Job launch action is included.
+  - Fresh environments, including Production only after separate approval, use corrected canonical foundation hash `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f` without the sandbox correction. Sandbox already has both required steps and must not reapply either SQL file.
   - Typed UUID RPC arguments are validated by PostgREST/PostgreSQL before function execution; stable ServSync codes apply after successful argument coercion.
   - Existing Estimate, Job, and Draft permission helpers are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work. No universal field-technician Estimate restriction was added.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-035 now records the sandbox-discovered Draft-persistence parity defect, capability-union correction, separate sandbox patch gate, and unchanged output-specific launch permissions.
+  - REASON: FB-035 now records the installed and runtime-validated sandbox foundation/correction, resolved permission parity, hidden product state, Production exclusion, and final merge-readiness gate.
 
 ## 2026-07-18
 

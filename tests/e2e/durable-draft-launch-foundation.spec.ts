@@ -780,19 +780,19 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(currentEntry).not.toContain('`src/types.ts`');
   });
 
-  test('documents draft PR state, unapplied correction, default guard, and post-apply permission matrix', () => {
+  test('documents draft PR state, validated sandbox correction, and final merge-readiness gate', () => {
     const changelog = sourceFile('docs/servsync-master-plan/CHANGELOG.md');
     const backlog = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
     const masterPlan = sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md');
 
     for (const source of [changelog, backlog, masterPlan]) {
       expect(source).toContain('PR #317 remains open and draft');
-      expect(source).toMatch(/package remains unapplied|packaged (?:and|but) unapplied/);
-      expect(source).toMatch(/default(?:-expression)? drift blocks application|defaults so any default-expression drift blocks application/);
+      expect(source).toMatch(/permission correction (?:is |was |were )?installed|foundation and permission correction are installed|both the foundation and its permission-parity correction installed/i);
+      expect(source).toMatch(/runtime (?:matrix|validation) passed/i);
       expect(source).toContain('Production remains untouched');
     }
-    expect(changelog).toContain('Focused sandbox permission-parity runtime testing remains required');
-    expect(backlog).toContain('focused permission matrix');
-    expect(masterPlan).toContain('permission matrix must run afterward');
+    expect(changelog).toContain('final merge-readiness audit');
+    expect(backlog).toContain('final merge-readiness audit');
+    expect(masterPlan).toContain('Final merge-readiness audit');
   });
 });
