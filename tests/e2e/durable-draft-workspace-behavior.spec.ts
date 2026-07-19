@@ -401,27 +401,31 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_save_work_draft'))).toBe(0);
   });
 
-  test('keeps a consumed Draft visible when output navigation fails and allows retry', async ({ page }) => {
-    await installWorkspaceHarness(page);
-    await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
-    await page.evaluate(({ draftA, contractorA, estimateId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed Draft', {
-      status: 'consumed',
-      intended_output: 'estimate',
-      launched_output_type: 'estimate',
-      launched_estimate_id: estimateId,
-      launched_estimate_id_snapshot: estimateId,
-      launched_at: '2026-07-19T11:00:00.000Z',
-    })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, estimateId: ESTIMATE_ID });
-    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
-    await page.getByRole('button', { name: 'Open Estimate' }).click();
-    await page.evaluate(() => window.__durableHarness.reject('output', 'estimate'));
-    await expect(page.getByText('The Estimate could not be opened. Try again.')).toBeVisible();
-    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open Estimate' })).toBeEnabled();
-    await page.getByRole('button', { name: 'Open Estimate' }).click();
-    expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
-    expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
-  });
+  for (const output of [{ type: 'estimate', label: 'Estimate', id: ESTIMATE_ID }, { type: 'job', label: 'Job', id: JOB_ID }] as const) {
+    test(`keeps a consumed Draft visible when ${output.type} navigation fails and allows retry`, async ({ page }) => {
+      await installWorkspaceHarness(page);
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await page.evaluate(({ draftA, contractorA, output }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed Draft', {
+        status: 'consumed',
+        intended_output: output.type,
+        launched_output_type: output.type,
+        launched_estimate_id: output.type === 'estimate' ? output.id : null,
+        launched_job_id: output.type === 'job' ? output.id : null,
+        launched_estimate_id_snapshot: output.type === 'estimate' ? output.id : null,
+        launched_job_id_snapshot: output.type === 'job' ? output.id : null,
+        launched_at: '2026-07-19T11:00:00.000Z',
+      })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
+      await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+      await page.getByRole('button', { name: `Open ${output.label}` }).click();
+      await page.evaluate(type => window.__durableHarness.reject('output', type), output.type);
+      await expect(page.getByText(`The ${output.label} could not be opened. Try again.`)).toBeVisible();
+      await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+      await expect(page.getByRole('button', { name: `Open ${output.label}` })).toBeEnabled();
+      await page.getByRole('button', { name: `Open ${output.label}` }).click();
+      expect(await page.evaluate(type => window.__durableHarness.callCount('output', type), output.type)).toBe(2);
+      expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
+    });
+  }
 
   for (const output of [{ type: 'estimate', id: ESTIMATE_ID }, { type: 'job', id: JOB_ID }] as const) {
     test(`renders a deleted ${output.type} honestly without an open action`, async ({ page }) => {
