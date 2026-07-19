@@ -11,8 +11,10 @@ declare
   v_save_fingerprint text;
   v_mismatch text;
 begin
-  -- This fingerprint intentionally limits the patch to the exact reviewed
-  -- predecessor installed from foundation hash cafa9260e...c25ae185.
+  -- This fixed-order fingerprint intentionally limits the patch to the exact
+  -- predecessor installed from foundation hash cafa9260e...c25ae185. It covers
+  -- identity and full arguments (including defaults), execution attributes,
+  -- configuration, and stored body so any public RPC default drift blocks apply.
   if (
     select count(*)
       from pg_proc proc
@@ -30,20 +32,21 @@ begin
 
   select md5(concat_ws(
     chr(31),
-    namespace.nspname,
-    proc.proname,
-    pg_get_function_identity_arguments(proc.oid),
-    oidvectortypes(proc.proargtypes),
-    pg_get_function_result(proc.oid),
-    proc.prokind::text,
-    language.lanname,
-    proc.prosecdef::text,
-    proc.proleakproof::text,
-    proc.proisstrict::text,
-    proc.provolatile::text,
-    proc.proparallel::text,
+    coalesce(namespace.nspname, ''),
+    coalesce(proc.proname, ''),
+    coalesce(pg_get_function_identity_arguments(proc.oid), ''),
+    coalesce(pg_get_function_arguments(proc.oid), ''),
+    coalesce(oidvectortypes(proc.proargtypes), ''),
+    coalesce(pg_get_function_result(proc.oid), ''),
+    coalesce(proc.prokind::text, ''),
+    coalesce(language.lanname, ''),
+    coalesce(proc.prosecdef::text, ''),
+    coalesce(proc.proleakproof::text, ''),
+    coalesce(proc.proisstrict::text, ''),
+    coalesce(proc.provolatile::text, ''),
+    coalesce(proc.proparallel::text, ''),
     coalesce(array_to_string(proc.proconfig, chr(30)), ''),
-    proc.prosrc
+    coalesce(proc.prosrc, '')
   ))
     into v_save_fingerprint
     from pg_proc proc
@@ -51,7 +54,7 @@ begin
     join pg_language language on language.oid = proc.prolang
    where proc.oid = v_save_oid;
 
-  if v_save_fingerprint <> '9ebff37b2cbf9eefbeefdf5bda1081aa' then
+  if v_save_fingerprint <> '04e8524257fb6fb60a843e4d509045c6' then
     raise exception 'SLICE_2B_PERMISSION_PARITY_SAVE_FINGERPRINT_MISMATCH';
   end if;
 

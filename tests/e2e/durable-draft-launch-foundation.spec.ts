@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -118,6 +119,10 @@ function topLevelSqlStatements(source: string) {
   expect(blockCommentDepth).toBe(0);
   if (current.trim()) statements.push(current.trim());
   return statements;
+}
+
+function predecessorFingerprint(fields: string[]) {
+  return createHash('md5').update(fields.map(field => field ?? '').join('\x1f')).digest('hex');
 }
 
 function sourceBetween(source: string, start: string, end: string) {
@@ -322,9 +327,10 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(guard).toContain("proc.proname = 'servsync_save_work_draft'");
     expect(guard).toContain(') <> 1 then');
     expect(guard).toContain("to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)')");
-    expect(guard).toContain("v_save_fingerprint <> '9ebff37b2cbf9eefbeefdf5bda1081aa'");
+    expect(guard).toContain("v_save_fingerprint <> '04e8524257fb6fb60a843e4d509045c6'");
     for (const attribute of [
       'pg_get_function_identity_arguments(proc.oid)',
+      'pg_get_function_arguments(proc.oid)',
       'oidvectortypes(proc.proargtypes)',
       'pg_get_function_result(proc.oid)',
       'proc.prokind::text',
@@ -342,6 +348,56 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(guard).toContain("has_function_privilege('authenticated', v_save_oid, 'execute')");
     expect(guard).toContain("proc.proname = 'servsync_private_can_persist_work_draft'");
     expect(guard).toContain('SLICE_2B_PERMISSION_PARITY_HELPER_ALREADY_EXISTS');
+  });
+
+  test('permission correction fingerprint detects predecessor default-argument drift', () => {
+    const guard = topLevelSqlStatements(permissionCorrectionSqlSource())[1];
+    const identityArguments = 'p_draft_id uuid, p_metadata jsonb, p_items jsonb, p_removed_item_ids jsonb';
+    const installedFullArguments = "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT '{}'::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb";
+    const defaultVariants = [
+      "p_draft_id uuid, p_metadata jsonb DEFAULT '{}'::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb",
+      "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT NULL::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb",
+      "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT '[]'::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb",
+      "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT '{}'::jsonb, p_items jsonb DEFAULT '{}'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb",
+      "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT '{}'::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT NULL::jsonb",
+      "p_draft_id uuid DEFAULT NULL::uuid, p_metadata jsonb DEFAULT '{}'::text::jsonb, p_items jsonb DEFAULT '[]'::jsonb, p_removed_item_ids jsonb DEFAULT '[]'::jsonb",
+    ];
+    const fixedCatalogFields = [
+      'public',
+      'servsync_save_work_draft',
+      identityArguments,
+      'uuid, jsonb, jsonb, jsonb',
+      'jsonb',
+      'f',
+      'plpgsql',
+      'true',
+      'false',
+      'false',
+      'v',
+      'u',
+      'search_path=public',
+      'installed predecessor body fixture',
+    ];
+    const identityOnlyFingerprint = predecessorFingerprint(fixedCatalogFields);
+    const installedFingerprint = predecessorFingerprint([
+      ...fixedCatalogFields.slice(0, 3),
+      installedFullArguments,
+      ...fixedCatalogFields.slice(3),
+    ]);
+
+    expect(guard).toContain("coalesce(pg_get_function_arguments(proc.oid), '')");
+    expect(guard).toContain('identity and full arguments (including defaults)');
+    expect(guard).toContain("v_save_fingerprint <> '04e8524257fb6fb60a843e4d509045c6'");
+    expect(new Set(defaultVariants.map(() => predecessorFingerprint(fixedCatalogFields)))).toEqual(
+      new Set([identityOnlyFingerprint]),
+    );
+    const variantFingerprints = defaultVariants.map(variant => predecessorFingerprint([
+      ...fixedCatalogFields.slice(0, 3),
+      variant,
+      ...fixedCatalogFields.slice(3),
+    ]));
+    expect(new Set(variantFingerprints).size).toBe(defaultVariants.length);
+    for (const fingerprint of variantFingerprints) expect(fingerprint).not.toBe(installedFingerprint);
   });
 
   test('permission correction verifies save dependencies, row types, columns, and installation markers', () => {
@@ -722,5 +778,21 @@ test.describe('Durable Draft Launch foundation', () => {
     const currentEntry = sourceBetween(changelog, '## 2026-07-19', '## 2026-07-18');
 
     expect(currentEntry).not.toContain('`src/types.ts`');
+  });
+
+  test('documents draft PR state, unapplied correction, default guard, and post-apply permission matrix', () => {
+    const changelog = sourceFile('docs/servsync-master-plan/CHANGELOG.md');
+    const backlog = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
+    const masterPlan = sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md');
+
+    for (const source of [changelog, backlog, masterPlan]) {
+      expect(source).toContain('PR #317 remains open and draft');
+      expect(source).toMatch(/package remains unapplied|packaged (?:and|but) unapplied/);
+      expect(source).toMatch(/default(?:-expression)? drift blocks application|defaults so any default-expression drift blocks application/);
+      expect(source).toContain('Production remains untouched');
+    }
+    expect(changelog).toContain('Focused sandbox permission-parity runtime testing remains required');
+    expect(backlog).toContain('focused permission matrix');
+    expect(masterPlan).toContain('permission matrix must run afterward');
   });
 });
