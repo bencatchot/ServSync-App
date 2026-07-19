@@ -731,6 +731,7 @@ test.describe('Durable Draft Launch foundation', () => {
   test('frontend save contract is a strict full snapshot and launch UI remains hidden', () => {
     const apiSource = sourceFile('src/features/drafts/durableDraftLaunchApi.ts');
     const typesSource = sourceFile('src/features/drafts/durableDraftLaunchTypes.ts');
+    const mappingsSource = sourceFile('src/features/drafts/durableDraftMappings.ts');
     const appSource = sourceFile('src/App.tsx');
     const sharedComposerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
 
@@ -738,8 +739,10 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(typesSource).toContain('metadata: ContractorWorkDraftMetadataInput');
     expect(typesSource).not.toContain('metadata: Record<string, unknown>');
     expect(typesSource).not.toContain("'succeeded' | 'failed'");
-    expect(apiSource).toContain('homeowner_user_id: payload.metadata.homeowner_user_id ?? null');
-    expect(apiSource).toContain('legacy_inspection_id: payload.metadata.legacy_inspection_id ?? null');
+    expect(apiSource).toContain('p_metadata: metadata');
+    expect(apiSource).toContain('p_removed_item_ids: removedItemIds');
+    expect(mappingsSource).toContain('homeowner_user_id: draft.subject.homeownerUserId');
+    expect(mappingsSource).toContain('legacy_inspection_id: draft.legacyInspectionId');
     expect(appSource).not.toContain('launchContractorWorkDraft');
     expect(sharedComposerSource).not.toContain('Create Estimate');
     expect(sharedComposerSource).not.toContain('Create Job');
@@ -762,6 +765,10 @@ test.describe('Durable Draft Launch foundation', () => {
       'servsync-durable-draft-launch-permission-parity-correction.sql',
       'src/features/drafts/durableDraftLaunchApi.ts',
       'src/features/drafts/durableDraftLaunchTypes.ts',
+      'src/features/drafts/durableDraftMappings.ts',
+      'src/features/drafts/durableDraftCapabilities.ts',
+      'src/features/drafts/durableDraftLaunchAttempt.ts',
+      'tests/e2e/durable-draft-adapters-2c-a.spec.ts',
       'tests/e2e/durable-draft-launch-foundation.spec.ts',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
@@ -780,19 +787,23 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(currentEntry).not.toContain('`src/types.ts`');
   });
 
-  test('documents draft PR state, validated sandbox correction, and final merge-readiness gate', () => {
+  test('documents merged foundation, validated sandbox correction, and split Slice 2C plan', () => {
     const changelog = sourceFile('docs/servsync-master-plan/CHANGELOG.md');
     const backlog = sourceFile('docs/servsync-master-plan/ServSync_Feature_Backlog.md');
     const masterPlan = sourceFile('docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md');
 
     for (const source of [changelog, backlog, masterPlan]) {
-      expect(source).toContain('PR #317 remains open and draft');
+      expect(source).toMatch(/PR #317 (?:is |subsequently )?merged|merged PR #317/i);
       expect(source).toMatch(/permission correction (?:is |was |were )?installed|foundation and permission correction are installed|both the foundation and its permission-parity correction installed/i);
       expect(source).toMatch(/runtime (?:matrix|validation) passed/i);
       expect(source).toContain('Production remains untouched');
+      expect(source).toContain('Slice 2C-A');
+      expect(source).toContain('Slice 2C-B');
+      expect(source).toContain('Slice 2C-C');
+      expect(source).toContain('Slice 2C-D');
     }
-    expect(changelog).toContain('final merge-readiness audit');
-    expect(backlog).toContain('final merge-readiness audit');
-    expect(masterPlan).toContain('Final merge-readiness audit');
+    expect(changelog).toContain('no UI wiring');
+    expect(backlog).toContain('hidden frontend contract work');
+    expect(masterPlan).toContain('hidden typed durable');
   });
 });
