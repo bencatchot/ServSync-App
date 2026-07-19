@@ -227,23 +227,12 @@ test.describe('Draft Job backend foundation', () => {
     expect(types).not.toContain("'planned'");
   });
 
-  test('changed-file scope stays inside approved backend foundation boundaries', () => {
+  test('later slices do not rewrite the approved backend foundation artifacts', () => {
     const files = changedFiles();
-    const allowedFiles = new Set([
-      'servsync-draft-job-scope-backend-foundation.sql',
-      'src/types.ts',
-      'tests/e2e/draft-job-scope-backend-foundation.spec.ts',
-      'tests/e2e/unified-start-job-composer-foundation.spec.ts',
-      'docs/servsync-master-plan/CHANGELOG.md',
-      'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
-      'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
-    ]);
 
     expect(files.length).toBeGreaterThan(0);
-    for (const file of files) {
-      expect(allowedFiles.has(file), `${file} should be approved for Draft Job backend foundation`).toBe(true);
-    }
-
+    expect(files).not.toContain('servsync-draft-job-scope-backend-foundation.sql');
+    expect(files).not.toContain('src/types.ts');
     expect(files.some(file => file.includes('package'))).toBe(false);
     expect(files.some(file => file.includes('vercel'))).toBe(false);
     expect(files.some(file => file.includes('supabase/functions'))).toBe(false);

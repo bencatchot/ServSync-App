@@ -129,14 +129,17 @@ import {
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
-import { ContractorDraftComposer } from './features/drafts/ContractorDraftComposer';
+import { DurableDraftWorkspace } from './features/drafts/DurableDraftWorkspace';
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
 import {
-  createBlankSharedDraftComposerDraft,
+  isDurableDraftComposerPathEnabled,
+  type DurableDraftOpenTarget,
+} from './features/drafts/durableDraftComposerIntegration';
+import { loadDurableDraftCapabilities } from './features/drafts/durableDraftCapabilities';
+import type { DurableDraftCompatibilityCapabilities } from './features/drafts/durableDraftLaunchTypes';
+import {
   sharedDraftComposerDraftFromDraftJob,
-  sharedDraftComposerDraftToDraftJobDraft,
-  validateSharedDraftComposerDraftForSave,
 } from './features/drafts/draftComposerMappings';
 import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';
 import { WorkComposerLineItemRow } from './features/work-composer/WorkComposerLineItemRow';
@@ -21703,15 +21706,70 @@ function ContractorDashboard({
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
   const [draftJobDraft, setDraftJobDraft] = useState<DraftJobComposerDraft>(() => createBlankDraftJobComposerDraft());
-  const [sharedDraftComposerDraft, setSharedDraftComposerDraft] = useState(() => createBlankSharedDraftComposerDraft());
+  const [durableDraftOpenTarget, setDurableDraftOpenTarget] = useState<DurableDraftOpenTarget | null>(null);
+  const [durableDraftCapabilities, setDurableDraftCapabilities] = useState<DurableDraftCompatibilityCapabilities>({
+    contractorId: null,
+    canReadDrafts: false,
+    canPersistDraft: false,
+    canImportLegacyDraft: false,
+    canLaunchJob: false,
+    canLaunchEstimate: false,
+  });
+  const [durableDraftCapabilityLoading, setDurableDraftCapabilityLoading] = useState(false);
+  const [durableDraftCapabilityError, setDurableDraftCapabilityError] = useState('');
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
-  const sharedDraftComposerEnabled = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;
+  const durableDraftComposerRequested = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;
+  const sharedDraftComposerEnabled = isDurableDraftComposerPathEnabled({
+    sharedDraftEnabled: SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED,
+    draftJobEnabled: DRAFT_JOB_UI_ENABLED,
+    demoPresentationMode: SERVSYNC_DEMO_PRESENTATION_MODE,
+  });
   const [savingDraftJob, setSavingDraftJob] = useState(false);
   const [creatingJobFromDraft, setCreatingJobFromDraft] = useState(false);
   const creatingJobFromDraftRef = useRef(false);
   const [loadingDraftJobId, setLoadingDraftJobId] = useState<string | null>(null);
   const [draftJobFeedback, setDraftJobFeedback] = useState<(ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sharedDraftComposerEnabled || !supabase) {
+      setDurableDraftCapabilityLoading(false);
+      setDurableDraftCapabilityError('');
+      setDurableDraftCapabilities({
+        contractorId: null,
+        canReadDrafts: false,
+        canPersistDraft: false,
+        canImportLegacyDraft: false,
+        canLaunchJob: false,
+        canLaunchEstimate: false,
+      });
+      return;
+    }
+    setDurableDraftCapabilityLoading(true);
+    setDurableDraftCapabilityError('');
+    void loadDurableDraftCapabilities(supabase)
+      .then(capabilities => {
+        if (!cancelled) setDurableDraftCapabilities(capabilities);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDurableDraftCapabilityError('Draft access could not be verified. Try again.');
+          setDurableDraftCapabilities({
+            contractorId: null,
+            canReadDrafts: false,
+            canPersistDraft: false,
+            canImportLegacyDraft: false,
+            canLaunchJob: false,
+            canLaunchEstimate: false,
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDurableDraftCapabilityLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sharedDraftComposerEnabled, profile.id, contractor?.id]);
 
   useEffect(() => {
     setAccountNameDraft(profile.full_name || '');
@@ -28878,9 +28936,7 @@ function ContractorDashboard({
         label: localHomeOptionLabel(home, index),
       })),
   }));
-  const activeDraftComposerDraft = sharedDraftComposerEnabled
-    ? sharedDraftComposerDraftToDraftJobDraft(sharedDraftComposerDraft)
-    : draftJobDraft;
+  const activeDraftComposerDraft = draftJobDraft;
   const draftJobConnectedOptionsForComposer = draftJobOptionsWithSavedSelection<DraftJobCustomerOption>(
     draftJobConnectedCustomerOptions,
     activeDraftComposerDraft.homeowner_user_id,
@@ -29114,6 +29170,11 @@ function ContractorDashboard({
       setContractorTab('inspections');
       return;
     }
+    if (durableDraftComposerRequested && SERVSYNC_DEMO_PRESENTATION_MODE) {
+      setInspectionView('list');
+      setContractorJobsViewAndScroll('overview');
+      return;
+    }
     const nextDraft = createBlankDraftJobComposerDraft({
       subject_type: selectedJobsLocalContact ? 'local' : 'connected',
       homeowner_user_id: selectedJobsConnection?.homeowner_user_id ?? '',
@@ -29122,8 +29183,21 @@ function ContractorDashboard({
       local_home_id: selectedJobsLocalContact ? singleLocalHomeId(selectedJobsLocalContact) : '',
       ...overrides,
     });
+    if (sharedDraftComposerEnabled) {
+      if (!durableDraftCapabilities.canPersistDraft) {
+        setError('You do not have access to save contractor Drafts.');
+        setInspectionView('list');
+        setContractorJobsViewAndScroll('open_jobs');
+        return;
+      }
+      const initialDraft = sharedDraftComposerDraftFromDraftJob(nextDraft, { intendedOutput: null });
+      setDurableDraftOpenTarget({ kind: 'new', initialDraft });
+      setInspectionView('draft_job');
+      setContractorJobsView('new_jobs');
+      setContractorTab('inspections');
+      return;
+    }
     setDraftJobDraft(nextDraft);
-    setSharedDraftComposerDraft(sharedDraftComposerDraftFromDraftJob(nextDraft, { intendedOutput: null }));
     setActiveDraftJobId(null);
     setRemovedDraftJobWorkItemIds([]);
     setDraftJobFeedback(null);
@@ -29155,8 +29229,24 @@ function ContractorDashboard({
       setContractorJobsViewAndScroll('open_jobs');
       return;
     }
+    if (durableDraftComposerRequested && SERVSYNC_DEMO_PRESENTATION_MODE) {
+      setInspectionView('list');
+      setContractorJobsViewAndScroll('open_jobs');
+      return;
+    }
     if (!isComposerDraftJob(draft)) {
       setError('This record is not a contractor Draft Job.');
+      return;
+    }
+    if (sharedDraftComposerEnabled) {
+      if (!durableDraftCapabilities.canImportLegacyDraft) {
+        setError('You can view this earlier Draft, but do not have access to prepare it for editing.');
+        return;
+      }
+      setDurableDraftOpenTarget({ kind: 'legacy', inspectionId: draft.id });
+      setInspectionView('draft_job');
+      setContractorJobsView('new_jobs');
+      setContractorTab('inspections');
       return;
     }
     setLoadingDraftJobId(draft.id);
@@ -29170,8 +29260,7 @@ function ContractorDashboard({
       }
       const nextDraft = draftJobComposerDraftFromRecords(freshDraft, items);
       setInspections(prev => [freshDraft, ...prev.filter(item => item.id !== freshDraft.id)]);
-      setDraftJobDraft(draftJobComposerDraftFromRecords(freshDraft, items));
-      setSharedDraftComposerDraft(sharedDraftComposerDraftFromDraftJob(nextDraft, { intendedOutput: 'job' }));
+      setDraftJobDraft(nextDraft);
       setActiveDraftJobId(freshDraft.id);
       setRemovedDraftJobWorkItemIds([]);
       setDraftJobFeedback(null);
@@ -29185,6 +29274,29 @@ function ContractorDashboard({
     }
   };
 
+  const openDurableDraftOutput = async (type: 'estimate' | 'job', id: string) => {
+    if (!supabase) throw new Error('ServSync is not configured.');
+    if (type === 'estimate') {
+      let estimate = estimates.find(candidate => candidate.id === id) ?? null;
+      if (!estimate) {
+        const { data, error: estimateError } = await supabase
+          .from('estimates')
+          .select(ESTIMATE_WITH_LINES_SELECT)
+          .eq('id', id)
+          .single();
+        if (estimateError) throw estimateError;
+        estimate = data as Estimate;
+        setEstimates(previous => [estimate as Estimate, ...previous.filter(candidate => candidate.id !== id)]);
+      }
+      openEstimateRecord(estimate);
+      return;
+    }
+    const job = inspections.find(candidate => candidate.id === id) ?? await fetchDraftJobRecord(id);
+    if (!job) throw new Error('Job not found.');
+    setInspections(previous => [job, ...previous.filter(candidate => candidate.id !== job.id)]);
+    openInspection(job);
+  };
+
   const saveDraftJobComposer = async () => {
     if (!supabase || !contractor) return;
     if (!DRAFT_JOB_UI_ENABLED) {
@@ -29195,9 +29307,7 @@ function ContractorDashboard({
       setDraftJobFeedback({ tone: 'error', title: draftJobRoleDeniedReason, testId: 'draft-job-save-feedback' });
       return;
     }
-    const validationMessage = sharedDraftComposerEnabled
-      ? validateSharedDraftComposerDraftForSave(sharedDraftComposerDraft)
-      : validateDraftJobComposerDraft(draftJobDraft);
+    const validationMessage = validateDraftJobComposerDraft(draftJobDraft);
     if (validationMessage) {
       setDraftJobFeedback({ tone: 'error', title: validationMessage, testId: 'draft-job-save-feedback' });
       return;
@@ -29213,9 +29323,7 @@ function ContractorDashboard({
       ? 'updating_metadata'
       : 'creating_draft';
     try {
-      const draftForSave = sharedDraftComposerEnabled
-        ? sharedDraftComposerDraftToDraftJobDraft(sharedDraftComposerDraft)
-        : draftJobDraft;
+      const draftForSave = draftJobDraft;
       const metadataPayload = draftJobMetadataPayload(draftForSave);
       if (!draftId) {
         savePhase = 'creating_draft';
@@ -29238,13 +29346,6 @@ function ContractorDashboard({
       scopeSaved = true;
       const nextDraft = applyDraftJobScopeResult(draftForSave, scopeResult);
       setDraftJobDraft(nextDraft);
-      if (sharedDraftComposerEnabled) {
-        setSharedDraftComposerDraft(prev => sharedDraftComposerDraftFromDraftJob(nextDraft, {
-          intendedOutput: prev.intended_output,
-          estimateSession: prev.estimate_session,
-          jobSession: prev.job_session,
-        }));
-      }
       setRemovedDraftJobWorkItemIds([]);
       savePhase = 'refreshing_saved_data';
       await refreshJobWorkItemsForJob(draftId);
@@ -29252,10 +29353,8 @@ function ContractorDashboard({
       if (savedDraft) setInspections(prev => [savedDraft, ...prev.filter(item => item.id !== savedDraft.id)]);
       setDraftJobFeedback({
         tone: 'success',
-        title: sharedDraftComposerEnabled ? 'Draft saved.' : 'Draft Job saved.',
-        body: sharedDraftComposerEnabled
-          ? 'Supported shared fields were saved. Intended output remains session-only in this hidden foundation.'
-          : 'This contractor-only draft is ready to resume from the Jobs area.',
+        title: 'Draft Job saved.',
+        body: 'This contractor-only draft is ready to resume from the Jobs area.',
         testId: 'draft-job-save-feedback',
       });
     } catch (err) {
@@ -37050,8 +37149,12 @@ function ContractorDashboard({
                   <ContractorWorkDashboard
                     loading={loading}
                     loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
-                    canStartDraft={DRAFT_JOB_UI_ENABLED && canManageDraftJobs}
-                    draftsToContinue={DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}
+                    canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled
+                      ? durableDraftCapabilities.canPersistDraft
+                      : DRAFT_JOB_UI_ENABLED && canManageDraftJobs)}
+                    draftsToContinue={sharedDraftComposerEnabled
+                      ? []
+                      : DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}
                     activeJobs={openJobs}
                     workReadyToStart={acceptedEstimatesNeedingJobs}
                     readyToInvoiceJobs={completedJobsReadyToInvoice}
@@ -38611,14 +38714,37 @@ function ContractorDashboard({
 	                    return (
                       <div className="space-y-4">
                         {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && (
-                          <DraftJobList
-                            drafts={selectedJobsCustomerDrafts}
-                            workItemsByJobId={jobWorkItemsByJobId}
-                            customerLabel={fieldWorkSubjectLabel}
-                            propertyLabel={fieldWorkSubjectAddress}
-                            loadingDraftId={loadingDraftJobId}
-                            onContinue={draft => void continueDraftJob(draft)}
-                          />
+                          sharedDraftComposerEnabled && supabase ? (
+                            <DurableDraftWorkspace
+                              client={supabase}
+                              mode="list"
+                              capabilities={durableDraftCapabilities}
+                              capabilityLoading={durableDraftCapabilityLoading}
+                              capabilityError={durableDraftCapabilityError}
+                              legacyDrafts={composerDraftJobs}
+                              connectedOptions={draftJobConnectedOptionsForComposer}
+                              localOptions={draftJobLocalOptionsForComposer}
+                              customerLabel={fieldWorkSubjectLabel}
+                              propertyLabel={fieldWorkSubjectAddress}
+                              onStartNew={startCleanDraftJobComposer}
+                              onOpenTarget={target => {
+                                setDurableDraftOpenTarget(target);
+                                setInspectionView('draft_job');
+                                setContractorJobsView('new_jobs');
+                              }}
+                              onBack={() => setContractorJobsViewAndScroll('overview')}
+                              onOpenOutput={openDurableDraftOutput}
+                            />
+                          ) : (
+                            <DraftJobList
+                              drafts={selectedJobsCustomerDrafts}
+                              workItemsByJobId={jobWorkItemsByJobId}
+                              customerLabel={fieldWorkSubjectLabel}
+                              propertyLabel={fieldWorkSubjectAddress}
+                              loadingDraftId={loadingDraftJobId}
+                              onContinue={draft => void continueDraftJob(draft)}
+                            />
+                          )
                         )}
                         {renderDemoPresentationJobsCheckpointStory()}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -40282,24 +40408,29 @@ function ContractorDashboard({
           )}
 
           {/* ── DRAFT JOB COMPOSER VIEW ── */}
-          {DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job' && (!sharedDraftComposerEnabled || canManageDraftJobs) && (
+          {DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job' && (!sharedDraftComposerEnabled || Boolean(supabase)) && (
             <Card title={sharedDraftComposerEnabled ? 'Start New Draft' : 'Start New Job'} icon={<Plus size={18} />}>
-              {sharedDraftComposerEnabled ? (
-                <ContractorDraftComposer
-                  draft={sharedDraftComposerDraft}
+              {sharedDraftComposerEnabled && supabase ? (
+                <DurableDraftWorkspace
+                  client={supabase}
+                  mode="editor"
+                  capabilities={durableDraftCapabilities}
+                  capabilityLoading={durableDraftCapabilityLoading}
+                  capabilityError={durableDraftCapabilityError}
+                  target={durableDraftOpenTarget}
+                  legacyDrafts={composerDraftJobs}
                   connectedOptions={draftJobConnectedOptionsForComposer}
                   localOptions={draftJobLocalOptionsForComposer}
-                  currentDraftId={activeDraftJobId}
-                  canSave={canManageDraftJobs && !savingDraftJob && !creatingJobFromDraft}
-                  saving={savingDraftJob}
-                  feedback={draftJobFeedback}
-                  onChange={setSharedDraftComposerDraft}
-                  onSave={() => void saveDraftJobComposer()}
+                  customerLabel={fieldWorkSubjectLabel}
+                  propertyLabel={fieldWorkSubjectAddress}
+                  onStartNew={startCleanDraftJobComposer}
+                  onOpenTarget={setDurableDraftOpenTarget}
                   onBack={() => {
+                    setDurableDraftOpenTarget(null);
                     setInspectionView('list');
                     setContractorJobsViewAndScroll('open_jobs');
                   }}
-                  onRemovePersistedLine={id => setRemovedDraftJobWorkItemIds(prev => prev.includes(id) ? prev : [...prev, id])}
+                  onOpenOutput={openDurableDraftOutput}
                 />
               ) : (
                 <>

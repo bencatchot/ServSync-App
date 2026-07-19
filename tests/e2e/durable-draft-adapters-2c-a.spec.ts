@@ -979,11 +979,13 @@ test.describe('Slice 2C-A durable Draft adapters', () => {
       .rejects.toMatchObject({ applicationCode: 'DRAFT_RESPONSE_INVALID', phase: 'import' });
   });
 
-  test('hidden adapters do not wire App, Composer, routes, or feature gates', () => {
+  test('2C-B wiring keeps private and launch-only adapters out of App and Composer', () => {
     const app = sourceFile('src/App.tsx');
     const composer = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const api = sourceFile('src/features/drafts/durableDraftLaunchApi.ts');
-    expect(app).not.toMatch(/durableDraft(?:LaunchApi|Mappings|Capabilities|LaunchAttempt)/);
+    expect(app).toContain('DurableDraftWorkspace');
+    expect(app).not.toContain('launchContractorWorkDraft');
+    expect(app).not.toContain('durableDraftLaunchAttempt');
     expect(composer).not.toMatch(/durableDraft(?:LaunchApi|Mappings|Capabilities|LaunchAttempt)/);
     expect(api).not.toContain('servsync_private_');
     expect(composer).not.toContain('Create Estimate');

@@ -43,12 +43,12 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     );
 
     expect(appSource).toContain("import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';");
-    expect(appSource).toContain('const sharedDraftComposerEnabled = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;');
-    expect(renderSource).toContain('sharedDraftComposerEnabled ? (');
-    expect(renderSource).toContain('<ContractorDraftComposer');
+    expect(appSource).toContain('const sharedDraftComposerEnabled = isDurableDraftComposerPathEnabled({');
+    expect(renderSource).toContain('sharedDraftComposerEnabled && supabase ? (');
+    expect(renderSource).toContain('<DurableDraftWorkspace');
     expect(renderSource).toContain('<DraftJobComposer');
     expect(renderSource).toContain('canManageDraftJobs');
-    expect(renderSource).toContain('onSave={() => void saveDraftJobComposer()}');
+    expect(renderSource).toContain('onOpenOutput={openDurableDraftOutput}');
     expect(renderSource).not.toContain('contractorTab === \'drafts\'');
     expect(appSource).not.toContain("label: 'Start New Draft'");
   });
@@ -148,12 +148,13 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     });
   });
 
-  test('shared composer UI has Estimate and Job only, with no launch or top-level notes controls', () => {
+  test('shared composer UI has Estimate and Job planning plus private notes, with no launch controls', () => {
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const selectorSource = sourceFile('src/features/drafts/DraftOutcomeSelector.tsx');
 
     expect(selectorSource).toContain("label: 'Estimate'");
     expect(selectorSource).toContain("label: 'Job'");
+    expect(selectorSource).toContain("label: 'Not decided'");
     expect(selectorSource).not.toContain('Invoice');
     expect(composerSource).toContain('data-testid="shared-draft-composer"');
     expect(composerSource).toContain('Save Draft');
@@ -162,7 +163,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(composerSource).not.toContain('Create Job');
     expect(composerSource).not.toContain('Create Invoice');
     expect(composerSource).not.toContain('Launch');
-    expect(composerSource).not.toContain('Notes / exclusions');
+    expect(composerSource).toContain("composerField('Private notes'");
     expect(composerSource).not.toContain('Payment schedule');
     expect(composerSource).not.toContain('inspection_checklist');
   });
@@ -177,7 +178,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(selectorSource).toContain('type="radio"');
     expect(selectorSource).toContain('focus-within:ring-2');
     expect(selectorSource).toContain('min-h-11');
-    expect(selectorSource).toContain('sm:grid-cols-2');
+    expect(selectorSource).toContain('sm:grid-cols-3');
     expect(composerSource).toContain('min-h-11');
     expect(composerSource).not.toContain('fixed bottom');
     expect(composerSource).not.toContain('overflow-x');

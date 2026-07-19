@@ -95,7 +95,7 @@ export function ContractorDraftComposer({
     });
   };
 
-  const updateIntent = (intendedOutput: DraftIntendedOutput) => {
+  const updateIntent = (intendedOutput: DraftIntendedOutput | null) => {
     onChange({
       ...draft,
       intended_output: intendedOutput,
@@ -208,6 +208,19 @@ export function ContractorDraftComposer({
           placeholder="Describe the work to perform, materials to use, or customer expectations."
         />
       ))}
+
+      {composerField('Private notes', (
+        <textarea
+          className={`${fieldClass()} min-h-[96px] resize-y`}
+          value={draft.notes}
+          onChange={event => onChange({ ...draft, notes: event.target.value })}
+          placeholder="Visible only to your company and not copied to the customer-facing Estimate or Job."
+          aria-describedby="durable-draft-private-notes-help"
+        />
+      ))}
+      <p id="durable-draft-private-notes-help" className="text-xs leading-5 text-slate-500">
+        Contractor-only planning notes. These are not copied to the customer-facing Estimate or Job.
+      </p>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

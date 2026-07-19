@@ -396,6 +396,7 @@ test.describe('Draft Job UI persistence and resume', () => {
   test('Continue Draft performs a canonical refetch and failed loads do not open a blank composer', () => {
     const appSource = sourceFile('src/App.tsx');
     const continueSource = sourceBetween(appSource, 'const continueDraftJob = async', 'const saveDraftJobComposer = async');
+    const legacyResumeSource = sourceBetween(continueSource, 'setLoadingDraftJobId(draft.id);', '} catch (err) {');
     const fetchSource = sourceBetween(appSource, 'const fetchDraftJobRecord = async', 'const startDraftJobComposer =');
     const listSource = sourceFile('src/features/jobs/DraftJobList.tsx');
 
@@ -404,8 +405,9 @@ test.describe('Draft Job UI persistence and resume', () => {
     expect(continueSource).toContain('fetchDraftJobRecord(draft.id)');
     expect(continueSource).toContain('refreshJobWorkItemsForJob(draft.id)');
     expect(continueSource).toContain('isComposerDraftJob(freshDraft)');
-    expect(continueSource).toContain('setDraftJobDraft(draftJobComposerDraftFromRecords(freshDraft, items))');
-    expect(continueSource.indexOf("setInspectionView('draft_job')")).toBeGreaterThan(continueSource.indexOf('isComposerDraftJob(freshDraft)'));
+    expect(continueSource).toContain('const nextDraft = draftJobComposerDraftFromRecords(freshDraft, items)');
+    expect(continueSource).toContain('setDraftJobDraft(nextDraft)');
+    expect(legacyResumeSource.indexOf("setInspectionView('draft_job')")).toBeGreaterThan(legacyResumeSource.indexOf('isComposerDraftJob(freshDraft)'));
     expect(continueSource).toContain('setLoadingDraftJobId(draft.id)');
     expect(continueSource).toContain('setLoadingDraftJobId(null)');
     expect(listSource).toContain('loadingDraftId === draft.id');
