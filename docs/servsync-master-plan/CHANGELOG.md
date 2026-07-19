@@ -11,12 +11,11 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `servsync-durable-draft-launch-foundation.sql`
   - `src/features/drafts/durableDraftLaunchApi.ts`
   - `src/features/drafts/durableDraftLaunchTypes.ts`
-  - `src/types.ts`
   - `tests/e2e/durable-draft-launch-foundation.spec.ts`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Corrected the packaged Slice 2B contract before sandbox application. Launch authorization now precedes private-ledger lookup or retry disclosure; Draft-to-output linkage remains only in the private success ledger; launch revalidates connected/local subjects and source requests; historical actor deletion no longer cascades audit rows; idempotency keys are contractor-serialized; save input uses stable validation and full-snapshot metadata; legacy intent defaults to null; ordering and labor precision match downstream contracts; and Estimate totals match the normal composer buckets.
+- Summary of change: Corrected the packaged Slice 2B contract before sandbox application. Launch authorization now uses a non-enumerating Draft lookup before private-ledger or consumed-output disclosure; connected Job launch matches the normal service-request/shared-property authorization boundary and locks relationship rows during revalidation; duplicate prevention excludes only the exact inactive legacy placeholder; contractor deletion cannot cascade-delete durable Draft history; private subject snapshots preserve consumed/discarded audit context after permitted subject deletion; and launched outputs remain deletion-restricted. The earlier correction also keeps Draft-to-output linkage private, serializes idempotency keys, validates full-snapshot save input, defaults legacy intent to null, uses deterministic ordering and downstream-compatible labor precision, and matches normal Estimate totals.
 - Reason for change: The focused audit found privacy, authorization-ordering, idempotency, validation, audit-retention, and mapping defects that made the first SQL package unsafe for sandbox execution.
 - Tests/checks run:
   - SQL remains unapplied; static/build/source-contract validation only.
@@ -24,6 +23,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Known risks or follow-ups:
   - A second focused read-only audit is required before any sandbox SQL application.
   - Runtime RLS, transaction rollback, concurrency, permission parity, and Estimate/Job mapping tests remain approval-gated until sandbox application.
+  - Typed UUID RPC arguments are validated by PostgREST/PostgreSQL before function execution; stable ServSync codes apply after successful argument coercion.
   - Existing Estimate, Job, and Draft permission checks are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
@@ -36,7 +36,6 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `servsync-durable-draft-launch-foundation.sql`
   - `src/features/drafts/durableDraftLaunchApi.ts`
   - `src/features/drafts/durableDraftLaunchTypes.ts`
-  - `src/types.ts`
   - `tests/e2e/durable-draft-launch-foundation.spec.ts`
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`

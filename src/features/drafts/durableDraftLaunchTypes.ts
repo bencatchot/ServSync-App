@@ -13,6 +13,9 @@ export type ContractorWorkDraft = {
   local_contact_id: string | null;
   local_home_id: string | null;
   service_request_id: string | null;
+  subject_type: 'connected_homeowner' | 'local_contact';
+  subject_display_name_snapshot: string;
+  property_display_snapshot: string;
   title: string;
   scope_description: string;
   private_notes: string;

@@ -71,6 +71,29 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(sql).not.toMatch(/status = 'consumed'[\s\S]*launched_by_user_id is not null[\s\S]*contractor_work_drafts_launch_state_check/);
   });
 
+  test('retains contractor audit history and keeps subject deletion constraints coherent', () => {
+    const sql = sqlSource();
+    const draftsTable = sourceBetween(sql, 'create table if not exists public.contractor_work_drafts', 'create table if not exists public.contractor_work_draft_items');
+    const itemsTable = sourceBetween(sql, 'create table if not exists public.contractor_work_draft_items', 'create table if not exists public.contractor_work_draft_launches');
+    const launchesTable = sourceBetween(sql, 'create table if not exists public.contractor_work_draft_launches', 'create unique index if not exists contractor_work_drafts_legacy_inspection_unique_idx');
+
+    expect(draftsTable).toContain('contractor_id uuid not null references public.contractor_profiles(id) on delete restrict');
+    expect(itemsTable).toContain('contractor_id uuid not null references public.contractor_profiles(id) on delete restrict');
+    expect(launchesTable).toContain('contractor_id uuid not null references public.contractor_profiles(id) on delete restrict');
+    expect(launchesTable).toContain('draft_id uuid not null references public.contractor_work_drafts(id) on delete restrict');
+    expect(draftsTable).toContain("subject_type text not null check (subject_type in ('connected_homeowner', 'local_contact'))");
+    expect(draftsTable).toContain('subject_display_name_snapshot text not null');
+    expect(draftsTable).toContain("status <> 'active' or homeowner_user_id is not null");
+    expect(draftsTable).toContain("status <> 'active' or local_contact_id is not null");
+    expect(draftsTable).toContain("constraint contractor_work_drafts_property_subject_check check (\n    status <> 'active'");
+    expect(draftsTable).toContain('launched_estimate_id uuid references public.estimates(id) on delete restrict');
+    expect(draftsTable).toContain('launched_job_id uuid references public.inspections(id) on delete restrict');
+    expect(launchesTable).toContain('launched_estimate_id uuid references public.estimates(id) on delete restrict');
+    expect(launchesTable).toContain('launched_job_id uuid references public.inspections(id) on delete restrict');
+    expect(sql).toContain('Contractor deletion is restricted while Draft audit records exist.');
+    expect(sql).toContain('consumed or discarded Drafts are immutable and may retain only private snapshots after subject deletion.');
+  });
+
   test('RLS and grants keep Draft and launch records contractor-private', () => {
     const sql = sqlSource();
 
@@ -125,6 +148,22 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(importRpc).not.toMatch(/delete from public\.(?:inspections|job_work_items)/i);
   });
 
+  test('legacy import cannot disclose foreign compatibility before tenant authorization', () => {
+    const sql = sqlSource();
+    const importRpc = sourceBetween(sql, 'create or replace function public.servsync_import_legacy_draft_job', 'create or replace function public.servsync_private_launch_work_draft_as_estimate');
+    const contractorLookupIndex = importRpc.indexOf('servsync_current_contractor_profile');
+    const permissionIndex = importRpc.indexOf('current_user_can_manage_contractor_billing(v_contractor_id)');
+    const inspectionLookupIndex = importRpc.indexOf('from public.inspections');
+    const compatibilityIndex = importRpc.indexOf("v_job.job_origin <> 'draft_composer'");
+
+    expect(contractorLookupIndex).toBeGreaterThanOrEqual(0);
+    expect(permissionIndex).toBeGreaterThan(contractorLookupIndex);
+    expect(inspectionLookupIndex).toBeGreaterThan(permissionIndex);
+    expect(compatibilityIndex).toBeGreaterThan(inspectionLookupIndex);
+    expect(importRpc).toContain('and (v_is_platform_admin or contractor_id = v_contractor_id)');
+    expect(importRpc).toContain("raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE'");
+  });
+
   test('authorization precedes all launch-ledger lookup and retry output disclosure', () => {
     const sql = sqlSource();
     const launchRpc = sourceBetween(sql, 'create or replace function public.servsync_launch_work_draft', 'revoke execute on function public.servsync_get_work_draft');
@@ -137,7 +176,9 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(permissionIndex).toBeLessThan(conflictLookupIndex);
     expect(permissionIndex).toBeLessThan(successLookupIndex);
     expect(permissionIndex).toBeLessThan(consumedReturnIndex);
-    expect(launchRpc).toContain("raise exception using message = 'DRAFT_PERMISSION_DENIED'");
+    expect(launchRpc).toContain("raise exception using message = 'DRAFT_NOT_FOUND'");
+    expect(sourceBetween(sql, 'create or replace function public.servsync_get_work_draft', 'create or replace function public.servsync_save_work_draft'))
+      .toContain("raise exception using message = 'DRAFT_NOT_FOUND'");
   });
 
   test('launch serializes idempotency and returns one canonical output without broad masking', () => {
@@ -163,6 +204,7 @@ test.describe('Durable Draft Launch foundation', () => {
     const launchRpc = sourceBetween(sql, 'create or replace function public.servsync_launch_work_draft', 'revoke execute on function public.servsync_get_work_draft');
 
     expect(validator).toContain('homeowner_contractor_connections');
+    expect(validator).toContain('connection_shared_properties');
     expect(validator).toContain("connection.status = 'active'");
     expect(validator).toContain('home.homeowner_user_id = p_draft.homeowner_user_id');
     expect(validator).toContain('request.contractor_id = p_draft.contractor_id');
@@ -170,7 +212,65 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(validator).toContain('v_request.home_id is distinct from p_draft.home_id');
     expect(validator).toContain('home.local_contact_id = p_draft.local_contact_id');
     expect(validator).toContain('SERVICE_REQUEST_INVALID');
-    expect(launchRpc).toContain('servsync_private_validate_work_draft_relationships(v_draft)');
+    expect(validator).toContain("p_requested_output = 'job'");
+    expect(validator).toContain('v_request_authorizes_home');
+    expect(validator).toContain('PROPERTY_NOT_SHARED');
+    expect(launchRpc).toContain('servsync_private_validate_work_draft_relationships(v_draft, v_output_type)');
+
+    const requestLockIndex = validator.indexOf('from public.service_requests request');
+    const connectionLockIndex = validator.indexOf('from public.homeowner_contractor_connections connection');
+    const sharedPropertyLockIndex = validator.indexOf('from public.connection_shared_properties shared_property');
+    const homeLockIndex = validator.indexOf('from public.homes home');
+    const localContactLockIndex = validator.indexOf('from public.contractor_local_contacts contact');
+    const localHomeLockIndex = validator.indexOf('from public.contractor_local_homes home');
+    expect(requestLockIndex).toBeLessThan(connectionLockIndex);
+    expect(connectionLockIndex).toBeLessThan(sharedPropertyLockIndex);
+    expect(sharedPropertyLockIndex).toBeLessThan(homeLockIndex);
+    expect(homeLockIndex).toBeLessThan(localContactLockIndex);
+    expect(localContactLockIndex).toBeLessThan(localHomeLockIndex);
+    expect(validator.split('for share').length - 1).toBeGreaterThanOrEqual(6);
+  });
+
+  test('Draft-to-Job property authorization matches the normal Job creation rule', () => {
+    const sql = sqlSource();
+    const validator = sourceBetween(sql, 'create or replace function public.servsync_private_validate_work_draft_relationships', 'create or replace function public.servsync_private_can_create_work_draft_estimate');
+    const normalJob = sourceBetween(sourceFile('servsync-connection-shared-properties.sql'), 'create or replace function public.servsync_create_field_work', 'revoke execute on function public.servsync_create_field_work');
+
+    for (const source of [validator, normalJob]) {
+      expect(source).toContain('connection_shared_properties');
+      expect(source).toContain("status = 'active'");
+      expect(source).toContain('home_id');
+      expect(source).toContain('service_request');
+    }
+    expect(normalJob).toContain('v_home_allowed_by_request');
+    expect(validator).toContain('v_request_authorizes_home');
+  });
+
+  test('duplicate Job prevention excludes only the exact inactive legacy placeholder', () => {
+    const sql = sqlSource();
+    const launchRpc = sourceBetween(sql, 'create or replace function public.servsync_launch_work_draft', 'revoke execute on function public.servsync_get_work_draft');
+    const legacyId = '11111111-1111-4111-8111-111111111111';
+    const unrelatedId = '22222222-2222-4222-8222-222222222222';
+    const isOperationalConflict = (job: { id: string; origin: string; status: string; jobStatus: string }) =>
+      job.jobStatus !== 'cancelled' && !(
+        job.id === legacyId
+        && job.origin === 'draft_composer'
+        && job.status === 'draft'
+        && job.jobStatus === 'draft'
+      );
+
+    expect(launchRpc).toContain('job.id = v_draft.legacy_inspection_id');
+    expect(launchRpc).toContain("job.job_origin = 'draft_composer'");
+    expect(launchRpc).toContain("job.status = 'draft'");
+    expect(launchRpc).toContain("job.job_status = 'draft'");
+    expect(launchRpc).toContain("job.job_status <> 'cancelled'");
+    expect(launchRpc).not.toContain("job.job_origin <> 'draft_composer'");
+    expect(isOperationalConflict({ id: legacyId, origin: 'draft_composer', status: 'draft', jobStatus: 'draft' })).toBe(false);
+    expect(isOperationalConflict({ id: legacyId, origin: 'draft_composer', status: 'active', jobStatus: 'scheduled' })).toBe(true);
+    expect(isOperationalConflict({ id: unrelatedId, origin: 'draft_composer', status: 'draft', jobStatus: 'draft' })).toBe(true);
+    expect(isOperationalConflict({ id: unrelatedId, origin: 'direct', status: 'active', jobStatus: 'cancelled' })).toBe(false);
+    expect(isOperationalConflict({ id: unrelatedId, origin: 'direct', status: 'active', jobStatus: 'scheduled' })).toBe(true);
+    expect(isOperationalConflict({ id: unrelatedId, origin: 'estimate', status: 'active', jobStatus: 'scheduled' })).toBe(true);
   });
 
   test('Estimate launch matches normal calculation buckets and existing creation permission', () => {
@@ -254,13 +354,20 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(sharedComposerSource).not.toContain('Launch Draft');
   });
 
+  test('documents typed top-level UUID coercion without overstating custom errors', () => {
+    const sql = sqlSource();
+
+    expect(sql).toContain('Typed UUID arguments are coerced by PostgREST/PostgreSQL before this function runs.');
+    expect(sql).toContain('ServSync error codes apply after successful argument coercion');
+    expect(sql).toContain('Foreign and unavailable legacy Draft IDs use the same non-enumerating compatibility response.');
+  });
+
   test('changed-file scope stays inside the approved Slice 2B correction', () => {
     const files = changedFiles();
     const allowedFiles = new Set([
       'servsync-durable-draft-launch-foundation.sql',
       'src/features/drafts/durableDraftLaunchApi.ts',
       'src/features/drafts/durableDraftLaunchTypes.ts',
-      'src/types.ts',
       'tests/e2e/durable-draft-launch-foundation.spec.ts',
       'docs/servsync-master-plan/CHANGELOG.md',
       'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
@@ -270,5 +377,12 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) expect(allowedFiles.has(file), `${file} should be approved`).toBe(true);
     expect(files.some(file => /package|vercel|supabase\/functions|marketing-screenshots/.test(file))).toBe(false);
+  });
+
+  test('Changelog file scope matches the final Slice 2B PR', () => {
+    const changelog = sourceFile('docs/servsync-master-plan/CHANGELOG.md');
+    const currentEntry = sourceBetween(changelog, '## 2026-07-19', '## 2026-07-18');
+
+    expect(currentEntry).not.toContain('`src/types.ts`');
   });
 });

@@ -12,13 +12,16 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.contractor_work_drafts (
   id uuid primary key default gen_random_uuid(),
-  contractor_id uuid not null references public.contractor_profiles(id) on delete cascade,
+  contractor_id uuid not null references public.contractor_profiles(id) on delete restrict,
   created_by_user_id uuid references public.profiles(id) on delete set null,
   homeowner_user_id uuid references public.profiles(id) on delete set null,
   home_id uuid references public.homes(id) on delete set null,
   local_contact_id uuid references public.contractor_local_contacts(id) on delete set null,
   local_home_id uuid references public.contractor_local_homes(id) on delete set null,
   service_request_id uuid references public.service_requests(id) on delete set null,
+  subject_type text not null check (subject_type in ('connected_homeowner', 'local_contact')),
+  subject_display_name_snapshot text not null,
+  property_display_snapshot text not null default '',
   title text not null default '',
   scope_description text not null default '',
   private_notes text not null default '',
@@ -38,12 +41,26 @@ create table if not exists public.contractor_work_drafts (
   updated_at timestamptz not null default now(),
   constraint contractor_work_drafts_id_contractor_unique unique (id, contractor_id),
   constraint contractor_work_drafts_subject_check check (
-    (homeowner_user_id is not null and local_contact_id is null)
-    or (homeowner_user_id is null and local_contact_id is not null)
+    (
+      subject_type = 'connected_homeowner'
+      and local_contact_id is null
+      and local_home_id is null
+      and (status <> 'active' or homeowner_user_id is not null)
+    )
+    or (
+      subject_type = 'local_contact'
+      and homeowner_user_id is null
+      and home_id is null
+      and service_request_id is null
+      and (status <> 'active' or local_contact_id is not null)
+    )
   ),
   constraint contractor_work_drafts_property_subject_check check (
-    (home_id is null or homeowner_user_id is not null)
-    and (local_home_id is null or local_contact_id is not null)
+    status <> 'active'
+    or (
+      (home_id is null or homeowner_user_id is not null)
+      and (local_home_id is null or local_contact_id is not null)
+    )
   ),
   constraint contractor_work_drafts_launch_state_check check (
     (
@@ -69,7 +86,7 @@ create table if not exists public.contractor_work_drafts (
 create table if not exists public.contractor_work_draft_items (
   id uuid primary key default gen_random_uuid(),
   draft_id uuid not null references public.contractor_work_drafts(id) on delete cascade,
-  contractor_id uuid not null references public.contractor_profiles(id) on delete cascade,
+  contractor_id uuid not null references public.contractor_profiles(id) on delete restrict,
   title text not null,
   description text not null default '',
   customer_description text not null default '',
@@ -94,8 +111,8 @@ create table if not exists public.contractor_work_draft_items (
 
 create table if not exists public.contractor_work_draft_launches (
   id uuid primary key default gen_random_uuid(),
-  draft_id uuid not null references public.contractor_work_drafts(id) on delete cascade,
-  contractor_id uuid not null references public.contractor_profiles(id) on delete cascade,
+  draft_id uuid not null references public.contractor_work_drafts(id) on delete restrict,
+  contractor_id uuid not null references public.contractor_profiles(id) on delete restrict,
   idempotency_key uuid not null,
   requested_output text not null check (requested_output in ('estimate', 'job')),
   status text not null default 'succeeded' check (status = 'succeeded'),
@@ -107,7 +124,7 @@ create table if not exists public.contractor_work_draft_launches (
   constraint contractor_work_draft_launches_contractor_match_fk
     foreign key (draft_id, contractor_id)
     references public.contractor_work_drafts(id, contractor_id)
-    on delete cascade,
+    on delete restrict,
   constraint contractor_work_draft_launches_status_linkage_check check (
     completed_at is not null
     and (
@@ -337,15 +354,11 @@ begin
     from public.contractor_work_drafts
    where id = p_draft_id;
 
-  if v_draft.id is null then
-    raise exception using message = 'DRAFT_NOT_FOUND';
-  end if;
-
-  if not (
+  if v_draft.id is null or not (
     public.current_user_can_access_contractor(v_draft.contractor_id)
     or public.current_user_is_platform_admin()
   ) then
-    raise exception using message = 'DRAFT_PERMISSION_DENIED';
+    raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
 
   select coalesce(
@@ -390,6 +403,8 @@ declare
   v_existing public.contractor_work_drafts;
   v_request public.service_requests;
   v_home public.homes;
+  v_homeowner public.profiles;
+  v_local_contact public.contractor_local_contacts;
   v_local_home public.contractor_local_homes;
   v_legacy public.inspections;
   v_draft_id uuid := p_draft_id;
@@ -399,6 +414,9 @@ declare
   v_local_home_id uuid;
   v_service_request_id uuid;
   v_legacy_inspection_id uuid;
+  v_subject_type text;
+  v_subject_display_name_snapshot text;
+  v_property_display_snapshot text := '';
   v_intended_output text;
   v_work_format text;
   v_labor_mode text;
@@ -579,6 +597,30 @@ begin
     raise exception using message = 'CUSTOMER_INVALID';
   end if;
 
+  if v_homeowner_user_id is not null then
+    select *
+      into v_homeowner
+      from public.profiles
+     where id = v_homeowner_user_id;
+
+    if v_homeowner.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    v_subject_type := 'connected_homeowner';
+    v_subject_display_name_snapshot := coalesce(
+      nullif(trim(v_homeowner.full_name), ''),
+      nullif(trim(v_homeowner.email), ''),
+      'Connected homeowner'
+    );
+    if v_home.id is not null then
+      v_property_display_snapshot := coalesce(
+        nullif(trim(concat_ws(', ', nullif(v_home.nickname, ''), nullif(v_home.address_line1, ''), nullif(v_home.city, ''), nullif(v_home.state, ''))), ''),
+        'Selected property'
+      );
+    end if;
+  end if;
+
   if v_local_home_id is not null then
     select *
       into v_local_home
@@ -597,13 +639,30 @@ begin
     end if;
   end if;
 
-  if v_local_contact_id is not null and not exists (
-    select 1
+  if v_local_contact_id is not null then
+    select *
+      into v_local_contact
       from public.contractor_local_contacts
      where id = v_local_contact_id
-       and contractor_id = v_contractor_id
-  ) then
-    raise exception using message = 'CUSTOMER_INVALID';
+       and contractor_id = v_contractor_id;
+
+    if v_local_contact.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    v_subject_type := 'local_contact';
+    v_subject_display_name_snapshot := coalesce(
+      nullif(trim(v_local_contact.display_name), ''),
+      nullif(trim(v_local_contact.email), ''),
+      nullif(trim(v_local_contact.phone), ''),
+      'Local customer'
+    );
+    if v_local_home.id is not null then
+      v_property_display_snapshot := coalesce(
+        nullif(trim(concat_ws(', ', nullif(v_local_home.nickname, ''), nullif(v_local_home.address_line1, ''), nullif(v_local_home.city, ''), nullif(v_local_home.state, ''))), ''),
+        'Selected property'
+      );
+    end if;
   end if;
 
   if (v_homeowner_user_id is null and v_local_contact_id is null)
@@ -645,6 +704,9 @@ begin
       local_contact_id,
       local_home_id,
       service_request_id,
+      subject_type,
+      subject_display_name_snapshot,
+      property_display_snapshot,
       title,
       scope_description,
       private_notes,
@@ -662,6 +724,9 @@ begin
       v_local_contact_id,
       case when v_local_contact_id is not null then v_local_home_id else null end,
       case when v_homeowner_user_id is not null then v_service_request_id else null end,
+      v_subject_type,
+      v_subject_display_name_snapshot,
+      v_property_display_snapshot,
       trim(coalesce(p_metadata->>'title', '')),
       trim(coalesce(p_metadata->>'scope_description', '')),
       coalesce(p_metadata->>'private_notes', ''),
@@ -680,6 +745,9 @@ begin
            local_contact_id = v_local_contact_id,
            local_home_id = case when v_local_contact_id is not null then v_local_home_id else null end,
            service_request_id = case when v_homeowner_user_id is not null then v_service_request_id else null end,
+           subject_type = v_subject_type,
+           subject_display_name_snapshot = v_subject_display_name_snapshot,
+           property_display_snapshot = v_property_display_snapshot,
            title = trim(coalesce(p_metadata->>'title', '')),
            scope_description = trim(coalesce(p_metadata->>'scope_description', '')),
            private_notes = coalesce(p_metadata->>'private_notes', ''),
@@ -891,7 +959,8 @@ end;
 $$;
 
 create or replace function public.servsync_private_validate_work_draft_relationships(
-  p_draft public.contractor_work_drafts
+  p_draft public.contractor_work_drafts,
+  p_requested_output text
 )
 returns void
 language plpgsql
@@ -900,68 +969,112 @@ set search_path = public
 as $$
 declare
   v_request public.service_requests;
+  v_connection public.homeowner_contractor_connections;
+  v_shared_property public.connection_shared_properties;
+  v_home public.homes;
+  v_local_contact public.contractor_local_contacts;
+  v_local_home public.contractor_local_homes;
+  v_request_authorizes_home boolean := false;
 begin
   if p_draft.homeowner_user_id is not null then
     if p_draft.local_contact_id is not null or p_draft.local_home_id is not null then
       raise exception using message = 'CUSTOMER_INVALID';
     end if;
 
-    if not exists (
-      select 1 from public.profiles profile where profile.id = p_draft.homeowner_user_id
-    ) or not exists (
-      select 1
-        from public.homeowner_contractor_connections connection
-       where connection.contractor_id = p_draft.contractor_id
-         and connection.homeowner_user_id = p_draft.homeowner_user_id
-         and connection.status = 'active'
-    ) then
-      raise exception using message = 'CUSTOMER_INVALID';
-    end if;
-
-    if p_draft.home_id is not null and not exists (
-      select 1
-        from public.homes home
-       where home.id = p_draft.home_id
-         and home.homeowner_user_id = p_draft.homeowner_user_id
-    ) then
-      raise exception using message = 'PROPERTY_INVALID';
-    end if;
-
+    -- Lock order: Draft (caller), service request, connection, shared property,
+    -- home, local contact, then local home. FOR SHARE blocks authorization-row
+    -- updates/deletes until the launch transaction completes.
     if p_draft.service_request_id is not null then
       select *
         into v_request
         from public.service_requests request
        where request.id = p_draft.service_request_id
-         and request.contractor_id = p_draft.contractor_id;
+         and request.contractor_id = p_draft.contractor_id
+       for share;
 
       if v_request.id is null
         or v_request.homeowner_user_id <> p_draft.homeowner_user_id
         or (v_request.home_id is not null and v_request.home_id is distinct from p_draft.home_id) then
         raise exception using message = 'SERVICE_REQUEST_INVALID';
       end if;
+
+      v_request_authorizes_home := v_request.home_id is not null
+        and v_request.home_id = p_draft.home_id;
+    end if;
+
+    select *
+      into v_connection
+      from public.homeowner_contractor_connections connection
+     where connection.contractor_id = p_draft.contractor_id
+       and connection.homeowner_user_id = p_draft.homeowner_user_id
+       and connection.status = 'active'
+     for share;
+
+    if v_connection.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if p_requested_output = 'job'
+      and p_draft.home_id is not null
+      and not v_request_authorizes_home then
+      select *
+        into v_shared_property
+        from public.connection_shared_properties shared_property
+       where shared_property.connection_id = v_connection.id
+         and shared_property.home_id = p_draft.home_id
+       for share;
+
+      if v_shared_property.id is null then
+        raise exception using message = 'PROPERTY_NOT_SHARED';
+      end if;
+    end if;
+
+    if p_draft.home_id is not null then
+      select *
+        into v_home
+        from public.homes home
+       where home.id = p_draft.home_id
+         and home.homeowner_user_id = p_draft.homeowner_user_id
+       for share;
+
+      if v_home.id is null then
+        raise exception using message = 'PROPERTY_INVALID';
+      end if;
+    end if;
+
+    if not exists (
+      select 1 from public.profiles profile where profile.id = p_draft.homeowner_user_id
+    ) then
+      raise exception using message = 'CUSTOMER_INVALID';
     end if;
   elsif p_draft.local_contact_id is not null then
     if p_draft.home_id is not null or p_draft.service_request_id is not null then
       raise exception using message = 'CUSTOMER_INVALID';
     end if;
 
-    if not exists (
-      select 1
-        from public.contractor_local_contacts contact
-       where contact.id = p_draft.local_contact_id
-         and contact.contractor_id = p_draft.contractor_id
-    ) then
+    select *
+      into v_local_contact
+      from public.contractor_local_contacts contact
+     where contact.id = p_draft.local_contact_id
+       and contact.contractor_id = p_draft.contractor_id
+     for share;
+
+    if v_local_contact.id is null then
       raise exception using message = 'CUSTOMER_INVALID';
     end if;
 
-    if p_draft.local_home_id is not null and not exists (
-      select 1
+    if p_draft.local_home_id is not null then
+      select *
+        into v_local_home
         from public.contractor_local_homes home
        where home.id = p_draft.local_home_id
          and home.contractor_id = p_draft.contractor_id
          and home.local_contact_id = p_draft.local_contact_id
-    ) then
-      raise exception using message = 'PROPERTY_INVALID';
+       for share;
+
+      if v_local_home.id is null then
+        raise exception using message = 'PROPERTY_INVALID';
+      end if;
     end if;
   else
     raise exception using message = 'CUSTOMER_INVALID';
@@ -998,17 +1111,35 @@ set search_path = public
 as $$
 declare
   v_job public.inspections;
+  v_contractor_id uuid;
+  v_is_platform_admin boolean := public.current_user_is_platform_admin();
   v_existing_id uuid;
   v_draft_id uuid;
+  v_subject_type text;
+  v_subject_display_name_snapshot text;
+  v_property_display_snapshot text := '';
 begin
   if p_inspection_id is null then
     raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+  end if;
+
+  select id
+    into v_contractor_id
+    from public.servsync_current_contractor_profile()
+   limit 1;
+
+  if not v_is_platform_admin and (
+    v_contractor_id is null
+    or not public.current_user_can_manage_contractor_billing(v_contractor_id)
+  ) then
+    raise exception using message = 'DRAFT_PERMISSION_DENIED';
   end if;
 
   select *
     into v_job
     from public.inspections
    where id = p_inspection_id
+     and (v_is_platform_admin or contractor_id = v_contractor_id)
    for update;
 
   if v_job.id is null
@@ -1024,6 +1155,51 @@ begin
 
   if p_intended_output is not null and p_intended_output not in ('estimate', 'job') then
     raise exception using message = 'UNSUPPORTED_OUTPUT';
+  end if;
+
+  if v_job.homeowner_user_id is not null then
+    v_subject_type := 'connected_homeowner';
+    select coalesce(nullif(trim(profile.full_name), ''), nullif(trim(profile.email), ''), 'Connected homeowner')
+      into v_subject_display_name_snapshot
+      from public.profiles profile
+     where profile.id = v_job.homeowner_user_id;
+    if v_job.home_id is not null then
+      select coalesce(
+        nullif(trim(concat_ws(', ', nullif(home.nickname, ''), nullif(home.address_line1, ''), nullif(home.city, ''), nullif(home.state, ''))), ''),
+        'Selected property'
+      )
+        into v_property_display_snapshot
+        from public.homes home
+       where home.id = v_job.home_id;
+    end if;
+  elsif v_job.local_contact_id is not null then
+    v_subject_type := 'local_contact';
+    select coalesce(
+      nullif(trim(contact.display_name), ''),
+      nullif(trim(contact.email), ''),
+      nullif(trim(contact.phone), ''),
+      'Local customer'
+    )
+      into v_subject_display_name_snapshot
+      from public.contractor_local_contacts contact
+     where contact.id = v_job.local_contact_id
+       and contact.contractor_id = v_job.contractor_id;
+    if v_job.local_home_id is not null then
+      select coalesce(
+        nullif(trim(concat_ws(', ', nullif(home.nickname, ''), nullif(home.address_line1, ''), nullif(home.city, ''), nullif(home.state, ''))), ''),
+        'Selected property'
+      )
+        into v_property_display_snapshot
+        from public.contractor_local_homes home
+       where home.id = v_job.local_home_id
+         and home.contractor_id = v_job.contractor_id;
+    end if;
+  else
+    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+  end if;
+
+  if v_subject_display_name_snapshot is null then
+    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
   end if;
 
   select id
@@ -1064,6 +1240,9 @@ begin
     local_contact_id,
     local_home_id,
     service_request_id,
+    subject_type,
+    subject_display_name_snapshot,
+    property_display_snapshot,
     title,
     scope_description,
     intended_output,
@@ -1081,6 +1260,9 @@ begin
     v_job.local_contact_id,
     v_job.local_home_id,
     v_job.service_request_id,
+    v_subject_type,
+    v_subject_display_name_snapshot,
+    v_property_display_snapshot,
     v_job.name,
     v_job.summary,
     p_intended_output,
@@ -1414,16 +1596,13 @@ begin
    where id = p_draft_id
    for update;
 
-  if v_draft.id is null then
-    raise exception using message = 'DRAFT_NOT_FOUND';
-  end if;
-
-  -- Authorization must precede every launch-ledger lookup and consumed-output return.
-  if not (
+  -- Missing and foreign-tenant Draft IDs share one non-enumerating response.
+  -- Authorization precedes every launch-ledger lookup and consumed-output return.
+  if v_draft.id is null or not (
     public.current_user_can_access_contractor(v_draft.contractor_id)
     or public.current_user_is_platform_admin()
   ) then
-    raise exception using message = 'DRAFT_PERMISSION_DENIED';
+    raise exception using message = 'DRAFT_NOT_FOUND';
   end if;
 
   -- Serialize contractor-scoped idempotency keys independently from Draft row locking.
@@ -1516,7 +1695,7 @@ begin
     raise exception using message = 'DRAFT_INVALID';
   end if;
 
-  perform public.servsync_private_validate_work_draft_relationships(v_draft);
+  perform public.servsync_private_validate_work_draft_relationships(v_draft, v_output_type);
 
   if v_output_type = 'job'
     and v_draft.service_request_id is not null
@@ -1525,9 +1704,13 @@ begin
         from public.inspections job
        where job.contractor_id = v_draft.contractor_id
          and job.service_request_id = v_draft.service_request_id
-         and job.job_origin <> 'draft_composer'
          and job.job_status <> 'cancelled'
-         and job.id <> coalesce(v_draft.legacy_inspection_id, '00000000-0000-0000-0000-000000000000'::uuid)
+         and not (
+           job.id = v_draft.legacy_inspection_id
+           and job.job_origin = 'draft_composer'
+           and job.status = 'draft'
+           and job.job_status = 'draft'
+         )
     ) then
     raise exception using message = 'LAUNCH_CONFLICT';
   end if;
@@ -1625,16 +1808,25 @@ revoke all on function public.servsync_private_work_draft_integer(text, text) fr
 revoke all on function public.servsync_private_work_draft_integer(text, text) from anon;
 revoke all on function public.servsync_private_work_draft_integer(text, text) from authenticated;
 
-revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from public;
-revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from anon;
-revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts) from authenticated;
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text) from public;
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text) from anon;
+revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text) from authenticated;
 
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from public;
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from anon;
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from authenticated;
 
 comment on table public.contractor_work_drafts is
-  'Contractor-only durable Draft planning records for the shared Work composer. Homeowners must not see these records.';
+  'Contractor-only durable Draft planning records for the shared Work composer. Homeowners must not see these records. Contractor deletion is restricted while Draft audit records exist.';
+
+comment on column public.contractor_work_drafts.subject_type is
+  'Contractor-private audit subject kind. Active Draft saves may replace the planning subject; consumed or discarded Drafts are immutable and may retain only private snapshots after subject deletion.';
+
+comment on column public.contractor_work_drafts.subject_display_name_snapshot is
+  'Contractor-private subject audit snapshot. It is not copied automatically to homeowner-visible output fields.';
+
+comment on column public.contractor_work_drafts.property_display_snapshot is
+  'Contractor-private property audit snapshot. It is not copied automatically to homeowner-visible output fields.';
 
 comment on column public.contractor_work_drafts.private_notes is
   'Contractor-only Draft notes. These are not automatically copied to homeowner-visible Estimate or Job fields.';
@@ -1662,6 +1854,15 @@ comment on column public.contractor_work_draft_launches.launched_estimate_id is
 
 comment on column public.contractor_work_draft_launches.launched_job_id is
   'Private reverse linkage to the canonical launched Job. Deletion is restricted to preserve the audit relationship.';
+
+comment on function public.servsync_get_work_draft(uuid) is
+  'Typed UUID arguments are coerced by PostgREST/PostgreSQL before this function runs. ServSync error codes apply after successful argument coercion; missing and foreign Draft IDs return DRAFT_NOT_FOUND.';
+
+comment on function public.servsync_import_legacy_draft_job(uuid, text) is
+  'Typed UUID arguments are coerced before execution. Foreign and unavailable legacy Draft IDs use the same non-enumerating compatibility response.';
+
+comment on function public.servsync_launch_work_draft(uuid, text, uuid) is
+  'Typed UUID arguments are coerced before execution. ServSync launch errors apply after coercion, and foreign or missing Draft IDs return DRAFT_NOT_FOUND before launch-state disclosure.';
 
 notify pgrst, 'reload schema';
 
