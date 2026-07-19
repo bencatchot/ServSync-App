@@ -33,8 +33,10 @@ create table if not exists public.contractor_work_drafts (
   status text not null default 'active' check (status in ('active', 'consumed', 'discarded')),
   legacy_inspection_id uuid references public.inspections(id) on delete set null,
   launched_output_type text check (launched_output_type is null or launched_output_type in ('estimate', 'job')),
-  launched_estimate_id uuid references public.estimates(id) on delete restrict,
-  launched_job_id uuid references public.inspections(id) on delete restrict,
+  launched_estimate_id uuid references public.estimates(id) on delete set null,
+  launched_job_id uuid references public.inspections(id) on delete set null,
+  launched_estimate_id_snapshot uuid,
+  launched_job_id_snapshot uuid,
   launched_at timestamptz,
   launched_by_user_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -68,6 +70,8 @@ create table if not exists public.contractor_work_drafts (
       and launched_output_type is null
       and launched_estimate_id is null
       and launched_job_id is null
+      and launched_estimate_id_snapshot is null
+      and launched_job_id_snapshot is null
       and launched_at is null
       and launched_by_user_id is null
     )
@@ -76,8 +80,20 @@ create table if not exists public.contractor_work_drafts (
       and launched_output_type is not null
       and launched_at is not null
       and (
-        (launched_output_type = 'estimate' and launched_estimate_id is not null and launched_job_id is null)
-        or (launched_output_type = 'job' and launched_job_id is not null and launched_estimate_id is null)
+        (
+          launched_output_type = 'estimate'
+          and launched_estimate_id_snapshot is not null
+          and launched_job_id_snapshot is null
+          and launched_job_id is null
+          and (launched_estimate_id is null or launched_estimate_id = launched_estimate_id_snapshot)
+        )
+        or (
+          launched_output_type = 'job'
+          and launched_job_id_snapshot is not null
+          and launched_estimate_id_snapshot is null
+          and launched_estimate_id is null
+          and (launched_job_id is null or launched_job_id = launched_job_id_snapshot)
+        )
       )
     )
   )
@@ -116,8 +132,10 @@ create table if not exists public.contractor_work_draft_launches (
   idempotency_key uuid not null,
   requested_output text not null check (requested_output in ('estimate', 'job')),
   status text not null default 'succeeded' check (status = 'succeeded'),
-  launched_estimate_id uuid references public.estimates(id) on delete restrict,
-  launched_job_id uuid references public.inspections(id) on delete restrict,
+  launched_estimate_id uuid references public.estimates(id) on delete set null,
+  launched_job_id uuid references public.inspections(id) on delete set null,
+  launched_estimate_id_snapshot uuid,
+  launched_job_id_snapshot uuid,
   requested_by_user_id uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   completed_at timestamptz,
@@ -128,8 +146,20 @@ create table if not exists public.contractor_work_draft_launches (
   constraint contractor_work_draft_launches_status_linkage_check check (
     completed_at is not null
     and (
-      (requested_output = 'estimate' and launched_estimate_id is not null and launched_job_id is null)
-      or (requested_output = 'job' and launched_job_id is not null and launched_estimate_id is null)
+      (
+        requested_output = 'estimate'
+        and launched_estimate_id_snapshot is not null
+        and launched_job_id_snapshot is null
+        and launched_job_id is null
+        and (launched_estimate_id is null or launched_estimate_id = launched_estimate_id_snapshot)
+      )
+      or (
+        requested_output = 'job'
+        and launched_job_id_snapshot is not null
+        and launched_estimate_id_snapshot is null
+        and launched_estimate_id is null
+        and (launched_job_id is null or launched_job_id = launched_job_id_snapshot)
+      )
     )
   )
 );
@@ -167,6 +197,14 @@ create unique index if not exists contractor_work_draft_launches_job_output_uniq
   on public.contractor_work_draft_launches(launched_job_id)
   where status = 'succeeded' and launched_job_id is not null;
 
+create unique index if not exists contractor_work_draft_launches_estimate_snapshot_unique_idx
+  on public.contractor_work_draft_launches(launched_estimate_id_snapshot)
+  where status = 'succeeded' and launched_estimate_id_snapshot is not null;
+
+create unique index if not exists contractor_work_draft_launches_job_snapshot_unique_idx
+  on public.contractor_work_draft_launches(launched_job_id_snapshot)
+  where status = 'succeeded' and launched_job_id_snapshot is not null;
+
 create index if not exists contractor_work_draft_launches_draft_created_idx
   on public.contractor_work_draft_launches(draft_id, created_at desc);
 
@@ -179,6 +217,100 @@ alter table public.job_work_items
     source_type is null
     or source_type in ('estimate_line_item', 'simple_task', 'manual', 'inspection_finding', 'draft_job_scope', 'work_draft_item')
   );
+
+create or replace function public.servsync_private_inspection_is_draft_placeholder(
+  p_job_origin text,
+  p_status text,
+  p_job_status text
+)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(p_job_origin = 'draft_composer'
+    and p_status = 'draft'
+    and p_job_status = 'draft', false);
+$$;
+
+do $$
+begin
+  if exists (
+    select 1
+      from public.inspections inspection
+     where inspection.service_request_id is not null
+       and inspection.job_status <> 'cancelled'
+       and not public.servsync_private_inspection_is_draft_placeholder(
+         inspection.job_origin,
+         inspection.status,
+         inspection.job_status
+       )
+     group by inspection.contractor_id, inspection.service_request_id
+    having count(*) > 1
+  ) then
+    raise exception using message = 'JOB_SERVICE_REQUEST_CONFLICT';
+  end if;
+end $$;
+
+create unique index if not exists inspections_unique_operational_service_request_idx
+  on public.inspections(contractor_id, service_request_id)
+  where service_request_id is not null
+    and job_status <> 'cancelled'
+    and not (
+      job_origin = 'draft_composer'
+      and status = 'draft'
+      and job_status = 'draft'
+    );
+
+create or replace function public.servsync_guard_operational_job_service_request()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.service_request_id is null
+    or new.job_status = 'cancelled'
+    or public.servsync_private_inspection_is_draft_placeholder(
+      new.job_origin,
+      new.status,
+      new.job_status
+    ) then
+    return new;
+  end if;
+
+  -- Every operational insert/transition for this tenant/request shares one
+  -- transaction lock, including direct, Estimate, calendar, import, restore,
+  -- legacy activation, and durable Draft launch paths.
+  perform pg_advisory_xact_lock(
+    hashtextextended(new.contractor_id::text || ':' || new.service_request_id::text, 0)
+  );
+
+  if exists (
+    select 1
+      from public.inspections existing
+     where existing.contractor_id = new.contractor_id
+       and existing.service_request_id = new.service_request_id
+       and existing.id <> new.id
+       and existing.job_status <> 'cancelled'
+       and not public.servsync_private_inspection_is_draft_placeholder(
+         existing.job_origin,
+         existing.status,
+         existing.job_status
+       )
+  ) then
+    raise exception using message = 'JOB_SERVICE_REQUEST_CONFLICT';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists inspections_guard_operational_service_request on public.inspections;
+create trigger inspections_guard_operational_service_request
+  before insert or update of contractor_id, service_request_id, status, job_status, job_origin
+  on public.inspections
+  for each row execute function public.servsync_guard_operational_job_service_request();
 
 drop trigger if exists contractor_work_drafts_touch_updated_at on public.contractor_work_drafts;
 create trigger contractor_work_drafts_touch_updated_at
@@ -1100,6 +1232,151 @@ as $$
   );
 $$;
 
+create or replace function public.servsync_private_validate_legacy_work_draft_relationships(
+  p_job public.inspections
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_request public.service_requests;
+  v_connection public.homeowner_contractor_connections;
+  v_home public.homes;
+  v_homeowner public.profiles;
+  v_local_contact public.contractor_local_contacts;
+  v_local_home public.contractor_local_homes;
+  v_subject_type text;
+  v_subject_display_name_snapshot text;
+  v_property_display_snapshot text := '';
+begin
+  if p_job.homeowner_user_id is not null then
+    if p_job.local_contact_id is not null or p_job.local_home_id is not null then
+      raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+    end if;
+
+    -- The legacy inspection row is locked by the caller. Relationship lock
+    -- order then matches launch: request, connection, home, subject profile.
+    if p_job.service_request_id is not null then
+      select *
+        into v_request
+        from public.service_requests request
+       where request.id = p_job.service_request_id
+         and request.contractor_id = p_job.contractor_id
+       for share;
+
+      if v_request.id is null
+        or v_request.homeowner_user_id <> p_job.homeowner_user_id
+        or (v_request.home_id is not null and v_request.home_id is distinct from p_job.home_id) then
+        raise exception using message = 'SERVICE_REQUEST_INVALID';
+      end if;
+    end if;
+
+    select *
+      into v_connection
+      from public.homeowner_contractor_connections connection
+     where connection.contractor_id = p_job.contractor_id
+       and connection.homeowner_user_id = p_job.homeowner_user_id
+       and connection.status = 'active'
+     for share;
+
+    if v_connection.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if p_job.home_id is not null then
+      select *
+        into v_home
+        from public.homes home
+       where home.id = p_job.home_id
+         and home.homeowner_user_id = p_job.homeowner_user_id
+       for share;
+
+      if v_home.id is null then
+        raise exception using message = 'PROPERTY_INVALID';
+      end if;
+    end if;
+
+    select *
+      into v_homeowner
+      from public.profiles profile
+     where profile.id = p_job.homeowner_user_id
+     for share;
+
+    if v_homeowner.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    v_subject_type := 'connected_homeowner';
+    v_subject_display_name_snapshot := coalesce(
+      nullif(trim(v_homeowner.full_name), ''),
+      nullif(trim(v_homeowner.email), ''),
+      'Connected homeowner'
+    );
+    if v_home.id is not null then
+      v_property_display_snapshot := coalesce(
+        nullif(trim(concat_ws(', ', nullif(v_home.nickname, ''), nullif(v_home.address_line1, ''), nullif(v_home.city, ''), nullif(v_home.state, ''))), ''),
+        'Selected property'
+      );
+    end if;
+  elsif p_job.local_contact_id is not null then
+    if p_job.homeowner_user_id is not null
+      or p_job.home_id is not null
+      or p_job.service_request_id is not null then
+      raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+    end if;
+
+    select *
+      into v_local_contact
+      from public.contractor_local_contacts contact
+     where contact.id = p_job.local_contact_id
+       and contact.contractor_id = p_job.contractor_id
+     for share;
+
+    if v_local_contact.id is null then
+      raise exception using message = 'CUSTOMER_INVALID';
+    end if;
+
+    if p_job.local_home_id is not null then
+      select *
+        into v_local_home
+        from public.contractor_local_homes home
+       where home.id = p_job.local_home_id
+         and home.contractor_id = p_job.contractor_id
+         and home.local_contact_id = p_job.local_contact_id
+       for share;
+
+      if v_local_home.id is null then
+        raise exception using message = 'PROPERTY_INVALID';
+      end if;
+    end if;
+
+    v_subject_type := 'local_contact';
+    v_subject_display_name_snapshot := coalesce(
+      nullif(trim(v_local_contact.display_name), ''),
+      nullif(trim(v_local_contact.email), ''),
+      nullif(trim(v_local_contact.phone), ''),
+      'Local customer'
+    );
+    if v_local_home.id is not null then
+      v_property_display_snapshot := coalesce(
+        nullif(trim(concat_ws(', ', nullif(v_local_home.nickname, ''), nullif(v_local_home.address_line1, ''), nullif(v_local_home.city, ''), nullif(v_local_home.state, ''))), ''),
+        'Selected property'
+      );
+    end if;
+  else
+    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
+  end if;
+
+  return jsonb_build_object(
+    'subject_type', v_subject_type,
+    'subject_display_name_snapshot', v_subject_display_name_snapshot,
+    'property_display_snapshot', v_property_display_snapshot
+  );
+end;
+$$;
+
 create or replace function public.servsync_import_legacy_draft_job(
   p_inspection_id uuid,
   p_intended_output text default null
@@ -1118,6 +1395,7 @@ declare
   v_subject_type text;
   v_subject_display_name_snapshot text;
   v_property_display_snapshot text := '';
+  v_validated_relationships jsonb;
 begin
   if p_inspection_id is null then
     raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
@@ -1157,50 +1435,12 @@ begin
     raise exception using message = 'UNSUPPORTED_OUTPUT';
   end if;
 
-  if v_job.homeowner_user_id is not null then
-    v_subject_type := 'connected_homeowner';
-    select coalesce(nullif(trim(profile.full_name), ''), nullif(trim(profile.email), ''), 'Connected homeowner')
-      into v_subject_display_name_snapshot
-      from public.profiles profile
-     where profile.id = v_job.homeowner_user_id;
-    if v_job.home_id is not null then
-      select coalesce(
-        nullif(trim(concat_ws(', ', nullif(home.nickname, ''), nullif(home.address_line1, ''), nullif(home.city, ''), nullif(home.state, ''))), ''),
-        'Selected property'
-      )
-        into v_property_display_snapshot
-        from public.homes home
-       where home.id = v_job.home_id;
-    end if;
-  elsif v_job.local_contact_id is not null then
-    v_subject_type := 'local_contact';
-    select coalesce(
-      nullif(trim(contact.display_name), ''),
-      nullif(trim(contact.email), ''),
-      nullif(trim(contact.phone), ''),
-      'Local customer'
-    )
-      into v_subject_display_name_snapshot
-      from public.contractor_local_contacts contact
-     where contact.id = v_job.local_contact_id
-       and contact.contractor_id = v_job.contractor_id;
-    if v_job.local_home_id is not null then
-      select coalesce(
-        nullif(trim(concat_ws(', ', nullif(home.nickname, ''), nullif(home.address_line1, ''), nullif(home.city, ''), nullif(home.state, ''))), ''),
-        'Selected property'
-      )
-        into v_property_display_snapshot
-        from public.contractor_local_homes home
-       where home.id = v_job.local_home_id
-         and home.contractor_id = v_job.contractor_id;
-    end if;
-  else
-    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
-  end if;
-
-  if v_subject_display_name_snapshot is null then
-    raise exception using message = 'LEGACY_DRAFT_INCOMPATIBLE';
-  end if;
+  -- Validate and lock every relationship before reading private snapshots or
+  -- writing a dedicated Draft. Any error rolls the import back atomically.
+  v_validated_relationships := public.servsync_private_validate_legacy_work_draft_relationships(v_job);
+  v_subject_type := v_validated_relationships->>'subject_type';
+  v_subject_display_name_snapshot := v_validated_relationships->>'subject_display_name_snapshot';
+  v_property_display_snapshot := coalesce(v_validated_relationships->>'property_display_snapshot', '');
 
   select id
     into v_existing_id
@@ -1569,6 +1809,7 @@ declare
   v_estimate_id uuid;
   v_job_id uuid;
   v_launch_id uuid;
+  v_constraint_name text;
 begin
   if auth.uid() is null then
     raise exception using message = 'DRAFT_PERMISSION_DENIED';
@@ -1638,6 +1879,14 @@ begin
       'output_type', v_existing_launch.requested_output,
       'estimate_id', v_existing_launch.launched_estimate_id,
       'job_id', v_existing_launch.launched_job_id,
+      'output_id_snapshot', case
+        when v_existing_launch.requested_output = 'estimate' then v_existing_launch.launched_estimate_id_snapshot
+        else v_existing_launch.launched_job_id_snapshot
+      end,
+      'output_available', case
+        when v_existing_launch.requested_output = 'estimate' then v_existing_launch.launched_estimate_id is not null
+        else v_existing_launch.launched_job_id is not null
+      end,
       'launch_id', v_existing_launch.id,
       'idempotent', v_existing_launch.idempotency_key = p_idempotency_key
     );
@@ -1650,8 +1899,16 @@ begin
   if v_draft.status = 'consumed' then
     if v_draft.launched_output_type is not null
       and (
-        (v_draft.launched_output_type = 'estimate' and v_draft.launched_estimate_id is not null and v_draft.launched_job_id is null)
-        or (v_draft.launched_output_type = 'job' and v_draft.launched_job_id is not null and v_draft.launched_estimate_id is null)
+        (
+          v_draft.launched_output_type = 'estimate'
+          and v_draft.launched_estimate_id_snapshot is not null
+          and v_draft.launched_job_id_snapshot is null
+        )
+        or (
+          v_draft.launched_output_type = 'job'
+          and v_draft.launched_job_id_snapshot is not null
+          and v_draft.launched_estimate_id_snapshot is null
+        )
       ) then
       return jsonb_build_object(
         'draft_id', v_draft.id,
@@ -1659,6 +1916,14 @@ begin
         'output_type', v_draft.launched_output_type,
         'estimate_id', v_draft.launched_estimate_id,
         'job_id', v_draft.launched_job_id,
+        'output_id_snapshot', case
+          when v_draft.launched_output_type = 'estimate' then v_draft.launched_estimate_id_snapshot
+          else v_draft.launched_job_id_snapshot
+        end,
+        'output_available', case
+          when v_draft.launched_output_type = 'estimate' then v_draft.launched_estimate_id is not null
+          else v_draft.launched_job_id is not null
+        end,
         'launch_id', null,
         'idempotent', false
       );
@@ -1724,7 +1989,21 @@ begin
     if not public.current_user_can_write_contractor_jobs(v_draft.contractor_id) then
       raise exception using message = 'DRAFT_PERMISSION_DENIED';
     end if;
-    v_job_id := public.servsync_private_launch_work_draft_as_job(v_draft);
+    begin
+      v_job_id := public.servsync_private_launch_work_draft_as_job(v_draft);
+    exception
+      when raise_exception then
+        if sqlerrm = 'JOB_SERVICE_REQUEST_CONFLICT' then
+          raise exception using message = 'LAUNCH_CONFLICT';
+        end if;
+        raise;
+      when unique_violation then
+        get stacked diagnostics v_constraint_name = constraint_name;
+        if v_constraint_name = 'inspections_unique_operational_service_request_idx' then
+          raise exception using message = 'LAUNCH_CONFLICT';
+        end if;
+        raise;
+    end;
   end if;
 
   insert into public.contractor_work_draft_launches (
@@ -1735,6 +2014,8 @@ begin
     status,
     launched_estimate_id,
     launched_job_id,
+    launched_estimate_id_snapshot,
+    launched_job_id_snapshot,
     requested_by_user_id,
     completed_at
   ) values (
@@ -1743,6 +2024,8 @@ begin
     p_idempotency_key,
     v_output_type,
     'succeeded',
+    v_estimate_id,
+    v_job_id,
     v_estimate_id,
     v_job_id,
     auth.uid(),
@@ -1755,6 +2038,8 @@ begin
          launched_output_type = v_output_type,
          launched_estimate_id = v_estimate_id,
          launched_job_id = v_job_id,
+         launched_estimate_id_snapshot = v_estimate_id,
+         launched_job_id_snapshot = v_job_id,
          launched_at = now(),
          launched_by_user_id = auth.uid(),
          updated_at = now()
@@ -1766,6 +2051,8 @@ begin
     'output_type', v_output_type,
     'estimate_id', v_estimate_id,
     'job_id', v_job_id,
+    'output_id_snapshot', coalesce(v_estimate_id, v_job_id),
+    'output_available', true,
     'launch_id', v_launch_id,
     'idempotent', false
   );
@@ -1812,9 +2099,21 @@ revoke all on function public.servsync_private_validate_work_draft_relationships
 revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text) from anon;
 revoke all on function public.servsync_private_validate_work_draft_relationships(public.contractor_work_drafts, text) from authenticated;
 
+revoke all on function public.servsync_private_validate_legacy_work_draft_relationships(public.inspections) from public;
+revoke all on function public.servsync_private_validate_legacy_work_draft_relationships(public.inspections) from anon;
+revoke all on function public.servsync_private_validate_legacy_work_draft_relationships(public.inspections) from authenticated;
+
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from public;
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from anon;
 revoke all on function public.servsync_private_can_create_work_draft_estimate(uuid) from authenticated;
+
+revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from public;
+revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from anon;
+revoke all on function public.servsync_private_inspection_is_draft_placeholder(text, text, text) from authenticated;
+
+revoke all on function public.servsync_guard_operational_job_service_request() from public;
+revoke all on function public.servsync_guard_operational_job_service_request() from anon;
+revoke all on function public.servsync_guard_operational_job_service_request() from authenticated;
 
 comment on table public.contractor_work_drafts is
   'Contractor-only durable Draft planning records for the shared Work composer. Homeowners must not see these records. Contractor deletion is restricted while Draft audit records exist.';
@@ -1830,6 +2129,12 @@ comment on column public.contractor_work_drafts.property_display_snapshot is
 
 comment on column public.contractor_work_drafts.private_notes is
   'Contractor-only Draft notes. These are not automatically copied to homeowner-visible Estimate or Job fields.';
+
+comment on column public.contractor_work_drafts.launched_estimate_id_snapshot is
+  'Immutable contractor-private audit ID for the originally launched Estimate. The live Estimate FK may become null if the output is deleted.';
+
+comment on column public.contractor_work_drafts.launched_job_id_snapshot is
+  'Immutable contractor-private audit ID for the originally launched Job. The live Job FK may become null if the eligible draft output is deleted.';
 
 comment on column public.contractor_work_drafts.created_by_user_id is
   'Historical actor reference. It becomes null rather than deleting the Draft when the profile is removed.';
@@ -1850,19 +2155,28 @@ comment on column public.contractor_work_draft_launches.requested_by_user_id is
   'Historical launch actor reference. It may become null without deleting the successful launch ledger row.';
 
 comment on column public.contractor_work_draft_launches.launched_estimate_id is
-  'Private reverse linkage to the canonical launched Estimate. Deletion is restricted to preserve the audit relationship.';
+  'Nullable private live linkage to the launched Estimate. Output deletion sets this FK null without erasing launch audit history.';
 
 comment on column public.contractor_work_draft_launches.launched_job_id is
-  'Private reverse linkage to the canonical launched Job. Deletion is restricted to preserve the audit relationship.';
+  'Nullable private live linkage to the launched Job. Eligible draft Job deletion sets this FK null without reactivating the consumed Draft.';
+
+comment on column public.contractor_work_draft_launches.launched_estimate_id_snapshot is
+  'Immutable contractor-private ID of the originally created Estimate, retained after live-output deletion.';
+
+comment on column public.contractor_work_draft_launches.launched_job_id_snapshot is
+  'Immutable contractor-private ID of the originally created Job, retained after live-output deletion.';
+
+comment on function public.servsync_guard_operational_job_service_request() is
+  'Shared inspections guard for one non-cancelled operational Job per contractor/service request. Inactive draft_composer placeholders remain outside the operational uniqueness domain until activation.';
 
 comment on function public.servsync_get_work_draft(uuid) is
   'Typed UUID arguments are coerced by PostgREST/PostgreSQL before this function runs. ServSync error codes apply after successful argument coercion; missing and foreign Draft IDs return DRAFT_NOT_FOUND.';
 
 comment on function public.servsync_import_legacy_draft_job(uuid, text) is
-  'Typed UUID arguments are coerced before execution. Foreign and unavailable legacy Draft IDs use the same non-enumerating compatibility response.';
+  'Typed UUID arguments are coerced before execution. Foreign and unavailable legacy Draft IDs use the same non-enumerating compatibility response; authorized subject/property/request relationships are locked and validated before private snapshots are read.';
 
 comment on function public.servsync_launch_work_draft(uuid, text, uuid) is
-  'Typed UUID arguments are coerced before execution. ServSync launch errors apply after coercion, and foreign or missing Draft IDs return DRAFT_NOT_FOUND before launch-state disclosure.';
+  'Typed UUID arguments are coerced before execution. ServSync launch errors apply after coercion, foreign or missing Draft IDs return DRAFT_NOT_FOUND before launch-state disclosure, and consumed retries report whether the immutable output snapshot still has a live output row.';
 
 notify pgrst, 'reload schema';
 
@@ -1879,3 +2193,6 @@ commit;
 -- 8. Reuse same key on another Draft and verify IDEMPOTENCY_CONFLICT.
 -- 9. Verify consumed/discarded Draft edits and launches fail.
 -- 10. Verify homeowner and cross-contractor reads are denied by RLS/RPC checks.
+-- 11. Race normal, Estimate, legacy-activation, and Draft-launch Job creation for one service request and verify only one operational Job succeeds.
+-- 12. Delete an eligible launched draft Job and verify live FKs clear, immutable output snapshots remain, and retries return output_available=false without relaunching.
+-- 13. Import connected/local legacy Drafts and verify stale, mixed, foreign, or mismatched relationships fail before snapshots or Draft rows are written.

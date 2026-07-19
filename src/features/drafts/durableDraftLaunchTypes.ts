@@ -29,6 +29,8 @@ export type ContractorWorkDraft = {
   launched_output_type: ContractorWorkDraftLaunchOutput | null;
   launched_estimate_id: string | null;
   launched_job_id: string | null;
+  launched_estimate_id_snapshot: string | null;
+  launched_job_id_snapshot: string | null;
   launched_at: string | null;
   launched_by_user_id: string | null;
   created_at: string;
@@ -65,6 +67,8 @@ export type ContractorWorkDraftLaunch = {
   status: ContractorWorkDraftLaunchStatus;
   launched_estimate_id: string | null;
   launched_job_id: string | null;
+  launched_estimate_id_snapshot: string | null;
+  launched_job_id_snapshot: string | null;
   requested_by_user_id: string | null;
   created_at: string;
   completed_at: string;
@@ -118,6 +122,8 @@ export type ContractorWorkDraftLaunchResult = {
   output_type: ContractorWorkDraftLaunchOutput;
   estimate_id?: string | null;
   job_id?: string | null;
+  output_id_snapshot: string;
+  output_available: boolean;
   launch_id?: string | null;
   idempotent?: boolean;
 };
