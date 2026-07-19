@@ -6,6 +6,39 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-18
 
+- Branch: `codex/shared-draft-composer-2a`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/sharedDraftComposerAvailability.ts`
+  - `src/features/drafts/draftComposerTypes.ts`
+  - `src/features/drafts/draftComposerMappings.ts`
+  - `src/features/drafts/DraftOutcomeSelector.tsx`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/work-composer/WorkComposerLineItemRow.tsx`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Added Slice 2A hidden shared Draft Composer UI foundation behind the strict default-off `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED === 'true'` gate, reusing existing Draft Job save/resume persistence and shared work-composer line item UI while exposing only an internal intended-output selector, shared supported fields, Save Draft, and Back to Work.
+- Reason for change: Establish the frontend component/state architecture for a future shared Draft launch workflow without exposing a half-complete product path or pretending Estimate/Job launch is ready.
+- Tests/checks run:
+  - `npm ci` passed.
+  - `npm run typecheck` passed.
+  - `npm run build` passed with the shared Draft composer gate disabled.
+  - `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED=true VITE_DRAFT_JOB_UI_ENABLED=true npm run build` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/shared-draft-composer-2a.spec.ts tests/e2e/draft-job-ui-persistence.spec.ts tests/e2e/contractor-work-dashboard-shell.spec.ts tests/e2e/draft-job-operational-filtering.spec.ts` passed.
+  - `TEST_APP_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/mobile-smoke.spec.ts` was blocked because `.env.test.local` and required credential variables were not present in the clean worktree.
+  - `npm run lint` remained blocked by the existing ESLint 9 / `@typescript-eslint/no-unused-expressions` compatibility error before reaching this slice.
+- Known risks or follow-ups:
+  - Slice 2A is frontend-only and hidden. It does not implement Create Estimate, Create Job from the shared composer, Invoice outcome, durable intended-output persistence, SQL/RPC/RLS changes, Supabase configuration, Vercel configuration, environment changes, deployment, sandbox data mutation, production data mutation, or feature-gate enablement.
+  - Intended output is session-only until Slice 2B adds durable Draft launch persistence and backend contracts.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records Slice 2A as hidden shared composer foundation work while preserving Production legacy workflow and deferring owner-facing Preview validation to Slice 2C.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first Work summary now notes that Slice 2A is a hidden frontend foundation only and not a complete Preview workflow.
+
 - Branch: `codex/draft-launch-principle-docs`
 - Files changed:
   - `docs/servsync-master-plan/ServSync_Contractor_Work_Module_Product_Specification_v1.md`

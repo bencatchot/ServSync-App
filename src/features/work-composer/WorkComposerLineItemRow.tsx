@@ -24,7 +24,7 @@ type WritingAssistInputProps = {
 type WorkComposerLineItemRowProps = {
   line: WorkComposerLineDraft;
   index: number;
-  itemLabel: 'estimate' | 'invoice' | 'draft job';
+  itemLabel: 'estimate' | 'invoice' | 'draft job' | 'draft';
   laborMode?: EstimateLaborMode;
   compactAdvanced?: boolean;
   advancedDetailsOpen?: boolean;
@@ -41,7 +41,7 @@ export function workComposerLineItemRowAdvancedVisibility(
   itemLabel: WorkComposerLineItemRowProps['itemLabel'],
   line: Pick<WorkComposerLineDraft, 'line_type' | 'model_spec' | 'supply_status'>,
 ) {
-  const supportsCatalogDetails = itemLabel !== 'draft job';
+  const supportsCatalogDetails = itemLabel !== 'draft job' && itemLabel !== 'draft';
   return {
     showModelSpec: supportsCatalogDetails && (line.line_type === 'material' || Boolean(line.model_spec.trim())),
     showSupplyStatus: supportsCatalogDetails && Boolean(line.supply_status),
@@ -74,12 +74,13 @@ export function WorkComposerLineItemRow({
   onDuplicate,
   writingAssistProps,
 }: WorkComposerLineItemRowProps) {
+  const isDraftScope = itemLabel === 'draft job' || itemLabel === 'draft';
   const { showModelSpec, showSupplyStatus } = workComposerLineItemRowAdvancedVisibility(itemLabel, line);
   const sourceNote = line.editor_source_note?.trim();
   const hasSecondaryRow = showModelSpec || showSupplyStatus;
   const showLaborHours = laborMode === 'line_specific' && workComposerLineCanTrackLaborHours(line);
   const priceColumnClass = showLaborHours ? 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_6rem_auto]' : 'lg:grid-cols-[8rem_1fr_5rem_5rem_7rem_6rem_auto]';
-  const inputPrefix = itemLabel === 'invoice' ? 'Invoice' : itemLabel === 'draft job' ? 'Draft job' : 'Estimate';
+  const inputPrefix = itemLabel === 'invoice' ? 'Invoice' : itemLabel === 'estimate' ? 'Estimate' : itemLabel === 'draft job' ? 'Draft job' : 'Draft';
   const moreDetailsLabel = itemLabel;
   const setAdvancedDetailsOpen = (open: boolean) => {
     onAdvancedDetailsOpenChange?.(open);
@@ -223,7 +224,7 @@ export function WorkComposerLineItemRow({
       </select>
     </WorkComposerField>
   );
-  const roomField = itemLabel === 'draft job' ? (
+  const roomField = isDraftScope ? (
     <WorkComposerField label="Room">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} room`}
@@ -234,7 +235,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const locationField = itemLabel === 'draft job' ? (
+  const locationField = isDraftScope ? (
     <WorkComposerField label="Location">
       <input
         aria-label={`${inputPrefix} line item ${index + 1} location`}
@@ -245,7 +246,7 @@ export function WorkComposerLineItemRow({
       />
     </WorkComposerField>
   ) : null;
-  const internalNotesField = itemLabel === 'draft job' ? (
+  const internalNotesField = isDraftScope ? (
     <div className="lg:col-span-2">
       <WorkComposerField label="Internal notes">
         <input
@@ -317,9 +318,9 @@ export function WorkComposerLineItemRow({
         {laborHoursField}
         {actionButtons}
       </div>
-      {hasSecondaryRow || itemLabel === 'draft job' ? (
-        <div className={`mt-3 grid gap-3 border-t border-slate-100 pt-3 ${itemLabel === 'draft job' ? 'lg:grid-cols-4' : 'lg:grid-cols-[minmax(0,1fr)_14rem]'}`}>
-          {itemLabel === 'draft job' ? (
+      {hasSecondaryRow || isDraftScope ? (
+        <div className={`mt-3 grid gap-3 border-t border-slate-100 pt-3 ${isDraftScope ? 'lg:grid-cols-4' : 'lg:grid-cols-[minmax(0,1fr)_14rem]'}`}>
+          {isDraftScope ? (
             <>
               {showModelSpec ? modelSpecField : null}
               {showSupplyStatus ? supplyStatusField : null}
