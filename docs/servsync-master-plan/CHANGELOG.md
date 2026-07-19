@@ -4,7 +4,59 @@ This changelog tracks approved app changes and master-plan updates that affect S
 
 Do not update this changelog for audit-only tasks unless specifically requested.
 
+## 2026-07-19
+
+- Branch: `codex/durable-draft-launch-2b`
+- Files changed:
+  - `servsync-durable-draft-launch-foundation.sql`
+  - `servsync-durable-draft-launch-permission-parity-correction.sql`
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `src/features/drafts/durableDraftLaunchTypes.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Completed Slice 2B sandbox validation for PR #317. Corrected canonical foundation hash `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f` implements the hidden durable Draft, item, launch-ledger, save/get/import/launch, private linkage, rollback, idempotency, and operational Job-deduplication contracts. The foundation and permission correction were installed successfully in ServSync Sandbox `zpzdkoaubyjtsomccxya`; correction hash `b4a98f33acd99083bea4497268393f6277ef330cdcb31bdc5d253adb94b14c7f` was applied exactly once after the previously reviewed foundation. The correction restores Draft-persistence parity through the union of existing billing-management and Job-write capabilities without broadening output-specific Estimate authority or adding role-name policy.
+- Reason for change: Sandbox runtime validation found that billing-only Draft persistence made Draft-to-Job narrower than normal Job creation for active users who have Job-write capability but not billing-management capability.
+- Tests/checks run:
+  - Full sandbox runtime validation passed, including save/resume, Estimate and Job launch mapping, one-Draft/one-launch, idempotency, deletion/retry, RLS, grants, privacy, tenant isolation, retention, PostgREST contracts, adversarial rollback injection, concurrency, relationship revocation, and property-unsharing locking.
+  - The owner/admin/office/field-technician/viewer/platform-admin compatibility matrix passed. Field-technician Draft save/update and Job launch now match existing Job-write authority; Estimate creation and launch authority remain unchanged.
+  - All disposable auth and business fixtures, temporary instrumentation, and validation residue were removed; operational duplicate groups remain zero.
+- Known risks or follow-ups:
+  - PR #317 remains open and draft. No known Slice 2B sandbox runtime blocker remains; final merge-readiness audit and owner approval are still required before mark-ready or merge.
+  - Production remains untouched on the legacy workflow; Slice 2B SQL is not installed there, no feature gate is enabled, and no visible Create Estimate or Create Job launch action is included.
+  - Fresh environments, including Production only after separate approval, use corrected canonical foundation hash `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f` without the sandbox correction. Sandbox already has both required steps and must not reapply either SQL file.
+  - Typed UUID RPC arguments are validated by PostgREST/PostgreSQL before function execution; stable ServSync codes apply after successful argument coercion.
+  - Existing Estimate, Job, and Draft permission helpers are compatibility boundaries only; configurable company permissions and final employee-role policy remain future work. No universal field-technician Estimate restriction was added.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the installed and runtime-validated sandbox foundation/correction, resolved permission parity, hidden product state, Production exclusion, and final merge-readiness gate.
+
 ## 2026-07-18
+
+- Branch: `codex/durable-draft-launch-2b`
+- Files changed:
+  - `servsync-durable-draft-launch-foundation.sql`
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `src/features/drafts/durableDraftLaunchTypes.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Packaged Slice 2B Durable Draft Launch Foundation for audit and sandbox-first approval. The SQL proposes dedicated contractor Draft, Draft item, and Draft launch ledger tables; durable nullable intended output; contractor-private Draft notes; consumed state; source-Draft links to launched Estimates and Jobs; one-Draft/one-successful-launch constraints; idempotency protection; canonical save/resume RPCs; an atomic launch RPC; private Estimate/Job launch helpers; and a non-destructive legacy inspection-backed Draft Job import bridge. Frontend additions are limited to hidden typed API wrappers for future integration.
+- Reason for change: The hidden shared Draft composer from Slice 2A needs a durable backend contract before a coherent Preview-visible Create Estimate/Create Job workflow can be implemented in Slice 2C.
+- Tests/checks run:
+  - SQL not applied; static validation only.
+  - Focused SQL/source tests were added for table definitions, constraints, RLS/grants, RPC signatures, save/resume behavior, launch/idempotency contracts, Estimate/Job launch mapping, legacy bridge, and hidden frontend scope.
+- Known risks or follow-ups:
+  - Slice 2B is hidden and unapplied until the SQL receives a separate focused audit and explicit sandbox-apply approval. It does not expose Create Estimate or Create Job actions in the shared Draft Composer, implement Invoice launch, apply SQL to Production, mutate Production data, change Vercel/Supabase settings, enable gates, deploy, redesign Jobs, or implement inspection/checklist UI.
+  - Slice 2C remains the first planned coherent owner-facing Preview workflow with both Create Estimate and Create Job launch actions.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records the packaged durable launch foundation, SQL-not-applied state, legacy bridge, and next approval gate for sandbox SQL application.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: Draft-first Work now distinguishes the packaged Slice 2B backend contract from the hidden frontend Slice 2A foundation and future Preview-visible Slice 2C workflow.
 
 - Branch: `codex/shared-draft-composer-2a`
 - Files changed:
