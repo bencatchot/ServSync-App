@@ -6,14 +6,311 @@
 begin;
 
 do $$
+declare
+  v_save_oid oid;
+  v_save_fingerprint text;
+  v_mismatch text;
 begin
-  if to_regclass('public.contractor_work_drafts') is null
-    or to_regclass('public.contractor_work_draft_items') is null
-    or to_regclass('public.contractor_work_draft_launches') is null
-    or to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)') is null
-    or to_regprocedure('public.current_user_can_manage_contractor_billing(uuid)') is null
-    or to_regprocedure('public.current_user_can_write_contractor_jobs(uuid)') is null then
-    raise exception 'SLICE_2B_PERMISSION_PARITY_PREREQUISITE_MISSING';
+  -- This fingerprint intentionally limits the patch to the exact reviewed
+  -- predecessor installed from foundation hash cafa9260e...c25ae185.
+  if (
+    select count(*)
+      from pg_proc proc
+      join pg_namespace namespace on namespace.oid = proc.pronamespace
+     where namespace.nspname = 'public'
+       and proc.proname = 'servsync_save_work_draft'
+  ) <> 1 then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_SAVE_OVERLOAD_MISMATCH';
+  end if;
+
+  v_save_oid := to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)');
+  if v_save_oid is null then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_SAVE_SIGNATURE_MISMATCH';
+  end if;
+
+  select md5(concat_ws(
+    chr(31),
+    namespace.nspname,
+    proc.proname,
+    pg_get_function_identity_arguments(proc.oid),
+    oidvectortypes(proc.proargtypes),
+    pg_get_function_result(proc.oid),
+    proc.prokind::text,
+    language.lanname,
+    proc.prosecdef::text,
+    proc.proleakproof::text,
+    proc.proisstrict::text,
+    proc.provolatile::text,
+    proc.proparallel::text,
+    coalesce(array_to_string(proc.proconfig, chr(30)), ''),
+    proc.prosrc
+  ))
+    into v_save_fingerprint
+    from pg_proc proc
+    join pg_namespace namespace on namespace.oid = proc.pronamespace
+    join pg_language language on language.oid = proc.prolang
+   where proc.oid = v_save_oid;
+
+  if v_save_fingerprint <> '9ebff37b2cbf9eefbeefdf5bda1081aa' then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_SAVE_FINGERPRINT_MISMATCH';
+  end if;
+
+  if has_function_privilege('public', v_save_oid, 'execute')
+    or has_function_privilege('anon', v_save_oid, 'execute')
+    or not has_function_privilege('authenticated', v_save_oid, 'execute') then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_SAVE_GRANT_MISMATCH';
+  end if;
+
+  if (
+    select count(*)
+      from pg_proc proc
+      join pg_namespace namespace on namespace.oid = proc.pronamespace
+     where namespace.nspname = 'public'
+       and proc.proname = 'servsync_private_can_persist_work_draft'
+  ) <> 0 then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_HELPER_ALREADY_EXISTS';
+  end if;
+
+  with expected(schema_name, function_name, argument_types, result_type) as (
+    values
+      ('auth', 'uid', '', 'uuid'),
+      ('public', 'current_user_can_manage_contractor_billing', 'uuid', 'boolean'),
+      ('public', 'current_user_can_write_contractor_jobs', 'uuid', 'boolean'),
+      ('public', 'servsync_current_contractor_profile', '', 'TABLE(id uuid, owner_user_id uuid, business_name text, slug text, contact_name text, email text, phone text, website_url text, logo_url text, city text, state text, zip_code text, service_categories text[], service_zip_codes text[], license_number text, insurance_status text, bonded_status text, business_summary text, public_profile_enabled boolean, account_status text, subscription_status text, monthly_price_cents integer, subscription_notes text, admin_notes text, permanent_invite_code text, created_at timestamp with time zone, updated_at timestamp with time zone)'),
+      ('public', 'servsync_get_work_draft', 'uuid', 'jsonb'),
+      ('public', 'servsync_private_work_draft_integer', 'text, text', 'integer'),
+      ('public', 'servsync_private_work_draft_numeric', 'text, text', 'numeric'),
+      ('public', 'servsync_private_work_draft_uuid', 'text, text', 'uuid')
+  ), actual as (
+    select
+      namespace.nspname as schema_name,
+      proc.proname as function_name,
+      oidvectortypes(proc.proargtypes) as argument_types,
+      pg_get_function_result(proc.oid) as result_type,
+      count(*) over (partition by namespace.nspname, proc.proname) as overload_count
+    from pg_proc proc
+    join pg_namespace namespace on namespace.oid = proc.pronamespace
+    where (namespace.nspname, proc.proname) in (
+      select expected.schema_name, expected.function_name from expected
+    )
+  )
+  select string_agg(
+    format('%I.%I(%s)', expected.schema_name, expected.function_name, expected.argument_types),
+    ', '
+    order by expected.schema_name, expected.function_name
+  )
+    into v_mismatch
+    from expected
+    left join actual
+      on actual.schema_name = expected.schema_name
+     and actual.function_name = expected.function_name
+     and actual.argument_types = expected.argument_types
+     and actual.result_type = expected.result_type
+   where actual.function_name is null
+      or actual.overload_count <> 1;
+
+  if v_mismatch is not null then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_FUNCTION_DEPENDENCY_MISMATCH: %', v_mismatch;
+  end if;
+
+  with expected(type_name) as (
+    values
+      ('public.contractor_work_drafts'),
+      ('public.contractor_work_draft_items'),
+      ('public.service_requests'),
+      ('public.homes'),
+      ('public.profiles'),
+      ('public.contractor_local_contacts'),
+      ('public.contractor_local_homes'),
+      ('public.homeowner_contractor_connections'),
+      ('public.inspections')
+  )
+  select string_agg(type_name, ', ' order by type_name)
+    into v_mismatch
+    from expected
+   where to_regtype(type_name) is null
+      or to_regclass(type_name) is null;
+
+  if v_mismatch is not null then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_ROW_TYPE_MISMATCH: %', v_mismatch;
+  end if;
+
+  with expected(table_name, column_name, data_type) as (
+    values
+      ('contractor_work_drafts', 'id', 'uuid'),
+      ('contractor_work_drafts', 'contractor_id', 'uuid'),
+      ('contractor_work_drafts', 'created_by_user_id', 'uuid'),
+      ('contractor_work_drafts', 'homeowner_user_id', 'uuid'),
+      ('contractor_work_drafts', 'home_id', 'uuid'),
+      ('contractor_work_drafts', 'local_contact_id', 'uuid'),
+      ('contractor_work_drafts', 'local_home_id', 'uuid'),
+      ('contractor_work_drafts', 'service_request_id', 'uuid'),
+      ('contractor_work_drafts', 'subject_type', 'text'),
+      ('contractor_work_drafts', 'subject_display_name_snapshot', 'text'),
+      ('contractor_work_drafts', 'property_display_snapshot', 'text'),
+      ('contractor_work_drafts', 'title', 'text'),
+      ('contractor_work_drafts', 'scope_description', 'text'),
+      ('contractor_work_drafts', 'private_notes', 'text'),
+      ('contractor_work_drafts', 'intended_output', 'text'),
+      ('contractor_work_drafts', 'work_format', 'text'),
+      ('contractor_work_drafts', 'labor_mode', 'text'),
+      ('contractor_work_drafts', 'labor_rate_cents', 'integer'),
+      ('contractor_work_drafts', 'job_labor_hours', 'numeric(8,2)'),
+      ('contractor_work_drafts', 'legacy_inspection_id', 'uuid'),
+      ('contractor_work_drafts', 'status', 'text'),
+      ('contractor_work_drafts', 'created_at', 'timestamp with time zone'),
+      ('contractor_work_drafts', 'updated_at', 'timestamp with time zone'),
+      ('contractor_work_draft_items', 'id', 'uuid'),
+      ('contractor_work_draft_items', 'draft_id', 'uuid'),
+      ('contractor_work_draft_items', 'contractor_id', 'uuid'),
+      ('contractor_work_draft_items', 'title', 'text'),
+      ('contractor_work_draft_items', 'description', 'text'),
+      ('contractor_work_draft_items', 'customer_description', 'text'),
+      ('contractor_work_draft_items', 'internal_notes', 'text'),
+      ('contractor_work_draft_items', 'line_type', 'text'),
+      ('contractor_work_draft_items', 'quantity', 'numeric(12,2)'),
+      ('contractor_work_draft_items', 'unit', 'text'),
+      ('contractor_work_draft_items', 'unit_price_cents', 'integer'),
+      ('contractor_work_draft_items', 'labor_hours', 'numeric(8,2)'),
+      ('contractor_work_draft_items', 'room_id', 'text'),
+      ('contractor_work_draft_items', 'room_label', 'text'),
+      ('contractor_work_draft_items', 'location_label', 'text'),
+      ('contractor_work_draft_items', 'sort_order', 'integer'),
+      ('contractor_work_draft_items', 'created_at', 'timestamp with time zone'),
+      ('contractor_work_draft_items', 'updated_at', 'timestamp with time zone'),
+      ('service_requests', 'id', 'uuid'),
+      ('service_requests', 'contractor_id', 'uuid'),
+      ('service_requests', 'homeowner_user_id', 'uuid'),
+      ('service_requests', 'home_id', 'uuid'),
+      ('homes', 'id', 'uuid'),
+      ('homes', 'homeowner_user_id', 'uuid'),
+      ('homes', 'nickname', 'text'),
+      ('homes', 'address_line1', 'text'),
+      ('homes', 'city', 'text'),
+      ('homes', 'state', 'text'),
+      ('profiles', 'id', 'uuid'),
+      ('profiles', 'full_name', 'text'),
+      ('profiles', 'email', 'text'),
+      ('contractor_local_contacts', 'id', 'uuid'),
+      ('contractor_local_contacts', 'contractor_id', 'uuid'),
+      ('contractor_local_contacts', 'display_name', 'text'),
+      ('contractor_local_contacts', 'email', 'text'),
+      ('contractor_local_contacts', 'phone', 'text'),
+      ('contractor_local_homes', 'id', 'uuid'),
+      ('contractor_local_homes', 'contractor_id', 'uuid'),
+      ('contractor_local_homes', 'local_contact_id', 'uuid'),
+      ('contractor_local_homes', 'nickname', 'text'),
+      ('contractor_local_homes', 'address_line1', 'text'),
+      ('contractor_local_homes', 'city', 'text'),
+      ('contractor_local_homes', 'state', 'text'),
+      ('homeowner_contractor_connections', 'contractor_id', 'uuid'),
+      ('homeowner_contractor_connections', 'homeowner_user_id', 'uuid'),
+      ('homeowner_contractor_connections', 'status', 'text'),
+      ('inspections', 'id', 'uuid'),
+      ('inspections', 'contractor_id', 'uuid'),
+      ('inspections', 'job_origin', 'text'),
+      ('inspections', 'status', 'text'),
+      ('inspections', 'job_status', 'text')
+  ), actual as (
+    select
+      table_class.relname as table_name,
+      attribute.attname as column_name,
+      format_type(attribute.atttypid, attribute.atttypmod) as data_type
+    from pg_attribute attribute
+    join pg_class table_class on table_class.oid = attribute.attrelid
+    join pg_namespace namespace on namespace.oid = table_class.relnamespace
+    where namespace.nspname = 'public'
+      and attribute.attnum > 0
+      and not attribute.attisdropped
+  )
+  select string_agg(
+    format('%I.%I %s', expected.table_name, expected.column_name, expected.data_type),
+    ', '
+    order by expected.table_name, expected.column_name
+  )
+    into v_mismatch
+    from expected
+    left join actual
+      on actual.table_name = expected.table_name
+     and actual.column_name = expected.column_name
+     and actual.data_type = expected.data_type
+   where actual.column_name is null;
+
+  if v_mismatch is not null then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_COLUMN_MISMATCH: %', v_mismatch;
+  end if;
+
+  if to_regclass('public.contractor_work_draft_launches') is null
+    or to_regprocedure('public.servsync_get_work_draft(uuid)') is null
+    or to_regprocedure('public.servsync_import_legacy_draft_job(uuid,text)') is null
+    or to_regprocedure('public.servsync_launch_work_draft(uuid,text,uuid)') is null
+    or to_regclass('public.inspections_unique_operational_service_request_idx') is null
+    or not exists (
+      select 1
+        from pg_trigger trg
+       where trg.tgrelid = 'public.inspections'::regclass
+         and trg.tgname = 'inspections_guard_operational_service_request'
+         and not trg.tgisinternal
+    )
+    or exists (
+      select 1
+        from pg_class table_class
+        join pg_namespace namespace on namespace.oid = table_class.relnamespace
+       where namespace.nspname = 'public'
+         and table_class.relname in (
+           'contractor_work_drafts',
+           'contractor_work_draft_items',
+           'contractor_work_draft_launches'
+         )
+         and not table_class.relrowsecurity
+    )
+    or (
+      select count(*)
+        from pg_class table_class
+        join pg_namespace namespace on namespace.oid = table_class.relnamespace
+       where namespace.nspname = 'public'
+         and table_class.relname in (
+           'contractor_work_drafts',
+           'contractor_work_draft_items',
+           'contractor_work_draft_launches'
+         )
+         and table_class.relkind = 'r'
+         and table_class.relrowsecurity
+    ) <> 3 then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_INSTALLATION_MARKER_MISMATCH';
+  end if;
+
+  with expected(table_name, constraint_name) as (
+    values
+      ('contractor_work_drafts', 'contractor_work_drafts_pkey'),
+      ('contractor_work_drafts', 'contractor_work_drafts_id_contractor_unique'),
+      ('contractor_work_drafts', 'contractor_work_drafts_status_check'),
+      ('contractor_work_drafts', 'contractor_work_drafts_subject_check'),
+      ('contractor_work_drafts', 'contractor_work_drafts_property_subject_check'),
+      ('contractor_work_drafts', 'contractor_work_drafts_intended_output_check'),
+      ('contractor_work_drafts', 'contractor_work_drafts_work_format_check'),
+      ('contractor_work_draft_items', 'contractor_work_draft_items_pkey'),
+      ('contractor_work_draft_items', 'contractor_work_draft_items_contractor_match_fk'),
+      ('contractor_work_draft_launches', 'contractor_work_draft_launches_status_linkage_check')
+  )
+  select string_agg(
+    format('%I.%I', expected.table_name, expected.constraint_name),
+    ', '
+    order by expected.table_name, expected.constraint_name
+  )
+    into v_mismatch
+    from expected
+    left join pg_namespace namespace on namespace.nspname = 'public'
+    left join pg_class table_class
+      on table_class.relnamespace = namespace.oid
+     and table_class.relname = expected.table_name
+    left join pg_constraint con
+      on con.conrelid = table_class.oid
+     and con.conname = expected.constraint_name
+   where con.oid is null;
+
+  if v_mismatch is not null then
+    raise exception 'SLICE_2B_PERMISSION_PARITY_CONSTRAINT_MISMATCH: %', v_mismatch;
   end if;
 end;
 $$;

@@ -21,6 +21,105 @@ function permissionCorrectionSqlSource() {
   return readFileSync(permissionCorrectionSqlPath, 'utf8');
 }
 
+function topLevelSqlStatements(source: string) {
+  const statements: string[] = [];
+  let current = '';
+  let index = 0;
+  let quote: 'single' | 'double' | null = null;
+  let dollarTag: string | null = null;
+  let blockCommentDepth = 0;
+  let lineComment = false;
+
+  while (index < source.length) {
+    if (lineComment) {
+      if (source[index] === '\n') lineComment = false;
+      index += 1;
+      continue;
+    }
+    if (blockCommentDepth > 0) {
+      if (source.startsWith('/*', index)) {
+        blockCommentDepth += 1;
+        index += 2;
+      } else if (source.startsWith('*/', index)) {
+        blockCommentDepth -= 1;
+        index += 2;
+      } else {
+        index += 1;
+      }
+      continue;
+    }
+    if (dollarTag) {
+      if (source.startsWith(dollarTag, index)) {
+        current += dollarTag;
+        index += dollarTag.length;
+        dollarTag = null;
+      } else {
+        current += source[index];
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      current += source[index];
+      if (source[index] === (quote === 'single' ? "'" : '"')) {
+        if (source[index + 1] === source[index]) {
+          current += source[index + 1];
+          index += 2;
+          continue;
+        }
+        quote = null;
+      }
+      index += 1;
+      continue;
+    }
+    if (source.startsWith('--', index)) {
+      lineComment = true;
+      index += 2;
+      continue;
+    }
+    if (source.startsWith('/*', index)) {
+      blockCommentDepth = 1;
+      index += 2;
+      continue;
+    }
+    if (source[index] === "'") {
+      quote = 'single';
+      current += source[index];
+      index += 1;
+      continue;
+    }
+    if (source[index] === '"') {
+      quote = 'double';
+      current += source[index];
+      index += 1;
+      continue;
+    }
+    if (source[index] === '$') {
+      const tag = source.slice(index).match(/^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/)?.[0];
+      if (tag) {
+        dollarTag = tag;
+        current += tag;
+        index += tag.length;
+        continue;
+      }
+    }
+    if (source[index] === ';') {
+      if (current.trim()) statements.push(current.trim());
+      current = '';
+      index += 1;
+      continue;
+    }
+    current += source[index];
+    index += 1;
+  }
+
+  expect(quote).toBeNull();
+  expect(dollarTag).toBeNull();
+  expect(blockCommentDepth).toBe(0);
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   expect(startIndex, `Expected source marker: ${start}`).toBeGreaterThanOrEqual(0);
@@ -176,10 +275,27 @@ test.describe('Durable Draft Launch foundation', () => {
 
   test('permission correction is function-only and preserves launch, import, RLS, and data', () => {
     const correction = permissionCorrectionSqlSource();
+    const statements = topLevelSqlStatements(correction);
+    const allowedStatements = [
+      /^begin$/i,
+      /^do\s+\$/i,
+      /^create\s+or\s+replace\s+function\b/i,
+      /^revoke\b/i,
+      /^grant\b/i,
+      /^comment\b/i,
+      /^notify\b/i,
+      /^commit$/i,
+    ];
 
     expect(correction.trim().startsWith('-- ServSync durable Draft launch permission-parity correction.')).toBe(true);
-    expect(correction).toMatch(/\nbegin;\n/);
-    expect(correction.trim().endsWith('commit;')).toBe(true);
+    expect(statements[0]).toBe('begin');
+    expect(statements[1]).toMatch(/^do\s+\$\$/i);
+    expect(statements.at(-1)).toBe('commit');
+    for (const statement of statements) {
+      expect(allowedStatements.some(pattern => pattern.test(statement)), statement.slice(0, 120)).toBe(true);
+    }
+    expect(statements.some(statement => /^(?:insert|update|delete|merge|truncate)\b/i.test(statement))).toBe(false);
+    expect(statements.some(statement => /^(?:alter|create|drop)\s+(?:table|index|trigger|policy)\b/i.test(statement))).toBe(false);
     expect(correction).toContain("to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)')");
     expect(correction).toContain('grant execute on function public.servsync_save_work_draft(uuid, jsonb, jsonb, jsonb) to authenticated');
     expect(correction).toContain('revoke all on function public.servsync_private_can_persist_work_draft(uuid) from authenticated');
@@ -192,6 +308,94 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(correction).not.toContain('create or replace function public.servsync_launch_work_draft');
     expect(correction).not.toContain('create or replace function public.servsync_import_legacy_draft_job');
     expect(correction).not.toMatch(/create policy|drop policy|enable row level security/i);
+  });
+
+  test('permission correction requires the exact reviewed predecessor before replacement', () => {
+    const correction = permissionCorrectionSqlSource();
+    const statements = topLevelSqlStatements(correction);
+    const guard = statements[1];
+    const helperIndex = statements.findIndex(statement => statement.startsWith('create or replace function public.servsync_private_can_persist_work_draft'));
+    const saveIndex = statements.findIndex(statement => statement.startsWith('create or replace function public.servsync_save_work_draft'));
+
+    expect(helperIndex).toBeGreaterThan(1);
+    expect(saveIndex).toBeGreaterThan(helperIndex);
+    expect(guard).toContain("proc.proname = 'servsync_save_work_draft'");
+    expect(guard).toContain(') <> 1 then');
+    expect(guard).toContain("to_regprocedure('public.servsync_save_work_draft(uuid,jsonb,jsonb,jsonb)')");
+    expect(guard).toContain("v_save_fingerprint <> '9ebff37b2cbf9eefbeefdf5bda1081aa'");
+    for (const attribute of [
+      'pg_get_function_identity_arguments(proc.oid)',
+      'oidvectortypes(proc.proargtypes)',
+      'pg_get_function_result(proc.oid)',
+      'proc.prokind::text',
+      'language.lanname',
+      'proc.prosecdef::text',
+      'proc.proleakproof::text',
+      'proc.proisstrict::text',
+      'proc.provolatile::text',
+      'proc.proparallel::text',
+      'array_to_string(proc.proconfig',
+      'proc.prosrc',
+    ]) expect(guard).toContain(attribute);
+    expect(guard).toContain("has_function_privilege('public', v_save_oid, 'execute')");
+    expect(guard).toContain("has_function_privilege('anon', v_save_oid, 'execute')");
+    expect(guard).toContain("has_function_privilege('authenticated', v_save_oid, 'execute')");
+    expect(guard).toContain("proc.proname = 'servsync_private_can_persist_work_draft'");
+    expect(guard).toContain('SLICE_2B_PERMISSION_PARITY_HELPER_ALREADY_EXISTS');
+  });
+
+  test('permission correction verifies save dependencies, row types, columns, and installation markers', () => {
+    const guard = topLevelSqlStatements(permissionCorrectionSqlSource())[1];
+
+    for (const dependency of [
+      "('auth', 'uid', '', 'uuid')",
+      "('public', 'current_user_can_manage_contractor_billing', 'uuid', 'boolean')",
+      "('public', 'current_user_can_write_contractor_jobs', 'uuid', 'boolean')",
+      "('public', 'servsync_current_contractor_profile', '', 'TABLE(",
+      "('public', 'servsync_get_work_draft', 'uuid', 'jsonb')",
+      "('public', 'servsync_private_work_draft_integer', 'text, text', 'integer')",
+      "('public', 'servsync_private_work_draft_numeric', 'text, text', 'numeric')",
+      "('public', 'servsync_private_work_draft_uuid', 'text, text', 'uuid')",
+    ]) expect(guard).toContain(dependency);
+    expect(guard).toContain('actual.overload_count <> 1');
+
+    for (const rowType of [
+      'public.contractor_work_drafts',
+      'public.contractor_work_draft_items',
+      'public.service_requests',
+      'public.homes',
+      'public.profiles',
+      'public.contractor_local_contacts',
+      'public.contractor_local_homes',
+      'public.homeowner_contractor_connections',
+      'public.inspections',
+    ]) expect(guard).toContain(`('${rowType}')`);
+    expect(guard).toContain('to_regtype(type_name) is null');
+
+    for (const columnContract of [
+      "('contractor_work_drafts', 'subject_display_name_snapshot', 'text')",
+      "('contractor_work_drafts', 'job_labor_hours', 'numeric(8,2)')",
+      "('contractor_work_draft_items', 'quantity', 'numeric(12,2)')",
+      "('contractor_work_draft_items', 'labor_hours', 'numeric(8,2)')",
+      "('service_requests', 'home_id', 'uuid')",
+      "('homeowner_contractor_connections', 'status', 'text')",
+      "('contractor_local_homes', 'local_contact_id', 'uuid')",
+      "('inspections', 'job_status', 'text')",
+    ]) expect(guard).toContain(columnContract);
+    expect(guard).toContain('format_type(attribute.atttypid, attribute.atttypmod)');
+
+    for (const marker of [
+      "to_regclass('public.contractor_work_draft_launches')",
+      "to_regprocedure('public.servsync_get_work_draft(uuid)')",
+      "to_regprocedure('public.servsync_import_legacy_draft_job(uuid,text)')",
+      "to_regprocedure('public.servsync_launch_work_draft(uuid,text,uuid)')",
+      "to_regclass('public.inspections_unique_operational_service_request_idx')",
+      "trg.tgname = 'inspections_guard_operational_service_request'",
+      'table_class.relrowsecurity',
+      "('contractor_work_drafts', 'contractor_work_drafts_subject_check')",
+      "('contractor_work_draft_items', 'contractor_work_draft_items_contractor_match_fk')",
+      "('contractor_work_draft_launches', 'contractor_work_draft_launches_status_linkage_check')",
+    ]) expect(guard).toContain(marker);
   });
 
   test('resume and output copies use deterministic item ordering', () => {
