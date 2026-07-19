@@ -789,7 +789,7 @@ test.describe('Durable Draft Launch foundation', () => {
       expect(source).toContain('Slice 2C-D');
     }
     expect(changelog).toContain('no UI wiring');
-    expect(backlog).toContain('hidden frontend contract work');
+    expect(backlog).toContain('hidden typed durable API contracts');
     expect(masterPlan).toContain('hidden typed durable');
   });
 });
