@@ -238,6 +238,20 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(workspace).toContain('importLegacyContractorWorkDraft');
   });
 
+  test('loads consumed outputs without side effects before generation-checked adoption', () => {
+    const app = sourceFile('src/App.tsx');
+    const workspace = sourceFile('src/features/drafts/DurableDraftWorkspace.tsx');
+    const loader = app.slice(app.indexOf('const loadDurableDraftOutput'), app.indexOf('const adoptDurableDraftOutput'));
+    const adopter = app.slice(app.indexOf('const adoptDurableDraftOutput'), app.indexOf('const saveDraftJobComposer'));
+    expect(loader).toContain("return { type: 'estimate', id, record: estimate }");
+    expect(loader).toContain("return { type: 'job', id, record: job }");
+    expect(loader).not.toMatch(/setEstimates|setInspections|openEstimateRecord|openInspection/);
+    expect(adopter).toMatch(/setEstimates[\s\S]*openEstimateRecord/);
+    expect(adopter).toMatch(/setInspections[\s\S]*openInspection/);
+    expect(workspace).toContain('openingOutputOperation.current === operation');
+    expect(workspace).toMatch(/await onLoadOutput[\s\S]*if \(!isCurrent\(\)\) return;[\s\S]*onAdoptOutput/);
+  });
+
   test('contains no active launch path, launch attempt mutation, or role-name policy', () => {
     const app = sourceFile('src/App.tsx');
     const workspace = sourceFile('src/features/drafts/DurableDraftWorkspace.tsx');

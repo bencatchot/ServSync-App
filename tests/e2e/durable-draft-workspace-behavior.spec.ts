@@ -13,6 +13,7 @@ const LEGACY_ID = '00000000-0000-4000-8000-000000000210';
 const HOME_B_SECONDARY = '00000000-0000-4000-8000-000000000211';
 const ESTIMATE_ID = '00000000-0000-4000-8000-000000000212';
 const JOB_ID = '00000000-0000-4000-8000-000000000213';
+const LEGACY_OTHER_ID = '00000000-0000-4000-8000-000000000214';
 
 async function installWorkspaceHarness(page: Page) {
   await page.goto('/');
@@ -83,6 +84,8 @@ async function installWorkspaceHarness(page: Page) {
       legacyDrafts: [] as Record<string, unknown>[],
       backCount: 0,
       openCount: 0,
+      adoptedOutputs: [] as string[],
+      activeOutput: null as string | null,
     };
     const capabilities = () => ({
       contractorId: state.contractorId,
@@ -92,7 +95,9 @@ async function installWorkspaceHarness(page: Page) {
       canLaunchJob: true,
       canLaunchEstimate: true,
     });
-    const render = () => root.render(React.createElement(DurableDraftWorkspace, {
+    const render = () => root.render(state.activeOutput
+      ? React.createElement('div', { 'data-testid': 'adopted-output' }, state.activeOutput)
+      : React.createElement(DurableDraftWorkspace, {
       client: clients[state.clientName],
       mode: state.mode,
       capabilities: capabilities(),
@@ -122,10 +127,15 @@ async function installWorkspaceHarness(page: Page) {
         state.mode = 'list';
         render();
       },
-      onOpenOutput: (type: string, id: string) => {
+      onLoadOutput: (type: string, id: string) => {
         const next = deferred();
         calls.push({ client: state.clientName, kind: 'output', name: type, args: id, settled: false, resolve: next.resolve, reject: next.reject });
         return next.promise;
+      },
+      onAdoptOutput: (output: { type: string; id: string }) => {
+        state.adoptedOutputs.push(`${output.type}:${output.id}`);
+        state.activeOutput = `${output.type}:${output.id}`;
+        render();
       },
     }));
     const rawDraft = (draftId: string, contractorId: string, title: string, overrides: Record<string, unknown> = {}) => ({
@@ -189,26 +199,33 @@ async function installWorkspaceHarness(page: Page) {
     });
     const harness = {
       render,
-      showList() { state.mode = 'list'; state.target = null; render(); },
-      showTarget(target: Record<string, unknown> | null) { state.mode = 'editor'; state.target = target; render(); },
+      showList() { state.mode = 'list'; state.target = null; state.activeOutput = null; render(); },
+      showTarget(target: Record<string, unknown> | null) { state.mode = 'editor'; state.target = target; state.activeOutput = null; render(); },
       showNew() { state.mode = 'editor'; state.target = { kind: 'new', initialDraft }; render(); },
       switchContext(contractorId: string, clientName: 'A' | 'B') { state.contractorId = contractorId; state.clientName = clientName; render(); },
       setLegacy(enabled: boolean) {
         state.legacyDrafts = enabled ? [{ id: ids.legacyId, name: 'Earlier plan', updated_at: '2026-07-19T10:00:00.000Z', job_origin: 'draft_composer', status: 'draft', job_status: 'draft' }] : [];
         render();
       },
+      setLegacyPair() {
+        state.legacyDrafts = [
+          { id: ids.legacyId, name: 'Earlier plan', updated_at: '2026-07-19T10:00:00.000Z', job_origin: 'draft_composer', status: 'draft', job_status: 'draft' },
+          { id: ids.legacyOtherId, name: 'Unrelated plan', updated_at: '2026-07-18T10:00:00.000Z', job_origin: 'draft_composer', status: 'draft', job_status: 'draft' },
+        ];
+        render();
+      },
       complete(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
         const call = calls.find(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
         if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
         call.settled = true;
-        call.resolve({ data, error: null, status: 200 });
+        call.resolve(kind === 'output' ? data : { data, error: null, status: 200 });
       },
       completeLast(kind: PendingCall['kind'], name: string, data: unknown, clientName?: string) {
         const matching = calls.filter(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
         const call = matching[matching.length - 1];
         if (!call) throw new Error(`Missing pending ${kind}:${name}:${clientName ?? '*'}`);
         call.settled = true;
-        call.resolve({ data, error: null, status: 200 });
+        call.resolve(kind === 'output' ? data : { data, error: null, status: 200 });
       },
       fail(kind: PendingCall['kind'], name: string, clientName?: string) {
         const call = calls.find(candidate => !candidate.settled && candidate.kind === kind && candidate.name === name && (!clientName || candidate.client === clientName));
@@ -226,7 +243,7 @@ async function installWorkspaceHarness(page: Page) {
         return calls.filter(call => call.kind === kind && call.name === name && (!clientName || call.client === clientName)).length;
       },
       calls() { return calls.map(({ client, kind, name, args, settled }) => ({ client, kind, name, args, settled })); },
-      snapshot() { return { ...state, target: state.target ? { ...state.target, initialDraft: undefined } : null }; },
+      snapshot() { return { ...state, adoptedOutputs: [...state.adoptedOutputs], target: state.target ? { ...state.target, initialDraft: undefined } : null }; },
       envelope,
       row,
     };
@@ -241,6 +258,7 @@ async function installWorkspaceHarness(page: Page) {
     homeBSecondary: HOME_B_SECONDARY,
     requestId: REQUEST_ID,
     legacyId: LEGACY_ID,
+    legacyOtherId: LEGACY_OTHER_ID,
   } });
 }
 
@@ -365,6 +383,24 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     expect(await page.evaluate(() => window.__durableHarness.snapshot().target)).toEqual({ kind: 'durable', draftId: DRAFT_A, initialDraft: undefined });
   });
 
+  test('ignores a pre-import list response and de-duplicates only the imported legacy row', async ({ page }) => {
+    await installWorkspaceHarness(page);
+    await page.evaluate(() => window.__durableHarness.setLegacyPair());
+    await page.evaluate(({ contractorB }) => window.__durableHarness.switchContext(contractorB, 'B'), { contractorB: CONTRACTOR_B });
+    await page.evaluate(() => window.__durableHarness.complete('list', 'contractor_work_drafts', [], 'B'));
+    await page.getByTestId('legacy-draft-row').filter({ hasText: 'Earlier plan' }).getByRole('button', { name: 'Continue Draft' }).click();
+    await page.evaluate(({ draftB }) => window.__durableHarness.complete('rpc', 'servsync_import_legacy_draft_job', draftB, 'B'), { draftB: DRAFT_B });
+    await page.evaluate(({ draftB, contractorB, legacyId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorB, 'Imported', { legacy_inspection_id: legacyId }), 'B'), { draftB: DRAFT_B, contractorB: CONTRACTOR_B, legacyId: LEGACY_ID });
+    await expect(page.getByLabel('Draft title')).toHaveValue('Imported');
+
+    await page.evaluate(({ draftA, contractorA }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftA, contractorA, 'Stale A Draft')], 'A'), { draftA: DRAFT_A, contractorA: CONTRACTOR_A });
+    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await page.evaluate(({ draftB, contractorB, legacyId }) => window.__durableHarness.complete('list', 'contractor_work_drafts', [window.__durableHarness.row(draftB, contractorB, 'Imported', { legacy_inspection_id: legacyId })], 'B'), { draftB: DRAFT_B, contractorB: CONTRACTOR_B, legacyId: LEGACY_ID });
+    await expect(page.getByText('Earlier plan')).toHaveCount(0);
+    await expect(page.getByText('Unrelated plan')).toBeVisible();
+    await expect(page.getByText('Stale A Draft')).toHaveCount(0);
+  });
+
   test('preserves a legacy row after import failure and permits retry', async ({ page }) => {
     await installWorkspaceHarness(page);
     await page.evaluate(() => window.__durableHarness.setLegacy(true));
@@ -399,6 +435,93 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.getByRole('button', { name: 'Back to Work' }).click();
     await expect(page.getByTestId('durable-draft-list')).toBeVisible();
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_save_work_draft'))).toBe(0);
+  });
+
+  for (const output of [{ type: 'estimate', label: 'Estimate', id: ESTIMATE_ID }, { type: 'job', label: 'Job', id: JOB_ID }] as const) {
+    test(`ignores a stale successful ${output.type} load after Back`, async ({ page }) => {
+      await installWorkspaceHarness(page);
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await page.evaluate(({ draftA, contractorA, output }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed Draft', {
+        status: 'consumed', intended_output: output.type, launched_output_type: output.type,
+        launched_estimate_id: output.type === 'estimate' ? output.id : null,
+        launched_job_id: output.type === 'job' ? output.id : null,
+        launched_estimate_id_snapshot: output.type === 'estimate' ? output.id : null,
+        launched_job_id_snapshot: output.type === 'job' ? output.id : null,
+        launched_at: '2026-07-19T11:00:00.000Z',
+      })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
+      await page.getByRole('button', { name: `Open ${output.label}` }).click();
+      await page.getByRole('button', { name: 'Back to Work' }).click();
+      await page.evaluate(output => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id } }), output);
+      await expect(page.getByTestId('durable-draft-list')).toBeVisible();
+      expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
+      expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
+    });
+
+    test(`adopts a current successful ${output.type} load`, async ({ page }) => {
+      await installWorkspaceHarness(page);
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await page.evaluate(({ draftA, contractorA, output }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed Draft', {
+        status: 'consumed', intended_output: output.type, launched_output_type: output.type,
+        launched_estimate_id: output.type === 'estimate' ? output.id : null,
+        launched_job_id: output.type === 'job' ? output.id : null,
+        launched_estimate_id_snapshot: output.type === 'estimate' ? output.id : null,
+        launched_job_id_snapshot: output.type === 'job' ? output.id : null,
+        launched_at: '2026-07-19T11:00:00.000Z',
+      })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
+      await page.getByRole('button', { name: `Open ${output.label}` }).click();
+      await page.evaluate(output => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id } }), output);
+      await expect(page.getByTestId('adopted-output')).toHaveText(`${output.type}:${output.id}`);
+      expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([`${output.type}:${output.id}`]);
+    });
+  }
+
+  test('keeps Draft B open when Draft A output succeeds late', async ({ page }) => {
+    await installWorkspaceHarness(page);
+    await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+    await page.evaluate(({ draftA, contractorA, estimateId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed A', { status: 'consumed', intended_output: 'estimate', launched_output_type: 'estimate', launched_estimate_id: estimateId, launched_estimate_id_snapshot: estimateId, launched_at: '2026-07-19T11:00:00.000Z' })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, estimateId: ESTIMATE_ID });
+    await page.getByRole('button', { name: 'Open Estimate' }).click();
+    await page.evaluate(({ draftB }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftB }), { draftB: DRAFT_B });
+    await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(2);
+    await page.evaluate(({ draftB, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorA, 'Draft B')), { draftB: DRAFT_B, contractorA: CONTRACTOR_A });
+    await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await expect(page.getByLabel('Draft title')).toHaveValue('Draft B');
+    expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
+  });
+
+  test('ignores stale output success after contractor and client context changes', async ({ page }) => {
+    for (const nextContext of [{ contractorId: CONTRACTOR_B, clientName: 'B' as const }, { contractorId: CONTRACTOR_A, clientName: 'B' as const }]) {
+      await installWorkspaceHarness(page);
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await page.evaluate(({ draftA, contractorA, estimateId }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed A', { status: 'consumed', intended_output: 'estimate', launched_output_type: 'estimate', launched_estimate_id: estimateId, launched_estimate_id_snapshot: estimateId, launched_at: '2026-07-19T11:00:00.000Z' })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, estimateId: ESTIMATE_ID });
+      await page.getByRole('button', { name: 'Open Estimate' }).click();
+      await page.evaluate(context => window.__durableHarness.switchContext(context.contractorId, context.clientName), nextContext);
+      await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft', 'B'))).toBe(1);
+      await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }, 'A'), { estimateId: ESTIMATE_ID });
+      expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
+      await page.evaluate(() => window.__durableHarness.showList());
+    }
+  });
+
+  test('an older same-key completion cannot clear a newer output lock', async ({ page }) => {
+    await installWorkspaceHarness(page);
+    const openConsumed = async () => {
+      const priorGetCount = await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'));
+      await page.evaluate(({ draftA }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftA }), { draftA: DRAFT_A });
+      await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(priorGetCount + 1);
+      await page.evaluate(({ draftA, contractorA, estimateId }) => window.__durableHarness.completeLast('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftA, contractorA, 'Consumed A', { status: 'consumed', intended_output: 'estimate', launched_output_type: 'estimate', launched_estimate_id: estimateId, launched_estimate_id_snapshot: estimateId, launched_at: '2026-07-19T11:00:00.000Z' })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, estimateId: ESTIMATE_ID });
+      await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+      await page.getByRole('button', { name: 'Open Estimate' }).click();
+    };
+    await openConsumed();
+    await page.evaluate(() => window.__durableHarness.showList());
+    await openConsumed();
+    expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
+    await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await expect(page.getByRole('button', { name: 'Opening…' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Opening…' }).click({ force: true });
+    expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
+    await page.evaluate(({ estimateId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await expect(page.getByTestId('adopted-output')).toBeVisible();
   });
 
   for (const output of [{ type: 'estimate', label: 'Estimate', id: ESTIMATE_ID }, { type: 'job', label: 'Job', id: JOB_ID }] as const) {
@@ -456,13 +579,14 @@ declare global {
       showNew: () => void;
       switchContext: (contractorId: string, clientName: 'A' | 'B') => void;
       setLegacy: (enabled: boolean) => void;
+      setLegacyPair: () => void;
       complete: (kind: 'list' | 'rpc' | 'output', name: string, data: unknown, clientName?: string) => void;
       completeLast: (kind: 'list' | 'rpc' | 'output', name: string, data: unknown, clientName?: string) => void;
       fail: (kind: 'list' | 'rpc' | 'output', name: string, clientName?: string) => void;
       reject: (kind: 'list' | 'rpc' | 'output', name: string, clientName?: string) => void;
       callCount: (kind: 'list' | 'rpc' | 'output', name: string, clientName?: string) => number;
       calls: () => Array<{ client: string; kind: string; name: string; args: Record<string, unknown>; settled: boolean }>;
-      snapshot: () => { backCount: number; openCount: number; target: Record<string, unknown> | null };
+      snapshot: () => { backCount: number; openCount: number; target: Record<string, unknown> | null; adoptedOutputs: string[]; activeOutput: string | null };
       envelope: (draftId: string, contractorId: string, title: string, overrides?: Record<string, unknown>) => Record<string, unknown>;
       row: (draftId: string, contractorId: string, title: string, overrides?: Record<string, unknown>) => Record<string, unknown>;
     };

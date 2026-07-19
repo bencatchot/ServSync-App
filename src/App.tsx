@@ -129,7 +129,7 @@ import {
 import { reviewModerationStatusPresentation } from './features/reviews/statusPresentation';
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
-import { DurableDraftWorkspace } from './features/drafts/DurableDraftWorkspace';
+import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
 import {
@@ -29274,7 +29274,7 @@ function ContractorDashboard({
     }
   };
 
-  const openDurableDraftOutput = async (type: 'estimate' | 'job', id: string) => {
+  const loadDurableDraftOutput = async (type: 'estimate' | 'job', id: string): Promise<DurableDraftLoadedOutput> => {
     if (!supabase) throw new Error('ServSync is not configured.');
     if (type === 'estimate') {
       let estimate = estimates.find(candidate => candidate.id === id) ?? null;
@@ -29286,15 +29286,22 @@ function ContractorDashboard({
           .single();
         if (estimateError) throw estimateError;
         estimate = data as Estimate;
-        setEstimates(previous => [estimate as Estimate, ...previous.filter(candidate => candidate.id !== id)]);
       }
-      openEstimateRecord(estimate);
-      return;
+      return { type: 'estimate', id, record: estimate };
     }
     const job = inspections.find(candidate => candidate.id === id) ?? await fetchDraftJobRecord(id);
     if (!job) throw new Error('Job not found.');
-    setInspections(previous => [job, ...previous.filter(candidate => candidate.id !== job.id)]);
-    openInspection(job);
+    return { type: 'job', id, record: job };
+  };
+
+  const adoptDurableDraftOutput = (output: DurableDraftLoadedOutput) => {
+    if (output.type === 'estimate') {
+      setEstimates(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
+      openEstimateRecord(output.record);
+      return;
+    }
+    setInspections(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
+    openInspection(output.record);
   };
 
   const saveDraftJobComposer = async () => {
@@ -38733,7 +38740,8 @@ function ContractorDashboard({
                                 setContractorJobsView('new_jobs');
                               }}
                               onBack={() => setContractorJobsViewAndScroll('overview')}
-                              onOpenOutput={openDurableDraftOutput}
+                              onLoadOutput={loadDurableDraftOutput}
+                              onAdoptOutput={adoptDurableDraftOutput}
                             />
                           ) : (
                             <DraftJobList
@@ -40430,7 +40438,8 @@ function ContractorDashboard({
                     setInspectionView('list');
                     setContractorJobsViewAndScroll('open_jobs');
                   }}
-                  onOpenOutput={openDurableDraftOutput}
+                  onLoadOutput={loadDurableDraftOutput}
+                  onAdoptOutput={adoptDurableDraftOutput}
                 />
               ) : (
                 <>

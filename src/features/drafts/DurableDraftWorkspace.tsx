@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
-import type { Inspection } from '../../types';
+import type { Estimate, Inspection } from '../../types';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { draftJobOptionsWithSavedSelection } from '../jobs/draftJobMappings';
 import { isComposerDraftJob } from '../jobs/jobRecordSelectors';
@@ -45,8 +45,13 @@ type DurableDraftWorkspaceProps = {
   onStartNew: () => void;
   onOpenTarget: (target: DurableDraftOpenTarget) => void;
   onBack: () => void;
-  onOpenOutput: (type: 'estimate' | 'job', id: string) => Promise<void>;
+  onLoadOutput: (type: 'estimate' | 'job', id: string) => Promise<DurableDraftLoadedOutput>;
+  onAdoptOutput: (output: DurableDraftLoadedOutput) => void;
 };
+
+export type DurableDraftLoadedOutput =
+  | { type: 'estimate'; id: string; record: Estimate }
+  | { type: 'job'; id: string; record: Inspection };
 
 function formatDraftTime(value: string | null) {
   if (!value) return '';
@@ -78,7 +83,8 @@ export function DurableDraftWorkspace({
   onStartNew,
   onOpenTarget,
   onBack,
-  onOpenOutput,
+  onLoadOutput,
+  onAdoptOutput,
 }: DurableDraftWorkspaceProps) {
   const [rows, setRows] = useState<DurableDraftListPresentation[]>([]);
   const [rowsOwner, setRowsOwner] = useState<{ client: DurableDraftSupabaseClient; contractorId: string | null } | null>(null);
@@ -96,7 +102,7 @@ export function DurableDraftWorkspace({
   const [openingTargetKey, setOpeningTargetKey] = useState<string | null>(null);
   const [openingOutputKey, setOpeningOutputKey] = useState<string | null>(null);
   const openingTargetLocks = useRef(new Set<string>());
-  const openingOutputLock = useRef<string | null>(null);
+  const openingOutputOperation = useRef<{ key: string; token: symbol } | null>(null);
   const saveLock = useRef(false);
   const saveOperation = useRef<symbol | null>(null);
   const listGeneration = useRef(0);
@@ -120,16 +126,16 @@ export function DurableDraftWorkspace({
       saveOperation.current = null;
       saveLock.current = false;
       openingTargetLocks.current.clear();
-      openingOutputLock.current = null;
+      openingOutputOperation.current = null;
     };
   }, []);
 
   useEffect(() => {
     openingTargetLocks.current.clear();
-    openingOutputLock.current = null;
+    openingOutputOperation.current = null;
     setOpeningTargetKey(null);
     setOpeningOutputKey(null);
-  }, [mode, client, capabilities.contractorId]);
+  }, [mode, client, capabilities.contractorId, target]);
 
   const loadList = useCallback(async () => {
     const contractorId = capabilities.contractorId;
@@ -367,27 +373,44 @@ export function DurableDraftWorkspace({
 
   const handleOpenOutput = async (type: 'estimate' | 'job', id: string) => {
     const key = `${type}:${id}`;
-    if (openingOutputLock.current || !id) return;
-    openingOutputLock.current = key;
+    if (openingOutputOperation.current || !id || !canonical?.draft.draftId) return;
+    const operation = { key, token: Symbol('durable-draft-output') };
+    openingOutputOperation.current = operation;
     const generation = editorGeneration.current;
     const contractorId = capabilities.contractorId;
+    const draftId = canonical.draft.draftId;
+    const capturedClient = client;
     const capturedTarget = context.current.target;
     const capturedTargetKey = context.current.targetKey;
+    const isCurrent = () => {
+      const current = context.current;
+      return mounted.current
+        && openingOutputOperation.current === operation
+        && generation === editorGeneration.current
+        && current.mode === 'editor'
+        && current.client === capturedClient
+        && current.contractorId === contractorId
+        && current.target === capturedTarget
+        && current.targetKey === capturedTargetKey
+        && capturedTarget?.kind === 'durable'
+        && capturedTarget.draftId === draftId
+        && canonical.draft.draftId === draftId;
+    };
     setOpeningOutputKey(key);
     setOutputError('');
     try {
-      await onOpenOutput(type, id);
+      const loaded = await onLoadOutput(type, id);
+      if (!isCurrent()) return;
+      if (loaded.type !== type || loaded.id !== id || loaded.record.id !== id) throw new Error('DRAFT_RESPONSE_INVALID');
+      onAdoptOutput(loaded);
     } catch {
-      const current = context.current;
-      if (!mounted.current
-        || generation !== editorGeneration.current
-        || current.contractorId !== contractorId
-        || current.target !== capturedTarget
-        || current.targetKey !== capturedTargetKey) return;
+      if (!isCurrent()) return;
       setOutputError(`The ${type === 'estimate' ? 'Estimate' : 'Job'} could not be opened. Try again.`);
     } finally {
-      if (openingOutputLock.current === key) openingOutputLock.current = null;
-      if (mounted.current) setOpeningOutputKey(previous => previous === key ? null : previous);
+      if (openingOutputOperation.current === operation) {
+        openingOutputOperation.current = null;
+        if (mounted.current) setOpeningOutputKey(previous => previous === key ? null : previous);
+      }
     }
   };
 
@@ -478,7 +501,11 @@ export function DurableDraftWorkspace({
         {unavailable ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This Draft created an {outputType === 'estimate' ? 'Estimate' : 'Job'} that is no longer available.</div> : null}
         {outputError ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{outputError}</div> : null}
         <div className="flex flex-wrap gap-2">
-          {canonical.draft.status === 'consumed' && outputType && liveOutputId ? <button type="button" onClick={() => void handleOpenOutput(outputType, liveOutputId)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white"><FileText size={16} /> Open {outputType === 'estimate' ? 'Estimate' : 'Job'}</button> : null}
+          {canonical.draft.status === 'consumed' && outputType && liveOutputId ? (
+            <button type="button" disabled={openingOutputKey !== null} onClick={() => void handleOpenOutput(outputType, liveOutputId)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {openingOutputKey === `${outputType}:${liveOutputId}` ? <><Loader2 className="animate-spin" size={16} /> Opening…</> : <><FileText size={16} /> Open {outputType === 'estimate' ? 'Estimate' : 'Job'}</>}
+            </button>
+          ) : null}
           <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
         </div>
       </section>

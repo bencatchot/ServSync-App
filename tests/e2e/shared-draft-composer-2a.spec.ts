@@ -48,7 +48,8 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(renderSource).toContain('<DurableDraftWorkspace');
     expect(renderSource).toContain('<DraftJobComposer');
     expect(renderSource).toContain('canManageDraftJobs');
-    expect(renderSource).toContain('onOpenOutput={openDurableDraftOutput}');
+    expect(renderSource).toContain('onLoadOutput={loadDurableDraftOutput}');
+    expect(renderSource).toContain('onAdoptOutput={adoptDurableDraftOutput}');
     expect(renderSource).not.toContain('contractorTab === \'drafts\'');
     expect(appSource).not.toContain("label: 'Start New Draft'");
   });
