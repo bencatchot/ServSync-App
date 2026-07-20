@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-19
 
+- Branch: `codex/durable-draft-launch-commitment-2c-c1`
+- Files changed: gated durable Draft workspace/composer launch orchestration, feature-local confirmation/state/error helpers, focused source/rendered tests, and the three planning documents.
+- Summary of change: Implemented Slice 2C-C1 in a draft PR after PR #319 merged. The default-off durable path now offers explicit `Create Estimate` or `Create Job` confirmation with output-specific capability checks, canonical save-before-launch, verified browser idempotency-attempt storage, same-key uncertain retry and remount/multi-tab recovery, canonical consumed adoption, active/consumed list synchronization, and the existing explicit Open Estimate/Open Job action. C1 never auto-launches or auto-opens an output, adds no Draft-to-Invoice path, and keeps private Draft content out of recovery storage.
+- Reason for change: The merged durable persistence workspace needed a bounded launch-commitment layer that preserves backend atomicity and idempotency guarantees before any automatic navigation or authenticated runtime closeout.
+- Tests/checks run: Pure launch-machine/error tests and more than fifty rendered C1 cases cover gate/capability boundaries, confirmation, local-new/dirty/clean save sequencing, storage failure, fresh/same-key/already-consumed outcomes, malformed/transport ambiguity, remount/multi-tab recovery, canonical consumed reconciliation, explicit output opening, and stale token/context ownership. Full validation results are recorded on the draft PR.
+- Known risks or follow-ups: Slice 2C-C2 still owns automatic post-launch output navigation and final navigation/mobile/accessibility polish. Slice 2C-D still owns authenticated Sandbox/Preview runtime and mobile validation. SQL is unchanged, no Supabase environment was accessed, Production durable Draft SQL remains unapplied, and all relevant gates remain default-off.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records merged 2C-B, the C1 launch-commitment scope, and the remaining C2/2C-D gates without marking the Draft-first workflow complete.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first sequence now records the approved 2C-C split and C1's explicit, recoverable, non-navigating launch boundary.
+
 - Branch: `codex/durable-draft-composer-integration-2c-b`
 - Files changed:
   - `src/App.tsx`
@@ -25,7 +38,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
   - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
   - `docs/servsync-master-plan/CHANGELOG.md`
-- Summary of change: Implemented Slice 2C-B in draft PR #319 so dedicated durable Draft state is authoritative only when the existing Shared Draft Composer and Draft Job gates are both enabled and Demo Presentation is off. The gated Jobs workspace supports atomic full-snapshot save, canonical resume, active and recently consumed lists, lazy legacy import with exact `legacy_inspection_id` de-duplication, contractor-private notes, capability-derived mutation controls, and read-only consumed/discarded/deleted-output presentation. Audit follow-ups normalize targetless restored editors, canonicalize first-save/import identity, reject stale list/save/resume/import results, clear incompatible hidden service-request identity, add guarded recovery actions, and split existing-output loading from generation-checked adoption so stale successes cannot navigate or clear newer token-owned locks. Rendered coverage exercises these races, including pre-import list completion. PR #318 is merged and Slice 2C-A is complete; Slice 2C-C launch controls and Slice 2C-D authenticated sandbox/Preview/mobile closeout remain separate.
+- Summary of change: Implemented Slice 2C-B in merged PR #319 so dedicated durable Draft state is authoritative only when the existing Shared Draft Composer and Draft Job gates are both enabled and Demo Presentation is off. The gated Jobs workspace supports atomic full-snapshot save, canonical resume, active and recently consumed lists, lazy legacy import with exact `legacy_inspection_id` de-duplication, contractor-private notes, capability-derived mutation controls, and read-only consumed/discarded/deleted-output presentation. Audit follow-ups normalize targetless restored editors, canonicalize first-save/import identity, reject stale list/save/resume/import results, clear incompatible hidden service-request identity, add guarded recovery actions, and split existing-output loading from generation-checked adoption so stale successes cannot navigate or clear newer token-owned locks. Rendered coverage exercises these races, including pre-import list completion. PR #318 is merged and Slice 2C-A is complete; Slice 2C-C was later split into C1/C2, while Slice 2C-D authenticated Sandbox/Preview/mobile closeout remains separate.
 - Reason for change: The merged durable database and frontend adapter foundations need a gated canonical Composer integration before launch UX can be added safely.
 - Tests/checks run:
   - Focused executable 2C-B tests cover gate combinations, canonical resume mapping, full-snapshot payloads, persisted/local item identity, explicit removals, reordering, duplicate-ID rejection, runtime list validation, legacy de-duplication, and safe structured error copy.
@@ -33,7 +46,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Known risks or follow-ups:
   - This slice adds no Create Estimate/Create Job launch control and never calls the launch adapter or launch-attempt utilities. Slice 2C-C remains required.
   - Gates remain default-off. No SQL, Supabase mutation, environment/Vercel change, Production SQL, or Production workflow change is included. Sandbox/Preview runtime and mobile validation remain Slice 2C-D.
-  - PR #319 remains open and draft pending an abbreviated read-only re-audit of the runtime-safety correction; it is not approved or merged by this entry.
+  - PR #319 subsequently passed final read-only verification and merged as `9f8e91adc08020c654be829400bd182d16dc8945`; Slice 2C-C remains separately gated work.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-035 now records gated durable save/resume/list/import and consumed presentation while keeping launch, runtime closeout, Production SQL, and rollout future.

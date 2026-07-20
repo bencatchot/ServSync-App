@@ -252,15 +252,18 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(workspace).toMatch(/await onLoadOutput[\s\S]*if \(!isCurrent\(\)\) return;[\s\S]*onAdoptOutput/);
   });
 
-  test('contains no active launch path, launch attempt mutation, or role-name policy', () => {
+  test('contains only the gated C1 launch path with no role-name policy or automatic output navigation', () => {
     const app = sourceFile('src/App.tsx');
     const workspace = sourceFile('src/features/drafts/DurableDraftWorkspace.tsx');
     const integration = sourceFile('src/features/drafts/durableDraftComposerIntegration.ts');
-    expect(workspace).not.toContain('launchContractorWorkDraft');
-    expect(workspace).not.toContain('recordDurableDraftLaunchSuccess');
-    expect(workspace).not.toContain('createDurableDraftLaunchAttempt');
-    expect(workspace).not.toContain('Create Estimate');
-    expect(workspace).not.toContain('Create Job');
+    const consumedAdoption = workspace.slice(workspace.indexOf('const adoptCanonicalConsumed'), workspace.indexOf('const handleLaunchFailure'));
+    expect(workspace).toContain('launchContractorWorkDraft');
+    expect(workspace).toContain('recordDurableDraftLaunchSuccess');
+    expect(workspace).toContain('createDurableDraftLaunchAttempt');
+    expect(workspace).toContain('launchEnabled');
+    expect(workspace).toContain('Do not create it again.');
+    expect(workspace).not.toContain('Create Invoice');
+    expect(consumedAdoption).not.toContain('onAdoptOutput');
     expect(app).not.toContain("from './features/drafts/durableDraftLaunchAttempt'");
     for (const role of ['field_tech', 'office', 'admin', 'viewer']) {
       expect(workspace).not.toContain(role);

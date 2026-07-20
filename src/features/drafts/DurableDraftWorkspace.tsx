@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react';
 import type { Estimate, Inspection } from '../../types';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
@@ -8,11 +8,19 @@ import { ContractorDraftComposer } from './ContractorDraftComposer';
 import {
   getContractorWorkDraft,
   importLegacyContractorWorkDraft,
+  launchContractorWorkDraft,
   listContractorWorkDrafts,
+  normalizeDurableDraftError,
   saveContractorWorkDraft,
+  DurableDraftError,
   type DurableDraftSupabaseClient,
 } from './durableDraftLaunchApi';
-import type { DurableDraftCompatibilityCapabilities } from './durableDraftLaunchTypes';
+import type {
+  ContractorWorkDraftLaunchOutput,
+  ContractorWorkDraftLaunchResult,
+  DurableDraftCompatibilityCapabilities,
+  DurableDraftLaunchAttemptRecord,
+} from './durableDraftLaunchTypes';
 import {
   durableDraftListRowsToPresentation,
   reconcileCanonicalSaveResponse,
@@ -29,6 +37,28 @@ import {
 } from './durableDraftComposerIntegration';
 import { validateSharedDraftComposerDraftForSave } from './draftComposerMappings';
 import type { SharedDraftComposerDraft } from './draftComposerTypes';
+import { DurableDraftLaunchConfirmation } from './DurableDraftLaunchConfirmation';
+import {
+  clearDefinitiveFailedDurableDraftLaunchAttempt,
+  createDurableDraftLaunchAttempt,
+  durableDraftLaunchAttemptKey,
+  readDurableDraftLaunchAttempt,
+  recordDurableDraftLaunchSuccess,
+  retainAmbiguousDurableDraftLaunchAttempt,
+  updateDurableDraftLaunchAttemptPhase,
+  type DurableDraftLaunchAttemptStorage,
+} from './durableDraftLaunchAttempt';
+import {
+  durableDraftLaunchAllowsEditing,
+  durableDraftLaunchCanRetry,
+  durableDraftLaunchIsBusy,
+  durableDraftLaunchReducer,
+  INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
+} from './durableDraftLaunchMachine';
+import {
+  classifyDurableDraftLaunchFailure,
+  durableDraftStorageUnavailableCopy,
+} from './durableDraftLaunchErrorCopy';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -45,8 +75,22 @@ type DurableDraftWorkspaceProps = {
   onStartNew: () => void;
   onOpenTarget: (target: DurableDraftOpenTarget) => void;
   onBack: () => void;
+  launchEnabled: boolean;
+  onRefreshCapabilities: () => Promise<DurableDraftCompatibilityCapabilities>;
   onLoadOutput: (type: 'estimate' | 'job', id: string) => Promise<DurableDraftLoadedOutput>;
   onAdoptOutput: (output: DurableDraftLoadedOutput) => void;
+};
+
+type DurableDraftLaunchOperation = {
+  token: symbol;
+  client: DurableDraftSupabaseClient;
+  contractorId: string;
+  draftId: string | null;
+  targetKey: string | null;
+  outputType: ContractorWorkDraftLaunchOutput;
+  editorGeneration: number;
+  rpcStarted: boolean;
+  idempotencyKey: string | null;
 };
 
 export type DurableDraftLoadedOutput =
@@ -68,6 +112,64 @@ function openTargetKey(target: DurableDraftOpenTarget | null) {
   return `${target.kind}:${target.kind === 'durable' ? target.draftId : target.inspectionId}`;
 }
 
+function browserLaunchAttemptStorage(): DurableDraftLaunchAttemptStorage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function launchCapability(capabilities: DurableDraftCompatibilityCapabilities, outputType: ContractorWorkDraftLaunchOutput) {
+  return outputType === 'estimate' ? capabilities.canLaunchEstimate : capabilities.canLaunchJob;
+}
+
+function validateDraftForLaunch(form: SharedDraftComposerDraft, canonical: DurableDraftCanonicalState | null) {
+  const saveValidation = validateSharedDraftComposerDraftForSave(form);
+  if (saveValidation) return saveValidation;
+  if (!form.intended_output) return 'Choose Estimate or Job before creating work from this Draft.';
+  if (!form.line_items.length) return 'Add at least one work item before creating work from this Draft.';
+  if (canonical && canonical.draft.status !== 'active') return 'This Draft is read-only and can no longer create work.';
+  const persistedIds = form.line_items.flatMap(item => item.job_work_item_id ? [item.job_work_item_id] : []);
+  if (new Set(persistedIds).size !== persistedIds.length) return 'This Draft contains duplicate saved work items. Refresh before trying again.';
+  return '';
+}
+
+function canonicalListPresentation(state: DurableDraftCanonicalState): DurableDraftListPresentation {
+  const { draft } = state;
+  if (!draft.draftId || !draft.contractorId || !draft.createdAt || !draft.updatedAt) {
+    throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
+  }
+  const liveOutputId = draft.launchedOutputType === 'estimate'
+    ? draft.launchedEstimateId
+    : draft.launchedOutputType === 'job'
+      ? draft.launchedJobId
+      : null;
+  const outputIdSnapshot = draft.launchedOutputType === 'estimate'
+    ? draft.launchedEstimateIdSnapshot
+    : draft.launchedOutputType === 'job'
+      ? draft.launchedJobIdSnapshot
+      : null;
+  return {
+    draftId: draft.draftId,
+    contractorId: draft.contractorId,
+    status: draft.status,
+    intendedOutput: draft.intendedOutput,
+    title: draft.title,
+    subjectType: draft.subject.type,
+    subjectLabel: draft.subjectDisplayNameSnapshot,
+    propertyLabel: draft.propertyDisplaySnapshot,
+    legacyInspectionId: draft.legacyInspectionId,
+    launchedOutputType: draft.launchedOutputType,
+    liveOutputId,
+    outputIdSnapshot,
+    outputAvailable: Boolean(liveOutputId),
+    launchedAt: draft.launchedAt,
+    createdAt: draft.createdAt,
+    updatedAt: draft.updatedAt,
+  };
+}
+
 export function DurableDraftWorkspace({
   client,
   mode,
@@ -83,6 +185,8 @@ export function DurableDraftWorkspace({
   onStartNew,
   onOpenTarget,
   onBack,
+  launchEnabled,
+  onRefreshCapabilities,
   onLoadOutput,
   onAdoptOutput,
 }: DurableDraftWorkspaceProps) {
@@ -101,8 +205,12 @@ export function DurableDraftWorkspace({
   const [outputError, setOutputError] = useState('');
   const [openingTargetKey, setOpeningTargetKey] = useState<string | null>(null);
   const [openingOutputKey, setOpeningOutputKey] = useState<string | null>(null);
+  const [launchState, dispatchLaunch] = useReducer(durableDraftLaunchReducer, INITIAL_DURABLE_DRAFT_LAUNCH_STATE);
+  const [launchProof, setLaunchProof] = useState<ContractorWorkDraftLaunchResult | null>(null);
   const openingTargetLocks = useRef(new Set<string>());
   const openingOutputOperation = useRef<{ key: string; token: symbol } | null>(null);
+  const launchOperation = useRef<DurableDraftLaunchOperation | null>(null);
+  const reconcileRecoveredAttempt = useRef<(attempt: DurableDraftLaunchAttemptRecord) => void>(() => undefined);
   const saveLock = useRef(false);
   const saveOperation = useRef<symbol | null>(null);
   const listGeneration = useRef(0);
@@ -111,10 +219,11 @@ export function DurableDraftWorkspace({
   const mounted = useRef(false);
   const targetlessNormalized = useRef(false);
   const adoptedDraftId = useRef<string | null>(null);
-  const context = useRef({ client, contractorId: capabilities.contractorId, mode, target, targetKey: openTargetKey(target) });
+  const recoveredAttemptKey = useRef<string | null>(null);
+  const context = useRef({ client, contractorId: capabilities.contractorId, mode, target, targetKey: openTargetKey(target), launchEnabled });
   const errorSummaryRef = useRef<HTMLDivElement | null>(null);
   const targetKey = openTargetKey(target);
-  context.current = { client, contractorId: capabilities.contractorId, mode, target, targetKey };
+  context.current = { client, contractorId: capabilities.contractorId, mode, target, targetKey, launchEnabled };
 
   useEffect(() => {
     mounted.current = true;
@@ -127,6 +236,7 @@ export function DurableDraftWorkspace({
       saveLock.current = false;
       openingTargetLocks.current.clear();
       openingOutputOperation.current = null;
+      launchOperation.current = null;
     };
   }, []);
 
@@ -135,6 +245,19 @@ export function DurableDraftWorkspace({
     openingOutputOperation.current = null;
     setOpeningTargetKey(null);
     setOpeningOutputKey(null);
+    const operation = launchOperation.current;
+    const preservesCanonicalizedTarget = operation
+      && mode === 'editor'
+      && target?.kind === 'durable'
+      && target.draftId === operation.draftId
+      && client === operation.client
+      && capabilities.contractorId === operation.contractorId;
+    if (!preservesCanonicalizedTarget) {
+      launchOperation.current = null;
+      recoveredAttemptKey.current = null;
+      setLaunchProof(null);
+      dispatchLaunch({ type: 'RESET' });
+    }
   }, [mode, client, capabilities.contractorId, target]);
 
   const loadList = useCallback(async () => {
@@ -289,8 +412,79 @@ export function DurableDraftWorkspace({
     };
   }, [mode, target, targetKey, capabilityLoading, capabilities.canImportLegacyDraft, capabilities.canPersistDraft, capabilities.contractorId, client, onOpenTarget]);
 
+  useEffect(() => {
+    const draftId = canonical?.draft.draftId;
+    const contractorId = capabilities.contractorId;
+    if (!launchEnabled || mode !== 'editor' || target?.kind !== 'durable' || !draftId || !contractorId || canonical.draft.status !== 'active') return;
+    const recoveryKey = `${contractorId}:${draftId}:${client === context.current.client ? 'current' : 'stale'}`;
+    if (recoveredAttemptKey.current === recoveryKey || launchOperation.current) return;
+    recoveredAttemptKey.current = recoveryKey;
+    const storage = browserLaunchAttemptStorage();
+    const fallbackOutput = canonical.draft.intendedOutput ?? 'job';
+    if (!storage) {
+      dispatchLaunch({ type: 'RECOVER', outputType: fallbackOutput, phase: 'storage_unavailable', message: durableDraftStorageUnavailableCopy(fallbackOutput) });
+      return;
+    }
+    const result = readDurableDraftLaunchAttempt(storage, contractorId, draftId);
+    if (result.status === 'absent') return;
+    if (result.status === 'unavailable' || result.status === 'invalid') {
+      dispatchLaunch({ type: 'RECOVER', outputType: fallbackOutput, phase: 'storage_unavailable', message: 'ServSync could not safely read the saved launch recovery state.' });
+      return;
+    }
+    const attempt = result.attempt;
+    if (attempt.phase === 'prepared') {
+      dispatchLaunch({ type: 'RECOVER', outputType: attempt.outputType, phase: 'preparing', idempotencyKey: attempt.idempotencyKey, message: 'An unused launch attempt is ready to continue.' });
+      return;
+    }
+    if (attempt.phase === 'launching') {
+      retainAmbiguousDurableDraftLaunchAttempt(storage, contractorId, draftId);
+    }
+    if (attempt.phase === 'succeeded') {
+      reconcileRecoveredAttempt.current(attempt);
+      return;
+    }
+    if (attempt.phase === 'launching' || attempt.phase === 'ambiguous') {
+      dispatchLaunch({
+        type: 'RECOVER',
+        outputType: attempt.outputType,
+        phase: 'ambiguous',
+        idempotencyKey: attempt.idempotencyKey,
+        message: 'ServSync could not confirm whether the output was created.',
+      });
+    }
+  }, [launchEnabled, mode, target, canonical, capabilities.contractorId, client]);
+
+  useEffect(() => {
+    const draftId = canonical?.draft.draftId;
+    const contractorId = capabilities.contractorId;
+    if (!launchEnabled || mode !== 'editor' || target?.kind !== 'durable' || !draftId || !contractorId) return;
+    const storage = browserLaunchAttemptStorage();
+    if (!storage) return;
+    const scopedKey = durableDraftLaunchAttemptKey(contractorId, draftId);
+    const handleStorage = (event: StorageEvent) => {
+      if (!context.current.launchEnabled || event.key !== scopedKey) return;
+      const result = readDurableDraftLaunchAttempt(storage, contractorId, draftId);
+      if (result.status !== 'found') return;
+      if (result.attempt.phase === 'succeeded') {
+        reconcileRecoveredAttempt.current(result.attempt);
+        return;
+      }
+      if (result.attempt.phase === 'launching' || result.attempt.phase === 'ambiguous') {
+        dispatchLaunch({
+          type: 'RECOVER',
+          outputType: result.attempt.outputType,
+          phase: 'ambiguous',
+          idempotencyKey: result.attempt.idempotencyKey,
+          message: 'Another ServSync tab may be creating this output.',
+        });
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [launchEnabled, mode, target, canonical?.draft.draftId, capabilities.contractorId]);
+
   const handleChange = (next: SharedDraftComposerDraft) => {
-    if (canonical?.draft.status && canonical.draft.status !== 'active') return;
+    if ((canonical?.draft.status && canonical.draft.status !== 'active') || !durableDraftLaunchAllowsEditing(launchState)) return;
     setForm(next);
     setDirty(true);
     setSaveState('dirty');
@@ -298,7 +492,7 @@ export function DurableDraftWorkspace({
   };
 
   const handleSave = async () => {
-    if (!form || !capabilities.contractorId || !capabilities.canPersistDraft || saveLock.current) return;
+    if (!form || !capabilities.contractorId || !capabilities.canPersistDraft || saveLock.current || launchOperation.current) return;
     const validation = validateSharedDraftComposerDraftForSave(form);
     if (validation) {
       setFeedback({ tone: 'error', title: validation, testId: 'durable-draft-save-error' });
@@ -366,7 +560,366 @@ export function DurableDraftWorkspace({
     }
   };
 
+  const launchOperationIsCurrent = (operation: DurableDraftLaunchOperation) => {
+    const current = context.current;
+    const expectedTarget = operation.draftId ? `durable:${operation.draftId}` : operation.targetKey;
+    return mounted.current
+      && launchOperation.current === operation
+      && current.launchEnabled
+      && current.mode === 'editor'
+      && current.client === operation.client
+      && current.contractorId === operation.contractorId
+      && current.targetKey === expectedTarget
+      && editorGeneration.current === operation.editorGeneration;
+  };
+
+  const refreshRowsAfterLaunch = async (
+    operation: DurableDraftLaunchOperation,
+    canonicalState: DurableDraftCanonicalState,
+  ) => {
+    const localRow = canonicalListPresentation(canonicalState);
+    setRows(previous => [localRow, ...previous.filter(row => row.draftId !== localRow.draftId)]
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.draftId.localeCompare(right.draftId)));
+    setRowsOwner({ client: operation.client, contractorId: operation.contractorId });
+    const generation = ++listGeneration.current;
+    try {
+      const listRows = await listContractorWorkDrafts(operation.client, { statuses: ['active', 'consumed'] });
+      const current = context.current;
+      if (!mounted.current
+        || generation !== listGeneration.current
+        || current.client !== operation.client
+        || current.contractorId !== operation.contractorId) return;
+      setRows(durableDraftListRowsToPresentation(listRows));
+      setRowsOwner({ client: operation.client, contractorId: operation.contractorId });
+    } catch {
+      // The canonical consumed row remains authoritative until a later list refresh succeeds.
+    }
+  };
+
+  const adoptCanonicalConsumed = async (
+    operation: DurableDraftLaunchOperation,
+    result?: ContractorWorkDraftLaunchResult,
+  ) => {
+    if (!operation.draftId) throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
+    setLaunchProof(result ?? launchProof);
+    setDirty(false);
+    setRemovedItemIds([]);
+    setSaveState('clean');
+    saveOperation.current = null;
+    saveLock.current = false;
+    listGeneration.current += 1;
+    dispatchLaunch({ type: 'CONSUMED_PROOF', operationToken: operation.token, alreadyConsumed: result?.status === 'already_consumed' });
+    const envelope = await getContractorWorkDraft(operation.client, operation.draftId);
+    const nextCanonical = canonicalStateFromEnvelope(envelope);
+    if (nextCanonical.draft.status !== 'consumed'
+      || nextCanonical.draft.draftId !== operation.draftId
+      || (result && (
+        nextCanonical.draft.launchedOutputType !== result.output_type
+        || (result.output_type === 'estimate' && nextCanonical.draft.launchedEstimateIdSnapshot !== result.output_id_snapshot)
+        || (result.output_type === 'job' && nextCanonical.draft.launchedJobIdSnapshot !== result.output_id_snapshot)
+      ))) {
+      throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
+    }
+    if (!launchOperationIsCurrent(operation)) return;
+    setCanonical(nextCanonical);
+    setForm(durableCanonicalStateToComposer(nextCanonical));
+    setFeedback({
+      tone: 'success',
+      title: `${nextCanonical.draft.launchedOutputType === 'estimate' ? 'Estimate' : 'Job'} created.`,
+      body: 'The Draft is now consumed and read-only.',
+      testId: 'durable-draft-launch-success',
+    });
+    dispatchLaunch({ type: 'CONSUMED', operationToken: operation.token });
+    launchOperation.current = null;
+    void refreshRowsAfterLaunch(operation, nextCanonical);
+  };
+
+  const handleLaunchFailure = async (
+    operation: DurableDraftLaunchOperation,
+    error: unknown,
+  ) => {
+    if (!launchOperationIsCurrent(operation)) return;
+    const storage = browserLaunchAttemptStorage();
+    const failure = classifyDurableDraftLaunchFailure(error);
+    const preLaunchMessage = !operation.rpcStarted && failure.kind === 'ambiguous'
+      ? error instanceof DurableDraftError && error.phase === 'capability'
+        ? 'ServSync could not verify your current access. No output was created.'
+        : 'ServSync could not safely prepare this Draft. No output was created.'
+      : failure.message;
+    if (failure.kind === 'reconcile' && operation.draftId) {
+      try {
+        const envelope = await getContractorWorkDraft(operation.client, operation.draftId);
+        const nextCanonical = canonicalStateFromEnvelope(envelope);
+        if (!launchOperationIsCurrent(operation)) return;
+        if (nextCanonical.draft.status === 'consumed') {
+          setCanonical(nextCanonical);
+          setForm(durableCanonicalStateToComposer(nextCanonical));
+          setDirty(false);
+          setRemovedItemIds([]);
+          dispatchLaunch({ type: 'CONSUMED', operationToken: operation.token });
+          launchOperation.current = null;
+          void refreshRowsAfterLaunch(operation, nextCanonical);
+          return;
+        }
+      } catch {
+        // Fall through to the safe failure state; the server remains authoritative.
+      }
+    }
+    if (operation.rpcStarted && (failure.kind === 'ambiguous' || failure.kind === 'unknown')) {
+      if (storage && operation.draftId) retainAmbiguousDurableDraftLaunchAttempt(storage, operation.contractorId, operation.draftId);
+      dispatchLaunch({
+        type: 'FAIL',
+        operationToken: operation.token,
+        phase: 'ambiguous',
+        message: failure.message,
+        idempotencyKey: operation.idempotencyKey,
+      });
+      setFeedback({ tone: 'error', title: failure.message, body: 'Retry uses the same protected attempt.', testId: 'durable-draft-launch-ambiguous' });
+    } else {
+      const preserveRecoveredKey = Boolean(operation.idempotencyKey && !operation.rpcStarted);
+      if (!preserveRecoveredKey && storage && operation.draftId) clearDefinitiveFailedDurableDraftLaunchAttempt(storage, operation.contractorId, operation.draftId);
+      dispatchLaunch({
+        type: 'FAIL',
+        operationToken: operation.token,
+        phase: failure.kind === 'denied' ? 'permission_denied' : 'fixable_failure',
+        message: preLaunchMessage,
+        idempotencyKey: preserveRecoveredKey ? operation.idempotencyKey : null,
+      });
+      setFeedback({ tone: 'error', title: preLaunchMessage, testId: 'durable-draft-launch-error' });
+    }
+    launchOperation.current = null;
+    queueMicrotask(() => errorSummaryRef.current?.focus());
+  };
+
+  const handleOpenLaunchConfirmation = () => {
+    if (!launchEnabled || capabilityLoading || saveLock.current || saveState === 'saving' || !form || !capabilities.contractorId || !capabilities.canPersistDraft) return;
+    const outputType = form.intended_output;
+    if (!outputType) return;
+    const validation = validateDraftForLaunch(form, canonical);
+    if (validation) {
+      setFeedback({ tone: 'error', title: validation, testId: 'durable-draft-launch-error' });
+      queueMicrotask(() => errorSummaryRef.current?.focus());
+      return;
+    }
+    if (!launchCapability(capabilities, outputType)) {
+      setFeedback({ tone: 'error', title: `Your current access does not allow creating this ${outputType === 'estimate' ? 'Estimate' : 'Job'}.`, testId: 'durable-draft-launch-error' });
+      return;
+    }
+    const storage = browserLaunchAttemptStorage();
+    try {
+      if (!storage) throw new Error('unavailable');
+      void storage.length;
+      if (canonical?.draft.draftId) {
+        const existing = readDurableDraftLaunchAttempt(storage, capabilities.contractorId, canonical.draft.draftId);
+        if (existing.status === 'unavailable' || existing.status === 'invalid') throw new Error('unavailable');
+        if (existing.status === 'found' && existing.attempt.outputType !== outputType) {
+          setFeedback({ tone: 'error', title: 'ServSync must resolve the existing output attempt before the intended output can change.', testId: 'durable-draft-launch-error' });
+          return;
+        }
+      }
+    } catch {
+      const message = durableDraftStorageUnavailableCopy(outputType);
+      dispatchLaunch({ type: 'RECOVER', outputType, phase: 'storage_unavailable', message });
+      setFeedback({ tone: 'error', title: message, testId: 'durable-draft-launch-storage-error' });
+      return;
+    }
+    dispatchLaunch({ type: 'OPEN_CONFIRMATION', outputType });
+  };
+
+  const handleConfirmLaunch = async () => {
+    if (!launchEnabled || saveLock.current || launchOperation.current || launchState.phase !== 'confirming' || !launchState.outputType || !form || !capabilities.contractorId) return;
+    const operation: DurableDraftLaunchOperation = {
+      token: Symbol('durable-draft-launch'),
+      client,
+      contractorId: capabilities.contractorId,
+      draftId: canonical?.draft.draftId ?? null,
+      targetKey,
+      outputType: launchState.outputType,
+      editorGeneration: editorGeneration.current,
+      rpcStarted: false,
+      idempotencyKey: null,
+    };
+    launchOperation.current = operation;
+    const needsSave = !canonical?.draft.draftId || dirty;
+    dispatchLaunch({ type: 'START', outputType: operation.outputType, operationToken: operation.token, needsSave });
+    setFeedback(null);
+    try {
+      let currentCanonical = canonical;
+      if (needsSave) {
+        const prepared = prepareDurableDraftSave({
+          form,
+          current: canonical,
+          contractorId: operation.contractorId,
+          removedDurableItemIds: removedItemIds,
+        });
+        const response = await saveContractorWorkDraft(operation.client, prepared.payload);
+        const reconciled = reconcileCanonicalSaveResponse(prepared.submitted, response, removedItemIds);
+        if (!launchOperationIsCurrent(operation)) return;
+        const draftId = reconciled.draft.draftId;
+        if (!draftId || reconciled.draft.contractorId !== operation.contractorId || reconciled.draft.status !== 'active') {
+          throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'save');
+        }
+        currentCanonical = reconciled;
+        operation.draftId = draftId;
+        operation.targetKey = `durable:${draftId}`;
+        setCanonical(reconciled);
+        setForm(durableCanonicalStateToComposer(reconciled));
+        setRemovedItemIds([]);
+        setDirty(false);
+        setSaveState('saved');
+        if (target?.kind === 'new') {
+          adoptedDraftId.current = draftId;
+          onOpenTarget({ kind: 'durable', draftId });
+          await new Promise(resolve => setTimeout(resolve, 0));
+          operation.editorGeneration = editorGeneration.current;
+        }
+        if (!launchOperationIsCurrent(operation)) return;
+        dispatchLaunch({ type: 'SAVED', operationToken: operation.token });
+      }
+      if (!operation.draftId || currentCanonical?.draft.status !== 'active' || currentCanonical.draft.intendedOutput !== operation.outputType) {
+        throw normalizeDurableDraftError({ message: 'DRAFT_NOT_ACTIVE' }, 'launch');
+      }
+      const refreshedCapabilities = await onRefreshCapabilities();
+      if (!launchOperationIsCurrent(operation)) return;
+      if (refreshedCapabilities.contractorId !== operation.contractorId
+        || !refreshedCapabilities.canPersistDraft
+        || !launchCapability(refreshedCapabilities, operation.outputType)) {
+        throw normalizeDurableDraftError({ message: 'DRAFT_PERMISSION_DENIED' }, 'launch');
+      }
+      const storage = browserLaunchAttemptStorage();
+      if (!storage) throw new Error('DRAFT_LAUNCH_STORAGE_UNAVAILABLE');
+      const existing = readDurableDraftLaunchAttempt(storage, operation.contractorId, operation.draftId);
+      if (existing.status === 'unavailable' || existing.status === 'invalid') throw new Error('DRAFT_LAUNCH_STORAGE_UNAVAILABLE');
+      const preparedAttempt = existing.status === 'found'
+        ? existing.attempt.outputType === operation.outputType ? { status: 'success' as const, attempt: existing.attempt } : { status: 'invalid' as const }
+        : createDurableDraftLaunchAttempt(storage, {
+            contractorId: operation.contractorId,
+            draftId: operation.draftId,
+            outputType: operation.outputType,
+          });
+      if (preparedAttempt.status !== 'success') throw new Error('DRAFT_LAUNCH_STORAGE_UNAVAILABLE');
+      dispatchLaunch({ type: 'ATTEMPT_READY', operationToken: operation.token, idempotencyKey: preparedAttempt.attempt.idempotencyKey });
+      operation.idempotencyKey = preparedAttempt.attempt.idempotencyKey;
+      const launchingAttempt = updateDurableDraftLaunchAttemptPhase(storage, operation.contractorId, operation.draftId, 'launching');
+      if (launchingAttempt.status !== 'success' || launchingAttempt.attempt.idempotencyKey !== preparedAttempt.attempt.idempotencyKey) {
+        throw new Error('DRAFT_LAUNCH_STORAGE_UNAVAILABLE');
+      }
+      if (!launchOperationIsCurrent(operation)) return;
+      operation.rpcStarted = true;
+      dispatchLaunch({ type: 'RPC_STARTED', operationToken: operation.token });
+      const result = await launchContractorWorkDraft(operation.client, {
+        draft_id: operation.draftId,
+        intended_output: operation.outputType,
+        idempotency_key: launchingAttempt.attempt.idempotencyKey,
+      });
+      if (!launchOperationIsCurrent(operation)) return;
+      dispatchLaunch({ type: 'RESPONSE_RECEIVED', operationToken: operation.token });
+      const recorded = recordDurableDraftLaunchSuccess(storage, operation.contractorId, operation.draftId, result);
+      if (recorded.status !== 'success') {
+        setFeedback({ tone: 'info', title: 'The output was created, but browser recovery state could not be updated.', testId: 'durable-draft-launch-storage-warning' });
+      }
+      try {
+        await adoptCanonicalConsumed(operation, result);
+      } catch {
+        if (!launchOperationIsCurrent(operation)) return;
+        const message = 'The output was created, but ServSync could not refresh the Draft details.';
+        dispatchLaunch({ type: 'RECONCILE_FAILED', operationToken: operation.token, message });
+        setFeedback({ tone: 'error', title: message, body: 'Retry refreshing the Draft. Do not create it again.', testId: 'durable-draft-reconcile-error' });
+        launchOperation.current = null;
+      }
+    } catch (error) {
+      if (error instanceof Error && (
+        error.message === 'DRAFT_LAUNCH_STORAGE_UNAVAILABLE'
+        || error.message.startsWith('DRAFT_IDEMPOTENCY_')
+        || error.message.startsWith('DRAFT_LAUNCH_ATTEMPT_')
+      )) {
+        if (!launchOperationIsCurrent(operation)) return;
+        const message = durableDraftStorageUnavailableCopy(operation.outputType);
+        dispatchLaunch({ type: 'FAIL', operationToken: operation.token, phase: 'storage_unavailable', message, idempotencyKey: null });
+        setFeedback({ tone: 'error', title: message, testId: 'durable-draft-launch-storage-error' });
+        launchOperation.current = null;
+        return;
+      }
+      await handleLaunchFailure(operation, error);
+    }
+  };
+
+  const handleDiscardPreparedLaunch = () => {
+    if (!launchEnabled || launchState.phase !== 'preparing' || !canonical?.draft.draftId || !capabilities.contractorId) return;
+    const storage = browserLaunchAttemptStorage();
+    if (!storage) return;
+    const cleared = clearDefinitiveFailedDurableDraftLaunchAttempt(storage, capabilities.contractorId, canonical.draft.draftId);
+    if (cleared.status === 'success' && cleared.removed) {
+      dispatchLaunch({ type: 'RESET' });
+      setFeedback({ tone: 'info', title: 'The unused launch attempt was discarded.' });
+    }
+  };
+
+  const handleRetryConsumedReconciliation = async () => {
+    if (!launchEnabled || launchOperation.current || !launchProof || !canonical?.draft.draftId || !capabilities.contractorId) return;
+    const operation: DurableDraftLaunchOperation = {
+      token: Symbol('durable-draft-reconcile'),
+      client,
+      contractorId: capabilities.contractorId,
+      draftId: canonical.draft.draftId,
+      targetKey,
+      outputType: launchProof.output_type,
+      editorGeneration: editorGeneration.current,
+      rpcStarted: true,
+      idempotencyKey: launchState.idempotencyKey,
+    };
+    launchOperation.current = operation;
+    dispatchLaunch({ type: 'RECONCILE_RETRY', outputType: operation.outputType, operationToken: operation.token, idempotencyKey: operation.idempotencyKey });
+    try {
+      await adoptCanonicalConsumed(operation, launchProof);
+    } catch {
+      if (!launchOperationIsCurrent(operation)) return;
+      const message = 'The output was created, but ServSync still could not refresh the Draft details.';
+      dispatchLaunch({ type: 'RECONCILE_FAILED', operationToken: operation.token, message });
+      setFeedback({ tone: 'error', title: message, body: 'Try refreshing the Draft again. Do not create it again.', testId: 'durable-draft-reconcile-error' });
+      launchOperation.current = null;
+    }
+  };
+
+  reconcileRecoveredAttempt.current = attempt => {
+    if (!launchEnabled || launchOperation.current || !canonical?.draft.draftId || !capabilities.contractorId) return;
+    if (attempt.contractorId !== capabilities.contractorId || attempt.draftId !== canonical.draft.draftId) return;
+    const operation: DurableDraftLaunchOperation = {
+      token: Symbol('durable-draft-recovered-success'),
+      client,
+      contractorId: attempt.contractorId,
+      draftId: attempt.draftId,
+      targetKey,
+      outputType: attempt.outputType,
+      editorGeneration: editorGeneration.current,
+      rpcStarted: true,
+      idempotencyKey: attempt.idempotencyKey,
+    };
+    launchOperation.current = operation;
+    dispatchLaunch({
+      type: 'RECONCILE_RETRY',
+      outputType: attempt.outputType,
+      operationToken: operation.token,
+      idempotencyKey: attempt.idempotencyKey,
+    });
+    void adoptCanonicalConsumed(operation).catch(() => {
+      if (!launchOperationIsCurrent(operation)) return;
+      const message = 'ServSync could not refresh the completed Draft. Retry with the same protected attempt.';
+      dispatchLaunch({
+        type: 'FAIL',
+        operationToken: operation.token,
+        phase: 'ambiguous',
+        message,
+        idempotencyKey: attempt.idempotencyKey,
+      });
+      setFeedback({ tone: 'error', title: message, testId: 'durable-draft-launch-ambiguous' });
+      launchOperation.current = null;
+    });
+  };
+
   const handleBack = () => {
+    if ((durableDraftLaunchIsBusy(launchState) || launchState.phase === 'ambiguous')
+      && !window.confirm('This action may still complete. Leave this Draft and check its status when you return?')) return;
     if (dirty && !window.confirm('Discard unsaved local changes and return to Work? The last saved Draft will remain available.')) return;
     onBack();
   };
@@ -477,6 +1030,22 @@ export function DurableDraftWorkspace({
   if (!form) {
     return <div ref={errorSummaryRef} tabIndex={-1} className="space-y-3 outline-none">{feedback ? <div role="alert" data-testid={feedback.testId} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{feedback.title}</div> : null}<button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Back to Work</button></div>;
   }
+  if (launchProof && canonical?.draft.status === 'active') {
+    const label = launchProof.output_type === 'estimate' ? 'Estimate' : 'Job';
+    return (
+      <section className="space-y-4" data-testid="durable-draft-consumed-reconciliation">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <h2 className="text-xl font-bold text-slate-950">{label} created</h2>
+          <p className="mt-2 text-sm text-slate-700">The Draft is consumed and read-only. ServSync is refreshing its canonical details.</p>
+        </div>
+        {feedback ? <div role="alert" data-testid={feedback.testId} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p className="font-semibold">{feedback.title}</p>{feedback.body ? <p className="mt-1">{feedback.body}</p> : null}</div> : null}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void handleRetryConsumedReconciliation()} disabled={durableDraftLaunchIsBusy(launchState)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Refresh Draft status</button>
+          <button type="button" onClick={onBack} className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Back to Work</button>
+        </div>
+      </section>
+    );
+  }
   if (canonical && (canonical.draft.status !== 'active' || !capabilities.canPersistDraft)) {
     const outputType = canonical.draft.launchedOutputType;
     const liveOutputId = outputType === 'estimate' ? canonical.draft.launchedEstimateId : canonical.draft.launchedJobId;
@@ -488,6 +1057,7 @@ export function DurableDraftWorkspace({
         : 'Active Draft · Read only';
     return (
       <section className="space-y-4" data-testid="durable-draft-read-only-summary">
+        {feedback ? <div role={feedback.tone === 'error' ? 'alert' : 'status'} data-testid={feedback.testId} className={`rounded-lg border p-3 text-sm ${feedback.tone === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-900'}`}><p className="font-semibold">{feedback.title}</p>{feedback.body ? <p className="mt-1">{feedback.body}</p> : null}</div> : null}
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold text-slate-950">{canonical.draft.title || 'Untitled Draft'}</h2><span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">{statusLabel}</span></div>
           <p className="mt-2 text-sm text-slate-600">{canonical.draft.subjectDisplayNameSnapshot}{canonical.draft.propertyDisplaySnapshot ? ` · ${canonical.draft.propertyDisplaySnapshot}` : ''}</p>
@@ -532,11 +1102,37 @@ export function DurableDraftWorkspace({
       property: canonical?.draft.propertyDisplaySnapshot || 'Saved property on this Draft',
     },
   );
+  const outputType = form.intended_output;
+  const outputAuthority = outputType ? launchCapability(capabilities, outputType) : false;
+  const launchBusy = durableDraftLaunchIsBusy(launchState);
+  const launchFrozen = !durableDraftLaunchAllowsEditing(launchState);
+  const launchLabel = launchEnabled && capabilities.canPersistDraft && outputType
+    ? `Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+    : null;
+  const recoveryLabel = durableDraftLaunchCanRetry(launchState) && outputType
+    ? `Retry Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+    : launchState.phase === 'preparing' && launchState.idempotencyKey && outputType
+      ? `Continue Create ${outputType === 'estimate' ? 'Estimate' : 'Job'}`
+      : null;
+  const launchDisabledReason = outputType && launchEnabled && capabilities.canPersistDraft && !outputAuthority
+    ? `Your current access does not allow creating this ${outputType === 'estimate' ? 'Estimate' : 'Job'}. You can still save the Draft.`
+    : launchState.phase === 'permission_denied'
+      ? launchState.message
+    : launchState.phase === 'storage_unavailable'
+      ? launchState.message
+      : launchState.phase === 'ambiguous'
+        ? launchState.message
+        : '';
+  const selectedOptions = form.subject_type === 'connected' ? connectedOptionsWithSavedSelection : localOptionsWithSavedSelection;
+  const selectedCustomerId = form.subject_type === 'connected' ? form.homeowner_user_id : form.local_contact_id;
+  const selectedPropertyId = form.subject_type === 'connected' ? form.home_id : form.local_home_id;
+  const confirmationCustomer = selectedOptions.find(option => option.id === selectedCustomerId);
+  const confirmationProperty = confirmationCustomer?.properties.find(property => property.id === selectedPropertyId);
 
   return (
     <div className="space-y-3">
       <div ref={errorSummaryRef} tabIndex={-1} className="outline-none" />
-      <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
+      <div aria-live="polite" className="sr-only">{saveState === 'saving' ? 'Saving Draft' : launchState.phase === 'preparing' ? 'Preparing launch protection' : launchState.phase === 'launching' ? `Creating ${outputType === 'estimate' ? 'Estimate' : 'Job'}` : launchState.phase === 'reconciling_consumed' ? 'Refreshing consumed Draft' : saveState === 'saved' ? 'Draft saved' : saveState === 'failed' ? 'Draft save failed' : ''}</div>
       <ContractorDraftComposer
         draft={form}
         connectedOptions={connectedOptionsWithSavedSelection}
@@ -544,11 +1140,31 @@ export function DurableDraftWorkspace({
         currentDraftId={canonical?.draft.draftId ?? null}
         canSave={capabilities.canPersistDraft && saveState !== 'saving'}
         saving={saveState === 'saving'}
+        interactionDisabled={launchFrozen}
+        launchLabel={launchLabel}
+        launchDisabled={!outputAuthority || launchBusy || saveState === 'saving' || launchState.phase === 'permission_denied' || launchState.phase === 'storage_unavailable'}
+        launchDisabledReason={launchDisabledReason}
+        launchBusy={launchBusy}
+        launchRecoveryLabel={recoveryLabel}
         feedback={feedback}
         onChange={handleChange}
         onSave={() => void handleSave()}
+        onLaunch={handleOpenLaunchConfirmation}
+        onDiscardPreparedLaunch={launchState.phase === 'preparing' && launchState.idempotencyKey ? handleDiscardPreparedLaunch : undefined}
         onBack={handleBack}
         onRemovePersistedLine={id => setRemovedItemIds(previous => previous.includes(id) ? previous : [...previous, id])}
+      />
+      {launchState.phase === 'storage_unavailable' ? <button type="button" onClick={() => { recoveredAttemptKey.current = null; dispatchLaunch({ type: 'RESET' }); setFeedback(null); }} className="min-h-11 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900">Recheck retry protection</button> : null}
+      <DurableDraftLaunchConfirmation
+        open={launchState.phase === 'confirming'}
+        outputType={launchState.outputType}
+        title={form.title}
+        customer={confirmationCustomer?.label ?? canonical?.draft.subjectDisplayNameSnapshot ?? ''}
+        property={confirmationProperty?.label ?? canonical?.draft.propertyDisplaySnapshot ?? ''}
+        itemCount={form.line_items.length}
+        busy={Boolean(launchOperation.current)}
+        onCancel={() => dispatchLaunch({ type: 'CANCEL_CONFIRMATION' })}
+        onConfirm={() => void handleConfirmLaunch()}
       />
     </div>
   );
