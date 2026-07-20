@@ -71,6 +71,7 @@ import {
   type PostLaunchNavigationIntent,
   type PostLaunchNavigationSource,
 } from './durableDraftPostLaunchNavigation';
+import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -90,7 +91,7 @@ type DurableDraftWorkspaceProps = {
   launchEnabled: boolean;
   onRefreshCapabilities: () => Promise<DurableDraftCompatibilityCapabilities>;
   onLoadOutput: (type: 'estimate' | 'job', id: string) => Promise<DurableDraftLoadedOutput>;
-  onAdoptOutput: (output: DurableDraftLoadedOutput) => void;
+  onAdoptOutput: (output: DurableDraftLoadedOutput, focusToken: symbol) => void;
 };
 
 type DurableDraftLaunchOperation = {
@@ -1372,14 +1373,12 @@ export function DurableDraftWorkspace({
     try {
       const loaded = await onLoadOutput(outputType, outputId);
       if (!isCurrent()) return;
-      if (loaded.type !== outputType
-        || loaded.id !== outputId
-        || loaded.record.id !== outputId
-        || loaded.record.contractor_id !== contractorId) throw new Error('DRAFT_RESPONSE_INVALID');
+      const validated = validateDurableDraftLoadedOutput(loaded, { outputType, outputId, contractorId });
+      if (!validated.ok) throw new Error('DRAFT_RESPONSE_INVALID');
       if (source === 'automatic' && intent) {
         dispatchPostLaunchNavigation({ type: 'START_ADOPTION', token: intent.token });
       }
-      onAdoptOutput(loaded);
+      onAdoptOutput(loaded, operation.token);
       if (source === 'automatic' && intent) {
         postLaunchEligibility.current = null;
         postLaunchIntent.current = null;
