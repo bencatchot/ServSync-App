@@ -149,7 +149,7 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     });
   });
 
-  test('shared composer UI has Estimate and Job planning plus private notes, with no launch controls', () => {
+  test('shared composer remains neutral while C1 injects gated launch actions from the durable workspace', () => {
     const composerSource = sourceFile('src/features/drafts/ContractorDraftComposer.tsx');
     const selectorSource = sourceFile('src/features/drafts/DraftOutcomeSelector.tsx');
 
@@ -163,7 +163,9 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     expect(composerSource).not.toContain('Create Estimate');
     expect(composerSource).not.toContain('Create Job');
     expect(composerSource).not.toContain('Create Invoice');
-    expect(composerSource).not.toContain('Launch');
+    expect(composerSource).toContain('launchLabel');
+    expect(composerSource).not.toContain('launchContractorWorkDraft');
+    expect(composerSource).not.toContain('createDurableDraftLaunchAttempt');
     expect(composerSource).toContain("composerField('Private notes'");
     expect(composerSource).not.toContain('Payment schedule');
     expect(composerSource).not.toContain('inspection_checklist');

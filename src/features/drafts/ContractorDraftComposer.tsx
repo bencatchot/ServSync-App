@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Save, X } from 'lucide-react';
+import { FileText, Loader2, Plus, Save, X } from 'lucide-react';
 import { ActionFeedback, type ActionFeedbackMessage, type ActionFeedbackTone } from '../feedback/ActionFeedback';
 import type { DraftJobCustomerOption } from '../jobs/DraftJobComposer';
 import { WorkComposerLineItemRow } from '../work-composer/WorkComposerLineItemRow';
@@ -17,9 +17,17 @@ type ContractorDraftComposerProps = {
   currentDraftId?: string | null;
   canSave: boolean;
   saving: boolean;
+  interactionDisabled?: boolean;
+  launchLabel?: string | null;
+  launchDisabled?: boolean;
+  launchDisabledReason?: string;
+  launchBusy?: boolean;
+  launchRecoveryLabel?: string | null;
   feedback?: (ActionFeedbackMessage & { tone: ActionFeedbackTone }) | null;
   onChange: (draft: SharedDraftComposerDraft) => void;
   onSave: () => void;
+  onLaunch?: () => void;
+  onDiscardPreparedLaunch?: () => void;
   onBack: () => void;
   onRemovePersistedLine: (id: string) => void;
 };
@@ -44,9 +52,17 @@ export function ContractorDraftComposer({
   currentDraftId,
   canSave,
   saving,
+  interactionDisabled = false,
+  launchLabel = null,
+  launchDisabled = false,
+  launchDisabledReason = '',
+  launchBusy = false,
+  launchRecoveryLabel = null,
   feedback,
   onChange,
   onSave,
+  onLaunch,
+  onDiscardPreparedLaunch,
   onBack,
   onRemovePersistedLine,
 }: ContractorDraftComposerProps) {
@@ -111,17 +127,16 @@ export function ContractorDraftComposer({
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Start New Draft</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">{currentDraftId ? 'Continue Draft' : 'Draft composer'}</h2>
-            <p className="mt-1 text-sm leading-6 text-blue-950">
-              Save contractor-only planning details before this Draft becomes an Estimate or Job in a later launch slice.
-            </p>
+            <p className="mt-1 text-sm leading-6 text-blue-950">Save contractor-only planning details, then create one Estimate or Job when the Draft is ready.</p>
           </div>
-          <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">Hidden foundation</span>
+          <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">Draft planning</span>
         </div>
       </div>
 
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
-      <DraftOutcomeSelector value={draft.intended_output} onChange={updateIntent} />
+      <fieldset disabled={interactionDisabled} className="contents" aria-label="Draft planning fields">
+      <DraftOutcomeSelector value={draft.intended_output} onChange={updateIntent} disabled={interactionDisabled} />
 
       <div className="grid gap-3 lg:grid-cols-3">
         {composerField('Customer type', (
@@ -275,12 +290,25 @@ export function ContractorDraftComposer({
 
       {draft.intended_output === 'estimate' ? <section aria-label="Estimate outcome details" data-testid="shared-draft-estimate-outcome-panel" /> : null}
       {draft.intended_output === 'job' ? <section aria-label="Job outcome details" data-testid="shared-draft-job-outcome-panel" /> : null}
+      </fieldset>
+
+      {!draft.intended_output ? (
+        <p className="text-sm font-medium text-slate-600" data-testid="durable-draft-launch-guidance">Choose Estimate or Job before creating work from this Draft.</p>
+      ) : null}
+      {launchDisabledReason ? <p className="text-sm font-medium text-amber-800" data-testid="durable-draft-launch-disabled-reason">{launchDisabledReason}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onSave} disabled={!canSave || saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+        {launchLabel && onLaunch ? (
+          <button type="button" onClick={onLaunch} disabled={launchDisabled || launchBusy} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" data-testid="durable-draft-create-output">
+            {launchBusy ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
+            {launchBusy ? 'Working…' : launchRecoveryLabel ?? launchLabel}
+          </button>
+        ) : null}
+        <button type="button" onClick={onSave} disabled={!canSave || saving || interactionDisabled} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
           <Save size={16} />
           {saving ? 'Saving...' : 'Save Draft'}
         </button>
+        {onDiscardPreparedLaunch ? <button type="button" onClick={onDiscardPreparedLaunch} disabled={launchBusy} className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 disabled:opacity-50">Discard unused attempt</button> : null}
         <button type="button" onClick={onBack} disabled={saving} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
           <X size={16} />
           Back to Work

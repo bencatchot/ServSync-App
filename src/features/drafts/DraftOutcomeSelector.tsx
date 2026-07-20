@@ -3,6 +3,7 @@ import type { DraftIntendedOutput } from './draftComposerTypes';
 type DraftOutcomeSelectorProps = {
   value: DraftIntendedOutput | null;
   onChange: (value: DraftIntendedOutput | null) => void;
+  disabled?: boolean;
 };
 
 const OPTIONS: Array<{ value: DraftIntendedOutput | null; label: string }> = [
@@ -11,7 +12,7 @@ const OPTIONS: Array<{ value: DraftIntendedOutput | null; label: string }> = [
   { value: 'job', label: 'Job' },
 ];
 
-export function DraftOutcomeSelector({ value, onChange }: DraftOutcomeSelectorProps) {
+export function DraftOutcomeSelector({ value, onChange, disabled = false }: DraftOutcomeSelectorProps) {
   return (
     <fieldset className="rounded-2xl border border-slate-200 bg-white p-3">
       <legend className="text-sm font-bold text-slate-950">Intended output</legend>
@@ -36,6 +37,7 @@ export function DraftOutcomeSelector({ value, onChange }: DraftOutcomeSelectorPr
                 value={option.value ?? ''}
                 checked={selected}
                 onChange={() => onChange(option.value)}
+                disabled={disabled}
                 className="sr-only"
               />
               {option.label}

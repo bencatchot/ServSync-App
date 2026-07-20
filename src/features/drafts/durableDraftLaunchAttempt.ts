@@ -6,12 +6,15 @@ import {
 import type {
   ContractorWorkDraftLaunchOutput,
   DurableDraftLaunchAttemptClearAllResult,
-  DurableDraftLaunchAttemptClearResult,
   DurableDraftLaunchAttemptPhase,
   DurableDraftLaunchAttemptReadResult,
   DurableDraftLaunchAttemptRecord,
   DurableDraftLaunchAttemptWriteResult,
 } from './durableDraftLaunchTypes';
+
+export type DurableDraftLaunchAttemptVerifiedClearResult =
+  | { status: 'success'; removed: boolean }
+  | { status: 'unavailable'; operation: 'read' | 'remove' | 'verify' };
 
 export const DURABLE_DRAFT_LAUNCH_ATTEMPT_PREFIX = 'servsync.workDraftLaunch:';
 
@@ -250,12 +253,19 @@ export function clearDurableDraftLaunchAttempt(
   storage: DurableDraftLaunchAttemptStorage,
   contractorId: string,
   draftId: string,
-): DurableDraftLaunchAttemptClearResult {
+): DurableDraftLaunchAttemptVerifiedClearResult {
+  const key = durableDraftLaunchAttemptKey(contractorId, draftId);
   try {
-    storage.removeItem(durableDraftLaunchAttemptKey(contractorId, draftId));
-    return { status: 'success', removed: true };
+    storage.removeItem(key);
   } catch {
     return { status: 'unavailable', operation: 'remove' };
+  }
+  try {
+    return storage.getItem(key) === null
+      ? { status: 'success', removed: true }
+      : { status: 'unavailable', operation: 'verify' };
+  } catch {
+    return { status: 'unavailable', operation: 'verify' };
   }
 }
 
@@ -263,7 +273,7 @@ export function clearDefinitiveFailedDurableDraftLaunchAttempt(
   storage: DurableDraftLaunchAttemptStorage,
   contractorId: string,
   draftId: string,
-): DurableDraftLaunchAttemptClearResult {
+): DurableDraftLaunchAttemptVerifiedClearResult {
   const result = readDurableDraftLaunchAttempt(storage, contractorId, draftId);
   if (result.status === 'unavailable') return result;
   if (result.status === 'found' && (result.attempt.phase === 'succeeded' || result.attempt.phase === 'ambiguous')) {

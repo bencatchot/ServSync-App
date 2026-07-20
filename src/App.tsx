@@ -38740,6 +38740,8 @@ function ContractorDashboard({
                                 setContractorJobsView('new_jobs');
                               }}
                               onBack={() => setContractorJobsViewAndScroll('overview')}
+                              launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
+                              onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
                               onLoadOutput={loadDurableDraftOutput}
                               onAdoptOutput={adoptDurableDraftOutput}
                             />
@@ -40438,6 +40440,8 @@ function ContractorDashboard({
                     setInspectionView('list');
                     setContractorJobsViewAndScroll('open_jobs');
                   }}
+                  launchEnabled={sharedDraftComposerEnabled && !SERVSYNC_DEMO_PRESENTATION_MODE}
+                  onRefreshCapabilities={() => loadDurableDraftCapabilities(supabase!)}
                   onLoadOutput={loadDurableDraftOutput}
                   onAdoptOutput={adoptDurableDraftOutput}
                 />
