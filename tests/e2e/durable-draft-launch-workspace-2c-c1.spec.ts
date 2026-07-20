@@ -220,7 +220,7 @@ async function installLaunchHarness(page: Page, options: {
       onBack: () => { state.backCount += 1; state.mode = 'list'; state.target = null; render(); },
       onLoadOutput: async (type: string, id: string) => {
         state.outputLoadCount += 1;
-        return { type, id, record: { id } };
+        return { type, id, record: { id, contractor_id: ids.contractorId } };
       },
       onAdoptOutput: () => { state.adoptCount += 1; },
     }));
@@ -439,7 +439,7 @@ async function rejectExternalAttemptThenCompleteLocalLaunch(page: Page, options:
   await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('${options.localOutput}', true))`);
   await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
   expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
-  expect(await harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(0);
+  await expect.poll(() => harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(1);
 }
 
 async function enterLifecycleUnavailable(page: Page, outputType: OutputType = 'estimate') {
@@ -832,16 +832,16 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
       expect(record.private_notes).toBeUndefined();
     });
 
-    test(`fresh ${label} success adopts consumed without automatic output navigation`, async ({ page }) => {
+    test(`fresh ${label} success adopts consumed and starts one automatic output navigation`, async ({ page }) => {
       await installLaunchHarness(page, { outputType });
       await completeInitialDraft(page, outputType);
       await confirmLaunch(page, outputType);
       await completeLaunchAndConsume(page, outputType, 'succeeded', false);
-      await expect(page.getByText(`${label} created.`, { exact: true })).toBeVisible();
+      await expect(page.getByText(new RegExp(`${label} created\\. Opening ${label}`))).toBeVisible();
       await expect(page.getByRole('button', { name: `Open ${label}` })).toBeVisible();
       const snapshot = await harnessValue<{ adoptCount: number; outputLoadCount: number }>(page, 'h.snapshot()');
-      expect(snapshot.adoptCount).toBe(0);
-      expect(snapshot.outputLoadCount).toBe(0);
+      expect(snapshot.adoptCount).toBe(1);
+      expect(snapshot.outputLoadCount).toBe(1);
     });
 
     test(`explicit Open ${label} remains available after consumed adoption`, async ({ page }) => {
@@ -850,8 +850,8 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
       await confirmLaunch(page, outputType);
       await completeLaunchAndConsume(page, outputType, 'succeeded', false);
       await page.getByRole('button', { name: `Open ${label}` }).click();
-      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(1);
-      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(1);
+      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(2);
+      await expect.poll(() => harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(2);
     });
 
     test(`already-consumed live ${label} reconciles without relaunch or a new key`, async ({ page }) => {

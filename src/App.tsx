@@ -29294,14 +29294,22 @@ function ContractorDashboard({
     return { type: 'job', id, record: job };
   };
 
+  const focusDurableDraftOutputHeading = (type: 'estimate' | 'job') => {
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-durable-output-heading="${type}"]`)?.focus({ preventScroll: true });
+    });
+  };
+
   const adoptDurableDraftOutput = (output: DurableDraftLoadedOutput) => {
     if (output.type === 'estimate') {
       setEstimates(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
       openEstimateRecord(output.record);
+      focusDurableDraftOutputHeading('estimate');
       return;
     }
     setInspections(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
     openInspection(output.record);
+    focusDurableDraftOutputHeading('job');
   };
 
   const saveDraftJobComposer = async () => {
@@ -37401,7 +37409,11 @@ function ContractorDashboard({
                         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
-                            <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
+                            <h3
+                              className="mt-1 text-lg font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                              data-durable-output-heading={contractorFinancialRecordKind === 'estimates' ? 'estimate' : undefined}
+                              tabIndex={contractorFinancialRecordKind === 'estimates' ? -1 : undefined}
+                            >{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
                             <p className="mt-1 text-sm leading-6 text-slate-500">
                               {contractorFinancialRecordKind === 'estimates'
                                 ? 'Create or edit a customer-facing estimate without the Jobs overview cards above it.'
@@ -41009,7 +41021,11 @@ function ContractorDashboard({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Job Card</p>
-                      <h2 className="mt-1 truncate text-xl font-bold text-slate-950">{activeInspection.name}</h2>
+                      <h2
+                        className="mt-1 truncate text-xl font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        data-durable-output-heading="job"
+                        tabIndex={-1}
+                      >{activeInspection.name}</h2>
                       <p className="mt-1 text-sm leading-6 text-slate-600">
                         {homeownerLabel || 'Customer not provided'}{homeAddress ? ` · ${homeAddress}` : ''}
                       </p>

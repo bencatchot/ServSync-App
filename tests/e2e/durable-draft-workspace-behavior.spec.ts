@@ -101,6 +101,8 @@ async function installWorkspaceHarness(page: Page) {
       client: clients[state.clientName],
       mode: state.mode,
       capabilities: capabilities(),
+      launchEnabled: true,
+      onRefreshCapabilities: async () => capabilities(),
       target: state.target,
       legacyDrafts: state.legacyDrafts,
       connectedOptions: [
@@ -451,7 +453,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
       })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
       await page.getByRole('button', { name: 'Back to Work' }).click();
-      await page.evaluate(output => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id } }), output);
+      await page.evaluate(({ output, contractorId }) => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id, contractor_id: contractorId } }), { output, contractorId: CONTRACTOR_A });
       await expect(page.getByTestId('durable-draft-list')).toBeVisible();
       expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
       expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
@@ -469,7 +471,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
         launched_at: '2026-07-19T11:00:00.000Z',
       })), { draftA: DRAFT_A, contractorA: CONTRACTOR_A, output });
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
-      await page.evaluate(output => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id } }), output);
+      await page.evaluate(({ output, contractorId }) => window.__durableHarness.complete('output', output.type, { type: output.type, id: output.id, record: { id: output.id, contractor_id: contractorId } }), { output, contractorId: CONTRACTOR_A });
       await expect(page.getByTestId('adopted-output')).toHaveText(`${output.type}:${output.id}`);
       expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([`${output.type}:${output.id}`]);
     });
@@ -483,7 +485,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.evaluate(({ draftB }) => window.__durableHarness.showTarget({ kind: 'durable', draftId: draftB }), { draftB: DRAFT_B });
     await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft'))).toBe(2);
     await page.evaluate(({ draftB, contractorA }) => window.__durableHarness.complete('rpc', 'servsync_get_work_draft', window.__durableHarness.envelope(draftB, contractorA, 'Draft B')), { draftB: DRAFT_B, contractorA: CONTRACTOR_A });
-    await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId, contractor_id: contractorId } }), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
     await expect(page.getByLabel('Draft title')).toHaveValue('Draft B');
     expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
   });
@@ -496,7 +498,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
       await page.getByRole('button', { name: 'Open Estimate' }).click();
       await page.evaluate(context => window.__durableHarness.switchContext(context.contractorId, context.clientName), nextContext);
       await expect.poll(() => page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_get_work_draft', 'B'))).toBe(1);
-      await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }, 'A'), { estimateId: ESTIMATE_ID });
+      await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId, contractor_id: contractorId } }, 'A'), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
       expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
       await page.evaluate(() => window.__durableHarness.showList());
     }
@@ -516,11 +518,11 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     await page.evaluate(() => window.__durableHarness.showList());
     await openConsumed();
     expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
-    await page.evaluate(({ estimateId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.complete('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId, contractor_id: contractorId } }), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
     await expect(page.getByRole('button', { name: 'Opening…' })).toBeDisabled();
     await page.getByRole('button', { name: 'Opening…' }).click({ force: true });
     expect(await page.evaluate(() => window.__durableHarness.callCount('output', 'estimate'))).toBe(2);
-    await page.evaluate(({ estimateId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId, contractor_id: contractorId } }), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
     await expect(page.getByTestId('adopted-output')).toBeVisible();
   });
 
@@ -546,7 +548,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
     expect((await page.evaluate(() => window.__durableHarness.snapshot())).adoptedOutputs).toEqual([]);
     expect(await page.evaluate(() => window.__durableHarness.callCount('rpc', 'servsync_launch_work_draft'))).toBe(0);
 
-    await page.evaluate(({ estimateId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId } }), { estimateId: ESTIMATE_ID });
+    await page.evaluate(({ estimateId, contractorId }) => window.__durableHarness.completeLast('output', 'estimate', { type: 'estimate', id: estimateId, record: { id: estimateId, contractor_id: contractorId } }), { estimateId: ESTIMATE_ID, contractorId: CONTRACTOR_A });
     await expect(page.getByTestId('adopted-output')).toHaveText(`estimate:${ESTIMATE_ID}`);
     const snapshot = await page.evaluate(() => window.__durableHarness.snapshot());
     expect(snapshot.adoptedOutputs).toEqual([`estimate:${ESTIMATE_ID}`]);
@@ -570,7 +572,7 @@ test.describe('Slice 2C-B rendered durable Draft behavior', () => {
       await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
       await page.evaluate(type => window.__durableHarness.reject('output', type), output.type);
-      await expect(page.getByText(`The ${output.label} could not be opened. Try again.`)).toBeVisible();
+      await expect(page.getByText(`${output.label} created, but it could not be opened. Open ${output.label} to try again.`)).toBeVisible();
       await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
       await expect(page.getByRole('button', { name: `Open ${output.label}` })).toBeEnabled();
       await page.getByRole('button', { name: `Open ${output.label}` }).click();
