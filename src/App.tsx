@@ -130,6 +130,15 @@ import { reviewModerationStatusPresentation } from './features/reviews/statusPre
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
+import {
+  DurableDraftOutputHeading,
+  createDurableDraftOutputFocusCoordinator,
+  type DurableDraftOutputFocusContext,
+} from './features/drafts/DurableDraftOutputFocus';
+import {
+  validateDurableDraftEstimateRecord,
+  validateDurableDraftJobRecord,
+} from './features/drafts/durableDraftOutputValidation';
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
 import {
@@ -21705,6 +21714,40 @@ function ContractorDashboard({
   const [inspectionView, setInspectionView] = useState<InspectionView>(() => storedInspectionViewForJobsView(initialContractorJobsView));
   const [inspectionSubTab, setInspectionSubTab] = useState<InspectionSubTab>('checklist');
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null);
+  const durableDraftOutputFocusContext = useRef<DurableDraftOutputFocusContext>({
+    outputType: null,
+    outputId: null,
+    contractorId: null,
+    workspaceActive: false,
+  });
+  const durableDraftOutputFocusCoordinator = useRef<ReturnType<typeof createDurableDraftOutputFocusCoordinator> | null>(null);
+  const focusedDurableOutputType = contractorTab === 'inspections'
+    && contractorJobsView === 'new_financial'
+    && contractorFinancialRecordKind === 'estimates'
+    && estimateComposerOpen
+    && editingEstimateId
+    ? 'estimate'
+    : contractorTab === 'inspections' && inspectionView === 'detail' && activeInspection
+      ? 'job'
+      : null;
+  const focusedDurableOutputId = focusedDurableOutputType === 'estimate'
+    ? editingEstimateId
+    : focusedDurableOutputType === 'job'
+      ? activeInspection?.id ?? null
+      : null;
+  durableDraftOutputFocusContext.current = {
+    outputType: focusedDurableOutputType,
+    outputId: focusedDurableOutputId,
+    contractorId: contractor?.id ?? null,
+    workspaceActive: focusedDurableOutputType !== null && focusedDurableOutputId !== null,
+  };
+  useEffect(() => {
+    durableDraftOutputFocusCoordinator.current?.cancelUnlessCurrent();
+  }, [contractor?.id, focusedDurableOutputId, focusedDurableOutputType]);
+  useEffect(() => () => {
+    durableDraftOutputFocusCoordinator.current?.dispose();
+    durableDraftOutputFocusCoordinator.current = null;
+  }, []);
   const [draftJobDraft, setDraftJobDraft] = useState<DraftJobComposerDraft>(() => createBlankDraftJobComposerDraft());
   const [durableDraftOpenTarget, setDurableDraftOpenTarget] = useState<DurableDraftOpenTarget | null>(null);
   const [durableDraftCapabilities, setDurableDraftCapabilities] = useState<DurableDraftCompatibilityCapabilities>({
@@ -29277,31 +29320,56 @@ function ContractorDashboard({
   const loadDurableDraftOutput = async (type: 'estimate' | 'job', id: string): Promise<DurableDraftLoadedOutput> => {
     if (!supabase) throw new Error('ServSync is not configured.');
     if (type === 'estimate') {
-      let estimate = estimates.find(candidate => candidate.id === id) ?? null;
-      if (!estimate) {
+      let rawEstimate: unknown = estimates.find(candidate => candidate.id === id) ?? null;
+      if (!rawEstimate) {
         const { data, error: estimateError } = await supabase
           .from('estimates')
           .select(ESTIMATE_WITH_LINES_SELECT)
           .eq('id', id)
           .single();
         if (estimateError) throw estimateError;
-        estimate = data as Estimate;
+        rawEstimate = data;
       }
-      return { type: 'estimate', id, record: estimate };
+      const validated = validateDurableDraftEstimateRecord(rawEstimate);
+      if (!validated.ok || validated.record.id !== id) throw new Error('DRAFT_OUTPUT_INVALID');
+      return { type: 'estimate', id, record: validated.record };
     }
-    const job = inspections.find(candidate => candidate.id === id) ?? await fetchDraftJobRecord(id);
-    if (!job) throw new Error('Job not found.');
-    return { type: 'job', id, record: job };
+    const rawJob: unknown = inspections.find(candidate => candidate.id === id) ?? await fetchDraftJobRecord(id);
+    if (!rawJob) throw new Error('Job not found.');
+    const validated = validateDurableDraftJobRecord(rawJob);
+    if (!validated.ok || validated.record.id !== id) throw new Error('DRAFT_OUTPUT_INVALID');
+    return { type: 'job', id, record: validated.record };
   };
 
-  const adoptDurableDraftOutput = (output: DurableDraftLoadedOutput) => {
+  const focusDurableDraftOutputHeading = (
+    output: DurableDraftLoadedOutput,
+    token: symbol,
+  ) => {
+    if (!durableDraftOutputFocusCoordinator.current) {
+      durableDraftOutputFocusCoordinator.current = createDurableDraftOutputFocusCoordinator({
+        requestFrame: callback => window.requestAnimationFrame(callback),
+        cancelFrame: handle => window.cancelAnimationFrame(handle),
+        getContext: () => durableDraftOutputFocusContext.current,
+      });
+    }
+    durableDraftOutputFocusCoordinator.current.request({
+      token,
+      outputType: output.type,
+      outputId: output.id,
+      contractorId: output.record.contractor_id,
+    });
+  };
+
+  const adoptDurableDraftOutput = (output: DurableDraftLoadedOutput, focusToken: symbol) => {
     if (output.type === 'estimate') {
       setEstimates(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
       openEstimateRecord(output.record);
+      focusDurableDraftOutputHeading(output, focusToken);
       return;
     }
     setInspections(previous => [output.record, ...previous.filter(candidate => candidate.id !== output.id)]);
     openInspection(output.record);
+    focusDurableDraftOutputHeading(output, focusToken);
   };
 
   const saveDraftJobComposer = async () => {
@@ -37401,7 +37469,18 @@ function ContractorDashboard({
                         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Focused editor</p>
-                            <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
+                            {contractorFinancialRecordKind === 'estimates' && editingEstimateId ? (
+                              <DurableDraftOutputHeading
+                                as="h3"
+                                outputType="estimate"
+                                outputId={editingEstimateId}
+                                className="mt-1 text-lg font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                              >
+                                Estimate workspace
+                              </DurableDraftOutputHeading>
+                            ) : (
+                              <h3 className="mt-1 text-lg font-bold text-slate-950">{contractorFinancialRecordKind === 'estimates' ? 'Estimate workspace' : 'Invoice workspace'}</h3>
+                            )}
                             <p className="mt-1 text-sm leading-6 text-slate-500">
                               {contractorFinancialRecordKind === 'estimates'
                                 ? 'Create or edit a customer-facing estimate without the Jobs overview cards above it.'
@@ -41009,7 +41088,14 @@ function ContractorDashboard({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Job Card</p>
-                      <h2 className="mt-1 truncate text-xl font-bold text-slate-950">{activeInspection.name}</h2>
+                      <DurableDraftOutputHeading
+                        as="h2"
+                        outputType="job"
+                        outputId={activeInspection.id}
+                        className="mt-1 truncate text-xl font-bold text-slate-950 outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      >
+                        {activeInspection.name}
+                      </DurableDraftOutputHeading>
                       <p className="mt-1 text-sm leading-6 text-slate-600">
                         {homeownerLabel || 'Customer not provided'}{homeAddress ? ` · ${homeAddress}` : ''}
                       </p>

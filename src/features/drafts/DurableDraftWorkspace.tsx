@@ -61,6 +61,17 @@ import {
   classifyDurableDraftLaunchFailure,
   durableDraftStorageUnavailableCopy,
 } from './durableDraftLaunchErrorCopy';
+import {
+  createPostLaunchNavigationEligibility,
+  INITIAL_POST_LAUNCH_NAVIGATION_STATE,
+  postLaunchNavigationContextMatches,
+  postLaunchNavigationReducer,
+  resolvePostLaunchNavigationIntent,
+  type PostLaunchNavigationEligibility,
+  type PostLaunchNavigationIntent,
+  type PostLaunchNavigationSource,
+} from './durableDraftPostLaunchNavigation';
+import { validateDurableDraftLoadedOutput } from './durableDraftOutputValidation';
 
 type DurableDraftWorkspaceProps = {
   client: DurableDraftSupabaseClient;
@@ -80,7 +91,7 @@ type DurableDraftWorkspaceProps = {
   launchEnabled: boolean;
   onRefreshCapabilities: () => Promise<DurableDraftCompatibilityCapabilities>;
   onLoadOutput: (type: 'estimate' | 'job', id: string) => Promise<DurableDraftLoadedOutput>;
-  onAdoptOutput: (output: DurableDraftLoadedOutput) => void;
+  onAdoptOutput: (output: DurableDraftLoadedOutput, focusToken: symbol) => void;
 };
 
 type DurableDraftLaunchOperation = {
@@ -93,6 +104,26 @@ type DurableDraftLaunchOperation = {
   editorGeneration: number;
   rpcStarted: boolean;
   idempotencyKey: string | null;
+  navigationSource: PostLaunchNavigationSource | null;
+  navigationEligibilityToken: symbol | null;
+};
+
+type DurableDraftOutputOperation = {
+  key: string;
+  token: symbol;
+  source: 'automatic' | 'manual';
+  intentToken: symbol | null;
+  client: DurableDraftSupabaseClient;
+  mode: 'list' | 'editor';
+  contractorId: string;
+  draftId: string;
+  target: DurableDraftOpenTarget | null;
+  targetKey: string | null;
+  outputType: ContractorWorkDraftLaunchOutput;
+  outputId: string;
+  editorGeneration: number;
+  workspaceGeneration: number;
+  clientGeneration: number;
 };
 
 export type DurableDraftLoadedOutput =
@@ -124,6 +155,14 @@ function browserLaunchAttemptStorage(): DurableDraftLaunchAttemptStorage | null 
 
 function launchCapability(capabilities: DurableDraftCompatibilityCapabilities, outputType: ContractorWorkDraftLaunchOutput) {
   return outputType === 'estimate' ? capabilities.canLaunchEstimate : capabilities.canLaunchJob;
+}
+
+function outputLoadWasNotFound(error: unknown) {
+  if (!error || typeof error !== 'object') return error instanceof Error && /not found/i.test(error.message);
+  const value = error as { code?: unknown; status?: unknown; message?: unknown };
+  return value.code === 'PGRST116'
+    || value.status === 404
+    || (typeof value.message === 'string' && /not found|no rows/i.test(value.message));
 }
 
 function validateDraftForLaunch(form: SharedDraftComposerDraft, canonical: DurableDraftCanonicalState | null) {
@@ -193,12 +232,16 @@ export function DurableDraftWorkspace({
   onAdoptOutput,
 }: DurableDraftWorkspaceProps) {
   const [rows, setRows] = useState<DurableDraftListPresentation[]>([]);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const [rowsOwner, setRowsOwner] = useState<{ client: DurableDraftSupabaseClient; contractorId: string | null } | null>(null);
   const rowsOwnerRef = useRef(rowsOwner);
   rowsOwnerRef.current = rowsOwner;
   const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [listError, setListError] = useState('');
   const [canonical, setCanonical] = useState<DurableDraftCanonicalState | null>(null);
+  const canonicalRef = useRef(canonical);
+  canonicalRef.current = canonical;
   const [form, setForm] = useState<SharedDraftComposerDraft | null>(null);
   const [removedItemIds, setRemovedItemIds] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -213,8 +256,14 @@ export function DurableDraftWorkspace({
   const launchStateRef = useRef(launchState);
   launchStateRef.current = launchState;
   const [launchProof, setLaunchProof] = useState<ContractorWorkDraftLaunchResult | null>(null);
+  const [, dispatchPostLaunchNavigation] = useReducer(
+    postLaunchNavigationReducer,
+    INITIAL_POST_LAUNCH_NAVIGATION_STATE,
+  );
+  const postLaunchEligibility = useRef<PostLaunchNavigationEligibility | null>(null);
+  const postLaunchIntent = useRef<PostLaunchNavigationIntent | null>(null);
   const openingTargetLocks = useRef(new Set<string>());
-  const openingOutputOperation = useRef<{ key: string; token: symbol } | null>(null);
+  const openingOutputOperation = useRef<DurableDraftOutputOperation | null>(null);
   const launchOperation = useRef<DurableDraftLaunchOperation | null>(null);
   const reconcileRecoveredAttempt = useRef<(attempt: DurableDraftLaunchAttemptRecord, replacePending?: boolean) => void>(() => undefined);
   const saveLock = useRef(false);
@@ -222,6 +271,21 @@ export function DurableDraftWorkspace({
   const listGeneration = useRef(0);
   const listOperation = useRef<symbol | null>(null);
   const editorGeneration = useRef(0);
+  const workspaceGeneration = useRef(0);
+  const clientGeneration = useRef(0);
+  const priorClient = useRef(client);
+  if (priorClient.current !== client) {
+    priorClient.current = client;
+    clientGeneration.current += 1;
+  }
+  const priorWorkspaceContext = useRef({ mode, targetKey: openTargetKey(target), contractorId: capabilities.contractorId });
+  const nextWorkspaceContext = { mode, targetKey: openTargetKey(target), contractorId: capabilities.contractorId };
+  if (priorWorkspaceContext.current.mode !== nextWorkspaceContext.mode
+    || priorWorkspaceContext.current.targetKey !== nextWorkspaceContext.targetKey
+    || priorWorkspaceContext.current.contractorId !== nextWorkspaceContext.contractorId) {
+    priorWorkspaceContext.current = nextWorkspaceContext;
+    workspaceGeneration.current += 1;
+  }
   const mounted = useRef(false);
   const targetlessNormalized = useRef(false);
   const adoptedDraftId = useRef<string | null>(null);
@@ -231,12 +295,22 @@ export function DurableDraftWorkspace({
   const targetKey = openTargetKey(target);
   context.current = { client, contractorId: capabilities.contractorId, mode, target, targetKey, launchEnabled };
 
+  const cancelPostLaunchNavigation = (token?: symbol) => {
+    if (token
+      && postLaunchEligibility.current?.token !== token
+      && postLaunchIntent.current?.token !== token) return;
+    postLaunchEligibility.current = null;
+    postLaunchIntent.current = null;
+    dispatchPostLaunchNavigation({ type: 'CANCEL_STALE', token });
+  };
+
   const applyExternalLaunchTransition = (
     event: Extract<DurableDraftLaunchMachineEvent, { type: 'EXTERNAL_ATTEMPT' | 'EXTERNAL_SUCCEEDED' }>,
     acceptedOwner: DurableDraftLaunchOperation | null = null,
   ) => {
     const decision = decideDurableDraftLaunchTransition(launchStateRef.current, event);
     if (!decision.accepted) return false;
+    if (event.type === 'EXTERNAL_SUCCEEDED') cancelPostLaunchNavigation();
     launchStateRef.current = decision.nextState;
     if (decision.ownershipEffect === 'invalidate') launchOperation.current = acceptedOwner;
     dispatchLaunch(event);
@@ -255,6 +329,8 @@ export function DurableDraftWorkspace({
       openingTargetLocks.current.clear();
       openingOutputOperation.current = null;
       launchOperation.current = null;
+      postLaunchEligibility.current = null;
+      postLaunchIntent.current = null;
     };
   }, []);
 
@@ -265,18 +341,20 @@ export function DurableDraftWorkspace({
     setOpeningOutputKey(null);
     const operation = launchOperation.current;
     const preservesCanonicalizedTarget = operation
+      && launchEnabled
       && mode === 'editor'
       && target?.kind === 'durable'
       && target.draftId === operation.draftId
       && client === operation.client
       && capabilities.contractorId === operation.contractorId;
     if (!preservesCanonicalizedTarget) {
+      cancelPostLaunchNavigation();
       launchOperation.current = null;
       recoveredAttemptKey.current = null;
       setLaunchProof(null);
       dispatchLaunch({ type: 'RESET' });
     }
-  }, [mode, client, capabilities.contractorId, target]);
+  }, [mode, client, capabilities.contractorId, target, launchEnabled]);
 
   const loadList = useCallback(async () => {
     const contractorId = capabilities.contractorId;
@@ -678,6 +756,18 @@ export function DurableDraftWorkspace({
     saveOperation.current = null;
     saveLock.current = false;
     operation.editorGeneration = ++editorGeneration.current;
+    const currentEligibility = postLaunchEligibility.current;
+    if (operation.navigationEligibilityToken && currentEligibility?.token === operation.navigationEligibilityToken) {
+      const refreshedEligibility = {
+        ...currentEligibility,
+        targetKey: `durable:${operation.draftId}`,
+        editorGeneration: operation.editorGeneration,
+        workspaceGeneration: workspaceGeneration.current,
+        clientGeneration: clientGeneration.current,
+      };
+      postLaunchEligibility.current = refreshedEligibility;
+      dispatchPostLaunchNavigation({ type: 'ELIGIBLE', eligibility: refreshedEligibility });
+    }
     setEditorLoading(false);
     listGeneration.current += 1;
     dispatchLaunch({ type: 'CONSUMED_PROOF', operationToken: operation.token, result });
@@ -692,17 +782,69 @@ export function DurableDraftWorkspace({
       throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
     }
     if (!launchOperationIsCurrent(operation)) return;
+    canonicalRef.current = nextCanonical;
     setCanonical(nextCanonical);
     setForm(durableCanonicalStateToComposer(nextCanonical));
+    const outputId = result.output_type === 'estimate'
+      ? nextCanonical.draft.launchedEstimateId
+      : nextCanonical.draft.launchedJobId;
+    const outputIdSnapshot = result.output_type === 'estimate'
+      ? nextCanonical.draft.launchedEstimateIdSnapshot
+      : nextCanonical.draft.launchedJobIdSnapshot;
+    const eligibility = postLaunchEligibility.current;
+    const navigationIntent = eligibility && operation.navigationEligibilityToken === eligibility.token
+      ? resolvePostLaunchNavigationIntent({
+          eligibility,
+          result,
+          draftId: operation.draftId,
+          contractorId: operation.contractorId,
+          outputType: result.output_type,
+          outputId,
+          outputIdSnapshot,
+          outputAvailable: Boolean(outputId),
+        })
+      : null;
+    const navigationContextMatches = navigationIntent
+      ? postLaunchNavigationContextMatches(navigationIntent, {
+          contractorId: context.current.contractorId,
+          targetKey: context.current.targetKey,
+          editorGeneration: editorGeneration.current,
+          workspaceGeneration: workspaceGeneration.current,
+          clientGeneration: clientGeneration.current,
+          launchEnabled: context.current.launchEnabled,
+        })
+      : false;
+    if (navigationIntent && navigationContextMatches) {
+      postLaunchIntent.current = navigationIntent;
+      dispatchPostLaunchNavigation({ type: 'CANONICAL_READY', intent: navigationIntent });
+    } else {
+      postLaunchEligibility.current = null;
+      postLaunchIntent.current = null;
+      dispatchPostLaunchNavigation({ type: 'RESET' });
+    }
     setFeedback({
       tone: 'success',
-      title: `${nextCanonical.draft.launchedOutputType === 'estimate' ? 'Estimate' : 'Job'} created.`,
-      body: 'The Draft is now consumed and read-only.',
+      title: navigationIntent && navigationContextMatches
+        ? `${result.output_type === 'estimate' ? 'Estimate' : 'Job'} created. Opening ${result.output_type === 'estimate' ? 'Estimate' : 'Job'}…`
+        : `${nextCanonical.draft.launchedOutputType === 'estimate' ? 'Estimate' : 'Job'} created.`,
+      body: navigationIntent && navigationContextMatches ? 'The Draft is consumed and read-only.' : 'The Draft is now consumed and read-only.',
       testId: 'durable-draft-launch-success',
     });
     dispatchLaunch({ type: 'CONSUMED', operationToken: operation.token, draftId: operation.draftId, outputType: operation.outputType });
     launchOperation.current = null;
     void refreshRowsAfterLaunch(operation, nextCanonical);
+    if (navigationIntent && navigationContextMatches) {
+      window.requestAnimationFrame(() => {
+        if (postLaunchIntent.current?.token !== navigationIntent.token) return;
+        void openConsumedDraftOutput({
+          source: 'automatic',
+          intent: navigationIntent,
+          canonicalState: nextCanonical,
+          outputType: navigationIntent.outputType,
+          outputId: navigationIntent.outputId,
+        });
+      });
+    }
   };
 
   const reconcileCanonicalLifecycle = async (
@@ -770,6 +912,7 @@ export function DurableDraftWorkspace({
     error: unknown,
   ) => {
     if (!launchOperationIsCurrent(operation)) return;
+    if (operation.navigationEligibilityToken) cancelPostLaunchNavigation(operation.navigationEligibilityToken);
     const storage = browserLaunchAttemptStorage();
     const failure = classifyDurableDraftLaunchFailure(error);
     const normalized = error instanceof DurableDraftError ? error : normalizeDurableDraftError(error, 'launch');
@@ -862,6 +1005,20 @@ export function DurableDraftWorkspace({
 
   const handleConfirmLaunch = async () => {
     if (!launchEnabled || saveLock.current || launchOperation.current || launchState.phase !== 'confirming' || !launchState.outputType || !form || !capabilities.contractorId) return;
+    if (!targetKey) return;
+    const navigationSource: PostLaunchNavigationSource = launchState.idempotencyKey ? 'explicit_retry' : 'confirmed_create';
+    const eligibility = createPostLaunchNavigationEligibility({
+      source: navigationSource,
+      contractorId: capabilities.contractorId,
+      outputType: launchState.outputType,
+      targetKey,
+      editorGeneration: editorGeneration.current,
+      workspaceGeneration: workspaceGeneration.current,
+      clientGeneration: clientGeneration.current,
+    });
+    postLaunchEligibility.current = eligibility;
+    postLaunchIntent.current = null;
+    dispatchPostLaunchNavigation({ type: 'ELIGIBLE', eligibility });
     const operation: DurableDraftLaunchOperation = {
       token: Symbol('durable-draft-launch'),
       client,
@@ -872,6 +1029,8 @@ export function DurableDraftWorkspace({
       editorGeneration: editorGeneration.current,
       rpcStarted: false,
       idempotencyKey: null,
+      navigationSource,
+      navigationEligibilityToken: eligibility.token,
     };
     launchOperation.current = operation;
     const needsSave = !canonical?.draft.draftId || dirty;
@@ -906,6 +1065,18 @@ export function DurableDraftWorkspace({
           onOpenTarget({ kind: 'durable', draftId });
           await new Promise(resolve => setTimeout(resolve, 0));
           operation.editorGeneration = editorGeneration.current;
+          const currentEligibility = postLaunchEligibility.current;
+          if (currentEligibility?.token === operation.navigationEligibilityToken) {
+            const canonicalizedEligibility = {
+              ...currentEligibility,
+              targetKey: `durable:${draftId}`,
+              editorGeneration: editorGeneration.current,
+              workspaceGeneration: workspaceGeneration.current,
+              clientGeneration: clientGeneration.current,
+            };
+            postLaunchEligibility.current = canonicalizedEligibility;
+            dispatchPostLaunchNavigation({ type: 'ELIGIBLE', eligibility: canonicalizedEligibility });
+          }
         }
         if (!launchOperationIsCurrent(operation)) return;
         dispatchLaunch({ type: 'SAVED', operationToken: operation.token, draftId });
@@ -968,6 +1139,7 @@ export function DurableDraftWorkspace({
         || error.message.startsWith('DRAFT_LAUNCH_ATTEMPT_')
       )) {
         if (!launchOperationIsCurrent(operation)) return;
+        if (operation.navigationEligibilityToken) cancelPostLaunchNavigation(operation.navigationEligibilityToken);
         const message = durableDraftStorageUnavailableCopy(operation.outputType);
         dispatchLaunch({ type: 'FAIL', operationToken: operation.token, phase: 'storage_unavailable', message, idempotencyKey: operation.idempotencyKey, recoveryLocked: Boolean(operation.idempotencyKey) });
         setFeedback({ tone: 'error', title: message, testId: 'durable-draft-launch-storage-error' });
@@ -1004,6 +1176,8 @@ export function DurableDraftWorkspace({
       editorGeneration: editorGeneration.current,
       rpcStarted: true,
       idempotencyKey: launchState.idempotencyKey,
+      navigationSource: postLaunchEligibility.current?.source ?? null,
+      navigationEligibilityToken: postLaunchEligibility.current?.token ?? null,
     };
     launchOperation.current = operation;
     dispatchLaunch({ type: 'RECONCILE_RETRY', outputType: operation.outputType, operationToken: operation.token, draftId: operation.draftId as string, idempotencyKey: operation.idempotencyKey, consumedProof: launchProof });
@@ -1055,6 +1229,8 @@ export function DurableDraftWorkspace({
       editorGeneration: editorGeneration.current,
       rpcStarted: true,
       idempotencyKey: attempt.idempotencyKey,
+      navigationSource: null,
+      navigationEligibilityToken: null,
     };
     const externalSuccessEvent = {
       type: 'EXTERNAL_SUCCEEDED',
@@ -1093,6 +1269,8 @@ export function DurableDraftWorkspace({
       editorGeneration: editorGeneration.current,
       rpcStarted: true,
       idempotencyKey: launchState.idempotencyKey,
+      navigationSource: null,
+      navigationEligibilityToken: null,
     };
     launchOperation.current = operation;
     dispatchLaunch({ type: 'RECONCILE_RETRY', outputType: operation.outputType, operationToken: operation.token, draftId: operation.draftId as string, idempotencyKey: operation.idempotencyKey, lifecycle: true });
@@ -1103,50 +1281,169 @@ export function DurableDraftWorkspace({
     if ((durableDraftLaunchIsBusy(launchState) || launchState.phase === 'ambiguous')
       && !window.confirm('This action may still complete. Leave this Draft and check its status when you return?')) return;
     if (dirty && !window.confirm('Discard unsaved local changes and return to Work? The last saved Draft will remain available.')) return;
+    cancelPostLaunchNavigation();
+    openingOutputOperation.current = null;
+    setOpeningOutputKey(null);
     onBack();
   };
 
-  const handleOpenOutput = async (type: 'estimate' | 'job', id: string) => {
-    const key = `${type}:${id}`;
-    if (openingOutputOperation.current || !id || !canonical?.draft.draftId) return;
-    const operation = { key, token: Symbol('durable-draft-output') };
+  const openConsumedDraftOutput = async (request: {
+    source: 'automatic' | 'manual';
+    intent?: PostLaunchNavigationIntent;
+    canonicalState?: DurableDraftCanonicalState;
+    listDraft?: DurableDraftListPresentation;
+    outputType: ContractorWorkDraftLaunchOutput;
+    outputId: string;
+  }) => {
+    const { source, intent, canonicalState, listDraft, outputType, outputId } = request;
+    const draftId = canonicalState?.draft.draftId ?? listDraft?.draftId ?? null;
+    const contractorId = canonicalState?.draft.contractorId ?? listDraft?.contractorId ?? null;
+    const current = context.current;
+    const editorContextMatches = current.mode === 'editor'
+      && current.target?.kind === 'durable'
+      && current.target.draftId === draftId
+      && canonicalState?.draft.status === 'consumed'
+      && canonicalState.draft.launchedOutputType === outputType;
+    const listContextMatches = source === 'manual'
+      && current.mode === 'list'
+      && current.target === null
+      && listDraft?.status === 'consumed'
+      && listDraft.launchedOutputType === outputType
+      && listDraft.liveOutputId === outputId
+      && listDraft.outputAvailable;
+    if (openingOutputOperation.current
+      || !draftId
+      || !contractorId
+      || !outputId
+      || !current.launchEnabled
+      || (!editorContextMatches && !listContextMatches)) return;
+    if (source === 'automatic' && (!intent || postLaunchIntent.current?.token !== intent.token)) return;
+    const key = `${outputType}:${outputId}`;
+    const operation: DurableDraftOutputOperation = {
+      key,
+      token: Symbol(`durable-draft-output-${source}`),
+      source,
+      intentToken: intent?.token ?? null,
+      client,
+      mode: current.mode,
+      contractorId,
+      draftId,
+      target: current.target,
+      targetKey: current.targetKey as string,
+      outputType,
+      outputId,
+      editorGeneration: editorGeneration.current,
+      workspaceGeneration: workspaceGeneration.current,
+      clientGeneration: clientGeneration.current,
+    };
     openingOutputOperation.current = operation;
-    const generation = editorGeneration.current;
-    const contractorId = capabilities.contractorId;
-    const draftId = canonical.draft.draftId;
-    const capturedClient = client;
-    const capturedTarget = context.current.target;
-    const capturedTargetKey = context.current.targetKey;
     const isCurrent = () => {
-      const current = context.current;
-      return mounted.current
+      const latest = context.current;
+      const baseCurrent = mounted.current
         && openingOutputOperation.current === operation
-        && generation === editorGeneration.current
-        && current.mode === 'editor'
-        && current.client === capturedClient
-        && current.contractorId === contractorId
-        && current.target === capturedTarget
-        && current.targetKey === capturedTargetKey
-        && capturedTarget?.kind === 'durable'
-        && capturedTarget.draftId === draftId
-        && canonical.draft.draftId === draftId;
+        && operation.editorGeneration === editorGeneration.current
+        && operation.workspaceGeneration === workspaceGeneration.current
+        && operation.clientGeneration === clientGeneration.current
+        && latest.launchEnabled
+        && latest.mode === operation.mode
+        && latest.client === operation.client
+        && latest.contractorId === operation.contractorId
+        && latest.target === operation.target
+        && latest.targetKey === operation.targetKey;
+      if (!baseCurrent) return false;
+      if (operation.mode === 'editor') {
+        const currentCanonical = canonicalRef.current;
+        return latest.target?.kind === 'durable'
+          && latest.target.draftId === operation.draftId
+          && currentCanonical?.draft.draftId === operation.draftId
+          && currentCanonical.draft.contractorId === operation.contractorId
+          && currentCanonical.draft.status === 'consumed'
+          && currentCanonical.draft.launchedOutputType === operation.outputType;
+      }
+      const currentRow = rowsRef.current.find(row => row.draftId === operation.draftId);
+      return latest.target === null
+        && currentRow?.contractorId === operation.contractorId
+        && currentRow.status === 'consumed'
+        && currentRow.launchedOutputType === operation.outputType
+        && currentRow.liveOutputId === operation.outputId
+        && currentRow.outputAvailable;
     };
     setOpeningOutputKey(key);
     setOutputError('');
     try {
-      const loaded = await onLoadOutput(type, id);
+      const loaded = await onLoadOutput(outputType, outputId);
       if (!isCurrent()) return;
-      if (loaded.type !== type || loaded.id !== id || loaded.record.id !== id) throw new Error('DRAFT_RESPONSE_INVALID');
-      onAdoptOutput(loaded);
-    } catch {
+      const validated = validateDurableDraftLoadedOutput(loaded, { outputType, outputId, contractorId });
+      if (!validated.ok) throw new Error('DRAFT_RESPONSE_INVALID');
+      if (source === 'automatic' && intent) {
+        dispatchPostLaunchNavigation({ type: 'START_ADOPTION', token: intent.token });
+      }
+      onAdoptOutput(loaded, operation.token);
+      if (source === 'automatic' && intent) {
+        postLaunchEligibility.current = null;
+        postLaunchIntent.current = null;
+        dispatchPostLaunchNavigation({ type: 'NAVIGATED', token: intent.token });
+      }
+    } catch (error) {
       if (!isCurrent()) return;
-      setOutputError(`The ${type === 'estimate' ? 'Estimate' : 'Job'} could not be opened. Try again.`);
+      const label = outputType === 'estimate' ? 'Estimate' : 'Job';
+      let unavailable = false;
+      if (outputLoadWasNotFound(error)) {
+        try {
+          const envelope = await getContractorWorkDraft(operation.client, operation.draftId);
+          const refreshed = canonicalStateFromEnvelope(envelope);
+          if (!isCurrent()) return;
+          const liveOutputId = outputType === 'estimate'
+            ? refreshed.draft.launchedEstimateId
+            : refreshed.draft.launchedJobId;
+          const snapshot = outputType === 'estimate'
+            ? refreshed.draft.launchedEstimateIdSnapshot
+            : refreshed.draft.launchedJobIdSnapshot;
+          if (refreshed.draft.draftId !== operation.draftId
+            || refreshed.draft.contractorId !== operation.contractorId
+            || refreshed.draft.status !== 'consumed'
+            || refreshed.draft.launchedOutputType !== outputType
+            || !snapshot) throw new Error('DRAFT_RESPONSE_INVALID');
+          if (!liveOutputId) {
+            unavailable = true;
+            canonicalRef.current = refreshed;
+            setCanonical(refreshed);
+            setForm(durableCanonicalStateToComposer(refreshed));
+            const localRow = canonicalListPresentation(refreshed);
+            setRows(previous => [localRow, ...previous.filter(row => row.draftId !== localRow.draftId)]
+              .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.draftId.localeCompare(right.draftId)));
+          }
+        } catch {
+          // Keep the consumed envelope and explicit retry when deletion cannot be proven canonically.
+        }
+      }
+      const message = unavailable
+        ? `The created ${label} is no longer available.`
+        : `${label} created, but it could not be opened. Open ${label} to try again.`;
+      setFeedback({ tone: 'success', title: `${label} created.`, body: 'The Draft is consumed and read-only.', testId: 'durable-draft-launch-success' });
+      setOutputError(message);
+      if (source === 'automatic' && intent) {
+        postLaunchEligibility.current = null;
+        postLaunchIntent.current = null;
+        dispatchPostLaunchNavigation({ type: unavailable ? 'UNAVAILABLE' : 'FAILED', token: intent.token, message });
+      }
     } finally {
       if (openingOutputOperation.current === operation) {
         openingOutputOperation.current = null;
         if (mounted.current) setOpeningOutputKey(previous => previous === key ? null : previous);
       }
     }
+  };
+
+  const handleOpenOutput = async (type: 'estimate' | 'job', id: string, listDraft?: DurableDraftListPresentation) => {
+    if (!canonical && !listDraft) return;
+    await openConsumedDraftOutput({
+      source: 'manual',
+      canonicalState: listDraft ? undefined : canonical ?? undefined,
+      listDraft,
+      outputType: type,
+      outputId: id,
+    });
   };
 
   const handleOpenTarget = (nextTarget: DurableDraftOpenTarget) => {
@@ -1398,7 +1695,7 @@ function DurableDraftRow({ draft, opening, onOpen, onOpenOutput, openingOutputKe
   draft: DurableDraftListPresentation;
   opening: boolean;
   onOpen: () => void;
-  onOpenOutput: (type: 'estimate' | 'job', id: string) => Promise<void>;
+  onOpenOutput: (type: 'estimate' | 'job', id: string, draft: DurableDraftListPresentation) => Promise<void>;
   openingOutputKey: string | null;
 }) {
   const consumed = draft.status === 'consumed';
@@ -1412,7 +1709,7 @@ function DurableDraftRow({ draft, opening, onOpen, onOpenOutput, openingOutputKe
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={opening} onClick={onOpen} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">{opening ? <><Loader2 className="animate-spin" size={15} /> Opening Draft…</> : <>{consumed ? 'View Draft' : 'Continue Draft'} <ArrowRight size={15} /></>}</button>
         {consumed && draft.outputAvailable && draft.launchedOutputType && draft.liveOutputId ? (
-          <button type="button" disabled={openingOutputKey !== null} onClick={() => void onOpenOutput(draft.launchedOutputType as 'estimate' | 'job', draft.liveOutputId as string)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{openingOutputKey === `${draft.launchedOutputType}:${draft.liveOutputId}` ? 'Opening…' : `Open ${outputLabel(draft)}`}</button>
+          <button type="button" disabled={openingOutputKey !== null} onClick={() => void onOpenOutput(draft.launchedOutputType as 'estimate' | 'job', draft.liveOutputId as string, draft)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">{openingOutputKey === `${draft.launchedOutputType}:${draft.liveOutputId}` ? 'Opening…' : `Open ${outputLabel(draft)}`}</button>
         ) : consumed ? <span className="self-center text-xs font-semibold text-amber-700">Output unavailable</span> : null}
       </div>
     </div>

@@ -791,6 +791,7 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(changelog).toContain('no UI wiring');
     expect(backlog).toContain('hidden typed durable API contracts');
     expect(masterPlan).toContain('typed durable adapters');
-    expect(masterPlan).toContain('C1 does not auto-open the created output');
+    expect(masterPlan).toContain('explicit Open Output');
+    expect(masterPlan).toContain('same-session confirmed Create and explicit Retry');
   });
 });
