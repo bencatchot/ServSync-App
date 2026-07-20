@@ -53,7 +53,9 @@ import {
   durableDraftLaunchCanRetry,
   durableDraftLaunchIsBusy,
   durableDraftLaunchReducer,
+  decideDurableDraftLaunchTransition,
   INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
+  type DurableDraftLaunchMachineEvent,
 } from './durableDraftLaunchMachine';
 import {
   classifyDurableDraftLaunchFailure,
@@ -228,6 +230,18 @@ export function DurableDraftWorkspace({
   const errorSummaryRef = useRef<HTMLDivElement | null>(null);
   const targetKey = openTargetKey(target);
   context.current = { client, contractorId: capabilities.contractorId, mode, target, targetKey, launchEnabled };
+
+  const applyExternalLaunchTransition = (
+    event: Extract<DurableDraftLaunchMachineEvent, { type: 'EXTERNAL_ATTEMPT' | 'EXTERNAL_SUCCEEDED' }>,
+    acceptedOwner: DurableDraftLaunchOperation | null = null,
+  ) => {
+    const decision = decideDurableDraftLaunchTransition(launchStateRef.current, event);
+    if (!decision.accepted) return false;
+    launchStateRef.current = decision.nextState;
+    if (decision.ownershipEffect === 'invalidate') launchOperation.current = acceptedOwner;
+    dispatchLaunch(event);
+    return true;
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -515,17 +529,21 @@ export function DurableDraftWorkspace({
         reconcileRecoveredAttempt.current(result.attempt, true);
         return;
       }
-      if (prior.idempotencyKey && prior.outputType && prior.outputType !== result.attempt.outputType) {
-        launchOperation.current = null;
-        dispatchLaunch({ type: 'RECOVERY_CONFLICT', outputType: prior.outputType, draftId, idempotencyKey: prior.idempotencyKey, message: 'ServSync found a conflicting output attempt. Reload the canonical Draft status before continuing.' });
+      const externalEvent = {
+        type: 'EXTERNAL_ATTEMPT' as const,
+        outputType: result.attempt.outputType,
+        phase: result.attempt.phase === 'prepared' ? 'preparing' as const : result.attempt.phase,
+        draftId,
+        idempotencyKey: result.attempt.idempotencyKey,
+        message: result.attempt.phase === 'prepared'
+          ? 'Another ServSync tab prepared this output attempt.'
+          : 'Another ServSync tab may be creating this output.',
+      };
+      const accepted = applyExternalLaunchTransition(externalEvent);
+      if (!accepted) return;
+      if (canonical.draft.intendedOutput && canonical.draft.intendedOutput !== result.attempt.outputType) {
+        dispatchLaunch({ type: 'RECOVERY_CONFLICT', outputType: prior.outputType ?? canonical.draft.intendedOutput, draftId, idempotencyKey: prior.idempotencyKey ?? result.attempt.idempotencyKey, message: 'ServSync found a conflicting output attempt. Reload the canonical Draft status before continuing.' });
         setFeedback({ tone: 'error', title: 'ServSync found a conflicting output attempt.', testId: 'durable-draft-launch-storage-error' });
-        return;
-      }
-      launchOperation.current = null;
-      if (result.attempt.phase === 'prepared') {
-        dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: 'preparing', draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'Another ServSync tab prepared this output attempt.' });
-      } else {
-        dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: result.attempt.phase, draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'Another ServSync tab may be creating this output.' });
       }
     };
     window.addEventListener('storage', handleStorage);
@@ -1027,7 +1045,6 @@ export function DurableDraftWorkspace({
           idempotent: true,
         };
     if (!attempt.outputIdSnapshot || attempt.outputAvailable === undefined) return;
-    launchOperation.current = null;
     const operation: DurableDraftLaunchOperation = {
       token: Symbol('durable-draft-recovered-success'),
       client,
@@ -1039,15 +1056,15 @@ export function DurableDraftWorkspace({
       rpcStarted: true,
       idempotencyKey: attempt.idempotencyKey,
     };
-    launchOperation.current = operation;
-    dispatchLaunch({
+    const externalSuccessEvent = {
       type: 'EXTERNAL_SUCCEEDED',
       outputType: attempt.outputType,
       operationToken: operation.token,
       draftId: attempt.draftId,
       idempotencyKey: attempt.idempotencyKey,
       result: recoveredResult,
-    });
+    } as const;
+    if (!applyExternalLaunchTransition(externalSuccessEvent, operation)) return;
     setLaunchProof(recoveredResult);
     void adoptCanonicalConsumed(operation, recoveredResult).catch(() => {
       if (!launchOperationIsCurrent(operation)) return;
@@ -1351,7 +1368,7 @@ export function DurableDraftWorkspace({
           if (canonical.draft.intendedOutput && result.attempt.outputType !== canonical.draft.intendedOutput) {
             dispatchLaunch({ type: 'RECOVERY_CONFLICT', outputType: result.attempt.outputType, draftId: result.attempt.draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'ServSync found a saved output attempt that does not match this Draft. Reload the canonical Draft status before continuing.' });
           } else {
-            dispatchLaunch({
+            applyExternalLaunchTransition({
               type: 'EXTERNAL_ATTEMPT',
               outputType: result.attempt.outputType,
               phase: result.attempt.phase === 'prepared' ? 'preparing' : result.attempt.phase === 'launching' ? 'launching' : 'ambiguous',

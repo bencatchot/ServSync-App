@@ -59,6 +59,12 @@ export type DurableDraftLaunchMachineEvent =
   | { type: 'STORAGE_INCONSISTENT'; outputType: ContractorWorkDraftLaunchOutput; message: string; idempotencyKey?: string | null; recoveryLocked: boolean }
   | { type: 'RESET' };
 
+export type DurableDraftLaunchTransitionDecision = {
+  accepted: boolean;
+  nextState: DurableDraftLaunchMachineState;
+  ownershipEffect: 'preserve' | 'invalidate';
+};
+
 export const INITIAL_DURABLE_DRAFT_LAUNCH_STATE: DurableDraftLaunchMachineState = {
   phase: 'idle',
   outputType: null,
@@ -322,6 +328,21 @@ export function durableDraftLaunchReducer(
     case 'RESET':
       return INITIAL_DURABLE_DRAFT_LAUNCH_STATE;
   }
+}
+
+export function decideDurableDraftLaunchTransition(
+  state: DurableDraftLaunchMachineState,
+  event: DurableDraftLaunchMachineEvent,
+): DurableDraftLaunchTransitionDecision {
+  const nextState = durableDraftLaunchReducer(state, event);
+  const accepted = nextState !== state;
+  return {
+    accepted,
+    nextState,
+    ownershipEffect: accepted && (event.type === 'EXTERNAL_ATTEMPT' || event.type === 'EXTERNAL_SUCCEEDED')
+      ? 'invalidate'
+      : 'preserve',
+  };
 }
 
 export function durableDraftLaunchIsBusy(state: DurableDraftLaunchMachineState) {

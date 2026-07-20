@@ -3,6 +3,7 @@ import {
   durableDraftLaunchAllowsEditing,
   durableDraftLaunchCanRetry,
   durableDraftLaunchReducer,
+  decideDurableDraftLaunchTransition,
   INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
 } from '../../src/features/drafts/durableDraftLaunchMachine';
 import { classifyDurableDraftLaunchFailure } from '../../src/features/drafts/durableDraftLaunchErrorCopy';
@@ -418,6 +419,29 @@ async function completeLaunchAndConsume(page: Page, outputType: OutputType, stat
   await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
 }
 
+async function rejectExternalAttemptThenCompleteLocalLaunch(page: Page, options: {
+  localOutput: OutputType;
+  externalPhase: 'prepared' | 'launching' | 'ambiguous';
+  externalOutput?: OutputType;
+  externalKey?: string;
+}) {
+  await installLaunchHarness(page, { outputType: options.localOutput });
+  await completeInitialDraft(page, options.localOutput);
+  await confirmLaunch(page, options.localOutput);
+  await harnessValue(page, `h.dispatchAttempt('${options.externalPhase}', '${options.externalOutput ?? options.localOutput}', '${options.externalKey ?? ATTEMPT_KEY}')`);
+  await expect(page.getByTestId('durable-draft-create-output')).toHaveText('Working…');
+  await expect(page.getByTestId('durable-draft-create-output')).toBeDisabled();
+  await expect(page.getByText(/Continue Create|Retry Create/)).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+  await harnessValue(page, `h.completeRpc('servsync_launch_work_draft', h.launchResult('${options.localOutput}', 'succeeded', false))`);
+  await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+  await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('${options.localOutput}', true))`);
+  await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+  expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+  expect(await harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(0);
+}
+
 async function enterLifecycleUnavailable(page: Page, outputType: OutputType = 'estimate') {
   await installLaunchHarness(page, { outputType });
   await completeInitialDraft(page, outputType);
@@ -654,6 +678,52 @@ test.describe('Slice 2C-C1 launch machine', () => {
     expect(reconciliating.phase).toBe('reconciling_consumed');
     expect(reconciliating.operationToken).toBe(externalToken);
     expect(durableDraftLaunchReducer(reconciliating, { type: 'FAIL', operationToken: localToken, phase: 'ambiguous', message: 'late' })).toBe(reconciliating);
+  });
+
+  test('external transition decisions preserve local ownership when reducer precedence rejects recovery', () => {
+    const localToken = Symbol('local-owner');
+    let launching = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    launching = durableDraftLaunchReducer(launching, { type: 'START', outputType: 'estimate', operationToken: localToken, draftId: DRAFT_ID, needsSave: false });
+    launching = durableDraftLaunchReducer(launching, { type: 'ATTEMPT_READY', operationToken: localToken, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    launching = durableDraftLaunchReducer(launching, { type: 'RPC_STARTED', operationToken: localToken });
+    for (const event of [
+      externalAttempt('preparing'),
+      externalAttempt('launching'),
+      externalAttempt('ambiguous'),
+      externalAttempt('preparing', { idempotencyKey: OTHER_ATTEMPT_KEY }),
+      externalAttempt('ambiguous', { outputType: 'job' }),
+    ]) {
+      const decision = decideDurableDraftLaunchTransition(launching, event);
+      expect(decision.accepted).toBe(false);
+      expect(decision.nextState).toBe(launching);
+      expect(decision.ownershipEffect).toBe('preserve');
+    }
+  });
+
+  test('external transition decisions invalidate ownership only for accepted recovery or success', () => {
+    const prepared = decideDurableDraftLaunchTransition(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, externalAttempt('preparing'));
+    expect(prepared.accepted).toBe(true);
+    expect(prepared.nextState.phase).toBe('preparing');
+    expect(prepared.ownershipEffect).toBe('invalidate');
+
+    const succeeded = decideDurableDraftLaunchTransition(lifecycleUnavailableState(), {
+      type: 'EXTERNAL_SUCCEEDED', outputType: 'estimate', operationToken: Symbol('external-success'), draftId: DRAFT_ID,
+      idempotencyKey: ATTEMPT_KEY, result: estimateResult,
+    });
+    expect(succeeded.accepted).toBe(true);
+    expect(succeeded.nextState.phase).toBe('reconciling_consumed');
+    expect(succeeded.ownershipEffect).toBe('invalidate');
+
+    const consumed = durableDraftLaunchReducer(succeeded.nextState, {
+      type: 'CONSUMED', operationToken: succeeded.nextState.operationToken as symbol, draftId: DRAFT_ID, outputType: 'estimate',
+    });
+    const ignored = decideDurableDraftLaunchTransition(consumed, {
+      type: 'EXTERNAL_SUCCEEDED', outputType: 'estimate', operationToken: Symbol('ignored'), draftId: DRAFT_ID,
+      idempotencyKey: ATTEMPT_KEY, result: estimateResult,
+    });
+    expect(ignored.accepted).toBe(false);
+    expect(ignored.nextState).toBe(consumed);
+    expect(ignored.ownershipEffect).toBe('preserve');
   });
 
   test('error taxonomy separates denied, fixable, reconcile, and ambiguous outcomes', () => {
@@ -1135,6 +1205,57 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     await harnessValue(page, "h.completeRpc('servsync_get_work_draft', { draft: { id: 'bad' }, items: [], launches: [] })");
     await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
+  });
+
+  for (const scenario of [
+    { name: 'same-key prepared', localOutput: 'estimate', externalPhase: 'prepared' },
+    { name: 'same-key launching', localOutput: 'estimate', externalPhase: 'launching' },
+    { name: 'same-key ambiguous', localOutput: 'estimate', externalPhase: 'ambiguous' },
+    { name: 'different-key prepared', localOutput: 'estimate', externalPhase: 'prepared', externalKey: OTHER_ATTEMPT_KEY },
+    { name: 'different-key ambiguous', localOutput: 'estimate', externalPhase: 'ambiguous', externalKey: OTHER_ATTEMPT_KEY },
+    { name: 'Estimate-to-Job prepared', localOutput: 'estimate', externalOutput: 'job', externalPhase: 'prepared' },
+    { name: 'Job-to-Estimate ambiguous', localOutput: 'job', externalOutput: 'estimate', externalPhase: 'ambiguous' },
+  ] as const) {
+    test(`local RPC ownership survives rejected ${scenario.name} external recovery`, async ({ page }) => {
+      await rejectExternalAttemptThenCompleteLocalLaunch(page, scenario);
+    });
+  }
+
+  test('local owning failure remains observable after a rejected external attempt', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await confirmLaunch(page, 'estimate');
+    await harnessValue(page, "h.dispatchAttempt('prepared', 'estimate')");
+    await expect(page.getByTestId('durable-draft-create-output')).toHaveText('Working…');
+    await harnessValue(page, "h.rejectRpc('servsync_launch_work_draft', 'local request failed')");
+    await expect(page.getByTestId('durable-draft-create-output')).toHaveText('Retry Create Estimate');
+    await expect(page.getByTestId('durable-draft-launch-ambiguous')).toBeVisible();
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+  });
+
+  test('external succeeded ignores a late local success and reconciles exactly once', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await confirmLaunch(page, 'estimate');
+    await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+    await harnessValue(page, "h.completeRpc('servsync_launch_work_draft', h.launchResult('estimate', 'succeeded', true))");
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    expect(await harnessValue<number>(page, "h.callCount('servsync_get_work_draft')")).toBe(2);
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+    expect(await harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(0);
+  });
+
+  test('lifecycle status reload remains authoritative after rejected external launching recovery', async ({ page }) => {
+    await enterLifecycleUnavailable(page, 'estimate');
+    await harnessValue(page, "h.dispatchAttempt('launching', 'estimate')");
+    await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toBeVisible();
+    await expect(page.getByText(/Continue Create|Retry Create/)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Reload Draft status' }).click();
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 2);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
   });
 
   test('external succeeded proof supersedes a locally pending launch', async ({ page }) => {
