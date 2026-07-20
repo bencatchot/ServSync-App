@@ -228,7 +228,8 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
   test('wires adapters only through the effective durable branch and preserves the legacy fallback', () => {
     const app = sourceFile('src/App.tsx');
     const workspace = sourceFile('src/features/drafts/DurableDraftWorkspace.tsx');
-    expect(app).toContain('isDurableDraftComposerPathEnabled({');
+    expect(app).toContain('const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({');
+    expect(app).toContain('useDurableDraftCohortAvailability({');
     expect(app).toContain('sharedDraftComposerEnabled && supabase ? (');
     expect(app).toContain('<DurableDraftWorkspace');
     expect(app).toContain('<DraftJobComposer');

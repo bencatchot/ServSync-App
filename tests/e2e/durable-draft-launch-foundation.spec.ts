@@ -782,7 +782,9 @@ test.describe('Durable Draft Launch foundation', () => {
       expect(source).toMatch(/PR #317 (?:is |subsequently )?merged|merged PR #317/i);
       expect(source).toMatch(/permission correction (?:is |was |were )?installed|foundation and permission correction are installed|both the foundation and its permission-parity correction installed/i);
       expect(source).toMatch(/runtime (?:matrix|validation) passed/i);
-      expect(source).toContain('Production remains untouched');
+      expect(source).toMatch(/Production (?:has|now has) (?:the )?(?:corrected )?canonical(?: durable Draft)? foundation installed and verified/i);
+      expect(source).toMatch(/Production durable Draft tables remain empty|its durable Draft tables remain empty/i);
+      expect(source).toMatch(/(?:all three )?(?:global )?gates remain (?:absent\/)?off|global gates are absent\/off/i);
       expect(source).toContain('Slice 2C-A');
       expect(source).toContain('Slice 2C-B');
       expect(source).toContain('Slice 2C-C');
