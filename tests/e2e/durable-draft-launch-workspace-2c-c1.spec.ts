@@ -22,6 +22,7 @@ const ESTIMATE_ID = '00000000-0000-4000-8000-000000000307';
 const JOB_ID = '00000000-0000-4000-8000-000000000308';
 const LAUNCH_ID = '00000000-0000-4000-8000-000000000309';
 const ATTEMPT_KEY = '00000000-0000-4000-8000-00000000030a';
+const OTHER_ATTEMPT_KEY = '00000000-0000-4000-8000-00000000030b';
 
 type OutputType = 'estimate' | 'job';
 
@@ -33,6 +34,7 @@ async function installLaunchHarness(page: Page, options: {
   canPersistDraft?: boolean;
   targetKind?: 'durable' | 'new';
   storedAttempt?: 'prepared' | 'launching' | 'ambiguous' | 'succeeded' | 'malformed';
+  storedAttemptOutputType?: OutputType;
 } = {}) {
   await page.goto('/');
   await page.evaluate(async ({ ids, options }) => {
@@ -85,6 +87,7 @@ async function installLaunchHarness(page: Page, options: {
         return query;
       },
     };
+    const secondaryClient = { ...client };
     const itemDraft = {
       id: 'local-row-1',
       job_work_item_id: options.targetKind === 'new' ? null : ids.itemId,
@@ -174,6 +177,7 @@ async function installLaunchHarness(page: Page, options: {
       launches: [],
     });
     const state = {
+      client,
       mode: 'editor' as 'list' | 'editor',
       target: options.targetKind === 'new'
         ? { kind: 'new', initialDraft }
@@ -194,7 +198,7 @@ async function installLaunchHarness(page: Page, options: {
       openTargets: [] as string[],
     };
     const render = () => root.render(React.createElement(DurableDraftWorkspace, {
-      client,
+      client: state.client,
       mode: state.mode,
       target: state.target,
       capabilities: state.capabilities,
@@ -226,7 +230,7 @@ async function installLaunchHarness(page: Page, options: {
       if (storedPhase === 'malformed') {
         localStorage.setItem(key, '{"schemaVersion":1,"private_notes":"must not survive"}');
       } else {
-        const outputType = options.outputType ?? 'estimate';
+        const outputType = options.storedAttemptOutputType ?? options.outputType ?? 'estimate';
         localStorage.setItem(key, JSON.stringify({
           schemaVersion: 1,
           contractorId: ids.contractorId,
@@ -251,6 +255,11 @@ async function installLaunchHarness(page: Page, options: {
       render,
       envelope,
       activeEnvelope: (outputType: OutputType | null = options.outputType === undefined ? 'estimate' : options.outputType) => envelope('active', outputType),
+      envelopeFor: (draftId: string, status: 'active' | 'consumed' | 'discarded' = 'active', outputType: OutputType | null = options.outputType ?? null) => ({
+        draft: { ...rawDraft(status, outputType), id: draftId },
+        items: [{ ...rawItem(draftId), draft_id: draftId }],
+        launches: [],
+      }),
       consumedEnvelope: (outputType: OutputType = options.outputType ?? 'estimate', available = true) => envelope('consumed', outputType, available),
       discardedEnvelope: (outputType: OutputType = options.outputType ?? 'estimate') => envelope('discarded', outputType, false),
       listRow: (status: 'active' | 'consumed' | 'discarded', outputType: OutputType = options.outputType ?? 'estimate', available = true) => rawDraft(status, outputType, available),
@@ -297,15 +306,29 @@ async function installLaunchHarness(page: Page, options: {
       setTarget(target: Record<string, unknown>) { state.mode = 'editor'; state.target = target; render(); },
       setMode(mode: 'list' | 'editor') { state.mode = mode; render(); },
       setContractorId(contractorId: string) { state.capabilities = { ...state.capabilities, contractorId }; render(); },
-      snapshot() { return { ...state, capabilities: { ...state.capabilities }, calls: calls.map(call => ({ kind: call.kind, name: call.name, args: call.args, settled: call.settled })) }; },
-      dispatchAttempt(phase: 'prepared' | 'launching' | 'ambiguous' | 'succeeded', outputType: OutputType = options.outputType ?? 'estimate') {
+      setClient() { state.client = secondaryClient; render(); },
+      unmount() { root.unmount(); },
+      snapshot() {
+        return {
+          mode: state.mode,
+          target: state.target,
+          launchEnabled: state.launchEnabled,
+          capabilities: { ...state.capabilities },
+          backCount: state.backCount,
+          adoptCount: state.adoptCount,
+          outputLoadCount: state.outputLoadCount,
+          openTargets: [...state.openTargets],
+          calls: calls.map(call => ({ kind: call.kind, name: call.name, args: call.args, settled: call.settled })),
+        };
+      },
+      dispatchAttempt(phase: 'prepared' | 'launching' | 'ambiguous' | 'succeeded', outputType: OutputType = options.outputType ?? 'estimate', idempotencyKey = ids.attemptKey) {
         const key = attemptStorageKey(ids.contractorId, ids.draftId);
         const value = JSON.stringify({
           schemaVersion: 1,
           contractorId: ids.contractorId,
           draftId: ids.draftId,
           outputType,
-          idempotencyKey: ids.attemptKey,
+          idempotencyKey,
           phase,
           createdAt: '2026-07-19T10:00:00.000Z',
           updatedAt: '2026-07-19T10:02:00.000Z',
@@ -395,6 +418,16 @@ async function completeLaunchAndConsume(page: Page, outputType: OutputType, stat
   await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
 }
 
+async function enterLifecycleUnavailable(page: Page, outputType: OutputType = 'estimate') {
+  await installLaunchHarness(page, { outputType });
+  await completeInitialDraft(page, outputType);
+  await confirmLaunch(page, outputType);
+  await harnessValue(page, "h.failRpc('servsync_launch_work_draft', { message: 'DRAFT_NOT_ACTIVE' })");
+  await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+  await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.activeEnvelope('${outputType}'))`);
+  await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toBeVisible();
+}
+
 test.describe('Slice 2C-C1 launch machine', () => {
   const estimateResult = {
     draft_id: DRAFT_ID,
@@ -406,6 +439,40 @@ test.describe('Slice 2C-C1 launch machine', () => {
     output_available: true,
     launch_id: LAUNCH_ID,
     idempotent: false,
+  };
+
+  const externalAttempt = (phase: 'preparing' | 'launching' | 'ambiguous', overrides: Partial<{
+    outputType: OutputType;
+    draftId: string;
+    idempotencyKey: string;
+  }> = {}) => ({
+    type: 'EXTERNAL_ATTEMPT' as const,
+    outputType: overrides.outputType ?? 'estimate',
+    phase,
+    draftId: overrides.draftId ?? DRAFT_ID,
+    idempotencyKey: overrides.idempotencyKey ?? ATTEMPT_KEY,
+    message: `external ${phase}`,
+  });
+
+  const lifecycleUnavailableState = () => {
+    const token = Symbol('lifecycle-owner');
+    let state = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    state = durableDraftLaunchReducer(state, { type: 'START', outputType: 'estimate', operationToken: token, draftId: DRAFT_ID, needsSave: false });
+    state = durableDraftLaunchReducer(state, { type: 'ATTEMPT_READY', operationToken: token, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    state = durableDraftLaunchReducer(state, { type: 'RPC_STARTED', operationToken: token });
+    state = durableDraftLaunchReducer(state, { type: 'BEGIN_LIFECYCLE_RECONCILIATION', operationToken: token, draftId: DRAFT_ID, message: 'checking' });
+    return durableDraftLaunchReducer(state, { type: 'LIFECYCLE_UNAVAILABLE', operationToken: token, message: 'locked' });
+  };
+
+  const reconciliationFailedState = () => {
+    const token = Symbol('reconcile-owner');
+    let state = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    state = durableDraftLaunchReducer(state, { type: 'START', outputType: 'estimate', operationToken: token, draftId: DRAFT_ID, needsSave: false });
+    state = durableDraftLaunchReducer(state, { type: 'ATTEMPT_READY', operationToken: token, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    state = durableDraftLaunchReducer(state, { type: 'RPC_STARTED', operationToken: token });
+    state = durableDraftLaunchReducer(state, { type: 'RESPONSE_RECEIVED', operationToken: token });
+    state = durableDraftLaunchReducer(state, { type: 'CONSUMED_PROOF', operationToken: token, result: estimateResult });
+    return durableDraftLaunchReducer(state, { type: 'RECONCILE_FAILED', operationToken: token, message: 'reload failed' });
   };
 
   test('confirmation cancel returns to idle', () => {
@@ -500,6 +567,93 @@ test.describe('Slice 2C-C1 launch machine', () => {
     expect(state.phase).toBe('discarded');
     expect(durableDraftLaunchAllowsEditing(state)).toBe(false);
     expect(durableDraftLaunchReducer(state, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' })).toBe(state);
+  });
+
+  test('lifecycle and canonical reconciliation locks reject weaker external attempts', () => {
+    for (const state of [lifecycleUnavailableState(), reconciliationFailedState()]) {
+      for (const phase of ['preparing', 'launching', 'ambiguous'] as const) {
+        expect(durableDraftLaunchReducer(state, externalAttempt(phase))).toBe(state);
+      }
+      expect(durableDraftLaunchAllowsEditing(state)).toBe(false);
+    }
+  });
+
+  test('authoritative external success supersedes lifecycle and reconciliation locks only into canonical reconciliation', () => {
+    for (const state of [lifecycleUnavailableState(), reconciliationFailedState()]) {
+      const token = Symbol('external-success');
+      const next = durableDraftLaunchReducer(state, {
+        type: 'EXTERNAL_SUCCEEDED',
+        outputType: 'estimate',
+        operationToken: token,
+        draftId: DRAFT_ID,
+        idempotencyKey: ATTEMPT_KEY,
+        result: estimateResult,
+      });
+      expect(next.phase).toBe('reconciling_consumed');
+      expect(next.operationToken).toBe(token);
+      expect(next.consumedProof).toEqual(estimateResult);
+      expect(durableDraftLaunchAllowsEditing(next)).toBe(false);
+    }
+  });
+
+  test('terminal consumed and discarded states ignore every external attempt and success', () => {
+    const token = Symbol('terminal-owner');
+    let consumed = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'START', outputType: 'estimate', operationToken: token, draftId: DRAFT_ID, needsSave: false });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'ATTEMPT_READY', operationToken: token, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'RPC_STARTED', operationToken: token });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'RESPONSE_RECEIVED', operationToken: token });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'CONSUMED_PROOF', operationToken: token, result: estimateResult });
+    consumed = durableDraftLaunchReducer(consumed, { type: 'CONSUMED', operationToken: token, draftId: DRAFT_ID, outputType: 'estimate' });
+    const discardedToken = Symbol('discarded-owner');
+    let discarded = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    discarded = durableDraftLaunchReducer(discarded, { type: 'START', outputType: 'estimate', operationToken: discardedToken, draftId: DRAFT_ID, needsSave: false });
+    discarded = durableDraftLaunchReducer(discarded, { type: 'ATTEMPT_READY', operationToken: discardedToken, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    discarded = durableDraftLaunchReducer(discarded, { type: 'RPC_STARTED', operationToken: discardedToken });
+    discarded = durableDraftLaunchReducer(discarded, { type: 'BEGIN_LIFECYCLE_RECONCILIATION', operationToken: discardedToken, draftId: DRAFT_ID, message: 'checking' });
+    discarded = durableDraftLaunchReducer(discarded, { type: 'LIFECYCLE_RESOLVED', operationToken: discardedToken, status: 'discarded' });
+    for (const state of [consumed, discarded]) {
+      for (const phase of ['preparing', 'launching', 'ambiguous'] as const) {
+        expect(durableDraftLaunchReducer(state, externalAttempt(phase))).toBe(state);
+      }
+      expect(durableDraftLaunchReducer(state, {
+        type: 'EXTERNAL_SUCCEEDED', outputType: 'estimate', operationToken: Symbol('external'), draftId: DRAFT_ID,
+        idempotencyKey: ATTEMPT_KEY, result: estimateResult,
+      })).toBe(state);
+    }
+  });
+
+  test('external recovery follows same-key and same-family precedence without downgrades', () => {
+    let prepared = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, externalAttempt('preparing'));
+    expect(prepared.phase).toBe('preparing');
+    const differentKey = durableDraftLaunchReducer(prepared, externalAttempt('launching', { idempotencyKey: OTHER_ATTEMPT_KEY }));
+    const differentFamily = durableDraftLaunchReducer(prepared, externalAttempt('launching', { outputType: 'job' }));
+    expect(differentKey).toBe(prepared);
+    expect(differentFamily).toBe(prepared);
+    const ambiguous = durableDraftLaunchReducer(prepared, externalAttempt('launching'));
+    expect(ambiguous.phase).toBe('ambiguous');
+    expect(durableDraftLaunchReducer(ambiguous, externalAttempt('preparing'))).toBe(ambiguous);
+    expect(durableDraftLaunchReducer(ambiguous, externalAttempt('launching')).phase).toBe('ambiguous');
+    prepared = durableDraftLaunchReducer(prepared, externalAttempt('ambiguous'));
+    expect(prepared.phase).toBe('ambiguous');
+  });
+
+  test('locally owned work rejects weaker external recovery while external success supersedes its token', () => {
+    const localToken = Symbol('local-owner');
+    let launching = durableDraftLaunchReducer(INITIAL_DURABLE_DRAFT_LAUNCH_STATE, { type: 'OPEN_CONFIRMATION', outputType: 'estimate' });
+    launching = durableDraftLaunchReducer(launching, { type: 'START', outputType: 'estimate', operationToken: localToken, draftId: DRAFT_ID, needsSave: false });
+    launching = durableDraftLaunchReducer(launching, { type: 'ATTEMPT_READY', operationToken: localToken, draftId: DRAFT_ID, idempotencyKey: ATTEMPT_KEY });
+    launching = durableDraftLaunchReducer(launching, { type: 'RPC_STARTED', operationToken: localToken });
+    expect(durableDraftLaunchReducer(launching, externalAttempt('preparing'))).toBe(launching);
+    expect(durableDraftLaunchReducer(launching, externalAttempt('ambiguous'))).toBe(launching);
+    const externalToken = Symbol('external-owner');
+    const reconciliating = durableDraftLaunchReducer(launching, {
+      type: 'EXTERNAL_SUCCEEDED', outputType: 'estimate', operationToken: externalToken, draftId: DRAFT_ID,
+      idempotencyKey: ATTEMPT_KEY, result: estimateResult,
+    });
+    expect(reconciliating.phase).toBe('reconciling_consumed');
+    expect(reconciliating.operationToken).toBe(externalToken);
+    expect(durableDraftLaunchReducer(reconciliating, { type: 'FAIL', operationToken: localToken, phase: 'ambiguous', message: 'late' })).toBe(reconciliating);
   });
 
   test('error taxonomy separates denied, fixable, reconcile, and ambiguous outcomes', () => {
@@ -1019,5 +1173,172 @@ test.describe('Slice 2C-C1 rendered durable launch behavior', () => {
     await harnessValue(page, "h.completeList([h.listRow('active', 'estimate')])");
     await expect(page.getByTestId('durable-draft-row-consumed')).toHaveCount(1);
     await expect(page.getByTestId('durable-draft-row-active')).toHaveCount(0);
+  });
+
+  for (const phase of ['prepared', 'ambiguous'] as const) {
+    test(`lifecycle lock rejects an external ${phase} attempt`, async ({ page }) => {
+      await enterLifecycleUnavailable(page, 'estimate');
+      await harnessValue(page, `h.dispatchAttempt('${phase}', 'estimate')`);
+      await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toBeVisible();
+      await expect(page.getByTestId('shared-draft-composer')).toHaveCount(0);
+      await expect(page.getByTestId('durable-draft-create-output')).toHaveCount(0);
+      await expect(page.getByText(/Continue Create|Retry Create/)).toHaveCount(0);
+      expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+    });
+  }
+
+  test('external success supersedes a lifecycle lock only through canonical consumed reconciliation', async ({ page }) => {
+    await enterLifecycleUnavailable(page, 'estimate');
+    await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 2);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    expect(await harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(0);
+    expect(await harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(0);
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(1);
+  });
+
+  test('canonical reconciliation failure rejects an external prepared downgrade', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'job' });
+    await completeInitialDraft(page, 'job');
+    await confirmLaunch(page, 'job');
+    await harnessValue(page, "h.completeRpc('servsync_launch_work_draft', h.launchResult('job', 'succeeded', false))");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+    await harnessValue(page, "h.failRpc('servsync_get_work_draft')");
+    await expect(page.getByTestId('durable-draft-consumed-reconciliation')).toBeVisible();
+    await harnessValue(page, "h.dispatchAttempt('prepared', 'job')");
+    await expect(page.getByTestId('durable-draft-consumed-reconciliation')).toBeVisible();
+    await expect(page.getByTestId('shared-draft-composer')).toHaveCount(0);
+    await expect(page.getByText(/Continue Create|Retry Create/)).toHaveCount(0);
+  });
+
+  test('stale save cannot reactivate a Draft after external consumed proof', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await page.getByLabel('Draft title').fill('Pending old save');
+    await page.getByRole('button', { name: 'Save Draft' }).click();
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') === 1);
+    await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    await harnessValue(page, "h.completeRpc('servsync_save_work_draft', h.activeEnvelope('estimate'))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-create-output')).toHaveCount(0);
+  });
+
+  test('stale resume cannot reactivate a Draft after consumed reconciliation', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await harnessValue(page, `h.setTarget({ kind: 'durable', draftId: '${DRAFT_ID}' })`);
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') === 2);
+    await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') === 3);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true), 1)");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.activeEnvelope('estimate'))");
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
+  });
+
+  test('verified prepared discard permits a later output change without reusing the old key', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate', storedAttempt: 'prepared' });
+    await completeInitialDraft(page, 'estimate');
+    await page.getByRole('button', { name: 'Discard unused attempt' }).click();
+    expect(await harnessValue<null>(page, 'h.storageRecord()')).toBeNull();
+    await page.getByRole('radio', { name: 'Job' }).check({ force: true });
+    expect(await page.getByRole('radio', { name: 'Job' }).isChecked()).toBe(true);
+    expect(await harnessValue<null>(page, 'h.storageRecord()')).toBeNull();
+    await confirmLaunch(page, 'job');
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
+    await harnessValue(page, "h.completeRpc('servsync_save_work_draft', h.activeEnvelope('job'))");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_launch_work_draft') > 0);
+    const nextKey = await harnessValue<string>(page, 'h.storageRecord().idempotencyKey');
+    expect(nextKey).not.toBe(ATTEMPT_KEY);
+  });
+
+  test('prepared discard verification failure blocks output-family change and a new key', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate', storedAttempt: 'prepared' });
+    await completeInitialDraft(page, 'estimate');
+    await harnessValue(page, 'h.ignoreStorageRemoval()');
+    await page.getByRole('button', { name: 'Discard unused attempt' }).click();
+    await expect(page.getByLabel('Job')).toBeDisabled();
+    expect(await harnessValue<string>(page, 'h.storageRecord().idempotencyKey')).toBe(ATTEMPT_KEY);
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
+  });
+
+  test('stored and canonical output mismatch enters lifecycle reconciliation without a new attempt', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'job', storedAttempt: 'prepared', storedAttemptOutputType: 'estimate' });
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 0);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.activeEnvelope('job'))");
+    await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toBeVisible();
+    await expect(page.getByText(/Continue Create|Retry Create/)).toHaveCount(0);
+    expect(await harnessValue<string>(page, 'h.storageRecord().idempotencyKey')).toBe(ATTEMPT_KEY);
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
+  });
+
+  test('Back during save-before-launch abandons adoption and never launches', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate', targetKind: 'new' });
+    await confirmLaunch(page, 'estimate');
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_save_work_draft') > 0);
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Back to Work' }).click();
+    await harnessValue(page, "h.completeRpc('servsync_save_work_draft', h.activeEnvelope('estimate'))");
+    expect(await harnessValue<number>(page, "h.callCount('servsync_launch_work_draft')")).toBe(0);
+    expect(await harnessValue<null>(page, 'h.storageRecord()')).toBeNull();
+    expect(await harnessValue<string[]>(page, 'h.snapshot().openTargets')).toEqual([]);
+  });
+
+  test('unmount during launch ignores late completion and preserves recoverable storage', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'job' });
+    await completeInitialDraft(page, 'job');
+    await confirmLaunch(page, 'job');
+    await harnessValue(page, 'h.unmount()');
+    await harnessValue(page, "h.completeRpc('servsync_launch_work_draft', h.launchResult('job', 'succeeded', false))");
+    await page.waitForTimeout(50);
+    expect(await harnessValue<string>(page, 'h.storageRecord().phase')).toBe('launching');
+    expect(await harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(0);
+    expect(await harnessValue<number>(page, 'h.snapshot().outputLoadCount')).toBe(0);
+  });
+
+  test('client switch during launch rejects the old client completion', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await confirmLaunch(page, 'estimate');
+    await harnessValue(page, 'h.setClient()');
+    await harnessValue(page, "h.rejectRpc('servsync_launch_work_draft', 'old client failed')");
+    await expect(page.getByTestId('durable-draft-launch-ambiguous')).toHaveCount(0);
+    expect(await harnessValue<number>(page, 'h.snapshot().adoptCount')).toBe(0);
+    expect(await harnessValue<string>(page, 'h.storageRecord().phase')).toBe('ambiguous');
+  });
+
+  test('lifecycle reload after target switch cannot enter the new Draft', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await confirmLaunch(page, 'estimate');
+    await harnessValue(page, "h.failRpc('servsync_launch_work_draft', { message: 'DRAFT_NOT_ACTIVE' })");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+    await harnessValue(page, `h.setTarget({ kind: 'durable', draftId: '${HOME_ID}' })`);
+    await harnessValue(page, "h.completeRpc('servsync_get_work_draft', h.consumedEnvelope('estimate', true))");
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 2);
+    await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.envelopeFor('${HOME_ID}', 'active', 'estimate'))`);
+    await expect(page.getByTestId('shared-draft-composer')).toBeVisible();
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toHaveCount(0);
+    await expect(page.getByTestId('durable-draft-lifecycle-unavailable')).toHaveCount(0);
+  });
+
+  test('old storage listener is removed after target switch', async ({ page }) => {
+    await installLaunchHarness(page, { outputType: 'estimate' });
+    await completeInitialDraft(page, 'estimate');
+    await harnessValue(page, `h.setTarget({ kind: 'durable', draftId: '${HOME_ID}' })`);
+    await page.waitForFunction(() => (window as typeof window & { __launchHarness: { callCount: (name: string) => number } }).__launchHarness.callCount('servsync_get_work_draft') > 1);
+    await harnessValue(page, `h.completeRpc('servsync_get_work_draft', h.envelopeFor('${HOME_ID}', 'active', 'estimate'))`);
+    const before = await harnessValue<number>(page, "h.callCount('servsync_get_work_draft')");
+    await harnessValue(page, "h.dispatchAttempt('succeeded', 'estimate')");
+    await page.waitForTimeout(50);
+    expect(await harnessValue<number>(page, "h.callCount('servsync_get_work_draft')")).toBe(before);
+    await expect(page.getByTestId('shared-draft-composer')).toBeVisible();
+    await expect(page.getByTestId('durable-draft-read-only-summary')).toHaveCount(0);
   });
 });

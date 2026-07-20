@@ -444,6 +444,16 @@ export function DurableDraftWorkspace({
       return;
     }
     const attempt = result.attempt;
+    if (canonical.draft.intendedOutput && attempt.outputType !== canonical.draft.intendedOutput) {
+      dispatchLaunch({
+        type: 'RECOVERY_CONFLICT',
+        outputType: attempt.outputType,
+        draftId,
+        idempotencyKey: attempt.idempotencyKey,
+        message: 'ServSync found a saved output attempt that does not match this Draft. Reload the canonical Draft status before continuing.',
+      });
+      return;
+    }
     if (attempt.phase === 'prepared') {
       dispatchLaunch({ type: 'RECOVER', outputType: attempt.outputType, phase: 'preparing', draftId, idempotencyKey: attempt.idempotencyKey, message: 'An unused launch attempt is ready to continue.' });
       return;
@@ -507,7 +517,7 @@ export function DurableDraftWorkspace({
       }
       if (prior.idempotencyKey && prior.outputType && prior.outputType !== result.attempt.outputType) {
         launchOperation.current = null;
-        dispatchLaunch({ type: 'STORAGE_INCONSISTENT', outputType: prior.outputType, idempotencyKey: prior.idempotencyKey, recoveryLocked: true, message: 'ServSync found a conflicting output attempt. Reload the canonical Draft status before continuing.' });
+        dispatchLaunch({ type: 'RECOVERY_CONFLICT', outputType: prior.outputType, draftId, idempotencyKey: prior.idempotencyKey, message: 'ServSync found a conflicting output attempt. Reload the canonical Draft status before continuing.' });
         setFeedback({ tone: 'error', title: 'ServSync found a conflicting output attempt.', testId: 'durable-draft-launch-storage-error' });
         return;
       }
@@ -515,7 +525,7 @@ export function DurableDraftWorkspace({
       if (result.attempt.phase === 'prepared') {
         dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: 'preparing', draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'Another ServSync tab prepared this output attempt.' });
       } else {
-        dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: 'ambiguous', draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'Another ServSync tab may be creating this output.' });
+        dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: result.attempt.phase, draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'Another ServSync tab may be creating this output.' });
       }
     };
     window.addEventListener('storage', handleStorage);
@@ -649,6 +659,8 @@ export function DurableDraftWorkspace({
     setSaveState('clean');
     saveOperation.current = null;
     saveLock.current = false;
+    operation.editorGeneration = ++editorGeneration.current;
+    setEditorLoading(false);
     listGeneration.current += 1;
     dispatchLaunch({ type: 'CONSUMED_PROOF', operationToken: operation.token, result });
     const envelope = await getContractorWorkDraft(operation.client, operation.draftId);
@@ -694,6 +706,8 @@ export function DurableDraftWorkspace({
         throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'get');
       }
       if (nextCanonical.draft.status === 'consumed') {
+        operation.editorGeneration = ++editorGeneration.current;
+        setEditorLoading(false);
         setCanonical(nextCanonical);
         setForm(durableCanonicalStateToComposer(nextCanonical));
         setDirty(false);
@@ -705,6 +719,8 @@ export function DurableDraftWorkspace({
         return;
       }
       if (nextCanonical.draft.status === 'discarded') {
+        operation.editorGeneration = ++editorGeneration.current;
+        setEditorLoading(false);
         setCanonical(nextCanonical);
         setForm(durableCanonicalStateToComposer(nextCanonical));
         setDirty(false);
@@ -1332,7 +1348,18 @@ export function DurableDraftWorkspace({
         } else if (result.status === 'found' && result.attempt.phase === 'succeeded') {
           reconcileRecoveredAttempt.current(result.attempt, true);
         } else if (result.status === 'found') {
-          dispatchLaunch({ type: 'EXTERNAL_ATTEMPT', outputType: result.attempt.outputType, phase: result.attempt.phase === 'prepared' ? 'preparing' : 'ambiguous', draftId: result.attempt.draftId, idempotencyKey: result.attempt.idempotencyKey, message: result.attempt.phase === 'prepared' ? 'An unused launch attempt is ready to continue.' : 'ServSync could not confirm whether the output was created.' });
+          if (canonical.draft.intendedOutput && result.attempt.outputType !== canonical.draft.intendedOutput) {
+            dispatchLaunch({ type: 'RECOVERY_CONFLICT', outputType: result.attempt.outputType, draftId: result.attempt.draftId, idempotencyKey: result.attempt.idempotencyKey, message: 'ServSync found a saved output attempt that does not match this Draft. Reload the canonical Draft status before continuing.' });
+          } else {
+            dispatchLaunch({
+              type: 'EXTERNAL_ATTEMPT',
+              outputType: result.attempt.outputType,
+              phase: result.attempt.phase === 'prepared' ? 'preparing' : result.attempt.phase === 'launching' ? 'launching' : 'ambiguous',
+              draftId: result.attempt.draftId,
+              idempotencyKey: result.attempt.idempotencyKey,
+              message: result.attempt.phase === 'prepared' ? 'An unused launch attempt is ready to continue.' : 'ServSync could not confirm whether the output was created.',
+            });
+          }
         }
       }} className="min-h-11 rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900">Recheck retry protection</button> : null}
       <DurableDraftLaunchConfirmation

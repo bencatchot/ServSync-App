@@ -53,7 +53,8 @@ export type DurableDraftLaunchMachineEvent =
   | { type: 'CONSUMED'; operationToken: symbol; draftId: string; outputType: ContractorWorkDraftLaunchOutput }
   | { type: 'FAIL'; operationToken: symbol; phase: FailurePhase; message: string; idempotencyKey?: string | null; recoveryLocked?: boolean }
   | { type: 'RECOVER'; outputType: ContractorWorkDraftLaunchOutput; phase: 'preparing' | 'ambiguous' | 'storage_unavailable'; draftId?: string | null; idempotencyKey?: string | null; message?: string; recoveryLocked?: boolean }
-  | { type: 'EXTERNAL_ATTEMPT'; outputType: ContractorWorkDraftLaunchOutput; phase: 'preparing' | 'ambiguous'; draftId: string; idempotencyKey: string; message: string }
+  | { type: 'RECOVERY_CONFLICT'; outputType: ContractorWorkDraftLaunchOutput; draftId: string; idempotencyKey: string; message: string }
+  | { type: 'EXTERNAL_ATTEMPT'; outputType: ContractorWorkDraftLaunchOutput; phase: 'preparing' | 'launching' | 'ambiguous'; draftId: string; idempotencyKey: string; message: string }
   | { type: 'EXTERNAL_SUCCEEDED'; outputType: ContractorWorkDraftLaunchOutput; operationToken: symbol; draftId: string; idempotencyKey: string; result: ContractorWorkDraftLaunchResult }
   | { type: 'STORAGE_INCONSISTENT'; outputType: ContractorWorkDraftLaunchOutput; message: string; idempotencyKey?: string | null; recoveryLocked: boolean }
   | { type: 'RESET' };
@@ -79,6 +80,71 @@ function sameResultIdentity(state: DurableDraftLaunchMachineState, result: Contr
     && state.draftId === result.draft_id
     && state.outputType === result.output_type
     && result.output_id_snapshot);
+}
+
+const TERMINAL_PHASES = new Set<DurableDraftLaunchPhase>(['consumed', 'discarded']);
+const RECONCILIATION_LOCK_PHASES = new Set<DurableDraftLaunchPhase>([
+  'validating',
+  'reconciling_consumed',
+  'already_consumed',
+  'reconciling_lifecycle',
+  'reconciliation_failed',
+  'lifecycle_unavailable',
+]);
+
+function externalAttemptMatches(
+  state: DurableDraftLaunchMachineState,
+  event: Extract<DurableDraftLaunchMachineEvent, { type: 'EXTERNAL_ATTEMPT' }>,
+) {
+  return (!state.draftId || state.draftId === event.draftId)
+    && (!state.outputType || state.outputType === event.outputType)
+    && (!state.idempotencyKey || state.idempotencyKey === event.idempotencyKey);
+}
+
+function applyExternalAttempt(
+  state: DurableDraftLaunchMachineState,
+  event: Extract<DurableDraftLaunchMachineEvent, { type: 'EXTERNAL_ATTEMPT' }>,
+): DurableDraftLaunchMachineState {
+  if (TERMINAL_PHASES.has(state.phase)
+    || RECONCILIATION_LOCK_PHASES.has(state.phase)
+    || state.operationToken
+    || !externalAttemptMatches(state, event)) return state;
+
+  if (event.phase === 'preparing') {
+    const acceptsPrepared = state.phase === 'idle'
+      || state.phase === 'confirming'
+      || state.phase === 'fixable_failure'
+      || state.phase === 'storage_unavailable'
+      || state.phase === 'preparing';
+    if (!acceptsPrepared || state.phase === 'ambiguous' || state.phase === 'permission_denied') return state;
+    return {
+      ...INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
+      phase: 'preparing',
+      outputType: event.outputType,
+      draftId: event.draftId,
+      idempotencyKey: event.idempotencyKey,
+      recoveryLocked: true,
+      message: event.message,
+    };
+  }
+
+  const acceptsUncertain = state.phase === 'idle'
+    || state.phase === 'confirming'
+    || state.phase === 'fixable_failure'
+    || state.phase === 'permission_denied'
+    || state.phase === 'storage_unavailable'
+    || state.phase === 'preparing'
+    || state.phase === 'ambiguous';
+  if (!acceptsUncertain) return state;
+  return {
+    ...INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
+    phase: 'ambiguous',
+    outputType: event.outputType,
+    draftId: event.draftId,
+    idempotencyKey: event.idempotencyKey,
+    recoveryLocked: true,
+    message: event.message,
+  };
 }
 
 export function durableDraftLaunchReducer(
@@ -215,17 +281,20 @@ export function durableDraftLaunchReducer(
         recoveryLocked: event.recoveryLocked ?? (event.phase === 'preparing' || event.phase === 'ambiguous'),
         message: event.message ?? '',
       };
-    case 'EXTERNAL_ATTEMPT':
-      if (state.phase === 'consumed' || state.phase === 'discarded') return state;
+    case 'RECOVERY_CONFLICT':
+      if (TERMINAL_PHASES.has(state.phase) || state.operationToken) return state;
       return {
-        ...INITIAL_DURABLE_DRAFT_LAUNCH_STATE,
-        phase: event.phase,
+        ...state,
+        phase: 'lifecycle_unavailable',
+        operationToken: null,
         outputType: event.outputType,
         draftId: event.draftId,
         idempotencyKey: event.idempotencyKey,
         recoveryLocked: true,
         message: event.message,
       };
+    case 'EXTERNAL_ATTEMPT':
+      return applyExternalAttempt(state, event);
     case 'EXTERNAL_SUCCEEDED':
       if (state.phase === 'consumed' || state.phase === 'discarded') return state;
       if (event.result.draft_id !== event.draftId || event.result.output_type !== event.outputType || !event.result.output_id_snapshot) return state;
