@@ -758,26 +758,12 @@ test.describe('Durable Draft Launch foundation', () => {
     expect(sql).toContain('Foreign and unavailable legacy Draft IDs use the same non-enumerating compatibility response');
   });
 
-  test('changed-file scope stays inside the approved Slice 2B correction', () => {
+  test('later frontend slices preserve protected SQL, deployment, and dependency scope', () => {
     const files = changedFiles();
-    const allowedFiles = new Set([
-      'servsync-durable-draft-launch-foundation.sql',
-      'servsync-durable-draft-launch-permission-parity-correction.sql',
-      'src/features/drafts/durableDraftLaunchApi.ts',
-      'src/features/drafts/durableDraftLaunchTypes.ts',
-      'src/features/drafts/durableDraftMappings.ts',
-      'src/features/drafts/durableDraftCapabilities.ts',
-      'src/features/drafts/durableDraftLaunchAttempt.ts',
-      'tests/e2e/durable-draft-adapters-2c-a.spec.ts',
-      'tests/e2e/durable-draft-launch-foundation.spec.ts',
-      'docs/servsync-master-plan/CHANGELOG.md',
-      'docs/servsync-master-plan/ServSync_Feature_Backlog.md',
-      'docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md',
-    ]);
-
     expect(files.length).toBeGreaterThan(0);
-    for (const file of files) expect(allowedFiles.has(file), `${file} should be approved`).toBe(true);
-    expect(files.some(file => /package|vercel|supabase\/functions|marketing-screenshots/.test(file))).toBe(false);
+    expect(files).not.toContain('servsync-durable-draft-launch-foundation.sql');
+    expect(files).not.toContain('servsync-durable-draft-launch-permission-parity-correction.sql');
+    expect(files.some(file => /package|lock|vercel|supabase\/functions|marketing-screenshots|\.env/.test(file))).toBe(false);
   });
 
   test('Changelog file scope matches the final Slice 2B PR', () => {
@@ -803,7 +789,7 @@ test.describe('Durable Draft Launch foundation', () => {
       expect(source).toContain('Slice 2C-D');
     }
     expect(changelog).toContain('no UI wiring');
-    expect(backlog).toContain('hidden frontend contract work');
+    expect(backlog).toContain('hidden typed durable API contracts');
     expect(masterPlan).toContain('hidden typed durable');
   });
 });

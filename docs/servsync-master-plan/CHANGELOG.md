@@ -6,6 +6,41 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-19
 
+- Branch: `codex/durable-draft-composer-integration-2c-b`
+- Files changed:
+  - `src/App.tsx`
+  - `src/features/drafts/ContractorDraftComposer.tsx`
+  - `src/features/drafts/DraftOutcomeSelector.tsx`
+  - `src/features/drafts/DurableDraftWorkspace.tsx`
+  - `src/features/drafts/durableDraftComposerIntegration.ts`
+  - `src/features/drafts/durableDraftLaunchApi.ts`
+  - `tests/e2e/durable-draft-composer-integration-2c-b.spec.ts`
+  - `tests/e2e/durable-draft-workspace-behavior.spec.ts`
+  - `tests/e2e/durable-draft-adapters-2c-a.spec.ts`
+  - `tests/e2e/durable-draft-launch-foundation.spec.ts`
+  - `tests/e2e/shared-draft-composer-2a.spec.ts`
+  - `tests/e2e/contractor-work-dashboard-shell.spec.ts`
+  - `tests/e2e/draft-job-scope-backend-foundation.spec.ts`
+  - `tests/e2e/draft-job-ui-persistence.spec.ts`
+  - `docs/servsync-master-plan/ServSync_Master_Plan_v1_0.md`
+  - `docs/servsync-master-plan/ServSync_Feature_Backlog.md`
+  - `docs/servsync-master-plan/CHANGELOG.md`
+- Summary of change: Implemented Slice 2C-B in draft PR #319 so dedicated durable Draft state is authoritative only when the existing Shared Draft Composer and Draft Job gates are both enabled and Demo Presentation is off. The gated Jobs workspace supports atomic full-snapshot save, canonical resume, active and recently consumed lists, lazy legacy import with exact `legacy_inspection_id` de-duplication, contractor-private notes, capability-derived mutation controls, and read-only consumed/discarded/deleted-output presentation. Audit follow-ups normalize targetless restored editors, canonicalize first-save/import identity, reject stale list/save/resume/import results, clear incompatible hidden service-request identity, add guarded recovery actions, and split existing-output loading from generation-checked adoption so stale successes cannot navigate or clear newer token-owned locks. Rendered coverage exercises these races, including pre-import list completion. PR #318 is merged and Slice 2C-A is complete; Slice 2C-C launch controls and Slice 2C-D authenticated sandbox/Preview/mobile closeout remain separate.
+- Reason for change: The merged durable database and frontend adapter foundations need a gated canonical Composer integration before launch UX can be added safely.
+- Tests/checks run:
+  - Focused executable 2C-B tests cover gate combinations, canonical resume mapping, full-snapshot payloads, persisted/local item identity, explicit removals, reordering, duplicate-ID rejection, runtime list validation, legacy de-duplication, and safe structured error copy.
+  - Source-contract coverage verifies lazy import, read-only consumed/deleted presentation, private notes, accessibility status, legacy fallback, and the absence of launch calls or launch-attempt UI wiring.
+- Known risks or follow-ups:
+  - This slice adds no Create Estimate/Create Job launch control and never calls the launch adapter or launch-attempt utilities. Slice 2C-C remains required.
+  - Gates remain default-off. No SQL, Supabase mutation, environment/Vercel change, Production SQL, or Production workflow change is included. Sandbox/Preview runtime and mobile validation remain Slice 2C-D.
+  - PR #319 remains open and draft pending an abbreviated read-only re-audit of the runtime-safety correction; it is not approved or merged by this entry.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-035 now records gated durable save/resume/list/import and consumed presentation while keeping launch, runtime closeout, Production SQL, and rollout future.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first sequence now records Slice 2C-B as the canonical gated integration layer after merged Slice 2C-A.
+
 - Branch: `codex/durable-draft-adapters-2c-a`
 - Files changed:
   - `src/features/drafts/durableDraftLaunchApi.ts`
@@ -25,8 +60,8 @@ Do not update this changelog for audit-only tasks unless specifically requested.
   - Typecheck, default and gated builds, existing durable foundation tests, shared Composer/Draft Job source regressions, diff/link/sensitive-value checks, SQL hashes, and unchanged App/Composer/gate checks passed. Lint remains blocked before project sources by the known ESLint 9 / TypeScript plugin incompatibility.
 - Known risks or follow-ups:
   - Slice 2C-A is not wired into `App.tsx`, the current Composer, routes, Draft lists, or visible actions. It changes no SQL, Supabase state, feature gate, environment, Vercel configuration, or Production behavior.
-  - PR #318 remains open and draft pending an abbreviated read-only re-audit of the adapter-safety correction. Slice 2C-B has not started.
-  - Slice 2C-B remains the next integration slice. Slice 2C-C remains the launch UX slice, and Slice 2C-D remains sandbox/Preview runtime, mobile, and documentation closeout. The user-visible Draft-first workflow is not complete.
+  - PR #318 subsequently passed its adapter-safety re-audit and merged. Slice 2C-B is now implemented separately in draft PR #319.
+  - Slice 2C-C remains the launch UX slice, and Slice 2C-D remains authenticated sandbox/Preview runtime, mobile, and documentation closeout. The user-visible Draft-first workflow is not complete.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
   - REASON: FB-035 now records PR #317 as merged and Slice 2C-A as hidden contract work while keeping durable Composer integration, launch UX, validation, Production SQL, and rollout future.

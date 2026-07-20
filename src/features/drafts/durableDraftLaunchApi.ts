@@ -244,6 +244,59 @@ export function parseContractorWorkDraftLaunchResult(value: unknown): Contractor
   return value as ContractorWorkDraftLaunchResult;
 }
 
+function parseDraftListRow(value: unknown): ContractorWorkDraftListRow | null {
+  if (!isRecord(value)
+    || !isDurableDraftUuid(value.id)
+    || !isDurableDraftUuid(value.contractor_id)
+    || (value.subject_type !== 'connected_homeowner' && value.subject_type !== 'local_contact')
+    || !isString(value.subject_display_name_snapshot)
+    || !isString(value.property_display_snapshot)
+    || !isString(value.title)
+    || (value.intended_output !== null && value.intended_output !== 'estimate' && value.intended_output !== 'job')
+    || value.work_format !== 'standard'
+    || (value.status !== 'active' && value.status !== 'consumed' && value.status !== 'discarded')
+    || !isNullableUuid(value.legacy_inspection_id)
+    || (value.launched_output_type !== null && value.launched_output_type !== 'estimate' && value.launched_output_type !== 'job')
+    || !isNullableUuid(value.launched_estimate_id)
+    || !isNullableUuid(value.launched_job_id)
+    || !isNullableUuid(value.launched_estimate_id_snapshot)
+    || !isNullableUuid(value.launched_job_id_snapshot)
+    || (value.launched_at !== null && !isDurableDraftTimestamp(value.launched_at))
+    || !isDurableDraftTimestamp(value.created_at)
+    || !isDurableDraftTimestamp(value.updated_at)
+    || Date.parse(value.updated_at) < Date.parse(value.created_at)) return null;
+
+  if (value.status === 'consumed') {
+    if (!isDurableDraftTimestamp(value.launched_at) || value.launched_output_type !== value.intended_output) return null;
+    if (value.launched_output_type === 'estimate') {
+      if (!isDurableDraftUuid(value.launched_estimate_id_snapshot)
+        || (value.launched_estimate_id !== null && value.launched_estimate_id !== value.launched_estimate_id_snapshot)
+        || value.launched_job_id !== null
+        || value.launched_job_id_snapshot !== null) return null;
+    } else if (value.launched_output_type === 'job') {
+      if (!isDurableDraftUuid(value.launched_job_id_snapshot)
+        || (value.launched_job_id !== null && value.launched_job_id !== value.launched_job_id_snapshot)
+        || value.launched_estimate_id !== null
+        || value.launched_estimate_id_snapshot !== null) return null;
+    } else return null;
+  } else if (value.launched_output_type !== null
+    || value.launched_estimate_id !== null
+    || value.launched_job_id !== null
+    || value.launched_estimate_id_snapshot !== null
+    || value.launched_job_id_snapshot !== null
+    || value.launched_at !== null) return null;
+
+  return value as ContractorWorkDraftListRow;
+}
+
+export function parseContractorWorkDraftListRows(value: unknown): ContractorWorkDraftListRow[] | null {
+  if (!Array.isArray(value)) return null;
+  const rows = value.map(parseDraftListRow);
+  if (rows.some(row => row === null)) return null;
+  const parsed = rows as ContractorWorkDraftListRow[];
+  return new Set(parsed.map(row => row.id)).size === parsed.length ? parsed : null;
+}
+
 function stringField(source: Record<string, unknown>, key: string): string | null {
   const value = source[key];
   return typeof value === 'string' && value.trim() ? value : null;
@@ -433,8 +486,9 @@ export async function listContractorWorkDrafts(
       .order('updated_at', { ascending: false })
       .order('id', { ascending: true });
     if (result.error) throw normalizeDurableDraftError(result.error, 'list', result.status);
-    if (!Array.isArray(result.data)) throw new Error('Unexpected durable Draft list response shape');
-    return result.data as unknown as ContractorWorkDraftListRow[];
+    const rows = parseContractorWorkDraftListRows(result.data);
+    if (!rows) throw normalizeDurableDraftError({ message: 'DRAFT_RESPONSE_INVALID' }, 'list');
+    return rows;
   } catch (error) {
     throw normalizeDurableDraftError(error, 'list');
   }

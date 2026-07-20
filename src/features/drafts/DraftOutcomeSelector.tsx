@@ -2,10 +2,11 @@ import type { DraftIntendedOutput } from './draftComposerTypes';
 
 type DraftOutcomeSelectorProps = {
   value: DraftIntendedOutput | null;
-  onChange: (value: DraftIntendedOutput) => void;
+  onChange: (value: DraftIntendedOutput | null) => void;
 };
 
-const OPTIONS: Array<{ value: DraftIntendedOutput; label: string }> = [
+const OPTIONS: Array<{ value: DraftIntendedOutput | null; label: string }> = [
+  { value: null, label: 'Not decided' },
   { value: 'estimate', label: 'Estimate' },
   { value: 'job', label: 'Job' },
 ];
@@ -17,12 +18,12 @@ export function DraftOutcomeSelector({ value, onChange }: DraftOutcomeSelectorPr
       <p className="mt-1 text-xs leading-5 text-slate-500">
         Choose what this Draft may become later. This hidden foundation does not launch the Draft.
       </p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Intended output">
+      <div className="mt-3 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Intended output">
         {OPTIONS.map(option => {
           const selected = value === option.value;
           return (
             <label
-              key={option.value}
+              key={option.value ?? 'none'}
               className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-bold transition focus-within:ring-2 focus-within:ring-blue-500 ${
                 selected
                   ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
@@ -32,7 +33,7 @@ export function DraftOutcomeSelector({ value, onChange }: DraftOutcomeSelectorPr
               <input
                 type="radio"
                 name="shared-draft-intended-output"
-                value={option.value}
+                value={option.value ?? ''}
                 checked={selected}
                 onChange={() => onChange(option.value)}
                 className="sr-only"

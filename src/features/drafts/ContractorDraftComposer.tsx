@@ -95,7 +95,7 @@ export function ContractorDraftComposer({
     });
   };
 
-  const updateIntent = (intendedOutput: DraftIntendedOutput) => {
+  const updateIntent = (intendedOutput: DraftIntendedOutput | null) => {
     onChange({
       ...draft,
       intended_output: intendedOutput,
@@ -126,6 +126,7 @@ export function ContractorDraftComposer({
       <div className="grid gap-3 lg:grid-cols-3">
         {composerField('Customer type', (
           <select
+            data-testid="durable-draft-customer-type"
             className={fieldClass()}
             value={draft.subject_type}
             disabled={subjectTypeLocked}
@@ -145,6 +146,7 @@ export function ContractorDraftComposer({
         ))}
         {composerField('Customer', (
           <select
+            data-testid="durable-draft-customer"
             className={fieldClass()}
             value={selectedCustomerId}
             onChange={event => {
@@ -155,7 +157,7 @@ export function ContractorDraftComposer({
                 home_id: draft.subject_type === 'connected' ? option?.properties[0]?.id ?? '' : '',
                 local_contact_id: draft.subject_type === 'local' ? event.target.value : '',
                 local_home_id: draft.subject_type === 'local' ? option?.properties[0]?.id ?? '' : '',
-                service_request_id: draft.subject_type === 'connected' ? draft.service_request_id : '',
+                service_request_id: '',
               });
             }}
           >
@@ -167,12 +169,14 @@ export function ContractorDraftComposer({
         ))}
         {composerField('Property', (
           <select
+            data-testid="durable-draft-property"
             className={fieldClass()}
             value={selectedPropertyId}
             onChange={event => onChange({
               ...draft,
               home_id: draft.subject_type === 'connected' ? event.target.value : '',
               local_home_id: draft.subject_type === 'local' ? event.target.value : '',
+              service_request_id: '',
             })}
             disabled={!selectedCustomer}
           >
@@ -208,6 +212,19 @@ export function ContractorDraftComposer({
           placeholder="Describe the work to perform, materials to use, or customer expectations."
         />
       ))}
+
+      {composerField('Private notes', (
+        <textarea
+          className={`${fieldClass()} min-h-[96px] resize-y`}
+          value={draft.notes}
+          onChange={event => onChange({ ...draft, notes: event.target.value })}
+          placeholder="Visible only to your company and not copied to the customer-facing Estimate or Job."
+          aria-describedby="durable-draft-private-notes-help"
+        />
+      ))}
+      <p id="durable-draft-private-notes-help" className="text-xs leading-5 text-slate-500">
+        Contractor-only planning notes. These are not copied to the customer-facing Estimate or Job.
+      </p>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

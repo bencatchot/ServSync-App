@@ -189,8 +189,12 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     expect(appSource).toContain("import { ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';");
     expect(overviewSource).toContain('CONTRACTOR_WORK_UI_ENABLED ? (');
     expect(overviewSource).toContain('<ContractorWorkDashboard');
-    expect(overviewSource).toContain('canStartDraft={DRAFT_JOB_UI_ENABLED && canManageDraftJobs}');
-    expect(overviewSource).toContain('draftsToContinue={DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}');
+    expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled');
+    expect(overviewSource).toContain('? durableDraftCapabilities.canPersistDraft');
+    expect(overviewSource).toContain(': DRAFT_JOB_UI_ENABLED && canManageDraftJobs)}');
+    expect(overviewSource).toContain('draftsToContinue={sharedDraftComposerEnabled');
+    expect(overviewSource).toContain('? []');
+    expect(overviewSource).toContain(': DRAFT_JOB_UI_ENABLED && canManageDraftJobs ? composerDraftJobs : []}');
     expect(overviewSource).toContain('onStartNewDraft={startCleanDraftJobComposer}');
     expect(overviewSource).toContain('onContinueDraft={draft => void continueDraftJob(draft)}');
     expect(overviewSource).toContain('activeJobs={openJobs}');
