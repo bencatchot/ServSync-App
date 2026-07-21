@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import {
   canSeeDurableDraftWorkflow,
   isGlobalDurableDraftMasterEnabled,
+  loadDurableDraftCohortEntitlement,
+  normalizeDurableDraftCohortUuid,
   parseDurableDraftCohortEntitlement,
 } from '../../src/features/drafts/durableDraftCohortAvailability';
 
@@ -51,26 +53,29 @@ async function installRenderedHarness(page: Page, options: {
       now: 0,
       requests: [],
       resolvers: [],
+      client: null,
       root: createRoot(host),
     };
 
-    const client = {
+    const createClient = () => ({
       rpc(functionName, args) {
         control.requests.push({ functionName, args });
         return new Promise(resolveRequest => control.resolvers.push(resolveRequest));
       },
-    };
+    });
+    control.client = createClient();
     const readNow = () => control.now;
 
     function Harness() {
-      const { availability } = cohort.useDurableDraftCohortAvailability({
-        client,
+      const { availability, refresh } = cohort.useDurableDraftCohortAvailability({
+        client: control.client,
         contractorId: control.contractorId,
         sessionIdentity: control.sessionIdentity,
         globalMasterEnabled: control.globalMasterEnabled,
         now: readNow,
         refreshTtlMs: 100,
       });
+      control.refresh = refresh;
       const visible = cohort.canSeeDurableDraftWorkflow({
         globalMasterEnabled: control.globalMasterEnabled,
         availability,
@@ -95,6 +100,13 @@ async function installRenderedHarness(page: Page, options: {
       },
       unmount() {
         control.root.unmount();
+      },
+      replaceClient() {
+        control.client = createClient();
+        render();
+      },
+      refresh() {
+        return control.refresh?.();
       },
     };
     render();
@@ -218,6 +230,81 @@ test.describe('durable Draft cohort pure frontend contract', () => {
     ], CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
   });
 
+  test('requires canonical UUID syntax and normalizes hexadecimal letter case', () => {
+    const lowercase = 'abcdefab-cdef-abcd-efab-cdefabcdefab';
+    const uppercase = lowercase.toUpperCase();
+    expect(normalizeDurableDraftCohortUuid(lowercase)).toBe(lowercase);
+    expect(normalizeDurableDraftCohortUuid(uppercase)).toBe(lowercase);
+    expect(parseDurableDraftCohortEntitlement([{
+      contractor_id: uppercase,
+      can_use_durable_drafts: true,
+    }], lowercase)).toEqual({ contractor_id: lowercase, can_use_durable_drafts: true });
+    expect(parseDurableDraftCohortEntitlement([{
+      contractor_id: lowercase,
+      can_use_durable_drafts: false,
+    }], uppercase)).toEqual({ contractor_id: lowercase, can_use_durable_drafts: false });
+  });
+
+  test('rejects malformed, non-string, mismatched, and non-boolean cohort identities', () => {
+    const malformed = [
+      'not-a-uuid',
+      '10000000-0000-4000-8000-00000000000g',
+      `{${CONTRACTOR_A}}`,
+      ` ${CONTRACTOR_A}`,
+      `${CONTRACTOR_A} `,
+      CONTRACTOR_A.slice(0, -1),
+      `${CONTRACTOR_A}extra`,
+      '',
+    ];
+    for (const contractorId of malformed) {
+      expect(() => parseDurableDraftCohortEntitlement([{
+        contractor_id: contractorId,
+        can_use_durable_drafts: true,
+      }], contractorId), contractorId).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    }
+    for (const contractorId of [null, 1, {}, []]) {
+      expect(() => parseDurableDraftCohortEntitlement([{
+        contractor_id: CONTRACTOR_A,
+        can_use_durable_drafts: true,
+      }], contractorId)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+      expect(() => parseDurableDraftCohortEntitlement([{
+        contractor_id: contractorId,
+        can_use_durable_drafts: true,
+      }], CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    }
+    expect(() => parseDurableDraftCohortEntitlement([{
+      contractor_id: CONTRACTOR_B,
+      can_use_durable_drafts: true,
+    }], CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    for (const entitlement of ['true', 1, null]) {
+      expect(() => parseDurableDraftCohortEntitlement([{
+        contractor_id: CONTRACTOR_A,
+        can_use_durable_drafts: entitlement,
+      }], CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    }
+    expect(() => parseDurableDraftCohortEntitlement({
+      contractor_id: CONTRACTOR_A,
+      can_use_durable_drafts: true,
+    }, CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    expect(() => parseDurableDraftCohortEntitlement([[{
+      contractor_id: CONTRACTOR_A,
+      can_use_durable_drafts: true,
+    }]], CONTRACTOR_A)).toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+  });
+
+  test('rejects a malformed expected contractor before invoking the RPC client', async () => {
+    let calls = 0;
+    const client = {
+      rpc: async () => {
+        calls += 1;
+        return { data: null, error: null };
+      },
+    };
+    await expect(loadDurableDraftCohortEntitlement(client, 'not-a-uuid'))
+      .rejects.toThrow('DRAFT_COHORT_RESPONSE_INVALID');
+    expect(calls).toBe(0);
+  });
+
   test('rejects stale contractor and session state even when the entitlement was true', () => {
     expect(canSeeDurableDraftWorkflow({
       globalMasterEnabled: true,
@@ -295,13 +382,16 @@ test.describe('durable Draft cohort rendered loading and race behavior', () => {
       window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
     }, { contractorA: CONTRACTOR_A });
     await expect(page.getByTestId('surface')).toHaveText('loading-jobs');
+    await page.evaluate(() => void window.__durableCohortHarness.refresh());
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
     await page.evaluate(({ contractorB }) => {
       window.__durableCohortHarness.resolve(1, [{ contractor_id: contractorB, can_use_durable_drafts: false }]);
     }, { contractorB: CONTRACTOR_B });
     await expect(page.getByTestId('surface')).toHaveText('legacy-jobs');
   });
 
-  test('invalidates on session change and does not update after unmount', async ({ page }) => {
+  test('invalidates immediately on session change and rejects the prior response', async ({ page }) => {
     await installRenderedHarness(page);
     await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
     await page.evaluate(() => {
@@ -310,9 +400,38 @@ test.describe('durable Draft cohort rendered loading and race behavior', () => {
     });
     await expect(page.getByTestId('surface')).toHaveText('loading-jobs');
     await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('loading-jobs');
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(1, [{ contractor_id: contractorA, can_use_durable_drafts: false }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('legacy-jobs');
+  });
+
+  test('starts a distinct request when the Supabase client changes', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
+    await page.evaluate(() => window.__durableCohortHarness.replaceClient());
+    await expect(page.getByTestId('surface')).toHaveText('loading-jobs');
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('loading-jobs');
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(1, [{ contractor_id: contractorA, can_use_durable_drafts: false }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('legacy-jobs');
+  });
+
+  test('does not update state after unmount', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
     await page.evaluate(() => window.__durableCohortHarness.unmount());
     await page.evaluate(({ contractorA }) => {
-      window.__durableCohortHarness.resolve(1, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
     }, { contractorA: CONTRACTOR_A });
     await expect(page.locator('#cohort-test-root')).toBeEmpty();
   });
@@ -349,6 +468,86 @@ test.describe('durable Draft cohort rendered loading and race behavior', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+  });
+
+  test('coalesces simultaneous stale focus and visibility refreshes', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('durable-work');
+    await page.evaluate(() => {
+      window.__durableCohortHarness.control.now = 101;
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(1, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('durable-work');
+  });
+
+  test('coalesces repeated focus events while one refresh owns the request', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: false }]);
+    }, { contractorA: CONTRACTOR_A });
+    await page.evaluate(() => {
+      window.__durableCohortHarness.control.now = 101;
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('focus'));
+    });
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+  });
+
+  test('coalesces repeated visible events while one refresh owns the request', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: false }]);
+    }, { contractorA: CONTRACTOR_A });
+    await page.evaluate(() => {
+      window.__durableCohortHarness.control.now = 101;
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+  });
+
+  test('clears failed request ownership and permits a later stale refresh', async ({ page }) => {
+    await installRenderedHarness(page);
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(1);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(0, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await page.evaluate(() => {
+      window.__durableCohortHarness.control.now = 101;
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(2);
+    await page.evaluate(() => window.__durableCohortHarness.resolve(1, null, { message: 'unavailable' }));
+    await expect(page.getByTestId('surface')).toHaveText('legacy-jobs');
+    await page.evaluate(() => {
+      window.__durableCohortHarness.control.now = 202;
+      window.dispatchEvent(new Event('focus'));
+    });
+    await expect.poll(() => page.evaluate(() => window.__durableCohortHarness.control.requests.length)).toBe(3);
+    await page.evaluate(({ contractorA }) => {
+      window.__durableCohortHarness.resolve(2, [{ contractor_id: contractorA, can_use_durable_drafts: true }]);
+    }, { contractorA: CONTRACTOR_A });
+    await expect(page.getByTestId('surface')).toHaveText('durable-work');
   });
 });
 

@@ -48,6 +48,16 @@ type DurableDraftCohortRpcRow = {
   can_use_durable_drafts: boolean;
 };
 
+type InFlightEntitlementRequest = {
+  client: DurableDraftCohortRpcClient;
+  contractorId: string;
+  sessionIdentity: string;
+  generation: number;
+  promise: Promise<void>;
+};
+
+const CANONICAL_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const DISABLED_DURABLE_DRAFT_COHORT_AVAILABILITY: DurableDraftCohortAvailability = {
   status: 'disabled',
   canUseDurableDrafts: false,
@@ -57,35 +67,45 @@ const DISABLED_DURABLE_DRAFT_COHORT_AVAILABILITY: DurableDraftCohortAvailability
   errorKind: null,
 };
 
+export function normalizeDurableDraftCohortUuid(value: unknown): string | null {
+  return typeof value === 'string' && CANONICAL_UUID_PATTERN.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
 function rpcRow(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    if (value.length === 0) return null;
-    if (value.length === 1) return value[0];
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value) || value.length !== 1) {
+    if (Array.isArray(value) && value.length === 0) return null;
     throw new Error('DRAFT_COHORT_RESPONSE_INVALID');
   }
-  return value;
+  return value[0];
 }
 
 export function parseDurableDraftCohortEntitlement(
   value: unknown,
-  expectedContractorId: string,
+  expectedContractorId: unknown,
 ): DurableDraftCohortRpcRow | null {
+  const normalizedExpectedContractorId = normalizeDurableDraftCohortUuid(expectedContractorId);
+  if (!normalizedExpectedContractorId) throw new Error('DRAFT_COHORT_RESPONSE_INVALID');
   const row = rpcRow(value);
   if (row === null || row === undefined) return null;
   if (typeof row !== 'object') throw new Error('DRAFT_COHORT_RESPONSE_INVALID');
   const record = row as Record<string, unknown>;
   const fields = Object.keys(record).sort();
+  const normalizedReturnedContractorId = normalizeDurableDraftCohortUuid(record.contractor_id);
   if (
     fields.length !== 2
     || fields[0] !== 'can_use_durable_drafts'
     || fields[1] !== 'contractor_id'
-    || record.contractor_id !== expectedContractorId
+    || !normalizedReturnedContractorId
+    || normalizedReturnedContractorId !== normalizedExpectedContractorId
     || typeof record.can_use_durable_drafts !== 'boolean'
   ) {
     throw new Error('DRAFT_COHORT_RESPONSE_INVALID');
   }
   return {
-    contractor_id: expectedContractorId,
+    contractor_id: normalizedExpectedContractorId,
     can_use_durable_drafts: record.can_use_durable_drafts,
   };
 }
@@ -123,11 +143,13 @@ export async function loadDurableDraftCohortEntitlement(
   client: DurableDraftCohortRpcClient,
   contractorId: string,
 ): Promise<DurableDraftCohortRpcRow | null> {
+  const normalizedContractorId = normalizeDurableDraftCohortUuid(contractorId);
+  if (!normalizedContractorId) throw new Error('DRAFT_COHORT_RESPONSE_INVALID');
   const result = await client.rpc('servsync_current_contractor_durable_draft_entitlement', {
-    p_contractor_id: contractorId,
+    p_contractor_id: normalizedContractorId,
   });
   if (result.error) throw new Error('DRAFT_COHORT_RPC_FAILED');
-  return parseDurableDraftCohortEntitlement(result.data, contractorId);
+  return parseDurableDraftCohortEntitlement(result.data, normalizedContractorId);
 }
 
 export function useDurableDraftCohortAvailability(input: {
@@ -142,6 +164,7 @@ export function useDurableDraftCohortAvailability(input: {
   const refreshTtlMs = input.refreshTtlMs ?? DURABLE_DRAFT_COHORT_REFRESH_TTL_MS;
   const generation = useRef(0);
   const mounted = useRef(true);
+  const inFlight = useRef<InFlightEntitlementRequest | null>(null);
   const stateRef = useRef<DurableDraftCohortAvailability>(DISABLED_DURABLE_DRAFT_COHORT_AVAILABILITY);
   const [availability, setAvailability] = useState<DurableDraftCohortAvailability>(
     DISABLED_DURABLE_DRAFT_COHORT_AVAILABILITY,
@@ -155,11 +178,25 @@ export function useDurableDraftCohortAvailability(input: {
 
   const refresh = useCallback(async () => {
     const { client, contractorId, globalMasterEnabled, sessionIdentity } = input;
-    const requestGeneration = ++generation.current;
     if (!client || !globalMasterEnabled || !contractorId || !sessionIdentity) {
+      generation.current += 1;
+      inFlight.current = null;
       commit(DISABLED_DURABLE_DRAFT_COHORT_AVAILABILITY);
       return;
     }
+
+    const currentInFlight = inFlight.current;
+    if (
+      currentInFlight
+      && currentInFlight.client === client
+      && currentInFlight.contractorId === contractorId
+      && currentInFlight.sessionIdentity === sessionIdentity
+      && currentInFlight.generation === generation.current
+    ) {
+      return currentInFlight.promise;
+    }
+
+    const requestGeneration = ++generation.current;
 
     const current = stateRef.current;
     const refreshingResolvedContext = current.status === 'resolved'
@@ -176,30 +213,44 @@ export function useDurableDraftCohortAvailability(input: {
       });
     }
 
-    try {
-      const entitlement = await loadDurableDraftCohortEntitlement(client, contractorId);
-      if (!mounted.current || generation.current !== requestGeneration) return;
-      commit({
-        status: 'resolved',
-        canUseDurableDrafts: entitlement?.can_use_durable_drafts === true,
-        contractorId,
-        sessionIdentity,
-        checkedAt: now(),
-        errorKind: null,
-      });
-    } catch (error) {
-      if (!mounted.current || generation.current !== requestGeneration) return;
-      commit({
-        status: 'error',
-        canUseDurableDrafts: false,
-        contractorId,
-        sessionIdentity,
-        checkedAt: now(),
-        errorKind: error instanceof Error && error.message === 'DRAFT_COHORT_RESPONSE_INVALID'
-          ? 'response'
-          : 'rpc',
-      });
-    }
+    let request: InFlightEntitlementRequest | null = null;
+    const promise = (async () => {
+      try {
+        const entitlement = await loadDurableDraftCohortEntitlement(client, contractorId);
+        if (!mounted.current || generation.current !== requestGeneration) return;
+        commit({
+          status: 'resolved',
+          canUseDurableDrafts: entitlement?.can_use_durable_drafts === true,
+          contractorId,
+          sessionIdentity,
+          checkedAt: now(),
+          errorKind: null,
+        });
+      } catch (error) {
+        if (!mounted.current || generation.current !== requestGeneration) return;
+        commit({
+          status: 'error',
+          canUseDurableDrafts: false,
+          contractorId,
+          sessionIdentity,
+          checkedAt: now(),
+          errorKind: error instanceof Error && error.message === 'DRAFT_COHORT_RESPONSE_INVALID'
+            ? 'response'
+            : 'rpc',
+        });
+      } finally {
+        if (request && inFlight.current === request) inFlight.current = null;
+      }
+    })();
+    request = {
+      client,
+      contractorId,
+      sessionIdentity,
+      generation: requestGeneration,
+      promise,
+    };
+    inFlight.current = request;
+    return promise;
   }, [commit, input.client, input.contractorId, input.globalMasterEnabled, input.sessionIdentity, now]);
 
   useEffect(() => {
@@ -231,6 +282,7 @@ export function useDurableDraftCohortAvailability(input: {
   useEffect(() => () => {
     mounted.current = false;
     generation.current += 1;
+    inFlight.current = null;
   }, []);
 
   return { availability, refresh };

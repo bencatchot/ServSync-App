@@ -176,12 +176,12 @@ Current source and deployed-state inventory:
 
 - `servsync-durable-draft-launch-foundation.sql`, SHA-256 `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f`, is the corrected canonical foundation. It is installed and verified in Production; Production durable Draft tables are empty and no authenticated Production durable workflow has run.
 - `servsync-durable-draft-launch-permission-parity-correction.sql`, SHA-256 `b4a98f33acd99083bea4497268393f6277ef330cdcb31bdc5d253adb94b14c7f`, is the historical Sandbox-only correction. Do not apply it to Production after the corrected canonical foundation.
-- `servsync-durable-draft-cohort-entitlement.sql` is additive cohort-gating source. It is not applied to Sandbox or Production by the source PR.
+- `servsync-durable-draft-cohort-entitlement.sql`, SHA-256 `51d1921d1d19cb79a95c4c81976b78a09d00968d7020140598362e8b72cf453b`, is installed and validated in Sandbox. It remains unapplied to Production.
 - No contractor is enrolled by the cohort-gating source PR. `durable_draft_beta_enabled` defaults to `false` for every existing and future billing-account row.
 
 The runtime exposure decision is default-deny. All of the following must be true: `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED=true`, `VITE_DRAFT_JOB_UI_ENABLED=true`, `VITE_CONTRACTOR_WORK_UI_ENABLED=true`, Demo Presentation off, a valid contractor context, and a server-resolved exact-tenant entitlement. Missing, partial, false, malformed, stale, or failed state renders legacy Jobs. The three global gates remain the emergency kill switch and remain absent/off in Production until separately approved. The cohort entitlement controls presentation only; existing Draft persistence, Estimate, Job, RLS, and RPC authority remains authoritative.
 
-The source uses a one-minute in-memory entitlement TTL. It refreshes on contractor/session changes and when a stale window regains focus or visibility. It does not poll and does not persist entitlement in browser storage. Removal therefore takes effect on the next bounded refresh without a source deployment.
+The source uses a one-minute in-memory entitlement TTL. It refreshes on contractor/session changes and when a stale window regains focus or visibility. Equivalent simultaneous refreshes for the same client, contractor, session, and request generation are coalesced into one RPC, while stale responses remain generation-guarded. It does not poll and does not persist entitlement in browser storage. Removal is observed on contractor/session change, a stale focus/visibility refresh, or forced reload; a continuously active uninterrupted tab has no guaranteed autonomous refresh maximum and remains an external-beta rollout limitation.
 
 Required approval sequence:
 
@@ -207,6 +207,8 @@ Sandbox validation matrix after separate approval:
 - neutral loading, RPC error, tenant/session switch, focus/visibility refresh, and direct durable-target restoration;
 - capability separation for Draft persistence, Estimate launch, and Job launch;
 - legacy Jobs fallback with zero durable controls for every non-entitled or unresolved state.
+
+Completed Sandbox validation: the staged matrix passed with one temporary exact-UUID target enrollment, all non-target billing rows false, role/capability separation intact, one private Draft and one unsent Estimate, homeowner and comparison-tenant isolation, stale session/context rejection, direct-entry normalization, and zero Production requests. Exact runtime fixtures were cleaned, the target entitlement was restored false, all billing rows ended false, the three branch-scoped gates were removed, and the final gates-off Preview returned to legacy Jobs. This evidence does not authorize Production SQL, Production enrollment, Production gates, Production smoke, or external beta.
 
 Do not treat source merge, cohort SQL application, tenant enrollment, global-gate enablement, or Preview validation as interchangeable approvals. Structured privacy-safe telemetry remains required before external beta. Telemetry must not contain private Draft notes, item descriptions, pricing, customer contact data, property details, service-request content, credentials, or raw identifiers beyond an explicitly reviewed minimum.
 
