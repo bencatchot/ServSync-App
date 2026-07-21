@@ -14,7 +14,7 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 - Known risks or follow-ups: PR #322 remains draft. The cohort SQL is installed in Sandbox but remains unapplied to Production; no contractor remains enrolled and all three global gates remain off. A continuously active uninterrupted tab still has no autonomous entitlement-refresh maximum because this source intentionally adds neither polling nor server push; removal is observed through context change, stale focus/visibility refresh, or forced reload. Production SQL, Production enrollment, gate rollout, smoke, telemetry, and external beta remain separately unauthorized.
 - Backlog impact:
   - BACKLOG FILE UPDATED: YES
-  - REASON: FB-035 now records cohort gating as implemented in source but pending SQL application, validation, approved enrollment, and rollout.
+  - REASON: FB-035 now records the completed source architecture, Sandbox SQL installation, authenticated pre-enrollment matrix, temporary one-row enrollment, all-gates staged Draft-to-unsent-Estimate validation, privacy and cross-tenant checks, exact cleanup, entitlement and branch-gate rollback, UUID parser hardening, and refresh coalescing. Sandbox is restored with all entitlements false, no runtime residue, and gates off; Production remains untouched. PR metadata verification, owner mark-ready/merge authorization, Production SQL preflight/application, Production test-tenant approval, Production gate rollout, bounded smoke, and telemetry/revocation decisions before broad external beta remain pending.
 - Master plan impact:
   - MASTER PLAN UPDATED: YES
   - REASON: The Draft-first rollout sequence now has a default-deny tenant exposure layer separate from launch authority and the global emergency kill switch.

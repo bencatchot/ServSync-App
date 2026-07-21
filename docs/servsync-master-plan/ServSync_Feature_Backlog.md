@@ -1546,7 +1546,7 @@ Recommended implementation sequence:
 11. Later: add invoice allocation, deposit, itemized progress, amount-only progress, final reconciliation, document revisions, comprehensive history, explicit reopening, and legacy direct-job retirement only after approval.
 
 Current next step:
-Complete review of the default-deny durable Draft contractor cohort-gating source. Keep all three global gates off. Do not apply the cohort SQL, enroll a tenant, enable ordinary Preview/Production exposure, ship direct Draft-to-Invoice launch, or begin external beta until separate approval covers SQL application, exact-UUID enrollment, the documented Sandbox matrix, Production rollout, and structured privacy-safe telemetry. The corrected canonical durable foundation is already installed in Production; do not reapply it or apply the Sandbox-only correction there.
+Complete final metadata verification for draft PR #322, then obtain separate owner authorization for mark-ready and merge. Source implementation, strict UUID parsing, and equivalent in-flight refresh coalescing are complete. The cohort SQL is installed in Sandbox; the pre-enrollment role matrix and supervised false-to-true-to-false target validation passed, including one exact Draft-to-unsent-Estimate path. Runtime fixtures were cleaned, all six Sandbox entitlement rows are currently false, and temporary branch gates were removed. Production remains unchanged: do not apply Production cohort SQL, enroll a Production tenant, enable Production gates, begin Production smoke, ship direct Draft-to-Invoice launch, or begin external beta without separate approval. Production rollout and privacy-safe telemetry remain separate gates.
 
 ## Current next recommended focus
 

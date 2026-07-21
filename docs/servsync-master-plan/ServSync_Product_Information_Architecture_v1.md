@@ -1045,7 +1045,7 @@ Current production state:
 - Production serves the legacy Jobs workflow because all three Draft/Work gates are absent/off.
 - The corrected canonical durable Draft backend is installed and verified; Production durable Draft tables remain empty and no authenticated Production durable workflow has run.
 - Create Estimate and Create Job from durable Draft exist in gated code, including canonical consumption and guarded same-session output navigation. Direct Draft-to-Invoice remains unimplemented.
-- Default-deny contractor cohort gating is implemented in source but its additive SQL is not applied and no contractor is enrolled. SQL application, exact-UUID enrollment, validation, and gate rollout remain separately approved operations.
+- Default-deny contractor cohort gating is implemented in draft PR #322. In Sandbox, the cohort SQL is installed and the staged role/runtime matrix passed: one test contractor was temporarily enrolled and restored to false, all entitlement rows are currently false, runtime-created Draft/Estimate records were cleaned, temporary branch variables were removed, and the final Preview is gates-off. In Production, the cohort column and RPC remain absent, no contractor is enrolled, the Draft/Work gates remain off, and no authenticated durable Draft runtime validation has occurred. PR mark-ready/merge, Production SQL, enrollment, gates, and smoke remain separately unauthorized. An uninterrupted active tab has no guaranteed autonomous entitlement-revocation maximum, so supervised rollback requires reload and broader-beta revocation semantics remain a separate decision.
 
 ## 11. Expansion Rules
 
