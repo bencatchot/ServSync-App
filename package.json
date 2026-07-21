@@ -28,6 +28,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
+    "demo:data:setup": "node --experimental-strip-types scripts/demo-data/servsync-demo-dataset.ts",
+    "screenshots:marketing": "playwright test --config=tests/marketing-screenshots/playwright.marketing.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
