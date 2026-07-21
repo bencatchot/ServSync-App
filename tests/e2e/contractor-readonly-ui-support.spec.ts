@@ -43,7 +43,7 @@ test.describe('contractor read-only UI support', () => {
     expect(dashboardSource).toContain('disabled={!selectedJobsCustomerName || createEstimateCapability.disabled}');
     expect(dashboardSource).toContain('disabled={!selectedJobsCustomerName || createInvoiceCapability.disabled}');
     expect(dashboardSource).toContain('disabled={inviteTeamCapability.disabled || creatingTeamInvite || !teamInviteDraft.email.trim()}');
-    expect(dashboardSource).toContain('disabled={savingInvoice || updatingInvoiceId === editingInvoiceId || !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}');
+    expect(dashboardSource).toContain('disabled={savingInvoice || invoiceDraftSendInProgress || !invoiceDraftCanSendToHomeowner || sendInvoiceCapability.disabled}');
     expect(dashboardSource).toContain('{readOnlyContractorActionReason && (');
     expect(dashboardSource).toContain('{sendInvoiceCapability.disabled && (');
     expect(dashboardSource).toContain('visibleInvoiceRecords.map');

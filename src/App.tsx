@@ -142,9 +142,13 @@ import {
 import { DraftNotice } from './features/drafts/DraftNotice';
 import { VisibilityNotice } from './features/drafts/VisibilityNotice';
 import {
-  isDurableDraftComposerPathEnabled,
   type DurableDraftOpenTarget,
 } from './features/drafts/durableDraftComposerIntegration';
+import {
+  canSeeDurableDraftWorkflow,
+  isGlobalDurableDraftMasterEnabled,
+  useDurableDraftCohortAvailability,
+} from './features/drafts/durableDraftCohortAvailability';
 import { loadDurableDraftCapabilities } from './features/drafts/durableDraftCapabilities';
 import type { DurableDraftCompatibilityCapabilities } from './features/drafts/durableDraftLaunchTypes';
 import {
@@ -21763,10 +21767,33 @@ function ContractorDashboard({
   const [activeDraftJobId, setActiveDraftJobId] = useState<string | null>(null);
   const [removedDraftJobWorkItemIds, setRemovedDraftJobWorkItemIds] = useState<string[]>([]);
   const durableDraftComposerRequested = SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED && DRAFT_JOB_UI_ENABLED;
-  const sharedDraftComposerEnabled = isDurableDraftComposerPathEnabled({
-    sharedDraftEnabled: SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED,
-    draftJobEnabled: DRAFT_JOB_UI_ENABLED,
-    demoPresentationMode: SERVSYNC_DEMO_PRESENTATION_MODE,
+  const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({
+    sharedDraftComposerEnabled: SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED,
+    draftJobUiEnabled: DRAFT_JOB_UI_ENABLED,
+    contractorWorkUiEnabled: CONTRACTOR_WORK_UI_ENABLED,
+    demoPresentationActive: SERVSYNC_DEMO_PRESENTATION_MODE,
+  });
+  const { availability: durableDraftCohortAvailability } = useDurableDraftCohortAvailability({
+    client: supabase,
+    contractorId: contractor?.id ?? null,
+    sessionIdentity: profile.id,
+    globalMasterEnabled: globalDurableDraftMasterEnabled,
+  });
+  const durableDraftCohortContextMatches = durableDraftCohortAvailability.contractorId === (contractor?.id ?? null)
+    && durableDraftCohortAvailability.sessionIdentity === profile.id;
+  const durableDraftCohortLoading = globalDurableDraftMasterEnabled
+    && Boolean(contractor?.id)
+    && (
+      !durableDraftCohortContextMatches
+      || durableDraftCohortAvailability.status === 'loading'
+    );
+  const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({
+    globalMasterEnabled: globalDurableDraftMasterEnabled,
+    availability: durableDraftCohortAvailability,
+    activeContractorId: contractor?.id ?? null,
+    activeSessionIdentity: profile.id,
+    validContractorContext: profile.role === 'contractor' && Boolean(contractor?.id),
+    demoPresentationActive: SERVSYNC_DEMO_PRESENTATION_MODE,
   });
   const [savingDraftJob, setSavingDraftJob] = useState(false);
   const [creatingJobFromDraft, setCreatingJobFromDraft] = useState(false);
@@ -21813,6 +21840,21 @@ function ContractorDashboard({
       });
     return () => { cancelled = true; };
   }, [sharedDraftComposerEnabled, profile.id, contractor?.id]);
+
+  useEffect(() => {
+    if (sharedDraftComposerEnabled) return;
+    const entitlementDefinitivelyUnavailable = !globalDurableDraftMasterEnabled
+      || durableDraftCohortAvailability.status === 'disabled'
+      || durableDraftCohortAvailability.status === 'error'
+      || (durableDraftCohortAvailability.status === 'resolved' && !durableDraftCohortAvailability.canUseDurableDrafts)
+      || !durableDraftCohortContextMatches;
+    if (entitlementDefinitivelyUnavailable) setDurableDraftOpenTarget(null);
+  }, [
+    durableDraftCohortAvailability,
+    durableDraftCohortContextMatches,
+    globalDurableDraftMasterEnabled,
+    sharedDraftComposerEnabled,
+  ]);
 
   useEffect(() => {
     setAccountNameDraft(profile.full_name || '');
@@ -37220,7 +37262,15 @@ function ContractorDashboard({
               })()}
 
               {contractorJobsView === 'overview' && (
-                CONTRACTOR_WORK_UI_ENABLED ? (
+                durableDraftCohortLoading ? (
+                  <section
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                    data-testid="durable-draft-cohort-loading"
+                    aria-live="polite"
+                  >
+                    <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                  </section>
+                ) : sharedDraftComposerEnabled ? (
                   <ContractorWorkDashboard
                     loading={loading}
                     loadError={!loading && !contractor ? 'Save the business profile before Work can load.' : ''}
@@ -37262,7 +37312,10 @@ function ContractorDashboard({
                       setInspectionView('list');
                     }}
                   />
-                ) : (
+                ) : null
+              )}
+
+              {contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (
               <section data-testid="contractor-jobs-overview" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <div>
@@ -37458,7 +37511,6 @@ function ContractorDashboard({
                   </div>
                 </div>
               </section>
-                )
               )}
 
               {contractorJobsView === 'new_financial' && (
@@ -38800,7 +38852,15 @@ function ContractorDashboard({
 	                    return (
                       <div className="space-y-4">
                         {DRAFT_JOB_UI_ENABLED && contractorJobsView === 'open_jobs' && (
-                          sharedDraftComposerEnabled && supabase ? (
+                          durableDraftCohortLoading ? (
+                            <div
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                              data-testid="durable-draft-cohort-list-loading"
+                              aria-live="polite"
+                            >
+                              <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                            </div>
+                          ) : sharedDraftComposerEnabled && supabase ? (
                             <DurableDraftWorkspace
                               client={supabase}
                               mode="list"
@@ -40436,7 +40496,7 @@ function ContractorDashboard({
               </>
               )}
 
-              {contractorJobsView === 'overview' && !CONTRACTOR_WORK_UI_ENABLED && (
+              {contractorJobsView === 'overview' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (
               <Card title="Recent jobs" icon={<ClipboardCheck size={18} />}>
                 {operationalInspections.length === 0 ? (
                   <EmptyState
@@ -40498,6 +40558,17 @@ function ContractorDashboard({
 
           {/* ── DRAFT JOB COMPOSER VIEW ── */}
           {DRAFT_JOB_UI_ENABLED && inspectionView === 'draft_job' && (!sharedDraftComposerEnabled || Boolean(supabase)) && (
+            durableDraftCohortLoading ? (
+              <Card title="Jobs" icon={<Plus size={18} />}>
+                <div
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  data-testid="durable-draft-cohort-editor-loading"
+                  aria-live="polite"
+                >
+                  <p className="text-sm font-semibold text-slate-700">Loading Jobs...</p>
+                </div>
+              </Card>
+            ) : (
             <Card title={sharedDraftComposerEnabled ? 'Start New Draft' : 'Start New Job'} icon={<Plus size={18} />}>
               {sharedDraftComposerEnabled && supabase ? (
                 <DurableDraftWorkspace
@@ -40557,6 +40628,7 @@ function ContractorDashboard({
                 </>
               )}
             </Card>
+            )
           )}
 
           {/* ── NEW VIEW ── */}

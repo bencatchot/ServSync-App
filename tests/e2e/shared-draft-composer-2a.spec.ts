@@ -43,7 +43,9 @@ test.describe('Hidden Shared Draft Composer UI Foundation', () => {
     );
 
     expect(appSource).toContain("import { SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED } from './features/drafts/sharedDraftComposerAvailability';");
-    expect(appSource).toContain('const sharedDraftComposerEnabled = isDurableDraftComposerPathEnabled({');
+    expect(appSource).toContain('const sharedDraftComposerEnabled = canSeeDurableDraftWorkflow({');
+    expect(appSource).toContain('useDurableDraftCohortAvailability({');
+    expect(renderSource).toContain('durableDraftCohortLoading ? (');
     expect(renderSource).toContain('sharedDraftComposerEnabled && supabase ? (');
     expect(renderSource).toContain('<DurableDraftWorkspace');
     expect(renderSource).toContain('<DraftJobComposer');

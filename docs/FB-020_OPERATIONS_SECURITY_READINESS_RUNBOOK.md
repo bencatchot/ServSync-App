@@ -170,6 +170,48 @@ Catalog checks should verify deployed state instead of assuming that repository 
 
 Use `docs/FB-020_BACKUP_RESTORE_LEDGER_TEMPLATES.md` as the sanitized capture format for future applied-SQL evidence. Real operational ledgers should stay in an approved private ops location unless intentionally sanitized for repo tracking.
 
+## Durable Draft Cohort Rollout
+
+Current source and deployed-state inventory:
+
+- `servsync-durable-draft-launch-foundation.sql`, SHA-256 `ac9e600ece3075e2d171da5571aab2b26e7a1f6f234239b02194fa7be3d2354f`, is the corrected canonical foundation. It is installed and verified in Production; Production durable Draft tables are empty and no authenticated Production durable workflow has run.
+- `servsync-durable-draft-launch-permission-parity-correction.sql`, SHA-256 `b4a98f33acd99083bea4497268393f6277ef330cdcb31bdc5d253adb94b14c7f`, is the historical Sandbox-only correction. Do not apply it to Production after the corrected canonical foundation.
+- `servsync-durable-draft-cohort-entitlement.sql`, SHA-256 `51d1921d1d19cb79a95c4c81976b78a09d00968d7020140598362e8b72cf453b`, is installed and validated in Sandbox. It remains unapplied to Production.
+- No contractor is enrolled by the cohort-gating source PR. `durable_draft_beta_enabled` defaults to `false` for every existing and future billing-account row.
+
+The runtime exposure decision is default-deny. All of the following must be true: `VITE_SHARED_DRAFT_COMPOSER_LAUNCH_ENABLED=true`, `VITE_DRAFT_JOB_UI_ENABLED=true`, `VITE_CONTRACTOR_WORK_UI_ENABLED=true`, Demo Presentation off, a valid contractor context, and a server-resolved exact-tenant entitlement. Missing, partial, false, malformed, stale, or failed state renders legacy Jobs. The three global gates remain the emergency kill switch and remain absent/off in Production until separately approved. The cohort entitlement controls presentation only; existing Draft persistence, Estimate, Job, RLS, and RPC authority remains authoritative.
+
+The source uses a one-minute in-memory entitlement TTL. It refreshes on contractor/session changes and when a stale window regains focus or visibility. Equivalent simultaneous refreshes for the same client, contractor, session, and request generation are coalesced into one RPC, while stale responses remain generation-guarded. It does not poll and does not persist entitlement in browser storage. Removal is observed on contractor/session change, a stale focus/visibility refresh, or forced reload; a continuously active uninterrupted tab has no guaranteed autonomous refresh maximum and remains an external-beta rollout limitation.
+
+Required approval sequence:
+
+1. Review and approve the exact cohort SQL hash and target environment.
+2. Apply the cohort SQL to Sandbox only under a separate SQL-application authorization.
+3. Run the controlled Sandbox matrix before any Production cohort SQL application.
+4. Approve one contractor by exact contractor UUID; never select a tenant by email, name, or fuzzy lookup.
+5. Record the approval reference, exact UUID, operator, timestamp, before/after value, readback result, and rollback owner in the private operational ledger.
+6. Enable all three global gates only in the separately approved validation environment.
+7. Apply the cohort SQL to Production only after a separate Production SQL authorization and read-only preflight.
+8. Enroll a Production tenant only with explicit owner approval and exact-UUID readback verification.
+9. Keep a tested `false` removal path and all three global gates available as independent rollback controls.
+
+An approved administrator performs enrollment as a one-row update scoped to the exact contractor UUID, verifies exactly one affected row, and reads back the same exact UUID plus boolean. Removal repeats the same operation with `false`. Do not use email selection, wildcard predicates, a bulk update, or a cohort-management UI. The platform-admin-only billing update policy remains the enrollment authority; the browser entitlement RPC grants no table mutation.
+
+Sandbox validation matrix after separate approval:
+
+- entitled owner, Job-only member, and viewer;
+- non-entitled owner, Job-only member, and viewer;
+- connected and unconnected homeowner;
+- platform admin without ordinary contractor owner/team context;
+- all global gates off, all three on, a partial-gate combination, and Demo Presentation;
+- neutral loading, RPC error, tenant/session switch, focus/visibility refresh, and direct durable-target restoration;
+- capability separation for Draft persistence, Estimate launch, and Job launch;
+- legacy Jobs fallback with zero durable controls for every non-entitled or unresolved state.
+
+Completed Sandbox validation: the staged matrix passed with one temporary exact-UUID target enrollment, all non-target billing rows false, role/capability separation intact, one private Draft and one unsent Estimate, homeowner and comparison-tenant isolation, stale session/context rejection, direct-entry normalization, and zero Production requests. Exact runtime fixtures were cleaned, the target entitlement was restored false, all billing rows ended false, the three branch-scoped gates were removed, and the final gates-off Preview returned to legacy Jobs. This evidence does not authorize Production SQL, Production enrollment, Production gates, Production smoke, or external beta.
+
+Do not treat source merge, cohort SQL application, tenant enrollment, global-gate enablement, or Preview validation as interchangeable approvals. Structured privacy-safe telemetry remains required before external beta. Telemetry must not contain private Draft notes, item descriptions, pricing, customer contact data, property details, service-request content, credentials, or raw identifiers beyond an explicitly reviewed minimum.
+
 ## Fresh Environment Rebuild Expectations
 
 A fresh environment rebuild should be possible from repository files plus documented secrets/settings.

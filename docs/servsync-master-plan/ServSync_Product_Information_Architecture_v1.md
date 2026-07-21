@@ -1042,11 +1042,10 @@ The Draft-first redesign should not be treated as a global navigation redesign b
 
 Current production state:
 
-- Production serves the legacy Jobs workflow because `VITE_DRAFT_JOB_UI_ENABLED` is absent in Production.
-- The Draft backend remains installed.
-- Draft-first Work development should continue in sandbox/preview until the redesigned Work module is approved and validated.
-- Create Estimate and Create Invoice from Draft remain unimplemented.
-- Create Job from Draft exists in code from the prior slice but should not be treated as a full Work redesign.
+- Production serves the legacy Jobs workflow because all three Draft/Work gates are absent/off.
+- The corrected canonical durable Draft backend is installed and verified; Production durable Draft tables remain empty and no authenticated Production durable workflow has run.
+- Create Estimate and Create Job from durable Draft exist in gated code, including canonical consumption and guarded same-session output navigation. Direct Draft-to-Invoice remains unimplemented.
+- Default-deny contractor cohort gating is implemented in draft PR #322. In Sandbox, the cohort SQL is installed and the staged role/runtime matrix passed: one test contractor was temporarily enrolled and restored to false, all entitlement rows are currently false, runtime-created Draft/Estimate records were cleaned, temporary branch variables were removed, and the final Preview is gates-off. In Production, the cohort column and RPC remain absent, no contractor is enrolled, the Draft/Work gates remain off, and no authenticated durable Draft runtime validation has occurred. PR mark-ready/merge, Production SQL, enrollment, gates, and smoke remain separately unauthorized. An uninterrupted active tab has no guaranteed autonomous entitlement-revocation maximum, so supervised rollback requires reload and broader-beta revocation semantics remain a separate decision.
 
 ## 11. Expansion Rules
 
@@ -1134,7 +1133,7 @@ This document defines direction. It does not ship behavior.
 Current guardrails:
 
 - Do not imply Production has the Draft-first Work redesign.
-- Do not imply Production has Create Estimate or Create Invoice from Draft.
+- Do not imply Production exposes Create Estimate or Create Job from Draft while the gates and tenant entitlement remain off; direct Draft-to-Invoice is not implemented.
 - Do not imply the legacy Jobs workflow has been removed.
 - Do not imply subscription plans are live enforcement unless separately verified.
 - Do not imply advanced dispatch, routing, native mobile apps, payment collection, accounting sync, or automated reminders are live.

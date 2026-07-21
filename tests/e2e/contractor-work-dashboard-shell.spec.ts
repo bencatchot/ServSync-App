@@ -181,13 +181,15 @@ test.describe('Contractor Work dashboard shell guardrails', () => {
     );
     const recentJobsSource = sourceBetween(
       appSource,
-      '{contractorJobsView === \'overview\' && !CONTRACTOR_WORK_UI_ENABLED && (',
+      '{contractorJobsView === \'overview\' && !durableDraftCohortLoading && !sharedDraftComposerEnabled && (',
       '{/* ── DRAFT JOB COMPOSER VIEW ── */}',
     );
 
     expect(appSource).toContain("import { CONTRACTOR_WORK_UI_ENABLED } from './features/work/contractorWorkAvailability';");
     expect(appSource).toContain("import { ContractorWorkDashboard } from './features/work/ContractorWorkDashboard';");
-    expect(overviewSource).toContain('CONTRACTOR_WORK_UI_ENABLED ? (');
+    expect(appSource).toContain('const globalDurableDraftMasterEnabled = isGlobalDurableDraftMasterEnabled({');
+    expect(overviewSource).toContain('durableDraftCohortLoading ? (');
+    expect(overviewSource).toContain('sharedDraftComposerEnabled ? (');
     expect(overviewSource).toContain('<ContractorWorkDashboard');
     expect(overviewSource).toContain('canStartDraft={!SERVSYNC_DEMO_PRESENTATION_MODE && (sharedDraftComposerEnabled');
     expect(overviewSource).toContain('? durableDraftCapabilities.canPersistDraft');
