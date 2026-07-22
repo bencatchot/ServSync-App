@@ -21,7 +21,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export const SCHEMA_VERSION = 'servsync-controlled-ops/v2';
-export const TOOL_VERSION = '1.1.0';
+export const TOOL_VERSION = '1.2.0';
 export const GENESIS_HASH = '0'.repeat(64);
 export const SAFE_LABEL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 export const PACKET_LOCK_NAME = '.controlled-ops-mutation.lock';
@@ -114,6 +114,72 @@ export function validateSafeLabel(value, fieldName) {
   return value;
 }
 
+function entropyBitsPerCharacter(value) {
+  const counts = new Map();
+  for (const character of value) counts.set(character, (counts.get(character) ?? 0) + 1);
+  let entropy = 0;
+  for (const count of counts.values()) {
+    const probability = count / value.length;
+    entropy -= probability * Math.log2(probability);
+  }
+  return entropy;
+}
+
+export function validateRawOperationRootInput(value, fieldName = 'operation root') {
+  if (typeof value !== 'string' || value.length === 0) fail('UNSAFE_OPERATION_ROOT', `${fieldName} is invalid.`);
+  if (value.normalize('NFC') !== value || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) {
+    fail('UNSAFE_OPERATION_ROOT', `${fieldName} contains unsafe characters.`);
+  }
+  return value;
+}
+
+function rejectOpaqueValue(value, fieldName) {
+  if (/^[a-z]+(?:[-_][a-z0-9]+)+$/.test(value)) return;
+  if (/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/.test(value)
+    || /^[a-f0-9]{32,}$/i.test(value)
+    || /^[A-Za-z0-9_+/=-]{24,}$/.test(value)
+    || (value.length >= 24 && entropyBitsPerCharacter(value) >= 3.8)) {
+    fail('UNSAFE_CALLER_METADATA', `${fieldName} must be a short non-secret reference.`);
+  }
+}
+
+export function validateControlledSlug(value, fieldName, { maxLength = 64, allowUnderscore = false } = {}) {
+  const pattern = allowUnderscore ? /^[a-z][a-z0-9_-]{0,63}$/ : /^[a-z][a-z0-9-]{0,63}$/;
+  if (typeof value !== 'string' || value.length > maxLength || !pattern.test(value) || value.normalize('NFC') !== value) {
+    fail('INVALID_LABEL', `${fieldName} must be a bounded structured label.`);
+  }
+  rejectOpaqueValue(value, fieldName);
+  return value;
+}
+
+export function validateOperationId(value) {
+  return validateControlledSlug(value, 'operation ID', { maxLength: 64 });
+}
+
+export function validateOperationClassification(value) {
+  return validateControlledSlug(value, 'operation classification', { maxLength: 40 });
+}
+
+export function validateTargetClassification(value) {
+  return validateControlledSlug(value, 'target classification', { maxLength: 40 });
+}
+
+export function validateCommandCategory(value) {
+  return validateControlledSlug(value, 'command category', { maxLength: 48 });
+}
+
+export function validateExpectedResult(value) {
+  return validateControlledSlug(value, 'expected result', { maxLength: 32 });
+}
+
+export function validateAuthorizationReference(value, fieldName = 'authorization reference') {
+  if (typeof value !== 'string' || value.length > 48 || !/^(?:auth|approval|ticket|test)-[a-z0-9][a-z0-9-]{1,35}$/.test(value) || value.normalize('NFC') !== value) {
+    fail('UNSAFE_CALLER_METADATA', `${fieldName} must be a bounded non-secret authorization reference.`);
+  }
+  rejectOpaqueValue(value, fieldName);
+  return value;
+}
+
 export function validateRelativePath(value, fieldName = 'path') {
   if (typeof value !== 'string' || value.length === 0 || value.length > 512 || isAbsolute(value) || value.includes('\0') || /[\u0000-\u001f\u007f]/.test(value)) {
     fail('UNSAFE_PATH', `${fieldName} must be a bounded relative path without control characters.`);
@@ -126,6 +192,7 @@ export function validateRelativePath(value, fieldName = 'path') {
 }
 
 export function resolveInside(root, relativePath) {
+  validateRawOperationRootInput(root);
   const safeRelative = validateRelativePath(relativePath);
   const rootPath = resolve(root);
   const candidate = resolve(rootPath, safeRelative);
@@ -292,6 +359,7 @@ export function assertOutsideGit(path) {
 
 export function assertOperationRoot(root, { allowSealed = true } = {}) {
   assertSupportedPlatform();
+  validateRawOperationRootInput(root);
   const rootPath = resolve(root);
   if (!existsSync(rootPath) || realpathSync(rootPath) !== rootPath) fail('INVALID_PACKET', 'Operation root is missing or has a symlinked component.');
   assertPacketOwnedDirectory(rootPath, rootPath, [0o700]);
@@ -304,7 +372,10 @@ export function assertOperationRoot(root, { allowSealed = true } = {}) {
   ], [], 'operation metadata');
   assertExactObject(metadata.root_identity, ['device', 'inode', 'uid', 'mode', 'links'], [], 'operation root identity');
   if (metadata.schema_version !== SCHEMA_VERSION || metadata.tool_version !== TOOL_VERSION) fail('INVALID_PACKET', 'Operation metadata is invalid.');
-  for (const field of ['operation_id', 'operation_classification', 'target_classification', 'authorization_reference']) validateSafeLabel(metadata[field], field);
+  validateOperationId(metadata.operation_id);
+  validateOperationClassification(metadata.operation_classification);
+  validateTargetClassification(metadata.target_classification);
+  validateAuthorizationReference(metadata.authorization_reference);
   validateTimestamp(metadata.created_utc, 'operation created timestamp');
   const identity = pathIdentity(rootPath);
   for (const key of ['device', 'inode', 'uid', 'mode']) if (metadata.root_identity[key] !== identity[key]) fail('ROOT_IDENTITY_CHANGED', 'Operation root identity changed.');

@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   appendEvent, claimExecutionToken, createManifest, freezeStage, initializeOperation, registerArtifact, sealOperation,
-  verifyEventChain, verifyPacket,
+  readEvents, verifyEventChain, verifyPacket,
 } from '../../scripts/controlled-ops/evidence.mjs';
 import { GENESIS_HASH, LIMITS, canonicalStringify, readJson } from '../../scripts/controlled-ops/internal.mjs';
 import { createSanitizationSummary } from '../../scripts/controlled-ops/sanitize.mjs';
@@ -34,6 +34,11 @@ function processExists(pid) {
 }
 
 function waitForExit(child) { return new Promise((resolve) => child.once('exit', (code) => resolve(code))); }
+
+async function waitForPath(path, attempts = 100) {
+  for (let attempt = 0; attempt < attempts && !existsSync(path); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(existsSync(path), true, `${path} was not created`);
+}
 
 test('eight concurrent appenders serialize safely and preserve one canonical event', async () => {
   const packet = makePacket(); const timestamp = new Date().toISOString();
@@ -215,6 +220,97 @@ test('wrapper interruption terminates the child process group and removes raw ca
     await new Promise((resolve) => setTimeout(resolve, 100));
     for (const pid of new Set(readFileSync(pids, 'utf8').trim().split('\n').map(Number))) assert.equal(processExists(pid), false, `process ${pid} survived`);
     assert.equal(readJson(join(packet.root, 'tokens', 'interrupt.json')).state, 'interrupted'); assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
+  } finally { packet.cleanup(); }
+});
+
+test('pre-spawn wrapper SIGTERM records terminal interruption without starting the command', async () => {
+  const packet = makePacket(); const counter = join(packet.parent, 'counter.txt'); const ready = join(packet.parent, 'ready.txt'); const release = join(packet.parent, 'release.txt');
+  try {
+    const wrapper = spawn('bash', [
+      wrapperPath, '--operation-root', packet.root, '--stage', 'stage-1', '--token', 'early-term',
+      '--category', 'fake-command', '--expected', 'completed', '--', process.execPath, fakeCommand, 'clean', '', counter,
+    ], {
+      stdio: 'ignore',
+      env: {
+        PATH: process.env.PATH ?? '',
+        SERVSYNC_CONTROLLED_OPS_ALLOW_TEST_HOOKS: '1',
+        SERVSYNC_CONTROLLED_OPS_TEST_BARRIER: JSON.stringify({ label: 'before-command-started', ready, release }),
+      },
+    });
+    await waitForPath(ready);
+    wrapper.kill('SIGTERM');
+    const exit = await waitForExit(wrapper);
+    assert.equal(exit, 94);
+    assert.equal(existsSync(counter), false);
+    assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
+    const token = readJson(join(packet.root, 'tokens', 'early-term.json'));
+    assert.equal(token.state, 'interrupted');
+    assert.equal(token.command_result.exit_kind, 'not_started');
+    assert.equal(token.harness_result.wrapper_signal, 'SIGTERM');
+    assert.equal(token.harness_result.forwarded_signal, 'SIGTERM');
+    assert.equal(token.harness_result.detail, 'pre_spawn_interruption');
+    const events = readEvents(packet.root);
+    assert.equal(events.some((event) => event.event_type === 'command_started'), false);
+    assert.equal(events.filter((event) => event.event_type === 'command_completed').length, 1);
+  } finally { packet.cleanup(); }
+});
+
+test('wrapper SIGHUP retains exact wrapper, forwarded, and child signal provenance', async () => {
+  const packet = makePacket(); const pids = join(packet.parent, 'sighup-pids.txt');
+  try {
+    const wrapper = spawn('bash', [
+      wrapperPath, '--operation-root', packet.root, '--stage', 'stage-1', '--token', 'sighup',
+      '--category', 'fake-command', '--expected', 'completed', '--', process.execPath, fakeCommand, 'tree', pids,
+    ], { stdio: 'ignore', env: { PATH: process.env.PATH ?? '' } });
+    await waitForPath(pids);
+    wrapper.kill('SIGHUP');
+    const exit = await waitForExit(wrapper);
+    assert.equal(exit, 94);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const pid of new Set(readFileSync(pids, 'utf8').trim().split('\n').map(Number))) assert.equal(processExists(pid), false, `process ${pid} survived`);
+    const token = readJson(join(packet.root, 'tokens', 'sighup.json'));
+    assert.equal(token.state, 'interrupted');
+    assert.equal(token.harness_result.wrapper_signal, 'SIGHUP');
+    assert.equal(token.harness_result.forwarded_signal, 'SIGHUP');
+    assert.equal(token.command_result.exit_kind, 'signal');
+    assert.equal(token.command_result.signal_name, 'SIGHUP');
+    assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
+  } finally { packet.cleanup(); }
+});
+
+test('high-entropy caller-authored metadata is rejected at creation, verification, manifest, and seal', () => {
+  const packet = makePacket(); const opaque = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4';
+  try {
+    assert.throws(() => initializeOperation(join(packet.parent, 'bad-auth'), {
+      operationId: 'operation-bad-auth', operationClassification: 'local-test', targetClassification: 'local-fixture',
+      authorizationReference: opaque,
+    }), /authorization reference|caller metadata/i);
+    assert.throws(() => claimExecutionToken(packet.root, {
+      stageId: 'stage-1', token: 'bad-category', commandCategory: opaque, expectedResult: 'completed',
+    }), /command category|caller metadata|label/i);
+    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'original-meta', commandCategory: 'fake', expectedResult: 'completed' });
+    writeFileSync(join(packet.root, 'operation.json'), `${canonicalStringify({
+      ...readJson(join(packet.root, 'operation.json')),
+      authorization_reference: opaque,
+    })}\n`, { mode: 0o600 });
+    assert.throws(() => verifyPacket(packet.root), /authorization reference|caller metadata/i);
+    assert.throws(() => createManifest(packet.root), /authorization reference|caller metadata/i);
+    assert.throws(() => sealOperation(packet.root), /authorization reference|caller metadata/i);
+  } finally { packet.cleanup(); }
+});
+
+test('operation root rejects controls, unicode separators, and non-NFC input before filesystem access', () => {
+  const packet = makePacket();
+  const invalidRoots = ['bad\nroot', 'bad\rroot', 'bad\troot', `bad${String.fromCharCode(0x7f)}root`, `bad${String.fromCharCode(0x85)}root`, 'bad\u2028root', 'bad\u2029root', 'cafe\u0301'];
+  try {
+    for (const leaf of invalidRoots) {
+      const root = join(packet.parent, leaf);
+      assert.throws(() => initializeOperation(root, {
+        operationId: 'bad-root', operationClassification: 'local-test', targetClassification: 'local-fixture',
+        authorizationReference: 'test-authorization',
+      }), /operation root|unsafe/i);
+      assert.equal(existsSync(root), false);
+    }
   } finally { packet.cleanup(); }
 });
 

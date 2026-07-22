@@ -66,7 +66,12 @@ export function scanSensitiveContent(input, { includeEntropy = true } = {}) {
   }
   if (includeEntropy) {
     const candidates = text.match(/[A-Za-z0-9_+/.=-]{24,}/g) ?? [];
-    const suspicious = candidates.filter((candidate) => !/^[a-f0-9]{64}$/i.test(candidate) && !/^[A-Z][A-Z0-9_]{2,63}$/.test(candidate) && entropyBitsPerCharacter(candidate) >= 4.0);
+    const suspicious = candidates.filter((candidate) => !/^[a-f0-9]{64}$/i.test(candidate)
+      && !/^[A-Z][A-Z0-9_]{2,63}$/.test(candidate)
+      && !/^servsync-controlled-ops\/[a-z0-9-]+-v\d+$/.test(candidate)
+      && !/^retain-seal-sha256-outside-packet$/.test(candidate)
+      && !/^(?:stages\/[a-z0-9-]+\/artifacts\/)?[a-z0-9][a-z0-9.-]{0,80}\.(?:txt|json|ndjson)$/.test(candidate)
+      && entropyBitsPerCharacter(candidate) >= 4.0);
     if (suspicious.length > 0) findings.push({ classification: 'high_entropy_value', count: suspicious.length, disposition: 'reject' });
   }
   return findings.sort((left, right) => compareStrings(left.classification, right.classification));

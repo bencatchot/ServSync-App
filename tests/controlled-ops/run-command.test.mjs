@@ -75,7 +75,7 @@ test('authorized retry uses a new token while an implicit retry is denied', () =
     assert.equal(runWrapper(packet.root, 'first', ['exit', '7']).status, 7);
     const denied = runWrapper(packet.root, 'retry-denied', ['clean'], ['--retry-of', 'first']);
     assert.equal(denied.status, 90);
-    const allowed = runWrapper(packet.root, 'retry-approved', ['clean'], ['--retry-of', 'first', '--retry-authorization', 'operator-approved']);
+    const allowed = runWrapper(packet.root, 'retry-approved', ['clean'], ['--retry-of', 'first', '--retry-authorization', 'approval-operator']);
     assert.equal(allowed.status, 0, allowed.stderr);
   } finally { packet.cleanup(); }
 });

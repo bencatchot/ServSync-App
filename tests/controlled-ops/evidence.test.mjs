@@ -70,9 +70,9 @@ test('execution tokens are atomic and retries require a new explicitly authorize
     updateExecutionToken(packet.root, 'token-1', 'started');
     updateExecutionToken(packet.root, 'token-1', 'completed', {
       commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null },
-      harnessResult: { classification: 'completed', detail: 'evidence_retained' },
+      harnessResult: { classification: 'completed', detail: 'evidence_retained', wrapper_signal: null, forwarded_signal: null },
     });
-    const retry = claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1', retryAuthorization: 'approved-retry' });
+    const retry = claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1', retryAuthorization: 'approval-retry' });
     assert.equal(retry.retry.retry_count, 1);
     assert.throws(() => updateExecutionToken(packet.root, 'token-1', 'started'), /transition/i);
   } finally { packet.cleanup(); }
@@ -80,7 +80,7 @@ test('execution tokens are atomic and retries require a new explicitly authorize
 
 test('retry lineage rejects reused authorization, cycles, and cross-operation token records', () => {
   const packet = makePacket(); const other = makePacket('stage-1', 'operation-test-2');
-  const completed = { commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null }, harnessResult: { classification: 'completed', detail: 'evidence_retained' } };
+  const completed = { commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null }, harnessResult: { classification: 'completed', detail: 'evidence_retained', wrapper_signal: null, forwarded_signal: null } };
   try {
     claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'original', commandCategory: 'fake', expectedResult: 'completed' });
     updateExecutionToken(packet.root, 'original', 'started'); updateExecutionToken(packet.root, 'original', 'completed', completed);

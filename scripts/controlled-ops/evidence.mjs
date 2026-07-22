@@ -11,8 +11,10 @@ import {
   assertExactObject, assertNoPacketLock, assertNoSymlinkPath, assertOperationRoot, assertOutsideGit,
   assertPacketOwnedDirectory, assertPacketOwnedFile, assertSupportedPlatform, canonicalStringify,
   claimFileAtomic, compareStrings, fsyncDirectory, openExclusivePacketFile, pathIdentity,
-  readDirectorySorted, readJson, resolveInside, safeError, sha256, utcNow, validateRelativePath,
-  validateSafeLabel, validateTimestamp, withPacketMutationLock, writeJsonAtomic,
+  readDirectorySorted, readJson, resolveInside, safeError, sha256, utcNow, validateAuthorizationReference,
+  validateCommandCategory, validateControlledSlug, validateExpectedResult, validateOperationClassification,
+  validateOperationId, validateRawOperationRootInput, validateRelativePath, validateSafeLabel,
+  validateTargetClassification, validateTimestamp, withPacketMutationLock, writeJsonAtomic,
 } from './internal.mjs';
 import {
   MANIFEST_SCHEMA, STAGE_MANIFEST_SCHEMA, buildPacketManifest, buildStageManifest, manifestDigest,
@@ -32,6 +34,7 @@ const EVENT_INPUT_FIELDS = new Set(['stage_id', 'event_id', 'event_type', 'actio
 const TERMINAL_TOKEN_STATES = new Set(['completed', 'command_failed', 'signaled', 'sanitizer_failed', 'interrupted', 'failed_before_execution', 'harness_failed_after_execution', 'limit_exceeded']);
 const TOKEN_STATES = new Set(['claimed', 'started', ...TERMINAL_TOKEN_STATES]);
 const TOKEN_FIELDS = ['schema_version', 'operation_id', 'stage_id', 'token', 'command_category', 'expected_result', 'state', 'claimed_at', 'started_at', 'completed_at', 'command_result', 'harness_result', 'retry'];
+const WRAPPER_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP']);
 const SEAL_SCHEMA = 'servsync-controlled-ops/seal-v2';
 const FREEZE_SCHEMA = 'servsync-controlled-ops/stage-freeze-v2';
 
@@ -51,9 +54,10 @@ function parseInteger(value, name) { if (!/^-?\d+$/.test(value ?? '')) throw new
 function operationPaths(root) { return { events: join(root, 'events.ndjson'), tokens: join(root, 'tokens'), stages: join(root, 'stages'), quarantine: join(root, 'quarantine'), manifest: join(root, 'manifest.json'), seal: join(root, 'seal.json') }; }
 
 export function initializeOperation(root, fields) {
-  assertSupportedPlatform(); const rootPath = resolve(root); assertOutsideGit(dirname(rootPath));
+  assertSupportedPlatform(); validateRawOperationRootInput(root); const rootPath = resolve(root); assertOutsideGit(dirname(rootPath));
   if (existsSync(rootPath)) throw new EvidenceError('OPERATION_ROOT_EXISTS', 'Operation root must not already exist.');
-  for (const name of ['operationId', 'operationClassification', 'targetClassification', 'authorizationReference']) validateSafeLabel(fields[name], name);
+  validateOperationId(fields.operationId); validateOperationClassification(fields.operationClassification);
+  validateTargetClassification(fields.targetClassification); validateAuthorizationReference(fields.authorizationReference);
   process.umask(0o077); mkdirSync(rootPath, { mode: 0o700 });
   for (const directory of ['tokens', 'stages', 'quarantine']) mkdirSync(join(rootPath, directory), { mode: 0o700 });
   const createdAt = fields.createdAt ?? utcNow(); validateTimestamp(createdAt, 'createdAt');
@@ -71,8 +75,12 @@ export function initializeOperation(root, fields) {
 function validateEvent(event) {
   assertExactObject(event, EVENT_FIELDS, [], 'event record');
   if (event.schema_version !== SCHEMA_VERSION || !Number.isInteger(event.sequence) || event.sequence < 1) throw new EvidenceError('INVALID_EVENT_SEQUENCE', 'Event schema or sequence is invalid.');
-  for (const field of ['operation_id', 'event_id', 'stage_id', 'event_type', 'target_classification', 'expected_result', 'observed_result', 'result_classification']) validateSafeLabel(event[field], field);
-  if (event.command_category !== null) validateSafeLabel(event.command_category, 'command category');
+  validateOperationId(event.operation_id); validateSafeLabel(event.event_id, 'event ID');
+  validateControlledSlug(event.stage_id, 'stage ID'); validateControlledSlug(event.event_type, 'event type', { allowUnderscore: true });
+  validateTargetClassification(event.target_classification); validateExpectedResult(event.expected_result);
+  validateControlledSlug(event.observed_result, 'observed result', { allowUnderscore: true });
+  validateControlledSlug(event.result_classification, 'result classification', { allowUnderscore: true });
+  if (event.command_category !== null) validateCommandCategory(event.command_category);
   if (event.exit_code !== null && (!Number.isInteger(event.exit_code) || event.exit_code < 0 || event.exit_code > 255)) throw new EvidenceError('INVALID_EXIT_CODE', 'Event exit code is invalid.');
   if (!Array.isArray(event.sanitized_artifact_paths) || event.sanitized_artifact_paths.length > LIMITS.artifact_count_per_stage) throw new EvidenceError('INVALID_EVENT_ARTIFACTS', 'Event artifact paths are invalid.');
   event.sanitized_artifact_paths.forEach((path) => validateRelativePath(path));
@@ -111,8 +119,11 @@ export function verifyEventChain(root) {
 
 function appendEventUnlocked(rootPath, metadata, expectedHead, input) {
   for (const key of Object.keys(input)) if (!EVENT_INPUT_FIELDS.has(key)) throw new EvidenceError('UNKNOWN_EVENT_FIELD', 'Event input contains an unknown field.');
-  for (const name of ['stage_id', 'event_id', 'event_type', 'result_classification', 'expected_result', 'observed_result']) validateSafeLabel(input[name], name);
-  if (input.command_category !== null) validateSafeLabel(input.command_category, 'command category'); validateTimestamp(input.action_timestamp, 'action timestamp');
+  validateControlledSlug(input.stage_id, 'stage ID'); validateSafeLabel(input.event_id, 'event ID');
+  validateControlledSlug(input.event_type, 'event type', { allowUnderscore: true });
+  validateControlledSlug(input.result_classification, 'result classification', { allowUnderscore: true });
+  validateExpectedResult(input.expected_result); validateControlledSlug(input.observed_result, 'observed result', { allowUnderscore: true });
+  if (input.command_category !== null) validateCommandCategory(input.command_category); validateTimestamp(input.action_timestamp, 'action timestamp');
   if (input.archive_timestamp !== null) validateTimestamp(input.archive_timestamp, 'archive timestamp');
   const stagePath = resolveInside(rootPath, `stages/${input.stage_id}`); if (!existsSync(stagePath) || existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('INVALID_STAGE', 'Events require an existing workflow-unfrozen stage.');
   const chain = verifyEventChain(rootPath); if (chain.eventCount >= LIMITS.event_count) throw new EvidenceError('EVENT_COUNT_LIMIT', 'Event count exceeds its configured limit.');
@@ -131,13 +142,13 @@ export function appendEvent(root, expectedHead, input) { return withPacketMutati
 
 export function createStage(root, stageId) {
   return withPacketMutationLock(root, 'create-stage', ({ rootPath, metadata }) => {
-    validateSafeLabel(stageId, 'stage ID'); const stagePath = resolveInside(rootPath, `stages/${stageId}`); if (existsSync(stagePath)) throw new EvidenceError('STAGE_EXISTS', 'Stage already exists.');
+    validateControlledSlug(stageId, 'stage ID'); const stagePath = resolveInside(rootPath, `stages/${stageId}`); if (existsSync(stagePath)) throw new EvidenceError('STAGE_EXISTS', 'Stage already exists.');
     mkdirSync(join(stagePath, 'artifacts'), { recursive: true, mode: 0o700 });
     writeJsonAtomic(join(stagePath, 'artifact-index.json'), { schema_version: 'servsync-controlled-ops/artifact-index-v2', operation_id: metadata.operation_id, stage_id: stageId, artifacts: [] }, 0o600, rootPath);
   });
 }
 
-function tokenPath(root, token) { validateSafeLabel(token, 'token'); return resolveInside(root, `tokens/${token}.json`); }
+function tokenPath(root, token) { validateControlledSlug(token, 'token'); return resolveInside(root, `tokens/${token}.json`); }
 function validateCommandResult(value) {
   if (value === null) return;
   assertExactObject(value, ['exit_kind', 'exit_code', 'signal_name', 'signal_number'], [], 'command result');
@@ -149,11 +160,22 @@ function validateCommandResult(value) {
 function validateToken(token, metadata) {
   assertExactObject(token, TOKEN_FIELDS, [], 'execution token');
   if (token.schema_version !== 'servsync-controlled-ops/execution-token-v2' || token.operation_id !== metadata.operation_id || !TOKEN_STATES.has(token.state)) throw new EvidenceError('INVALID_TOKEN', 'Execution token schema, operation, or state is invalid.');
-  for (const field of ['stage_id', 'token', 'command_category', 'expected_result']) validateSafeLabel(token[field], field);
+  validateControlledSlug(token.stage_id, 'stage ID'); validateControlledSlug(token.token, 'token');
+  validateCommandCategory(token.command_category); validateExpectedResult(token.expected_result);
   validateTimestamp(token.claimed_at, 'token claimed timestamp'); if (token.started_at !== null) validateTimestamp(token.started_at, 'token started timestamp'); if (token.completed_at !== null) validateTimestamp(token.completed_at, 'token completed timestamp');
   validateCommandResult(token.command_result);
-  if (token.harness_result !== null) { assertExactObject(token.harness_result, ['classification', 'detail'], [], 'harness result'); validateSafeLabel(token.harness_result.classification, 'harness classification'); validateSafeLabel(token.harness_result.detail, 'harness detail'); }
-  if (token.retry !== null) { assertExactObject(token.retry, ['prior_token', 'authorization_reference', 'retry_count'], [], 'retry lineage'); validateSafeLabel(token.retry.prior_token, 'prior token'); validateSafeLabel(token.retry.authorization_reference, 'retry authorization'); if (!Number.isInteger(token.retry.retry_count) || token.retry.retry_count < 1) throw new EvidenceError('INVALID_TOKEN', 'Retry count is invalid.'); }
+  if (token.harness_result !== null) {
+    assertExactObject(token.harness_result, ['classification', 'detail', 'wrapper_signal', 'forwarded_signal'], [], 'harness result');
+    validateControlledSlug(token.harness_result.classification, 'harness classification', { allowUnderscore: true });
+    validateControlledSlug(token.harness_result.detail, 'harness detail', { allowUnderscore: true });
+    if (token.harness_result.wrapper_signal !== null && !WRAPPER_SIGNALS.has(token.harness_result.wrapper_signal)) throw new EvidenceError('INVALID_TOKEN', 'Wrapper signal provenance is invalid.');
+    if (token.harness_result.forwarded_signal !== null && !WRAPPER_SIGNALS.has(token.harness_result.forwarded_signal)) throw new EvidenceError('INVALID_TOKEN', 'Forwarded signal provenance is invalid.');
+  }
+  if (token.retry !== null) {
+    assertExactObject(token.retry, ['prior_token', 'authorization_reference', 'retry_count'], [], 'retry lineage');
+    validateControlledSlug(token.retry.prior_token, 'prior token'); validateAuthorizationReference(token.retry.authorization_reference, 'retry authorization');
+    if (!Number.isInteger(token.retry.retry_count) || token.retry.retry_count < 1) throw new EvidenceError('INVALID_TOKEN', 'Retry count is invalid.');
+  }
   if (['claimed'].includes(token.state) && (token.started_at !== null || token.completed_at !== null)) throw new EvidenceError('INVALID_TOKEN', 'Claimed token timestamps are inconsistent.');
   if (token.state === 'started' && (token.started_at === null || token.completed_at !== null)) throw new EvidenceError('INVALID_TOKEN', 'Started token timestamps are inconsistent.');
   if (TERMINAL_TOKEN_STATES.has(token.state) && token.completed_at === null) throw new EvidenceError('INVALID_TOKEN', 'Terminal token lacks completion evidence.');
@@ -161,6 +183,9 @@ function validateToken(token, metadata) {
   if (token.state === 'command_failed' && (token.command_result?.exit_kind !== 'normal' || token.command_result.exit_code === 0)) throw new EvidenceError('INVALID_TOKEN', 'Failed token command evidence is inconsistent.');
   if (token.state === 'signaled' && token.command_result?.exit_kind !== 'signal') throw new EvidenceError('INVALID_TOKEN', 'Signaled token command evidence is inconsistent.');
   if (token.state === 'failed_before_execution' && token.command_result?.exit_kind !== 'not_started') throw new EvidenceError('INVALID_TOKEN', 'Pre-execution token evidence is inconsistent.');
+  if (token.state === 'interrupted' && token.harness_result?.classification !== 'interrupted') throw new EvidenceError('INVALID_TOKEN', 'Interrupted token evidence is inconsistent.');
+  if (token.harness_result !== null && token.harness_result.wrapper_signal !== null && token.state !== 'interrupted') throw new EvidenceError('INVALID_TOKEN', 'Wrapper signal provenance is only valid for interruptions.');
+  if (token.harness_result !== null && token.harness_result.forwarded_signal !== token.harness_result.wrapper_signal) throw new EvidenceError('INVALID_TOKEN', 'Forwarded signal provenance is inconsistent.');
   return token;
 }
 
@@ -186,12 +211,13 @@ export function verifyTokens(root) { const { rootPath, metadata } = assertOperat
 
 export function claimExecutionToken(root, fields) {
   return withPacketMutationLock(root, 'claim-token', ({ rootPath, metadata }) => {
-    for (const name of ['stageId', 'token', 'commandCategory', 'expectedResult']) validateSafeLabel(fields[name], name);
+    validateControlledSlug(fields.stageId, 'stage ID'); validateControlledSlug(fields.token, 'token');
+    validateCommandCategory(fields.commandCategory); validateExpectedResult(fields.expectedResult);
     const stagePath = resolveInside(rootPath, `stages/${fields.stageId}`); if (!existsSync(stagePath) || existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('INVALID_STAGE', 'Execution stage is missing or workflow-frozen.');
     let retry = null;
     if (fields.retryOf || fields.retryAuthorization) {
       if (!fields.retryOf || !fields.retryAuthorization || fields.retryOf === fields.token) throw new EvidenceError('RETRY_NOT_AUTHORIZED', 'Retries require a distinct prior token and explicit authorization.');
-      validateSafeLabel(fields.retryOf, 'retry token'); validateSafeLabel(fields.retryAuthorization, 'retry authorization');
+      validateControlledSlug(fields.retryOf, 'retry token'); validateAuthorizationReference(fields.retryAuthorization, 'retry authorization');
       for (const file of readDirectorySorted(operationPaths(rootPath).tokens)) {
         const existing = validateToken(readCanonicalJsonFile(join(operationPaths(rootPath).tokens, file)), metadata);
         if (existing.retry?.authorization_reference === fields.retryAuthorization) throw new EvidenceError('DUPLICATE_RETRY_AUTHORIZATION', 'Retry authorization is already used.');
@@ -211,7 +237,7 @@ export function updateExecutionToken(root, token, state, fields = {}) {
   return withPacketMutationLock(root, 'update-token', ({ rootPath, metadata }) => {
     if (!TOKEN_STATES.has(state)) throw new EvidenceError('INVALID_TOKEN_STATUS', 'Execution token state is invalid.');
     const path = tokenPath(rootPath, token); const current = validateToken(readCanonicalJsonFile(path), metadata);
-    const transitions = { claimed: new Set(['started', 'failed_before_execution']), started: new Set(['completed', 'command_failed', 'signaled', 'sanitizer_failed', 'interrupted', 'harness_failed_after_execution', 'limit_exceeded', 'failed_before_execution']) };
+    const transitions = { claimed: new Set(['started', 'failed_before_execution', 'interrupted']), started: new Set(['completed', 'command_failed', 'signaled', 'sanitizer_failed', 'interrupted', 'harness_failed_after_execution', 'limit_exceeded']) };
     if (!transitions[current.state]?.has(state)) throw new EvidenceError('INVALID_TOKEN_TRANSITION', 'Execution token transition is invalid.');
     const now = utcNow(); const next = { ...current, state, started_at: state === 'started' ? now : current.started_at, completed_at: TERMINAL_TOKEN_STATES.has(state) ? now : null, command_result: fields.commandResult ?? current.command_result, harness_result: fields.harnessResult ?? current.harness_result };
     validateToken(next, metadata); writeJsonAtomic(path, next, 0o600, rootPath); return next;
@@ -272,10 +298,10 @@ export function promoteCommandArtifacts(root, stageId, token, items) {
   });
 }
 
-function scanArtifact(path, { internalMetadata = false } = {}) {
+function scanArtifact(path) {
   const content = readFileSync(path, 'utf8');
   return {
-    secret: scanSensitiveContent(content, { includeEntropy: !internalMetadata }),
+    secret: scanSensitiveContent(content),
     customer: scanCustomerContent(content),
   };
 }
@@ -292,9 +318,7 @@ function scanPacketSecurity(root, { allowActiveLock = false } = {}) {
       }
     } else if (info.isFile()) {
       assertPacketOwnedFile(root, path, [0o600, 0o400], LIMITS.manifest_bytes);
-      const retainedPath = relative(root, path).split('\\').join('/');
-      const internalMetadata = retainedPath.endsWith('.json') || retainedPath === 'events.ndjson';
-      const scans = scanArtifact(path, { internalMetadata }); totals.secret_findings += scans.secret.length; totals.customer_content_findings += scans.customer.length; totals.files_scanned += 1;
+      const scans = scanArtifact(path); totals.secret_findings += scans.secret.length; totals.customer_content_findings += scans.customer.length; totals.files_scanned += 1;
     } else throw new EvidenceError('UNSUPPORTED_FILE', 'Unsupported packet entry.');
   };
   visit(root); return totals;
@@ -310,7 +334,7 @@ function freezeTree(root, path, depth = 0) {
 
 export function freezeStage(root, stageId, timestamps = {}) {
   return withPacketMutationLock(root, 'freeze-stage', ({ rootPath, metadata }) => {
-    validateSafeLabel(stageId, 'stage ID'); verifyTokensUnlocked(rootPath, metadata);
+    validateControlledSlug(stageId, 'stage ID'); verifyTokensUnlocked(rootPath, metadata);
     if (readDirectorySorted(operationPaths(rootPath).quarantine).length > 0) throw new EvidenceError('QUARANTINE_NOT_EMPTY', 'Quarantine must be empty before freeze.');
     const stagePath = resolveInside(rootPath, `stages/${stageId}`); if (existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('STAGE_FROZEN', 'Stage is already workflow-frozen.');
     const chain = verifyEventChain(rootPath); const index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json')); if (!Array.isArray(index.artifacts) || index.artifacts.length === 0) throw new EvidenceError('MISSING_ARTIFACT', 'A stage cannot freeze without evidence artifacts.');
@@ -338,7 +362,7 @@ function validateFreeze(freeze, metadata, stageId) {
   return freeze;
 }
 export function verifyStageFreeze(root, stageId) {
-  const { rootPath, metadata } = assertOperationRoot(root); validateSafeLabel(stageId, 'stage ID'); const stagePath = resolveInside(rootPath, `stages/${stageId}`); assertPacketOwnedDirectory(rootPath, stagePath, [0o500]);
+  const { rootPath, metadata } = assertOperationRoot(root); validateControlledSlug(stageId, 'stage ID'); const stagePath = resolveInside(rootPath, `stages/${stageId}`); assertPacketOwnedDirectory(rootPath, stagePath, [0o500]);
   const manifestPath = join(stagePath, 'stage-manifest.json'); const freezePath = join(stagePath, 'stage-freeze.json'); assertPacketOwnedFile(rootPath, manifestPath, [0o400]); assertPacketOwnedFile(rootPath, freezePath, [0o400]);
   const manifest = readCanonicalJsonFile(manifestPath); validateStageManifest(manifest); const freeze = validateFreeze(readCanonicalJsonFile(freezePath), metadata, stageId);
   if (freeze.stage_manifest_digest !== manifestDigest(manifest)) throw new EvidenceError('STAGE_FREEZE_MISMATCH', 'Stage manifest digest does not match freeze.');
@@ -376,7 +400,7 @@ function validateSeal(seal, metadata) {
   assertExactObject(seal, ['schema_version', 'operation_id', 'sealed_utc', 'manifest_digest', 'final_event_chain_head', 'stage_freeze_digests', 'security_scan_summary', 'permission_digest', 'external_anchor'], [], 'packet seal');
   assertExactObject(seal.security_scan_summary, ['secret_findings', 'customer_content_findings', 'files_scanned'], [], 'seal security scan');
   if (seal.schema_version !== SEAL_SCHEMA || seal.operation_id !== metadata.operation_id || seal.external_anchor !== 'retain-seal-sha256-outside-packet' || !Array.isArray(seal.stage_freeze_digests)) throw new EvidenceError('INVALID_SEAL', 'Packet seal schema is invalid.');
-  for (const entry of seal.stage_freeze_digests) { assertExactObject(entry, ['stage_id', 'freeze_digest'], [], 'seal stage digest'); validateSafeLabel(entry.stage_id, 'seal stage ID'); if (!/^[a-f0-9]{64}$/.test(entry.freeze_digest)) throw new EvidenceError('INVALID_SEAL', 'Stage freeze digest is invalid.'); }
+  for (const entry of seal.stage_freeze_digests) { assertExactObject(entry, ['stage_id', 'freeze_digest'], [], 'seal stage digest'); validateControlledSlug(entry.stage_id, 'seal stage ID'); if (!/^[a-f0-9]{64}$/.test(entry.freeze_digest)) throw new EvidenceError('INVALID_SEAL', 'Stage freeze digest is invalid.'); }
   if (![seal.manifest_digest, seal.final_event_chain_head, seal.permission_digest].every((value) => /^[a-f0-9]{64}$/.test(value)) || seal.security_scan_summary.secret_findings !== 0 || seal.security_scan_summary.customer_content_findings !== 0 || !Number.isInteger(seal.security_scan_summary.files_scanned)) throw new EvidenceError('INVALID_SEAL', 'Seal integrity values are invalid.');
   validateTimestamp(seal.sealed_utc, 'sealed timestamp'); return seal;
 }
@@ -417,7 +441,7 @@ function runCli() {
     case 'head': { const rootPath = required(options, 'root'); assertNoPacketLock(rootPath); process.stdout.write(`${verifyEventChain(rootPath).head}\n`); break; }
     case 'append-event': process.stdout.write(`${canonicalStringify(appendEvent(required(options, 'root'), required(options, 'expected-head'), eventInput(options)))}\n`); break;
     case 'claim-token': process.stdout.write(`${canonicalStringify(claimExecutionToken(required(options, 'root'), { stageId: required(options, 'stage'), token: required(options, 'token'), commandCategory: required(options, 'category'), expectedResult: required(options, 'expected'), retryOf: options['retry-of'], retryAuthorization: options['retry-authorization'] }))}\n`); break;
-    case 'update-token': process.stdout.write(`${canonicalStringify(updateExecutionToken(required(options, 'root'), required(options, 'token'), required(options, 'status'), { commandResult: options['exit-kind'] ? commandResultFromOptions(options) : undefined, harnessResult: options['harness-classification'] ? { classification: options['harness-classification'], detail: required(options, 'harness-detail') } : undefined }))}\n`); break;
+    case 'update-token': process.stdout.write(`${canonicalStringify(updateExecutionToken(required(options, 'root'), required(options, 'token'), required(options, 'status'), { commandResult: options['exit-kind'] ? commandResultFromOptions(options) : undefined, harnessResult: options['harness-classification'] ? { classification: options['harness-classification'], detail: required(options, 'harness-detail'), wrapper_signal: options['wrapper-signal'] ?? null, forwarded_signal: options['forwarded-signal'] ?? null } : undefined }))}\n`); break;
     case 'register-artifact': registerArtifact(required(options, 'root'), required(options, 'stage'), required(options, 'path'), required(options, 'class'), options.summary); break;
     case 'freeze-stage': process.stdout.write(`${canonicalStringify(freezeStage(required(options, 'root'), required(options, 'stage')))}\n`); break;
     case 'create-manifest': process.stdout.write(`${canonicalStringify(createManifest(required(options, 'root')))}\n`); break;

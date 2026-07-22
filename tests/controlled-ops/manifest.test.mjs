@@ -169,7 +169,7 @@ test('completed tokens without exit-code evidence block manifest creation', () =
       schema_version: 'servsync-controlled-ops/execution-token-v2', operation_id: 'operation-test-1', stage_id: 'stage-1',
       token: 'broken', command_category: 'fake', expected_result: 'completed', state: 'completed',
       claimed_at: new Date().toISOString(), started_at: new Date().toISOString(), completed_at: new Date().toISOString(),
-      command_result: null, harness_result: { classification: 'completed', detail: 'evidence_retained' }, retry: null,
+      command_result: null, harness_result: { classification: 'completed', detail: 'evidence_retained', wrapper_signal: null, forwarded_signal: null }, retry: null,
     })}\n`, { mode: 0o600 });
     assert.throws(() => createManifest(packet.root), /command evidence/i);
   } finally { packet.cleanup(); }
