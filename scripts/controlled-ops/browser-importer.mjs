@@ -28,6 +28,7 @@ import {
   canonicalStringify,
   fsyncDirectory,
   safeError,
+  sha256File,
   validateRawOperationRootInput,
   validateTimestamp,
 } from './internal.mjs';
@@ -38,6 +39,7 @@ import {
   attemptIdFor,
   decodeUtf8,
   testIdFor,
+  validateGeneratedBrowserId,
   validateDuration,
   validateSummary,
 } from './browser-schema.mjs';
@@ -53,6 +55,7 @@ const PLAYWRIGHT_LAST_RUN_FILENAME = '.last-run.json';
 const BROWSER_LAUNCH_FILENAME = 'browser-launch.json';
 const BROWSER_REPORTER_READY_FILENAME = 'browser-reporter-ready.json';
 const cleanupHandleStates = new WeakMap();
+const WORKSPACE_REGISTRY_KEY = Symbol.for('servsync.controlledOps.browserEvidenceWorkspaces.v1');
 const WORKSPACE_DIRECTORY_MODES = Object.freeze({
   [JOURNAL_DIRECTORY]: 0o700,
   [SUMMARY_DIRECTORY]: 0o700,
@@ -77,6 +80,63 @@ function identityOf(path) {
 
 function sameIdentity(left, right) {
   return left.dev === right.dev && left.ino === right.ino && left.uid === right.uid && left.mode === right.mode && left.type === right.type;
+}
+
+function workspaceRegistry() {
+  if (!globalThis[WORKSPACE_REGISTRY_KEY]) {
+    globalThis[WORKSPACE_REGISTRY_KEY] = {
+      roots: new Map(),
+      journalRoots: new Map(),
+      summaryRoots: new Map(),
+      launchRoots: new Map(),
+    };
+  }
+  return globalThis[WORKSPACE_REGISTRY_KEY];
+}
+
+function registerWorkspaceState(state) {
+  const registry = workspaceRegistry();
+  registry.roots.set(state.root, state);
+  registry.journalRoots.set(join(state.root, JOURNAL_DIRECTORY), state);
+  registry.summaryRoots.set(join(state.root, SUMMARY_DIRECTORY), state);
+  registry.launchRoots.set(join(state.root, LAUNCH_DIRECTORY), state);
+}
+
+function unregisterWorkspaceState(state) {
+  const registry = workspaceRegistry();
+  registry.roots.delete(state.root);
+  registry.journalRoots.delete(join(state.root, JOURNAL_DIRECTORY));
+  registry.summaryRoots.delete(join(state.root, SUMMARY_DIRECTORY));
+  registry.launchRoots.delete(join(state.root, LAUNCH_DIRECTORY));
+}
+
+function fileProvenance(path, maximumBytes) {
+  const info = lstatSync(path);
+  return {
+    dev: info.dev,
+    ino: info.ino,
+    uid: info.uid,
+    mode: modeOf(info),
+    nlink: info.nlink,
+    size: info.size,
+    sha256: sha256File(path, maximumBytes),
+  };
+}
+
+function sameFileProvenance(path, expected, maximumBytes) {
+  if (!expected) return false;
+  const actual = fileProvenance(path, maximumBytes);
+  return actual.dev === expected.dev
+    && actual.ino === expected.ino
+    && actual.uid === expected.uid
+    && actual.mode === expected.mode
+    && actual.nlink === expected.nlink
+    && actual.size === expected.size
+    && actual.sha256 === expected.sha256;
+}
+
+function provenanceError() {
+  throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser cleanup evidence does not belong to the authenticated workspace run.');
 }
 
 function assertWorkspaceRootSafety(state) {
@@ -164,13 +224,35 @@ function validateFileContentBeforeCleanup(state, relativePath) {
   if (relativePath === `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`) {
     const { records, sourceDigest } = readJournal(path);
     reconcile(records, sourceDigest, { outputRoot: join(state.root, OUTPUT_DIRECTORY), generatedAt: new Date().toISOString() });
+    const runId = records[0]?.run_id;
+    const imported = state.provenance.imported;
+    const launch = state.provenance.launch;
+    if (imported) {
+      if (runId !== imported.runId || sourceDigest !== imported.sourceJournalSha256 || !sameFileProvenance(path, imported.journalFile, BROWSER_LIMITS.journal_bytes)) provenanceError();
+    } else if (launch) {
+      if (runId !== launch.runId) provenanceError();
+    } else {
+      provenanceError();
+    }
   } else if (relativePath === `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`) {
     const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
-    verifyBrowserSummary(path, existsSync(journalPath) ? { sourceJournalPath: journalPath } : {});
+    const summary = verifyBrowserSummary(path, existsSync(journalPath) ? { sourceJournalPath: journalPath } : {});
+    const imported = state.provenance.imported;
+    if (!imported
+      || summary.run_id !== imported.runId
+      || summary.source_journal_sha256 !== imported.sourceJournalSha256
+      || !sameFileProvenance(path, imported.summaryFile, BROWSER_LIMITS.summary_bytes)) provenanceError();
   } else if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`) {
-    readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-launch-v1', 'browser launch descriptor');
+    const descriptor = readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-launch-v1', 'browser launch descriptor');
+    const launch = state.provenance.launch;
+    if (!launch
+      || descriptor.run_id !== launch.runId
+      || descriptor.nonce_digest !== launch.nonceDigest
+      || !sameFileProvenance(path, launch.descriptorFile, BROWSER_LIMITS.summary_bytes)) provenanceError();
   } else if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`) {
-    readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-reporter-ready-v1', 'browser reporter-ready record');
+    const ready = readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-reporter-ready-v1', 'browser reporter-ready record');
+    const launch = state.provenance.launch;
+    if (!launch || ready.run_id !== launch.runId || ready.nonce_digest !== launch.nonceDigest) provenanceError();
   } else if (relativePath === `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`) {
     const parsed = parseStrictJson(decodeUtf8(readFileSync(path)));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
@@ -222,8 +304,13 @@ export function createBrowserEvidenceWorkspace({ parentRoot = '/private/tmp', pr
     root,
     rootIdentity,
     directoryIdentities,
+    provenance: {
+      imported: null,
+      launch: null,
+    },
     cleanupState: 'active',
   };
+  registerWorkspaceState(state);
   const cleanupHandle = Object.freeze({});
   cleanupHandleStates.set(cleanupHandle, state);
   const workspace = {
@@ -238,6 +325,24 @@ export function createBrowserEvidenceWorkspace({ parentRoot = '/private/tmp', pr
     cleanupHandle,
   };
   return Object.freeze(workspace);
+}
+
+export function registerBrowserLaunchProvenance({ launchRoot, descriptorPath, runId, nonceDigest } = {}) {
+  if (!launchRoot || !descriptorPath || !runId || !nonceDigest) throw new EvidenceError('INVALID_BROWSER_PROVENANCE', 'Browser launch provenance is incomplete.');
+  const root = resolve(launchRoot);
+  const state = workspaceRegistry().launchRoots.get(root);
+  if (!state) return { registered: false };
+  validateGeneratedBrowserId(runId, 'browser launch provenance run ID');
+  if (typeof nonceDigest !== 'string' || !/^[a-f0-9]{64}$/.test(nonceDigest)) throw new EvidenceError('INVALID_BROWSER_PROVENANCE', 'Browser launch provenance digest is invalid.');
+  const expectedPath = join(state.root, LAUNCH_DIRECTORY, BROWSER_LAUNCH_FILENAME);
+  if (resolve(descriptorPath) !== expectedPath) throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser launch provenance path does not match the generated workspace.');
+  assertWorkspaceChild(state, `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`, { type: 'file', mode: 0o600 });
+  state.provenance.launch = {
+    runId,
+    nonceDigest,
+    descriptorFile: fileProvenance(expectedPath, BROWSER_LIMITS.summary_bytes),
+  };
+  return { registered: true };
 }
 
 function parseOptions(arguments_) {
@@ -433,6 +538,20 @@ export function importBrowserJournal({ journalPath, summaryPath, outputRoot = nu
   const summary = reconcile(records, sourceDigest, { outputRoot, generatedAt });
   const content = `${canonicalStringify(summary)}\n`;
   const destination = createExclusiveSummary(summaryPath, content);
+  const registry = workspaceRegistry();
+  const journalState = registry.journalRoots.get(dirname(resolve(journalPath)));
+  const summaryState = registry.summaryRoots.get(dirname(resolve(destination)));
+  if (journalState || summaryState) {
+    if (!journalState || !summaryState || journalState !== summaryState) {
+      throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser import paths do not belong to the same generated workspace.');
+    }
+    journalState.provenance.imported = {
+      runId: summary.run_id,
+      sourceJournalSha256: sourceDigest,
+      journalFile: fileProvenance(resolve(journalPath), BROWSER_LIMITS.journal_bytes),
+      summaryFile: fileProvenance(destination, BROWSER_LIMITS.summary_bytes),
+    };
+  }
   return { summary, summaryPath: destination };
 }
 
@@ -507,6 +626,7 @@ export function cleanupBrowserEvidence(cleanupHandle) {
     const root = assertWorkspaceRootSafety(state);
     rmdirSync(root);
     deleted.push('.');
+    unregisterWorkspaceState(state);
     state.cleanupState = 'cleaned';
     return { status: 'cleaned', run_id: state.runId, deleted };
   } catch (error) {

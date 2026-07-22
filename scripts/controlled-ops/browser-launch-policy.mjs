@@ -27,6 +27,7 @@ import {
 } from './internal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
 import { validateBrowserLoopbackUrl, validateBrowserUrl } from './browser-schema.mjs';
+import { registerBrowserLaunchProvenance } from './browser-importer.mjs';
 
 export const BROWSER_LAUNCH_SCHEMA = 'servsync-controlled-ops/browser-launch-v1';
 export const BROWSER_REPORTER_READY_SCHEMA = 'servsync-controlled-ops/browser-reporter-ready-v1';
@@ -156,6 +157,12 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
     reporter_ready_path: reporterReadyPath,
   };
   writeExclusiveJson(launchRoot, descriptorPath, descriptor);
+  registerBrowserLaunchProvenance({
+    launchRoot,
+    descriptorPath,
+    runId,
+    nonceDigest: descriptor.nonce_digest,
+  });
   return { descriptor, descriptorPath, nonce, reporterReadyPath };
 }
 

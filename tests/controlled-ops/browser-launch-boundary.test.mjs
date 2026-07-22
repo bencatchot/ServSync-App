@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import {
@@ -11,6 +11,7 @@ import {
   BROWSER_LAUNCH_TOOL_VERSION,
   createBrowserLaunchContract,
   createBrowserEgressGuard,
+  writeReporterReady,
 } from '../../scripts/controlled-ops/browser-launch-policy.mjs';
 import { canonicalStringify, sha256, utcNow } from '../../scripts/controlled-ops/internal.mjs';
 import { cleanupBrowserEvidence, createBrowserEvidenceWorkspace, importBrowserJournal } from '../../scripts/controlled-ops/browser-importer.mjs';
@@ -48,6 +49,16 @@ function writeCompleteJournal(root) {
   writer.append({ record_type: 'browser_run_completed', run_id: 'browser-run-local', timestamp: '2026-07-22T16:00:01.000Z', status: 'passed', duration_ms: 1000 });
   writer.close();
   return writer.journalPath;
+}
+
+function copyMode600(source, destination) {
+  copyFileSync(source, destination);
+  chmodSync(destination, 0o600);
+  return readFileSync(destination, 'utf8');
+}
+
+function assertCleanupProvenanceRejects(handle) {
+  assert.throws(() => cleanupBrowserEvidence(handle), (error) => error?.code === 'BROWSER_CLEANUP_PROVENANCE_MISMATCH');
 }
 
 function httpGet(url, { method = 'GET', headers = {}, body = null } = {}) {
@@ -324,6 +335,122 @@ test('browser cleanup blocks unknown entries and root replacement before deletio
     writer.append({ record_type: 'browser_run_started', run_id: 'browser-run-local', timestamp: '2026-07-22T16:00:00.000Z' });
     assert.throws(() => cleanupBrowserEvidence(openJournal.cleanupHandle), /terminal|incomplete|recognized/i);
     writer.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup rejects foreign valid journal artifacts copied into an authenticated workspace', () => {
+  const root = tempRoot();
+  try {
+    const source = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetJournalOnly = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const sourceJournal = writeCompleteJournal(source.journalRoot);
+    const sourceJournalContent = readFileSync(sourceJournal, 'utf8');
+    const copiedJournalContent = copyMode600(source.journalPath, targetJournalOnly.journalPath);
+    assertCleanupProvenanceRejects(targetJournalOnly.cleanupHandle);
+    assert.equal(readFileSync(source.journalPath, 'utf8'), sourceJournalContent);
+    assert.equal(readFileSync(targetJournalOnly.journalPath, 'utf8'), copiedJournalContent);
+    assert.equal(existsSync(source.root), true);
+    assert.equal(existsSync(targetJournalOnly.root), true);
+
+    const sourceWithSummary = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetWithSummary = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const journalPath = writeCompleteJournal(sourceWithSummary.journalRoot);
+    importBrowserJournal({ journalPath, summaryPath: sourceWithSummary.summaryPath, outputRoot: sourceWithSummary.outputRoot });
+    const sourceSummaryContent = readFileSync(sourceWithSummary.summaryPath, 'utf8');
+    const copiedJournal = copyMode600(sourceWithSummary.journalPath, targetWithSummary.journalPath);
+    const copiedSummary = copyMode600(sourceWithSummary.summaryPath, targetWithSummary.summaryPath);
+    assertCleanupProvenanceRejects(targetWithSummary.cleanupHandle);
+    assert.equal(readFileSync(sourceWithSummary.summaryPath, 'utf8'), sourceSummaryContent);
+    assert.equal(readFileSync(targetWithSummary.journalPath, 'utf8'), copiedJournal);
+    assert.equal(readFileSync(targetWithSummary.summaryPath, 'utf8'), copiedSummary);
+    assert.equal(existsSync(sourceWithSummary.root), true);
+    assert.equal(existsSync(targetWithSummary.root), true);
+
+    cleanupBrowserEvidence(sourceWithSummary.cleanupHandle);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup rejects foreign valid launch artifacts copied into an authenticated workspace', () => {
+  const root = tempRoot();
+  try {
+    const source = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetDescriptorOnly = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const launch = createBrowserLaunchContract({ root: source.launchRoot, baseURL: 'http://127.0.0.1:4100', runLabel: 'synthetic-form-submit' });
+    const sourceDescriptorContent = readFileSync(launch.descriptorPath, 'utf8');
+    const copiedDescriptorContent = copyMode600(launch.descriptorPath, join(targetDescriptorOnly.launchRoot, 'browser-launch.json'));
+    assertCleanupProvenanceRejects(targetDescriptorOnly.cleanupHandle);
+    assert.equal(readFileSync(launch.descriptorPath, 'utf8'), sourceDescriptorContent);
+    assert.equal(readFileSync(join(targetDescriptorOnly.launchRoot, 'browser-launch.json'), 'utf8'), copiedDescriptorContent);
+    assert.equal(existsSync(source.root), true);
+    assert.equal(existsSync(targetDescriptorOnly.root), true);
+    cleanupBrowserEvidence(source.cleanupHandle);
+
+    const sourceWithReady = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetWithReady = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const readyLaunch = createBrowserLaunchContract({ root: sourceWithReady.launchRoot, baseURL: 'http://127.0.0.1:4100', runLabel: 'synthetic-form-submit' });
+    writeReporterReady({ descriptorPath: readyLaunch.descriptorPath, nonce: readyLaunch.nonce });
+    const sourceReadyContent = readFileSync(readyLaunch.reporterReadyPath, 'utf8');
+    const copiedDescriptor = copyMode600(readyLaunch.descriptorPath, join(targetWithReady.launchRoot, 'browser-launch.json'));
+    const copiedReady = copyMode600(readyLaunch.reporterReadyPath, join(targetWithReady.launchRoot, 'browser-reporter-ready.json'));
+    assertCleanupProvenanceRejects(targetWithReady.cleanupHandle);
+    assert.equal(readFileSync(readyLaunch.reporterReadyPath, 'utf8'), sourceReadyContent);
+    assert.equal(readFileSync(join(targetWithReady.launchRoot, 'browser-launch.json'), 'utf8'), copiedDescriptor);
+    assert.equal(readFileSync(join(targetWithReady.launchRoot, 'browser-reporter-ready.json'), 'utf8'), copiedReady);
+    assert.equal(existsSync(sourceWithReady.root), true);
+    assert.equal(existsSync(targetWithReady.root), true);
+    cleanupBrowserEvidence(sourceWithReady.cleanupHandle);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup still accepts genuine artifacts bound to their own workspace provenance', () => {
+  const root = tempRoot();
+  try {
+    const imported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-imported-' });
+    const journalPath = writeCompleteJournal(imported.journalRoot);
+    importBrowserJournal({ journalPath, summaryPath: imported.summaryPath, outputRoot: imported.outputRoot });
+    assert.equal(cleanupBrowserEvidence(imported.cleanupHandle).status, 'cleaned');
+
+    const launched = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-launched-' });
+    const launch = createBrowserLaunchContract({ root: launched.launchRoot, baseURL: 'http://127.0.0.1:4100', runLabel: 'synthetic-form-submit' });
+    writeReporterReady({ descriptorPath: launch.descriptorPath, nonce: launch.nonce });
+    assert.equal(cleanupBrowserEvidence(launched.cleanupHandle).status, 'cleaned');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup rejects replayed artifacts after current workspace provenance is established', () => {
+  const root = tempRoot();
+  try {
+    const sourceImported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetImported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const sourceJournal = writeCompleteJournal(sourceImported.journalRoot);
+    importBrowserJournal({ journalPath: sourceJournal, summaryPath: sourceImported.summaryPath, outputRoot: sourceImported.outputRoot });
+    const targetJournal = writeCompleteJournal(targetImported.journalRoot);
+    importBrowserJournal({ journalPath: targetJournal, summaryPath: targetImported.summaryPath, outputRoot: targetImported.outputRoot });
+    copyMode600(sourceImported.journalPath, targetImported.journalPath);
+    copyMode600(sourceImported.summaryPath, targetImported.summaryPath);
+    assertCleanupProvenanceRejects(targetImported.cleanupHandle);
+    assert.equal(existsSync(targetImported.root), true);
+    cleanupBrowserEvidence(sourceImported.cleanupHandle);
+
+    const sourceLaunch = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
+    const targetLaunch = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
+    const sourceContract = createBrowserLaunchContract({ root: sourceLaunch.launchRoot, baseURL: 'http://127.0.0.1:4100', runLabel: 'synthetic-form-submit' });
+    writeReporterReady({ descriptorPath: sourceContract.descriptorPath, nonce: sourceContract.nonce });
+    const targetContract = createBrowserLaunchContract({ root: targetLaunch.launchRoot, baseURL: 'http://127.0.0.1:4100', runLabel: 'synthetic-form-submit' });
+    writeReporterReady({ descriptorPath: targetContract.descriptorPath, nonce: targetContract.nonce });
+    copyMode600(sourceContract.descriptorPath, targetContract.descriptorPath);
+    copyMode600(sourceContract.reporterReadyPath, targetContract.reporterReadyPath);
+    assertCleanupProvenanceRejects(targetLaunch.cleanupHandle);
+    assert.equal(existsSync(targetLaunch.root), true);
+    cleanupBrowserEvidence(sourceLaunch.cleanupHandle);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
