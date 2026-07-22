@@ -16,7 +16,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   EvidenceError,
@@ -260,16 +260,26 @@ export function verifyBrowserSummary(summaryPath, { sourceJournalPath = null } =
 }
 
 export function cleanupBrowserEvidence({ journalPath = null, summaryPath = null, journalRoot = null, outputRoot = null } = {}) {
-  const targets = [journalPath, summaryPath].filter(Boolean).map(resolve);
+  const resolveCleanupPath = (value, label) => {
+    validateRawOperationRootInput(value, label);
+    const path = resolve(value);
+    if (path === sep || path === '/tmp' || path === '/private/tmp' || path === process.cwd() || dirname(path) === path) {
+      throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean a dangerous browser evidence path.');
+    }
+    assertCanonicalParents(path);
+    return path;
+  };
+  const targets = [journalPath, summaryPath].filter(Boolean).map((value) => resolveCleanupPath(value, 'browser cleanup file'));
   for (const target of targets) {
+    if (!existsSync(target)) continue;
     const info = lstatSync(target);
-    if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence file.');
+    if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1 || modeOf(info) !== 0o600) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence file.');
     unlinkSync(target);
   }
-  for (const root of [journalRoot, outputRoot].filter(Boolean).map(resolve)) {
+  for (const root of [journalRoot, outputRoot].filter(Boolean).map((value) => resolveCleanupPath(value, 'browser cleanup root'))) {
     if (!existsSync(root)) continue;
     const info = lstatSync(root);
-    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.()) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence directory.');
+    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || modeOf(info) !== 0o700) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence directory.');
     const entries = readdirSync(root);
     if (entries.length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence directory is not empty.');
     rmdirSync(root);

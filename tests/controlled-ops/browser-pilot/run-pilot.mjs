@@ -4,11 +4,20 @@ import { spawn } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertNoProhibitedBrowserEnvironment,
+  assertReporterReady,
+  assertSupportedLauncherArguments,
+  createBrowserLaunchContract,
+} from '../../../scripts/controlled-ops/browser-launch-policy.mjs';
 import { importBrowserJournal, verifyBrowserSummary } from '../../../scripts/controlled-ops/browser-importer.mjs';
 import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journal.mjs';
 import { startBrowserLocalServer } from '../fixtures/browser-local-server.mjs';
 
 const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+
+assertSupportedLauncherArguments(process.argv.slice(2));
+assertNoProhibitedBrowserEnvironment(process.env);
 
 function mkdir700(path) {
   mkdirSync(path, { mode: 0o700 });
@@ -50,24 +59,27 @@ function runPlaywright(command, args, options) {
 const tmpRoot = mkdtempSync(join('/private/tmp', 'servsync-browser-pilot-'));
 chmodSync(tmpRoot, 0o700);
 const journalRoot = join(tmpRoot, 'journal');
+const launchRoot = join(tmpRoot, 'launch');
 const summaryRoot = join(tmpRoot, 'summary');
 const outputRoot = join(tmpRoot, 'playwright-output');
 mkdir700(journalRoot);
+mkdir700(launchRoot);
 mkdir700(summaryRoot);
 mkdir700(outputRoot);
 
 let fixture;
 try {
   fixture = await startBrowserLocalServer();
+  const launch = createBrowserLaunchContract({
+    root: launchRoot,
+    baseURL: fixture.baseURL,
+    runLabel: 'synthetic-form-submit',
+  });
   const env = { ...process.env };
-  delete env.TEST_APP_URL;
-  delete env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  delete env.SUPABASE_URL;
-  delete env.SUPABASE_ANON_KEY;
-  delete env.VITE_SUPABASE_URL;
-  delete env.VITE_SUPABASE_ANON_KEY;
   env.CONTROLLED_OPS_BROWSER_BASE_URL = fixture.baseURL;
   env.CONTROLLED_OPS_BROWSER_JOURNAL_ROOT = journalRoot;
+  env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR = launch.descriptorPath;
+  env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE = launch.nonce;
   env.CONTROLLED_OPS_BROWSER_OUTPUT_ROOT = outputRoot;
   env.CONTROLLED_OPS_BROWSER_RUN_LABEL = 'synthetic-form-submit';
 
@@ -83,6 +95,7 @@ try {
     process.stderr.write(result.stdout);
     throw new Error(`Controlled-ops browser pilot failed with status ${result.status}.`);
   }
+  assertReporterReady({ descriptorPath: launch.descriptorPath, nonce: launch.nonce });
 
   const journalPath = join(journalRoot, JOURNAL_FILENAME);
   const summaryPath = join(summaryRoot, 'browser-summary.json');

@@ -2,7 +2,6 @@ import { relative } from 'node:path';
 import {
   BROWSER_LIMITS,
   attemptIdFor,
-  generatedRunId,
   testIdFor,
   validateBrowserSafeLabel,
   validateBrowserUrl,
@@ -11,6 +10,7 @@ import {
 } from './browser-schema.mjs';
 import { createJournalWriter } from './browser-journal.mjs';
 import { classifyError } from './browser-importer.mjs';
+import { assertBrowserLaunchContract, writeReporterReady } from './browser-launch-policy.mjs';
 import { EvidenceError, utcNow, validateControlledSlug, validateRelativePath } from './internal.mjs';
 
 function mapStatus(status) {
@@ -33,7 +33,7 @@ function mapRunStatus(status) {
 export default class ControlledOpsBrowserReporter {
   constructor(options = {}) {
     this.options = options;
-    this.runId = generatedRunId();
+    this.runId = null;
     this.testStarts = new Map();
     this.writer = null;
     this.startedAt = null;
@@ -46,6 +46,14 @@ export default class ControlledOpsBrowserReporter {
     validateControlledSlug(runLabel, 'browser run label', { maxLength: BROWSER_LIMITS.label_length });
     const baseUrl = this.options.baseURL || process.env.CONTROLLED_OPS_BROWSER_BASE_URL;
     validateBrowserUrl(baseUrl);
+    const launch = assertBrowserLaunchContract({
+      descriptorPath: this.options.descriptorPath || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+      nonce: this.options.nonce || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
+    });
+    if (launch.descriptor.base_url !== validateBrowserUrl(baseUrl) || launch.descriptor.run_label !== runLabel) {
+      throw new EvidenceError('BROWSER_LAUNCH_CONTRACT_MISMATCH', 'Browser reporter launch contract does not match config.');
+    }
+    this.runId = launch.descriptor.run_id;
     if (config.projects.length !== 1 || config.projects[0].name !== 'chromium') throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A requires exactly one chromium project.');
     if (config.workers !== 1 || config.fullyParallel) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A requires one serial worker.');
     if (config.projects[0].retries !== 0 && config.projects[0].retries > BROWSER_LIMITS.retry_index_max) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A retry config is invalid.');
@@ -57,6 +65,10 @@ export default class ControlledOpsBrowserReporter {
       record_type: 'browser_run_started',
       run_id: this.runId,
       timestamp: this.startedAt,
+    });
+    writeReporterReady({
+      descriptorPath: this.options.descriptorPath || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+      nonce: this.options.nonce || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
     });
   }
 

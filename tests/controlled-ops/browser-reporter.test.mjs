@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { createBrowserLaunchContract } from '../../scripts/controlled-ops/browser-launch-policy.mjs';
 import ControlledOpsBrowserReporter from '../../scripts/controlled-ops/playwright-reporter.mjs';
 import { readJournal } from '../../scripts/controlled-ops/browser-journal.mjs';
 
@@ -16,14 +17,22 @@ function hasCode(code) {
 }
 
 test('controlled-ops reporter writes a strict local lifecycle journal', async () => {
-  const parent = tempRoot();
-  try {
-    const journalRoot = join(parent, 'journal');
-    const reporter = new ControlledOpsBrowserReporter({
-      journalRoot,
-      baseURL: 'http://127.0.0.1:43210',
-      runLabel: 'synthetic-form-submit',
-    });
+    const parent = tempRoot();
+    try {
+      const journalRoot = join(parent, 'journal');
+      const launchRoot = join(parent, 'launch');
+      const launch = createBrowserLaunchContract({
+        root: launchRoot,
+        baseURL: 'http://127.0.0.1:43210',
+        runLabel: 'synthetic-form-submit',
+      });
+      const reporter = new ControlledOpsBrowserReporter({
+        descriptorPath: launch.descriptorPath,
+        journalRoot,
+        nonce: launch.nonce,
+        baseURL: 'http://127.0.0.1:43210',
+        runLabel: 'synthetic-form-submit',
+      });
     const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
     const suite = { allTests: () => [{ title: 'synthetic-form-submit' }] };
     const testCase = { id: 'test-case-1', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
@@ -46,8 +55,13 @@ test('controlled-ops reporter writes a strict local lifecycle journal', async ()
 test('controlled-ops reporter rejects nonlocal or parallel Playwright configuration', () => {
   const parent = tempRoot();
   try {
-    assert.throws(() => new ControlledOpsBrowserReporter({ journalRoot: join(parent, 'journal'), baseURL: 'https://example.com:443' }).onBegin({ projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false }, { allTests: () => [] }), hasCode('INVALID_BROWSER_TARGET'));
-    assert.throws(() => new ControlledOpsBrowserReporter({ journalRoot: join(parent, 'journal-two'), baseURL: 'http://127.0.0.1:43210' }).onBegin({ projects: [{ name: 'chromium', retries: 0 }], workers: 2, fullyParallel: true }, { allTests: () => [] }), hasCode('BROWSER_REPORTER_CONFIG'));
+    const launch = createBrowserLaunchContract({
+      root: join(parent, 'launch'),
+      baseURL: 'http://127.0.0.1:43210',
+      runLabel: 'synthetic-form-submit',
+    });
+    assert.throws(() => new ControlledOpsBrowserReporter({ descriptorPath: launch.descriptorPath, journalRoot: join(parent, 'journal'), nonce: launch.nonce, baseURL: 'https://example.com:443' }).onBegin({ projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false }, { allTests: () => [] }), hasCode('INVALID_BROWSER_TARGET'));
+    assert.throws(() => new ControlledOpsBrowserReporter({ descriptorPath: launch.descriptorPath, journalRoot: join(parent, 'journal-two'), nonce: launch.nonce, baseURL: 'http://127.0.0.1:43210' }).onBegin({ projects: [{ name: 'chromium', retries: 0 }], workers: 2, fullyParallel: true }, { allTests: () => [] }), hasCode('BROWSER_REPORTER_CONFIG'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
