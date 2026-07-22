@@ -9,6 +9,7 @@ const test = base.extend({
     assertReporterReady({
       descriptorPath: process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
       expectedReporterPid: process.ppid,
+      journalAuthSecret: process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET,
       nonce: process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
     });
     const guard = createBrowserEgressGuard(baseURL);

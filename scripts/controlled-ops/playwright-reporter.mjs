@@ -48,6 +48,7 @@ export default class ControlledOpsBrowserReporter {
     validateBrowserUrl(baseUrl);
     const launch = assertBrowserLaunchContract({
       descriptorPath: this.options.descriptorPath || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+      journalAuthSecret: this.options.journalAuthSecret || process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET,
       nonce: this.options.nonce || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
     });
     if (launch.descriptor.base_url !== validateBrowserUrl(baseUrl) || launch.descriptor.run_label !== runLabel) {
@@ -59,7 +60,8 @@ export default class ControlledOpsBrowserReporter {
     if (config.projects[0].retries !== 0 && config.projects[0].retries > BROWSER_LIMITS.retry_index_max) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A retry config is invalid.');
     if (suite.allTests().length > BROWSER_LIMITS.tests_per_run) throw new EvidenceError('BROWSER_TEST_LIMIT', 'Slice 2A test count limit exceeded.');
 
-    this.writer = createJournalWriter(journalRoot);
+    const journalAuthSecret = this.options.journalAuthSecret || process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET;
+    this.writer = createJournalWriter(journalRoot, { allowPrepared: true, journalAuthSecret });
     this.startedAt = utcNow();
     this.writer.append({
       record_type: 'browser_run_started',
@@ -68,6 +70,7 @@ export default class ControlledOpsBrowserReporter {
     });
     writeReporterReady({
       descriptorPath: this.options.descriptorPath || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+      journalAuthSecret,
       nonce: this.options.nonce || process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
     });
   }

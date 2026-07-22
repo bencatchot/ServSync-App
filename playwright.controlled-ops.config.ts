@@ -23,6 +23,7 @@ export default defineConfig({
     ['./scripts/controlled-ops/playwright-reporter.mjs', {
       baseURL,
       descriptorPath: process.env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+      journalAuthSecret: process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET,
       journalRoot: process.env.CONTROLLED_OPS_BROWSER_JOURNAL_ROOT,
       nonce: process.env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
       runLabel: process.env.CONTROLLED_OPS_BROWSER_RUN_LABEL ?? 'synthetic-form-submit',

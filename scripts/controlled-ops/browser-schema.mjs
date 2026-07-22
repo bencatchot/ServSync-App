@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import {
   GENESIS_HASH,
@@ -64,6 +64,7 @@ export const BROWSER_RECORD_FIELDS = [
   'status',
   'duration_ms',
   'error_classification',
+  'run_auth_tag',
   'previous_record_hash',
   'current_record_hash',
 ];
@@ -225,9 +226,12 @@ export function validateBrowserRecord(record) {
   if (![record.previous_record_hash, record.current_record_hash].every((value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value))) {
     throw new EvidenceError('INVALID_BROWSER_HASH', 'Browser journal hash is invalid.');
   }
+  if (record.run_auth_tag !== null && (typeof record.run_auth_tag !== 'string' || !/^[a-f0-9]{64}$/.test(record.run_auth_tag))) {
+    throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Browser journal auth tag is invalid.');
+  }
 
   if (record.record_type === 'browser_run_started') {
-    if (record.worker_index !== null || record.retry_index !== null || record.spec_path !== null || record.test_id !== null || record.attempt_id !== null || record.safe_label !== null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none') {
+    if (record.worker_index !== null || record.retry_index !== null || record.spec_path !== null || record.test_id !== null || record.attempt_id !== null || record.safe_label !== null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none' || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser run-start record contains invalid fields.');
     }
   } else if (record.record_type === 'browser_run_completed') {
@@ -236,17 +240,17 @@ export function validateBrowserRecord(record) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser run-complete record contains invalid fields.');
     }
   } else if (record.record_type === 'browser_test_started') {
-    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none') {
+    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none' || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser test-start record contains invalid fields.');
     }
   } else if (record.record_type === 'browser_step_completed') {
     validateNullableStatus(record.status, STEP_STATUSES, 'browser step status');
-    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.duration_ms === null) {
+    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.duration_ms === null || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser step record contains invalid fields.');
     }
   } else if (record.record_type === 'browser_test_completed') {
     validateNullableStatus(record.status, TEST_STATUSES, 'browser test status');
-    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.duration_ms === null) {
+    if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.duration_ms === null || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser test-complete record contains invalid fields.');
     }
   }
@@ -257,6 +261,19 @@ export function validateBrowserRecord(record) {
 
 export function hashBrowserRecord(previousHash, withoutCurrentHash) {
   return sha256(`${previousHash}\n${canonicalStringify(withoutCurrentHash)}`);
+}
+
+export function browserRunAuthPayload(recordWithoutHash) {
+  return canonicalStringify({ ...recordWithoutHash, run_auth_tag: null });
+}
+
+export function computeBrowserRunAuthTag(secret, recordWithoutHash) {
+  if (typeof secret !== 'string' || !/^[a-f0-9]{64}$/.test(secret)) {
+    throw new EvidenceError('INVALID_BROWSER_AUTH_SECRET', 'Browser run auth secret is invalid.');
+  }
+  return createHmac('sha256', Buffer.from(secret, 'hex'))
+    .update(browserRunAuthPayload(recordWithoutHash))
+    .digest('hex');
 }
 
 export function buildBrowserRecord(previousHash, input) {
@@ -277,6 +294,7 @@ export function buildBrowserRecord(previousHash, input) {
     status: input.status ?? null,
     duration_ms: input.duration_ms ?? null,
     error_classification: input.error_classification ?? 'none',
+    run_auth_tag: input.run_auth_tag ?? null,
     previous_record_hash: previousHash,
   };
   const record = { ...recordWithoutHash, current_record_hash: hashBrowserRecord(previousHash, recordWithoutHash) };

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import {
   closeSync,
   constants,
@@ -27,7 +27,6 @@ import {
 } from './internal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
 import { validateBrowserLoopbackUrl, validateBrowserUrl } from './browser-schema.mjs';
-import { registerBrowserLaunchProvenance } from './browser-importer.mjs';
 
 export const BROWSER_LAUNCH_SCHEMA = 'servsync-controlled-ops/browser-launch-v1';
 export const BROWSER_REPORTER_READY_SCHEMA = 'servsync-controlled-ops/browser-reporter-ready-v1';
@@ -81,6 +80,20 @@ function readCanonicalJson(path) {
   return parsed;
 }
 
+function assertJournalAuthSecret(secret) {
+  if (typeof secret !== 'string' || !/^[a-f0-9]{64}$/.test(secret)) {
+    throw new EvidenceError('INVALID_BROWSER_AUTH_SECRET', 'Browser launch auth secret is invalid.');
+  }
+  return secret;
+}
+
+function reporterReadyAuthTag(secret, readyWithoutTag) {
+  assertJournalAuthSecret(secret);
+  return createHmac('sha256', Buffer.from(secret, 'hex'))
+    .update(canonicalStringify({ ...readyWithoutTag, ready_auth_tag: null }))
+    .digest('hex');
+}
+
 function assertMode700Directory(path, fieldName) {
   validateRawOperationRootInput(path, fieldName);
   const root = resolve(path);
@@ -94,10 +107,19 @@ function assertMode700Directory(path, fieldName) {
   return root;
 }
 
-function writeExclusiveJson(root, path, value) {
+function writeExclusiveJson(root, path, value, { allowPrepared = false } = {}) {
   if (dirname(path) !== root) throw new EvidenceError('UNSAFE_BROWSER_LAUNCH_PATH', 'Browser launch file must be inside the launch root.');
-  if (existsSync(path)) throw new EvidenceError('PREEXISTING_BROWSER_LAUNCH_FILE', 'Browser launch file already exists.');
-  const descriptor = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  let descriptor;
+  if (existsSync(path)) {
+    if (!allowPrepared) throw new EvidenceError('PREEXISTING_BROWSER_LAUNCH_FILE', 'Browser launch file already exists.');
+    const prepared = lstatSync(path);
+    if (!prepared.isFile() || prepared.isSymbolicLink() || prepared.uid !== process.getuid?.() || prepared.nlink !== 1 || modeOf(prepared) !== 0o600 || prepared.size !== 0) {
+      throw new EvidenceError('UNSAFE_BROWSER_LAUNCH_FILE', 'Prepared browser launch file is unsafe.');
+    }
+    descriptor = openSync(path, constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+  } else {
+    descriptor = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  }
   try {
     const info = fstatSync(descriptor);
     if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || modeOf(info) !== 0o600) {
@@ -143,6 +165,7 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
   const safeBaseURL = validateBrowserUrl(baseURL);
   const safeRunLabel = validateControlledSlug(runLabel, 'browser run label', { maxLength: 64 });
   const nonce = randomBytes(32).toString('hex');
+  const journalAuthSecret = randomBytes(32).toString('hex');
   const runId = `browser-run-${randomBytes(12).toString('hex')}`;
   const descriptorPath = join(launchRoot, LAUNCH_DESCRIPTOR_FILENAME);
   const reporterReadyPath = join(launchRoot, REPORTER_READY_FILENAME);
@@ -152,30 +175,26 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
     created_utc: utcNow(),
     run_id: runId,
     nonce_digest: sha256(nonce),
+    journal_auth_digest: sha256(journalAuthSecret),
     base_url: safeBaseURL,
     run_label: safeRunLabel,
     reporter_ready_path: reporterReadyPath,
   };
   writeExclusiveJson(launchRoot, descriptorPath, descriptor);
-  registerBrowserLaunchProvenance({
-    launchRoot,
-    descriptorPath,
-    runId,
-    nonceDigest: descriptor.nonce_digest,
-  });
-  return { descriptor, descriptorPath, nonce, reporterReadyPath };
+  return { descriptor, descriptorPath, journalAuthSecret, nonce, reporterReadyPath };
 }
 
 export function readBrowserLaunchDescriptor(descriptorPath) {
   const path = assertLaunchFile(descriptorPath, LAUNCH_DESCRIPTOR_FILENAME);
   const descriptor = readCanonicalJson(path);
-  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'base_url', 'run_label', 'reporter_ready_path'];
+  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'journal_auth_digest', 'base_url', 'run_label', 'reporter_ready_path'];
   const keys = Object.keys(descriptor).sort();
   if (canonicalStringify(keys) !== canonicalStringify(required.sort())) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor schema is invalid.');
   if (descriptor.schema_version !== BROWSER_LAUNCH_SCHEMA || descriptor.tool_version !== BROWSER_LAUNCH_TOOL_VERSION) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor version is invalid.');
   validateTimestamp(descriptor.created_utc, 'browser launch created timestamp');
   if (!/^browser-run-[a-f0-9]{24}$/.test(descriptor.run_id)) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch run ID is invalid.');
   if (!/^[a-f0-9]{64}$/.test(descriptor.nonce_digest)) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch nonce digest is invalid.');
+  if (!/^[a-f0-9]{64}$/.test(descriptor.journal_auth_digest)) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch auth digest is invalid.');
   validateBrowserUrl(descriptor.base_url);
   validateControlledSlug(descriptor.run_label, 'browser run label', { maxLength: 64 });
   const readyPath = resolve(descriptor.reporter_ready_path);
@@ -184,23 +203,27 @@ export function readBrowserLaunchDescriptor(descriptorPath) {
   return { descriptor, descriptorPath: path, launchRoot: root, reporterReadyPath: readyPath };
 }
 
-export function assertBrowserLaunchContract({ descriptorPath, nonce }) {
+export function assertBrowserLaunchContract({ descriptorPath, nonce, journalAuthSecret = null }) {
   if (!descriptorPath || !nonce) throw new EvidenceError('BROWSER_LAUNCH_CONTRACT_MISSING', 'Controlled-ops browser launch contract is required.');
   const result = readBrowserLaunchDescriptor(descriptorPath);
   if (sha256(nonce) !== result.descriptor.nonce_digest) throw new EvidenceError('BROWSER_LAUNCH_CONTRACT_MISMATCH', 'Controlled-ops browser launch nonce does not match.');
+  if (journalAuthSecret !== null && sha256(assertJournalAuthSecret(journalAuthSecret)) !== result.descriptor.journal_auth_digest) {
+    throw new EvidenceError('BROWSER_LAUNCH_CONTRACT_MISMATCH', 'Controlled-ops browser launch auth secret does not match.');
+  }
   return result;
 }
 
 export function assertBrowserLaunchContractFromEnv(env = process.env) {
   return assertBrowserLaunchContract({
     descriptorPath: env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR,
+    journalAuthSecret: env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET ?? null,
     nonce: env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE,
   });
 }
 
-export function writeReporterReady({ descriptorPath, nonce }) {
-  const { descriptor, launchRoot, reporterReadyPath } = assertBrowserLaunchContract({ descriptorPath, nonce });
-  const ready = {
+export function writeReporterReady({ descriptorPath, nonce, journalAuthSecret = null }) {
+  const { descriptor, launchRoot, reporterReadyPath } = assertBrowserLaunchContract({ descriptorPath, nonce, journalAuthSecret });
+  const readyWithoutTag = {
     schema_version: BROWSER_REPORTER_READY_SCHEMA,
     tool_version: BROWSER_LAUNCH_TOOL_VERSION,
     created_utc: utcNow(),
@@ -208,21 +231,33 @@ export function writeReporterReady({ descriptorPath, nonce }) {
     nonce_digest: descriptor.nonce_digest,
     pid: process.pid,
   };
-  writeExclusiveJson(launchRoot, reporterReadyPath, ready);
+  const ready = {
+    ...readyWithoutTag,
+    ready_auth_tag: journalAuthSecret ? reporterReadyAuthTag(journalAuthSecret, readyWithoutTag) : null,
+  };
+  writeExclusiveJson(launchRoot, reporterReadyPath, ready, { allowPrepared: true });
   return ready;
 }
 
-export function assertReporterReady({ descriptorPath, nonce, expectedReporterPid = null }) {
-  const { descriptor, reporterReadyPath } = assertBrowserLaunchContract({ descriptorPath, nonce });
+export function assertReporterReady({ descriptorPath, nonce, expectedReporterPid = null, journalAuthSecret = null }) {
+  const { descriptor, reporterReadyPath } = assertBrowserLaunchContract({ descriptorPath, nonce, journalAuthSecret });
   const path = assertLaunchFile(reporterReadyPath, REPORTER_READY_FILENAME);
   const ready = readCanonicalJson(path);
-  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'pid'];
+  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'pid', 'ready_auth_tag'];
   const keys = Object.keys(ready).sort();
   if (canonicalStringify(keys) !== canonicalStringify(required.sort())) throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready schema is invalid.');
   if (ready.schema_version !== BROWSER_REPORTER_READY_SCHEMA || ready.tool_version !== BROWSER_LAUNCH_TOOL_VERSION) throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready version is invalid.');
   validateTimestamp(ready.created_utc, 'browser reporter-ready timestamp');
   if (ready.run_id !== descriptor.run_id || ready.nonce_digest !== descriptor.nonce_digest || !Number.isInteger(ready.pid) || ready.pid < 1) {
     throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready binding is invalid.');
+  }
+  if (journalAuthSecret !== null) {
+    const { ready_auth_tag: actualTag, ...readyWithoutTag } = ready;
+    if (actualTag !== reporterReadyAuthTag(journalAuthSecret, readyWithoutTag)) {
+      throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready auth binding is invalid.');
+    }
+  } else if (ready.ready_auth_tag !== null && (typeof ready.ready_auth_tag !== 'string' || !/^[a-f0-9]{64}$/.test(ready.ready_auth_tag))) {
+    throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready auth tag is invalid.');
   }
   if (expectedReporterPid !== null && ready.pid !== expectedReporterPid) {
     throw new EvidenceError('INVALID_BROWSER_REPORTER_READY', 'Browser reporter-ready process binding is invalid.');

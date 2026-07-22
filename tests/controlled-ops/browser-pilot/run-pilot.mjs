@@ -8,9 +8,16 @@ import {
   assertNoProhibitedBrowserEnvironment,
   assertReporterReady,
   assertSupportedLauncherArguments,
-  createBrowserLaunchContract,
 } from '../../../scripts/controlled-ops/browser-launch-policy.mjs';
-import { cleanupBrowserEvidence, createBrowserEvidenceWorkspace, importBrowserJournal, verifyBrowserSummary } from '../../../scripts/controlled-ops/browser-importer.mjs';
+import {
+  cleanupBrowserEvidence,
+  createBrowserEvidenceWorkspace,
+  createBrowserWorkspaceLaunchContract,
+  importBrowserJournal,
+  recordBrowserBookkeeping,
+  recordBrowserReporterReady,
+  verifyBrowserSummary,
+} from '../../../scripts/controlled-ops/browser-importer.mjs';
 import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journal.mjs';
 import { startBrowserLocalServer } from '../fixtures/browser-local-server.mjs';
 
@@ -57,8 +64,8 @@ let fixture;
 let runError = null;
 try {
   fixture = await startBrowserLocalServer();
-  const launch = createBrowserLaunchContract({
-    root: workspace.launchRoot,
+  const launch = createBrowserWorkspaceLaunchContract({
+    cleanupHandle: workspace.cleanupHandle,
     baseURL: fixture.baseURL,
     runLabel: 'synthetic-form-submit',
   });
@@ -66,6 +73,7 @@ try {
   env.CONTROLLED_OPS_BROWSER_BASE_URL = fixture.baseURL;
   env.CONTROLLED_OPS_BROWSER_JOURNAL_ROOT = workspace.journalRoot;
   env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR = launch.descriptorPath;
+  env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET = launch.journalAuthSecret;
   env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE = launch.nonce;
   env.CONTROLLED_OPS_BROWSER_OUTPUT_ROOT = workspace.outputRoot;
   env.CONTROLLED_OPS_BROWSER_RUN_LABEL = 'synthetic-form-submit';
@@ -82,7 +90,9 @@ try {
     process.stderr.write(result.stdout);
     throw new Error(`Controlled-ops browser pilot failed with status ${result.status}.`);
   }
-  assertReporterReady({ descriptorPath: launch.descriptorPath, nonce: launch.nonce });
+  recordBrowserBookkeeping({ cleanupHandle: workspace.cleanupHandle });
+  recordBrowserReporterReady({ cleanupHandle: workspace.cleanupHandle });
+  assertReporterReady({ descriptorPath: launch.descriptorPath, journalAuthSecret: launch.journalAuthSecret, nonce: launch.nonce });
 
   const journalPath = join(workspace.journalRoot, JOURNAL_FILENAME);
   const summaryPath = workspace.summaryPath;
@@ -97,6 +107,11 @@ try {
   runError = error;
 } finally {
   if (fixture) await fixture.close();
+  try {
+    recordBrowserBookkeeping({ cleanupHandle: workspace.cleanupHandle });
+  } catch (bookkeepingError) {
+    if (!runError && bookkeepingError?.code !== 'BROWSER_PROVENANCE_STATE') runError = bookkeepingError;
+  }
   try {
     cleanupBrowserEvidence(workspace.cleanupHandle);
   } catch (cleanupError) {

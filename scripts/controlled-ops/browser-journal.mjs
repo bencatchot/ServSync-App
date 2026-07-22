@@ -25,7 +25,7 @@ import {
   sha256File,
   validateRawOperationRootInput,
 } from './internal.mjs';
-import { BROWSER_LIMITS, buildBrowserRecord, decodeUtf8, parseBrowserJournal } from './browser-schema.mjs';
+import { BROWSER_LIMITS, buildBrowserRecord, computeBrowserRunAuthTag, decodeUtf8, parseBrowserJournal } from './browser-schema.mjs';
 
 export const JOURNAL_FILENAME = 'browser-journal.ndjson';
 
@@ -65,11 +65,18 @@ export function assertExactlyOneJournal(root, expectedPath = null) {
   return journalPath;
 }
 
-export function createJournalWriter(root) {
+export function createJournalWriter(root, { journalAuthSecret = null, allowPrepared = false } = {}) {
   const rootPath = validateJournalRootInput(root);
   const journalPath = join(rootPath, JOURNAL_FILENAME);
-  if (existsSync(journalPath)) throw new EvidenceError('PREEXISTING_BROWSER_JOURNAL', 'Browser journal already exists.');
-  const descriptor = openSync(journalPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  let descriptor;
+  if (existsSync(journalPath)) {
+    if (!allowPrepared) throw new EvidenceError('PREEXISTING_BROWSER_JOURNAL', 'Browser journal already exists.');
+    const prepared = assertJournalFile(journalPath);
+    if (prepared.size !== 0) throw new EvidenceError('PREEXISTING_BROWSER_JOURNAL', 'Prepared browser journal is not empty.');
+    descriptor = openSync(journalPath, constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+  } else {
+    descriptor = openSync(journalPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  }
   const info = fstatSync(descriptor);
   if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || modeOf(info) !== 0o600) {
     closeSync(descriptor);
@@ -86,7 +93,31 @@ export function createJournalWriter(root) {
     if (closed) throw new EvidenceError('BROWSER_JOURNAL_CLOSED', 'Browser journal is already closed.');
     sequence += 1;
     if (sequence > BROWSER_LIMITS.journal_records) throw new EvidenceError('BROWSER_RECORD_LIMIT', 'Browser journal record limit exceeded.');
-    const record = buildBrowserRecord(previousHash, { ...input, sequence });
+    const recordInput = { ...input, sequence };
+    if (journalAuthSecret && recordInput.record_type === 'browser_run_completed' && !recordInput.run_auth_tag) {
+      const authCandidate = {
+        schema_version: 'servsync-controlled-ops/browser-journal-v1',
+        sequence: recordInput.sequence,
+        record_type: recordInput.record_type,
+        run_id: recordInput.run_id,
+        timestamp: recordInput.timestamp,
+        target_classification: 'local',
+        project: 'chromium',
+        worker_index: recordInput.worker_index ?? null,
+        retry_index: recordInput.retry_index ?? null,
+        spec_path: recordInput.spec_path ?? null,
+        test_id: recordInput.test_id ?? null,
+        attempt_id: recordInput.attempt_id ?? null,
+        safe_label: recordInput.safe_label ?? null,
+        status: recordInput.status ?? null,
+        duration_ms: recordInput.duration_ms ?? null,
+        error_classification: recordInput.error_classification ?? 'none',
+        run_auth_tag: null,
+        previous_record_hash: previousHash,
+      };
+      recordInput.run_auth_tag = computeBrowserRunAuthTag(journalAuthSecret, authCandidate);
+    }
+    const record = buildBrowserRecord(previousHash, recordInput);
     const line = `${canonicalStringify(record)}\n`;
     const lineBytes = Buffer.byteLength(line);
     if (lineBytes > BROWSER_LIMITS.line_bytes || bytes + lineBytes > BROWSER_LIMITS.journal_bytes) {
