@@ -13,16 +13,18 @@ import {
   createBrowserEgressGuard,
   writeReporterReady,
 } from '../../scripts/controlled-ops/browser-launch-policy.mjs';
-import { canonicalStringify, sha256, utcNow } from '../../scripts/controlled-ops/internal.mjs';
+import { canonicalStringify, GENESIS_HASH, sha256, utcNow } from '../../scripts/controlled-ops/internal.mjs';
 import {
   cleanupBrowserEvidence,
   createBrowserEvidenceWorkspace,
   createBrowserWorkspaceLaunchContract,
+  importGeneratedBrowserWorkspaceJournal,
   importBrowserJournal,
-  recordBrowserBookkeeping,
   recordBrowserReporterReady,
+  setBrowserCleanupTestHookForTests,
 } from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
+import { attemptIdFor, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
 import { startBrowserLocalServer } from './fixtures/browser-local-server.mjs';
 
 const repoRoot = resolve('.');
@@ -76,6 +78,60 @@ function writeSupportedJournal(workspace, options = {}) {
     status: options.status ?? 'passed',
   });
   return { journalPath, launch };
+}
+
+function writeFailedSupportedJournal(workspace) {
+  const launch = createSupportedLaunch(workspace);
+  const writer = createJournalWriter(workspace.journalRoot, { allowPrepared: true, journalAuthSecret: launch.journalAuthSecret });
+  const runId = launch.descriptor.run_id;
+  const specPath = 'tests/controlled-ops/browser-pilot/pilot.spec.ts';
+  const safeLabel = 'synthetic-form-submit';
+  const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
+  const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
+  writer.append({ record_type: 'browser_run_started', run_id: runId, timestamp: '2026-07-22T16:00:00.000Z' });
+  writer.append({ record_type: 'browser_test_started', run_id: runId, timestamp: '2026-07-22T16:00:00.100Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel });
+  writer.append({ record_type: 'browser_test_completed', run_id: runId, timestamp: '2026-07-22T16:00:00.900Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, status: 'failed', duration_ms: 800, error_classification: 'assertion' });
+  writer.append({ record_type: 'browser_run_completed', run_id: runId, timestamp: '2026-07-22T16:00:01.000Z', status: 'failed', duration_ms: 1000, error_classification: 'assertion' });
+  writer.close();
+}
+
+function setupCompleteWorkspace(root, prefix = 'servsync-browser-race-') {
+  const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix });
+  mkdirSync(workspace.outputRoot, { mode: 0o755 });
+  chmodSync(workspace.outputRoot, 0o755);
+  const launch = createSupportedLaunch(workspace);
+  writeReporterReady({ descriptorPath: launch.descriptorPath, journalAuthSecret: launch.journalAuthSecret, nonce: launch.nonce });
+  recordBrowserReporterReady({ cleanupHandle: workspace.cleanupHandle });
+  writeCompleteJournal(workspace.journalRoot, {
+    allowPrepared: true,
+    journalAuthSecret: launch.journalAuthSecret,
+    runId: launch.descriptor.run_id,
+  });
+  importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
+  return { workspace, launch };
+}
+
+function makeSummaryPath(root, name) {
+  const summaryRoot = join(root, name);
+  mkdir700(summaryRoot);
+  return join(summaryRoot, 'browser-summary.json');
+}
+
+function rewriteJournalProvenanceMode(path, mode) {
+  let previousHash = GENESIS_HASH;
+  const records = readFileSync(path, 'utf8').trimEnd().split('\n').map((line) => {
+    const record = JSON.parse(line);
+    const withoutCurrentHash = {
+      ...record,
+      provenance_mode: mode,
+      previous_record_hash: previousHash,
+    };
+    delete withoutCurrentHash.current_record_hash;
+    const currentHash = sha256(`${previousHash}\n${canonicalStringify(withoutCurrentHash)}`);
+    previousHash = currentHash;
+    return canonicalStringify({ ...withoutCurrentHash, current_record_hash: currentHash });
+  });
+  writeFileSync(path, `${records.join('\n')}\n`, { mode: 0o600 });
 }
 
 function copyMode600(source, destination) {
@@ -292,8 +348,8 @@ test('browser cleanup is exact, idempotent, and refuses unsafe paths', () => {
   const root = tempRoot();
   try {
     const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-cleanup-' });
-    const { journalPath } = writeSupportedJournal(workspace);
-    importBrowserJournal({ journalPath, summaryPath: workspace.summaryPath, outputRoot: workspace.outputRoot });
+    writeSupportedJournal(workspace);
+    importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
     const sentinel = join(root, 'sentinel');
     writeFileSync(sentinel, 'keep', { mode: 0o600 });
     const first = cleanupBrowserEvidence(workspace.cleanupHandle);
@@ -373,6 +429,64 @@ test('browser cleanup blocks unknown entries and root replacement before deletio
   }
 });
 
+test('browser cleanup fails closed for deterministic substitutions at cleanup phases', () => {
+  const root = tempRoot();
+  const previousFlag = process.env.CONTROLLED_OPS_BROWSER_TEST_HOOKS;
+  process.env.CONTROLLED_OPS_BROWSER_TEST_HOOKS = '1';
+  const replacementFor = (workspace, relativePath) => {
+    const path = join(workspace.root, ...relativePath.split('/'));
+    replaceWithNewInode(path, readFileSync(path, 'utf8'), relativePath.endsWith('.last-run.json') ? 0o644 : 0o600);
+    return path;
+  };
+  try {
+    const artifactCases = [
+      ['after_initial_inventory', 'journal/browser-journal.ndjson'],
+      ['after_directory_verification', 'summary/browser-summary.json'],
+      ['before_artifact_validation', 'browser-workspace.json'],
+      ['after_artifact_validation', 'summary/browser-summary.json'],
+      ['before_final_identity_check', 'launch/browser-launch.json'],
+      ['between_artifacts', 'launch/browser-reporter-ready.json'],
+    ];
+    for (const [phase, relativePath] of artifactCases) {
+      const { workspace } = setupCompleteWorkspace(root);
+      let replacementPath = null;
+      setBrowserCleanupTestHookForTests((event) => {
+        if (!replacementPath && event.phase === phase && (phase !== 'between_artifacts' || event.relativePath === 'journal/browser-journal.ndjson')) {
+          replacementPath = replacementFor(workspace, relativePath);
+        }
+      });
+      assert.throws(() => cleanupBrowserEvidence(workspace.cleanupHandle), /provenance|cleanup evidence|race|recognized|canonical|not empty/i, phase);
+      assert.equal(replacementPath ? existsSync(replacementPath) : true, true, phase);
+      assert.equal(existsSync(workspace.root), true, phase);
+    }
+
+    const directoryCase = setupCompleteWorkspace(root, 'servsync-browser-dir-race-');
+    const directorySentinel = join(directoryCase.workspace.outputRoot, 'unexpected-after-validation');
+    setBrowserCleanupTestHookForTests((event) => {
+      if (event.phase === 'before_directory_removal' && event.relativePath === 'playwright-output' && !existsSync(directorySentinel)) {
+        writeFileSync(directorySentinel, 'stay', { mode: 0o600 });
+      }
+    });
+    assert.throws(() => cleanupBrowserEvidence(directoryCase.workspace.cleanupHandle), /not empty/i);
+    assert.equal(readFileSync(directorySentinel, 'utf8'), 'stay');
+
+    const rootCase = setupCompleteWorkspace(root, 'servsync-browser-root-race-');
+    const rootSentinel = join(rootCase.workspace.root, 'unexpected-before-root');
+    setBrowserCleanupTestHookForTests((event) => {
+      if (event.phase === 'before_root_removal' && !existsSync(rootSentinel)) {
+        writeFileSync(rootSentinel, 'stay', { mode: 0o600 });
+      }
+    });
+    assert.throws(() => cleanupBrowserEvidence(rootCase.workspace.cleanupHandle), /not empty/i);
+    assert.equal(readFileSync(rootSentinel, 'utf8'), 'stay');
+  } finally {
+    setBrowserCleanupTestHookForTests(null);
+    if (previousFlag === undefined) delete process.env.CONTROLLED_OPS_BROWSER_TEST_HOOKS;
+    else process.env.CONTROLLED_OPS_BROWSER_TEST_HOOKS = previousFlag;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('browser cleanup rejects foreign valid journal artifacts copied into an authenticated workspace', () => {
   const root = tempRoot();
   try {
@@ -389,8 +503,8 @@ test('browser cleanup rejects foreign valid journal artifacts copied into an aut
 
     const sourceWithSummary = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
     const targetWithSummary = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
-    const { journalPath } = writeSupportedJournal(sourceWithSummary);
-    importBrowserJournal({ journalPath, summaryPath: sourceWithSummary.summaryPath, outputRoot: sourceWithSummary.outputRoot });
+    writeSupportedJournal(sourceWithSummary);
+    importGeneratedBrowserWorkspaceJournal({ cleanupHandle: sourceWithSummary.cleanupHandle });
     const sourceSummaryContent = readFileSync(sourceWithSummary.summaryPath, 'utf8');
     const copiedJournal = copyMode600(sourceWithSummary.journalPath, targetWithSummary.journalPath);
     const copiedSummary = copyMode600(sourceWithSummary.summaryPath, targetWithSummary.summaryPath);
@@ -428,13 +542,116 @@ test('browser provenance is module-private and duplicate importers cannot launde
         summaryPath: workspace.summaryPath,
         outputRoot: workspace.outputRoot,
       }),
-      /authenticated generated workspace|provenance/i,
+      /authenticated generated workspace|generated browser journals|provenance/i,
     );
     assert.equal(existsSync(workspace.summaryPath), false);
     assert.throws(
       () => duplicateImporter.recordBrowserReporterReady({ cleanupHandle: workspace.cleanupHandle }),
       /authentic workspace cleanup handle/i,
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('generated workspace journals cannot be imported through standalone paths or duplicate modules', async () => {
+  const root = tempRoot();
+  try {
+    const duplicateImporter = await import(`${importerModuleUrl.href}?generated-import=${Date.now()}-${Math.random()}`);
+    const cases = [
+      ['sibling generated summary', (workspace) => workspace.summaryPath, false],
+      ['external summary', () => makeSummaryPath(root, 'external-summary'), false],
+      ['alternate same-root summary', (workspace) => {
+        const alternate = join(workspace.root, 'alternate-summary');
+        mkdir700(alternate);
+        return join(alternate, 'browser-summary.json');
+      }, false],
+      ['another generated workspace summary', () => {
+        const other = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-other-summary-' });
+        return other.summaryPath;
+      }, false],
+      ['marker deleted sibling summary', (workspace) => {
+        rmSync(join(workspace.root, 'browser-workspace.json'));
+        return workspace.summaryPath;
+      }, false],
+      ['marker replaced sibling summary', (workspace) => {
+        const marker = join(workspace.root, 'browser-workspace.json');
+        rmSync(marker);
+        writeFileSync(marker, `${canonicalStringify({ created_utc: utcNow(), run_id: workspace.runId, schema_version: 'servsync-controlled-ops/browser-workspace-v1', tool_version: '2a.1.0' })}\n`, { mode: 0o600 });
+        return workspace.summaryPath;
+      }, false],
+      ['copied generated journal external summary', (workspace) => {
+        const copiedRoot = join(root, 'copied-generated-journal');
+        mkdir700(copiedRoot);
+        copyMode600(workspace.journalPath, join(copiedRoot, 'browser-journal.ndjson'));
+        return makeSummaryPath(root, 'copied-generated-summary');
+      }, true],
+      ['generated journal external output root', () => makeSummaryPath(root, 'external-output-summary'), false],
+    ];
+    for (const [name, makeDestination, useCopiedJournal] of cases) {
+      const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-generated-reject-' });
+      const { journalPath } = writeSupportedJournal(workspace);
+      const summaryPath = makeDestination(workspace);
+      const effectiveJournal = useCopiedJournal ? join(root, 'copied-generated-journal', 'browser-journal.ndjson') : journalPath;
+      assert.throws(
+        () => duplicateImporter.importBrowserJournal({
+          journalPath: effectiveJournal,
+          summaryPath,
+          outputRoot: name === 'generated journal external output root' ? root : workspace.outputRoot,
+        }),
+        /generated|authenticated|provenance/i,
+        name,
+      );
+      assert.equal(existsSync(summaryPath), false, name);
+    }
+
+    const changedMode = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-mode-change-' });
+    const { journalPath: changedPath } = writeSupportedJournal(changedMode);
+    rewriteJournalProvenanceMode(changedPath, 'standalone');
+    assert.throws(
+      () => importBrowserJournal({ journalPath: changedPath, summaryPath: changedMode.summaryPath, outputRoot: changedMode.outputRoot }),
+      /auth tag|provenance/i,
+    );
+    assert.equal(existsSync(changedMode.summaryPath), false);
+
+    const cliWorkspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-cli-generated-' });
+    writeSupportedJournal(cliWorkspace);
+    const cliSummary = makeSummaryPath(root, 'cli-generated-summary');
+    const cli = await run(process.execPath, [
+      'scripts/controlled-ops/browser-importer.mjs',
+      'import',
+      '--journal',
+      cliWorkspace.journalPath,
+      '--summary',
+      cliSummary,
+      '--output-root',
+      cliWorkspace.outputRoot,
+    ], { cwd: repoRoot, env: process.env });
+    assert.notEqual(cli.code, 0);
+    assert.match(cli.stderr, /generated|authenticated/i);
+    assert.equal(existsSync(cliSummary), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('authenticated generated workspace import is private, one-time, and standalone import remains supported', () => {
+  const root = tempRoot();
+  try {
+    const generated = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-auth-import-' });
+    writeSupportedJournal(generated);
+    const first = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: generated.cleanupHandle });
+    assert.equal(first.summary.status, 'passed');
+    assert.throws(() => importGeneratedBrowserWorkspaceJournal({ cleanupHandle: generated.cleanupHandle }), /already exists|provenance/i);
+
+    const standaloneRoot = join(root, 'standalone-journal');
+    mkdir700(standaloneRoot);
+    const standaloneSummary = makeSummaryPath(root, 'standalone-summary');
+    const standaloneOutput = join(root, 'standalone-output');
+    mkdir700(standaloneOutput);
+    const standaloneJournal = writeCompleteJournal(standaloneRoot);
+    const standalone = importBrowserJournal({ journalPath: standaloneJournal, summaryPath: standaloneSummary, outputRoot: standaloneOutput });
+    assert.equal(standalone.summary.status, 'passed');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -492,32 +709,29 @@ test('browser cleanup rejects reporter-ready replay after authenticated recordin
   }
 });
 
-test('browser cleanup binds Playwright last-run bookkeeping to recorded file identity', () => {
-  const lastRun = canonicalStringify({ failedTests: [], status: 'passed' });
-  const prepareOutput = (workspace) => {
-    mkdirSync(workspace.outputRoot, { mode: 0o755 });
-    chmodSync(workspace.outputRoot, 0o755);
-  };
+test('browser cleanup refuses caller-created Playwright last-run bookkeeping', async () => {
+  const lastRun = `${canonicalStringify({ failedTests: [], status: 'passed' })}\n`;
   const root = tempRoot();
   try {
-    const unrecorded = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-last-run-' });
-    prepareOutput(unrecorded);
-    writeFileSync(join(unrecorded.outputRoot, '.last-run.json'), lastRun, { mode: 0o644 });
-    assertCleanupProvenanceRejects(unrecorded.cleanupHandle);
+    const module = await import(importerModuleUrl.href);
+    assert.equal(module.recordBrowserBookkeeping, undefined);
 
-    const genuine = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-last-run-' });
-    prepareOutput(genuine);
-    writeFileSync(join(genuine.outputRoot, '.last-run.json'), lastRun, { mode: 0o644 });
-    recordBrowserBookkeeping({ cleanupHandle: genuine.cleanupHandle });
-    assert.equal(cleanupBrowserEvidence(genuine.cleanupHandle).status, 'cleaned');
-
-    const replayed = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-last-run-' });
-    prepareOutput(replayed);
-    const replayedPath = join(replayed.outputRoot, '.last-run.json');
-    writeFileSync(replayedPath, lastRun, { mode: 0o644 });
-    recordBrowserBookkeeping({ cleanupHandle: replayed.cleanupHandle });
-    replaceWithNewInode(replayedPath, lastRun, 0o644);
-    assertCleanupProvenanceRejects(replayed.cleanupHandle);
+    for (const name of ['before-run', 'after-run', 'foreign-copy']) {
+      const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-last-run-' });
+      const lastRunPath = join(workspace.outputRoot, '.last-run.json');
+      mkdirSync(workspace.outputRoot, { mode: 0o755 });
+      chmodSync(workspace.outputRoot, 0o755);
+      if (name === 'foreign-copy') {
+        const foreign = join(root, 'foreign-last-run.json');
+        writeFileSync(foreign, lastRun, { mode: 0o644 });
+        copyFileSync(foreign, lastRunPath);
+        chmodSync(lastRunPath, 0o644);
+      } else {
+        writeFileSync(lastRunPath, lastRun, { mode: 0o644 });
+      }
+      assert.throws(() => cleanupBrowserEvidence(workspace.cleanupHandle), /unexpected workspace entry/i, name);
+      assert.equal(existsSync(lastRunPath), true, name);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -562,8 +776,8 @@ test('browser cleanup still accepts genuine artifacts bound to their own workspa
   const root = tempRoot();
   try {
     const imported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-imported-' });
-    const { journalPath } = writeSupportedJournal(imported);
-    importBrowserJournal({ journalPath, summaryPath: imported.summaryPath, outputRoot: imported.outputRoot });
+    writeSupportedJournal(imported);
+    importGeneratedBrowserWorkspaceJournal({ cleanupHandle: imported.cleanupHandle });
     assert.equal(cleanupBrowserEvidence(imported.cleanupHandle).status, 'cleaned');
 
     const launched = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-launched-' });
@@ -571,6 +785,10 @@ test('browser cleanup still accepts genuine artifacts bound to their own workspa
     writeReporterReady({ descriptorPath: launch.descriptorPath, journalAuthSecret: launch.journalAuthSecret, nonce: launch.nonce });
     recordBrowserReporterReady({ cleanupHandle: launched.cleanupHandle });
     assert.equal(cleanupBrowserEvidence(launched.cleanupHandle).status, 'cleaned');
+
+    const failedRun = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-failed-terminal-' });
+    writeFailedSupportedJournal(failedRun);
+    assert.equal(cleanupBrowserEvidence(failedRun.cleanupHandle).status, 'cleaned');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -581,10 +799,10 @@ test('browser cleanup rejects replayed artifacts after current workspace provena
   try {
     const sourceImported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-' });
     const targetImported = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-target-' });
-    const { journalPath: sourceJournal } = writeSupportedJournal(sourceImported);
-    importBrowserJournal({ journalPath: sourceJournal, summaryPath: sourceImported.summaryPath, outputRoot: sourceImported.outputRoot });
-    const { journalPath: targetJournal } = writeSupportedJournal(targetImported);
-    importBrowserJournal({ journalPath: targetJournal, summaryPath: targetImported.summaryPath, outputRoot: targetImported.outputRoot });
+    writeSupportedJournal(sourceImported);
+    importGeneratedBrowserWorkspaceJournal({ cleanupHandle: sourceImported.cleanupHandle });
+    writeSupportedJournal(targetImported);
+    importGeneratedBrowserWorkspaceJournal({ cleanupHandle: targetImported.cleanupHandle });
     copyMode600(sourceImported.journalPath, targetImported.journalPath);
     copyMode600(sourceImported.summaryPath, targetImported.summaryPath);
     assertCleanupProvenanceRejects(targetImported.cleanupHandle);

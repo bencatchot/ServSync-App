@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,12 +13,13 @@ import {
   cleanupBrowserEvidence,
   createBrowserEvidenceWorkspace,
   createBrowserWorkspaceLaunchContract,
-  importBrowserJournal,
-  recordBrowserBookkeeping,
+  importGeneratedBrowserWorkspaceJournal,
   recordBrowserReporterReady,
   verifyBrowserSummary,
 } from '../../../scripts/controlled-ops/browser-importer.mjs';
 import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journal.mjs';
+import { canonicalStringify } from '../../../scripts/controlled-ops/internal.mjs';
+import { parseStrictJson } from '../../../scripts/controlled-ops/sanitize.mjs';
 import { startBrowserLocalServer } from '../fixtures/browser-local-server.mjs';
 
 const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -58,6 +59,26 @@ function runPlaywright(command, args, options) {
   });
 }
 
+function finalizePlaywrightBookkeeping(outputRoot) {
+  const lastRunPath = join(outputRoot, '.last-run.json');
+  if (!existsSync(lastRunPath)) return { status: 'absent' };
+  const info = lstatSync(lastRunPath);
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (info.mode & 0o777) !== 0o644) {
+    throw new Error('Playwright last-run record is not a safe generated file.');
+  }
+  const content = readFileSync(lastRunPath, 'utf8');
+  const parsed = parseStrictJson(content);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+    || canonicalStringify(Object.keys(parsed).sort()) !== canonicalStringify(['failedTests', 'status'])
+    || !['passed', 'failed'].includes(parsed.status)
+    || !Array.isArray(parsed.failedTests)
+    || parsed.failedTests.length !== 0) {
+    throw new Error('Playwright last-run record is not recognized as supported generated bookkeeping.');
+  }
+  unlinkSync(lastRunPath);
+  return { status: 'removed' };
+}
+
 const workspace = createBrowserEvidenceWorkspace({ prefix: 'servsync-browser-pilot-' });
 
 let fixture;
@@ -90,13 +111,13 @@ try {
     process.stderr.write(result.stdout);
     throw new Error(`Controlled-ops browser pilot failed with status ${result.status}.`);
   }
-  recordBrowserBookkeeping({ cleanupHandle: workspace.cleanupHandle });
+  finalizePlaywrightBookkeeping(workspace.outputRoot);
   recordBrowserReporterReady({ cleanupHandle: workspace.cleanupHandle });
   assertReporterReady({ descriptorPath: launch.descriptorPath, journalAuthSecret: launch.journalAuthSecret, nonce: launch.nonce });
 
   const journalPath = join(workspace.journalRoot, JOURNAL_FILENAME);
   const summaryPath = workspace.summaryPath;
-  const { summary } = importBrowserJournal({ journalPath, summaryPath, outputRoot: workspace.outputRoot });
+  const { summary } = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
   verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath });
   if (summary.status !== 'passed' || summary.counts.started !== 1 || summary.counts.passed !== 1 || summary.counts.steps !== 3) {
     throw new Error('Controlled-ops browser pilot summary did not reconcile.');
@@ -108,9 +129,9 @@ try {
 } finally {
   if (fixture) await fixture.close();
   try {
-    recordBrowserBookkeeping({ cleanupHandle: workspace.cleanupHandle });
+    finalizePlaywrightBookkeeping(workspace.outputRoot);
   } catch (bookkeepingError) {
-    if (!runError && bookkeepingError?.code !== 'BROWSER_PROVENANCE_STATE') runError = bookkeepingError;
+    if (!runError) runError = bookkeepingError;
   }
   try {
     cleanupBrowserEvidence(workspace.cleanupHandle);

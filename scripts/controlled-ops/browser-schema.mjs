@@ -16,6 +16,7 @@ import { parseStrictJson, scanCustomerContent, scanSensitiveContent } from './sa
 export const BROWSER_JOURNAL_SCHEMA = 'servsync-controlled-ops/browser-journal-v1';
 export const BROWSER_SUMMARY_SCHEMA = 'servsync-controlled-ops/browser-summary-v1';
 export const BROWSER_TOOL_VERSION = '2a.1.0';
+export const BROWSER_PROVENANCE_MODES = Object.freeze(['standalone', 'generated_workspace']);
 
 export const BROWSER_LIMITS = Object.freeze({
   tests_per_run: 25,
@@ -52,6 +53,7 @@ export const BROWSER_RECORD_FIELDS = [
   'sequence',
   'record_type',
   'run_id',
+  'provenance_mode',
   'timestamp',
   'target_classification',
   'project',
@@ -212,6 +214,7 @@ export function validateBrowserRecord(record) {
   }
   if (!RECORD_TYPES.includes(record.record_type)) throw new EvidenceError('INVALID_BROWSER_RECORD_TYPE', 'Browser journal record type is invalid.');
   validateGeneratedBrowserId(record.run_id, 'browser run ID');
+  if (!BROWSER_PROVENANCE_MODES.includes(record.provenance_mode)) throw new EvidenceError('INVALID_BROWSER_PROVENANCE_MODE', 'Browser journal provenance mode is invalid.');
   validateTimestamp(record.timestamp, 'browser journal timestamp');
   validateTargetClassification(record.target_classification);
   validateProject(record.project);
@@ -239,6 +242,9 @@ export function validateBrowserRecord(record) {
     if (record.worker_index !== null || record.retry_index !== null || record.spec_path !== null || record.test_id !== null || record.attempt_id !== null || record.safe_label !== null || record.duration_ms === null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser run-complete record contains invalid fields.');
     }
+    if (record.provenance_mode === 'generated_workspace' && record.run_auth_tag === null) {
+      throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Generated browser journals require an authenticated terminal record.');
+    }
   } else if (record.record_type === 'browser_test_started') {
     if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none' || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser test-start record contains invalid fields.');
@@ -253,6 +259,9 @@ export function validateBrowserRecord(record) {
     if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.duration_ms === null || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser test-complete record contains invalid fields.');
     }
+  }
+  if (record.provenance_mode === 'standalone' && record.run_auth_tag !== null) {
+    throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Standalone browser journals must not contain generated auth tags.');
   }
 
   for (const value of [record.spec_path, record.safe_label, record.status, record.error_classification].filter(Boolean)) scanBrowserString(value, 'browser retained string');
@@ -282,6 +291,7 @@ export function buildBrowserRecord(previousHash, input) {
     sequence: input.sequence,
     record_type: input.record_type,
     run_id: input.run_id,
+    provenance_mode: input.provenance_mode ?? 'standalone',
     timestamp: input.timestamp,
     target_classification: 'local',
     project: 'chromium',

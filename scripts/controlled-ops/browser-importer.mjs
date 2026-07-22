@@ -34,6 +34,7 @@ import {
 } from './internal.mjs';
 import {
   BROWSER_LIMITS,
+  BROWSER_PROVENANCE_MODES,
   BROWSER_SUMMARY_SCHEMA,
   BROWSER_TOOL_VERSION,
   attemptIdFor,
@@ -53,7 +54,6 @@ const LAUNCH_DIRECTORY = 'launch';
 const JOURNAL_DIRECTORY = 'journal';
 const SUMMARY_DIRECTORY = 'summary';
 const OUTPUT_DIRECTORY = 'playwright-output';
-const PLAYWRIGHT_LAST_RUN_FILENAME = '.last-run.json';
 const BROWSER_LAUNCH_FILENAME = 'browser-launch.json';
 const BROWSER_REPORTER_READY_FILENAME = 'browser-reporter-ready.json';
 const BROWSER_WORKSPACE_MARKER_FILENAME = 'browser-workspace.json';
@@ -62,6 +62,7 @@ const cleanupHandleStates = new WeakMap();
 const workspaceJournalRoots = new Map();
 const workspaceSummaryRoots = new Map();
 const workspaceLaunchRoots = new Map();
+let cleanupTestHook = null;
 const WORKSPACE_DIRECTORY_MODES = Object.freeze({
   [JOURNAL_DIRECTORY]: 0o700,
   [SUMMARY_DIRECTORY]: 0o700,
@@ -190,6 +191,11 @@ function provenanceError() {
   throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser cleanup evidence does not belong to the authenticated workspace run.');
 }
 
+function invokeCleanupTestHook(phase, state, relativePath = null) {
+  if (!cleanupTestHook) return;
+  cleanupTestHook({ phase, runId: state.runId, root: state.root, relativePath });
+}
+
 function assertWorkspaceRootSafety(state) {
   const root = state.root;
   validateRawOperationRootInput(root, 'browser evidence workspace root');
@@ -256,7 +262,6 @@ function expectedEntries() {
     `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
     `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
     OUTPUT_DIRECTORY,
-    `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
   ]);
 }
 
@@ -294,6 +299,14 @@ function verifyJournalAuthentication(state, records) {
   if (terminal.run_auth_tag !== computeBrowserRunAuthTag(launch.journalAuthSecret, withoutCurrentHash)) provenanceError();
 }
 
+function journalProvenanceMode(records) {
+  const mode = records[0]?.provenance_mode;
+  if (!BROWSER_PROVENANCE_MODES.includes(mode) || records.some((record) => record.provenance_mode !== mode)) {
+    throw new EvidenceError('INVALID_BROWSER_PROVENANCE_MODE', 'Browser journal provenance mode is inconsistent.');
+  }
+  return mode;
+}
+
 function verifyReporterReadyAuthentication(state, ready) {
   const launch = state.provenance.launch;
   const prepared = state.provenance.reporterReadyPrepared;
@@ -322,7 +335,7 @@ function validateFileContentBeforeCleanup(state, relativePath) {
     const imported = state.provenance.imported;
     if (imported) {
       if (sourceDigest !== imported.sourceJournalSha256 || !sameFileProvenance(path, imported.journalFile, BROWSER_LIMITS.journal_bytes)) provenanceError();
-    } else {
+    } else if (journalProvenanceMode(records) !== 'generated_workspace' || !samePreparedFileIdentity(path, state.provenance.journalPrepared)) {
       provenanceError();
     }
   } else if (relativePath === `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`) {
@@ -346,18 +359,51 @@ function validateFileContentBeforeCleanup(state, relativePath) {
     verifyReporterReadyAuthentication(state, ready);
     const reporterReady = state.provenance.reporterReady;
     if (!reporterReady || !sameFileProvenance(path, reporterReady, BROWSER_LIMITS.summary_bytes)) provenanceError();
-  } else if (relativePath === `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`) {
-    const bookkeeping = state.provenance.bookkeeping;
-    if (!bookkeeping || !sameFileProvenance(path, bookkeeping, BROWSER_LIMITS.summary_bytes)) provenanceError();
-    const parsed = parseStrictJson(decodeUtf8(readFileSync(path)));
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
-      || Object.keys(parsed).sort().join(',') !== 'failedTests,status'
-      || !['passed', 'failed'].includes(parsed.status)
-      || !Array.isArray(parsed.failedTests)
-      || parsed.failedTests.length !== 0) {
-      throw new EvidenceError('BROWSER_CLEANUP_INVALID_FILE', 'Playwright last-run record is not recognized as safe generated browser evidence.');
-    }
   }
+}
+
+function validatedArtifactProvenance(state, relativePath) {
+  const path = join(state.root, ...relativePath.split('/'));
+  if (!existsSync(path)) return null;
+  validateFileContentBeforeCleanup(state, relativePath);
+  if (relativePath === BROWSER_WORKSPACE_MARKER_FILENAME) return { path, provenance: state.provenance.marker, maximumBytes: BROWSER_LIMITS.summary_bytes, mode: 0o600 };
+  if (relativePath === `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`) {
+    const provenance = state.provenance.imported?.journalFile
+      ?? (lstatSync(path).size === 0 ? state.provenance.journalPrepared : fileProvenance(path, BROWSER_LIMITS.journal_bytes));
+    if (!provenance) provenanceError();
+    return { path, provenance, maximumBytes: BROWSER_LIMITS.journal_bytes, mode: 0o600 };
+  }
+  if (relativePath === `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`) {
+    const provenance = state.provenance.imported?.summaryFile;
+    if (!provenance) provenanceError();
+    return { path, provenance, maximumBytes: BROWSER_LIMITS.summary_bytes, mode: 0o600 };
+  }
+  if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`) {
+    const provenance = state.provenance.reporterReady ?? state.provenance.reporterReadyPrepared;
+    if (!provenance) provenanceError();
+    return { path, provenance, maximumBytes: BROWSER_LIMITS.summary_bytes, mode: 0o600 };
+  }
+  if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`) {
+    const provenance = state.provenance.launch?.descriptorFile;
+    if (!provenance) provenanceError();
+    return { path, provenance, maximumBytes: BROWSER_LIMITS.summary_bytes, mode: 0o600 };
+  }
+  throw new EvidenceError('BROWSER_CLEANUP_UNKNOWN_ENTRY', 'Browser cleanup artifact is not recognized.');
+}
+
+function cleanupOneArtifact(state, relativePath, deleted) {
+  const path = join(state.root, ...relativePath.split('/'));
+  if (!existsSync(path)) return;
+  invokeCleanupTestHook('before_artifact_validation', state, relativePath);
+  const expected = validatedArtifactProvenance(state, relativePath);
+  if (!expected) return;
+  invokeCleanupTestHook('after_artifact_validation', state, relativePath);
+  invokeCleanupTestHook('before_final_identity_check', state, relativePath);
+  const safePath = assertWorkspaceChild(state, relativePath, { type: 'file', mode: expected.mode });
+  if (safePath !== expected.path || !sameFileProvenance(safePath, expected.provenance, expected.maximumBytes)) provenanceError();
+  unlinkSync(safePath);
+  deleted.push(relativePath);
+  fsyncDirectory(dirname(safePath));
 }
 
 function inventoryWorkspace(state, path = state.root, depth = 0, entries = []) {
@@ -407,7 +453,6 @@ export function createBrowserEvidenceWorkspace({ parentRoot = '/private/tmp', pr
       launch: null,
       reporterReadyPrepared: null,
       reporterReady: null,
-      bookkeeping: null,
     },
     cleanupState: 'active',
   };
@@ -463,24 +508,6 @@ export function recordBrowserReporterReady({ cleanupHandle } = {}) {
   verifyReporterReadyAuthentication(state, ready);
   if (state.provenance.reporterReady) throw new EvidenceError('BROWSER_PROVENANCE_STATE', 'Browser reporter-ready provenance already exists.');
   state.provenance.reporterReady = fileProvenance(readyPath, BROWSER_LIMITS.summary_bytes);
-  return { status: 'recorded' };
-}
-
-export function recordBrowserBookkeeping({ cleanupHandle } = {}) {
-  const state = stateForCleanupHandle(cleanupHandle);
-  const lastRunPath = join(state.root, OUTPUT_DIRECTORY, PLAYWRIGHT_LAST_RUN_FILENAME);
-  if (!existsSync(lastRunPath)) return { status: 'absent' };
-  assertWorkspaceChild(state, `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`, { type: 'file', mode: 0o644 });
-  const parsed = parseStrictJson(decodeUtf8(readFileSync(lastRunPath)));
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
-    || Object.keys(parsed).sort().join(',') !== 'failedTests,status'
-    || !['passed', 'failed'].includes(parsed.status)
-    || !Array.isArray(parsed.failedTests)
-    || parsed.failedTests.length !== 0) {
-    throw new EvidenceError('BROWSER_CLEANUP_INVALID_FILE', 'Playwright last-run record is not recognized as safe generated browser evidence.');
-  }
-  if (state.provenance.bookkeeping) throw new EvidenceError('BROWSER_PROVENANCE_STATE', 'Browser bookkeeping provenance already exists.');
-  state.provenance.bookkeeping = fileProvenance(lastRunPath, BROWSER_LIMITS.summary_bytes);
   return { status: 'recorded' };
 }
 
@@ -671,35 +698,33 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
   return validateSummary(summary);
 }
 
-export function importBrowserJournal({ journalPath, summaryPath, outputRoot = null, generatedAt } = {}) {
+function importBrowserJournalInternal({ journalPath, summaryPath, outputRoot = null, generatedAt, authenticatedState = null } = {}) {
   if (!journalPath || !summaryPath) throw new EvidenceError('INVALID_ARGUMENTS', 'Browser import requires journalPath and summaryPath.');
   const { records, sourceDigest } = readJournal(journalPath);
+  const provenanceMode = journalProvenanceMode(records);
+  if (provenanceMode === 'generated_workspace' && !authenticatedState) {
+    throw new EvidenceError('BROWSER_GENERATED_IMPORT_REQUIRES_AUTH', 'Generated browser journals require an authenticated workspace import.');
+  }
+  if (provenanceMode === 'standalone' && authenticatedState) {
+    throw new EvidenceError('BROWSER_PROVENANCE_MODE_MISMATCH', 'Authenticated generated import requires a generated workspace journal.');
+  }
   const summary = reconcile(records, sourceDigest, { outputRoot, generatedAt });
   const content = `${canonicalStringify(summary)}\n`;
   const journalState = workspaceJournalRoots.get(dirname(resolve(journalPath)));
   const summaryState = workspaceSummaryRoots.get(dirname(resolve(summaryPath)));
-  const journalRoot = dirname(resolve(journalPath));
-  const summaryRoot = dirname(resolve(summaryPath));
-  const candidateWorkspaceRoot = dirname(journalRoot);
-  if (basename(journalRoot) === JOURNAL_DIRECTORY
-    && basename(summaryRoot) === SUMMARY_DIRECTORY
-    && candidateWorkspaceRoot === dirname(summaryRoot)
-    && existsSync(join(candidateWorkspaceRoot, BROWSER_WORKSPACE_MARKER_FILENAME))
-    && (!journalState || !summaryState || journalState !== summaryState)) {
-    throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser import requires an authenticated generated workspace.');
-  }
-  if (journalState || summaryState) {
-    if (!journalState || !summaryState || journalState !== summaryState) {
+  const activeState = authenticatedState ?? journalState ?? summaryState;
+  if (journalState || summaryState || authenticatedState) {
+    if (!journalState || !summaryState || journalState !== summaryState || (authenticatedState && journalState !== authenticatedState)) {
       throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser import paths do not belong to the same generated workspace.');
     }
-    if (journalState.provenance.imported) {
+    if (activeState.provenance.imported) {
       throw new EvidenceError('BROWSER_PROVENANCE_STATE', 'Browser import provenance already exists.');
     }
-    verifyJournalAuthentication(journalState, records);
+    verifyJournalAuthentication(activeState, records);
   }
   const destination = createExclusiveSummary(summaryPath, content);
-  if (journalState || summaryState) {
-    journalState.provenance.imported = {
+  if (activeState) {
+    activeState.provenance.imported = {
       runId: summary.run_id,
       sourceJournalSha256: sourceDigest,
       journalFile: fileProvenance(resolve(journalPath), BROWSER_LIMITS.journal_bytes),
@@ -707,6 +732,23 @@ export function importBrowserJournal({ journalPath, summaryPath, outputRoot = nu
     };
   }
   return { summary, summaryPath: destination };
+}
+
+export function importBrowserJournal({ journalPath, summaryPath, outputRoot = null, generatedAt } = {}) {
+  return importBrowserJournalInternal({ journalPath, summaryPath, outputRoot, generatedAt });
+}
+
+export function importGeneratedBrowserWorkspaceJournal({ cleanupHandle, generatedAt } = {}) {
+  const state = stateForCleanupHandle(cleanupHandle);
+  const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
+  const summaryPath = join(state.root, SUMMARY_DIRECTORY, SUMMARY_FILENAME);
+  return importBrowserJournalInternal({
+    journalPath,
+    summaryPath,
+    outputRoot: join(state.root, OUTPUT_DIRECTORY),
+    generatedAt,
+    authenticatedState: state,
+  });
 }
 
 export function verifyBrowserSummary(summaryPath, { sourceJournalPath = null } = {}) {
@@ -739,40 +781,28 @@ export function cleanupBrowserEvidence(cleanupHandle) {
       throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root is missing before cleanup.');
     }
     inventoryWorkspace(state);
+    invokeCleanupTestHook('after_initial_inventory', state);
     for (const [name, identity] of Object.entries(state.directoryIdentities)) {
       const path = assertWorkspaceChild(state, name, { type: 'directory', mode: identity.mode });
       if (!sameIdentity(identityOf(path), identity)) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace child directory identity changed.');
     }
-    for (const relativePath of [
-      BROWSER_WORKSPACE_MARKER_FILENAME,
-      `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
-      `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`,
-      `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
-      `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
-      `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
-    ]) {
-      validateFileContentBeforeCleanup(state, relativePath);
-    }
+    invokeCleanupTestHook('after_directory_verification', state);
     for (const relativePath of [
       `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
       `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`,
       `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
       `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
-      `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
       BROWSER_WORKSPACE_MARKER_FILENAME,
     ]) {
-      const path = join(state.root, ...relativePath.split('/'));
-      if (!existsSync(path)) continue;
-      const safePath = assertWorkspaceChild(state, relativePath, { type: 'file', mode: relativePath.endsWith(PLAYWRIGHT_LAST_RUN_FILENAME) ? 0o644 : 0o600 });
-      unlinkSync(safePath);
-      deleted.push(relativePath);
-      fsyncDirectory(dirname(safePath));
+      cleanupOneArtifact(state, relativePath, deleted);
+      invokeCleanupTestHook('between_artifacts', state, relativePath);
     }
     for (const relativePath of [OUTPUT_DIRECTORY, LAUNCH_DIRECTORY, SUMMARY_DIRECTORY, JOURNAL_DIRECTORY]) {
       const path = join(state.root, relativePath);
       if (!existsSync(path)) continue;
       const safePath = assertWorkspaceChild(state, relativePath, { type: 'directory', mode: state.directoryIdentities[relativePath]?.mode ?? WORKSPACE_DIRECTORY_MODES[relativePath] });
       if (readdirSync(safePath).length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence directory is not empty.');
+      invokeCleanupTestHook('before_directory_removal', state, relativePath);
       rmdirSync(safePath);
       deleted.push(relativePath);
       fsyncDirectory(dirname(safePath));
@@ -780,6 +810,7 @@ export function cleanupBrowserEvidence(cleanupHandle) {
     inventoryWorkspace({ ...state, root: state.root });
     if (readdirSync(state.root).length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence workspace root is not empty.');
     const root = assertWorkspaceRootSafety(state);
+    invokeCleanupTestHook('before_root_removal', state);
     rmdirSync(root);
     deleted.push('.');
     unregisterWorkspaceState(state);
@@ -789,6 +820,13 @@ export function cleanupBrowserEvidence(cleanupHandle) {
     state.cleanupState = 'cleanup_failed';
     throw error;
   }
+}
+
+export function setBrowserCleanupTestHookForTests(hook) {
+  if (process.env.CONTROLLED_OPS_BROWSER_TEST_HOOKS !== '1') {
+    throw new EvidenceError('BROWSER_TEST_HOOK_DISABLED', 'Browser cleanup test hooks are disabled outside controlled local tests.');
+  }
+  cleanupTestHook = hook;
 }
 
 function runCli() {

@@ -25,7 +25,7 @@ import {
   sha256File,
   validateRawOperationRootInput,
 } from './internal.mjs';
-import { BROWSER_LIMITS, buildBrowserRecord, computeBrowserRunAuthTag, decodeUtf8, parseBrowserJournal } from './browser-schema.mjs';
+import { BROWSER_LIMITS, BROWSER_PROVENANCE_MODES, buildBrowserRecord, computeBrowserRunAuthTag, decodeUtf8, parseBrowserJournal } from './browser-schema.mjs';
 
 export const JOURNAL_FILENAME = 'browser-journal.ndjson';
 
@@ -65,8 +65,10 @@ export function assertExactlyOneJournal(root, expectedPath = null) {
   return journalPath;
 }
 
-export function createJournalWriter(root, { journalAuthSecret = null, allowPrepared = false } = {}) {
+export function createJournalWriter(root, { journalAuthSecret = null, allowPrepared = false, provenanceMode = null } = {}) {
   const rootPath = validateJournalRootInput(root);
+  const mode = provenanceMode ?? (journalAuthSecret ? 'generated_workspace' : 'standalone');
+  if (!BROWSER_PROVENANCE_MODES.includes(mode)) throw new EvidenceError('INVALID_BROWSER_PROVENANCE_MODE', 'Browser journal provenance mode is invalid.');
   const journalPath = join(rootPath, JOURNAL_FILENAME);
   let descriptor;
   if (existsSync(journalPath)) {
@@ -93,13 +95,14 @@ export function createJournalWriter(root, { journalAuthSecret = null, allowPrepa
     if (closed) throw new EvidenceError('BROWSER_JOURNAL_CLOSED', 'Browser journal is already closed.');
     sequence += 1;
     if (sequence > BROWSER_LIMITS.journal_records) throw new EvidenceError('BROWSER_RECORD_LIMIT', 'Browser journal record limit exceeded.');
-    const recordInput = { ...input, sequence };
+    const recordInput = { ...input, sequence, provenance_mode: mode };
     if (journalAuthSecret && recordInput.record_type === 'browser_run_completed' && !recordInput.run_auth_tag) {
       const authCandidate = {
         schema_version: 'servsync-controlled-ops/browser-journal-v1',
         sequence: recordInput.sequence,
         record_type: recordInput.record_type,
         run_id: recordInput.run_id,
+        provenance_mode: recordInput.provenance_mode,
         timestamp: recordInput.timestamp,
         target_classification: 'local',
         project: 'chromium',
