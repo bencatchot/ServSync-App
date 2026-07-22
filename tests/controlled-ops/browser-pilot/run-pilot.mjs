@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -10,7 +10,7 @@ import {
   assertSupportedLauncherArguments,
   createBrowserLaunchContract,
 } from '../../../scripts/controlled-ops/browser-launch-policy.mjs';
-import { importBrowserJournal, verifyBrowserSummary } from '../../../scripts/controlled-ops/browser-importer.mjs';
+import { cleanupBrowserEvidence, createBrowserEvidenceWorkspace, importBrowserJournal, verifyBrowserSummary } from '../../../scripts/controlled-ops/browser-importer.mjs';
 import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journal.mjs';
 import { startBrowserLocalServer } from '../fixtures/browser-local-server.mjs';
 
@@ -18,11 +18,6 @@ const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 
 assertSupportedLauncherArguments(process.argv.slice(2));
 assertNoProhibitedBrowserEnvironment(process.env);
-
-function mkdir700(path) {
-  mkdirSync(path, { mode: 0o700 });
-  chmodSync(path, 0o700);
-}
 
 function assertNoNativeArtifacts(root) {
   if (!existsSync(root)) return;
@@ -56,31 +51,23 @@ function runPlaywright(command, args, options) {
   });
 }
 
-const tmpRoot = mkdtempSync(join('/private/tmp', 'servsync-browser-pilot-'));
-chmodSync(tmpRoot, 0o700);
-const journalRoot = join(tmpRoot, 'journal');
-const launchRoot = join(tmpRoot, 'launch');
-const summaryRoot = join(tmpRoot, 'summary');
-const outputRoot = join(tmpRoot, 'playwright-output');
-mkdir700(journalRoot);
-mkdir700(launchRoot);
-mkdir700(summaryRoot);
-mkdir700(outputRoot);
+const workspace = createBrowserEvidenceWorkspace({ prefix: 'servsync-browser-pilot-' });
 
 let fixture;
+let runError = null;
 try {
   fixture = await startBrowserLocalServer();
   const launch = createBrowserLaunchContract({
-    root: launchRoot,
+    root: workspace.launchRoot,
     baseURL: fixture.baseURL,
     runLabel: 'synthetic-form-submit',
   });
   const env = { ...process.env };
   env.CONTROLLED_OPS_BROWSER_BASE_URL = fixture.baseURL;
-  env.CONTROLLED_OPS_BROWSER_JOURNAL_ROOT = journalRoot;
+  env.CONTROLLED_OPS_BROWSER_JOURNAL_ROOT = workspace.journalRoot;
   env.CONTROLLED_OPS_BROWSER_LAUNCH_DESCRIPTOR = launch.descriptorPath;
   env.CONTROLLED_OPS_BROWSER_LAUNCH_NONCE = launch.nonce;
-  env.CONTROLLED_OPS_BROWSER_OUTPUT_ROOT = outputRoot;
+  env.CONTROLLED_OPS_BROWSER_OUTPUT_ROOT = workspace.outputRoot;
   env.CONTROLLED_OPS_BROWSER_RUN_LABEL = 'synthetic-form-submit';
 
   const playwrightBin = join(repoRoot, 'node_modules/.bin/playwright');
@@ -97,16 +84,23 @@ try {
   }
   assertReporterReady({ descriptorPath: launch.descriptorPath, nonce: launch.nonce });
 
-  const journalPath = join(journalRoot, JOURNAL_FILENAME);
-  const summaryPath = join(summaryRoot, 'browser-summary.json');
-  const { summary } = importBrowserJournal({ journalPath, summaryPath, outputRoot });
+  const journalPath = join(workspace.journalRoot, JOURNAL_FILENAME);
+  const summaryPath = workspace.summaryPath;
+  const { summary } = importBrowserJournal({ journalPath, summaryPath, outputRoot: workspace.outputRoot });
   verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath });
   if (summary.status !== 'passed' || summary.counts.started !== 1 || summary.counts.passed !== 1 || summary.counts.steps !== 3) {
     throw new Error('Controlled-ops browser pilot summary did not reconcile.');
   }
-  assertNoNativeArtifacts(outputRoot);
+  assertNoNativeArtifacts(workspace.outputRoot);
   process.stdout.write('controlled-ops browser pilot passed\n');
+} catch (error) {
+  runError = error;
 } finally {
   if (fixture) await fixture.close();
-  rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
+  try {
+    cleanupBrowserEvidence(workspace.cleanupHandle);
+  } catch (cleanupError) {
+    if (!runError) runError = cleanupError;
+  }
 }
+if (runError) throw runError;

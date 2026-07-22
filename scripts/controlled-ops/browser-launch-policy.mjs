@@ -26,7 +26,7 @@ import {
   validateTimestamp,
 } from './internal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
-import { validateBrowserUrl } from './browser-schema.mjs';
+import { validateBrowserLoopbackUrl, validateBrowserUrl } from './browser-schema.mjs';
 
 export const BROWSER_LAUNCH_SCHEMA = 'servsync-controlled-ops/browser-launch-v1';
 export const BROWSER_REPORTER_READY_SCHEMA = 'servsync-controlled-ops/browser-reporter-ready-v1';
@@ -229,6 +229,7 @@ export function createBrowserEgressGuard(baseURL) {
   const check = (value) => {
     let target;
     try {
+      validateBrowserLoopbackUrl(value, { fieldName: 'browser request URL', allowPath: true });
       target = new URL(value);
     } catch {
       violations += 1;

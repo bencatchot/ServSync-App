@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  chmodSync,
   closeSync,
   constants,
   existsSync,
@@ -8,6 +9,7 @@ import {
   fsyncSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -16,7 +18,8 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   EvidenceError,
@@ -38,11 +41,203 @@ import {
   validateDuration,
   validateSummary,
 } from './browser-schema.mjs';
-import { readJournal } from './browser-journal.mjs';
+import { JOURNAL_FILENAME, readJournal } from './browser-journal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
+
+const SUMMARY_FILENAME = 'browser-summary.json';
+const LAUNCH_DIRECTORY = 'launch';
+const JOURNAL_DIRECTORY = 'journal';
+const SUMMARY_DIRECTORY = 'summary';
+const OUTPUT_DIRECTORY = 'playwright-output';
+const PLAYWRIGHT_LAST_RUN_FILENAME = '.last-run.json';
+const BROWSER_LAUNCH_FILENAME = 'browser-launch.json';
+const BROWSER_REPORTER_READY_FILENAME = 'browser-reporter-ready.json';
+const cleanupHandleStates = new WeakMap();
+const WORKSPACE_DIRECTORY_MODES = Object.freeze({
+  [JOURNAL_DIRECTORY]: 0o700,
+  [SUMMARY_DIRECTORY]: 0o700,
+  [LAUNCH_DIRECTORY]: 0o700,
+  [OUTPUT_DIRECTORY]: 0o755,
+});
 
 function modeOf(info) {
   return info.mode & 0o777;
+}
+
+function identityOf(path) {
+  const info = lstatSync(path);
+  return {
+    dev: info.dev,
+    ino: info.ino,
+    uid: info.uid,
+    mode: modeOf(info),
+    type: info.isDirectory() ? 'directory' : info.isFile() ? 'file' : 'other',
+  };
+}
+
+function sameIdentity(left, right) {
+  return left.dev === right.dev && left.ino === right.ino && left.uid === right.uid && left.mode === right.mode && left.type === right.type;
+}
+
+function assertWorkspaceRootSafety(state) {
+  const root = state.root;
+  validateRawOperationRootInput(root, 'browser evidence workspace root');
+  if (!isAbsolute(root) || root !== resolve(root) || root !== root.normalize('NFC')) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root is not canonical.');
+  if ([sep, '/tmp', '/private/tmp', process.cwd(), process.env.HOME].filter(Boolean).includes(root) || dirname(root) === root) {
+    throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Refusing to clean a dangerous browser evidence workspace root.');
+  }
+  assertCanonicalParents(root);
+  assertOutsideGit(root);
+  if (!existsSync(root) || realpathSync(root) !== root) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root is missing or symlinked.');
+  const info = lstatSync(root);
+  if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || modeOf(info) !== 0o700 || !sameIdentity(identityOf(root), state.rootIdentity)) {
+    throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root identity changed.');
+  }
+  return root;
+}
+
+function assertWorkspaceChild(state, relativePath, { type, mode }) {
+  const root = assertWorkspaceRootSafety(state);
+  const parts = relativePath.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..')) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Browser cleanup child path is unsafe.');
+  const path = resolve(root, ...parts);
+  if (path === root || !path.startsWith(`${root}${sep}`) || relative(root, path).split(sep).join('/') !== relativePath) {
+    throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Browser cleanup child escapes the workspace root.');
+  }
+  assertCanonicalParents(path);
+  if (realpathSync(dirname(path)) !== dirname(path)) throw new EvidenceError('SYMLINK_REJECTED', 'Browser cleanup child parent is symlinked.');
+  const before = lstatSync(path);
+  if (before.isSymbolicLink() || before.uid !== process.getuid?.() || before.dev !== state.rootIdentity.dev || modeOf(before) !== mode) {
+    throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Browser cleanup child ownership, device, mode, or symlink state is unsafe.');
+  }
+  if (type === 'file' && (!before.isFile() || before.nlink !== 1)) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Browser cleanup child file is unsafe.');
+  if (type === 'directory' && !before.isDirectory()) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Browser cleanup child directory is unsafe.');
+  const after = lstatSync(path);
+  if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+    throw new EvidenceError('BROWSER_CLEANUP_RACE', 'Browser cleanup child changed during validation.');
+  }
+  return path;
+}
+
+function snapshotExpectedDirectories(root) {
+  const directories = [JOURNAL_DIRECTORY, SUMMARY_DIRECTORY, LAUNCH_DIRECTORY].map((name) => {
+    const path = join(root, name);
+    const mode = WORKSPACE_DIRECTORY_MODES[name];
+    mkdirSync(path, { mode });
+    chmodSync(path, mode);
+    const info = lstatSync(path);
+    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.dev !== lstatSync(root).dev || modeOf(info) !== mode) {
+      throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace child directory is unsafe.');
+    }
+    return [name, identityOf(path)];
+  });
+  return Object.fromEntries(directories);
+}
+
+function expectedEntries() {
+  return new Set([
+    JOURNAL_DIRECTORY,
+    `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
+    SUMMARY_DIRECTORY,
+    `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`,
+    LAUNCH_DIRECTORY,
+    `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
+    `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
+    OUTPUT_DIRECTORY,
+    `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
+  ]);
+}
+
+function readCanonicalBrowserJson(path, expectedSchema, label) {
+  const content = decodeUtf8(readFileSync(path));
+  if (!content.endsWith('\n')) throw new EvidenceError('BROWSER_CLEANUP_INVALID_FILE', `${label} must be canonical JSON.`);
+  const parsed = parseStrictJson(content.slice(0, -1));
+  if (content !== `${canonicalStringify(parsed)}\n` || parsed.schema_version !== expectedSchema) {
+    throw new EvidenceError('BROWSER_CLEANUP_INVALID_FILE', `${label} is not recognized as generated browser evidence.`);
+  }
+  return parsed;
+}
+
+function validateFileContentBeforeCleanup(state, relativePath) {
+  const path = join(state.root, ...relativePath.split('/'));
+  if (!existsSync(path)) return;
+  if (relativePath === `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`) {
+    const { records, sourceDigest } = readJournal(path);
+    reconcile(records, sourceDigest, { outputRoot: join(state.root, OUTPUT_DIRECTORY), generatedAt: new Date().toISOString() });
+  } else if (relativePath === `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`) {
+    const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
+    verifyBrowserSummary(path, existsSync(journalPath) ? { sourceJournalPath: journalPath } : {});
+  } else if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`) {
+    readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-launch-v1', 'browser launch descriptor');
+  } else if (relativePath === `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`) {
+    readCanonicalBrowserJson(path, 'servsync-controlled-ops/browser-reporter-ready-v1', 'browser reporter-ready record');
+  } else if (relativePath === `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`) {
+    const parsed = parseStrictJson(decodeUtf8(readFileSync(path)));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+      || Object.keys(parsed).sort().join(',') !== 'failedTests,status'
+      || !['passed', 'failed'].includes(parsed.status)
+      || !Array.isArray(parsed.failedTests)
+      || parsed.failedTests.length !== 0) {
+      throw new EvidenceError('BROWSER_CLEANUP_INVALID_FILE', 'Playwright last-run record is not recognized as safe generated browser evidence.');
+    }
+  }
+}
+
+function inventoryWorkspace(state, path = state.root, depth = 0, entries = []) {
+  if (depth > 4) throw new EvidenceError('BROWSER_CLEANUP_INVENTORY', 'Browser cleanup inventory exceeded its depth limit.');
+  const root = state.root;
+  const names = readdirSync(path).sort();
+  for (const name of names) {
+    const child = join(path, name);
+    const childRelative = relative(root, child).split(sep).join('/');
+    const info = lstatSync(child);
+    if (!expectedEntries().has(childRelative)) {
+      throw new EvidenceError('BROWSER_CLEANUP_UNKNOWN_ENTRY', 'Browser cleanup encountered an unexpected workspace entry.');
+    }
+    if (info.isSymbolicLink()) throw new EvidenceError('SYMLINK_REJECTED', 'Browser cleanup refuses symlinked entries.');
+    entries.push(childRelative);
+    if (info.isDirectory()) inventoryWorkspace(state, child, depth + 1, entries);
+  }
+  return entries;
+}
+
+export function createBrowserEvidenceWorkspace({ parentRoot = '/private/tmp', prefix = 'servsync-browser-evidence-' } = {}) {
+  validateRawOperationRootInput(parentRoot, 'browser evidence parent root');
+  validateRawOperationRootInput(prefix, 'browser evidence prefix');
+  if (!prefix.startsWith('servsync-') || /[\/\\]/.test(prefix)) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence prefix is unsafe.');
+  const parent = resolve(parentRoot);
+  assertCanonicalParents(parent);
+  assertOutsideGit(parent);
+  const root = mkdtempSync(join(parent, prefix));
+  chmodSync(root, 0o700);
+  if (realpathSync(root) !== root) throw new EvidenceError('SYMLINK_REJECTED', 'Browser evidence workspace root is symlinked.');
+  const rootIdentity = identityOf(root);
+  if (rootIdentity.type !== 'directory' || rootIdentity.uid !== process.getuid?.() || rootIdentity.mode !== 0o700) {
+    throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root failed safety checks.');
+  }
+  const directoryIdentities = snapshotExpectedDirectories(root);
+  const runId = `browser-workspace-${randomBytes(12).toString('hex')}`;
+  const state = {
+    runId,
+    root,
+    rootIdentity,
+    directoryIdentities,
+    cleanupState: 'active',
+  };
+  const cleanupHandle = Object.freeze({});
+  cleanupHandleStates.set(cleanupHandle, state);
+  const workspace = {
+    runId,
+    root,
+    journalRoot: join(root, JOURNAL_DIRECTORY),
+    summaryRoot: join(root, SUMMARY_DIRECTORY),
+    launchRoot: join(root, LAUNCH_DIRECTORY),
+    outputRoot: join(root, OUTPUT_DIRECTORY),
+    journalPath: join(root, JOURNAL_DIRECTORY, JOURNAL_FILENAME),
+    summaryPath: join(root, SUMMARY_DIRECTORY, SUMMARY_FILENAME),
+    cleanupHandle,
+  };
+  return Object.freeze(workspace);
 }
 
 function parseOptions(arguments_) {
@@ -259,30 +454,64 @@ export function verifyBrowserSummary(summaryPath, { sourceJournalPath = null } =
   return summary;
 }
 
-export function cleanupBrowserEvidence({ journalPath = null, summaryPath = null, journalRoot = null, outputRoot = null } = {}) {
-  const resolveCleanupPath = (value, label) => {
-    validateRawOperationRootInput(value, label);
-    const path = resolve(value);
-    if (path === sep || path === '/tmp' || path === '/private/tmp' || path === process.cwd() || dirname(path) === path) {
-      throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean a dangerous browser evidence path.');
+export function cleanupBrowserEvidence(cleanupHandle) {
+  const state = cleanupHandleStates.get(cleanupHandle);
+  if (!state) throw new EvidenceError('INVALID_BROWSER_CLEANUP_HANDLE', 'Browser cleanup requires an authentic workspace cleanup handle.');
+  if (state.cleanupState === 'cleaned') return { status: 'already_cleaned', run_id: state.runId, deleted: [] };
+  if (state.cleanupState !== 'active') throw new EvidenceError('BROWSER_CLEANUP_STATE', 'Browser cleanup handle is not active.');
+  state.cleanupState = 'cleaning';
+  const deleted = [];
+  try {
+    if (!existsSync(state.root)) {
+      throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace root is missing before cleanup.');
     }
-    assertCanonicalParents(path);
-    return path;
-  };
-  const targets = [journalPath, summaryPath].filter(Boolean).map((value) => resolveCleanupPath(value, 'browser cleanup file'));
-  for (const target of targets) {
-    if (!existsSync(target)) continue;
-    const info = lstatSync(target);
-    if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1 || modeOf(info) !== 0o600) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence file.');
-    unlinkSync(target);
-  }
-  for (const root of [journalRoot, outputRoot].filter(Boolean).map((value) => resolveCleanupPath(value, 'browser cleanup root'))) {
-    if (!existsSync(root)) continue;
-    const info = lstatSync(root);
-    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || modeOf(info) !== 0o700) throw new EvidenceError('UNSAFE_BROWSER_CLEANUP', 'Refusing to clean unsafe browser evidence directory.');
-    const entries = readdirSync(root);
-    if (entries.length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence directory is not empty.');
+    inventoryWorkspace(state);
+    for (const [name, identity] of Object.entries(state.directoryIdentities)) {
+      const path = assertWorkspaceChild(state, name, { type: 'directory', mode: identity.mode });
+      if (!sameIdentity(identityOf(path), identity)) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace child directory identity changed.');
+    }
+    for (const relativePath of [
+      `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
+      `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`,
+      `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
+      `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
+      `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
+    ]) {
+      validateFileContentBeforeCleanup(state, relativePath);
+    }
+    for (const relativePath of [
+      `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
+      `${SUMMARY_DIRECTORY}/${SUMMARY_FILENAME}`,
+      `${LAUNCH_DIRECTORY}/${BROWSER_REPORTER_READY_FILENAME}`,
+      `${LAUNCH_DIRECTORY}/${BROWSER_LAUNCH_FILENAME}`,
+      `${OUTPUT_DIRECTORY}/${PLAYWRIGHT_LAST_RUN_FILENAME}`,
+    ]) {
+      const path = join(state.root, ...relativePath.split('/'));
+      if (!existsSync(path)) continue;
+      const safePath = assertWorkspaceChild(state, relativePath, { type: 'file', mode: relativePath.endsWith(PLAYWRIGHT_LAST_RUN_FILENAME) ? 0o644 : 0o600 });
+      unlinkSync(safePath);
+      deleted.push(relativePath);
+      fsyncDirectory(dirname(safePath));
+    }
+    for (const relativePath of [OUTPUT_DIRECTORY, LAUNCH_DIRECTORY, SUMMARY_DIRECTORY, JOURNAL_DIRECTORY]) {
+      const path = join(state.root, relativePath);
+      if (!existsSync(path)) continue;
+      const safePath = assertWorkspaceChild(state, relativePath, { type: 'directory', mode: state.directoryIdentities[relativePath]?.mode ?? WORKSPACE_DIRECTORY_MODES[relativePath] });
+      if (readdirSync(safePath).length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence directory is not empty.');
+      rmdirSync(safePath);
+      deleted.push(relativePath);
+      fsyncDirectory(dirname(safePath));
+    }
+    inventoryWorkspace({ ...state, root: state.root });
+    if (readdirSync(state.root).length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence workspace root is not empty.');
+    const root = assertWorkspaceRootSafety(state);
     rmdirSync(root);
+    deleted.push('.');
+    state.cleanupState = 'cleaned';
+    return { status: 'cleaned', run_id: state.runId, deleted };
+  } catch (error) {
+    state.cleanupState = 'cleanup_failed';
+    throw error;
   }
 }
 

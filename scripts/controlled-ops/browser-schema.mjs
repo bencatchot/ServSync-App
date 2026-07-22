@@ -121,20 +121,42 @@ export function validateTargetClassification(value) {
 }
 
 export function validateBrowserUrl(value) {
+  const raw = validateBrowserLoopbackUrl(value, { fieldName: 'browser base URL', allowPath: false });
+  return raw.canonical_origin;
+}
+
+export function validateBrowserLoopbackUrl(value, { fieldName = 'browser URL', allowPath = true } = {}) {
+  if (typeof value !== 'string' || value.normalize('NFC') !== value || /[\u0000-\u001f\u007f-\u009f\u2028\u2029\s\\]/u.test(value)) {
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} contains unsafe characters.`);
+  }
+  const rawPattern = allowPath
+    ? /^http:\/\/127\.0\.0\.1:([1-9][0-9]{3,4})(?:\/[^#]*)?$/
+    : /^http:\/\/127\.0\.0\.1:([1-9][0-9]{3,4})\/?$/;
+  const match = rawPattern.exec(value);
+  if (!match) {
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} must use exact raw http://127.0.0.1:<port> spelling.`);
+  }
+  const port = Number.parseInt(match[1], 10);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535 || String(port) !== match[1]) {
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} requires an explicit bounded decimal port.`);
+  }
   let url;
   try {
     url = new URL(value);
   } catch {
-    throw new EvidenceError('INVALID_BROWSER_TARGET', 'Browser base URL is invalid.');
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} is invalid.`);
   }
-  if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.username || url.password || url.search || url.hash) {
-    throw new EvidenceError('INVALID_BROWSER_TARGET', 'Slice 2A browser target must be plain loopback HTTP without credentials, query, or fragment.');
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.hash || url.port !== String(port)) {
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} must be plain exact loopback HTTP without credentials or fragment.`);
   }
-  const port = Number.parseInt(url.port, 10);
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    throw new EvidenceError('INVALID_BROWSER_TARGET', 'Slice 2A browser target requires an explicit bounded loopback port.');
+  if (!allowPath && (url.pathname !== '/' || url.search)) {
+    throw new EvidenceError('INVALID_BROWSER_TARGET', `${fieldName} must not include path, query, or fragment.`);
   }
-  return url.toString().replace(/\/$/, '');
+  return {
+    canonical_origin: `http://127.0.0.1:${port}`,
+    port,
+    raw_host: '127.0.0.1',
+  };
 }
 
 export function generatedRunId() {

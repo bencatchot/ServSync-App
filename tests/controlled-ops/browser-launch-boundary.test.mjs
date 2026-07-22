@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import {
@@ -10,9 +10,10 @@ import {
   BROWSER_REPORTER_READY_SCHEMA,
   BROWSER_LAUNCH_TOOL_VERSION,
   createBrowserLaunchContract,
+  createBrowserEgressGuard,
 } from '../../scripts/controlled-ops/browser-launch-policy.mjs';
 import { canonicalStringify, sha256, utcNow } from '../../scripts/controlled-ops/internal.mjs';
-import { cleanupBrowserEvidence, importBrowserJournal } from '../../scripts/controlled-ops/browser-importer.mjs';
+import { cleanupBrowserEvidence, createBrowserEvidenceWorkspace, importBrowserJournal } from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
 import { startBrowserLocalServer } from './fixtures/browser-local-server.mjs';
 
@@ -246,27 +247,109 @@ test('browser egress guard blocks browser-controlled channels before disallowed 
 test('browser cleanup is exact, idempotent, and refuses unsafe paths', () => {
   const root = tempRoot();
   try {
-    const journalRoot = join(root, 'journal');
-    const summaryRoot = join(root, 'summary');
-    const outputRoot = join(root, 'output');
-    for (const path of [journalRoot, summaryRoot, outputRoot]) mkdir700(path);
-    const journalPath = writeCompleteJournal(journalRoot);
-    const summaryPath = join(summaryRoot, 'browser-summary.json');
-    importBrowserJournal({ journalPath, summaryPath, outputRoot });
+    const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-cleanup-' });
+    const journalPath = writeCompleteJournal(workspace.journalRoot);
+    importBrowserJournal({ journalPath, summaryPath: workspace.summaryPath, outputRoot: workspace.outputRoot });
     const sentinel = join(root, 'sentinel');
     writeFileSync(sentinel, 'keep', { mode: 0o600 });
-    cleanupBrowserEvidence({ journalPath, summaryPath, journalRoot, outputRoot });
-    cleanupBrowserEvidence({ journalPath, summaryPath, journalRoot, outputRoot });
+    const first = cleanupBrowserEvidence(workspace.cleanupHandle);
+    const second = cleanupBrowserEvidence(workspace.cleanupHandle);
+    assert.equal(first.status, 'cleaned');
+    assert.equal(second.status, 'already_cleaned');
     assert.equal(readFileSync(sentinel, 'utf8'), 'keep');
-    assert.throws(() => cleanupBrowserEvidence({ journalRoot: '/' }), /Refusing to clean/);
-    assert.throws(() => cleanupBrowserEvidence({ journalRoot: '/tmp' }), /Refusing to clean/);
-    const unsafeRoot = join(root, 'unsafe');
-    const external = join(root, 'external');
-    mkdir700(external);
-    symlinkSync(external, unsafeRoot);
-    assert.throws(() => cleanupBrowserEvidence({ journalRoot: unsafeRoot }), /Symlinked|unsafe/i);
+    assert.throws(() => cleanupBrowserEvidence({ journalRoot: '/' }), /authentic workspace cleanup handle/i);
+    assert.throws(() => cleanupBrowserEvidence({ ...workspace.cleanupHandle }), /authentic workspace cleanup handle/i);
+    assert.throws(() => cleanupBrowserEvidence(JSON.parse(JSON.stringify(workspace.cleanupHandle))), /authentic workspace cleanup handle/i);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup rejects forged handles and preserves arbitrary external targets', () => {
+  const root = tempRoot();
+  try {
+    const externalFile = join(root, 'external-owned-file.txt');
+    writeFileSync(externalFile, 'external sentinel', { mode: 0o600 });
+    const fileBefore = lstatSync(externalFile);
+    assert.throws(() => cleanupBrowserEvidence({ journalPath: externalFile }), /authentic workspace cleanup handle/i);
+    const fileAfter = lstatSync(externalFile);
+    assert.equal(readFileSync(externalFile, 'utf8'), 'external sentinel');
+    assert.equal(fileAfter.ino, fileBefore.ino);
+    assert.equal(fileAfter.mode & 0o777, fileBefore.mode & 0o777);
+    assert.equal(fileAfter.nlink, fileBefore.nlink);
+
+    const externalDirectory = join(root, 'external-owned-dir');
+    mkdir700(externalDirectory);
+    const dirBefore = lstatSync(externalDirectory);
+    assert.throws(() => cleanupBrowserEvidence({ journalRoot: externalDirectory }), /authentic workspace cleanup handle/i);
+    const dirAfter = lstatSync(externalDirectory);
+    assert.equal(dirAfter.ino, dirBefore.ino);
+    assert.equal(dirAfter.mode & 0o777, dirBefore.mode & 0o777);
+
+    const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-cross-run-' });
+    const otherWorkspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-cross-run-' });
+    const copied = Object.assign({}, workspace.cleanupHandle);
+    assert.throws(() => cleanupBrowserEvidence(copied), /authentic workspace cleanup handle/i);
+    assert.equal(existsSync(workspace.root), true);
+    cleanupBrowserEvidence(otherWorkspace.cleanupHandle);
+    assert.equal(existsSync(workspace.root), true);
+    cleanupBrowserEvidence(workspace.cleanupHandle);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser cleanup blocks unknown entries and root replacement before deletion', () => {
+  const root = tempRoot();
+  try {
+    const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-unknown-' });
+    mkdirSync(workspace.outputRoot, { mode: 0o755 });
+    chmodSync(workspace.outputRoot, 0o755);
+    writeFileSync(join(workspace.outputRoot, '.controlled-ops-forged'), 'unexpected', { mode: 0o600 });
+    assert.throws(() => cleanupBrowserEvidence(workspace.cleanupHandle), /unexpected workspace entry/i);
+
+    const replaced = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-replaced-' });
+    rmSync(replaced.root, { recursive: true, force: true });
+    mkdir700(replaced.root);
+    assert.throws(() => cleanupBrowserEvidence(replaced.cleanupHandle), /identity changed|workspace root/i);
+
+    const replacedFile = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-file-replaced-' });
+    const journalPath = writeCompleteJournal(replacedFile.journalRoot);
+    rmSync(journalPath);
+    writeFileSync(journalPath, 'replacement', { mode: 0o600 });
+    assert.throws(() => cleanupBrowserEvidence(replacedFile.cleanupHandle), /recognized browser evidence|canonical|invalid|record boundary/i);
+
+    const openJournal = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-open-journal-' });
+    const writer = createJournalWriter(openJournal.journalRoot);
+    writer.append({ record_type: 'browser_run_started', run_id: 'browser-run-local', timestamp: '2026-07-22T16:00:00.000Z' });
+    assert.throws(() => cleanupBrowserEvidence(openJournal.cleanupHandle), /terminal|incomplete|recognized/i);
+    writer.close();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('browser egress guard enforces exact raw host spelling and port', () => {
+  const guard = createBrowserEgressGuard('http://127.0.0.1:4100');
+  assert.equal(guard.shouldAllow('http://127.0.0.1:4100/'), true);
+  for (const url of [
+    'http://2130706433:4100/',
+    'http://0x7f000001:4100/',
+    'http://017700000001:4100/',
+    'http://127.1:4100/',
+    'http://127.0.1:4100/',
+    'http://0x7f.0.0.1:4100/',
+    'http://[::1]:4100/',
+    'http://[::ffff:127.0.0.1]:4100/',
+    'http://localhost:4100/',
+    'http://127.0.0.1.:4100/',
+    'http://127.0.0.1:4100@other-host/',
+    'http://127.0.0.1%3A4100/',
+    'http://127.0.0.1:4101/',
+    'http://127.0.0.1/',
+    'http://127.0.0.1:99999/',
+  ]) {
+    assert.equal(guard.shouldAllow(url), false, url);
   }
 });
 

@@ -41,6 +41,16 @@ test('browser schema accepts only loopback browser targets', () => {
   assert.throws(() => validateBrowserUrl('https://127.0.0.1:4100/'), hasCode('INVALID_BROWSER_TARGET'));
   assert.throws(() => validateBrowserUrl('http://127.0.0.1/'), hasCode('INVALID_BROWSER_TARGET'));
   assert.throws(() => validateBrowserUrl('http://127.0.0.1:4100/?token=value'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://localhost:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://2130706433:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://0x7f000001:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://017700000001:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://127.1:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://[::1]:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://127.0.0.1.:4100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://127.0.0.1:4100@other-host/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://127.0.0.1:04100/'), hasCode('INVALID_BROWSER_TARGET'));
+  assert.throws(() => validateBrowserUrl('http://127.0.0.1:99999/'), hasCode('INVALID_BROWSER_TARGET'));
   assert.throws(() => validateBrowserUrl('http://example.com:4100/'), hasCode('INVALID_BROWSER_TARGET'));
 });
 
