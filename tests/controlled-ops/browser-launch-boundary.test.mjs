@@ -97,6 +97,36 @@ function httpConnect(baseURL) {
   });
 }
 
+function openHoldingSocket(baseURL) {
+  const parsed = new URL(baseURL);
+  return new Promise((resolveSocket, reject) => {
+    const socket = connect(Number(parsed.port), parsed.hostname);
+    socket.once('connect', () => resolveSocket(socket));
+    socket.once('error', reject);
+    socket.setTimeout(1000, () => {
+      socket.destroy();
+      reject(new Error('socket did not connect before timeout'));
+    });
+  });
+}
+
+function connectionLimitCloses(baseURL) {
+  const parsed = new URL(baseURL);
+  return new Promise((resolveClosed) => {
+    const socket = connect(Number(parsed.port), parsed.hostname);
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolveClosed(value);
+    };
+    socket.on('close', () => finish(true));
+    socket.on('error', () => finish(true));
+    socket.setTimeout(1000, () => finish(false));
+  });
+}
+
 async function startSentinel() {
   let count = 0;
   const server = createServer((request, response) => {
@@ -261,5 +291,14 @@ test('synthetic server enforces method, host, route, body, and request bounds', 
     assert.equal(await httpGet(bounded.baseURL), 429);
   } finally {
     await bounded.close();
+  }
+  const connectionLimited = await startBrowserLocalServer({ limits: { max_connections: 1 } });
+  let heldSocket = null;
+  try {
+    heldSocket = await openHoldingSocket(connectionLimited.baseURL);
+    assert.equal(await connectionLimitCloses(connectionLimited.baseURL), true);
+  } finally {
+    heldSocket?.destroy();
+    await connectionLimited.close();
   }
 });
