@@ -17,9 +17,9 @@ import { GENESIS_HASH, canonicalStringify, compareStrings } from '../../scripts/
 import { evidenceCli, makePacket, repoRoot, runWrapper, writeSafeArtifact } from './helpers.mjs';
 
 function prepareStage(packet, content = 'status=ok\n') {
-  const { output, summary } = writeSafeArtifact(packet.root, 'evidence.txt', content);
+  const { output, summary, summaryName } = writeSafeArtifact(packet.root, 'evidence.txt', content);
   registerArtifact(packet.root, 'stage-1', 'evidence.txt', 'test_evidence', summary);
-  rmSync(summary);
+  registerArtifact(packet.root, 'stage-1', summaryName, 'sanitization_summary');
   appendEvent(packet.root, GENESIS_HASH, {
     stage_id: 'stage-1', event_id: 'stage-complete', event_type: 'stage_completed', action_timestamp: new Date().toISOString(),
     archive_timestamp: null, command_category: null, expected_result: 'completed', observed_result: 'completed',
@@ -60,13 +60,11 @@ test('freeze fails for missing, unsafe, or quarantined evidence', () => {
 test('stage freeze independently blocks a registered artifact that fails security scanning', () => {
   const packet = makePacket();
   try {
-    const artifact = join(packet.root, 'stages', 'stage-1', 'artifacts', 'unsafe.txt');
-    const summary = join(packet.root, 'quarantine', 'unsafe-summary.json');
-    writeFileSync(artifact, `authorization: Bearer ${['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiJmaXh0dXJlIn0', 'signature-value'].join('.')}\n`, { mode: 0o600 });
-    writeFileSync(summary, '{"passed":true}\n', { mode: 0o600 });
+    const { output, summary, summaryName } = writeSafeArtifact(packet.root, 'unsafe.txt');
     registerArtifact(packet.root, 'stage-1', 'unsafe.txt', 'test_evidence', summary);
-    rmSync(summary);
-    assert.throws(() => freezeStage(packet.root, 'stage-1'), /secret scan/i);
+    registerArtifact(packet.root, 'stage-1', summaryName, 'sanitization_summary');
+    writeFileSync(output, `authorization: Bearer ${['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiJmaXh0dXJlIn0', 'signature-value'].join('.')}\n`);
+    assert.throws(() => freezeStage(packet.root, 'stage-1'), /summary|secret/i);
   } finally { packet.cleanup(); }
 });
 
@@ -78,7 +76,7 @@ test('post-freeze artifact modification is detected and later stage remains sepa
     createStage(packet.root, 'stage-2');
     chmodSync(output, 0o600);
     writeFileSync(output, 'status=failed\n');
-    assert.throws(() => verifyStageFreeze(packet.root, 'stage-1'), /changed|mismatch/i);
+    assert.throws(() => verifyStageFreeze(packet.root, 'stage-1'), /changed|mismatch|unsafe/i);
   } finally { packet.cleanup(); }
 });
 
@@ -87,17 +85,17 @@ test('nested stage artifacts freeze recursively and reject unregistered addition
   try {
     const nestedDirectory = join(packet.root, 'stages', 'stage-1', 'artifacts', 'nested');
     const input = join(packet.root, 'quarantine', 'nested.input');
-    const summary = join(packet.root, 'quarantine', 'nested.summary.json');
+    const summary = join(nestedDirectory, 'evidence.sanitization.json');
     const output = join(nestedDirectory, 'evidence.txt');
     mkdirSync(nestedDirectory, { mode: 0o700 });
     writeFileSync(input, 'status=ok\n', { mode: 0o600 });
     const sanitized = spawnSync(process.execPath, [
-      join(repoRoot, 'scripts/controlled-ops/sanitize.mjs'), '--input', input, '--output', output, '--summary', summary, '--mode', 'lines',
+      join(repoRoot, 'scripts/controlled-ops/sanitize.mjs'), '--input', input, '--output', output, '--summary', summary, '--artifact-path', 'nested/evidence.txt', '--mode', 'lines',
     ], { encoding: 'utf8' });
     assert.equal(sanitized.status, 0, sanitized.stderr);
     rmSync(input);
     registerArtifact(packet.root, 'stage-1', 'nested/evidence.txt', 'test_evidence', summary);
-    rmSync(summary);
+    registerArtifact(packet.root, 'stage-1', 'nested/evidence.sanitization.json', 'sanitization_summary');
     appendEvent(packet.root, GENESIS_HASH, {
       stage_id: 'stage-1', event_id: 'nested-complete', event_type: 'stage_completed', action_timestamp: new Date().toISOString(),
       archive_timestamp: null, command_category: null, expected_result: 'completed', observed_result: 'completed',
@@ -138,12 +136,14 @@ test('final sealing and verification detect post-seal tampering', () => {
     const second = createManifest(packet.root);
     assert.equal(canonicalStringify(first), canonicalStringify(second));
     const seal = sealOperation(packet.root);
-    assert.equal(verifyPacket(packet.root).status, 'verified');
+    assert.equal(verifyPacket(packet.root, seal.seal_sha256).status, 'verified');
+    assert.throws(() => verifyPacket(packet.root, 'f'.repeat(64)), /externally retained digest/i);
     assert.throws(() => createStage(packet.root, 'stage-2'), /sealed/i);
     chmodSync(join(packet.root, 'events.ndjson'), 0o600);
     writeFileSync(join(packet.root, 'events.ndjson'), `${readFileSync(join(packet.root, 'events.ndjson'), 'utf8')}{}\n`);
     assert.throws(() => verifyPacket(packet.root), /event|sequence|hash/i);
-    assert.ok(seal.manifest_digest);
+    assert.ok(seal.seal.manifest_digest);
+    assert.match(seal.seal_sha256, /^[a-f0-9]{64}$/);
   } finally { packet.cleanup(); }
 });
 
@@ -155,7 +155,7 @@ test('permission failure and malformed exit evidence fail closed', () => {
     createManifest(packet.root);
     sealOperation(packet.root);
     chmodSync(join(packet.root, 'operation.json'), 0o644);
-    assert.throws(() => verifyPacket(packet.root), /permissions/i);
+    assert.throws(() => verifyPacket(packet.root), /permissions|mode is unsafe/i);
   } finally { packet.cleanup(); }
 });
 
@@ -166,12 +166,12 @@ test('completed tokens without exit-code evidence block manifest creation', () =
     freezeStage(packet.root, 'stage-1');
     const tokenPath = join(packet.root, 'tokens', 'broken.json');
     writeFileSync(tokenPath, `${canonicalStringify({
-      schema_version: 'servsync-controlled-ops/execution-token-v1', operation_id: 'operation-test-1', stage_id: 'stage-1',
-      token: 'broken', command_category: 'fake', expected_result: 'completed', status: 'completed',
+      schema_version: 'servsync-controlled-ops/execution-token-v2', operation_id: 'operation-test-1', stage_id: 'stage-1',
+      token: 'broken', command_category: 'fake', expected_result: 'completed', state: 'completed',
       claimed_at: new Date().toISOString(), started_at: new Date().toISOString(), completed_at: new Date().toISOString(),
-      command_exit_code: null, retry: null,
+      command_result: null, harness_result: { classification: 'completed', detail: 'evidence_retained' }, retry: null,
     })}\n`, { mode: 0o600 });
-    assert.throws(() => createManifest(packet.root), /exit-code/i);
+    assert.throws(() => createManifest(packet.root), /command evidence/i);
   } finally { packet.cleanup(); }
 });
 

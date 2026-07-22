@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sanitizeContent, scanCustomerContent, scanSensitiveContent } from '../../scripts/controlled-ops/sanitize.mjs';
+import { LIMITS, canonicalStringify } from '../../scripts/controlled-ops/internal.mjs';
+import { createFingerprintRecord, parseStrictJson, sanitizeContent, scanCustomerContent, scanSensitiveContent, verifyFingerprintRecord } from '../../scripts/controlled-ops/sanitize.mjs';
 
 test('allowlisted line and strict JSON output sanitize deterministically', () => {
   const lines = sanitizeContent('status=ok\r\ncount=1\r\n');
@@ -8,7 +9,7 @@ test('allowlisted line and strict JSON output sanitize deterministically', () =>
   const json = sanitizeContent('{"count":1,"status":"ok"}', { mode: 'json' });
   assert.equal(json.output, '{"count":1,"status":"ok"}\n');
   assert.throws(() => sanitizeContent('{"unknown":"ok"}', { mode: 'json' }), /unknown field/i);
-  assert.throws(() => sanitizeContent('{"status":', { mode: 'json' }), /valid JSON/i);
+  assert.throws(() => sanitizeContent('{"status":', { mode: 'json' }), /canonical duplicate-free JSON/i);
 });
 
 test('secret classes and high-entropy values are rejected without retaining matches', () => {
@@ -43,7 +44,20 @@ test('synthetic markers require explicit approval and exact syntax', () => {
   assert.throws(() => scanCustomerContent('test person', { approvedSyntheticMarkers: ['test person'] }), /invalid/i);
 });
 
-test('SHA-256 fingerprints and safe prefixes are permitted', () => {
-  const fingerprint = 'a'.repeat(64);
-  assert.equal(sanitizeContent(`sha256=${fingerprint}\nfingerprint=deadbeef…\n`).summary.passed, true);
+test('fingerprints require harness provenance and safe prefixes remain tightly bounded', () => {
+  assert.throws(() => sanitizeContent(`fingerprint=${'a'.repeat(64)}\n`), /unknown field/i);
+  assert.throws(() => sanitizeContent(`sha256=${'a'.repeat(64)}\n`), /unknown field/i);
+  const record = createFingerprintRecord('stage/output.txt', 'status=ok\n');
+  assert.equal(verifyFingerprintRecord(record, 'status=ok\n'), true);
+  assert.equal(sanitizeContent('identifier_prefix=deadbeef\n').output, 'identifier_prefix=deadbeef\n');
+  assert.throws(() => sanitizeContent('identifier_prefix=deadbee\n'), /exactly eight/i);
+});
+
+test('strict JSON rejects duplicate keys, noncanonical bytes, depth, array, and field limits', () => {
+  assert.throws(() => parseStrictJson('{"status":"ok","status":"ok"}'), /duplicate/i);
+  assert.throws(() => sanitizeContent('{ "status":"ok"}', { mode: 'json' }), /canonically serialized/i);
+  assert.throws(() => parseStrictJson(`${'['.repeat(LIMITS.json_depth + 2)}0${']'.repeat(LIMITS.json_depth + 2)}`), /nesting|depth/i);
+  assert.throws(() => parseStrictJson(`[${Array.from({ length: LIMITS.json_array_items + 1 }, () => '0').join(',')}]`), /array length/i);
+  const oversizedObject = Object.fromEntries(Array.from({ length: LIMITS.json_object_fields + 1 }, (_, index) => [`x${index}`, index]));
+  assert.throws(() => parseStrictJson(canonicalStringify(oversizedObject)), /field count/i);
 });

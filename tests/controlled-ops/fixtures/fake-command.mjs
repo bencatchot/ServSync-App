@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { appendFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { appendFileSync, writeFileSync } from 'node:fs';
 
-const [mode = 'clean', value = '', counterPath = ''] = process.argv.slice(2);
-if (counterPath) appendFileSync(counterPath, 'executed\n', { encoding: 'utf8' });
+const allArguments = process.argv.slice(2);
+const [mode = 'clean', value = '', counterPath = ''] = allArguments;
+if (counterPath && mode !== 'argv') appendFileSync(counterPath, 'executed\n', { encoding: 'utf8' });
 
 switch (mode) {
   case 'clean':
@@ -37,7 +39,29 @@ switch (mode) {
     process.stdout.write(`affected_rows=${Number.parseInt(value || '1', 10)}\nstatus=completed\n`);
     break;
   case 'large':
-    process.stdout.write(`${'count=1\n'.repeat(Math.min(Number.parseInt(value || '100', 10), 1000))}`);
+    process.stdout.write(`${'count=1\n'.repeat(Math.min(Number.parseInt(value || '100', 10), 200_000))}`);
+    break;
+  case 'large-stderr':
+    process.stderr.write(`${'count=1\n'.repeat(Math.min(Number.parseInt(value || '100', 10), 200_000))}`);
+    break;
+  case 'both-large': {
+    const repeats = Math.min(Number.parseInt(value || '100', 10), 200_000);
+    process.stdout.write(`${'count=1\n'.repeat(repeats)}`); process.stderr.write(`${'count=1\n'.repeat(repeats)}`);
+    break;
+  }
+  case 'long-line':
+    process.stdout.write(`status=${'x'.repeat(Math.min(Number.parseInt(value || '20000', 10), 100_000))}\n`);
+    break;
+  case 'tree': {
+    const childScript = `const {spawn}=require('node:child_process');const {appendFileSync}=require('node:fs');const p=spawn(process.execPath,['-e','setInterval(()=>{},1000)']);appendFileSync(process.argv[1],process.pid+'\\n'+p.pid+'\\n');setInterval(()=>{},1000);`;
+    const child = spawn(process.execPath, ['-e', childScript, value], { stdio: 'ignore' });
+    writeFileSync(value, `${process.pid}\n${child.pid}\n`);
+    await new Promise(() => {});
+    break;
+  }
+  case 'argv':
+    writeFileSync(value, JSON.stringify(allArguments.slice(2)));
+    process.stdout.write('status=ok\n');
     break;
   case 'signal':
     process.kill(process.pid, 'SIGTERM');

@@ -55,8 +55,8 @@ test('event verification rejects tampering, duplicate IDs, stale heads, and time
 test('concurrent event append lock fails safely', () => {
   const packet = makePacket();
   try {
-    mkdirSync(join(packet.root, '.controlled-ops-events.lock'), { mode: 0o700 });
-    assert.throws(() => appendEvent(packet.root, GENESIS_HASH, event(new Date().toISOString(), 'event-1')), /concurrent/i);
+    mkdirSync(join(packet.root, '.controlled-ops-mutation.lock'), { mode: 0o700 });
+    assert.throws(() => appendEvent(packet.root, GENESIS_HASH, event(new Date().toISOString(), 'event-1')), /mutation lock/i);
     assert.equal(readFileSync(join(packet.root, 'events.ndjson'), 'utf8'), '');
   } finally { packet.cleanup(); }
 });
@@ -68,11 +68,28 @@ test('execution tokens are atomic and retries require a new explicitly authorize
     assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-1', commandCategory: 'fake', expectedResult: 'completed' }), /already/i);
     assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1' }), /retries require/i);
     updateExecutionToken(packet.root, 'token-1', 'started');
-    updateExecutionToken(packet.root, 'token-1', 'completed', { commandExitCode: 0 });
+    updateExecutionToken(packet.root, 'token-1', 'completed', {
+      commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null },
+      harnessResult: { classification: 'completed', detail: 'evidence_retained' },
+    });
     const retry = claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1', retryAuthorization: 'approved-retry' });
     assert.equal(retry.retry.retry_count, 1);
     assert.throws(() => updateExecutionToken(packet.root, 'token-1', 'started'), /transition/i);
   } finally { packet.cleanup(); }
+});
+
+test('retry lineage rejects reused authorization, cycles, and cross-operation token records', () => {
+  const packet = makePacket(); const other = makePacket('stage-1', 'operation-test-2');
+  const completed = { commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null }, harnessResult: { classification: 'completed', detail: 'evidence_retained' } };
+  try {
+    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'original', commandCategory: 'fake', expectedResult: 'completed' });
+    updateExecutionToken(packet.root, 'original', 'started'); updateExecutionToken(packet.root, 'original', 'completed', completed);
+    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-one', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'approval-one' });
+    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-two', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'approval-one' }), /already used/i);
+    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'self', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'self', retryAuthorization: 'approval-two' }), /distinct prior token/i);
+    writeFileSync(join(other.root, 'tokens', 'foreign.json'), readFileSync(join(packet.root, 'tokens', 'original.json')), { mode: 0o600 });
+    assert.throws(() => claimExecutionToken(other.root, { stageId: 'stage-1', token: 'retry-foreign', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'foreign', retryAuthorization: 'approval-three' }), /operation|schema/i);
+  } finally { packet.cleanup(); other.cleanup(); }
 });
 
 test('later stages are separate and cannot replace an existing stage', () => {

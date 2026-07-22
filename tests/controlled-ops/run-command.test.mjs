@@ -16,7 +16,9 @@ test('wrapper preserves zero and nonzero exit codes and separates output', () =>
       assert.ok(existsSync(join(artifacts, `${token}.stdout.txt`)));
       assert.ok(existsSync(join(artifacts, `${token}.stderr.txt`)));
       assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
-      assert.equal(readJson(join(packet.root, 'tokens', `${token}.json`)).command_exit_code, expected);
+      const tokenRecord = readJson(join(packet.root, 'tokens', `${token}.json`));
+      assert.equal(tokenRecord.command_result.exit_kind, 'normal');
+      assert.equal(tokenRecord.command_result.exit_code, expected);
     } finally { packet.cleanup(); }
   }
 });
@@ -60,7 +62,7 @@ test('sanitizer failure removes quarantine and never promotes raw output or retr
     assert.equal(result.status, 92);
     assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
     assert.deepEqual(readdirSync(join(packet.root, 'stages', 'stage-1', 'artifacts')), []);
-    assert.equal(readJson(join(packet.root, 'tokens', 'secret.json')).status, 'sanitizer_failure');
+    assert.equal(readJson(join(packet.root, 'tokens', 'secret.json')).state, 'sanitizer_failed');
     assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 1);
     const retained = readFileSync(join(packet.root, 'events.ndjson'), 'utf8');
     assert.equal(retained.includes('Bearer'), false);
@@ -95,7 +97,10 @@ test('signal termination remains distinguishable from harness failure', () => {
   try {
     const result = runWrapper(packet.root, 'signal', ['signal']);
     assert.equal(result.status, 143, result.stderr);
-    assert.equal(readJson(join(packet.root, 'tokens', 'signal.json')).command_exit_code, 143);
+    const token = readJson(join(packet.root, 'tokens', 'signal.json'));
+    assert.equal(token.state, 'signaled');
+    assert.equal(token.command_result.exit_kind, 'signal');
+    assert.equal(token.command_result.signal_name, 'SIGTERM');
   } finally { packet.cleanup(); }
 });
 
@@ -108,6 +113,6 @@ test('affected-row assertions are explicit and fail without rerunning the comman
     const fail = runWrapper(packet.root, 'rows-fail', ['affected', '2', counter], ['--expected-affected-rows', '1']);
     assert.equal(fail.status, 93, fail.stderr);
     assert.equal(readFileSync(counter, 'utf8').trim().split('\n').length, 2);
-    assert.equal(readJson(join(packet.root, 'tokens', 'rows-fail.json')).status, 'completed');
+    assert.equal(readJson(join(packet.root, 'tokens', 'rows-fail.json')).state, 'harness_failed_after_execution');
   } finally { packet.cleanup(); }
 });
