@@ -134,7 +134,6 @@ export function validateRawOperationRootInput(value, fieldName = 'operation root
 }
 
 function rejectOpaqueValue(value, fieldName) {
-  if (/^[a-z]+(?:[-_][a-z0-9]+)+$/.test(value)) return;
   if (/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/.test(value)
     || /^[a-f0-9]{32,}$/i.test(value)
     || /^[A-Za-z0-9_+/=-]{24,}$/.test(value)
@@ -173,8 +172,15 @@ export function validateExpectedResult(value) {
 }
 
 export function validateAuthorizationReference(value, fieldName = 'authorization reference') {
-  if (typeof value !== 'string' || value.length > 48 || !/^(?:auth|approval|ticket|test)-[a-z0-9][a-z0-9-]{1,35}$/.test(value) || value.normalize('NFC') !== value) {
+  if (typeof value !== 'string' || value.length > 40 || value.normalize('NFC') !== value) {
     fail('UNSAFE_CALLER_METADATA', `${fieldName} must be a bounded non-secret authorization reference.`);
+  }
+  const match = /^(owner|ticket|issue|review|task|change):([a-z0-9][a-z0-9-]{1,23})$/.exec(value);
+  if (!match) fail('UNSAFE_CALLER_METADATA', `${fieldName} must use an approved human-readable reference type.`);
+  const shortReference = match[2];
+  const compact = shortReference.replaceAll('-', '');
+  if ((compact.length >= 16 && /[a-z]/.test(compact) && /\d/.test(compact)) || /^[a-f0-9]{16,}$/i.test(compact)) {
+    fail('UNSAFE_CALLER_METADATA', `${fieldName} must not contain opaque random-looking material.`);
   }
   rejectOpaqueValue(value, fieldName);
   return value;

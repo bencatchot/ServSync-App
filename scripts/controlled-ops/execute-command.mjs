@@ -11,7 +11,7 @@ import {
   validateExpectedResult,
 } from './internal.mjs';
 import {
-  appendEvent, claimExecutionToken, promoteCommandArtifacts, updateExecutionToken, verifyEventChain,
+  appendEvent, claimExecutionToken, promoteCommandArtifacts, terminalObservedResultForState, updateExecutionToken, verifyEventChain,
 } from './evidence.mjs';
 import { createSanitizationSummary, sanitizeContent } from './sanitize.mjs';
 
@@ -58,8 +58,9 @@ function assertCaptureDestinations(rootPath, stageId, token) {
   }
 }
 
-function recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, observedResult, commandResult, artifactPaths = []) {
+function recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, tokenState, commandResult, artifactPaths = [], detail = null) {
   const head = verifyEventChain(rootPath).head;
+  const observedResult = terminalObservedResultForState(tokenState, detail);
   const exitCode = commandResult.exit_kind === 'normal' ? commandResult.exit_code : (commandResult.exit_kind === 'signal' ? 128 + commandResult.signal_number : null);
   appendEvent(rootPath, head, {
     stage_id: stageId, event_id: `${token}-completed`, event_type: 'command_completed', action_timestamp: utcNow(), archive_timestamp: null,
@@ -144,30 +145,37 @@ async function main() {
     tokenClaimed = true;
     if (await checkpoint('after-token-claim')) { finalizePreSpawnInterruption(); return; }
     rawStdout = join(quarantine, `${token}.stdout.raw`); rawStderr = join(quarantine, `${token}.stderr.raw`);
-  try {
-    assertPacketOwnedDirectory(rootPath, quarantine, [0o700]);
-    assertCaptureDestinations(rootPath, stageId, token);
-    if (await checkpoint('before-capture-creation')) { finalizePreSpawnInterruption(); return; }
-    stdoutFd = openExclusivePacketFile(rootPath, rawStdout); stderrFd = openExclusivePacketFile(rootPath, rawStderr);
-    if (await checkpoint('after-capture-open')) { finalizePreSpawnInterruption(); return; }
-  } catch {
-    cleanupRaw();
-    updateExecutionToken(rootPath, token, 'failed_before_execution', { commandResult: { exit_kind: 'not_started', exit_code: null, signal_name: null, signal_number: null }, harnessResult: harnessResult('capture_setup_failure', 'capture_setup_failure') });
-    process.exitCode = EXIT.capture; return;
-  }
+    try {
+      assertPacketOwnedDirectory(rootPath, quarantine, [0o700]);
+      assertCaptureDestinations(rootPath, stageId, token);
+      if (await checkpoint('before-capture-creation')) { finalizePreSpawnInterruption(); return; }
+      stdoutFd = openExclusivePacketFile(rootPath, rawStdout); stderrFd = openExclusivePacketFile(rootPath, rawStderr);
+      if (await checkpoint('after-capture-open')) { finalizePreSpawnInterruption(); return; }
+    } catch {
+      cleanupRaw();
+      const notStarted = { exit_kind: 'not_started', exit_code: null, signal_name: null, signal_number: null };
+      updateExecutionToken(rootPath, token, 'failed_before_execution', { commandResult: notStarted, harnessResult: harnessResult('capture_setup_failure', 'capture_setup_failure') });
+      recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, 'failed_before_execution', notStarted);
+      process.exitCode = EXIT.capture; return;
+    }
 
-  if (await checkpoint('before-command-started')) { finalizePreSpawnInterruption(); return; }
+    if (await checkpoint('before-command-started')) { finalizePreSpawnInterruption(); return; }
 
-  let limitClass = null; let stdoutBytes = 0; let stderrBytes = 0; let combinedBytes = 0; let stdoutLineBytes = 0; let stderrLineBytes = 0; let closed = false;
+    let limitClass = null; let stdoutBytes = 0; let stderrBytes = 0; let combinedBytes = 0; let stdoutLineBytes = 0; let stderrLineBytes = 0; let closed = false;
 
   const closeResult = await new Promise((resolveClose) => {
+    let timer;
     try { child = spawn(command, args, { detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: process.env }); }
     catch { resolveClose({ code: null, signal: null, spawnError: true }); return; }
+    let spawnError = false; child.once('error', () => { spawnError = true; });
+    if (child.pid === undefined) {
+      child.once('close', (code, signal) => { if (timer) clearTimeout(timer); closed = true; resolveClose({ code, signal, spawnError: true }); });
+      return;
+    }
     const startedAt = utcNow(); const head = verifyEventChain(rootPath).head;
     appendEvent(rootPath, head, { stage_id: stageId, event_id: `${token}-started`, event_type: 'command_started', action_timestamp: startedAt, archive_timestamp: null, command_category: commandCategory, expected_result: expectedResult, observed_result: 'started', result_classification: 'started', exit_code: null, sanitized_artifact_paths: [] });
     updateExecutionToken(rootPath, token, 'started');
     void checkpoint('after-child-spawn').then((signal) => { if (signal) void terminateGroup(child, signal.name); });
-    let spawnError = false; child.once('error', () => { spawnError = true; });
     const consume = (stream, descriptor, kind) => stream.on('data', (chunk) => {
       if (closed || limitClass) return;
       const nextKind = (kind === 'stdout' ? stdoutBytes : stderrBytes) + chunk.length; const nextCombined = combinedBytes + chunk.length;
@@ -178,7 +186,7 @@ async function main() {
       if (kind === 'stdout') { stdoutBytes = nextKind; stdoutLineBytes = lineBytes; } else { stderrBytes = nextKind; stderrLineBytes = lineBytes; }
     });
     consume(child.stdout, stdoutFd, 'stdout'); consume(child.stderr, stderrFd, 'stderr');
-    const timer = setTimeout(() => { limitClass = 'runtime_timeout'; void terminateGroup(child); }, runtimeMs);
+    timer = setTimeout(() => { limitClass = 'runtime_timeout'; void terminateGroup(child); }, runtimeMs);
     child.once('close', (code, signal) => { clearTimeout(timer); closed = true; resolveClose({ code, signal, spawnError }); });
   });
   fsyncSync(stdoutFd); fsyncSync(stderrFd); closeSync(stdoutFd); closeSync(stderrFd); stdoutFd = undefined; stderrFd = undefined;
@@ -229,13 +237,13 @@ async function main() {
     ]);
   } catch {
     for (const path of paths) safeUnlink(path); updateExecutionToken(rootPath, token, 'harness_failed_after_execution', { commandResult, harnessResult: harnessResult('harness_failed', 'artifact_promotion_failure') });
-    recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, 'harness_failed', commandResult); process.exitCode = EXIT.evidence; return;
+    recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, 'harness_failed_after_execution', commandResult, [], 'harness_failed'); process.exitCode = EXIT.evidence; return;
   }
 
   const mismatch = expectedRows !== null && stdoutSanitized.split('\n').filter((line) => line === `affected_rows=${expectedRows}`).length !== 1;
   const state = mismatch ? 'harness_failed_after_execution' : (closeResult.signal ? 'signaled' : (closeResult.code === 0 ? 'completed' : 'command_failed')); updateExecutionToken(rootPath, token, state, { commandResult, harnessResult: harnessResult(mismatch ? 'affected_rows_mismatch' : 'evidence_complete', mismatch ? 'affected_rows_mismatch' : 'evidence_complete') });
   const artifactPaths = [stdoutName, stderrName, stdoutSummaryName, stderrSummaryName].map((name) => `stages/${stageId}/artifacts/${name}`);
-  recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, mismatch ? 'affected_rows_mismatch' : (closeResult.code === 0 ? 'passed' : state), commandResult, artifactPaths);
+  recordTerminalEvent(rootPath, stageId, token, commandCategory, expectedResult, state, commandResult, artifactPaths, mismatch ? 'affected_rows_mismatch' : null);
   process.exitCode = mismatch ? EXIT.evidence : (commandResult.exit_kind === 'signal' ? 128 + commandResult.signal_number : commandResult.exit_code);
   } finally {
     for (const [name, listener] of listeners) process.off(name, listener);

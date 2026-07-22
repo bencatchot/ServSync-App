@@ -72,7 +72,7 @@ test('execution tokens are atomic and retries require a new explicitly authorize
       commandResult: { exit_kind: 'normal', exit_code: 0, signal_name: null, signal_number: null },
       harnessResult: { classification: 'completed', detail: 'evidence_retained', wrapper_signal: null, forwarded_signal: null },
     });
-    const retry = claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1', retryAuthorization: 'approval-retry' });
+    const retry = claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'token-2', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'token-1', retryAuthorization: 'review:retry' });
     assert.equal(retry.retry.retry_count, 1);
     assert.throws(() => updateExecutionToken(packet.root, 'token-1', 'started'), /transition/i);
   } finally { packet.cleanup(); }
@@ -84,11 +84,11 @@ test('retry lineage rejects reused authorization, cycles, and cross-operation to
   try {
     claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'original', commandCategory: 'fake', expectedResult: 'completed' });
     updateExecutionToken(packet.root, 'original', 'started'); updateExecutionToken(packet.root, 'original', 'completed', completed);
-    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-one', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'approval-one' });
-    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-two', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'approval-one' }), /already used/i);
-    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'self', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'self', retryAuthorization: 'approval-two' }), /distinct prior token/i);
+    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-one', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'review:one' });
+    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'retry-two', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'original', retryAuthorization: 'review:one' }), /already used/i);
+    assert.throws(() => claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'self', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'self', retryAuthorization: 'review:two' }), /distinct prior token/i);
     writeFileSync(join(other.root, 'tokens', 'foreign.json'), readFileSync(join(packet.root, 'tokens', 'original.json')), { mode: 0o600 });
-    assert.throws(() => claimExecutionToken(other.root, { stageId: 'stage-1', token: 'retry-foreign', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'foreign', retryAuthorization: 'approval-three' }), /operation|schema/i);
+    assert.throws(() => claimExecutionToken(other.root, { stageId: 'stage-1', token: 'retry-foreign', commandCategory: 'fake', expectedResult: 'completed', retryOf: 'foreign', retryAuthorization: 'review:three' }), /operation|schema/i);
   } finally { packet.cleanup(); other.cleanup(); }
 });
 
@@ -103,6 +103,6 @@ test('later stages are separate and cannot replace an existing stage', () => {
 test('operation initialization refuses a packet inside a Git worktree', () => {
   assert.throws(() => initializeOperation(join(repoRoot, 'controlled-ops-packet-should-not-exist'), {
     operationId: 'operation-test-git', operationClassification: 'local-test', targetClassification: 'local-fixture',
-    authorizationReference: 'test-authorization',
+    authorizationReference: 'task:local',
   }), /outside Git/i);
 });

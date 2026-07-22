@@ -8,14 +8,14 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   appendEvent, claimExecutionToken, createManifest, freezeStage, initializeOperation, registerArtifact, sealOperation,
-  readEvents, verifyEventChain, verifyPacket,
+  readEvents, updateExecutionToken, verifyEventChain, verifyPacket,
 } from '../../scripts/controlled-ops/evidence.mjs';
-import { GENESIS_HASH, LIMITS, canonicalStringify, readJson } from '../../scripts/controlled-ops/internal.mjs';
+import { GENESIS_HASH, LIMITS, canonicalStringify, readJson, sha256 } from '../../scripts/controlled-ops/internal.mjs';
 import { createSanitizationSummary } from '../../scripts/controlled-ops/sanitize.mjs';
 import { evidenceCli, fakeCommand, makePacket, runWrapper, wrapperPath, writeSafeArtifact } from './helpers.mjs';
 
 function stageEvent(packet) {
-  appendEvent(packet.root, GENESIS_HASH, {
+  appendEvent(packet.root, verifyEventChain(packet.root).head, {
     stage_id: 'stage-1', event_id: 'stage-complete', event_type: 'stage_completed', action_timestamp: new Date().toISOString(),
     archive_timestamp: null, command_category: null, expected_result: 'completed', observed_result: 'completed',
     result_classification: 'passed', exit_code: null, sanitized_artifact_paths: [],
@@ -27,6 +27,33 @@ function prepareStage(packet) {
   registerArtifact(packet.root, 'stage-1', 'evidence.txt', 'test_evidence', summary);
   registerArtifact(packet.root, 'stage-1', summaryName, 'sanitization_summary');
   stageEvent(packet);
+}
+
+function rewriteEvents(root, events) {
+  let previous = GENESIS_HASH;
+  const rewritten = events.map((event, index) => {
+    const withoutHash = {
+      ...event,
+      sequence: index + 1,
+      previous_event_hash: previous,
+    };
+    delete withoutHash.current_event_hash;
+    const current = { ...withoutHash, current_event_hash: sha256(`${previous}\n${canonicalStringify(withoutHash)}`) };
+    previous = current.current_event_hash;
+    return current;
+  });
+  writeFileSync(join(root, 'events.ndjson'), `${rewritten.map((event) => canonicalStringify(event)).join('\n')}\n`, { mode: 0o600 });
+}
+
+function terminalTokenWithoutEvent(packet, token, state = 'failed_before_execution') {
+  claimExecutionToken(packet.root, { stageId: 'stage-1', token, commandCategory: 'fake', expectedResult: 'completed' });
+  const notStarted = { exit_kind: 'not_started', exit_code: null, signal_name: null, signal_number: null };
+  updateExecutionToken(packet.root, token, state, {
+    commandResult: notStarted,
+    harnessResult: state === 'interrupted'
+      ? { classification: 'interrupted', detail: 'pre_spawn_interruption', wrapper_signal: 'SIGTERM', forwarded_signal: 'SIGTERM' }
+      : { classification: 'capture_setup_failure', detail: 'capture_setup_failure', wrapper_signal: null, forwarded_signal: null },
+  });
 }
 
 function processExists(pid) {
@@ -92,7 +119,8 @@ test('artifact-parent symlink swap after preflight is revalidated before promoti
     rmSync(artifactDirectory, { recursive: true }); symlinkSync(external, artifactDirectory);
     const exit = await new Promise((resolve) => wrapper.once('exit', resolve)); assert.equal(exit, 93);
     assert.deepEqual(readdirSync(external), []); assert.deepEqual(readdirSync(join(packet.root, 'quarantine')), []);
-    assert.equal(readJson(join(packet.root, 'tokens', 'swap.json')).state, 'harness_failed_after_execution');
+    assert.equal(readJson(join(packet.root, 'tokens', 'swap.json')).state, 'started');
+    assert.throws(() => verifyPacket(packet.root), /unresolved/i);
   } finally { packet.cleanup(); }
 });
 
@@ -101,7 +129,7 @@ test('operation initialization rejects a symlinked parent component', () => {
   try {
     mkdirSync(actual, { mode: 0o700 }); symlinkSync(actual, linked);
     assert.throws(() => initializeOperation(join(linked, 'new-packet'), {
-      operationId: 'symlink-parent', operationClassification: 'local-test', targetClassification: 'local-fixture', authorizationReference: 'test-authorization',
+      operationId: 'symlink-parent', operationClassification: 'local-test', targetClassification: 'local-fixture', authorizationReference: 'task:local',
     }), /symlink/i);
   } finally { packet.cleanup(); }
 });
@@ -134,6 +162,122 @@ test('unresolved token and unknown administrative-prefix file block integrity op
     writeFileSync(join(second.root, '.controlled-ops-forged'), 'status=ok\n', { mode: 0o600 });
     assert.throws(() => createManifest(second.root), /unclassified/i);
   } finally { second.cleanup(); }
+});
+
+test('terminal token states require exactly one matching terminal timeline event', () => {
+  for (const [state, token] of [['failed_before_execution', 'fbexec'], ['interrupted', 'intr']]) {
+    const packet = makePacket();
+    try {
+      prepareStage(packet);
+      terminalTokenWithoutEvent(packet, token, state);
+      assert.throws(() => verifyPacket(packet.root), /terminal event|timeline/i);
+      assert.throws(() => freezeStage(packet.root, 'stage-1'), /terminal event|timeline/i);
+      assert.throws(() => createManifest(packet.root), /terminal event|timeline/i);
+      assert.throws(() => sealOperation(packet.root), /terminal event|timeline/i);
+    } finally { packet.cleanup(); }
+  }
+});
+
+test('terminal timeline event mismatches and duplicate completed events fail closed', () => {
+  const invalidMutations = ['duplicate', 'wrong-stage', 'wrong-state', 'wrong-exit'];
+  for (const mutation of invalidMutations) {
+    const packet = makePacket();
+    try {
+      const result = runWrapper(packet.root, `token-${mutation}`, ['clean']);
+      assert.equal(result.status, 0, result.stderr);
+      prepareStage(packet);
+      const events = readEvents(packet.root);
+      const terminalIndex = events.findIndex((event) => event.event_id === `token-${mutation}-completed`);
+      assert.notEqual(terminalIndex, -1);
+      if (mutation === 'duplicate') events.push({ ...events[terminalIndex] });
+      if (mutation === 'wrong-stage') events[terminalIndex] = { ...events[terminalIndex], stage_id: 'stage-other' };
+      if (mutation === 'wrong-state') events[terminalIndex] = { ...events[terminalIndex], observed_result: 'command_failed', result_classification: 'command_failed' };
+      if (mutation === 'wrong-exit') events[terminalIndex] = { ...events[terminalIndex], exit_code: 7 };
+      rewriteEvents(packet.root, events);
+      assert.throws(() => verifyPacket(packet.root), /timeline|duplicate|sequence|context|classification|exit/i);
+      assert.throws(() => createManifest(packet.root), /timeline|duplicate|sequence|context|classification|exit/i);
+      assert.throws(() => sealOperation(packet.root), /timeline|duplicate|sequence|context|classification|exit/i);
+    } finally { packet.cleanup(); }
+  }
+});
+
+test('pre-execution terminal token rejects fake command-started evidence', () => {
+  const packet = makePacket();
+  try {
+    prepareStage(packet);
+    terminalTokenWithoutEvent(packet, 'pre-exec-start', 'failed_before_execution');
+    const head = verifyEventChain(packet.root).head;
+    appendEvent(packet.root, head, {
+      stage_id: 'stage-1', event_id: 'pre-exec-start-started', event_type: 'command_started', action_timestamp: new Date().toISOString(),
+      archive_timestamp: null, command_category: 'fake', expected_result: 'completed', observed_result: 'started',
+      result_classification: 'started', exit_code: null, sanitized_artifact_paths: [],
+    });
+    const secondHead = verifyEventChain(packet.root).head;
+    appendEvent(packet.root, secondHead, {
+      stage_id: 'stage-1', event_id: 'pre-exec-start-completed', event_type: 'command_completed', action_timestamp: new Date().toISOString(),
+      archive_timestamp: null, command_category: 'fake', expected_result: 'completed', observed_result: 'failed_before_execution',
+      result_classification: 'failed_before_execution', exit_code: null, sanitized_artifact_paths: [],
+    });
+    assert.throws(() => verifyPacket(packet.root), /start evidence/i);
+    assert.throws(() => createManifest(packet.root), /start evidence/i);
+    assert.throws(() => sealOperation(packet.root), /start evidence/i);
+  } finally { packet.cleanup(); }
+});
+
+test('terminal event cannot complete a nonterminal token packet', () => {
+  const packet = makePacket();
+  try {
+    prepareStage(packet);
+    claimExecutionToken(packet.root, { stageId: 'stage-1', token: 'still-claimed', commandCategory: 'fake', expectedResult: 'completed' });
+    const head = verifyEventChain(packet.root).head;
+    appendEvent(packet.root, head, {
+      stage_id: 'stage-1', event_id: 'still-claimed-completed', event_type: 'command_completed', action_timestamp: new Date().toISOString(),
+      archive_timestamp: null, command_category: 'fake', expected_result: 'completed', observed_result: 'failed_before_execution',
+      result_classification: 'failed_before_execution', exit_code: null, sanitized_artifact_paths: [],
+    });
+    assert.throws(() => verifyPacket(packet.root), /unresolved/i);
+    assert.throws(() => freezeStage(packet.root, 'stage-1'), /unresolved/i);
+    assert.throws(() => createManifest(packet.root), /unresolved/i);
+    assert.throws(() => sealOperation(packet.root), /unresolved/i);
+  } finally { packet.cleanup(); }
+});
+
+test('real pre-execution terminal paths emit terminal events before packet completion', () => {
+  const scenarios = [
+    ['capture-fail', () => {
+      const packet = makePacket();
+      symlinkSync(join(packet.parent, 'external.txt'), join(packet.root, 'quarantine', 'capture-fail.stdout.raw'));
+      writeFileSync(join(packet.parent, 'external.txt'), 'unchanged\n', { mode: 0o600 });
+      return packet;
+    }, ['clean']],
+    ['spawn-fail', () => makePacket(), [join(process.execPath, 'not-a-command')]],
+  ];
+  for (const [token, packetFactory, commandArguments] of scenarios) {
+    const packet = packetFactory();
+    try {
+      const result = token === 'spawn-fail'
+        ? runWrapper(packet.root, token, [], ['--', ...commandArguments])
+        : runWrapper(packet.root, token, commandArguments);
+      assert.equal(result.status, 91);
+      const tokenRecord = readJson(join(packet.root, 'tokens', `${token}.json`));
+      assert.equal(tokenRecord.state, 'failed_before_execution');
+      const terminalEvents = readEvents(packet.root).filter((event) => event.event_id === `${token}-completed`);
+      assert.equal(terminalEvents.length, 1);
+      assert.equal(terminalEvents[0].observed_result, 'failed_before_execution');
+    } finally { packet.cleanup(); }
+  }
+});
+
+test('valid terminal token and event packet can freeze, manifest, seal, and verify', () => {
+  const packet = makePacket();
+  try {
+    assert.equal(runWrapper(packet.root, 'valid-token', ['clean']).status, 0);
+    prepareStage(packet);
+    freezeStage(packet.root, 'stage-1');
+    createManifest(packet.root);
+    const sealed = sealOperation(packet.root);
+    assert.equal(verifyPacket(packet.root, sealed.seal_sha256).status, 'verified');
+  } finally { packet.cleanup(); }
 });
 
 test('forged sanitization summaries and arbitrary fingerprints fail closed', () => {
@@ -279,7 +423,7 @@ test('wrapper SIGHUP retains exact wrapper, forwarded, and child signal provenan
 });
 
 test('high-entropy caller-authored metadata is rejected at creation, verification, manifest, and seal', () => {
-  const packet = makePacket(); const opaque = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4';
+  const packet = makePacket(); const opaque = 'auth-a1b2c3d4e5f6g7h8i9j0k1l2m3n4';
   try {
     assert.throws(() => initializeOperation(join(packet.parent, 'bad-auth'), {
       operationId: 'operation-bad-auth', operationClassification: 'local-test', targetClassification: 'local-fixture',
@@ -299,6 +443,52 @@ test('high-entropy caller-authored metadata is rejected at creation, verificatio
   } finally { packet.cleanup(); }
 });
 
+test('authorization and retry references reject opaque variants at creation time', () => {
+  const invalid = [
+    'auth-a1b2c3d4e5f6g7h8i9j0k1l2m3n4',
+    'task:a1b2c3d4e5f6g7h8i9j0',
+    'review:ab12-cd34-ef56-gh78',
+    'ticket:abcdefabcdefabcd',
+    'issue:eyJhbGciOiJIUzI1NiJ9',
+    'owner:synthetic-customer-test@example',
+  ];
+  for (const reference of invalid) {
+    const packet = makePacket();
+    try {
+      assert.throws(() => initializeOperation(join(packet.parent, `bad-${invalid.indexOf(reference)}`), {
+        operationId: 'operation-bad-reference', operationClassification: 'local-test', targetClassification: 'local-fixture',
+        authorizationReference: reference,
+      }), /authorization reference|caller metadata|human-readable/i);
+      assert.equal(runWrapper(packet.root, 'original', ['clean']).status, 0);
+      assert.throws(() => claimExecutionToken(packet.root, {
+        stageId: 'stage-1', token: 'retry-bad', commandCategory: 'fake-command', expectedResult: 'completed',
+        retryOf: 'original', retryAuthorization: reference,
+      }), /retry authorization|caller metadata|human-readable/i);
+    } finally { packet.cleanup(); }
+  }
+});
+
+test('low-entropy authorization and retry references remain compatible', () => {
+  for (const reference of ['owner:approved', 'ticket:323', 'issue:fb020', 'review:security', 'task:reaudit', 'change:local']) {
+    const type = reference.split(':')[0];
+    const packet = makePacket('stage-1', `op-${type}`);
+    try {
+      initializeOperation(join(packet.parent, `packet-${type}`), {
+        operationId: `op-${type}-extra`,
+        operationClassification: 'local-test',
+        targetClassification: 'local-fixture',
+        authorizationReference: reference,
+      });
+      assert.equal(runWrapper(packet.root, 'original', ['clean']).status, 0);
+      const retry = claimExecutionToken(packet.root, {
+        stageId: 'stage-1', token: `retry-${reference.split(':')[0]}`, commandCategory: 'fake-command', expectedResult: 'completed',
+        retryOf: 'original', retryAuthorization: reference,
+      });
+      assert.equal(retry.retry.authorization_reference, reference);
+    } finally { packet.cleanup(); }
+  }
+});
+
 test('operation root rejects controls, unicode separators, and non-NFC input before filesystem access', () => {
   const packet = makePacket();
   const invalidRoots = ['bad\nroot', 'bad\rroot', 'bad\troot', `bad${String.fromCharCode(0x7f)}root`, `bad${String.fromCharCode(0x85)}root`, 'bad\u2028root', 'bad\u2029root', 'cafe\u0301'];
@@ -307,7 +497,7 @@ test('operation root rejects controls, unicode separators, and non-NFC input bef
       const root = join(packet.parent, leaf);
       assert.throws(() => initializeOperation(root, {
         operationId: 'bad-root', operationClassification: 'local-test', targetClassification: 'local-fixture',
-        authorizationReference: 'test-authorization',
+        authorizationReference: 'task:local',
       }), /operation root|unsafe/i);
       assert.equal(existsSync(root), false);
     }

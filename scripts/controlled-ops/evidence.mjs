@@ -37,6 +37,16 @@ const TOKEN_FIELDS = ['schema_version', 'operation_id', 'stage_id', 'token', 'co
 const WRAPPER_SIGNALS = new Set(['SIGINT', 'SIGTERM', 'SIGHUP']);
 const SEAL_SCHEMA = 'servsync-controlled-ops/seal-v2';
 const FREEZE_SCHEMA = 'servsync-controlled-ops/stage-freeze-v2';
+const TERMINAL_EVENT_EXPECTATIONS = Object.freeze({
+  completed: { observed: new Set(['passed']), exitKinds: new Set(['normal']), artifacts: 'required', startedEvent: 'required' },
+  command_failed: { observed: new Set(['command_failed']), exitKinds: new Set(['normal']), artifacts: 'required', startedEvent: 'required' },
+  signaled: { observed: new Set(['signaled']), exitKinds: new Set(['signal']), artifacts: 'required', startedEvent: 'required' },
+  sanitizer_failed: { observed: new Set(['sanitizer_failed']), exitKinds: new Set(['normal', 'signal']), artifacts: 'forbidden', startedEvent: 'required' },
+  interrupted: { observed: new Set(['interrupted']), exitKinds: new Set(['not_started', 'normal', 'signal']), artifacts: 'forbidden', startedEvent: 'allowed' },
+  failed_before_execution: { observed: new Set(['failed_before_execution']), exitKinds: new Set(['not_started']), artifacts: 'forbidden', startedEvent: 'forbidden' },
+  harness_failed_after_execution: { observed: new Set(['harness_failed', 'affected_rows_mismatch']), exitKinds: new Set(['normal', 'signal']), artifacts: 'allowed', startedEvent: 'required' },
+  limit_exceeded: { observed: new Set(['limit_exceeded']), exitKinds: new Set(['signal']), artifacts: 'forbidden', startedEvent: 'required' },
+});
 
 function parseOptions(arguments_) {
   const options = { positional: [] };
@@ -189,13 +199,53 @@ function validateToken(token, metadata) {
   return token;
 }
 
+function eventExitCode(commandResult) {
+  if (commandResult?.exit_kind === 'normal') return commandResult.exit_code;
+  if (commandResult?.exit_kind === 'signal') return 128 + commandResult.signal_number;
+  return null;
+}
+
+export function terminalObservedResultForState(state, detail = null) {
+  const expectation = TERMINAL_EVENT_EXPECTATIONS[state];
+  if (!expectation) throw new EvidenceError('INVALID_TOKEN', 'Terminal token state has no event mapping.');
+  const observed = state === 'completed' ? 'passed'
+    : (state === 'harness_failed_after_execution' ? (detail === 'affected_rows_mismatch' ? 'affected_rows_mismatch' : 'harness_failed') : state);
+  if (!expectation.observed.has(observed)) throw new EvidenceError('INVALID_TOKEN', 'Terminal token state cannot emit the requested result.');
+  return observed;
+}
+
+function verifyTerminalEventBinding(token, events) {
+  const expectation = TERMINAL_EVENT_EXPECTATIONS[token.state];
+  if (!expectation) throw new EvidenceError('INVALID_TOKEN', 'Terminal token state has no event mapping.');
+  const startedEvents = events.filter((event) => event.event_id === `${token.token}-started`);
+  const terminalEvents = events.filter((event) => event.event_id === `${token.token}-completed`);
+  if (terminalEvents.length !== 1) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} must have exactly one terminal event.`);
+  if (expectation.startedEvent === 'required' && startedEvents.length !== 1) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} lacks required start evidence.`);
+  if (expectation.startedEvent === 'forbidden' && startedEvents.length !== 0) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} has impossible start evidence.`);
+  if (expectation.startedEvent === 'allowed' && startedEvents.length > 1) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} has duplicate start evidence.`);
+  if (token.started_at !== null && startedEvents.length !== 1) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} lacks required start evidence.`);
+  if (token.started_at === null && startedEvents.length !== 0) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} has start evidence without a started token timestamp.`);
+  const terminal = terminalEvents[0];
+  if (terminal.event_type !== 'command_completed' || terminal.stage_id !== token.stage_id || terminal.command_category !== token.command_category || terminal.expected_result !== token.expected_result) {
+    throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} terminal event does not match token context.`);
+  }
+  if (!expectation.observed.has(terminal.observed_result) || terminal.result_classification !== terminal.observed_result) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} terminal event classification is incompatible.`);
+  if (!expectation.exitKinds.has(token.command_result?.exit_kind) || terminal.exit_code !== eventExitCode(token.command_result)) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} terminal event exit evidence is incompatible.`);
+  if (expectation.artifacts === 'required' && terminal.sanitized_artifact_paths.length === 0) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} terminal event lacks required artifacts.`);
+  if (expectation.artifacts === 'forbidden' && terminal.sanitized_artifact_paths.length !== 0) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} terminal event has forbidden artifacts.`);
+  if (token.state === 'interrupted') {
+    const signal = token.harness_result?.wrapper_signal;
+    if (token.command_result.exit_kind === 'not_started' && signal === null) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} interruption lacks wrapper signal provenance.`);
+  }
+}
+
 function verifyTokensUnlocked(root, metadata) {
-  const tokens = []; const retryAuthorizations = new Set(); const eventIds = new Set(readEvents(root).map((event) => event.event_id));
+  const tokens = []; const retryAuthorizations = new Set(); const events = readEvents(root);
   for (const file of readDirectorySorted(operationPaths(root).tokens)) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}\.json$/.test(file)) throw new EvidenceError('UNCLASSIFIED_FILE', 'Token directory contains an unexpected file.');
     const token = validateToken(readCanonicalJsonFile(join(operationPaths(root).tokens, file)), metadata);
     if (!TERMINAL_TOKEN_STATES.has(token.state)) throw new EvidenceError('UNRESOLVED_TOKEN', `Execution token ${token.token} is unresolved in state ${token.state}.`);
-    if (token.started_at !== null && (!eventIds.has(`${token.token}-started`) || !eventIds.has(`${token.token}-completed`))) throw new EvidenceError('INCOMPLETE_TOKEN_TIMELINE', `Execution token ${token.token} lacks required terminal timeline evidence.`);
+    verifyTerminalEventBinding(token, events);
     if (token.retry) {
       if (retryAuthorizations.has(token.retry.authorization_reference)) throw new EvidenceError('DUPLICATE_RETRY_AUTHORIZATION', 'Retry authorization is reused.'); retryAuthorizations.add(token.retry.authorization_reference);
       if (token.retry.prior_token === token.token) throw new EvidenceError('RETRY_CYCLE', 'Retry token cannot reference itself.');

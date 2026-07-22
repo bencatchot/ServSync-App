@@ -18,7 +18,7 @@ export function makePacket(stageId = 'stage-1', operationId = 'operation-test-1'
     operationId,
     operationClassification: 'local-test',
     targetClassification: 'local-fixture',
-    authorizationReference: 'test-authorization',
+    authorizationReference: 'task:local',
     createdAt: new Date(Date.now() - 5_000).toISOString(),
   });
   createStage(root, stageId);
