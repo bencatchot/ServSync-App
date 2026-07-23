@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { importBrowserJournal, verifyBrowserSummary } from '../../scripts/controlled-ops/browser-importer.mjs';
+import {
+  createStandaloneBrowserEvidenceSession,
+  createStandaloneBrowserJournalWriter,
+  importStandaloneBrowserJournal,
+  verifyBrowserSummary,
+} from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter, readJournal } from '../../scripts/controlled-ops/browser-journal.mjs';
 import { buildBrowserRecord } from '../../scripts/controlled-ops/browser-schema.mjs';
 import { GENESIS_HASH, canonicalStringify } from '../../scripts/controlled-ops/internal.mjs';
@@ -28,7 +33,7 @@ test('journal root rejects symlinks and unknown sibling files', () => {
 
     rmSync(journal);
     mkdirSync(journal, { mode: 0o700 });
-    const writer = createJournalWriter(journal);
+    const writer = createJournalWriter(journal, { journalAuthSecret: 'b'.repeat(64), provenanceMode: 'standalone' });
     writer.append({ record_type: 'browser_run_started', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:00.000Z' });
     writer.append({ record_type: 'browser_run_completed', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000 });
     writer.close();
@@ -69,13 +74,14 @@ test('summary creation refuses preexisting leaves and unsafe output artifacts', 
     const summaryRoot = join(parent, 'summary');
     const outputRoot = join(parent, 'output');
     for (const path of [journalRoot, summaryRoot, outputRoot]) mkdirSync(path, { mode: 0o700 });
-    const writer = createJournalWriter(journalRoot);
-    writer.append({ record_type: 'browser_run_started', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:00.000Z' });
-    writer.append({ record_type: 'browser_run_completed', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000 });
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    writer.append({ record_type: 'browser_run_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.000Z' });
+    writer.append({ record_type: 'browser_run_completed', run_id: session.runId, timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000 });
     writer.close();
-    const summaryPath = join(summaryRoot, 'browser-summary.json');
+    const summaryPath = session.summaryPath;
     writeFileSync(summaryPath, '', { mode: 0o600 });
-    assert.throws(() => importBrowserJournal({ journalPath: writer.journalPath, summaryPath, outputRoot }), hasCode('PREEXISTING_BROWSER_SUMMARY'));
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), hasCode('PREEXISTING_BROWSER_SUMMARY'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

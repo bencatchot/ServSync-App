@@ -242,8 +242,8 @@ export function validateBrowserRecord(record) {
     if (record.worker_index !== null || record.retry_index !== null || record.spec_path !== null || record.test_id !== null || record.attempt_id !== null || record.safe_label !== null || record.duration_ms === null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser run-complete record contains invalid fields.');
     }
-    if (record.provenance_mode === 'generated_workspace' && record.run_auth_tag === null) {
-      throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Generated browser journals require an authenticated terminal record.');
+    if (record.run_auth_tag === null) {
+      throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Browser journals require an authenticated terminal record.');
     }
   } else if (record.record_type === 'browser_test_started') {
     if (record.worker_index !== 0 || record.retry_index === null || record.spec_path === null || record.test_id === null || record.attempt_id === null || record.safe_label === null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none' || record.run_auth_tag !== null) {
@@ -260,10 +260,6 @@ export function validateBrowserRecord(record) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser test-complete record contains invalid fields.');
     }
   }
-  if (record.provenance_mode === 'standalone' && record.run_auth_tag !== null) {
-    throw new EvidenceError('INVALID_BROWSER_AUTH_TAG', 'Standalone browser journals must not contain generated auth tags.');
-  }
-
   for (const value of [record.spec_path, record.safe_label, record.status, record.error_classification].filter(Boolean)) scanBrowserString(value, 'browser retained string');
   return record;
 }

@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { importBrowserJournal, verifyBrowserSummary } from '../../scripts/controlled-ops/browser-importer.mjs';
+import {
+  createStandaloneBrowserEvidenceSession,
+  createStandaloneBrowserJournalWriter,
+  importBrowserJournal,
+  importStandaloneBrowserJournal,
+  verifyBrowserSummary,
+} from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
 import { attemptIdFor, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
 
@@ -16,9 +22,7 @@ function hasCode(code) {
   return (error) => error?.code === code;
 }
 
-function writeValidJournal(root) {
-  const writer = createJournalWriter(root);
-  const runId = 'browser-run-local';
+function writeValidJournal(writer, runId) {
   const specPath = 'tests/controlled-ops/browser-pilot/pilot.spec.ts';
   const safeLabel = 'synthetic-form-submit';
   const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
@@ -32,29 +36,24 @@ function writeValidJournal(root) {
   return writer.journalPath;
 }
 
-test('browser importer creates one canonical sanitized summary', () => {
+test('standalone browser importer creates one canonical sanitized summary through an authenticated session', () => {
   const parent = makeDir('servsync-browser-importer-');
   try {
-    const journalRoot = join(parent, 'journal');
-    const summaryRoot = join(parent, 'summary');
-    const outputRoot = join(parent, 'output');
-    for (const path of [journalRoot, summaryRoot, outputRoot]) {
-      mkdirSync(path, { mode: 0o700 });
-      chmodSync(path, 0o700);
-    }
-    const journalPath = writeValidJournal(journalRoot);
-    const summaryPath = join(summaryRoot, 'browser-summary.json');
-    const result = importBrowserJournal({ journalPath, summaryPath, outputRoot, generatedAt: '2026-07-22T15:00:02.000Z' });
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    const journalPath = writeValidJournal(writer, session.runId);
+    const result = importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle, generatedAt: '2026-07-22T15:00:02.000Z' });
     assert.equal(result.summary.status, 'passed');
     assert.equal(result.summary.counts.started, 1);
-    assert.deepEqual(verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath }), result.summary);
-    assert.equal(readFileSync(summaryPath, 'utf8').endsWith('\n'), true);
+    assert.deepEqual(verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), result.summary);
+    assert.equal(readFileSync(session.summaryPath, 'utf8').endsWith('\n'), true);
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), /already exists|provenance/i);
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
 });
 
-test('browser importer rejects incomplete journals and prohibited artifacts', () => {
+test('path-based browser import is verification-only and never creates a summary', () => {
   const parent = makeDir('servsync-browser-importer-bad-');
   try {
     const journalRoot = join(parent, 'journal');
@@ -64,13 +63,17 @@ test('browser importer rejects incomplete journals and prohibited artifacts', ()
       mkdirSync(path, { mode: 0o700 });
       chmodSync(path, 0o700);
     }
-    const journalPath = writeValidJournal(journalRoot);
+    const writer = createJournalWriter(journalRoot, { journalAuthSecret: 'a'.repeat(64), provenanceMode: 'standalone' });
+    const journalPath = writeValidJournal(writer, 'browser-run-local');
+    const summaryPath = join(summaryRoot, 'browser-summary.json');
     writeFileSync(join(outputRoot, 'screenshot.png'), 'not-image', { mode: 0o600 });
-    assert.throws(() => importBrowserJournal({ journalPath, summaryPath: join(summaryRoot, 'browser-summary.json'), outputRoot }), hasCode('PROHIBITED_BROWSER_ARTIFACT'));
+    assert.throws(() => importBrowserJournal({ journalPath, summaryPath, outputRoot }), hasCode('BROWSER_PATH_IMPORT_DISABLED'));
+    assert.equal(existsSync(summaryPath), false);
     rmSync(join(outputRoot, 'screenshot.png'));
     const journalContent = readFileSync(journalPath, 'utf8').split('\n').slice(0, -2).join('\n') + '\n';
     writeFileSync(journalPath, journalContent, { mode: 0o600 });
-    assert.throws(() => importBrowserJournal({ journalPath, summaryPath: join(summaryRoot, 'browser-summary.json'), outputRoot }), hasCode('BROWSER_INCOMPLETE_JOURNAL'));
+    assert.throws(() => importBrowserJournal({ journalPath, summaryPath, outputRoot }), hasCode('BROWSER_PATH_IMPORT_DISABLED'));
+    assert.equal(existsSync(summaryPath), false);
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

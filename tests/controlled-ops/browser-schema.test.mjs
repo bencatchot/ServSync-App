@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   BROWSER_LIMITS,
+  BROWSER_JOURNAL_SCHEMA,
   BROWSER_SUMMARY_SCHEMA,
   BROWSER_TOOL_VERSION,
   attemptIdFor,
   buildBrowserRecord,
+  computeBrowserRunAuthTag,
   parseBrowserJournal,
   testIdFor,
   validateBrowserSafeLabel,
@@ -25,13 +27,37 @@ function makeJournal() {
     run_id: 'browser-run-local',
     timestamp: '2026-07-22T15:00:00.000Z',
   });
-  const completed = buildBrowserRecord(started.current_record_hash, {
+  const completedInput = {
     sequence: 2,
     record_type: 'browser_run_completed',
     run_id: 'browser-run-local',
     timestamp: '2026-07-22T15:00:01.000Z',
     status: 'passed',
     duration_ms: 1000,
+  };
+  const completed = buildBrowserRecord(started.current_record_hash, {
+    ...completedInput,
+    run_auth_tag: computeBrowserRunAuthTag('f'.repeat(64), {
+      schema_version: BROWSER_JOURNAL_SCHEMA,
+      sequence: completedInput.sequence,
+      record_type: completedInput.record_type,
+      run_id: completedInput.run_id,
+      provenance_mode: 'standalone',
+      timestamp: completedInput.timestamp,
+      target_classification: 'local',
+      project: 'chromium',
+      worker_index: null,
+      retry_index: null,
+      spec_path: null,
+      test_id: null,
+      attempt_id: null,
+      safe_label: null,
+      status: completedInput.status,
+      duration_ms: completedInput.duration_ms,
+      error_classification: 'none',
+      run_auth_tag: null,
+      previous_record_hash: started.current_record_hash,
+    }),
   });
   return `${canonicalStringify(started)}\n${canonicalStringify(completed)}\n`;
 }

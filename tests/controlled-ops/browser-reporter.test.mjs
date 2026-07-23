@@ -28,6 +28,7 @@ test('controlled-ops reporter writes a strict local lifecycle journal', async ()
       });
       const reporter = new ControlledOpsBrowserReporter({
         descriptorPath: launch.descriptorPath,
+        journalAuthSecret: launch.journalAuthSecret,
         journalRoot,
         nonce: launch.nonce,
         baseURL: 'http://127.0.0.1:43210',
