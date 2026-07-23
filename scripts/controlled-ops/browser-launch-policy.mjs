@@ -268,6 +268,14 @@ export function assertReporterReady({ descriptorPath, nonce, expectedReporterPid
 export function createBrowserEgressGuard(baseURL) {
   const allowed = new URL(validateBrowserUrl(baseURL));
   let violations = 0;
+  const decisionCounts = {
+    invalid: 0,
+    rejected_external: 0,
+    alternate_port: 0,
+    websocket: 0,
+    worker: 0,
+    other: 0,
+  };
   const check = (value) => {
     let target;
     try {
@@ -275,6 +283,7 @@ export function createBrowserEgressGuard(baseURL) {
       target = new URL(value);
     } catch {
       violations += 1;
+      decisionCounts.invalid += 1;
       return false;
     }
     const allowedTarget = target.protocol === 'http:'
@@ -283,11 +292,18 @@ export function createBrowserEgressGuard(baseURL) {
       && !target.username
       && !target.password
       && !target.hash;
-    if (!allowedTarget) violations += 1;
+    if (!allowedTarget) {
+      violations += 1;
+      if (target.hostname === allowed.hostname && target.port !== allowed.port) decisionCounts.alternate_port += 1;
+      else decisionCounts.rejected_external += 1;
+    }
     return allowedTarget;
   };
   return {
     shouldAllow: check,
+    recordRejectedWebSocket() { decisionCounts.websocket += 1; },
+    recordRejectedWorker() { decisionCounts.worker += 1; },
+    getDecisionCounts() { return { ...decisionCounts }; },
     get violationCount() { return violations; },
   };
 }

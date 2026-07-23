@@ -20,6 +20,69 @@ function hasCode(code) {
   return (error) => error?.code === code;
 }
 
+function zero(keys) {
+  return Object.fromEntries(keys.map((key) => [key, 0]));
+}
+
+function emptyObservability() {
+  return {
+    console: {
+      total_count: 0,
+      type_counts: zero(['log', 'info', 'warning', 'error', 'debug', 'trace', 'other']),
+      severity_counts: zero(['debug', 'info', 'warning', 'error', 'other']),
+      safe_message_class_counts: zero(['synthetic_safe', 'unclassified']),
+      rejected_sensitive_count: 0,
+      rejected_customer_content_count: 0,
+      invalid_event_count: 0,
+      overflow_count: 0,
+      late_event_count: 0,
+      listener_error_count: 0,
+      first_observed_utc: null,
+      last_observed_utc: null,
+      completeness_status: 'complete',
+      collector_failure_class: 'none',
+    },
+    page_error: {
+      total_count: 0,
+      error_kind_counts: zero(['error', 'dom_exception', 'thrown_primitive', 'thrown_object', 'unknown']),
+      safe_message_class_counts: zero(['synthetic_safe', 'unclassified']),
+      stack_present_count: 0,
+      origin_class_counts: zero(['local_page', 'unknown']),
+      duplicate_count: 0,
+      rejected_sensitive_count: 0,
+      rejected_customer_content_count: 0,
+      invalid_event_count: 0,
+      overflow_count: 0,
+      late_event_count: 0,
+      listener_error_count: 0,
+      first_observed_utc: null,
+      last_observed_utc: null,
+      completeness_status: 'complete',
+      collector_failure_class: 'none',
+    },
+    network: {
+      total_requests: 0,
+      method_class_counts: zero(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'OTHER']),
+      origin_class_counts: zero(['exact_local_origin', 'rejected_external', 'invalid', 'non_http_special']),
+      route_class_counts: zero(['root', 'submit', 'health', 'redirect', 'redirect_target', 'static_asset', 'unknown_static', 'unknown_dynamic']),
+      resource_type_counts: zero(['document', 'stylesheet', 'image', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other']),
+      navigation_count: 0,
+      subresource_count: 0,
+      status_class_counts: zero(['1xx', '2xx', '3xx', '4xx', '5xx', 'no_response']),
+      failure_class_counts: zero(['blocked_by_policy', 'aborted', 'connection', 'timeout', 'other', 'unknown']),
+      redirect_count: 0,
+      rejected_egress_class_counts: zero(['invalid', 'rejected_external', 'alternate_port', 'websocket', 'worker', 'other']),
+      websocket_attempt_count: 0,
+      worker_attempt_count: 0,
+      overflow_count: 0,
+      late_event_count: 0,
+      listener_error_count: 0,
+      completeness_status: 'complete',
+      collector_failure_class: 'none',
+    },
+  };
+}
+
 function makeJournal() {
   const started = buildBrowserRecord(GENESIS_HASH, {
     sequence: 1,
@@ -55,6 +118,9 @@ function makeJournal() {
       status: completedInput.status,
       duration_ms: completedInput.duration_ms,
       error_classification: 'none',
+      console_aggregate: null,
+      page_error_aggregate: null,
+      network_aggregate: null,
       run_auth_tag: null,
       previous_record_hash: started.current_record_hash,
     }),
@@ -126,7 +192,20 @@ test('browser summary validates reconciled counts and safe identifiers', () => {
       duration_ms: 900,
       error_classification: 'none',
       step_count: 3,
+      observability: emptyObservability(),
     }],
+    observability: {
+      completeness_status: 'complete',
+      totals: {
+        console_total: 0,
+        page_error_total: 0,
+        network_total: 0,
+        overflow_total: 0,
+        rejected_sensitive_total: 0,
+        rejected_customer_content_total: 0,
+        collector_failure_total: 0,
+      },
+    },
     prohibited_artifacts: { screenshots: 0, traces: 0, videos: 0, hars: 0, html_reports: 0, storage_states: 0 },
   };
   summary.tests[0].attempt_id = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });

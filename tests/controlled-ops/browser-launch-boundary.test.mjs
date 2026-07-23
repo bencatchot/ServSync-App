@@ -27,6 +27,7 @@ import {
 } from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
 import { attemptIdFor, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
+import { createEmptyBrowserObservabilityAggregates } from '../../scripts/controlled-ops/browser-collectors.mjs';
 import { startBrowserLocalServer } from './fixtures/browser-local-server.mjs';
 
 const repoRoot = resolve('.');
@@ -98,8 +99,12 @@ function writeFailedSupportedJournal(workspace) {
   const safeLabel = 'synthetic-form-submit';
   const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
   const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
+  const observability = createEmptyBrowserObservabilityAggregates();
   writer.append({ record_type: 'browser_run_started', run_id: runId, timestamp: '2026-07-22T16:00:00.000Z' });
   writer.append({ record_type: 'browser_test_started', run_id: runId, timestamp: '2026-07-22T16:00:00.100Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel });
+  writer.append({ record_type: 'browser_console_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.500Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, console_aggregate: observability.console_aggregate });
+  writer.append({ record_type: 'browser_page_error_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.600Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, page_error_aggregate: observability.page_error_aggregate });
+  writer.append({ record_type: 'browser_network_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.700Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, network_aggregate: observability.network_aggregate });
   writer.append({ record_type: 'browser_test_completed', run_id: runId, timestamp: '2026-07-22T16:00:00.900Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, status: 'failed', duration_ms: 800, error_classification: 'assertion' });
   writer.append({ record_type: 'browser_run_completed', run_id: runId, timestamp: '2026-07-22T16:00:01.000Z', status: 'failed', duration_ms: 1000, error_classification: 'assertion' });
   writer.close();

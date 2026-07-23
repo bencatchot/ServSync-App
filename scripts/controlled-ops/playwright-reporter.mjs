@@ -1,5 +1,13 @@
 import { relative } from 'node:path';
 import {
+  BROWSER_OBSERVABILITY_ATTACHMENT_NAME,
+  BROWSER_OBSERVABILITY_MIME_TYPE,
+  parseBrowserObservabilityAttachment,
+  validateConsoleAggregate,
+  validateNetworkAggregate,
+  validatePageErrorAggregate,
+} from './browser-collectors.mjs';
+import {
   BROWSER_LIMITS,
   attemptIdFor,
   testIdFor,
@@ -125,6 +133,43 @@ export default class ControlledOpsBrowserReporter {
   onTestEnd(test, result) {
     const start = this.testStarts.get(test.id);
     if (!start) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser test ended before test start.');
+    const observability = this.#validatedObservabilityAttachment(result, start);
+    this.writer.append({
+      record_type: 'browser_console_summary',
+      run_id: this.runId,
+      timestamp: utcNow(),
+      worker_index: start.workerIndex,
+      retry_index: start.retryIndex,
+      spec_path: start.specPath,
+      test_id: start.testId,
+      attempt_id: start.attemptId,
+      safe_label: start.safeLabel,
+      console_aggregate: observability.console_aggregate,
+    });
+    this.writer.append({
+      record_type: 'browser_page_error_summary',
+      run_id: this.runId,
+      timestamp: utcNow(),
+      worker_index: start.workerIndex,
+      retry_index: start.retryIndex,
+      spec_path: start.specPath,
+      test_id: start.testId,
+      attempt_id: start.attemptId,
+      safe_label: start.safeLabel,
+      page_error_aggregate: observability.page_error_aggregate,
+    });
+    this.writer.append({
+      record_type: 'browser_network_summary',
+      run_id: this.runId,
+      timestamp: utcNow(),
+      worker_index: start.workerIndex,
+      retry_index: start.retryIndex,
+      spec_path: start.specPath,
+      test_id: start.testId,
+      attempt_id: start.attemptId,
+      safe_label: start.safeLabel,
+      network_aggregate: observability.network_aggregate,
+    });
     const status = mapStatus(result.status);
     const errorClass = classifyError(status, result.error);
     validateDuration(result.duration, 'browser test duration');
@@ -142,6 +187,31 @@ export default class ControlledOpsBrowserReporter {
       duration_ms: result.duration,
       error_classification: errorClass,
     });
+  }
+
+  #validatedObservabilityAttachment(result, start) {
+    const attachments = (result.attachments ?? []).filter((attachment) => attachment.name === BROWSER_OBSERVABILITY_ATTACHMENT_NAME);
+    if (attachments.length !== 1) {
+      throw new EvidenceError('BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser test requires exactly one controlled observability attachment.');
+    }
+    const attachment = attachments[0];
+    if (attachment.contentType !== BROWSER_OBSERVABILITY_MIME_TYPE || attachment.path || !Buffer.isBuffer(attachment.body)) {
+      throw new EvidenceError('BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser observability attachment must be body-backed with the expected media type.');
+    }
+    const envelope = parseBrowserObservabilityAttachment(attachment.body);
+    if (envelope.run_id !== this.runId
+      || envelope.test_id !== start.testId
+      || envelope.attempt_id !== start.attemptId
+      || envelope.worker_index !== start.workerIndex
+      || envelope.retry_index !== start.retryIndex
+      || envelope.spec_path !== start.specPath
+      || envelope.safe_label !== start.safeLabel) {
+      throw new EvidenceError('BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser observability attachment identity does not match the test attempt.');
+    }
+    validateConsoleAggregate(envelope.console_aggregate);
+    validatePageErrorAggregate(envelope.page_error_aggregate);
+    validateNetworkAggregate(envelope.network_aggregate);
+    return envelope;
   }
 
   onEnd(result) {

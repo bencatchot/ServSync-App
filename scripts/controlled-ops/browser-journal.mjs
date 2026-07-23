@@ -121,6 +121,9 @@ export function createJournalWriter(root, { journalAuthSecret = null, allowPrepa
         status: recordInput.status ?? null,
         duration_ms: recordInput.duration_ms ?? null,
         error_classification: recordInput.error_classification ?? 'none',
+        console_aggregate: recordInput.console_aggregate ?? null,
+        page_error_aggregate: recordInput.page_error_aggregate ?? null,
+        network_aggregate: recordInput.network_aggregate ?? null,
         run_auth_tag: null,
         previous_record_hash: previousHash,
       };

@@ -115,6 +115,26 @@ export function startBrowserLocalServer(options = {}) {
     }
     if (request.method === 'GET') {
       if (rejectBodylessRequest(request, response)) return;
+      if (url.pathname === '/redirect') {
+        response.writeHead(302, {
+          location: '/redirect-target',
+          'cache-control': 'no-store',
+        });
+        response.end('');
+        return;
+      }
+      if (url.pathname === '/health' || url.pathname === '/redirect-target') {
+        boundedResponse(response, 200, 'ok');
+        return;
+      }
+      if (url.pathname === '/static/pilot.css') {
+        response.writeHead(200, {
+          'content-type': 'text/css; charset=utf-8',
+          'cache-control': 'no-store',
+        });
+        response.end('body{font-family:sans-serif}');
+        return;
+      }
       if (url.pathname === '/' || url.pathname === '/favicon.ico') {
         response.writeHead(url.pathname === '/' ? 200 : 204, {
           'content-type': url.pathname === '/' ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
