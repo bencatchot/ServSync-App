@@ -70,6 +70,12 @@ export function scanSensitiveContent(input, { includeEntropy = true } = {}) {
       && !/^[A-Z][A-Z0-9_]{2,63}$/.test(candidate)
       && !/^servsync-controlled-ops\/[a-z0-9-]+-v\d+$/.test(candidate)
       && !/^retain-seal-sha256-outside-packet$/.test(candidate)
+      && !/^browser_freeze_verification$/.test(candidate)
+      && !/^packet_recovery_without_global_workspace_absence_proof$/.test(candidate)
+      && !/^(?:browser_summary|browser_import_summary)_(?:relative_path|path|sha256|bytes)$/.test(candidate)
+      && !/^(?:promotion_event_(?:id|hash)|event_chain_head_at_verification|verification_(?:utc|status)|cleanup_assurance|privacy_scan)$/.test(candidate)
+      && !/^(?:secret_findings|customer_content_findings|prohibited_retained_artifact_findings|files_scanned)$/.test(candidate)
+      && !/^(?:packet_sanitization_status|browser_workspace_cleanup_status|source_manifest_digest|source_binding_mode|current_source_snapshot)$/.test(candidate)
       && !/^(?:stages\/[a-z0-9-]+\/artifacts\/)?[a-z0-9][a-z0-9.-]{0,80}\.(?:txt|json|ndjson)$/.test(candidate)
       && entropyBitsPerCharacter(candidate) >= 4.0);
     if (suspicious.length > 0) findings.push({ classification: 'high_entropy_value', count: suspicious.length, disposition: 'reject' });

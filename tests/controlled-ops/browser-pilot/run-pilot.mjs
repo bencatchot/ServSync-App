@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -21,8 +21,11 @@ import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journa
 import { PACKET_LOCK_NAME, canonicalStringify } from '../../../scripts/controlled-ops/internal.mjs';
 import {
   createStage,
+  createManifest,
   freezeStage,
   initializeOperation,
+  sealOperation,
+  verifyPacket,
 } from '../../../scripts/controlled-ops/evidence.mjs';
 import { readCanonicalJsonFile } from '../../../scripts/controlled-ops/manifest.mjs';
 import { BROWSER_WORKFLOW_COMMAND_CATEGORY } from '../../../scripts/controlled-ops/browser-schema.mjs';
@@ -72,6 +75,17 @@ function removeEmptyGeneratedOutputDirectories(root) {
       throw new Error('Playwright generated a non-empty output directory.');
     }
     rmdirSync(path);
+  }
+}
+
+function makeWritable(path) {
+  if (!existsSync(path)) return;
+  const info = lstatSync(path);
+  if (info.isDirectory() && !info.isSymbolicLink()) {
+    chmodSync(path, 0o700);
+    for (const name of readdirSync(path)) makeWritable(join(path, name));
+  } else if (!info.isSymbolicLink()) {
+    chmodSync(path, 0o600);
   }
 }
 
@@ -372,12 +386,11 @@ async function runPacketBoundPilot() {
     if (existsSync(join(packetRoot, 'manifest.json')) || existsSync(join(packetRoot, 'seal.json')) || existsSync(join(packetRoot, 'stages', stageId, 'stage-freeze.json'))) {
       throw new Error('Controlled-ops packet-bound browser pilot unexpectedly froze, manifested, or sealed the packet.');
     }
-    try {
-      freezeStage(packetRoot, stageId);
-      throw new Error('Controlled-ops packet-bound browser pilot did not block generic freeze.');
-    } catch (error) {
-      if (error?.code !== 'BROWSER_VERIFICATION_DEFERRED') throw error;
-    }
+    const freeze = freezeStage(packetRoot, stageId);
+    if (freeze.lifecycle !== 'workflow-frozen') throw new Error('Controlled-ops packet-bound browser pilot did not workflow-freeze browser evidence.');
+    createManifest(packetRoot);
+    const sealed = sealOperation(packetRoot);
+    if (verifyPacket(packetRoot, sealed.seal_sha256).status !== 'verified') throw new Error('Controlled-ops packet-bound browser pilot packet verification failed.');
     process.stdout.write('controlled-ops packet-bound browser pilot passed\n');
   } catch (error) {
     runError = error;
@@ -395,6 +408,7 @@ async function runPacketBoundPilot() {
     } catch (cleanupError) {
       if (!runError) runError = cleanupError;
     }
+    makeWritable(parent);
     rmSync(parent, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
   }
   if (runError) throw runError;
