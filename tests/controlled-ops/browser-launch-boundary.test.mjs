@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import {
   PROHIBITED_BROWSER_ENV_NAMES,
@@ -11,6 +11,7 @@ import {
   BROWSER_LAUNCH_TOOL_VERSION,
   createBrowserLaunchContract,
   createBrowserEgressGuard,
+  validateBrowserSourceManifest,
   writeReporterReady,
 } from '../../scripts/controlled-ops/browser-launch-policy.mjs';
 import { canonicalStringify, GENESIS_HASH, sha256, utcNow } from '../../scripts/controlled-ops/internal.mjs';
@@ -26,7 +27,8 @@ import {
   recordBrowserReporterReady,
 } from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
-import { attemptIdFor, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
+import { attemptIdFor, computeBrowserRunAuthTag, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
+import { createEmptyBrowserObservabilityAggregates } from '../../scripts/controlled-ops/browser-collectors.mjs';
 import { startBrowserLocalServer } from './fixtures/browser-local-server.mjs';
 
 const repoRoot = resolve('.');
@@ -59,13 +61,21 @@ function run(command, args, options) {
   });
 }
 
-function writeCompleteJournal(root, { runId = 'browser-run-local', journalAuthSecret = null, allowPrepared = false, status = 'passed', provenanceMode = null } = {}) {
+function writeCompleteJournal(root, { runId = 'browser-run-local', journalAuthSecret = null, allowPrepared = false, status = 'passed', provenanceMode = null, sourceManifestDigest = null } = {}) {
+  const effectiveProvenanceMode = provenanceMode ?? (journalAuthSecret ? null : 'standalone');
   const writer = createJournalWriter(root, {
     allowPrepared,
     journalAuthSecret: journalAuthSecret ?? 'c'.repeat(64),
-    provenanceMode: provenanceMode ?? (journalAuthSecret ? null : 'standalone'),
+    provenanceMode: effectiveProvenanceMode,
   });
-  writer.append({ record_type: 'browser_run_started', run_id: runId, timestamp: '2026-07-22T16:00:00.000Z' });
+  writer.append({
+    record_type: 'browser_run_started',
+    run_id: runId,
+    timestamp: '2026-07-22T16:00:00.000Z',
+    ...(journalAuthSecret || effectiveProvenanceMode === 'generated_workspace'
+      ? { source_binding_mode: 'current_source_snapshot', source_manifest_digest: sourceManifestDigest }
+      : {}),
+  });
   writer.append({ record_type: 'browser_run_completed', run_id: runId, timestamp: '2026-07-22T16:00:01.000Z', status, duration_ms: 1000 });
   writer.close();
   return writer.journalPath;
@@ -86,6 +96,7 @@ function writeSupportedJournal(workspace, options = {}) {
     journalAuthSecret: launch.journalAuthSecret,
     runId: launch.descriptor.run_id,
     status: options.status ?? 'passed',
+    sourceManifestDigest: launch.descriptor.source_manifest_digest,
   });
   return { journalPath, launch };
 }
@@ -98,8 +109,18 @@ function writeFailedSupportedJournal(workspace) {
   const safeLabel = 'synthetic-form-submit';
   const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
   const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
-  writer.append({ record_type: 'browser_run_started', run_id: runId, timestamp: '2026-07-22T16:00:00.000Z' });
+  const observability = createEmptyBrowserObservabilityAggregates();
+  writer.append({
+    record_type: 'browser_run_started',
+    run_id: runId,
+    source_binding_mode: 'current_source_snapshot',
+    source_manifest_digest: launch.descriptor.source_manifest_digest,
+    timestamp: '2026-07-22T16:00:00.000Z',
+  });
   writer.append({ record_type: 'browser_test_started', run_id: runId, timestamp: '2026-07-22T16:00:00.100Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel });
+  writer.append({ record_type: 'browser_console_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.500Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, console_aggregate: observability.console_aggregate });
+  writer.append({ record_type: 'browser_page_error_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.600Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, page_error_aggregate: observability.page_error_aggregate });
+  writer.append({ record_type: 'browser_network_summary', run_id: runId, timestamp: '2026-07-22T16:00:00.700Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, network_aggregate: observability.network_aggregate });
   writer.append({ record_type: 'browser_test_completed', run_id: runId, timestamp: '2026-07-22T16:00:00.900Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, status: 'failed', duration_ms: 800, error_classification: 'assertion' });
   writer.append({ record_type: 'browser_run_completed', run_id: runId, timestamp: '2026-07-22T16:00:01.000Z', status: 'failed', duration_ms: 1000, error_classification: 'assertion' });
   writer.close();
@@ -116,6 +137,7 @@ function setupCompleteWorkspace(root, prefix = 'servsync-browser-race-') {
     allowPrepared: true,
     journalAuthSecret: launch.journalAuthSecret,
     runId: launch.descriptor.run_id,
+    sourceManifestDigest: launch.descriptor.source_manifest_digest,
   });
   importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
   return { workspace, launch };
@@ -125,6 +147,19 @@ function makeSummaryPath(root, name) {
   const summaryRoot = join(root, name);
   mkdir700(summaryRoot);
   return join(summaryRoot, 'browser-summary.json');
+}
+
+function writeSnapshotSource(root, collectorContent = 'export const value = 1;\n') {
+  const files = {
+    'scripts/controlled-ops/browser-collectors.mjs': collectorContent,
+    'tests/controlled-ops/browser-pilot/controlled-ops-test.ts': 'export const fixture = true;\n',
+    'tests/controlled-ops/browser-pilot/pilot.spec.ts': 'export const spec = true;\n',
+  };
+  for (const [relativePath, content] of Object.entries(files)) {
+    const path = join(root, ...relativePath.split('/'));
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    writeFileSync(path, content, { mode: 0o600 });
+  }
 }
 
 function rewriteJournalProvenanceMode(path, mode, { terminalAuthTag } = {}) {
@@ -140,6 +175,26 @@ function rewriteJournalProvenanceMode(path, mode, { terminalAuthTag } = {}) {
       withoutCurrentHash.run_auth_tag = terminalAuthTag;
     }
     delete withoutCurrentHash.current_record_hash;
+    const currentHash = sha256(`${previousHash}\n${canonicalStringify(withoutCurrentHash)}`);
+    previousHash = currentHash;
+    return canonicalStringify({ ...withoutCurrentHash, current_record_hash: currentHash });
+  });
+  writeFileSync(path, `${records.join('\n')}\n`, { mode: 0o600 });
+}
+
+function rewriteJournalRecords(path, mutator, { journalAuthSecret = null } = {}) {
+  let previousHash = GENESIS_HASH;
+  const records = readFileSync(path, 'utf8').trimEnd().split('\n').map((line, index) => {
+    const original = JSON.parse(line);
+    const changed = mutator({ ...original }, index);
+    const withoutCurrentHash = {
+      ...changed,
+      previous_record_hash: previousHash,
+    };
+    delete withoutCurrentHash.current_record_hash;
+    if (withoutCurrentHash.record_type === 'browser_run_completed' && journalAuthSecret) {
+      withoutCurrentHash.run_auth_tag = computeBrowserRunAuthTag(journalAuthSecret, withoutCurrentHash);
+    }
     const currentHash = sha256(`${previousHash}\n${canonicalStringify(withoutCurrentHash)}`);
     previousHash = currentHash;
     return canonicalStringify({ ...withoutCurrentHash, current_record_hash: currentHash });
@@ -543,6 +598,7 @@ test('browser provenance is module-private and duplicate importers cannot launde
       allowPrepared: true,
       journalAuthSecret: launch.journalAuthSecret,
       runId: launch.descriptor.run_id,
+      sourceManifestDigest: launch.descriptor.source_manifest_digest,
     });
 
     assert.throws(
@@ -702,9 +758,11 @@ test('authenticated generated workspace import is private, one-time, and standal
   const root = tempRoot();
   try {
     const generated = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-auth-import-' });
-    writeSupportedJournal(generated);
+    const { launch } = writeSupportedJournal(generated);
     const first = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: generated.cleanupHandle });
     assert.equal(first.summary.status, 'passed');
+    assert.equal(first.summary.source_binding_mode, 'current_source_snapshot');
+    assert.equal(first.summary.source_manifest_digest, launch.descriptor.source_manifest_digest);
     assert.throws(() => importGeneratedBrowserWorkspaceJournal({ cleanupHandle: generated.cleanupHandle }), /already exists|provenance/i);
 
     const standaloneSession = createStandaloneBrowserEvidenceSession({ parentRoot: root });
@@ -714,7 +772,32 @@ test('authenticated generated workspace import is private, one-time, and standal
     standaloneWriter.close();
     const standalone = importStandaloneBrowserJournal({ standaloneHandle: standaloneSession.standaloneHandle });
     assert.equal(standalone.summary.status, 'passed');
+    assert.equal(standalone.summary.source_binding_mode, 'none');
+    assert.equal(standalone.summary.source_manifest_digest, null);
     assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: standaloneSession.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('authenticated generated import rejects source-binding drift before summary retention', () => {
+  const root = tempRoot();
+  try {
+    for (const [name, mutate] of [
+      ['missing digest', (record) => record.record_type === 'browser_run_started' ? { ...record, source_manifest_digest: null } : record],
+      ['wrong digest', (record) => record.record_type === 'browser_run_started' ? { ...record, source_manifest_digest: 'e'.repeat(64) } : record],
+      ['standalone source mode', (record) => record.record_type === 'browser_run_started' ? { ...record, source_binding_mode: 'none', source_manifest_digest: null } : record],
+    ]) {
+      const workspace = createBrowserEvidenceWorkspace({ parentRoot: root, prefix: 'servsync-browser-source-binding-' });
+      const { launch } = writeSupportedJournal(workspace);
+      rewriteJournalRecords(workspace.journalPath, mutate, { journalAuthSecret: launch.journalAuthSecret });
+      assert.throws(
+        () => importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle }),
+        (error) => ['INVALID_BROWSER_SOURCE_BINDING', 'BROWSER_CLEANUP_PROVENANCE_MISMATCH'].includes(error?.code),
+        name,
+      );
+      assert.equal(existsSync(workspace.summaryPath), false, name);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -911,6 +994,39 @@ test('browser egress guard enforces exact raw host spelling and port', () => {
     'http://127.0.0.1:99999/',
   ]) {
     assert.equal(guard.shouldAllow(url), false, url);
+  }
+});
+
+test('source snapshot contract captures current bytes and rejects post-contract changes', () => {
+  const root = tempRoot();
+  try {
+    const repo = join(root, 'repo');
+    const launchOne = join(root, 'launch-one');
+    const launchTwo = join(root, 'launch-two');
+    writeSnapshotSource(repo, 'export const value = 1;\n');
+    const first = createBrowserLaunchContract({
+      root: launchOne,
+      baseURL: 'http://127.0.0.1:4100',
+      runLabel: 'synthetic-form-submit',
+      repoRoot: repo,
+    });
+    validateBrowserSourceManifest(first.descriptor.source_manifest, first.descriptor.source_manifest_digest, { repoRoot: repo });
+
+    writeSnapshotSource(repo, 'export const value = 2;\n');
+    const second = createBrowserLaunchContract({
+      root: launchTwo,
+      baseURL: 'http://127.0.0.1:4100',
+      runLabel: 'synthetic-form-submit',
+      repoRoot: repo,
+    });
+    assert.notEqual(first.descriptor.source_manifest_digest, second.descriptor.source_manifest_digest);
+    validateBrowserSourceManifest(second.descriptor.source_manifest, second.descriptor.source_manifest_digest, { repoRoot: repo });
+    assert.throws(
+      () => validateBrowserSourceManifest(first.descriptor.source_manifest, first.descriptor.source_manifest_digest, { repoRoot: repo }),
+      hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

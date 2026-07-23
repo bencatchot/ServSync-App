@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import {
+  createEmptyBrowserObservabilityAggregates,
+} from '../../scripts/controlled-ops/browser-collectors.mjs';
 import {
   createStandaloneBrowserEvidenceSession,
   createStandaloneBrowserJournalWriter,
@@ -13,6 +17,7 @@ import {
 } from '../../scripts/controlled-ops/browser-importer.mjs';
 import { createJournalWriter } from '../../scripts/controlled-ops/browser-journal.mjs';
 import { attemptIdFor, testIdFor } from '../../scripts/controlled-ops/browser-schema.mjs';
+import { canonicalStringify } from '../../scripts/controlled-ops/internal.mjs';
 
 function makeDir(prefix) {
   const root = mkdtempSync(join('/private/tmp', prefix));
@@ -33,9 +38,13 @@ function writeValidJournal(writer, runId) {
   const safeLabel = 'synthetic-form-submit';
   const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
   const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
+  const observability = createEmptyBrowserObservabilityAggregates();
   writer.append({ record_type: 'browser_run_started', run_id: runId, timestamp: '2026-07-22T15:00:00.000Z' });
   writer.append({ record_type: 'browser_test_started', run_id: runId, timestamp: '2026-07-22T15:00:00.100Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel });
   writer.append({ record_type: 'browser_step_completed', run_id: runId, timestamp: '2026-07-22T15:00:00.200Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: 'open-local-page', status: 'passed', duration_ms: 10 });
+  writer.append({ record_type: 'browser_console_summary', run_id: runId, timestamp: '2026-07-22T15:00:00.500Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, console_aggregate: observability.console_aggregate });
+  writer.append({ record_type: 'browser_page_error_summary', run_id: runId, timestamp: '2026-07-22T15:00:00.600Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, page_error_aggregate: observability.page_error_aggregate });
+  writer.append({ record_type: 'browser_network_summary', run_id: runId, timestamp: '2026-07-22T15:00:00.700Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, network_aggregate: observability.network_aggregate });
   writer.append({ record_type: 'browser_test_completed', run_id: runId, timestamp: '2026-07-22T15:00:00.800Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, status: 'passed', duration_ms: 700, error_classification: 'none' });
   writer.append({ record_type: 'browser_run_completed', run_id: runId, timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000, error_classification: 'none' });
   writer.close();
@@ -56,6 +65,8 @@ test('standalone browser importer creates one canonical sanitized summary throug
     const journalPath = writeValidJournal(writer, session.runId);
     const result = importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle, generatedAt: '2026-07-22T15:00:02.000Z' });
     assert.equal(result.summary.status, 'passed');
+    assert.equal(result.summary.source_binding_mode, 'none');
+    assert.equal(result.summary.source_manifest_digest, null);
     assert.equal(result.summary.counts.started, 1);
     assert.deepEqual(verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), result.summary);
     assert.equal(readFileSync(session.summaryPath, 'utf8').endsWith('\n'), true);
@@ -72,6 +83,43 @@ test('standalone browser importer creates one canonical sanitized summary throug
     assert.equal(readFileSync(session.summaryPath, 'utf8').includes('a'.repeat(64)), false);
     assert.equal(finalizeStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'already_finalized');
     assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'already_finalized');
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('standalone browser verifier recomputes summary from journal and rejects tampered aggregates', () => {
+  const parent = makeDir('servsync-browser-verify-recompute-');
+  try {
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    const journalPath = writeValidJournal(writer, session.runId);
+    const result = importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle, generatedAt: '2026-07-22T15:00:02.000Z' });
+    assert.deepEqual(verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), result.summary);
+    const verifier = JSON.parse(execFileSync(process.execPath, [
+      'scripts/controlled-ops/browser-verify.mjs',
+      '--summary',
+      session.summaryPath,
+      '--journal',
+      journalPath,
+    ], { encoding: 'utf8' }));
+    assert.equal(verifier.journal_recomputed, true);
+    assert.equal(verifier.terminal_hmac_authenticated, false);
+    assert.equal(verifier.source_binding_mode, 'none');
+    assert.equal(verifier.source_manifest_digest, null);
+    const tampered = structuredClone(result.summary);
+    tampered.observability.totals.network_total = 1;
+    writeFileSync(session.summaryPath, `${canonicalStringify(tampered)}\n`, { mode: 0o600 });
+    assert.throws(() => verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), hasCode('BROWSER_SOURCE_MISMATCH'));
+    tampered.observability.totals.network_total = 0;
+    tampered.prohibited_artifacts.screenshots = 1;
+    writeFileSync(session.summaryPath, `${canonicalStringify(tampered)}\n`, { mode: 0o600 });
+    assert.throws(() => verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), hasCode('PROHIBITED_BROWSER_ARTIFACT'));
+    tampered.prohibited_artifacts.screenshots = 0;
+    tampered.source_binding_mode = 'current_source_snapshot';
+    tampered.source_manifest_digest = 'a'.repeat(64);
+    writeFileSync(session.summaryPath, `${canonicalStringify(tampered)}\n`, { mode: 0o600 });
+    assert.throws(() => verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), hasCode('BROWSER_SOURCE_MISMATCH'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
@@ -172,6 +220,80 @@ test('path-based browser import is verification-only and never creates a summary
     writeFileSync(journalPath, journalContent, { mode: 0o600 });
     assert.throws(() => importBrowserJournal({ journalPath, summaryPath, outputRoot }), hasCode('BROWSER_PATH_IMPORT_DISABLED'));
     assert.equal(existsSync(summaryPath), false);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('browser journal failed append does not consume the next sequence number', () => {
+  const parent = makeDir('servsync-browser-sequence-');
+  try {
+    const journalRoot = join(parent, 'journal');
+    mkdirSync(journalRoot, { mode: 0o700 });
+    chmodSync(journalRoot, 0o700);
+    const writer = createJournalWriter(journalRoot, { journalAuthSecret: 'a'.repeat(64), provenanceMode: 'standalone' });
+    assert.throws(() => writer.append({ record_type: 'browser_run_started', timestamp: '2026-07-22T15:00:00.000Z' }), (error) => ['INVALID_BROWSER_ID', 'INVALID_CANONICAL_VALUE'].includes(error?.code));
+    writer.append({ record_type: 'browser_run_started', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:00.000Z' });
+    writer.append({ record_type: 'browser_run_completed', run_id: 'browser-run-local', timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000 });
+    writer.close();
+    const content = readFileSync(writer.journalPath, 'utf8').trimEnd().split('\n').map((line) => JSON.parse(line));
+    assert.deepEqual(content.map((record) => record.sequence), [1, 2]);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('trusted browser import rejects attempts missing Slice 2B aggregate summaries', () => {
+  const parent = makeDir('servsync-browser-missing-aggregate-');
+  try {
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    const specPath = 'tests/controlled-ops/browser-pilot/pilot.spec.ts';
+    const safeLabel = 'synthetic-form-submit';
+    const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
+    const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
+    writer.append({ record_type: 'browser_run_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.000Z' });
+    writer.append({ record_type: 'browser_test_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.100Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel });
+    writer.append({ record_type: 'browser_test_completed', run_id: session.runId, timestamp: '2026-07-22T15:00:00.800Z', worker_index: 0, retry_index: 0, spec_path: specPath, test_id: testId, attempt_id: attemptId, safe_label: safeLabel, status: 'passed', duration_ms: 700, error_classification: 'none' });
+    writer.append({ record_type: 'browser_run_completed', run_id: session.runId, timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000, error_classification: 'none' });
+    writer.close();
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), hasCode('BROWSER_INCOMPLETE_JOURNAL'));
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('standalone writer cannot claim current-source snapshot provenance', () => {
+  const parent = makeDir('servsync-browser-standalone-source-binding-');
+  try {
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    assert.throws(() => writer.append({
+      record_type: 'browser_run_started',
+      run_id: session.runId,
+      source_binding_mode: 'current_source_snapshot',
+      source_manifest_digest: 'a'.repeat(64),
+      timestamp: '2026-07-22T15:00:00.000Z',
+    }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
+    writer.append({ record_type: 'browser_run_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.000Z' });
+    writer.append({ record_type: 'browser_run_completed', run_id: session.runId, timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1000 });
+    writer.close();
+    const result = importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle });
+    assert.equal(result.summary.source_binding_mode, 'none');
+    assert.equal(result.summary.source_manifest_digest, null);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('trusted browser import rejects any unexpected retained output-root file', () => {
+  const parent = makeDir('servsync-browser-output-root-');
+  try {
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    writeValidJournal(writer, session.runId);
+    writeFileSync(join(session.outputRoot, 'unexpected.txt'), 'synthetic', { mode: 0o600 });
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), hasCode('PROHIBITED_BROWSER_ARTIFACT'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

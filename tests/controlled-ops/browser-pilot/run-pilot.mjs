@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { existsSync, lstatSync, readdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, rmdirSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -44,6 +44,19 @@ function assertNoNativeArtifacts(root) {
         throw new Error('Playwright output contains an unsafe non-file entry.');
       }
     }
+  }
+}
+
+function removeEmptyGeneratedOutputDirectories(root) {
+  if (!existsSync(root)) return;
+  const entries = readdirSync(root, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const path = join(root, entry.name);
+    if (readdirSync(path).length !== 0) {
+      throw new Error('Playwright generated a non-empty output directory.');
+    }
+    rmdirSync(path);
   }
 }
 
@@ -112,6 +125,7 @@ try {
     throw new Error(`Controlled-ops browser pilot failed with status ${result.status}.`);
   }
   finalizePlaywrightBookkeeping(workspace.outputRoot);
+  removeEmptyGeneratedOutputDirectories(workspace.outputRoot);
   recordBrowserReporterReady({ cleanupHandle: workspace.cleanupHandle });
   assertReporterReady({ descriptorPath: launch.descriptorPath, journalAuthSecret: launch.journalAuthSecret, nonce: launch.nonce });
 
@@ -119,10 +133,38 @@ try {
   const summaryPath = workspace.summaryPath;
   const { summary } = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
   verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath });
+  if (summary.source_binding_mode !== 'current_source_snapshot' || summary.source_manifest_digest !== launch.descriptor.source_manifest_digest) {
+    throw new Error('Controlled-ops browser pilot source snapshot digest did not reconcile.');
+  }
   if (summary.status !== 'passed' || summary.counts.started !== 1 || summary.counts.passed !== 1 || summary.counts.steps !== 3) {
     throw new Error('Controlled-ops browser pilot summary did not reconcile.');
   }
+  if (summary.observability.completeness_status !== 'complete'
+    || summary.observability.totals.console_total !== 1
+    || summary.observability.totals.page_error_total !== 1
+    || summary.observability.totals.network_total !== 5
+    || summary.observability.totals.overflow_total !== 0
+    || summary.observability.totals.rejected_sensitive_total !== 0
+    || summary.observability.totals.rejected_customer_content_total !== 0
+    || summary.observability.totals.collector_failure_total !== 0) {
+    throw new Error('Controlled-ops browser pilot observability summary did not reconcile.');
+  }
+  const [{ observability }] = summary.tests;
+  if (observability.console.safe_message_class_counts.synthetic_safe !== 1
+    || observability.page_error.safe_message_class_counts.synthetic_safe !== 1
+    || observability.network.method_class_counts.GET !== 4
+    || observability.network.method_class_counts.POST !== 1
+    || observability.network.route_class_counts.root !== 1
+    || observability.network.route_class_counts.health !== 1
+    || observability.network.route_class_counts.redirect !== 1
+    || observability.network.route_class_counts.redirect_target !== 1
+    || observability.network.route_class_counts.submit !== 1
+    || observability.network.status_class_counts['2xx'] !== 4
+    || observability.network.status_class_counts['3xx'] !== 1) {
+    throw new Error('Controlled-ops browser pilot aggregate counts were unexpected.');
+  }
   assertNoNativeArtifacts(workspace.outputRoot);
+  removeEmptyGeneratedOutputDirectories(workspace.outputRoot);
   process.stdout.write('controlled-ops browser pilot passed\n');
 } catch (error) {
   runError = error;
@@ -130,6 +172,7 @@ try {
   if (fixture) await fixture.close();
   try {
     finalizePlaywrightBookkeeping(workspace.outputRoot);
+    removeEmptyGeneratedOutputDirectories(workspace.outputRoot);
   } catch (bookkeepingError) {
     if (!runError) runError = bookkeepingError;
   }

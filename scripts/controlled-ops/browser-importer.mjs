@@ -43,8 +43,14 @@ import {
   testIdFor,
   validateGeneratedBrowserId,
   validateDuration,
+  validateBrowserSourceBinding,
   validateSummary,
 } from './browser-schema.mjs';
+import {
+  validateConsoleAggregate,
+  validateNetworkAggregate,
+  validatePageErrorAggregate,
+} from './browser-collectors.mjs';
 import { JOURNAL_FILENAME, createJournalWriter, readJournal } from './browser-journal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
 import { createBrowserLaunchContract } from './browser-launch-policy.mjs';
@@ -315,6 +321,12 @@ function verifyJournalAuthentication(state, records) {
   if (!samePreparedFileIdentity(journalPath, prepared)) provenanceError();
   const terminal = records.at(-1);
   if (!terminal || terminal.record_type !== 'browser_run_completed' || terminal.run_id !== launch.runId) provenanceError();
+  const runStart = records[0];
+  if (runStart.record_type !== 'browser_run_started'
+    || runStart.source_binding_mode !== launch.sourceBindingMode
+    || runStart.source_manifest_digest !== launch.sourceManifestDigest) {
+    provenanceError();
+  }
   const withoutCurrentHash = { ...terminal };
   delete withoutCurrentHash.current_record_hash;
   if (terminal.run_auth_tag !== computeBrowserRunAuthTag(launch.journalAuthSecret, withoutCurrentHash)) provenanceError();
@@ -326,6 +338,8 @@ function verifyStandaloneJournalAuthentication(state, records) {
   const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
   if (!samePreparedFileIdentity(journalPath, prepared)) provenanceError();
   if (records.some((record) => record.run_id !== state.runId)) provenanceError();
+  const runStart = records[0];
+  if (runStart.record_type !== 'browser_run_started' || runStart.source_binding_mode !== 'none' || runStart.source_manifest_digest !== null) provenanceError();
   const terminal = records.at(-1);
   if (!terminal || terminal.record_type !== 'browser_run_completed') provenanceError();
   const withoutCurrentHash = { ...terminal };
@@ -714,6 +728,8 @@ export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, r
     nonceDigest: launch.descriptor.nonce_digest,
     journalAuthDigest: launch.descriptor.journal_auth_digest,
     journalAuthSecret: launch.journalAuthSecret,
+    sourceBindingMode: 'current_source_snapshot',
+    sourceManifestDigest: launch.descriptor.source_manifest_digest,
     descriptorFile: fileProvenance(descriptorPath, BROWSER_LIMITS.summary_bytes),
   };
   state.provenance.reporterReadyPrepared = createPreparedFile(join(state.root, LAUNCH_DIRECTORY, BROWSER_REPORTER_READY_FILENAME));
@@ -820,6 +836,7 @@ function countProhibitedArtifacts(outputRoot) {
     else if (lower.endsWith('.har')) counts.hars += 1;
     else if (lower.endsWith('.html')) counts.html_reports += 1;
     else if (lower.includes('storage') && lower.endsWith('.json')) counts.storage_states += 1;
+    else throw new EvidenceError('PROHIBITED_BROWSER_ARTIFACT', 'Browser output root contains an unexpected retained artifact.');
   };
   visit(root);
   return counts;
@@ -834,36 +851,73 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
   if (records.at(-1).record_type !== 'browser_run_completed') throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Run-completion record must be last.');
   const runId = runStarted[0].run_id;
   if (records.some((record) => record.run_id !== runId)) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser journal contains multiple run IDs.');
+  const sourceBinding = validateBrowserSourceBinding(runStarted[0].source_binding_mode, runStarted[0].source_manifest_digest, { runStart: true });
 
   const starts = new Map();
   const terminals = new Map();
   const stepCounts = new Map();
+  const collectorRecords = new Map();
   const attemptIds = new Set();
+  const openAttempts = new Map();
   for (const record of records.slice(1, -1)) {
     if (record.record_type === 'browser_test_started') {
-      if (starts.has(record.test_id)) throw new EvidenceError('BROWSER_DUPLICATE_ID', 'Duplicate browser test start.');
+      if (starts.has(record.attempt_id)) throw new EvidenceError('BROWSER_DUPLICATE_ID', 'Duplicate browser attempt start.');
       if (attemptIds.has(record.attempt_id)) throw new EvidenceError('BROWSER_DUPLICATE_ID', 'Duplicate browser attempt ID.');
       if (record.test_id !== testIdFor({ specPath: record.spec_path, project: record.project, safeLabel: record.safe_label })) throw new EvidenceError('BROWSER_ID_MISMATCH', 'Browser test ID does not match safe inputs.');
       if (record.attempt_id !== attemptIdFor({ testId: record.test_id, retryIndex: record.retry_index, workerIndex: record.worker_index })) throw new EvidenceError('BROWSER_ID_MISMATCH', 'Browser attempt ID does not match safe inputs.');
-      starts.set(record.test_id, record);
+      starts.set(record.attempt_id, record);
       attemptIds.add(record.attempt_id);
+      openAttempts.set(record.attempt_id, { phase: 'started', collectors: new Set() });
     } else if (record.record_type === 'browser_step_completed') {
-      if (!starts.has(record.test_id)) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser step references a test that has not started.');
-      stepCounts.set(record.test_id, (stepCounts.get(record.test_id) ?? 0) + 1);
-      if (stepCounts.get(record.test_id) > BROWSER_LIMITS.steps_per_test) throw new EvidenceError('BROWSER_STEP_LIMIT', 'Browser step limit exceeded.');
+      const attempt = openAttempts.get(record.attempt_id);
+      if (!attempt || attempt.phase !== 'started') throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser step references an attempt that is not accepting steps.');
+      stepCounts.set(record.attempt_id, (stepCounts.get(record.attempt_id) ?? 0) + 1);
+      if (stepCounts.get(record.attempt_id) > BROWSER_LIMITS.steps_per_test) throw new EvidenceError('BROWSER_STEP_LIMIT', 'Browser step limit exceeded.');
+    } else if (['browser_console_summary', 'browser_page_error_summary', 'browser_network_summary'].includes(record.record_type)) {
+      const attempt = openAttempts.get(record.attempt_id);
+      if (!attempt) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser collector summary references an attempt that has not started.');
+      const requiredOrder = ['browser_console_summary', 'browser_page_error_summary', 'browser_network_summary'];
+      if (record.record_type !== requiredOrder[attempt.collectors.size]) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser collector summary ordering is invalid.');
+      if (attempt.collectors.has(record.record_type)) throw new EvidenceError('BROWSER_DUPLICATE_ID', 'Browser attempt has duplicate collector summary.');
+      const start = starts.get(record.attempt_id);
+      if (!start || record.test_id !== start.test_id || record.retry_index !== start.retry_index || record.worker_index !== start.worker_index || record.spec_path !== start.spec_path || record.safe_label !== start.safe_label) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser collector summary identity does not match its attempt.');
+      const byAttempt = collectorRecords.get(record.attempt_id) ?? {};
+      if (record.record_type === 'browser_console_summary') {
+        validateConsoleAggregate(record.console_aggregate);
+        byAttempt.console = record.console_aggregate;
+      } else if (record.record_type === 'browser_page_error_summary') {
+        validatePageErrorAggregate(record.page_error_aggregate);
+        byAttempt.page_error = record.page_error_aggregate;
+      } else {
+        validateNetworkAggregate(record.network_aggregate);
+        byAttempt.network = record.network_aggregate;
+      }
+      collectorRecords.set(record.attempt_id, byAttempt);
+      attempt.collectors.add(record.record_type);
     } else if (record.record_type === 'browser_test_completed') {
-      if (!starts.has(record.test_id)) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser test completion lacks a start record.');
-      if (terminals.has(record.test_id)) throw new EvidenceError('BROWSER_DUPLICATE_TERMINAL', 'Browser test has duplicate terminal records.');
-      terminals.set(record.test_id, record);
+      const attempt = openAttempts.get(record.attempt_id);
+      if (!attempt) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser test completion lacks a start record.');
+      if (attempt.collectors.size !== 3) throw new EvidenceError('BROWSER_INCOMPLETE_JOURNAL', 'Browser test completion lacks required collector summaries.');
+      if (terminals.has(record.attempt_id)) throw new EvidenceError('BROWSER_DUPLICATE_TERMINAL', 'Browser attempt has duplicate terminal records.');
+      terminals.set(record.attempt_id, record);
+      openAttempts.delete(record.attempt_id);
     } else {
       throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser record appears in an invalid position.');
     }
   }
   if (starts.size > BROWSER_LIMITS.tests_per_run) throw new EvidenceError('BROWSER_TEST_LIMIT', 'Browser test limit exceeded.');
   if (starts.size !== terminals.size) throw new EvidenceError('BROWSER_INCOMPLETE_JOURNAL', 'Every started browser test must have one terminal record.');
+  if (openAttempts.size !== 0) throw new EvidenceError('BROWSER_INCOMPLETE_JOURNAL', 'Browser journal contains an unfinished attempt.');
 
-  const tests = [...starts.values()].sort((left, right) => left.test_id.localeCompare(right.test_id)).map((start) => {
-    const terminal = terminals.get(start.test_id);
+  const tests = [...starts.values()].sort((left, right) => left.attempt_id.localeCompare(right.attempt_id)).map((start) => {
+    const terminal = terminals.get(start.attempt_id);
+    const observability = collectorRecords.get(start.attempt_id);
+    if (!observability?.console || !observability?.page_error || !observability?.network) throw new EvidenceError('BROWSER_INCOMPLETE_JOURNAL', 'Browser observability evidence is incomplete.');
+    for (const aggregate of [observability.console, observability.page_error, observability.network]) {
+      if (aggregate.completeness_status !== 'complete' || aggregate.overflow_count !== 0 || aggregate.listener_error_count !== 0 || aggregate.collector_failure_class !== 'none') {
+        throw new EvidenceError('BROWSER_OBSERVABILITY_INCOMPLETE', 'Browser observability evidence is not trusted complete.');
+      }
+    }
     validateDuration(terminal.duration_ms, 'browser test duration');
     return {
       test_id: start.test_id,
@@ -876,7 +930,8 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
       status: terminal.status,
       duration_ms: terminal.duration_ms,
       error_classification: terminal.error_classification,
-      step_count: stepCounts.get(start.test_id) ?? 0,
+      step_count: stepCounts.get(start.attempt_id) ?? 0,
+      observability,
     };
   });
   const counts = {
@@ -904,19 +959,49 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
     generated_utc: generatedAt,
     source_journal_sha256: sourceDigest,
     run_id: runId,
+    source_binding_mode: sourceBinding.source_binding_mode,
+    source_manifest_digest: sourceBinding.source_manifest_digest,
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
-    retry_limit: 1,
+    retry_limit: BROWSER_LIMITS.retry_index_max,
     started_utc: runStarted[0].timestamp,
     completed_utc: runCompleted[0].timestamp,
     duration_ms: runCompleted[0].duration_ms,
     status: runStatus,
     counts,
     tests,
+    observability: summarizeObservability(tests),
     prohibited_artifacts: prohibited,
   };
   return validateSummary(summary);
+}
+
+function summarizeObservability(tests) {
+  const totals = {
+    console_total: 0,
+    page_error_total: 0,
+    network_total: 0,
+    overflow_total: 0,
+    rejected_sensitive_total: 0,
+    rejected_customer_content_total: 0,
+    collector_failure_total: 0,
+  };
+  for (const test of tests) {
+    totals.console_total += test.observability.console.total_count;
+    totals.page_error_total += test.observability.page_error.total_count;
+    totals.network_total += test.observability.network.total_requests;
+    for (const aggregate of [test.observability.console, test.observability.page_error, test.observability.network]) {
+      totals.overflow_total += aggregate.overflow_count;
+      totals.rejected_sensitive_total += aggregate.rejected_sensitive_count ?? 0;
+      totals.rejected_customer_content_total += aggregate.rejected_customer_content_count ?? 0;
+      totals.collector_failure_total += aggregate.listener_error_count;
+    }
+  }
+  return {
+    completeness_status: totals.overflow_total === 0 && totals.collector_failure_total === 0 ? 'complete' : 'incomplete_collector_error',
+    totals,
+  };
 }
 
 function importTrustedBrowserJournalInternal({ journalPath, summaryPath, outputRoot = null, generatedAt, authenticatedState = null, standaloneState = null } = {}) {
@@ -936,6 +1021,16 @@ function importTrustedBrowserJournalInternal({ journalPath, summaryPath, outputR
     throw new EvidenceError('BROWSER_PROVENANCE_MODE_MISMATCH', 'Authenticated standalone import requires a standalone journal.');
   }
   const summary = reconcile(records, sourceDigest, { outputRoot, generatedAt });
+  if (authenticatedState) {
+    const launch = authenticatedState.provenance.launch;
+    if (!launch
+      || summary.source_binding_mode !== launch.sourceBindingMode
+      || summary.source_manifest_digest !== launch.sourceManifestDigest) {
+      provenanceError();
+    }
+  } else if (standaloneState && (summary.source_binding_mode !== 'none' || summary.source_manifest_digest !== null)) {
+    provenanceError();
+  }
   const content = `${canonicalStringify(summary)}\n`;
   const journalState = authenticatedState ? workspaceJournalRoots.get(dirname(resolve(journalPath))) : null;
   const summaryState = authenticatedState ? workspaceSummaryRoots.get(dirname(resolve(summaryPath))) : null;
@@ -1118,8 +1213,12 @@ export function verifyBrowserSummary(summaryPath, { sourceJournalPath = null } =
   if (content !== `${canonicalStringify(parsed)}\n`) throw new EvidenceError('BROWSER_SUMMARY_NONCANONICAL', 'Browser summary is not canonical JSON.');
   const summary = validateSummary(parsed);
   if (sourceJournalPath) {
-    const { sourceDigest } = readJournal(sourceJournalPath);
+    const { records, sourceDigest } = readJournal(sourceJournalPath);
     if (sourceDigest !== summary.source_journal_sha256) throw new EvidenceError('BROWSER_SOURCE_MISMATCH', 'Browser summary source digest does not match current journal.');
+    const expected = reconcile(records, sourceDigest, { generatedAt: summary.generated_utc });
+    if (canonicalStringify(expected) !== canonicalStringify(summary)) {
+      throw new EvidenceError('BROWSER_SOURCE_MISMATCH', 'Browser summary does not match independently reconciled journal evidence.');
+    }
   }
   return summary;
 }
@@ -1184,7 +1283,15 @@ function runCli() {
     process.stdout.write(`${canonicalStringify({ status: 'imported', summary_path: result.summaryPath, run_status: result.summary.status })}\n`);
   } else if (command === 'verify') {
     const summary = verifyBrowserSummary(required(options, 'summary'), { sourceJournalPath: options.journal ?? null });
-    process.stdout.write(`${canonicalStringify({ status: 'verified', run_status: summary.status, tests: summary.counts.started })}\n`);
+    process.stdout.write(`${canonicalStringify({
+      journal_recomputed: Boolean(options.journal),
+      run_status: summary.status,
+      source_binding_mode: summary.source_binding_mode,
+      source_manifest_digest: summary.source_manifest_digest,
+      status: 'verified',
+      terminal_hmac_authenticated: false,
+      tests: summary.counts.started,
+    })}\n`);
   } else {
     throw new EvidenceError('INVALID_COMMAND', 'Unknown browser importer command.');
   }
