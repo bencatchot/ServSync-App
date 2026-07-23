@@ -29,7 +29,14 @@ import {
   validateTimestamp,
 } from './internal.mjs';
 import { parseStrictJson } from './sanitize.mjs';
-import { validateBrowserLoopbackUrl, validateBrowserUrl } from './browser-schema.mjs';
+import {
+  BROWSER_WORKFLOW_COMMAND_CATEGORY,
+  createBrowserPacketBinding,
+  unboundBrowserPacketBindingFields,
+  validateBrowserLoopbackUrl,
+  validateBrowserPacketBindingFields,
+  validateBrowserUrl,
+} from './browser-schema.mjs';
 
 export const BROWSER_LAUNCH_SCHEMA = 'servsync-controlled-ops/browser-launch-v1';
 export const BROWSER_REPORTER_READY_SCHEMA = 'servsync-controlled-ops/browser-reporter-ready-v1';
@@ -226,7 +233,29 @@ export function assertSupportedLauncherArguments(argv = []) {
   if (argv.length > 0) throw new EvidenceError('UNSUPPORTED_BROWSER_LAUNCH_ARGUMENT', 'Controlled-ops browser launcher does not accept positional arguments or Playwright flags.');
 }
 
-export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot = process.cwd(), sourceManifest = null }) {
+function launchPacketBindingFields({ packetBinding = null, runId, sourceSnapshot }) {
+  if (packetBinding === null) return unboundBrowserPacketBindingFields({ runStart: true });
+  assertExactObject(packetBinding, ['operation_id', 'stage_id', 'execution_token_id', 'command_category'], [], 'browser launch packet binding input');
+  const binding = createBrowserPacketBinding({
+    operationId: packetBinding.operation_id,
+    stageId: packetBinding.stage_id,
+    executionTokenId: packetBinding.execution_token_id,
+    commandCategory: packetBinding.command_category,
+    browserRunId: runId,
+    sourceBindingMode: 'current_source_snapshot',
+    sourceManifestDigest: sourceSnapshot.digest,
+  });
+  return {
+    packet_binding_mode: 'command_token',
+    operation_id: binding.operation_id,
+    stage_id: binding.stage_id,
+    execution_token_id: binding.execution_token_id,
+    command_category: binding.command_category,
+    binding_digest: binding.binding_digest,
+  };
+}
+
+export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot = process.cwd(), sourceManifest = null, packetBinding = null }) {
   const launchRoot = assertMode700Directory(root, 'browser launch root');
   const safeBaseURL = validateBrowserUrl(baseURL);
   const safeRunLabel = validateControlledSlug(runLabel, 'browser run label', { maxLength: 64 });
@@ -236,6 +265,7 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot 
   const nonce = randomBytes(32).toString('hex');
   const journalAuthSecret = randomBytes(32).toString('hex');
   const runId = `browser-run-${randomBytes(12).toString('hex')}`;
+  const packetFields = launchPacketBindingFields({ packetBinding, runId, sourceSnapshot });
   const descriptorPath = join(launchRoot, LAUNCH_DESCRIPTOR_FILENAME);
   const reporterReadyPath = join(launchRoot, REPORTER_READY_FILENAME);
   const descriptor = {
@@ -249,6 +279,7 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot 
     run_label: safeRunLabel,
     source_manifest: sourceSnapshot.manifest,
     source_manifest_digest: sourceSnapshot.digest,
+    ...packetFields,
     reporter_ready_path: reporterReadyPath,
   };
   writeExclusiveJson(launchRoot, descriptorPath, descriptor);
@@ -258,7 +289,7 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot 
 export function readBrowserLaunchDescriptor(descriptorPath) {
   const path = assertLaunchFile(descriptorPath, LAUNCH_DESCRIPTOR_FILENAME);
   const descriptor = readCanonicalJson(path);
-  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'journal_auth_digest', 'base_url', 'run_label', 'source_manifest', 'source_manifest_digest', 'reporter_ready_path'];
+  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'journal_auth_digest', 'base_url', 'run_label', 'source_manifest', 'source_manifest_digest', 'packet_binding_mode', 'operation_id', 'stage_id', 'execution_token_id', 'command_category', 'binding_digest', 'reporter_ready_path'];
   const keys = Object.keys(descriptor).sort();
   if (canonicalStringify(keys) !== canonicalStringify(required.sort())) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor schema is invalid.');
   if (descriptor.schema_version !== BROWSER_LAUNCH_SCHEMA || descriptor.tool_version !== BROWSER_LAUNCH_TOOL_VERSION) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor version is invalid.');
@@ -269,6 +300,23 @@ export function readBrowserLaunchDescriptor(descriptorPath) {
   validateBrowserUrl(descriptor.base_url);
   validateControlledSlug(descriptor.run_label, 'browser run label', { maxLength: 64 });
   validateBrowserSourceManifest(descriptor.source_manifest, descriptor.source_manifest_digest, { verifyCurrentBytes: false });
+  validateBrowserPacketBindingFields({
+    packet_binding_mode: descriptor.packet_binding_mode,
+    operation_id: descriptor.operation_id,
+    stage_id: descriptor.stage_id,
+    execution_token_id: descriptor.execution_token_id,
+    command_category: descriptor.command_category,
+    binding_digest: descriptor.binding_digest,
+  }, {
+    runStart: true,
+    browserRunId: descriptor.run_id,
+    sourceBindingMode: 'current_source_snapshot',
+    sourceManifestDigest: descriptor.source_manifest_digest,
+    provenanceMode: descriptor.packet_binding_mode === 'command_token' ? 'generated_workspace' : 'standalone',
+  });
+  if (descriptor.packet_binding_mode === 'command_token' && descriptor.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY) {
+    throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch packet binding command category is invalid.');
+  }
   const readyPath = resolve(descriptor.reporter_ready_path);
   const root = dirname(path);
   if (dirname(readyPath) !== root || basename(readyPath) !== REPORTER_READY_FILENAME) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser reporter-ready path is invalid.');
