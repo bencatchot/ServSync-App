@@ -37,8 +37,8 @@ export const BROWSER_LAUNCH_TOOL_VERSION = '2a.2.0';
 export const REPORTER_READY_FILENAME = 'browser-reporter-ready.json';
 export const LAUNCH_DESCRIPTOR_FILENAME = 'browser-launch.json';
 export const BROWSER_SOURCE_MANIFEST_SCHEMA = 'servsync-controlled-ops/browser-source-manifest-v1';
-export const APPROVED_BROWSER_SOURCE_ROLES = Object.freeze(['collector_module', 'controlled_fixture', 'pilot_spec']);
-export const APPROVED_BROWSER_SOURCE_PATHS = Object.freeze({
+export const ALLOWLISTED_BROWSER_SOURCE_ROLES = Object.freeze(['collector_module', 'controlled_fixture', 'pilot_spec']);
+export const ALLOWLISTED_BROWSER_SOURCE_PATHS = Object.freeze({
   collector_module: 'scripts/controlled-ops/browser-collectors.mjs',
   controlled_fixture: 'tests/controlled-ops/browser-pilot/controlled-ops-test.ts',
   pilot_spec: 'tests/controlled-ops/browser-pilot/pilot.spec.ts',
@@ -113,10 +113,10 @@ function assertRepoFile(repoRoot, relativePath) {
   return { absolute, relativePath: safePath, sha256: sha256File(absolute, 2 * 1024 * 1024) };
 }
 
-export function createApprovedBrowserSourceManifest({ repoRoot = process.cwd() } = {}) {
+export function createCurrentBrowserSourceSnapshotManifest({ repoRoot = process.cwd() } = {}) {
   const roles = {};
-  for (const role of APPROVED_BROWSER_SOURCE_ROLES) {
-    const entry = assertRepoFile(repoRoot, APPROVED_BROWSER_SOURCE_PATHS[role]);
+  for (const role of ALLOWLISTED_BROWSER_SOURCE_ROLES) {
+    const entry = assertRepoFile(repoRoot, ALLOWLISTED_BROWSER_SOURCE_PATHS[role]);
     roles[role] = {
       path: entry.relativePath,
       sha256: entry.sha256,
@@ -133,19 +133,19 @@ export function createApprovedBrowserSourceManifest({ repoRoot = process.cwd() }
 export function validateBrowserSourceManifest(manifest, expectedDigest = null, { repoRoot = process.cwd(), verifyCurrentBytes = true } = {}) {
   assertExactObject(manifest, ['schema_version', 'roles'], [], 'browser source manifest');
   if (manifest.schema_version !== BROWSER_SOURCE_MANIFEST_SCHEMA) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest schema is invalid.');
-  assertExactObject(manifest.roles, APPROVED_BROWSER_SOURCE_ROLES, [], 'browser source manifest roles');
+  assertExactObject(manifest.roles, ALLOWLISTED_BROWSER_SOURCE_ROLES, [], 'browser source manifest roles');
   const seenPaths = new Set();
-  for (const role of APPROVED_BROWSER_SOURCE_ROLES) {
+  for (const role of ALLOWLISTED_BROWSER_SOURCE_ROLES) {
     const entry = manifest.roles[role];
     assertExactObject(entry, ['path', 'sha256'], [], 'browser source manifest entry');
-    const expectedPath = APPROVED_BROWSER_SOURCE_PATHS[role];
-    if (entry.path !== expectedPath) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest path is not approved.');
+    const expectedPath = ALLOWLISTED_BROWSER_SOURCE_PATHS[role];
+    if (entry.path !== expectedPath) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest path is not allowlisted.');
     if (seenPaths.has(entry.path)) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest contains a duplicate path.');
     seenPaths.add(entry.path);
     if (typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest digest is invalid.');
     if (verifyCurrentBytes) {
       const current = assertRepoFile(repoRoot, entry.path);
-      if (current.sha256 !== entry.sha256) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser source manifest no longer matches approved source bytes.');
+      if (current.sha256 !== entry.sha256) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser source manifest no longer matches the launch-time source snapshot.');
     }
   }
   const digest = sha256(canonicalStringify(manifest));
@@ -230,9 +230,9 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot 
   const launchRoot = assertMode700Directory(root, 'browser launch root');
   const safeBaseURL = validateBrowserUrl(baseURL);
   const safeRunLabel = validateControlledSlug(runLabel, 'browser run label', { maxLength: 64 });
-  const approvedSource = sourceManifest
+  const sourceSnapshot = sourceManifest
     ? validateBrowserSourceManifest(sourceManifest, null, { repoRoot })
-    : createApprovedBrowserSourceManifest({ repoRoot });
+    : createCurrentBrowserSourceSnapshotManifest({ repoRoot });
   const nonce = randomBytes(32).toString('hex');
   const journalAuthSecret = randomBytes(32).toString('hex');
   const runId = `browser-run-${randomBytes(12).toString('hex')}`;
@@ -247,8 +247,8 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot 
     journal_auth_digest: sha256(journalAuthSecret),
     base_url: safeBaseURL,
     run_label: safeRunLabel,
-    source_manifest: approvedSource.manifest,
-    source_manifest_digest: approvedSource.digest,
+    source_manifest: sourceSnapshot.manifest,
+    source_manifest_digest: sourceSnapshot.digest,
     reporter_ready_path: reporterReadyPath,
   };
   writeExclusiveJson(launchRoot, descriptorPath, descriptor);

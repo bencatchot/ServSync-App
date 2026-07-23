@@ -43,6 +43,7 @@ import {
   testIdFor,
   validateGeneratedBrowserId,
   validateDuration,
+  validateBrowserSourceBinding,
   validateSummary,
 } from './browser-schema.mjs';
 import {
@@ -320,6 +321,12 @@ function verifyJournalAuthentication(state, records) {
   if (!samePreparedFileIdentity(journalPath, prepared)) provenanceError();
   const terminal = records.at(-1);
   if (!terminal || terminal.record_type !== 'browser_run_completed' || terminal.run_id !== launch.runId) provenanceError();
+  const runStart = records[0];
+  if (runStart.record_type !== 'browser_run_started'
+    || runStart.source_binding_mode !== launch.sourceBindingMode
+    || runStart.source_manifest_digest !== launch.sourceManifestDigest) {
+    provenanceError();
+  }
   const withoutCurrentHash = { ...terminal };
   delete withoutCurrentHash.current_record_hash;
   if (terminal.run_auth_tag !== computeBrowserRunAuthTag(launch.journalAuthSecret, withoutCurrentHash)) provenanceError();
@@ -331,6 +338,8 @@ function verifyStandaloneJournalAuthentication(state, records) {
   const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
   if (!samePreparedFileIdentity(journalPath, prepared)) provenanceError();
   if (records.some((record) => record.run_id !== state.runId)) provenanceError();
+  const runStart = records[0];
+  if (runStart.record_type !== 'browser_run_started' || runStart.source_binding_mode !== 'none' || runStart.source_manifest_digest !== null) provenanceError();
   const terminal = records.at(-1);
   if (!terminal || terminal.record_type !== 'browser_run_completed') provenanceError();
   const withoutCurrentHash = { ...terminal };
@@ -719,6 +728,8 @@ export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, r
     nonceDigest: launch.descriptor.nonce_digest,
     journalAuthDigest: launch.descriptor.journal_auth_digest,
     journalAuthSecret: launch.journalAuthSecret,
+    sourceBindingMode: 'current_source_snapshot',
+    sourceManifestDigest: launch.descriptor.source_manifest_digest,
     descriptorFile: fileProvenance(descriptorPath, BROWSER_LIMITS.summary_bytes),
   };
   state.provenance.reporterReadyPrepared = createPreparedFile(join(state.root, LAUNCH_DIRECTORY, BROWSER_REPORTER_READY_FILENAME));
@@ -840,6 +851,7 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
   if (records.at(-1).record_type !== 'browser_run_completed') throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Run-completion record must be last.');
   const runId = runStarted[0].run_id;
   if (records.some((record) => record.run_id !== runId)) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser journal contains multiple run IDs.');
+  const sourceBinding = validateBrowserSourceBinding(runStarted[0].source_binding_mode, runStarted[0].source_manifest_digest, { runStart: true });
 
   const starts = new Map();
   const terminals = new Map();
@@ -947,6 +959,8 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
     generated_utc: generatedAt,
     source_journal_sha256: sourceDigest,
     run_id: runId,
+    source_binding_mode: sourceBinding.source_binding_mode,
+    source_manifest_digest: sourceBinding.source_manifest_digest,
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
@@ -1007,6 +1021,16 @@ function importTrustedBrowserJournalInternal({ journalPath, summaryPath, outputR
     throw new EvidenceError('BROWSER_PROVENANCE_MODE_MISMATCH', 'Authenticated standalone import requires a standalone journal.');
   }
   const summary = reconcile(records, sourceDigest, { outputRoot, generatedAt });
+  if (authenticatedState) {
+    const launch = authenticatedState.provenance.launch;
+    if (!launch
+      || summary.source_binding_mode !== launch.sourceBindingMode
+      || summary.source_manifest_digest !== launch.sourceManifestDigest) {
+      provenanceError();
+    }
+  } else if (standaloneState && (summary.source_binding_mode !== 'none' || summary.source_manifest_digest !== null)) {
+    provenanceError();
+  }
   const content = `${canonicalStringify(summary)}\n`;
   const journalState = authenticatedState ? workspaceJournalRoots.get(dirname(resolve(journalPath))) : null;
   const summaryState = authenticatedState ? workspaceSummaryRoots.get(dirname(resolve(summaryPath))) : null;
@@ -1259,7 +1283,15 @@ function runCli() {
     process.stdout.write(`${canonicalStringify({ status: 'imported', summary_path: result.summaryPath, run_status: result.summary.status })}\n`);
   } else if (command === 'verify') {
     const summary = verifyBrowserSummary(required(options, 'summary'), { sourceJournalPath: options.journal ?? null });
-    process.stdout.write(`${canonicalStringify({ status: 'verified', run_status: summary.status, tests: summary.counts.started })}\n`);
+    process.stdout.write(`${canonicalStringify({
+      journal_recomputed: Boolean(options.journal),
+      run_status: summary.status,
+      source_binding_mode: summary.source_binding_mode,
+      source_manifest_digest: summary.source_manifest_digest,
+      status: 'verified',
+      terminal_hmac_authenticated: false,
+      tests: summary.counts.started,
+    })}\n`);
   } else {
     throw new EvidenceError('INVALID_COMMAND', 'Unknown browser importer command.');
   }

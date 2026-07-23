@@ -113,6 +113,8 @@ function makeJournal() {
       record_type: completedInput.record_type,
       run_id: completedInput.run_id,
       provenance_mode: 'standalone',
+      source_binding_mode: null,
+      source_manifest_digest: null,
       timestamp: completedInput.timestamp,
       target_classification: 'local',
       project: 'chromium',
@@ -184,6 +186,8 @@ test('browser schema rejects retries beyond Slice 2B and impossible observabilit
     generated_utc: '2026-07-22T15:00:02.000Z',
     source_journal_sha256: 'a'.repeat(64),
     run_id: 'browser-run-local',
+    source_binding_mode: 'none',
+    source_manifest_digest: null,
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
@@ -224,6 +228,8 @@ test('browser summary validates reconciled counts and safe identifiers', () => {
     generated_utc: '2026-07-22T15:00:02.000Z',
     source_journal_sha256: 'a'.repeat(64),
     run_id: 'browser-run-local',
+    source_binding_mode: 'none',
+    source_manifest_digest: null,
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
@@ -265,4 +271,78 @@ test('browser summary validates reconciled counts and safe identifiers', () => {
   assert.equal(validateSummary(summary).status, 'passed');
   summary.counts.failed = 1;
   assert.throws(() => validateSummary(summary), hasCode('BROWSER_COUNT_MISMATCH'));
+});
+
+test('browser source binding schema distinguishes generated snapshots from standalone evidence', () => {
+  const digest = 'b'.repeat(64);
+  const generatedStart = buildBrowserRecord(GENESIS_HASH, {
+    sequence: 1,
+    record_type: 'browser_run_started',
+    run_id: 'browser-run-local',
+    provenance_mode: 'generated_workspace',
+    source_binding_mode: 'current_source_snapshot',
+    source_manifest_digest: digest,
+    timestamp: '2026-07-22T15:00:00.000Z',
+  });
+  assert.equal(generatedStart.source_manifest_digest, digest);
+  assert.throws(() => buildBrowserRecord(GENESIS_HASH, {
+    sequence: 1,
+    record_type: 'browser_run_started',
+    run_id: 'browser-run-local',
+    provenance_mode: 'generated_workspace',
+    source_binding_mode: 'current_source_snapshot',
+    timestamp: '2026-07-22T15:00:00.000Z',
+  }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
+  assert.throws(() => buildBrowserRecord(GENESIS_HASH, {
+    sequence: 1,
+    record_type: 'browser_run_started',
+    run_id: 'browser-run-local',
+    provenance_mode: 'generated_workspace',
+    source_binding_mode: 'none',
+    source_manifest_digest: null,
+    timestamp: '2026-07-22T15:00:00.000Z',
+  }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
+  assert.throws(() => buildBrowserRecord(GENESIS_HASH, {
+    sequence: 1,
+    record_type: 'browser_run_started',
+    run_id: 'browser-run-local',
+    provenance_mode: 'standalone',
+    source_binding_mode: 'current_source_snapshot',
+    source_manifest_digest: digest,
+    timestamp: '2026-07-22T15:00:00.000Z',
+  }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
+  assert.throws(() => buildBrowserRecord(GENESIS_HASH, {
+    sequence: 1,
+    record_type: 'browser_test_started',
+    run_id: 'browser-run-local',
+    source_binding_mode: 'none',
+    timestamp: '2026-07-22T15:00:00.000Z',
+    worker_index: 0,
+    retry_index: 0,
+    spec_path: 'tests/controlled-ops/browser-pilot/pilot.spec.ts',
+    test_id: testIdFor({ specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts', project: 'chromium', safeLabel: 'synthetic-form-submit' }),
+    attempt_id: 'attempt-2f6f18aca72856912b5fac01',
+    safe_label: 'synthetic-form-submit',
+  }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
+  assert.throws(() => validateSummary({
+    schema_version: BROWSER_SUMMARY_SCHEMA,
+    tool_version: BROWSER_TOOL_VERSION,
+    generated_utc: '2026-07-22T15:00:02.000Z',
+    source_journal_sha256: 'a'.repeat(64),
+    run_id: 'browser-run-local',
+    source_binding_mode: 'current_source_snapshot',
+    source_manifest_digest: null,
+    target_classification: 'local',
+    project: 'chromium',
+    worker_count: 1,
+    retry_limit: BROWSER_LIMITS.retry_index_max,
+    started_utc: '2026-07-22T15:00:00.000Z',
+    completed_utc: '2026-07-22T15:00:01.000Z',
+    duration_ms: 1000,
+    status: 'passed',
+    counts: { started: 0, passed: 0, failed: 0, timed_out: 0, skipped: 0, interrupted: 0, incomplete: 0, steps: 0 },
+    tests: [],
+    observability: { completeness_status: 'complete', totals: { console_total: 0, page_error_total: 0, network_total: 0, overflow_total: 0, rejected_sensitive_total: 0, rejected_customer_content_total: 0, collector_failure_total: 0 } },
+    prohibited_artifacts: { screenshots: 0, traces: 0, videos: 0, hars: 0, html_reports: 0, storage_states: 0 },
+  }), hasCode('INVALID_BROWSER_SOURCE_BINDING'));
 });

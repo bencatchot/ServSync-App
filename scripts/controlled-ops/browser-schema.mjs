@@ -17,6 +17,7 @@ export const BROWSER_JOURNAL_SCHEMA = 'servsync-controlled-ops/browser-journal-v
 export const BROWSER_SUMMARY_SCHEMA = 'servsync-controlled-ops/browser-summary-v1';
 export const BROWSER_TOOL_VERSION = '2b.1.0';
 export const BROWSER_PROVENANCE_MODES = Object.freeze(['standalone', 'generated_workspace']);
+export const SOURCE_BINDING_MODES = Object.freeze(['current_source_snapshot', 'none']);
 
 export const BROWSER_LIMITS = Object.freeze({
   tests_per_run: 25,
@@ -79,6 +80,8 @@ export const BROWSER_RECORD_FIELDS = [
   'record_type',
   'run_id',
   'provenance_mode',
+  'source_binding_mode',
+  'source_manifest_digest',
   'timestamp',
   'target_classification',
   'project',
@@ -105,6 +108,8 @@ export const BROWSER_SUMMARY_FIELDS = [
   'generated_utc',
   'source_journal_sha256',
   'run_id',
+  'source_binding_mode',
+  'source_manifest_digest',
   'target_classification',
   'project',
   'worker_count',
@@ -140,6 +145,32 @@ export function validateGeneratedBrowserId(value, fieldName = 'browser generated
     throw new EvidenceError('INVALID_BROWSER_ID', `${fieldName} is invalid.`);
   }
   return value;
+}
+
+export function validateSourceManifestDigest(value, fieldName = 'browser source manifest digest') {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', `${fieldName} is invalid.`);
+  }
+  return value;
+}
+
+export function validateBrowserSourceBinding(mode, digest, { runStart = false } = {}) {
+  if (!runStart) {
+    if (mode !== null || digest !== null) {
+      throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', 'Browser source binding is only retained on the run-start record.');
+    }
+    return { source_binding_mode: null, source_manifest_digest: null };
+  }
+  if (!SOURCE_BINDING_MODES.includes(mode)) {
+    throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', 'Browser source binding mode is invalid.');
+  }
+  if (mode === 'current_source_snapshot') {
+    return { source_binding_mode: mode, source_manifest_digest: validateSourceManifestDigest(digest) };
+  }
+  if (digest !== null) {
+    throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', 'Standalone browser source binding must not retain a source digest.');
+  }
+  return { source_binding_mode: mode, source_manifest_digest: null };
 }
 
 export function validateProject(value) {
@@ -330,6 +361,7 @@ export function validateBrowserRecord(record) {
   if (!RECORD_TYPES.includes(record.record_type)) throw new EvidenceError('INVALID_BROWSER_RECORD_TYPE', 'Browser journal record type is invalid.');
   validateGeneratedBrowserId(record.run_id, 'browser run ID');
   if (!BROWSER_PROVENANCE_MODES.includes(record.provenance_mode)) throw new EvidenceError('INVALID_BROWSER_PROVENANCE_MODE', 'Browser journal provenance mode is invalid.');
+  validateBrowserSourceBinding(record.source_binding_mode, record.source_manifest_digest, { runStart: record.record_type === 'browser_run_started' });
   validateTimestamp(record.timestamp, 'browser journal timestamp');
   validateTargetClassification(record.target_classification);
   validateProject(record.project);
@@ -349,6 +381,12 @@ export function validateBrowserRecord(record) {
   }
 
   if (record.record_type === 'browser_run_started') {
+    if (record.provenance_mode === 'generated_workspace' && record.source_binding_mode !== 'current_source_snapshot') {
+      throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', 'Generated browser journals require a current-source snapshot binding.');
+    }
+    if (record.provenance_mode === 'standalone' && record.source_binding_mode !== 'none') {
+      throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', 'Standalone browser journals require no source snapshot binding.');
+    }
     if (record.worker_index !== null || record.retry_index !== null || record.spec_path !== null || record.test_id !== null || record.attempt_id !== null || record.safe_label !== null || record.status !== null || record.duration_ms !== null || record.error_classification !== 'none' || record.console_aggregate !== null || record.page_error_aggregate !== null || record.network_aggregate !== null || record.run_auth_tag !== null) {
       throw new EvidenceError('INVALID_BROWSER_RECORD', 'Browser run-start record contains invalid fields.');
     }
@@ -414,12 +452,15 @@ export function computeBrowserRunAuthTag(secret, recordWithoutHash) {
 }
 
 export function buildBrowserRecord(previousHash, input) {
+  const provenanceMode = input.provenance_mode ?? 'standalone';
   const recordWithoutHash = {
     schema_version: BROWSER_JOURNAL_SCHEMA,
     sequence: input.sequence,
     record_type: input.record_type,
     run_id: input.run_id,
-    provenance_mode: input.provenance_mode ?? 'standalone',
+    provenance_mode: provenanceMode,
+    source_binding_mode: input.source_binding_mode ?? (input.record_type === 'browser_run_started' && provenanceMode === 'standalone' ? 'none' : null),
+    source_manifest_digest: input.source_manifest_digest ?? null,
     timestamp: input.timestamp,
     target_classification: 'local',
     project: 'chromium',
@@ -475,6 +516,7 @@ export function validateSummary(summary) {
   validateTimestamp(summary.generated_utc, 'browser summary timestamp');
   if (!/^[a-f0-9]{64}$/.test(summary.source_journal_sha256)) throw new EvidenceError('INVALID_BROWSER_SUMMARY', 'Browser source digest is invalid.');
   validateGeneratedBrowserId(summary.run_id, 'browser summary run ID');
+  validateBrowserSourceBinding(summary.source_binding_mode, summary.source_manifest_digest, { runStart: true });
   validateTargetClassification(summary.target_classification);
   validateProject(summary.project);
   if (summary.worker_count !== 1 || summary.retry_limit !== BROWSER_LIMITS.retry_index_max) throw new EvidenceError('INVALID_BROWSER_SUMMARY', 'Browser summary worker or retry limit is invalid.');

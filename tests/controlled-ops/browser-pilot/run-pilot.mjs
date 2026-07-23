@@ -133,6 +133,9 @@ try {
   const summaryPath = workspace.summaryPath;
   const { summary } = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: workspace.cleanupHandle });
   verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath });
+  if (summary.source_binding_mode !== 'current_source_snapshot' || summary.source_manifest_digest !== launch.descriptor.source_manifest_digest) {
+    throw new Error('Controlled-ops browser pilot source snapshot digest did not reconcile.');
+  }
   if (summary.status !== 'passed' || summary.counts.started !== 1 || summary.counts.passed !== 1 || summary.counts.steps !== 3) {
     throw new Error('Controlled-ops browser pilot summary did not reconcile.');
   }

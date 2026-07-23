@@ -24,7 +24,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.stdout.write(`${canonicalStringify({
       journal_recomputed: Boolean(options.journal),
       run_status: summary.status,
+      source_binding_mode: summary.source_binding_mode,
+      source_manifest_digest: summary.source_manifest_digest,
       status: 'verified',
+      terminal_hmac_authenticated: false,
       tests: summary.counts.started,
     })}\n`);
   } catch (error) {

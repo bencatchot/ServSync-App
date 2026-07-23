@@ -109,6 +109,8 @@ export function createJournalWriter(root, { journalAuthSecret = null, allowPrepa
         record_type: recordInput.record_type,
         run_id: recordInput.run_id,
         provenance_mode: recordInput.provenance_mode,
+        source_binding_mode: recordInput.source_binding_mode ?? null,
+        source_manifest_digest: recordInput.source_manifest_digest ?? null,
         timestamp: recordInput.timestamp,
         target_classification: 'local',
         project: 'chromium',

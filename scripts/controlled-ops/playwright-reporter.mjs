@@ -19,7 +19,7 @@ import {
 } from './browser-schema.mjs';
 import { createJournalWriter } from './browser-journal.mjs';
 import { classifyError } from './browser-importer.mjs';
-import { APPROVED_BROWSER_SOURCE_PATHS, assertBrowserLaunchContract, validateBrowserSourceManifest, writeReporterReady } from './browser-launch-policy.mjs';
+import { ALLOWLISTED_BROWSER_SOURCE_PATHS, assertBrowserLaunchContract, validateBrowserSourceManifest, writeReporterReady } from './browser-launch-policy.mjs';
 import { EvidenceError, utcNow, validateControlledSlug, validateRelativePath } from './internal.mjs';
 
 function mapStatus(status) {
@@ -68,7 +68,7 @@ export default class ControlledOpsBrowserReporter {
     if (config.workers !== 1 || config.fullyParallel) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2B requires one serial worker.');
     if (config.projects[0].retries !== 0) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2B requires retries to be disabled.');
     if (suite.allTests().length > BROWSER_LIMITS.tests_per_run) throw new EvidenceError('BROWSER_TEST_LIMIT', 'Slice 2B test count limit exceeded.');
-    this.#verifyApprovedSourceSuite(suite, launch.descriptor);
+    this.#verifySnapshotBoundSourceSuite(suite, launch.descriptor);
 
     const journalAuthSecret = this.options.journalAuthSecret || process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET;
     this.writer = createJournalWriter(journalRoot, { allowPrepared: true, journalAuthSecret });
@@ -76,6 +76,8 @@ export default class ControlledOpsBrowserReporter {
     this.writer.append({
       record_type: 'browser_run_started',
       run_id: this.runId,
+      source_binding_mode: 'current_source_snapshot',
+      source_manifest_digest: launch.descriptor.source_manifest_digest,
       timestamp: this.startedAt,
     });
     writeReporterReady({
@@ -85,17 +87,20 @@ export default class ControlledOpsBrowserReporter {
     });
   }
 
-  #verifyApprovedSourceSuite(suite, descriptor) {
-    const approved = validateBrowserSourceManifest(descriptor.source_manifest, descriptor.source_manifest_digest);
-    this.sourceManifestDigest = approved.digest;
+  #verifySnapshotBoundSourceSuite(suite, descriptor) {
+    const snapshot = validateBrowserSourceManifest(descriptor.source_manifest, descriptor.source_manifest_digest);
+    this.sourceManifestDigest = descriptor.source_manifest_digest;
+    if (snapshot.digest !== descriptor.source_manifest_digest) {
+      throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser source manifest digest does not match the launch descriptor snapshot.');
+    }
     const tests = suite.allTests();
-    const expectedSpec = APPROVED_BROWSER_SOURCE_PATHS.pilot_spec;
-    if (tests.length !== 1) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Slice 2B supports exactly one approved synthetic test.');
+    const expectedSpec = ALLOWLISTED_BROWSER_SOURCE_PATHS.pilot_spec;
+    if (tests.length !== 1) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Slice 2B supports exactly one snapshot-bound synthetic test.');
     const relativeSpec = validateRelativePath(relative(process.cwd(), tests[0].location.file).split('\\').join('/'), 'browser spec path');
     if (relativeSpec !== expectedSpec || descriptor.source_manifest.roles.pilot_spec.path !== expectedSpec) {
-      throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser test suite does not match approved source manifest.');
+      throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser test suite does not match the allowlisted source manifest.');
     }
-    validateBrowserSafeLabel(tests[0].title, 'browser approved test title');
+    validateBrowserSafeLabel(tests[0].title, 'browser snapshot-bound test title');
   }
 
   onTestBegin(test, result) {

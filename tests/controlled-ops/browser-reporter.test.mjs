@@ -82,6 +82,8 @@ test('controlled-ops reporter writes a strict local lifecycle journal', async ()
     reporter.onEnd({ status: 'passed' });
     const journal = readJournal(join(journalRoot, 'browser-journal.ndjson'));
     assert.equal(journal.records[0].record_type, 'browser_run_started');
+    assert.equal(journal.records[0].source_binding_mode, 'current_source_snapshot');
+    assert.equal(journal.records[0].source_manifest_digest, launch.descriptor.source_manifest_digest);
     assert.equal(journal.records.at(-1).record_type, 'browser_run_completed');
     assert.equal(journal.records.filter((record) => record.record_type === 'browser_step_completed').length, 2);
     assert.deepEqual(journal.records.slice(4, 8).map((record) => record.record_type), [
@@ -149,12 +151,17 @@ test('controlled-ops reporter rejects missing duplicate or path-backed observabi
     const wrongDigest = makeReporter('wrong-digest');
     const forged = attachmentFor({ runId: wrongDigest.attachment ? JSON.parse(wrongDigest.attachment.body.toString('utf8')).run_id : 'browser-run-local', sourceManifestDigest: 'f'.repeat(64), specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts', safeLabel: 'synthetic-form-submit' });
     wrongDigest.reporter.onTestEnd(wrongDigest.testCase, { status: 'passed', duration: 1, attachments: [forged] });
+    wrongDigest.reporter.onEnd({ status: 'failed' });
+    const wrongDigestJournal = readJournal(join(parent, 'journal-wrong-digest', 'browser-journal.ndjson'));
+    assert.equal(wrongDigestJournal.records[0].source_binding_mode, 'current_source_snapshot');
+    assert.notEqual(wrongDigestJournal.records[0].source_manifest_digest, 'f'.repeat(64));
+    assert.equal(wrongDigestJournal.records.find((record) => record.record_type === 'browser_console_summary').console_aggregate.completeness_status, 'incomplete_invalid_attachment');
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
 });
 
-test('controlled-ops reporter rejects unapproved or expanded source suites before journaling', () => {
+test('controlled-ops reporter rejects non-allowlisted or expanded source suites before journaling', () => {
   const parent = tempRoot();
   try {
     const makeReporter = (suffix) => {
@@ -173,11 +180,11 @@ test('controlled-ops reporter rejects unapproved or expanded source suites befor
       });
     };
     const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
-    const approved = { id: 'approved', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
+    const snapshotBound = { id: 'snapshot-bound', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
     const uncontrolled = { id: 'uncontrolled', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/uncontrolled.spec.ts') } };
     assert.throws(() => makeReporter('direct').onBegin(config, { allTests: () => [uncontrolled] }), hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'));
-    assert.throws(() => makeReporter('extra').onBegin(config, { allTests: () => [approved, uncontrolled] }), hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'));
-    assert.throws(() => makeReporter('retry').onBegin({ projects: [{ name: 'chromium', retries: 1 }], workers: 1, fullyParallel: false }, { allTests: () => [approved] }), hasCode('BROWSER_REPORTER_CONFIG'));
+    assert.throws(() => makeReporter('extra').onBegin(config, { allTests: () => [snapshotBound, uncontrolled] }), hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'));
+    assert.throws(() => makeReporter('retry').onBegin({ projects: [{ name: 'chromium', retries: 1 }], workers: 1, fullyParallel: false }, { allTests: () => [snapshotBound] }), hasCode('BROWSER_REPORTER_CONFIG'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
