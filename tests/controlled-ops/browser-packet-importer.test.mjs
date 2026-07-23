@@ -416,7 +416,7 @@ test('promotion rejects caller-supplied importedAt and derives current monotonic
       .find((current) => current.event_id === 'browser-token-browser-evidence');
     assert.ok(Date.parse(importSummary.imported_utc) >= Date.parse('2026-07-23T12:00:01.000Z'));
     assert.ok(Date.parse(event.action_timestamp) >= Date.parse(importSummary.imported_utc));
-    assert.throws(() => freezeStage(run.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.equal(freezeStage(run.packet.root, 'stage-1').lifecycle, 'workflow-frozen');
   } finally {
     run.cleanup();
   }
@@ -773,7 +773,7 @@ test('fixed browser artifact paths and classes cannot bypass deferred finalizati
       entry.path === BROWSER_SUMMARY_ARTIFACT ? { ...entry, artifact_class: 'internal' } : entry
     ));
     writeCanonical(indexPath, index);
-    assert.throws(() => freezeStage(relabeled.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.throws(() => freezeStage(relabeled.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_INVALID'));
   } finally {
     relabeled.cleanup();
   }
@@ -789,7 +789,7 @@ test('fixed browser artifact paths and classes cannot bypass deferred finalizati
       summary_path: 'alternate-browser-summary.json',
     });
     writeCanonical(indexPath, index);
-    assert.throws(() => freezeStage(wrongPath.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.throws(() => freezeStage(wrongPath.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_INVALID'));
   } finally {
     wrongPath.cleanup();
   }
@@ -980,7 +980,7 @@ test('packet importer does not freeze, manifest, seal, or retain raw browser wor
   }
 });
 
-test('browser packet imports block generic finalization until browser-aware verification exists', () => {
+test('browser packet imports block manifest and seal until browser-aware freeze verifies evidence', () => {
   const run = prepareBoundRun();
   try {
     promoteGeneratedBrowserEvidenceToPacket({
@@ -990,12 +990,10 @@ test('browser packet imports block generic finalization until browser-aware veri
       browserWorkspace: run.workspace,
       generatedAt: '2026-07-23T12:00:02.000Z',
     });
-    assert.throws(() => freezeStage(run.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
     assert.throws(() => createManifest(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
     assert.throws(() => sealOperation(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
     assert.throws(() => verifyPacket(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
     for (const [command, args] of [
-      ['freeze-stage', ['freeze-stage', '--root', run.packet.root, '--stage', 'stage-1']],
       ['create-manifest', ['create-manifest', '--root', run.packet.root]],
       ['seal', ['seal', '--root', run.packet.root]],
       ['verify', ['verify', '--root', run.packet.root]],
@@ -1004,6 +1002,11 @@ test('browser packet imports block generic finalization until browser-aware veri
       assert.notEqual(result.status, 0, command);
       assert.match(result.stderr, /BROWSER_VERIFICATION_DEFERRED/, command);
     }
+    assert.equal(freezeStage(run.packet.root, 'stage-1').lifecycle, 'workflow-frozen');
+    assert.equal(existsSync(join(run.packet.root, 'stages', 'stage-1', 'artifacts', 'browser-freeze-verification.json')), true);
+    createManifest(run.packet.root);
+    const sealed = sealOperation(run.packet.root);
+    assert.equal(verifyPacket(run.packet.root, sealed.seal_sha256).status, 'verified');
   } finally {
     run.cleanup();
   }

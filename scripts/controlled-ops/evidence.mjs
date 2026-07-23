@@ -25,6 +25,13 @@ import {
   SANITIZER_SCHEMA, SANITIZER_VERSION, sanitizeContent, scanCustomerContent, scanSensitiveContent,
   verifySanitizationSummary,
 } from './sanitize.mjs';
+import {
+  BROWSER_FREEZE_VERIFICATION_ARTIFACT,
+  BROWSER_IMPORT_SUMMARY_ARTIFACT,
+  BROWSER_SUMMARY_ARTIFACT,
+  ensureBrowserVerificationForFreeze,
+  verifyBrowserStageEvidence,
+} from './browser-packet-verifier.mjs';
 
 const EVENT_FIELDS = [
   'schema_version', 'operation_id', 'sequence', 'event_id', 'stage_id', 'event_type', 'action_timestamp',
@@ -349,10 +356,22 @@ export function promoteCommandArtifacts(root, stageId, token, items) {
   });
 }
 
+function isBrowserPacketArtifactPath(path) {
+  return [BROWSER_SUMMARY_ARTIFACT, BROWSER_IMPORT_SUMMARY_ARTIFACT, BROWSER_FREEZE_VERIFICATION_ARTIFACT]
+    .some((name) => path.endsWith(`/artifacts/${name}`));
+}
+
+function isInternalControlFilePath(path) {
+  return /\/(?:operation\.json|events\.ndjson|manifest\.json|seal\.json)$/.test(path)
+    || /\/tokens\/[^/]+\.json$/.test(path)
+    || /\/stages\/[^/]+\/(?:artifact-index\.json|stage-manifest\.json|stage-freeze\.json)$/.test(path);
+}
+
 function scanArtifact(path) {
   const content = readFileSync(path, 'utf8');
+  const browserPacketArtifact = isBrowserPacketArtifactPath(path) || isInternalControlFilePath(path);
   return {
-    secret: scanSensitiveContent(content),
+    secret: scanSensitiveContent(content, { includeEntropy: !browserPacketArtifact }),
     customer: scanCustomerContent(content),
   };
 }
@@ -385,12 +404,16 @@ function freezeTree(root, path, depth = 0) {
 
 export function freezeStage(root, stageId, timestamps = {}) {
   return withPacketMutationLock(root, 'freeze-stage', ({ rootPath, metadata }) => {
-    validateControlledSlug(stageId, 'stage ID'); verifyTokensUnlocked(rootPath, metadata);
-    if (readDirectorySorted(operationPaths(rootPath).quarantine).length > 0) throw new EvidenceError('QUARANTINE_NOT_EMPTY', 'Quarantine must be empty before freeze.');
+    validateControlledSlug(stageId, 'stage ID'); let tokens = verifyTokensUnlocked(rootPath, metadata);
     const stagePath = resolveInside(rootPath, `stages/${stageId}`); if (existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('STAGE_FROZEN', 'Stage is already workflow-frozen.');
-    const index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json')); if (!Array.isArray(index.artifacts) || index.artifacts.length === 0) throw new EvidenceError('MISSING_ARTIFACT', 'A stage cannot freeze without evidence artifacts.');
-    assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id, stageId);
-    const chain = verifyEventChain(rootPath);
+    let index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json')); if (!Array.isArray(index.artifacts) || index.artifacts.length === 0) throw new EvidenceError('MISSING_ARTIFACT', 'A stage cannot freeze without evidence artifacts.');
+    let chain = verifyEventChain(rootPath); let events = readEvents(rootPath);
+    const browserVerification = ensureBrowserVerificationForFreeze({ rootPath, metadata, stageId, events, chain, tokens });
+    if (browserVerification) {
+      tokens = verifyTokensUnlocked(rootPath, metadata); chain = verifyEventChain(rootPath); events = readEvents(rootPath);
+      verifyBrowserStageEvidence({ rootPath, metadata, stageId, events, chain, tokens }); index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json'));
+    } else assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id, stageId);
+    if (readDirectorySorted(operationPaths(rootPath).quarantine).length > 0) throw new EvidenceError('QUARANTINE_NOT_EMPTY', 'Quarantine must be empty before freeze.');
     const registered = new Set(index.artifacts.map((entry) => entry.path)); const retained = [];
     const collect = (path, prefix = '', depth = 0) => {
       if (depth > LIMITS.traversal_depth) throw new EvidenceError('TRAVERSAL_DEPTH_LIMIT', 'Stage traversal exceeds its configured depth.');
@@ -399,7 +422,7 @@ export function freezeStage(root, stageId, timestamps = {}) {
     collect(join(stagePath, 'artifacts')); if (canonicalStringify([...registered].sort(compareStrings)) !== canonicalStringify(retained.sort(compareStrings))) throw new EvidenceError('UNCLASSIFIED_FILE', 'Stage contains missing or unregistered artifacts.');
     for (const entry of index.artifacts) { if (entry.sanitization_status === 'passed') verifyArtifactSummary(rootPath, stageId, entry); const scans = scanArtifact(resolveInside(rootPath, `stages/${stageId}/artifacts/${entry.path}`)); if (scans.secret.length) throw new EvidenceError('SECRET_SCAN_FAILED', 'Stage secret scan failed.'); if (scans.customer.length) throw new EvidenceError('CUSTOMER_SCAN_FAILED', 'Stage customer-content scan failed.'); }
     const actionTimestamp = timestamps.actionTimestamp ?? utcNow(); const collectionTimestamp = timestamps.collectionTimestamp ?? utcNow(); const freezeTimestamp = timestamps.freezeTimestamp ?? utcNow();
-    const action = validateTimestamp(actionTimestamp, 'stage action timestamp'); const collection = validateTimestamp(collectionTimestamp, 'stage collection timestamp'); const frozen = validateTimestamp(freezeTimestamp, 'stage freeze timestamp'); if (action < Date.parse(chain.lastActionTimestamp) || collection < action || frozen < collection) throw new EvidenceError('TIMESTAMP_REGRESSION', 'Stage timestamps regress.');
+    const action = validateTimestamp(actionTimestamp, 'stage action timestamp'); const collection = validateTimestamp(collectionTimestamp, 'stage collection timestamp'); const frozen = validateTimestamp(freezeTimestamp, 'stage freeze timestamp'); const minimumAction = Math.max(Date.parse(chain.lastActionTimestamp), browserVerification ? Date.parse(browserVerification.verification_utc) : 0); if (action < minimumAction || collection < action || frozen < collection) throw new EvidenceError('TIMESTAMP_REGRESSION', 'Stage timestamps regress.');
     freezeTree(rootPath, join(stagePath, 'artifacts')); chmodSync(join(stagePath, 'artifact-index.json'), 0o400);
     const manifest = buildStageManifest(rootPath, metadata.operation_id, stageId, index); writeJsonAtomic(join(stagePath, 'stage-manifest.json'), manifest, 0o400, rootPath);
     const freezeRecord = { schema_version: FREEZE_SCHEMA, operation_id: metadata.operation_id, stage_id: stageId, lifecycle: 'workflow-frozen', action_completed_utc: actionTimestamp, collected_utc: collectionTimestamp, frozen_utc: freezeTimestamp, event_chain_head: chain.head, stage_manifest_digest: manifestDigest(manifest), security_scan: { secret_findings: 0, customer_content_findings: 0 } };
@@ -421,7 +444,9 @@ export function verifyStageFreeze(root, stageId) {
   const manifest = readCanonicalJsonFile(manifestPath); validateStageManifest(manifest); const freeze = validateFreeze(readCanonicalJsonFile(freezePath), metadata, stageId);
   if (freeze.stage_manifest_digest !== manifestDigest(manifest)) throw new EvidenceError('STAGE_FREEZE_MISMATCH', 'Stage manifest digest does not match freeze.');
   const heads = new Set([GENESIS_HASH, ...readEvents(rootPath).map((event) => event.current_event_hash)]); if (!heads.has(freeze.event_chain_head)) throw new EvidenceError('STAGE_FREEZE_MISMATCH', 'Stage freeze references an unknown event head.');
-  const action = validateTimestamp(freeze.action_completed_utc, 'stage action timestamp'); const collection = validateTimestamp(freeze.collected_utc, 'stage collection timestamp'); const frozen = validateTimestamp(freeze.frozen_utc, 'stage freeze timestamp'); if (collection < action || frozen < collection) throw new EvidenceError('TIMESTAMP_REGRESSION', 'Stage timestamps regress.');
+  const chain = verifyEventChain(rootPath); const tokens = verifyTokensUnlocked(rootPath, metadata); const browserVerification = verifyBrowserStageEvidence({ rootPath, metadata, stageId, events: readEvents(rootPath), chain, tokens });
+  if (browserVerification && freeze.event_chain_head !== browserVerification.event_chain_head_at_verification) throw new EvidenceError('STAGE_FREEZE_MISMATCH', 'Stage freeze does not bind the verified browser event-chain head.');
+  const action = validateTimestamp(freeze.action_completed_utc, 'stage action timestamp'); const collection = validateTimestamp(freeze.collected_utc, 'stage collection timestamp'); const frozen = validateTimestamp(freeze.frozen_utc, 'stage freeze timestamp'); if (collection < action || frozen < collection || (browserVerification && action < Date.parse(browserVerification.verification_utc))) throw new EvidenceError('TIMESTAMP_REGRESSION', 'Stage timestamps regress.');
   verifyStageManifest(rootPath, manifest); return freeze;
 }
 
