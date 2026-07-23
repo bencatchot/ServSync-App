@@ -31,6 +31,7 @@ function emptyObservability() {
       type_counts: zero(['log', 'info', 'warning', 'error', 'debug', 'trace', 'other']),
       severity_counts: zero(['debug', 'info', 'warning', 'error', 'other']),
       safe_message_class_counts: zero(['synthetic_safe', 'unclassified']),
+      rejected_event_count: 0,
       rejected_sensitive_count: 0,
       rejected_customer_content_count: 0,
       invalid_event_count: 0,
@@ -49,6 +50,7 @@ function emptyObservability() {
       stack_present_count: 0,
       origin_class_counts: zero(['local_page', 'unknown']),
       duplicate_count: 0,
+      rejected_event_count: 0,
       rejected_sensitive_count: 0,
       rejected_customer_content_count: 0,
       invalid_event_count: 0,
@@ -72,6 +74,11 @@ function emptyObservability() {
       failure_class_counts: zero(['blocked_by_policy', 'aborted', 'connection', 'timeout', 'other', 'unknown']),
       redirect_count: 0,
       rejected_egress_class_counts: zero(['invalid', 'rejected_external', 'alternate_port', 'websocket', 'worker', 'other']),
+      terminal_response_count: 0,
+      terminal_failure_count: 0,
+      unresolved_request_count: 0,
+      duplicate_terminal_count: 0,
+      unexpected_page_count: 0,
       websocket_attempt_count: 0,
       worker_attempt_count: 0,
       overflow_count: 0,
@@ -157,6 +164,52 @@ test('journal parser enforces canonical hash-chained records', () => {
   assert.equal(parsed.records.length, 2);
   assert.throws(() => parseBrowserJournal(makeJournal().replace('"sequence":1', '"sequence" : 1')), hasCode('BROWSER_NONCANONICAL_RECORD'));
   assert.throws(() => parseBrowserJournal(makeJournal().replace('2026-07-22T15:00:01.000Z', '2026-07-22T14:59:59.000Z')), (error) => ['BROWSER_TIMESTAMP_REGRESSION', 'BROWSER_HASH_CHAIN_MISMATCH'].includes(error?.code));
+});
+
+test('browser schema rejects retries beyond Slice 2B and impossible observability aggregates', () => {
+  const testId = testIdFor({
+    specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts',
+    project: 'chromium',
+    safeLabel: 'synthetic-form-submit',
+  });
+  assert.throws(() => attemptIdFor({ testId, retryIndex: 1, workerIndex: 0 }), hasCode('INVALID_BROWSER_RECORD'));
+
+  const base = emptyObservability();
+  base.console.total_count = 1;
+  base.console.type_counts.log = 1;
+  base.console.severity_counts.info = 1;
+  assert.throws(() => validateSummary({
+    schema_version: BROWSER_SUMMARY_SCHEMA,
+    tool_version: BROWSER_TOOL_VERSION,
+    generated_utc: '2026-07-22T15:00:02.000Z',
+    source_journal_sha256: 'a'.repeat(64),
+    run_id: 'browser-run-local',
+    target_classification: 'local',
+    project: 'chromium',
+    worker_count: 1,
+    retry_limit: BROWSER_LIMITS.retry_index_max,
+    started_utc: '2026-07-22T15:00:00.000Z',
+    completed_utc: '2026-07-22T15:00:01.000Z',
+    duration_ms: 1000,
+    status: 'passed',
+    counts: { started: 1, passed: 1, failed: 0, timed_out: 0, skipped: 0, interrupted: 0, incomplete: 0, steps: 0 },
+    tests: [{
+      test_id: testId,
+      attempt_id: attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 }),
+      spec_path: 'tests/controlled-ops/browser-pilot/pilot.spec.ts',
+      safe_label: 'synthetic-form-submit',
+      project: 'chromium',
+      worker_index: 0,
+      retry_index: 0,
+      status: 'passed',
+      duration_ms: 900,
+      error_classification: 'none',
+      step_count: 0,
+      observability: base,
+    }],
+    observability: { completeness_status: 'complete', totals: { console_total: 1, page_error_total: 0, network_total: 0, overflow_total: 0, rejected_sensitive_total: 0, rejected_customer_content_total: 0, collector_failure_total: 0 } },
+    prohibited_artifacts: { screenshots: 0, traces: 0, videos: 0, hars: 0, html_reports: 0, storage_states: 0 },
+  }), hasCode('BROWSER_OBSERVABILITY_COUNT_MISMATCH'));
 });
 
 test('browser summary validates reconciled counts and safe identifiers', () => {

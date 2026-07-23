@@ -60,6 +60,7 @@ export const REJECTED_EGRESS_CLASSES = Object.freeze(['invalid', 'rejected_exter
 const ENVELOPE_FIELDS = [
   'schema_version',
   'run_id',
+  'source_manifest_digest',
   'test_id',
   'attempt_id',
   'worker_index',
@@ -78,6 +79,7 @@ const CONSOLE_AGGREGATE_FIELDS = [
   'type_counts',
   'severity_counts',
   'safe_message_class_counts',
+  'rejected_event_count',
   'rejected_sensitive_count',
   'rejected_customer_content_count',
   'invalid_event_count',
@@ -97,6 +99,7 @@ const PAGE_ERROR_AGGREGATE_FIELDS = [
   'stack_present_count',
   'origin_class_counts',
   'duplicate_count',
+  'rejected_event_count',
   'rejected_sensitive_count',
   'rejected_customer_content_count',
   'invalid_event_count',
@@ -121,6 +124,11 @@ const NETWORK_AGGREGATE_FIELDS = [
   'failure_class_counts',
   'redirect_count',
   'rejected_egress_class_counts',
+  'terminal_response_count',
+  'terminal_failure_count',
+  'unresolved_request_count',
+  'duplicate_terminal_count',
+  'unexpected_page_count',
   'websocket_attempt_count',
   'worker_attempt_count',
   'overflow_count',
@@ -261,6 +269,7 @@ function createConsoleAggregate() {
     type_counts: zeroCounts(CONSOLE_TYPES),
     severity_counts: zeroCounts(CONSOLE_SEVERITIES),
     safe_message_class_counts: zeroCounts(SAFE_MESSAGE_CLASSES),
+    rejected_event_count: 0,
     rejected_sensitive_count: 0,
     rejected_customer_content_count: 0,
     invalid_event_count: 0,
@@ -282,6 +291,7 @@ function createPageErrorAggregate() {
     stack_present_count: 0,
     origin_class_counts: zeroCounts(['local_page', 'unknown']),
     duplicate_count: 0,
+    rejected_event_count: 0,
     rejected_sensitive_count: 0,
     rejected_customer_content_count: 0,
     invalid_event_count: 0,
@@ -308,6 +318,11 @@ function createNetworkAggregate() {
     failure_class_counts: zeroCounts(FAILURE_CLASSES),
     redirect_count: 0,
     rejected_egress_class_counts: zeroCounts(REJECTED_EGRESS_CLASSES),
+    terminal_response_count: 0,
+    terminal_failure_count: 0,
+    unresolved_request_count: 0,
+    duplicate_terminal_count: 0,
+    unexpected_page_count: 0,
     websocket_attempt_count: 0,
     worker_attempt_count: 0,
     overflow_count: 0,
@@ -342,7 +357,7 @@ function markCallbackFailure(aggregate) {
   aggregate.collector_failure_class = 'listener_callback';
 }
 
-export function createBrowserObservabilityState({ runId, testInfo, baseURL }) {
+export function createBrowserObservabilityState({ runId, testInfo, baseURL, sourceManifestDigest = null }) {
   const specPath = validateRelativePath(relative(process.cwd(), testInfo.file).split('\\').join('/'), 'browser spec path');
   const safeLabel = validateBrowserSafeLabel(testInfo.title, 'browser test title');
   const workerIndex = testInfo.workerIndex ?? 0;
@@ -351,6 +366,7 @@ export function createBrowserObservabilityState({ runId, testInfo, baseURL }) {
   const attemptId = attemptIdFor({ testId, retryIndex, workerIndex });
   return {
     runId: validateGeneratedBrowserId(runId, 'browser run ID'),
+    sourceManifestDigest,
     testId,
     attemptId,
     workerIndex,
@@ -359,8 +375,13 @@ export function createBrowserObservabilityState({ runId, testInfo, baseURL }) {
     specPath,
     baseURL,
     startedUtc: utcNow(),
-    finalized: false,
+    phase: 'collecting',
+    egressApplied: false,
+    primaryPage: null,
     pages: new Set(),
+    requestIds: new WeakMap(),
+    requests: new Map(),
+    nextRequestId: 1,
     disposers: [],
     seenErrors: new Set(),
     console: createConsoleAggregate(),
@@ -369,42 +390,68 @@ export function createBrowserObservabilityState({ runId, testInfo, baseURL }) {
   };
 }
 
-export function observeBrowserPage(state, page) {
-  if (state.finalized || state.pages.has(page)) return;
-  state.pages.add(page);
-  const onConsole = (message) => observeConsoleEvent(state, message);
-  const onPageError = (error) => observePageErrorEvent(state, error);
+function isFinalized(state) {
+  return state.phase === 'finalized';
+}
+
+function markIncompleteNetwork(state, failureClass = 'lifecycle') {
+  if (state.network.completeness_status === 'complete') state.network.completeness_status = 'incomplete_collector_error';
+  if (state.network.collector_failure_class === 'none') state.network.collector_failure_class = failureClass;
+}
+
+export function observeBrowserContext(state, context) {
+  if (isFinalized(state) || state.contextObserved) return;
+  state.contextObserved = true;
   const onRequest = (request) => observeRequestEvent(state, request);
   const onResponse = (response) => observeResponseEvent(state, response);
   const onRequestFailed = (request) => observeRequestFailedEvent(state, request);
+  const onPage = (page) => observeBrowserPage(state, page, { allowPrimary: true });
+  context.on('request', onRequest);
+  context.on('response', onResponse);
+  context.on('requestfailed', onRequestFailed);
+  context.on('page', onPage);
+  state.disposers.push(() => {
+    context.off('request', onRequest);
+    context.off('response', onResponse);
+    context.off('requestfailed', onRequestFailed);
+    context.off('page', onPage);
+  });
+}
+
+export function observeBrowserPage(state, page, { allowPrimary = false } = {}) {
+  if (isFinalized(state) || state.pages.has(page)) return;
+  if (!state.primaryPage && allowPrimary) state.primaryPage = page;
+  else if (page !== state.primaryPage) {
+    state.network.unexpected_page_count += 1;
+    markIncompleteNetwork(state);
+  }
+  state.pages.add(page);
+  const onConsole = (message) => observeConsoleEvent(state, message);
+  const onPageError = (error) => observePageErrorEvent(state, error);
   const onWebSocket = () => {
-    if (state.finalized) return markLate(state.network);
+    if (isFinalized(state)) return markLate(state.network);
     state.network.websocket_attempt_count += 1;
+    markIncompleteNetwork(state);
   };
   const onWorker = () => {
-    if (state.finalized) return markLate(state.network);
+    if (isFinalized(state)) return markLate(state.network);
     state.network.worker_attempt_count += 1;
+    markIncompleteNetwork(state);
   };
   page.on('console', onConsole);
   page.on('pageerror', onPageError);
-  page.on('request', onRequest);
-  page.on('response', onResponse);
-  page.on('requestfailed', onRequestFailed);
   page.on('websocket', onWebSocket);
   page.on('worker', onWorker);
   state.disposers.push(() => {
     page.off('console', onConsole);
     page.off('pageerror', onPageError);
-    page.off('request', onRequest);
-    page.off('response', onResponse);
-    page.off('requestfailed', onRequestFailed);
     page.off('websocket', onWebSocket);
     page.off('worker', onWorker);
   });
 }
 
 export function observeConsoleEvent(state, message) {
-  if (state.finalized) return markLate(state.console);
+  if (isFinalized(state)) return markLate(state.console);
   try {
     if (state.console.total_count >= BROWSER_LIMITS.console_events_per_attempt) return markOverflow(state.console);
     const type = consoleType(typeof message.type === 'function' ? message.type() : message.type);
@@ -421,7 +468,10 @@ export function observeConsoleEvent(state, message) {
     const scan = scanText(text.value);
     if (scan.sensitive) state.console.rejected_sensitive_count += 1;
     if (scan.customer) state.console.rejected_customer_content_count += 1;
-    if (scan.sensitive || scan.customer) return;
+    if (scan.sensitive || scan.customer) {
+      state.console.rejected_event_count += 1;
+      return;
+    }
     increment(state.console.safe_message_class_counts, safeMessageClass(text.value));
   } catch {
     markCallbackFailure(state.console);
@@ -429,7 +479,7 @@ export function observeConsoleEvent(state, message) {
 }
 
 export function observePageErrorEvent(state, error) {
-  if (state.finalized) return markLate(state.pageError);
+  if (isFinalized(state)) return markLate(state.pageError);
   try {
     if (state.pageError.total_count >= BROWSER_LIMITS.page_errors_per_attempt) return markOverflow(state.pageError);
     const kind = errorKind(error);
@@ -450,7 +500,10 @@ export function observePageErrorEvent(state, error) {
     const scan = scanText(combined);
     if (scan.sensitive) state.pageError.rejected_sensitive_count += 1;
     if (scan.customer) state.pageError.rejected_customer_content_count += 1;
-    if (scan.sensitive || scan.customer) return;
+    if (scan.sensitive || scan.customer) {
+      state.pageError.rejected_event_count += 1;
+      return;
+    }
     const messageClass = safeMessageClass(message.value);
     increment(state.pageError.safe_message_class_counts, messageClass);
     const dedupeKey = `${kind}:${messageClass}:${stack.value ? 'stack' : 'nostack'}`;
@@ -462,9 +515,16 @@ export function observePageErrorEvent(state, error) {
 }
 
 export function observeRequestEvent(state, request) {
-  if (state.finalized) return markLate(state.network);
+  if (isFinalized(state)) return markLate(state.network);
   try {
     if (state.network.total_requests >= BROWSER_LIMITS.network_requests_per_attempt) return markOverflow(state.network);
+    if (state.requestIds.has(request)) {
+      state.network.duplicate_terminal_count += 1;
+      return markIncompleteNetwork(state);
+    }
+    const requestId = state.nextRequestId;
+    state.nextRequestId += 1;
+    state.requestIds.set(request, requestId);
     const url = typeof request.url === 'function' ? request.url() : '';
     const { origin_class: originClass, route_class: routeClass } = classifySafeBrowserUrl(url, state.baseURL);
     state.network.total_requests += 1;
@@ -475,25 +535,50 @@ export function observeRequestEvent(state, request) {
     if (typeof request.isNavigationRequest === 'function' && request.isNavigationRequest()) state.network.navigation_count += 1;
     else state.network.subresource_count += 1;
     if (typeof request.redirectedFrom === 'function' && request.redirectedFrom()) state.network.redirect_count += 1;
+    state.requests.set(requestId, { terminal: null });
   } catch {
     markCallbackFailure(state.network);
   }
 }
 
+function terminalizeRequest(state, request, terminalKind, callback) {
+  const requestId = state.requestIds.get(request);
+  if (!requestId || !state.requests.has(requestId)) {
+    state.network.duplicate_terminal_count += 1;
+    markIncompleteNetwork(state);
+    return;
+  }
+  const entry = state.requests.get(requestId);
+  if (entry.terminal !== null) {
+    state.network.duplicate_terminal_count += 1;
+    markIncompleteNetwork(state);
+    return;
+  }
+  entry.terminal = terminalKind;
+  callback();
+}
+
 export function observeResponseEvent(state, response) {
-  if (state.finalized) return markLate(state.network);
+  if (isFinalized(state)) return markLate(state.network);
   try {
-    increment(state.network.status_class_counts, statusClass(typeof response.status === 'function' ? response.status() : null));
+    const request = typeof response.request === 'function' ? response.request() : null;
+    terminalizeRequest(state, request, 'response', () => {
+      state.network.terminal_response_count += 1;
+      increment(state.network.status_class_counts, statusClass(typeof response.status === 'function' ? response.status() : null));
+    });
   } catch {
     markCallbackFailure(state.network);
   }
 }
 
 export function observeRequestFailedEvent(state, request) {
-  if (state.finalized) return markLate(state.network);
+  if (isFinalized(state)) return markLate(state.network);
   try {
-    increment(state.network.status_class_counts, 'no_response');
-    increment(state.network.failure_class_counts, failureClass(typeof request.failure === 'function' ? request.failure() : null));
+    terminalizeRequest(state, request, 'failure', () => {
+      state.network.terminal_failure_count += 1;
+      increment(state.network.status_class_counts, 'no_response');
+      increment(state.network.failure_class_counts, failureClass(typeof request.failure === 'function' ? request.failure() : null));
+    });
   } catch {
     markCallbackFailure(state.network);
   }
@@ -507,16 +592,40 @@ export function applyEgressDecisionCounts(state, decisionCounts = {}) {
     }
     state.network.rejected_egress_class_counts[key] += value;
   }
+  state.egressApplied = true;
+}
+
+export async function drainAndFinalizeBrowserObservability(state, { context, decisionCounts = {} } = {}) {
+  state.phase = 'draining';
+  try {
+    if (context && typeof context.close === 'function') await context.close();
+  } catch {
+    markIncompleteNetwork(state, 'teardown');
+  }
+  await new Promise((resolveDrain) => setTimeout(resolveDrain, 0));
+  applyEgressDecisionCounts(state, decisionCounts);
+  return finalizeBrowserObservability(state);
 }
 
 export function finalizeBrowserObservability(state) {
+  if (!state.egressApplied) state.egressApplied = true;
+  for (const [requestId, entry] of state.requests.entries()) {
+    if (entry.terminal === null) {
+      entry.terminal = 'unresolved';
+      state.network.unresolved_request_count += 1;
+      increment(state.network.status_class_counts, 'no_response');
+      markIncompleteNetwork(state);
+    }
+    state.requests.delete(requestId);
+  }
   for (const dispose of state.disposers.splice(0)) {
     try { dispose(); } catch { state.console.listener_error_count += 1; state.console.completeness_status = 'incomplete_collector_error'; state.console.collector_failure_class = 'teardown'; }
   }
-  state.finalized = true;
+  state.phase = 'finalized';
   const envelope = {
     schema_version: BROWSER_OBSERVABILITY_SCHEMA,
     run_id: state.runId,
+    source_manifest_digest: state.sourceManifestDigest,
     test_id: state.testId,
     attempt_id: state.attemptId,
     worker_index: state.workerIndex,
@@ -564,6 +673,9 @@ function validateCommonAggregate(aggregate, fields, fieldName) {
   }
   if (!COMPLETENESS_STATES.includes(aggregate.completeness_status)) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', `${fieldName} completeness is invalid.`);
   if (!COLLECTOR_FAILURE_CLASSES.includes(aggregate.collector_failure_class)) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', `${fieldName} failure class is invalid.`);
+  if (aggregate.completeness_status === 'complete' && (aggregate.overflow_count !== 0 || aggregate.late_event_count !== 0 || aggregate.listener_error_count !== 0 || aggregate.collector_failure_class !== 'none')) {
+    throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', `${fieldName} complete status conflicts with incomplete counters.`);
+  }
 }
 
 export function validateConsoleAggregate(aggregate) {
@@ -571,7 +683,10 @@ export function validateConsoleAggregate(aggregate) {
   validateNullableInteger(aggregate.total_count, 'browser console total', { max: BROWSER_LIMITS.console_events_per_attempt });
   validateCounterMap(aggregate.type_counts, CONSOLE_TYPES, 'browser console type counts', { total: aggregate.total_count, max: BROWSER_LIMITS.console_events_per_attempt });
   validateCounterMap(aggregate.severity_counts, CONSOLE_SEVERITIES, 'browser console severity counts', { total: aggregate.total_count, max: BROWSER_LIMITS.console_events_per_attempt });
-  validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser console message class counts', { max: BROWSER_LIMITS.console_events_per_attempt });
+  const safeTotal = validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser console message class counts', { max: BROWSER_LIMITS.console_events_per_attempt });
+  validateNullableInteger(aggregate.rejected_event_count, 'browser console rejected event count', { max: BROWSER_LIMITS.console_events_per_attempt });
+  if (safeTotal + aggregate.rejected_event_count + aggregate.invalid_event_count !== aggregate.total_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser console disposition counts do not reconcile.');
+  if (aggregate.rejected_sensitive_count > aggregate.rejected_event_count || aggregate.rejected_customer_content_count > aggregate.rejected_event_count || Math.max(aggregate.rejected_sensitive_count, aggregate.rejected_customer_content_count) > aggregate.rejected_event_count || aggregate.rejected_event_count > aggregate.rejected_sensitive_count + aggregate.rejected_customer_content_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser console rejected counts do not reconcile.');
   return aggregate;
 }
 
@@ -579,10 +694,14 @@ export function validatePageErrorAggregate(aggregate) {
   validateCommonAggregate(aggregate, PAGE_ERROR_AGGREGATE_FIELDS, 'browser page error aggregate');
   validateNullableInteger(aggregate.total_count, 'browser page error total', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateCounterMap(aggregate.error_kind_counts, ERROR_KINDS, 'browser page error kind counts', { total: aggregate.total_count, max: BROWSER_LIMITS.page_errors_per_attempt });
-  validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser page error message class counts', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  const safeTotal = validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser page error message class counts', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateCounterMap(aggregate.origin_class_counts, ['local_page', 'unknown'], 'browser page error origin counts', { total: aggregate.total_count, max: BROWSER_LIMITS.page_errors_per_attempt });
   validateNullableInteger(aggregate.stack_present_count, 'browser page error stack count', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateNullableInteger(aggregate.duplicate_count, 'browser page error duplicate count', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  validateNullableInteger(aggregate.rejected_event_count, 'browser page error rejected event count', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  if (safeTotal + aggregate.rejected_event_count + aggregate.invalid_event_count !== aggregate.total_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser page-error disposition counts do not reconcile.');
+  if (aggregate.stack_present_count > aggregate.total_count || aggregate.duplicate_count > Math.max(aggregate.total_count - 1, 0)) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser page-error impossible counts were rejected.');
+  if (aggregate.rejected_sensitive_count > aggregate.rejected_event_count || aggregate.rejected_customer_content_count > aggregate.rejected_event_count || Math.max(aggregate.rejected_sensitive_count, aggregate.rejected_customer_content_count) > aggregate.rejected_event_count || aggregate.rejected_event_count > aggregate.rejected_sensitive_count + aggregate.rejected_customer_content_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser page-error rejected counts do not reconcile.');
   return aggregate;
 }
 
@@ -596,12 +715,22 @@ export function validateNetworkAggregate(aggregate) {
   validateNullableInteger(aggregate.navigation_count, 'browser network navigation count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.subresource_count, 'browser network subresource count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   if (aggregate.navigation_count + aggregate.subresource_count !== aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network navigation counts do not reconcile.');
-  validateCounterMap(aggregate.status_class_counts, STATUS_CLASSES, 'browser network status counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
-  validateCounterMap(aggregate.failure_class_counts, FAILURE_CLASSES, 'browser network failure counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateCounterMap(aggregate.status_class_counts, STATUS_CLASSES, 'browser network status counts', { total: aggregate.total_requests, max: BROWSER_LIMITS.network_requests_per_attempt });
+  const failureTotal = validateCounterMap(aggregate.failure_class_counts, FAILURE_CLASSES, 'browser network failure counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateCounterMap(aggregate.rejected_egress_class_counts, REJECTED_EGRESS_CLASSES, 'browser network rejected egress counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.redirect_count, 'browser network redirect count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.terminal_response_count, 'browser network terminal response count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.terminal_failure_count, 'browser network terminal failure count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.unresolved_request_count, 'browser network unresolved count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.duplicate_terminal_count, 'browser network duplicate terminal count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.unexpected_page_count, 'browser network unexpected page count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.websocket_attempt_count, 'browser network websocket count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.worker_attempt_count, 'browser network worker count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  if (aggregate.redirect_count > aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network redirect count is impossible.');
+  if (aggregate.terminal_response_count + aggregate.terminal_failure_count + aggregate.unresolved_request_count !== aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network terminal counts do not reconcile.');
+  if (aggregate.status_class_counts.no_response !== aggregate.terminal_failure_count + aggregate.unresolved_request_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network no-response counts do not reconcile.');
+  if (failureTotal !== aggregate.terminal_failure_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network failure counts do not reconcile.');
+  if (aggregate.completeness_status === 'complete' && (aggregate.unresolved_request_count !== 0 || aggregate.duplicate_terminal_count !== 0 || aggregate.unexpected_page_count !== 0 || aggregate.worker_attempt_count !== 0 || aggregate.websocket_attempt_count !== 0)) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser network unsupported activity cannot be complete.');
   return aggregate;
 }
 
@@ -609,6 +738,7 @@ export function validateBrowserObservabilityEnvelope(envelope) {
   assertExactObject(envelope, ENVELOPE_FIELDS, [], 'browser observability envelope');
   if (envelope.schema_version !== BROWSER_OBSERVABILITY_SCHEMA) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', 'Browser observability schema is invalid.');
   validateGeneratedBrowserId(envelope.run_id, 'browser observability run ID');
+  if (envelope.source_manifest_digest !== null && (typeof envelope.source_manifest_digest !== 'string' || !/^[a-f0-9]{64}$/.test(envelope.source_manifest_digest))) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', 'Browser source manifest digest is invalid.');
   validateGeneratedBrowserId(envelope.test_id, 'browser observability test ID');
   validateGeneratedBrowserId(envelope.attempt_id, 'browser observability attempt ID');
   validateProject('chromium');

@@ -825,6 +825,7 @@ function countProhibitedArtifacts(outputRoot) {
     else if (lower.endsWith('.har')) counts.hars += 1;
     else if (lower.endsWith('.html')) counts.html_reports += 1;
     else if (lower.includes('storage') && lower.endsWith('.json')) counts.storage_states += 1;
+    else throw new EvidenceError('PROHIBITED_BROWSER_ARTIFACT', 'Browser output root contains an unexpected retained artifact.');
   };
   visit(root);
   return counts;
@@ -949,7 +950,7 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
-    retry_limit: 1,
+    retry_limit: BROWSER_LIMITS.retry_index_max,
     started_utc: runStarted[0].timestamp,
     completed_utc: runCompleted[0].timestamp,
     duration_ms: runCompleted[0].duration_ms,
@@ -1188,8 +1189,12 @@ export function verifyBrowserSummary(summaryPath, { sourceJournalPath = null } =
   if (content !== `${canonicalStringify(parsed)}\n`) throw new EvidenceError('BROWSER_SUMMARY_NONCANONICAL', 'Browser summary is not canonical JSON.');
   const summary = validateSummary(parsed);
   if (sourceJournalPath) {
-    const { sourceDigest } = readJournal(sourceJournalPath);
+    const { records, sourceDigest } = readJournal(sourceJournalPath);
     if (sourceDigest !== summary.source_journal_sha256) throw new EvidenceError('BROWSER_SOURCE_MISMATCH', 'Browser summary source digest does not match current journal.');
+    const expected = reconcile(records, sourceDigest, { generatedAt: summary.generated_utc });
+    if (canonicalStringify(expected) !== canonicalStringify(summary)) {
+      throw new EvidenceError('BROWSER_SOURCE_MISMATCH', 'Browser summary does not match independently reconciled journal evidence.');
+    }
   }
   return summary;
 }

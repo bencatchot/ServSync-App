@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
@@ -11,6 +12,7 @@ import {
   observePageErrorEvent,
   observeRequestEvent,
   observeRequestFailedEvent,
+  observeBrowserPage,
   observeResponseEvent,
   parseBrowserObservabilityAttachment,
   validateBrowserObservabilityEnvelope,
@@ -37,6 +39,7 @@ function state() {
     runId: 'browser-run-local',
     testInfo: testInfo(),
     baseURL: 'http://127.0.0.1:41234',
+    sourceManifestDigest: 'b'.repeat(64),
   });
 }
 
@@ -109,18 +112,57 @@ test('network collector keeps URL, header, and body material out of the envelope
     postData: () => { throw new Error('must-not-read-body'); },
   };
   observeRequestEvent(current, request);
-  observeResponseEvent(current, { status: () => 200, headers: () => { throw new Error('must-not-read-response-headers'); } });
-  observeRequestFailedEvent(current, { failure: () => ({ errorText: 'blockedbyclient' }) });
+  observeResponseEvent(current, { request: () => request, status: () => 200, headers: () => { throw new Error('must-not-read-response-headers'); } });
   const body = finalizeBrowserObservability(current);
   const envelope = parseBrowserObservabilityAttachment(body);
   assert.equal(envelope.network_aggregate.total_requests, 1);
   assert.equal(envelope.network_aggregate.method_class_counts.POST, 1);
   assert.equal(envelope.network_aggregate.route_class_counts.submit, 1);
   assert.equal(envelope.network_aggregate.status_class_counts['2xx'], 1);
-  assert.equal(envelope.network_aggregate.failure_class_counts.blocked_by_policy, 1);
+  assert.equal(envelope.network_aggregate.terminal_response_count, 1);
+  assert.equal(envelope.network_aggregate.terminal_failure_count, 0);
   assert.equal(body.includes('token'), false);
   assert.equal(body.includes('fragment'), false);
   assert.equal(body.includes('discarded'), false);
+});
+
+test('network collector records exact terminality and rejects unresolved or duplicate outcomes', () => {
+  const failed = state();
+  const failedRequest = {
+    url: () => 'http://127.0.0.1:41234/health',
+    method: () => 'GET',
+    resourceType: () => 'fetch',
+    isNavigationRequest: () => false,
+    redirectedFrom: () => null,
+    failure: () => ({ errorText: 'blockedbyclient' }),
+  };
+  observeRequestEvent(failed, failedRequest);
+  observeRequestFailedEvent(failed, failedRequest);
+  let envelope = parseBrowserObservabilityAttachment(finalizeBrowserObservability(failed));
+  assert.equal(envelope.network_aggregate.terminal_failure_count, 1);
+  assert.equal(envelope.network_aggregate.status_class_counts.no_response, 1);
+  assert.equal(envelope.network_aggregate.completeness_status, 'complete');
+
+  const unresolved = state();
+  const unresolvedRequest = {
+    url: () => 'http://127.0.0.1:41234/health',
+    method: () => 'GET',
+    resourceType: () => 'fetch',
+    isNavigationRequest: () => false,
+    redirectedFrom: () => null,
+  };
+  observeRequestEvent(unresolved, unresolvedRequest);
+  envelope = parseBrowserObservabilityAttachment(finalizeBrowserObservability(unresolved));
+  assert.equal(envelope.network_aggregate.unresolved_request_count, 1);
+  assert.equal(envelope.network_aggregate.completeness_status, 'incomplete_collector_error');
+
+  const duplicate = state();
+  observeRequestEvent(duplicate, unresolvedRequest);
+  observeResponseEvent(duplicate, { request: () => unresolvedRequest, status: () => 200 });
+  observeRequestFailedEvent(duplicate, unresolvedRequest);
+  envelope = parseBrowserObservabilityAttachment(finalizeBrowserObservability(duplicate));
+  assert.equal(envelope.network_aggregate.duplicate_terminal_count, 1);
+  assert.equal(envelope.network_aggregate.completeness_status, 'incomplete_collector_error');
 });
 
 test('URL classifier discards raw dynamic paths and rejects nonlocal spellings', () => {
@@ -138,6 +180,21 @@ test('URL classifier discards raw dynamic paths and rejects nonlocal spellings',
   });
 });
 
+test('popup worker and websocket activity cannot produce trusted complete evidence', () => {
+  const current = state();
+  const primary = new EventEmitter();
+  const popup = new EventEmitter();
+  observeBrowserPage(current, primary, { allowPrimary: true });
+  observeBrowserPage(current, popup, { allowPrimary: true });
+  primary.emit('worker');
+  primary.emit('websocket');
+  const envelope = parseBrowserObservabilityAttachment(finalizeBrowserObservability(current));
+  assert.equal(envelope.network_aggregate.unexpected_page_count, 1);
+  assert.equal(envelope.network_aggregate.worker_attempt_count, 1);
+  assert.equal(envelope.network_aggregate.websocket_attempt_count, 1);
+  assert.equal(envelope.network_aggregate.completeness_status, 'incomplete_collector_error');
+});
+
 test('attachment envelope is canonical, exact, bounded, and identity-bound', () => {
   const specPath = 'tests/controlled-ops/browser-pilot/pilot.spec.ts';
   const safeLabel = 'synthetic-form-submit';
@@ -145,6 +202,7 @@ test('attachment envelope is canonical, exact, bounded, and identity-bound', () 
   const envelope = {
     schema_version: BROWSER_OBSERVABILITY_SCHEMA,
     run_id: 'browser-run-local',
+    source_manifest_digest: 'b'.repeat(64),
     test_id: testId,
     attempt_id: attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 }),
     worker_index: 0,

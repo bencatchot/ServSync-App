@@ -2,9 +2,9 @@ import { expect, test as base } from '@playwright/test';
 import {
   BROWSER_OBSERVABILITY_ATTACHMENT_NAME,
   BROWSER_OBSERVABILITY_MIME_TYPE,
-  applyEgressDecisionCounts,
   createBrowserObservabilityState,
-  finalizeBrowserObservability,
+  drainAndFinalizeBrowserObservability,
+  observeBrowserContext,
   observeBrowserPage,
 } from '../../../scripts/controlled-ops/browser-collectors.mjs';
 import {
@@ -29,9 +29,9 @@ export const test = base.extend({
       runId: launch.descriptor.run_id,
       testInfo,
       baseURL,
+      sourceManifestDigest: launch.descriptor.source_manifest_digest,
     });
-    const observePage = (pageToObserve) => observeBrowserPage(observability, pageToObserve);
-    context.on('page', observePage);
+    observeBrowserContext(observability, context);
     await context.route('**/*', async (route) => {
       if (guard.shouldAllow(route.request().url())) await route.continue();
       else await route.abort('blockedbyclient');
@@ -43,11 +43,12 @@ export const test = base.extend({
       }
     });
     const page = await context.newPage();
-    observePage(page);
+    observeBrowserPage(observability, page, { allowPrimary: true });
     await use(page);
-    context.off('page', observePage);
-    applyEgressDecisionCounts(observability, guard.getDecisionCounts());
-    const body = finalizeBrowserObservability(observability);
+    const body = await drainAndFinalizeBrowserObservability(observability, {
+      context,
+      decisionCounts: guard.getDecisionCounts(),
+    });
     await testInfo.attach(BROWSER_OBSERVABILITY_ATTACHMENT_NAME, {
       body,
       contentType: BROWSER_OBSERVABILITY_MIME_TYPE,

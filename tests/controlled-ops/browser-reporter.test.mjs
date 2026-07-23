@@ -24,12 +24,13 @@ function hasCode(code) {
   return (error) => error?.code === code;
 }
 
-function attachmentFor({ runId, specPath, safeLabel }) {
+function attachmentFor({ runId, specPath, safeLabel, sourceManifestDigest }) {
   const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
   const attemptId = attemptIdFor({ testId, retryIndex: 0, workerIndex: 0 });
   const envelope = {
     schema_version: BROWSER_OBSERVABILITY_SCHEMA,
     run_id: runId,
+    source_manifest_digest: sourceManifestDigest,
     test_id: testId,
     attempt_id: attemptId,
     worker_index: 0,
@@ -66,8 +67,8 @@ test('controlled-ops reporter writes a strict local lifecycle journal', async ()
         runLabel: 'synthetic-form-submit',
       });
     const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
-    const suite = { allTests: () => [{ title: 'synthetic-form-submit' }] };
     const testCase = { id: 'test-case-1', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
+    const suite = { allTests: () => [testCase] };
     reporter.onBegin(config, suite);
     reporter.onTestBegin(testCase, { workerIndex: 0, retry: 0 });
     reporter.onStepEnd(testCase, {}, { category: 'test.step', title: 'open-local-page', duration: 5 });
@@ -76,7 +77,7 @@ test('controlled-ops reporter writes a strict local lifecycle journal', async ()
     reporter.onTestEnd(testCase, {
       status: 'passed',
       duration: 25,
-      attachments: [attachmentFor({ runId: launch.descriptor.run_id, specPath, safeLabel: 'synthetic-form-submit' })],
+      attachments: [attachmentFor({ runId: launch.descriptor.run_id, sourceManifestDigest: launch.descriptor.source_manifest_digest, specPath, safeLabel: 'synthetic-form-submit' })],
     });
     reporter.onEnd({ status: 'passed' });
     const journal = readJournal(join(journalRoot, 'browser-journal.ndjson'));
@@ -127,19 +128,56 @@ test('controlled-ops reporter rejects missing duplicate or path-backed observabi
         baseURL: 'http://127.0.0.1:43210',
         runLabel: 'synthetic-form-submit',
       });
-      const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
-      const suite = { allTests: () => [{ title: 'synthetic-form-submit' }] };
       const testCase = { id: `test-case-${suffix}`, title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
+      const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
+      const suite = { allTests: () => [testCase] };
       reporter.onBegin(config, suite);
       reporter.onTestBegin(testCase, { workerIndex: 0, retry: 0 });
-      return { reporter, testCase, attachment: attachmentFor({ runId: launch.descriptor.run_id, specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts', safeLabel: 'synthetic-form-submit' }) };
+      return { reporter, testCase, attachment: attachmentFor({ runId: launch.descriptor.run_id, sourceManifestDigest: launch.descriptor.source_manifest_digest, specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts', safeLabel: 'synthetic-form-submit' }) };
     };
     const missing = makeReporter('missing');
-    assert.throws(() => missing.reporter.onTestEnd(missing.testCase, { status: 'passed', duration: 1, attachments: [] }), hasCode('BROWSER_OBSERVABILITY_ATTACHMENT'));
+    missing.reporter.onTestEnd(missing.testCase, { status: 'passed', duration: 1, attachments: [] });
+    missing.reporter.onEnd({ status: 'failed' });
+    const missingJournal = readJournal(join(parent, 'journal-missing', 'browser-journal.ndjson'));
+    assert.equal(missingJournal.records.find((record) => record.record_type === 'browser_console_summary').console_aggregate.completeness_status, 'incomplete_missing_attachment');
     const duplicate = makeReporter('duplicate');
-    assert.throws(() => duplicate.reporter.onTestEnd(duplicate.testCase, { status: 'passed', duration: 1, attachments: [duplicate.attachment, duplicate.attachment] }), hasCode('BROWSER_OBSERVABILITY_ATTACHMENT'));
+    duplicate.reporter.onTestEnd(duplicate.testCase, { status: 'passed', duration: 1, attachments: [duplicate.attachment, duplicate.attachment] });
     const pathBacked = makeReporter('path-backed');
-    assert.throws(() => pathBacked.reporter.onTestEnd(pathBacked.testCase, { status: 'passed', duration: 1, attachments: [{ ...pathBacked.attachment, body: undefined, path: join(parent, 'unsafe.json') }] }), hasCode('BROWSER_OBSERVABILITY_ATTACHMENT'));
+    pathBacked.reporter.onTestEnd(pathBacked.testCase, { status: 'passed', duration: 1, attachments: [{ ...pathBacked.attachment, body: undefined, path: join(parent, 'unsafe.json') }] });
+    const extraBody = makeReporter('extra-body');
+    extraBody.reporter.onTestEnd(extraBody.testCase, { status: 'passed', duration: 1, attachments: [extraBody.attachment, { name: 'uncontrolled-extra', contentType: 'text/plain', body: Buffer.from('ignored') }] });
+    const wrongDigest = makeReporter('wrong-digest');
+    const forged = attachmentFor({ runId: wrongDigest.attachment ? JSON.parse(wrongDigest.attachment.body.toString('utf8')).run_id : 'browser-run-local', sourceManifestDigest: 'f'.repeat(64), specPath: 'tests/controlled-ops/browser-pilot/pilot.spec.ts', safeLabel: 'synthetic-form-submit' });
+    wrongDigest.reporter.onTestEnd(wrongDigest.testCase, { status: 'passed', duration: 1, attachments: [forged] });
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('controlled-ops reporter rejects unapproved or expanded source suites before journaling', () => {
+  const parent = tempRoot();
+  try {
+    const makeReporter = (suffix) => {
+      const launch = createBrowserLaunchContract({
+        root: join(parent, `launch-source-${suffix}`),
+        baseURL: 'http://127.0.0.1:43210',
+        runLabel: 'synthetic-form-submit',
+      });
+      return new ControlledOpsBrowserReporter({
+        descriptorPath: launch.descriptorPath,
+        journalAuthSecret: launch.journalAuthSecret,
+        journalRoot: join(parent, `journal-source-${suffix}`),
+        nonce: launch.nonce,
+        baseURL: 'http://127.0.0.1:43210',
+        runLabel: 'synthetic-form-submit',
+      });
+    };
+    const config = { projects: [{ name: 'chromium', retries: 0 }], workers: 1, fullyParallel: false };
+    const approved = { id: 'approved', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/pilot.spec.ts') } };
+    const uncontrolled = { id: 'uncontrolled', title: 'synthetic-form-submit', location: { file: join(process.cwd(), 'tests/controlled-ops/browser-pilot/uncontrolled.spec.ts') } };
+    assert.throws(() => makeReporter('direct').onBegin(config, { allTests: () => [uncontrolled] }), hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'));
+    assert.throws(() => makeReporter('extra').onBegin(config, { allTests: () => [approved, uncontrolled] }), hasCode('BROWSER_SOURCE_MANIFEST_MISMATCH'));
+    assert.throws(() => makeReporter('retry').onBegin({ projects: [{ name: 'chromium', retries: 1 }], workers: 1, fullyParallel: false }, { allTests: () => [approved] }), hasCode('BROWSER_REPORTER_CONFIG'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

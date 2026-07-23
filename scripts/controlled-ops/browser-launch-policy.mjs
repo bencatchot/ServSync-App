@@ -13,15 +13,18 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import {
   EvidenceError,
+  assertExactObject,
   assertCanonicalParents,
   canonicalStringify,
   fsyncDirectory,
   sha256,
+  sha256File,
   utcNow,
   validateControlledSlug,
+  validateRelativePath,
   validateRawOperationRootInput,
   validateTimestamp,
 } from './internal.mjs';
@@ -33,6 +36,13 @@ export const BROWSER_REPORTER_READY_SCHEMA = 'servsync-controlled-ops/browser-re
 export const BROWSER_LAUNCH_TOOL_VERSION = '2a.2.0';
 export const REPORTER_READY_FILENAME = 'browser-reporter-ready.json';
 export const LAUNCH_DESCRIPTOR_FILENAME = 'browser-launch.json';
+export const BROWSER_SOURCE_MANIFEST_SCHEMA = 'servsync-controlled-ops/browser-source-manifest-v1';
+export const APPROVED_BROWSER_SOURCE_ROLES = Object.freeze(['collector_module', 'controlled_fixture', 'pilot_spec']);
+export const APPROVED_BROWSER_SOURCE_PATHS = Object.freeze({
+  collector_module: 'scripts/controlled-ops/browser-collectors.mjs',
+  controlled_fixture: 'tests/controlled-ops/browser-pilot/controlled-ops-test.ts',
+  pilot_spec: 'tests/controlled-ops/browser-pilot/pilot.spec.ts',
+});
 
 export const PROHIBITED_BROWSER_ENV_NAMES = Object.freeze([
   'BROWSER_BASE_URL',
@@ -85,6 +95,62 @@ function assertJournalAuthSecret(secret) {
     throw new EvidenceError('INVALID_BROWSER_AUTH_SECRET', 'Browser launch auth secret is invalid.');
   }
   return secret;
+}
+
+function assertRepoFile(repoRoot, relativePath) {
+  const safePath = validateRelativePath(relativePath, 'browser source manifest path');
+  const root = resolve(repoRoot);
+  const absolute = resolve(root, ...safePath.split('/'));
+  if (absolute === root || !absolute.startsWith(`${root}${sep}`) || relative(root, absolute).split(sep).join('/') !== safePath) {
+    throw new EvidenceError('UNSAFE_BROWSER_SOURCE_MANIFEST', 'Browser source manifest path escapes the repository.');
+  }
+  assertCanonicalParents(absolute);
+  if (realpathSync(dirname(absolute)) !== dirname(absolute)) throw new EvidenceError('SYMLINK_REJECTED', 'Browser source manifest parent is symlinked.');
+  const info = lstatSync(absolute);
+  if (!info.isFile() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.nlink !== 1) {
+    throw new EvidenceError('UNSAFE_BROWSER_SOURCE_MANIFEST', 'Browser source manifest file is unsafe.');
+  }
+  return { absolute, relativePath: safePath, sha256: sha256File(absolute, 2 * 1024 * 1024) };
+}
+
+export function createApprovedBrowserSourceManifest({ repoRoot = process.cwd() } = {}) {
+  const roles = {};
+  for (const role of APPROVED_BROWSER_SOURCE_ROLES) {
+    const entry = assertRepoFile(repoRoot, APPROVED_BROWSER_SOURCE_PATHS[role]);
+    roles[role] = {
+      path: entry.relativePath,
+      sha256: entry.sha256,
+    };
+  }
+  const manifest = {
+    schema_version: BROWSER_SOURCE_MANIFEST_SCHEMA,
+    roles,
+  };
+  const digest = sha256(canonicalStringify(manifest));
+  return Object.freeze({ manifest, digest });
+}
+
+export function validateBrowserSourceManifest(manifest, expectedDigest = null, { repoRoot = process.cwd(), verifyCurrentBytes = true } = {}) {
+  assertExactObject(manifest, ['schema_version', 'roles'], [], 'browser source manifest');
+  if (manifest.schema_version !== BROWSER_SOURCE_MANIFEST_SCHEMA) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest schema is invalid.');
+  assertExactObject(manifest.roles, APPROVED_BROWSER_SOURCE_ROLES, [], 'browser source manifest roles');
+  const seenPaths = new Set();
+  for (const role of APPROVED_BROWSER_SOURCE_ROLES) {
+    const entry = manifest.roles[role];
+    assertExactObject(entry, ['path', 'sha256'], [], 'browser source manifest entry');
+    const expectedPath = APPROVED_BROWSER_SOURCE_PATHS[role];
+    if (entry.path !== expectedPath) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest path is not approved.');
+    if (seenPaths.has(entry.path)) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest contains a duplicate path.');
+    seenPaths.add(entry.path);
+    if (typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256)) throw new EvidenceError('INVALID_BROWSER_SOURCE_MANIFEST', 'Browser source manifest digest is invalid.');
+    if (verifyCurrentBytes) {
+      const current = assertRepoFile(repoRoot, entry.path);
+      if (current.sha256 !== entry.sha256) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser source manifest no longer matches approved source bytes.');
+    }
+  }
+  const digest = sha256(canonicalStringify(manifest));
+  if (expectedDigest !== null && digest !== expectedDigest) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser source manifest digest mismatch.');
+  return { manifest, digest };
 }
 
 function reporterReadyAuthTag(secret, readyWithoutTag) {
@@ -160,10 +226,13 @@ export function assertSupportedLauncherArguments(argv = []) {
   if (argv.length > 0) throw new EvidenceError('UNSUPPORTED_BROWSER_LAUNCH_ARGUMENT', 'Controlled-ops browser launcher does not accept positional arguments or Playwright flags.');
 }
 
-export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
+export function createBrowserLaunchContract({ root, baseURL, runLabel, repoRoot = process.cwd(), sourceManifest = null }) {
   const launchRoot = assertMode700Directory(root, 'browser launch root');
   const safeBaseURL = validateBrowserUrl(baseURL);
   const safeRunLabel = validateControlledSlug(runLabel, 'browser run label', { maxLength: 64 });
+  const approvedSource = sourceManifest
+    ? validateBrowserSourceManifest(sourceManifest, null, { repoRoot })
+    : createApprovedBrowserSourceManifest({ repoRoot });
   const nonce = randomBytes(32).toString('hex');
   const journalAuthSecret = randomBytes(32).toString('hex');
   const runId = `browser-run-${randomBytes(12).toString('hex')}`;
@@ -178,6 +247,8 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
     journal_auth_digest: sha256(journalAuthSecret),
     base_url: safeBaseURL,
     run_label: safeRunLabel,
+    source_manifest: approvedSource.manifest,
+    source_manifest_digest: approvedSource.digest,
     reporter_ready_path: reporterReadyPath,
   };
   writeExclusiveJson(launchRoot, descriptorPath, descriptor);
@@ -187,7 +258,7 @@ export function createBrowserLaunchContract({ root, baseURL, runLabel }) {
 export function readBrowserLaunchDescriptor(descriptorPath) {
   const path = assertLaunchFile(descriptorPath, LAUNCH_DESCRIPTOR_FILENAME);
   const descriptor = readCanonicalJson(path);
-  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'journal_auth_digest', 'base_url', 'run_label', 'reporter_ready_path'];
+  const required = ['schema_version', 'tool_version', 'created_utc', 'run_id', 'nonce_digest', 'journal_auth_digest', 'base_url', 'run_label', 'source_manifest', 'source_manifest_digest', 'reporter_ready_path'];
   const keys = Object.keys(descriptor).sort();
   if (canonicalStringify(keys) !== canonicalStringify(required.sort())) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor schema is invalid.');
   if (descriptor.schema_version !== BROWSER_LAUNCH_SCHEMA || descriptor.tool_version !== BROWSER_LAUNCH_TOOL_VERSION) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch descriptor version is invalid.');
@@ -197,6 +268,7 @@ export function readBrowserLaunchDescriptor(descriptorPath) {
   if (!/^[a-f0-9]{64}$/.test(descriptor.journal_auth_digest)) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser launch auth digest is invalid.');
   validateBrowserUrl(descriptor.base_url);
   validateControlledSlug(descriptor.run_label, 'browser run label', { maxLength: 64 });
+  validateBrowserSourceManifest(descriptor.source_manifest, descriptor.source_manifest_digest, { verifyCurrentBytes: false });
   const readyPath = resolve(descriptor.reporter_ready_path);
   const root = dirname(path);
   if (dirname(readyPath) !== root || basename(readyPath) !== REPORTER_READY_FILENAME) throw new EvidenceError('INVALID_BROWSER_LAUNCH_DESCRIPTOR', 'Browser reporter-ready path is invalid.');

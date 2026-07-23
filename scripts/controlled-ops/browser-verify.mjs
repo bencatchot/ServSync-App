@@ -21,7 +21,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const options = parseOptions(process.argv.slice(2));
     if (!options.summary) throw new EvidenceError('INVALID_ARGUMENTS', '--summary is required.');
     const summary = verifyBrowserSummary(options.summary, { sourceJournalPath: options.journal ?? null });
-    process.stdout.write(`${canonicalStringify({ status: 'verified', run_status: summary.status, tests: summary.counts.started })}\n`);
+    process.stdout.write(`${canonicalStringify({
+      journal_recomputed: Boolean(options.journal),
+      run_status: summary.status,
+      status: 'verified',
+      tests: summary.counts.started,
+    })}\n`);
   } catch (error) {
     const safe = safeError(error);
     process.stderr.write(`${basename(process.argv[1])}: ${safe.code}: ${safe.message}\n`);

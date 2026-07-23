@@ -21,7 +21,7 @@ export const BROWSER_PROVENANCE_MODES = Object.freeze(['standalone', 'generated_
 export const BROWSER_LIMITS = Object.freeze({
   tests_per_run: 25,
   workers: 1,
-  retry_index_max: 1,
+  retry_index_max: 0,
   steps_per_test: 50,
   journal_records: 1400,
   line_bytes: 16 * 1024,
@@ -71,6 +71,7 @@ const STATUS_CLASSES = Object.freeze(['1xx', '2xx', '3xx', '4xx', '5xx', 'no_res
 const FAILURE_CLASSES = Object.freeze(['blocked_by_policy', 'aborted', 'connection', 'timeout', 'other', 'unknown']);
 const RESOURCE_TYPES = Object.freeze(['document', 'stylesheet', 'image', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other']);
 const REJECTED_EGRESS_CLASSES = Object.freeze(['invalid', 'rejected_external', 'alternate_port', 'websocket', 'worker', 'other']);
+const COMPLETE_ONLY_FIELDS = Object.freeze(['overflow_count', 'late_event_count', 'listener_error_count']);
 
 export const BROWSER_RECORD_FIELDS = [
   'schema_version',
@@ -142,12 +143,12 @@ export function validateGeneratedBrowserId(value, fieldName = 'browser generated
 }
 
 export function validateProject(value) {
-  if (value !== 'chromium') throw new EvidenceError('INVALID_BROWSER_PROJECT', 'Slice 2A supports only the chromium project.');
+  if (value !== 'chromium') throw new EvidenceError('INVALID_BROWSER_PROJECT', 'Slice 2B supports only the chromium project.');
   return value;
 }
 
 export function validateTargetClassification(value) {
-  if (value !== 'local') throw new EvidenceError('INVALID_BROWSER_TARGET', 'Slice 2A supports only local browser targets.');
+  if (value !== 'local') throw new EvidenceError('INVALID_BROWSER_TARGET', 'Slice 2B supports only local browser targets.');
   return value;
 }
 
@@ -203,6 +204,8 @@ export function testIdFor({ specPath, project, safeLabel }) {
 
 export function attemptIdFor({ testId, retryIndex, workerIndex }) {
   validateGeneratedBrowserId(testId, 'browser test ID');
+  validateNullableInteger(retryIndex, 'browser retry index', { min: 0, max: BROWSER_LIMITS.retry_index_max });
+  validateNullableInteger(workerIndex, 'browser worker index', { min: 0, max: 0 });
   return `attempt-${sha256(`${testId}\n${retryIndex}\n${workerIndex}`).slice(0, 24)}`;
 }
 
@@ -228,6 +231,7 @@ function validateCounterMap(value, keys, fieldName, { total = null, max = BROWSE
     sum += count;
   }
   if (total !== null && sum !== total) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', `${fieldName} does not reconcile.`);
+  return sum;
 }
 
 function validateAggregateCommon(aggregate, fieldName) {
@@ -239,30 +243,43 @@ function validateAggregateCommon(aggregate, fieldName) {
   if (aggregate.last_observed_utc != null) validateTimestamp(aggregate.last_observed_utc, `${fieldName} last observed`);
   if (aggregate.first_observed_utc != null && aggregate.last_observed_utc != null && Date.parse(aggregate.last_observed_utc) < Date.parse(aggregate.first_observed_utc)) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', `${fieldName} timestamps regress.`);
   if (!COMPLETENESS_STATES.includes(aggregate.completeness_status) || !COLLECTOR_FAILURE_CLASSES.includes(aggregate.collector_failure_class)) throw new EvidenceError('INVALID_BROWSER_OBSERVABILITY', `${fieldName} state is invalid.`);
+  if (aggregate.completeness_status === 'complete') {
+    for (const key of COMPLETE_ONLY_FIELDS) {
+      if (aggregate[key] !== 0) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', `${fieldName} cannot be complete with ${key}.`);
+    }
+    if (aggregate.collector_failure_class !== 'none') throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', `${fieldName} cannot be complete with a collector failure.`);
+  }
 }
 
 function validateSummaryConsoleAggregate(aggregate) {
-  assertExactObject(aggregate, ['total_count', 'type_counts', 'severity_counts', 'safe_message_class_counts', 'rejected_sensitive_count', 'rejected_customer_content_count', 'invalid_event_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'first_observed_utc', 'last_observed_utc', 'completeness_status', 'collector_failure_class'], [], 'browser summary console aggregate');
+  assertExactObject(aggregate, ['total_count', 'type_counts', 'severity_counts', 'safe_message_class_counts', 'rejected_event_count', 'rejected_sensitive_count', 'rejected_customer_content_count', 'invalid_event_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'first_observed_utc', 'last_observed_utc', 'completeness_status', 'collector_failure_class'], [], 'browser summary console aggregate');
   validateNullableInteger(aggregate.total_count, 'browser summary console total', { max: BROWSER_LIMITS.console_events_per_attempt });
   validateCounterMap(aggregate.type_counts, CONSOLE_TYPES, 'browser summary console type counts', { total: aggregate.total_count, max: BROWSER_LIMITS.console_events_per_attempt });
   validateCounterMap(aggregate.severity_counts, CONSOLE_SEVERITIES, 'browser summary console severity counts', { total: aggregate.total_count, max: BROWSER_LIMITS.console_events_per_attempt });
-  validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser summary console safe message counts', { max: BROWSER_LIMITS.console_events_per_attempt });
+  const safeTotal = validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser summary console safe message counts', { max: BROWSER_LIMITS.console_events_per_attempt });
+  validateNullableInteger(aggregate.rejected_event_count, 'browser summary console rejected event count', { max: BROWSER_LIMITS.console_events_per_attempt });
+  if (safeTotal + aggregate.rejected_event_count + aggregate.invalid_event_count !== aggregate.total_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary console disposition counts do not reconcile.');
+  if (aggregate.rejected_sensitive_count > aggregate.rejected_event_count || aggregate.rejected_customer_content_count > aggregate.rejected_event_count || Math.max(aggregate.rejected_sensitive_count, aggregate.rejected_customer_content_count) > aggregate.rejected_event_count || aggregate.rejected_event_count > aggregate.rejected_sensitive_count + aggregate.rejected_customer_content_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary console rejected counts do not reconcile.');
   validateAggregateCommon(aggregate, 'browser summary console aggregate');
 }
 
 function validateSummaryPageErrorAggregate(aggregate) {
-  assertExactObject(aggregate, ['total_count', 'error_kind_counts', 'safe_message_class_counts', 'stack_present_count', 'origin_class_counts', 'duplicate_count', 'rejected_sensitive_count', 'rejected_customer_content_count', 'invalid_event_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'first_observed_utc', 'last_observed_utc', 'completeness_status', 'collector_failure_class'], [], 'browser summary page-error aggregate');
+  assertExactObject(aggregate, ['total_count', 'error_kind_counts', 'safe_message_class_counts', 'stack_present_count', 'origin_class_counts', 'duplicate_count', 'rejected_event_count', 'rejected_sensitive_count', 'rejected_customer_content_count', 'invalid_event_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'first_observed_utc', 'last_observed_utc', 'completeness_status', 'collector_failure_class'], [], 'browser summary page-error aggregate');
   validateNullableInteger(aggregate.total_count, 'browser summary page error total', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateCounterMap(aggregate.error_kind_counts, ERROR_KINDS, 'browser summary page error kind counts', { total: aggregate.total_count, max: BROWSER_LIMITS.page_errors_per_attempt });
-  validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser summary page error safe message counts', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  const safeTotal = validateCounterMap(aggregate.safe_message_class_counts, SAFE_MESSAGE_CLASSES, 'browser summary page error safe message counts', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateCounterMap(aggregate.origin_class_counts, PAGE_ERROR_ORIGINS, 'browser summary page error origin counts', { total: aggregate.total_count, max: BROWSER_LIMITS.page_errors_per_attempt });
   validateNullableInteger(aggregate.stack_present_count, 'browser summary page error stack count', { max: BROWSER_LIMITS.page_errors_per_attempt });
   validateNullableInteger(aggregate.duplicate_count, 'browser summary page error duplicate count', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  validateNullableInteger(aggregate.rejected_event_count, 'browser summary page error rejected event count', { max: BROWSER_LIMITS.page_errors_per_attempt });
+  if (safeTotal + aggregate.rejected_event_count + aggregate.invalid_event_count !== aggregate.total_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary page-error disposition counts do not reconcile.');
+  if (aggregate.stack_present_count > aggregate.total_count || aggregate.duplicate_count > Math.max(aggregate.total_count - 1, 0)) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary page-error impossible counts were rejected.');
+  if (aggregate.rejected_sensitive_count > aggregate.rejected_event_count || aggregate.rejected_customer_content_count > aggregate.rejected_event_count || Math.max(aggregate.rejected_sensitive_count, aggregate.rejected_customer_content_count) > aggregate.rejected_event_count || aggregate.rejected_event_count > aggregate.rejected_sensitive_count + aggregate.rejected_customer_content_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary page-error rejected counts do not reconcile.');
   validateAggregateCommon(aggregate, 'browser summary page-error aggregate');
 }
 
 function validateSummaryNetworkAggregate(aggregate) {
-  assertExactObject(aggregate, ['total_requests', 'method_class_counts', 'origin_class_counts', 'route_class_counts', 'resource_type_counts', 'navigation_count', 'subresource_count', 'status_class_counts', 'failure_class_counts', 'redirect_count', 'rejected_egress_class_counts', 'websocket_attempt_count', 'worker_attempt_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'completeness_status', 'collector_failure_class'], [], 'browser summary network aggregate');
+  assertExactObject(aggregate, ['total_requests', 'method_class_counts', 'origin_class_counts', 'route_class_counts', 'resource_type_counts', 'navigation_count', 'subresource_count', 'status_class_counts', 'failure_class_counts', 'redirect_count', 'rejected_egress_class_counts', 'terminal_response_count', 'terminal_failure_count', 'unresolved_request_count', 'duplicate_terminal_count', 'unexpected_page_count', 'websocket_attempt_count', 'worker_attempt_count', 'overflow_count', 'late_event_count', 'listener_error_count', 'completeness_status', 'collector_failure_class'], [], 'browser summary network aggregate');
   validateNullableInteger(aggregate.total_requests, 'browser summary network total', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateCounterMap(aggregate.method_class_counts, METHOD_CLASSES, 'browser summary network method counts', { total: aggregate.total_requests, max: BROWSER_LIMITS.network_requests_per_attempt });
   validateCounterMap(aggregate.origin_class_counts, ORIGIN_CLASSES, 'browser summary network origin counts', { total: aggregate.total_requests, max: BROWSER_LIMITS.network_requests_per_attempt });
@@ -271,12 +288,22 @@ function validateSummaryNetworkAggregate(aggregate) {
   validateNullableInteger(aggregate.navigation_count, 'browser summary network navigation count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.subresource_count, 'browser summary network subresource count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   if (aggregate.navigation_count + aggregate.subresource_count !== aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network navigation counts do not reconcile.');
-  validateCounterMap(aggregate.status_class_counts, STATUS_CLASSES, 'browser summary network status counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
-  validateCounterMap(aggregate.failure_class_counts, FAILURE_CLASSES, 'browser summary network failure counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateCounterMap(aggregate.status_class_counts, STATUS_CLASSES, 'browser summary network status counts', { total: aggregate.total_requests, max: BROWSER_LIMITS.network_requests_per_attempt });
+  const failureTotal = validateCounterMap(aggregate.failure_class_counts, FAILURE_CLASSES, 'browser summary network failure counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateCounterMap(aggregate.rejected_egress_class_counts, REJECTED_EGRESS_CLASSES, 'browser summary rejected egress counts', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.redirect_count, 'browser summary network redirect count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.terminal_response_count, 'browser summary network terminal response count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.terminal_failure_count, 'browser summary network terminal failure count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.unresolved_request_count, 'browser summary network unresolved count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.duplicate_terminal_count, 'browser summary network duplicate terminal count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  validateNullableInteger(aggregate.unexpected_page_count, 'browser summary network unexpected page count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.websocket_attempt_count, 'browser summary network websocket count', { max: BROWSER_LIMITS.network_requests_per_attempt });
   validateNullableInteger(aggregate.worker_attempt_count, 'browser summary network worker count', { max: BROWSER_LIMITS.network_requests_per_attempt });
+  if (aggregate.redirect_count > aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network redirect count is impossible.');
+  if (aggregate.terminal_response_count + aggregate.terminal_failure_count + aggregate.unresolved_request_count !== aggregate.total_requests) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network terminal counts do not reconcile.');
+  if (aggregate.status_class_counts.no_response !== aggregate.terminal_failure_count + aggregate.unresolved_request_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network no-response counts do not reconcile.');
+  if (failureTotal !== aggregate.terminal_failure_count) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network failure counts do not reconcile.');
+  if (aggregate.completeness_status === 'complete' && (aggregate.unresolved_request_count !== 0 || aggregate.duplicate_terminal_count !== 0 || aggregate.unexpected_page_count !== 0 || aggregate.worker_attempt_count !== 0 || aggregate.websocket_attempt_count !== 0)) throw new EvidenceError('BROWSER_OBSERVABILITY_COUNT_MISMATCH', 'Browser summary network unsupported activity cannot be complete.');
   validateAggregateCommon(aggregate, 'browser summary network aggregate');
 }
 

@@ -2,6 +2,7 @@ import { relative } from 'node:path';
 import {
   BROWSER_OBSERVABILITY_ATTACHMENT_NAME,
   BROWSER_OBSERVABILITY_MIME_TYPE,
+  createEmptyBrowserObservabilityAggregates,
   parseBrowserObservabilityAttachment,
   validateConsoleAggregate,
   validateNetworkAggregate,
@@ -18,7 +19,7 @@ import {
 } from './browser-schema.mjs';
 import { createJournalWriter } from './browser-journal.mjs';
 import { classifyError } from './browser-importer.mjs';
-import { assertBrowserLaunchContract, writeReporterReady } from './browser-launch-policy.mjs';
+import { APPROVED_BROWSER_SOURCE_PATHS, assertBrowserLaunchContract, validateBrowserSourceManifest, writeReporterReady } from './browser-launch-policy.mjs';
 import { EvidenceError, utcNow, validateControlledSlug, validateRelativePath } from './internal.mjs';
 
 function mapStatus(status) {
@@ -63,10 +64,11 @@ export default class ControlledOpsBrowserReporter {
       throw new EvidenceError('BROWSER_LAUNCH_CONTRACT_MISMATCH', 'Browser reporter launch contract does not match config.');
     }
     this.runId = launch.descriptor.run_id;
-    if (config.projects.length !== 1 || config.projects[0].name !== 'chromium') throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A requires exactly one chromium project.');
-    if (config.workers !== 1 || config.fullyParallel) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A requires one serial worker.');
-    if (config.projects[0].retries !== 0 && config.projects[0].retries > BROWSER_LIMITS.retry_index_max) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2A retry config is invalid.');
-    if (suite.allTests().length > BROWSER_LIMITS.tests_per_run) throw new EvidenceError('BROWSER_TEST_LIMIT', 'Slice 2A test count limit exceeded.');
+    if (config.projects.length !== 1 || config.projects[0].name !== 'chromium') throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2B requires exactly one chromium project.');
+    if (config.workers !== 1 || config.fullyParallel) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2B requires one serial worker.');
+    if (config.projects[0].retries !== 0) throw new EvidenceError('BROWSER_REPORTER_CONFIG', 'Slice 2B requires retries to be disabled.');
+    if (suite.allTests().length > BROWSER_LIMITS.tests_per_run) throw new EvidenceError('BROWSER_TEST_LIMIT', 'Slice 2B test count limit exceeded.');
+    this.#verifyApprovedSourceSuite(suite, launch.descriptor);
 
     const journalAuthSecret = this.options.journalAuthSecret || process.env.CONTROLLED_OPS_BROWSER_JOURNAL_AUTH_SECRET;
     this.writer = createJournalWriter(journalRoot, { allowPrepared: true, journalAuthSecret });
@@ -83,6 +85,19 @@ export default class ControlledOpsBrowserReporter {
     });
   }
 
+  #verifyApprovedSourceSuite(suite, descriptor) {
+    const approved = validateBrowserSourceManifest(descriptor.source_manifest, descriptor.source_manifest_digest);
+    this.sourceManifestDigest = approved.digest;
+    const tests = suite.allTests();
+    const expectedSpec = APPROVED_BROWSER_SOURCE_PATHS.pilot_spec;
+    if (tests.length !== 1) throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Slice 2B supports exactly one approved synthetic test.');
+    const relativeSpec = validateRelativePath(relative(process.cwd(), tests[0].location.file).split('\\').join('/'), 'browser spec path');
+    if (relativeSpec !== expectedSpec || descriptor.source_manifest.roles.pilot_spec.path !== expectedSpec) {
+      throw new EvidenceError('BROWSER_SOURCE_MANIFEST_MISMATCH', 'Browser test suite does not match approved source manifest.');
+    }
+    validateBrowserSafeLabel(tests[0].title, 'browser approved test title');
+  }
+
   onTestBegin(test, result) {
     const safeLabel = validateBrowserSafeLabel(test.title, 'browser test title');
     const specPath = validateRelativePath(relative(process.cwd(), test.location.file).split('\\').join('/'), 'browser spec path');
@@ -90,8 +105,8 @@ export default class ControlledOpsBrowserReporter {
     const testId = testIdFor({ specPath, project: 'chromium', safeLabel });
     const workerIndex = result.workerIndex ?? 0;
     const retryIndex = result.retry ?? 0;
-    if (workerIndex !== 0) throw new EvidenceError('BROWSER_WORKER_LIMIT', 'Slice 2A requires worker index zero.');
-    if (retryIndex > BROWSER_LIMITS.retry_index_max) throw new EvidenceError('BROWSER_RETRY_LIMIT', 'Slice 2A retry limit exceeded.');
+    if (workerIndex !== 0) throw new EvidenceError('BROWSER_WORKER_LIMIT', 'Slice 2B requires worker index zero.');
+    if (retryIndex !== 0) throw new EvidenceError('BROWSER_RETRY_LIMIT', 'Slice 2B does not support retries.');
     const attemptId = attemptIdFor({ testId, retryIndex, workerIndex });
     this.testStarts.set(test.id, { safeLabel, specPath, testId, attemptId, workerIndex, retryIndex });
     this.writer.append({
@@ -133,7 +148,7 @@ export default class ControlledOpsBrowserReporter {
   onTestEnd(test, result) {
     const start = this.testStarts.get(test.id);
     if (!start) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser test ended before test start.');
-    const observability = this.#validatedObservabilityAttachment(result, start);
+    const { observability } = this.#observabilityOrIncomplete(result, start);
     this.writer.append({
       record_type: 'browser_console_summary',
       run_id: this.runId,
@@ -189,17 +204,34 @@ export default class ControlledOpsBrowserReporter {
     });
   }
 
+  #observabilityOrIncomplete(result, start) {
+    try {
+      return { observability: this.#validatedObservabilityAttachment(result, start), attachmentErrorClass: null };
+    } catch (error) {
+      const observability = createEmptyBrowserObservabilityAggregates();
+      const classification = error?.code === 'BROWSER_OBSERVABILITY_ATTACHMENT_MISSING'
+        ? 'incomplete_missing_attachment'
+        : 'incomplete_invalid_attachment';
+      for (const aggregate of [observability.console_aggregate, observability.page_error_aggregate, observability.network_aggregate]) {
+        aggregate.completeness_status = classification;
+        aggregate.collector_failure_class = 'attachment';
+      }
+      return { observability, attachmentErrorClass: classification };
+    }
+  }
+
   #validatedObservabilityAttachment(result, start) {
-    const attachments = (result.attachments ?? []).filter((attachment) => attachment.name === BROWSER_OBSERVABILITY_ATTACHMENT_NAME);
+    const attachments = result.attachments ?? [];
     if (attachments.length !== 1) {
-      throw new EvidenceError('BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser test requires exactly one controlled observability attachment.');
+      throw new EvidenceError(attachments.length === 0 ? 'BROWSER_OBSERVABILITY_ATTACHMENT_MISSING' : 'BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser test requires exactly one controlled observability attachment.');
     }
     const attachment = attachments[0];
-    if (attachment.contentType !== BROWSER_OBSERVABILITY_MIME_TYPE || attachment.path || !Buffer.isBuffer(attachment.body)) {
+    if (attachment.name !== BROWSER_OBSERVABILITY_ATTACHMENT_NAME || attachment.contentType !== BROWSER_OBSERVABILITY_MIME_TYPE || attachment.path || !Buffer.isBuffer(attachment.body)) {
       throw new EvidenceError('BROWSER_OBSERVABILITY_ATTACHMENT', 'Browser observability attachment must be body-backed with the expected media type.');
     }
     const envelope = parseBrowserObservabilityAttachment(attachment.body);
     if (envelope.run_id !== this.runId
+      || envelope.source_manifest_digest !== this.sourceManifestDigest
       || envelope.test_id !== start.testId
       || envelope.attempt_id !== start.attemptId
       || envelope.worker_index !== start.workerIndex
