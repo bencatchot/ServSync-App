@@ -8,6 +8,8 @@ import {
   compareStrings,
   sha256,
   validateControlledSlug,
+  validateCommandCategory,
+  validateOperationId,
   validateRelativePath,
   validateTimestamp,
 } from './internal.mjs';
@@ -15,9 +17,12 @@ import { parseStrictJson, scanCustomerContent, scanSensitiveContent } from './sa
 
 export const BROWSER_JOURNAL_SCHEMA = 'servsync-controlled-ops/browser-journal-v1';
 export const BROWSER_SUMMARY_SCHEMA = 'servsync-controlled-ops/browser-summary-v1';
+export const BROWSER_PACKET_BINDING_SCHEMA = 'servsync-controlled-ops/browser-packet-binding-v1';
 export const BROWSER_TOOL_VERSION = '2b.1.0';
 export const BROWSER_PROVENANCE_MODES = Object.freeze(['standalone', 'generated_workspace']);
 export const SOURCE_BINDING_MODES = Object.freeze(['current_source_snapshot', 'none']);
+export const PACKET_BINDING_MODES = Object.freeze(['none', 'command_token']);
+export const BROWSER_WORKFLOW_COMMAND_CATEGORY = 'browser-workflow';
 
 export const BROWSER_LIMITS = Object.freeze({
   tests_per_run: 25,
@@ -82,6 +87,12 @@ export const BROWSER_RECORD_FIELDS = [
   'provenance_mode',
   'source_binding_mode',
   'source_manifest_digest',
+  'packet_binding_mode',
+  'operation_id',
+  'stage_id',
+  'execution_token_id',
+  'command_category',
+  'binding_digest',
   'timestamp',
   'target_classification',
   'project',
@@ -110,6 +121,12 @@ export const BROWSER_SUMMARY_FIELDS = [
   'run_id',
   'source_binding_mode',
   'source_manifest_digest',
+  'packet_binding_mode',
+  'operation_id',
+  'stage_id',
+  'execution_token_id',
+  'command_category',
+  'binding_digest',
   'target_classification',
   'project',
   'worker_count',
@@ -152,6 +169,166 @@ export function validateSourceManifestDigest(value, fieldName = 'browser source 
     throw new EvidenceError('INVALID_BROWSER_SOURCE_BINDING', `${fieldName} is invalid.`);
   }
   return value;
+}
+
+export function validateBrowserBindingDigest(value, fieldName = 'browser packet binding digest') {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', `${fieldName} is invalid.`);
+  }
+  return value;
+}
+
+export function canonicalBrowserPacketBinding(input) {
+  assertExactObject(input, [
+    'schema_version',
+    'operation_id',
+    'stage_id',
+    'execution_token_id',
+    'command_category',
+    'browser_run_id',
+    'source_binding_mode',
+    'source_manifest_digest',
+  ], [], 'browser packet binding');
+  if (input.schema_version !== BROWSER_PACKET_BINDING_SCHEMA) {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding schema is invalid.');
+  }
+  const operationId = validateOperationId(input.operation_id);
+  const stageId = validateControlledSlug(input.stage_id, 'browser packet stage ID');
+  const executionTokenId = validateControlledSlug(input.execution_token_id, 'browser packet execution token ID');
+  const commandCategory = validateCommandCategory(input.command_category);
+  if (commandCategory !== BROWSER_WORKFLOW_COMMAND_CATEGORY) {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding command category is invalid.');
+  }
+  const browserRunId = validateGeneratedBrowserId(input.browser_run_id, 'browser packet run ID');
+  if (input.source_binding_mode !== 'current_source_snapshot') {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding requires current-source snapshot mode.');
+  }
+  const sourceManifestDigest = validateSourceManifestDigest(input.source_manifest_digest);
+  return {
+    schema_version: BROWSER_PACKET_BINDING_SCHEMA,
+    operation_id: operationId,
+    stage_id: stageId,
+    execution_token_id: executionTokenId,
+    command_category: commandCategory,
+    browser_run_id: browserRunId,
+    source_binding_mode: 'current_source_snapshot',
+    source_manifest_digest: sourceManifestDigest,
+  };
+}
+
+export function digestBrowserPacketBinding(input) {
+  return sha256(canonicalStringify(canonicalBrowserPacketBinding(input)));
+}
+
+export function createBrowserPacketBinding({
+  operationId,
+  stageId,
+  executionTokenId,
+  commandCategory = BROWSER_WORKFLOW_COMMAND_CATEGORY,
+  browserRunId,
+  sourceBindingMode,
+  sourceManifestDigest,
+} = {}) {
+  const binding = canonicalBrowserPacketBinding({
+    schema_version: BROWSER_PACKET_BINDING_SCHEMA,
+    operation_id: operationId,
+    stage_id: stageId,
+    execution_token_id: executionTokenId,
+    command_category: commandCategory,
+    browser_run_id: browserRunId,
+    source_binding_mode: sourceBindingMode,
+    source_manifest_digest: sourceManifestDigest,
+  });
+  return Object.freeze({ ...binding, binding_digest: digestBrowserPacketBinding(binding) });
+}
+
+export function validateBrowserPacketBindingFields(fields, {
+  runStart = false,
+  browserRunId = null,
+  sourceBindingMode = null,
+  sourceManifestDigest = null,
+  provenanceMode = null,
+} = {}) {
+  assertExactObject(fields, [
+    'packet_binding_mode',
+    'operation_id',
+    'stage_id',
+    'execution_token_id',
+    'command_category',
+    'binding_digest',
+  ], [], 'browser packet binding fields');
+  if (!runStart) {
+    if (fields.packet_binding_mode !== null
+      || fields.operation_id !== null
+      || fields.stage_id !== null
+      || fields.execution_token_id !== null
+      || fields.command_category !== null
+      || fields.binding_digest !== null) {
+      throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding is retained only on run-start records.');
+    }
+    return {
+      packet_binding_mode: null,
+      operation_id: null,
+      stage_id: null,
+      execution_token_id: null,
+      command_category: null,
+      binding_digest: null,
+    };
+  }
+  if (!PACKET_BINDING_MODES.includes(fields.packet_binding_mode)) {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding mode is invalid.');
+  }
+  if (fields.packet_binding_mode === 'none') {
+    if (fields.operation_id !== null
+      || fields.stage_id !== null
+      || fields.execution_token_id !== null
+      || fields.command_category !== null
+      || fields.binding_digest !== null) {
+      throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Unbound browser evidence must not retain packet identifiers.');
+    }
+    return {
+      packet_binding_mode: 'none',
+      operation_id: null,
+      stage_id: null,
+      execution_token_id: null,
+      command_category: null,
+      binding_digest: null,
+    };
+  }
+  if (provenanceMode !== 'generated_workspace') {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Only generated browser evidence may use command-token packet binding.');
+  }
+  const binding = createBrowserPacketBinding({
+    operationId: fields.operation_id,
+    stageId: fields.stage_id,
+    executionTokenId: fields.execution_token_id,
+    commandCategory: fields.command_category,
+    browserRunId,
+    sourceBindingMode,
+    sourceManifestDigest,
+  });
+  if (fields.binding_digest !== binding.binding_digest) {
+    throw new EvidenceError('INVALID_BROWSER_PACKET_BINDING', 'Browser packet binding digest mismatch.');
+  }
+  return {
+    packet_binding_mode: 'command_token',
+    operation_id: binding.operation_id,
+    stage_id: binding.stage_id,
+    execution_token_id: binding.execution_token_id,
+    command_category: binding.command_category,
+    binding_digest: binding.binding_digest,
+  };
+}
+
+export function unboundBrowserPacketBindingFields({ runStart = false } = {}) {
+  return {
+    packet_binding_mode: runStart ? 'none' : null,
+    operation_id: null,
+    stage_id: null,
+    execution_token_id: null,
+    command_category: null,
+    binding_digest: null,
+  };
 }
 
 export function validateBrowserSourceBinding(mode, digest, { runStart = false } = {}) {
@@ -362,6 +539,20 @@ export function validateBrowserRecord(record) {
   validateGeneratedBrowserId(record.run_id, 'browser run ID');
   if (!BROWSER_PROVENANCE_MODES.includes(record.provenance_mode)) throw new EvidenceError('INVALID_BROWSER_PROVENANCE_MODE', 'Browser journal provenance mode is invalid.');
   validateBrowserSourceBinding(record.source_binding_mode, record.source_manifest_digest, { runStart: record.record_type === 'browser_run_started' });
+  validateBrowserPacketBindingFields({
+    packet_binding_mode: record.packet_binding_mode,
+    operation_id: record.operation_id,
+    stage_id: record.stage_id,
+    execution_token_id: record.execution_token_id,
+    command_category: record.command_category,
+    binding_digest: record.binding_digest,
+  }, {
+    runStart: record.record_type === 'browser_run_started',
+    browserRunId: record.run_id,
+    sourceBindingMode: record.source_binding_mode,
+    sourceManifestDigest: record.source_manifest_digest,
+    provenanceMode: record.provenance_mode,
+  });
   validateTimestamp(record.timestamp, 'browser journal timestamp');
   validateTargetClassification(record.target_classification);
   validateProject(record.project);
@@ -439,7 +630,21 @@ export function hashBrowserRecord(previousHash, withoutCurrentHash) {
 }
 
 export function browserRunAuthPayload(recordWithoutHash) {
-  return canonicalStringify({ ...recordWithoutHash, run_auth_tag: null });
+  const payload = { ...recordWithoutHash, run_auth_tag: null };
+  if (payload.packet_binding_mode === null
+    && payload.operation_id === null
+    && payload.stage_id === null
+    && payload.execution_token_id === null
+    && payload.command_category === null
+    && payload.binding_digest === null) {
+    delete payload.packet_binding_mode;
+    delete payload.operation_id;
+    delete payload.stage_id;
+    delete payload.execution_token_id;
+    delete payload.command_category;
+    delete payload.binding_digest;
+  }
+  return canonicalStringify(payload);
 }
 
 export function computeBrowserRunAuthTag(secret, recordWithoutHash) {
@@ -461,6 +666,12 @@ export function buildBrowserRecord(previousHash, input) {
     provenance_mode: provenanceMode,
     source_binding_mode: input.source_binding_mode ?? (input.record_type === 'browser_run_started' && provenanceMode === 'standalone' ? 'none' : null),
     source_manifest_digest: input.source_manifest_digest ?? null,
+    packet_binding_mode: input.packet_binding_mode ?? (input.record_type === 'browser_run_started' ? 'none' : null),
+    operation_id: input.operation_id ?? null,
+    stage_id: input.stage_id ?? null,
+    execution_token_id: input.execution_token_id ?? null,
+    command_category: input.command_category ?? null,
+    binding_digest: input.binding_digest ?? null,
     timestamp: input.timestamp,
     target_classification: 'local',
     project: 'chromium',
@@ -517,6 +728,20 @@ export function validateSummary(summary) {
   if (!/^[a-f0-9]{64}$/.test(summary.source_journal_sha256)) throw new EvidenceError('INVALID_BROWSER_SUMMARY', 'Browser source digest is invalid.');
   validateGeneratedBrowserId(summary.run_id, 'browser summary run ID');
   validateBrowserSourceBinding(summary.source_binding_mode, summary.source_manifest_digest, { runStart: true });
+  validateBrowserPacketBindingFields({
+    packet_binding_mode: summary.packet_binding_mode,
+    operation_id: summary.operation_id,
+    stage_id: summary.stage_id,
+    execution_token_id: summary.execution_token_id,
+    command_category: summary.command_category,
+    binding_digest: summary.binding_digest,
+  }, {
+    runStart: true,
+    browserRunId: summary.run_id,
+    sourceBindingMode: summary.source_binding_mode,
+    sourceManifestDigest: summary.source_manifest_digest,
+    provenanceMode: summary.source_binding_mode === 'current_source_snapshot' ? 'generated_workspace' : 'standalone',
+  });
   validateTargetClassification(summary.target_classification);
   validateProject(summary.project);
   if (summary.worker_count !== 1 || summary.retry_limit !== BROWSER_LIMITS.retry_index_max) throw new EvidenceError('INVALID_BROWSER_SUMMARY', 'Browser summary worker or retry limit is invalid.');

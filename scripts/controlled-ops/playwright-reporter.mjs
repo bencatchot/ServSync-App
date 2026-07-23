@@ -78,6 +78,12 @@ export default class ControlledOpsBrowserReporter {
       run_id: this.runId,
       source_binding_mode: 'current_source_snapshot',
       source_manifest_digest: launch.descriptor.source_manifest_digest,
+      packet_binding_mode: launch.descriptor.packet_binding_mode,
+      operation_id: launch.descriptor.operation_id,
+      stage_id: launch.descriptor.stage_id,
+      execution_token_id: launch.descriptor.execution_token_id,
+      command_category: launch.descriptor.command_category,
+      binding_digest: launch.descriptor.binding_digest,
       timestamp: this.startedAt,
     });
     writeReporterReady({

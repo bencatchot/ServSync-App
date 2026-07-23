@@ -44,6 +44,7 @@ import {
   validateGeneratedBrowserId,
   validateDuration,
   validateBrowserSourceBinding,
+  validateBrowserPacketBindingFields,
   validateSummary,
 } from './browser-schema.mjs';
 import {
@@ -324,7 +325,13 @@ function verifyJournalAuthentication(state, records) {
   const runStart = records[0];
   if (runStart.record_type !== 'browser_run_started'
     || runStart.source_binding_mode !== launch.sourceBindingMode
-    || runStart.source_manifest_digest !== launch.sourceManifestDigest) {
+    || runStart.source_manifest_digest !== launch.sourceManifestDigest
+    || runStart.packet_binding_mode !== launch.packetBinding.packet_binding_mode
+    || runStart.operation_id !== launch.packetBinding.operation_id
+    || runStart.stage_id !== launch.packetBinding.stage_id
+    || runStart.execution_token_id !== launch.packetBinding.execution_token_id
+    || runStart.command_category !== launch.packetBinding.command_category
+    || runStart.binding_digest !== launch.packetBinding.binding_digest) {
     provenanceError();
   }
   const withoutCurrentHash = { ...terminal };
@@ -715,13 +722,13 @@ export function createStandaloneBrowserJournalWriter({ standaloneHandle } = {}) 
   }
 }
 
-export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, runLabel } = {}) {
+export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, runLabel, packetBinding = null } = {}) {
   const state = stateForCleanupHandle(cleanupHandle);
   if (state.provenance.launch || state.provenance.journalPrepared || state.provenance.reporterReadyPrepared) {
     throw new EvidenceError('BROWSER_PROVENANCE_STATE', 'Browser workspace launch provenance already exists.');
   }
   const launchRoot = assertWorkspaceChild(state, LAUNCH_DIRECTORY, { type: 'directory', mode: WORKSPACE_DIRECTORY_MODES[LAUNCH_DIRECTORY] });
-  const launch = createBrowserLaunchContract({ root: launchRoot, baseURL, runLabel });
+  const launch = createBrowserLaunchContract({ root: launchRoot, baseURL, runLabel, packetBinding });
   const descriptorPath = join(state.root, LAUNCH_DIRECTORY, BROWSER_LAUNCH_FILENAME);
   state.provenance.launch = {
     runId: launch.descriptor.run_id,
@@ -730,6 +737,14 @@ export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, r
     journalAuthSecret: launch.journalAuthSecret,
     sourceBindingMode: 'current_source_snapshot',
     sourceManifestDigest: launch.descriptor.source_manifest_digest,
+    packetBinding: {
+      packet_binding_mode: launch.descriptor.packet_binding_mode,
+      operation_id: launch.descriptor.operation_id,
+      stage_id: launch.descriptor.stage_id,
+      execution_token_id: launch.descriptor.execution_token_id,
+      command_category: launch.descriptor.command_category,
+      binding_digest: launch.descriptor.binding_digest,
+    },
     descriptorFile: fileProvenance(descriptorPath, BROWSER_LIMITS.summary_bytes),
   };
   state.provenance.reporterReadyPrepared = createPreparedFile(join(state.root, LAUNCH_DIRECTORY, BROWSER_REPORTER_READY_FILENAME));
@@ -852,6 +867,20 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
   const runId = runStarted[0].run_id;
   if (records.some((record) => record.run_id !== runId)) throw new EvidenceError('BROWSER_LIFECYCLE_MISMATCH', 'Browser journal contains multiple run IDs.');
   const sourceBinding = validateBrowserSourceBinding(runStarted[0].source_binding_mode, runStarted[0].source_manifest_digest, { runStart: true });
+  const packetBinding = validateBrowserPacketBindingFields({
+    packet_binding_mode: runStarted[0].packet_binding_mode,
+    operation_id: runStarted[0].operation_id,
+    stage_id: runStarted[0].stage_id,
+    execution_token_id: runStarted[0].execution_token_id,
+    command_category: runStarted[0].command_category,
+    binding_digest: runStarted[0].binding_digest,
+  }, {
+    runStart: true,
+    browserRunId: runStarted[0].run_id,
+    sourceBindingMode: sourceBinding.source_binding_mode,
+    sourceManifestDigest: sourceBinding.source_manifest_digest,
+    provenanceMode: runStarted[0].provenance_mode,
+  });
 
   const starts = new Map();
   const terminals = new Map();
@@ -961,6 +990,7 @@ function reconcile(records, sourceDigest, { outputRoot = null, generatedAt = new
     run_id: runId,
     source_binding_mode: sourceBinding.source_binding_mode,
     source_manifest_digest: sourceBinding.source_manifest_digest,
+    ...packetBinding,
     target_classification: 'local',
     project: 'chromium',
     worker_count: 1,
@@ -1025,10 +1055,23 @@ function importTrustedBrowserJournalInternal({ journalPath, summaryPath, outputR
     const launch = authenticatedState.provenance.launch;
     if (!launch
       || summary.source_binding_mode !== launch.sourceBindingMode
-      || summary.source_manifest_digest !== launch.sourceManifestDigest) {
+      || summary.source_manifest_digest !== launch.sourceManifestDigest
+      || summary.packet_binding_mode !== launch.packetBinding.packet_binding_mode
+      || summary.operation_id !== launch.packetBinding.operation_id
+      || summary.stage_id !== launch.packetBinding.stage_id
+      || summary.execution_token_id !== launch.packetBinding.execution_token_id
+      || summary.command_category !== launch.packetBinding.command_category
+      || summary.binding_digest !== launch.packetBinding.binding_digest) {
       provenanceError();
     }
-  } else if (standaloneState && (summary.source_binding_mode !== 'none' || summary.source_manifest_digest !== null)) {
+  } else if (standaloneState && (summary.source_binding_mode !== 'none'
+    || summary.source_manifest_digest !== null
+    || summary.packet_binding_mode !== 'none'
+    || summary.operation_id !== null
+    || summary.stage_id !== null
+    || summary.execution_token_id !== null
+    || summary.command_category !== null
+    || summary.binding_digest !== null)) {
     provenanceError();
   }
   const content = `${canonicalStringify(summary)}\n`;
@@ -1236,8 +1279,22 @@ export function cleanupBrowserEvidence(cleanupHandle) {
     }
     inventoryWorkspace(state);
     for (const [name, identity] of Object.entries(state.directoryIdentities)) {
-      const path = assertWorkspaceChild(state, name, { type: 'directory', mode: identity.mode });
-      if (!sameIdentity(identityOf(path), identity)) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace child directory identity changed.');
+      let expectedIdentity = identity;
+      if (name === OUTPUT_DIRECTORY && identity.mode === 0o755) {
+        const outputPath = join(state.root, name);
+        const current = existsSync(outputPath) ? identityOf(outputPath) : null;
+        if (current
+          && current.dev === identity.dev
+          && current.ino === identity.ino
+          && current.uid === identity.uid
+          && current.type === identity.type
+          && current.mode === 0o700) {
+          expectedIdentity = current;
+          state.directoryIdentities[name] = current;
+        }
+      }
+      const path = assertWorkspaceChild(state, name, { type: 'directory', mode: expectedIdentity.mode });
+      if (!sameIdentity(identityOf(path), expectedIdentity)) throw new EvidenceError('UNSAFE_BROWSER_WORKSPACE', 'Browser evidence workspace child directory identity changed.');
     }
     for (const relativePath of [
       `${JOURNAL_DIRECTORY}/${JOURNAL_FILENAME}`,
@@ -1251,7 +1308,11 @@ export function cleanupBrowserEvidence(cleanupHandle) {
     for (const relativePath of [OUTPUT_DIRECTORY, LAUNCH_DIRECTORY, SUMMARY_DIRECTORY, JOURNAL_DIRECTORY]) {
       const path = join(state.root, relativePath);
       if (!existsSync(path)) continue;
-      const safePath = assertWorkspaceChild(state, relativePath, { type: 'directory', mode: state.directoryIdentities[relativePath]?.mode ?? WORKSPACE_DIRECTORY_MODES[relativePath] });
+      let expectedMode = state.directoryIdentities[relativePath]?.mode ?? WORKSPACE_DIRECTORY_MODES[relativePath];
+      if (relativePath === OUTPUT_DIRECTORY && !state.directoryIdentities[relativePath] && modeOf(lstatSync(path)) === 0o700) {
+        expectedMode = 0o700;
+      }
+      const safePath = assertWorkspaceChild(state, relativePath, { type: 'directory', mode: expectedMode });
       if (readdirSync(safePath).length > 0) throw new EvidenceError('BROWSER_CLEANUP_NOT_EMPTY', 'Browser evidence directory is not empty.');
       rmdirSync(safePath);
       deleted.push(relativePath);
