@@ -21,6 +21,7 @@ import { JOURNAL_FILENAME } from '../../../scripts/controlled-ops/browser-journa
 import { PACKET_LOCK_NAME, canonicalStringify } from '../../../scripts/controlled-ops/internal.mjs';
 import {
   createStage,
+  freezeStage,
   initializeOperation,
 } from '../../../scripts/controlled-ops/evidence.mjs';
 import { readCanonicalJsonFile } from '../../../scripts/controlled-ops/manifest.mjs';
@@ -370,6 +371,12 @@ async function runPacketBoundPilot() {
     }
     if (existsSync(join(packetRoot, 'manifest.json')) || existsSync(join(packetRoot, 'seal.json')) || existsSync(join(packetRoot, 'stages', stageId, 'stage-freeze.json'))) {
       throw new Error('Controlled-ops packet-bound browser pilot unexpectedly froze, manifested, or sealed the packet.');
+    }
+    try {
+      freezeStage(packetRoot, stageId);
+      throw new Error('Controlled-ops packet-bound browser pilot did not block generic freeze.');
+    } catch (error) {
+      if (error?.code !== 'BROWSER_VERIFICATION_DEFERRED') throw error;
     }
     process.stdout.write('controlled-ops packet-bound browser pilot passed\n');
   } catch (error) {

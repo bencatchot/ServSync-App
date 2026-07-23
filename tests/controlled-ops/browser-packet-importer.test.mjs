@@ -8,6 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createEmptyBrowserObservabilityAggregates } from '../../scripts/controlled-ops/browser-collectors.mjs';
@@ -36,12 +37,16 @@ import {
 import {
   appendEvent,
   claimExecutionToken,
+  createManifest,
+  freezeStage,
+  sealOperation,
   updateExecutionToken,
+  verifyPacket,
   verifyEventChain,
 } from '../../scripts/controlled-ops/evidence.mjs';
 import { readCanonicalJsonFile } from '../../scripts/controlled-ops/manifest.mjs';
 import { GENESIS_HASH, canonicalStringify } from '../../scripts/controlled-ops/internal.mjs';
-import { makePacket } from './helpers.mjs';
+import { evidenceCli, makePacket } from './helpers.mjs';
 
 function tempRoot(prefix = 'servsync-browser-packet-') {
   const root = mkdtempSync(join('/private/tmp', prefix));
@@ -202,6 +207,45 @@ test('packet-bound generated browser run promotes exactly one packet-owned summa
     assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-token-browser-summary.json')), false);
     const index = readCanonicalJsonFile(join(run.packet.root, 'stages', 'stage-1', 'artifact-index.json'));
     assert.deepEqual(index.artifacts.map((entry) => entry.path).sort(), [BROWSER_IMPORT_SUMMARY_ARTIFACT, BROWSER_SUMMARY_ARTIFACT].sort());
+  } finally {
+    run.cleanup();
+  }
+});
+
+test('event append failure leaves a recoverable browser import transaction and retries once', () => {
+  const run = prepareBoundRun();
+  try {
+    assert.throws(() => promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+      generatedAt: '2026-07-23T12:00:02.000Z',
+      importedAt: '2026-07-23T01:00:03.000Z',
+    }), hasCode('TIMESTAMP_REGRESSION'));
+    assert.equal(existsSync(run.workspace.root), false);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-import-transaction.json')), true);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-summary-candidate.json')), true);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-import-summary-candidate.json')), true);
+    assert.equal(existsSync(join(run.packet.root, 'stages', 'stage-1', 'artifacts', BROWSER_SUMMARY_ARTIFACT)), true);
+    assert.equal(existsSync(join(run.packet.root, 'stages', 'stage-1', 'artifacts', BROWSER_IMPORT_SUMMARY_ARTIFACT)), true);
+    assert.equal(readFileSync(join(run.packet.root, 'events.ndjson'), 'utf8').includes('browser-promoted'), false);
+    assert.throws(() => freezeStage(run.packet.root, 'stage-1'), hasCode('QUARANTINE_NOT_EMPTY'));
+    const result = promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+    });
+    assert.equal(result.status, BROWSER_PACKET_IMPORT_STATUS);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-import-transaction.json')), false);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-summary-candidate.json')), false);
+    assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-import-summary-candidate.json')), false);
+    const events = readFileSync(join(run.packet.root, 'events.ndjson'), 'utf8')
+      .split('\n')
+      .filter((line) => line.includes('browser-promoted'));
+    assert.equal(events.length, 1);
+    assert.throws(() => freezeStage(run.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
   } finally {
     run.cleanup();
   }
@@ -389,6 +433,36 @@ test('packet importer does not freeze, manifest, seal, or retain raw browser wor
     assert.equal(retained.includes('browser-reporter-ready.json'), false);
     assert.equal(retained.includes('journal_auth'), false);
     assert.equal(retained.includes('nonce'), false);
+  } finally {
+    run.cleanup();
+  }
+});
+
+test('browser packet imports block generic finalization until browser-aware verification exists', () => {
+  const run = prepareBoundRun();
+  try {
+    promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+      generatedAt: '2026-07-23T12:00:02.000Z',
+      importedAt: '2026-07-23T12:00:03.000Z',
+    });
+    assert.throws(() => freezeStage(run.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.throws(() => createManifest(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.throws(() => sealOperation(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    assert.throws(() => verifyPacket(run.packet.root), hasCode('BROWSER_VERIFICATION_DEFERRED'));
+    for (const [command, args] of [
+      ['freeze-stage', ['freeze-stage', '--root', run.packet.root, '--stage', 'stage-1']],
+      ['create-manifest', ['create-manifest', '--root', run.packet.root]],
+      ['seal', ['seal', '--root', run.packet.root]],
+      ['verify', ['verify', '--root', run.packet.root]],
+    ]) {
+      const result = spawnSync(process.execPath, [evidenceCli, ...args], { encoding: 'utf8' });
+      assert.notEqual(result.status, 0, command);
+      assert.match(result.stderr, /BROWSER_VERIFICATION_DEFERRED/, command);
+    }
   } finally {
     run.cleanup();
   }

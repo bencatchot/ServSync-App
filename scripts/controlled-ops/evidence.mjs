@@ -19,6 +19,7 @@ import {
 import {
   MANIFEST_SCHEMA, STAGE_MANIFEST_SCHEMA, buildPacketManifest, buildStageManifest, manifestDigest,
   readCanonicalJsonFile, validatePacketManifest, validateStageManifest, verifyPacketManifest, verifyStageManifest,
+  assertNoDeferredBrowserVerificationArtifacts,
 } from './manifest.mjs';
 import {
   SANITIZER_SCHEMA, SANITIZER_VERSION, sanitizeContent, scanCustomerContent, scanSensitiveContent,
@@ -127,7 +128,7 @@ export function verifyEventChain(root) {
   return { eventCount: events.length, head: previousHash, lastActionTimestamp: events.at(-1)?.action_timestamp ?? metadata.created_utc };
 }
 
-function appendEventUnlocked(rootPath, metadata, expectedHead, input) {
+export function appendEventUnderPacketMutation(rootPath, metadata, expectedHead, input) {
   for (const key of Object.keys(input)) if (!EVENT_INPUT_FIELDS.has(key)) throw new EvidenceError('UNKNOWN_EVENT_FIELD', 'Event input contains an unknown field.');
   validateControlledSlug(input.stage_id, 'stage ID'); validateSafeLabel(input.event_id, 'event ID');
   validateControlledSlug(input.event_type, 'event type', { allowUnderscore: true });
@@ -148,7 +149,7 @@ function appendEventUnlocked(rootPath, metadata, expectedHead, input) {
   fsyncDirectory(rootPath); return event;
 }
 
-export function appendEvent(root, expectedHead, input) { return withPacketMutationLock(root, 'append-event', ({ rootPath, metadata }) => appendEventUnlocked(rootPath, metadata, expectedHead, input)); }
+export function appendEvent(root, expectedHead, input) { return withPacketMutationLock(root, 'append-event', ({ rootPath, metadata }) => appendEventUnderPacketMutation(rootPath, metadata, expectedHead, input)); }
 
 export function createStage(root, stageId) {
   return withPacketMutationLock(root, 'create-stage', ({ rootPath, metadata }) => {
@@ -387,7 +388,9 @@ export function freezeStage(root, stageId, timestamps = {}) {
     validateControlledSlug(stageId, 'stage ID'); verifyTokensUnlocked(rootPath, metadata);
     if (readDirectorySorted(operationPaths(rootPath).quarantine).length > 0) throw new EvidenceError('QUARANTINE_NOT_EMPTY', 'Quarantine must be empty before freeze.');
     const stagePath = resolveInside(rootPath, `stages/${stageId}`); if (existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('STAGE_FROZEN', 'Stage is already workflow-frozen.');
-    const chain = verifyEventChain(rootPath); const index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json')); if (!Array.isArray(index.artifacts) || index.artifacts.length === 0) throw new EvidenceError('MISSING_ARTIFACT', 'A stage cannot freeze without evidence artifacts.');
+    const index = readCanonicalJsonFile(join(stagePath, 'artifact-index.json')); if (!Array.isArray(index.artifacts) || index.artifacts.length === 0) throw new EvidenceError('MISSING_ARTIFACT', 'A stage cannot freeze without evidence artifacts.');
+    assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id, stageId);
+    const chain = verifyEventChain(rootPath);
     const registered = new Set(index.artifacts.map((entry) => entry.path)); const retained = [];
     const collect = (path, prefix = '', depth = 0) => {
       if (depth > LIMITS.traversal_depth) throw new EvidenceError('TRAVERSAL_DEPTH_LIMIT', 'Stage traversal exceeds its configured depth.');
@@ -413,6 +416,7 @@ function validateFreeze(freeze, metadata, stageId) {
 }
 export function verifyStageFreeze(root, stageId) {
   const { rootPath, metadata } = assertOperationRoot(root); validateControlledSlug(stageId, 'stage ID'); const stagePath = resolveInside(rootPath, `stages/${stageId}`); assertPacketOwnedDirectory(rootPath, stagePath, [0o500]);
+  assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id, stageId);
   const manifestPath = join(stagePath, 'stage-manifest.json'); const freezePath = join(stagePath, 'stage-freeze.json'); assertPacketOwnedFile(rootPath, manifestPath, [0o400]); assertPacketOwnedFile(rootPath, freezePath, [0o400]);
   const manifest = readCanonicalJsonFile(manifestPath); validateStageManifest(manifest); const freeze = validateFreeze(readCanonicalJsonFile(freezePath), metadata, stageId);
   if (freeze.stage_manifest_digest !== manifestDigest(manifest)) throw new EvidenceError('STAGE_FREEZE_MISMATCH', 'Stage manifest digest does not match freeze.');
@@ -440,6 +444,7 @@ function permissionSummary(root, { allowActiveLock = false } = {}) {
 
 export function createManifest(root) {
   return withPacketMutationLock(root, 'create-manifest', ({ rootPath, metadata }) => {
+    assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id);
     verifyEventChain(rootPath); verifyTokensUnlocked(rootPath, metadata); for (const stageId of readDirectorySorted(operationPaths(rootPath).stages)) verifyStageFreeze(rootPath, stageId);
     const security = scanPacketSecurity(rootPath, { allowActiveLock: true }); if (security.secret_findings) throw new EvidenceError('SECRET_SCAN_FAILED', 'Packet secret scan failed.'); if (security.customer_content_findings) throw new EvidenceError('CUSTOMER_SCAN_FAILED', 'Packet customer-content scan failed.');
     const manifest = buildPacketManifest(rootPath, metadata.operation_id, { allowActiveLock: true }); writeJsonAtomic(operationPaths(rootPath).manifest, manifest, 0o600, rootPath); return manifest;
@@ -456,6 +461,7 @@ function validateSeal(seal, metadata) {
 }
 export function sealOperation(root, sealedAt = utcNow()) {
   return withPacketMutationLock(root, 'seal', ({ rootPath, metadata }) => {
+    assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id);
     validateTimestamp(sealedAt, 'sealed timestamp'); verifyTokensUnlocked(rootPath, metadata); assertPacketOwnedFile(rootPath, operationPaths(rootPath).manifest, [0o600], LIMITS.manifest_bytes);
     const manifest = readCanonicalJsonFile(operationPaths(rootPath).manifest); validatePacketManifest(manifest); verifyPacketManifest(rootPath, manifest, { allowActiveLock: true }); const chain = verifyEventChain(rootPath);
     const stages = readDirectorySorted(operationPaths(rootPath).stages).map((stageId) => { const freeze = verifyStageFreeze(rootPath, stageId); return { stage_id: stageId, freeze_digest: sha256(`${canonicalStringify(freeze)}\n`) }; });
@@ -467,7 +473,7 @@ export function sealOperation(root, sealedAt = utcNow()) {
 }
 
 export function verifyPacket(root, expectedSealDigest = null) {
-  const { rootPath, metadata } = assertOperationRoot(root); assertNoPacketLock(rootPath); const chain = verifyEventChain(rootPath); const tokens = verifyTokensUnlocked(rootPath, metadata); const stages = readDirectorySorted(operationPaths(rootPath).stages).map((stageId) => verifyStageFreeze(rootPath, stageId));
+  const { rootPath, metadata } = assertOperationRoot(root); assertNoPacketLock(rootPath); assertNoDeferredBrowserVerificationArtifacts(rootPath, metadata.operation_id); const chain = verifyEventChain(rootPath); const tokens = verifyTokensUnlocked(rootPath, metadata); const stages = readDirectorySorted(operationPaths(rootPath).stages).map((stageId) => verifyStageFreeze(rootPath, stageId));
   assertPacketOwnedFile(rootPath, operationPaths(rootPath).manifest, [0o600], LIMITS.manifest_bytes); assertPacketOwnedFile(rootPath, operationPaths(rootPath).seal, [0o600], LIMITS.manifest_bytes);
   const manifest = readCanonicalJsonFile(operationPaths(rootPath).manifest); verifyPacketManifest(rootPath, manifest); const seal = validateSeal(readCanonicalJsonFile(operationPaths(rootPath).seal), metadata);
   const digest = sha256(`${canonicalStringify(seal)}\n`); if (expectedSealDigest !== null && expectedSealDigest !== digest) throw new EvidenceError('EXTERNAL_ANCHOR_MISMATCH', 'Packet seal does not match the externally retained digest.');
