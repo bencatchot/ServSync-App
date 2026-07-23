@@ -32,6 +32,15 @@ import {
   ensureBrowserVerificationForFreeze,
   verifyBrowserStageEvidence,
 } from './browser-packet-verifier.mjs';
+import {
+  BROWSER_ATTEMPT_IMPORT_SUMMARY_ARTIFACT,
+  BROWSER_ATTEMPT_OUTCOME_ARTIFACT,
+  BROWSER_ATTEMPT_SELECTION_ARTIFACT,
+  BROWSER_ATTEMPT_SUMMARY_ARTIFACT,
+  BROWSER_ATTEMPTS_DIR,
+  assertBrowserTokenClaimAllowed,
+  buildAttemptInventory,
+} from './browser-attempts.mjs';
 
 const EVENT_FIELDS = [
   'schema_version', 'operation_id', 'sequence', 'event_id', 'stage_id', 'event_type', 'action_timestamp',
@@ -263,6 +272,8 @@ function verifyTokensUnlocked(root, metadata) {
     }
     tokens.push(token);
   }
+  const browserStages = new Set(tokens.filter((token) => token.command_category === 'browser-workflow').map((token) => token.stage_id));
+  for (const stageId of browserStages) buildAttemptInventory(root, metadata, stageId, events, { requireOutcomes: false });
   return tokens;
 }
 export function verifyTokens(root) { const { rootPath, metadata } = assertOperationRoot(root); assertNoPacketLock(rootPath); return verifyTokensUnlocked(rootPath, metadata); }
@@ -272,6 +283,7 @@ export function claimExecutionToken(root, fields) {
     validateControlledSlug(fields.stageId, 'stage ID'); validateControlledSlug(fields.token, 'token');
     validateCommandCategory(fields.commandCategory); validateExpectedResult(fields.expectedResult);
     const stagePath = resolveInside(rootPath, `stages/${fields.stageId}`); if (!existsSync(stagePath) || existsSync(join(stagePath, 'stage-freeze.json'))) throw new EvidenceError('INVALID_STAGE', 'Execution stage is missing or workflow-frozen.');
+    assertBrowserTokenClaimAllowed(rootPath, metadata, fields);
     let retry = null;
     if (fields.retryOf || fields.retryAuthorization) {
       if (!fields.retryOf || !fields.retryAuthorization || fields.retryOf === fields.token) throw new EvidenceError('RETRY_NOT_AUTHORIZED', 'Retries require a distinct prior token and explicit authorization.');
@@ -358,7 +370,10 @@ export function promoteCommandArtifacts(root, stageId, token, items) {
 
 function isBrowserPacketArtifactPath(path) {
   return [BROWSER_SUMMARY_ARTIFACT, BROWSER_IMPORT_SUMMARY_ARTIFACT, BROWSER_FREEZE_VERIFICATION_ARTIFACT]
-    .some((name) => path.endsWith(`/artifacts/${name}`));
+    .some((name) => path.endsWith(`/artifacts/${name}`))
+    || [BROWSER_ATTEMPT_SUMMARY_ARTIFACT, BROWSER_ATTEMPT_IMPORT_SUMMARY_ARTIFACT, BROWSER_ATTEMPT_OUTCOME_ARTIFACT]
+      .some((name) => path.includes(`/artifacts/${BROWSER_ATTEMPTS_DIR}/`) && path.endsWith(`/${name}`))
+    || path.endsWith(`/artifacts/${BROWSER_ATTEMPT_SELECTION_ARTIFACT}`);
 }
 
 function isInternalControlFilePath(path) {

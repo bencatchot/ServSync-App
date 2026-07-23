@@ -30,6 +30,14 @@ import {
   testIdFor,
 } from '../../scripts/controlled-ops/browser-schema.mjs';
 import {
+  attemptImportSummaryPath,
+  attemptOutcomePath,
+  attemptSummaryPath,
+  BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS,
+  BROWSER_ATTEMPT_OUTCOME_CLASS,
+  BROWSER_ATTEMPT_SUMMARY_CLASS,
+} from '../../scripts/controlled-ops/browser-attempts.mjs';
+import {
   BROWSER_IMPORT_SUMMARY_ARTIFACT,
   BROWSER_PACKET_IMPORT_STATUS,
   BROWSER_SUMMARY_ARTIFACT,
@@ -189,6 +197,10 @@ function importSummaryCandidatePath(root) {
   return join(root, 'quarantine', 'browser-import-summary-candidate.json');
 }
 
+function attemptTransactionPath(root, token = 'browser-token') {
+  return join(root, 'quarantine', `browser-attempt-${token}-transaction.json`);
+}
+
 function browserEvent(root, token = 'browser-token') {
   return readFileSync(join(root, 'events.ndjson'), 'utf8')
     .split('\n')
@@ -247,12 +259,7 @@ function transactionFromPromoted(run, { state = 'event_recorded', token = 'brows
 
 function promotedRunWithTransaction(state = 'event_recorded') {
   const run = prepareBoundRun();
-  promoteGeneratedBrowserEvidenceToPacket({
-    operationRoot: run.packet.root,
-    stageId: 'stage-1',
-    executionTokenId: 'browser-token',
-    browserWorkspace: run.workspace,
-  });
+  writeFinalDurableStateWithLiveWorkspace(run);
   writeCanonical(transactionPath(run.packet.root), transactionFromPromoted(run, { state }));
   return run;
 }
@@ -261,6 +268,30 @@ function browserArtifactIndexEntries() {
   return [
     { path: BROWSER_IMPORT_SUMMARY_ARTIFACT, artifact_class: 'browser_import_summary', sanitization_status: 'internal', summary_path: BROWSER_IMPORT_SUMMARY_ARTIFACT },
     { path: BROWSER_SUMMARY_ARTIFACT, artifact_class: 'browser_summary', sanitization_status: 'internal', summary_path: BROWSER_IMPORT_SUMMARY_ARTIFACT },
+  ];
+}
+
+function attemptArtifact(root, token, relativePath) {
+  return join(root, 'stages', 'stage-1', 'artifacts', relativePath(token));
+}
+
+function attemptSummaryFile(root, token = 'browser-token') {
+  return attemptArtifact(root, token, attemptSummaryPath);
+}
+
+function attemptImportSummaryFile(root, token = 'browser-token') {
+  return attemptArtifact(root, token, attemptImportSummaryPath);
+}
+
+function attemptOutcomeFile(root, token = 'browser-token') {
+  return attemptArtifact(root, token, attemptOutcomePath);
+}
+
+function browserAttemptIndexEntries(token = 'browser-token') {
+  return [
+    { path: attemptSummaryPath(token), artifact_class: BROWSER_ATTEMPT_SUMMARY_CLASS, sanitization_status: 'internal', summary_path: attemptOutcomePath(token) },
+    { path: attemptImportSummaryPath(token), artifact_class: BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS, sanitization_status: 'internal', summary_path: attemptOutcomePath(token) },
+    { path: attemptOutcomePath(token), artifact_class: BROWSER_ATTEMPT_OUTCOME_CLASS, sanitization_status: 'internal', summary_path: attemptOutcomePath(token) },
   ];
 }
 
@@ -365,18 +396,24 @@ test('packet-bound generated browser run promotes exactly one packet-owned summa
     assert.equal(result.freeze_state, 'not_frozen');
     assert.equal(result.manifest_state, 'not_created');
     assert.equal(result.seal_state, 'not_created');
-    const artifactDir = join(run.packet.root, 'stages', 'stage-1', 'artifacts');
-    const summaryPath = join(artifactDir, BROWSER_SUMMARY_ARTIFACT);
-    const importSummaryPath = join(artifactDir, BROWSER_IMPORT_SUMMARY_ARTIFACT);
+    const summaryPath = attemptSummaryFile(run.packet.root);
+    const importSummaryPath = attemptImportSummaryFile(run.packet.root);
+    const outcomePath = attemptOutcomeFile(run.packet.root);
     assert.equal(modeOf(summaryPath), 0o600);
     assert.equal(modeOf(importSummaryPath), 0o600);
+    assert.equal(modeOf(outcomePath), 0o600);
     assert.equal(lstatSync(summaryPath).nlink, 1);
     assert.equal(lstatSync(importSummaryPath).nlink, 1);
+    assert.equal(lstatSync(outcomePath).nlink, 1);
     const summary = readCanonicalJsonFile(summaryPath);
     assert.equal(summary.packet_binding_mode, 'command_token');
     assert.equal(summary.binding_digest, run.launch.descriptor.binding_digest);
     const importSummary = validateBrowserImportSummary(readCanonicalJsonFile(importSummaryPath));
     assert.equal(importSummary.browser_summary_sha256, result.browser_summary_sha256);
+    assert.equal(importSummary.browser_summary_relative_path, `stages/stage-1/artifacts/${attemptSummaryPath('browser-token')}`);
+    const outcome = readCanonicalJsonFile(outcomePath);
+    assert.equal(outcome.attempt_status, 'succeeded');
+    assert.equal(outcome.browser_evidence_status, 'promoted');
     assert.equal(importSummary.browser_workspace_cleanup_status, 'cleaned');
     assert.equal(existsSync(run.workspace.root), false);
     assert.equal(existsSync(join(run.packet.root, 'manifest.json')), false);
@@ -384,7 +421,7 @@ test('packet-bound generated browser run promotes exactly one packet-owned summa
     assert.equal(existsSync(join(run.packet.root, 'stages', 'stage-1', 'stage-freeze.json')), false);
     assert.equal(existsSync(join(run.packet.root, 'quarantine', 'browser-token-browser-summary.json')), false);
     const index = readCanonicalJsonFile(join(run.packet.root, 'stages', 'stage-1', 'artifact-index.json'));
-    assert.deepEqual(index.artifacts.map((entry) => entry.path).sort(), [BROWSER_IMPORT_SUMMARY_ARTIFACT, BROWSER_SUMMARY_ARTIFACT].sort());
+    assert.deepEqual(index.artifacts.map((entry) => entry.path).sort(), browserAttemptIndexEntries().map((entry) => entry.path).sort());
   } finally {
     run.cleanup();
   }
@@ -408,7 +445,7 @@ test('promotion rejects caller-supplied importedAt and derives current monotonic
       browserWorkspace: run.workspace,
     });
     assert.equal(result.status, BROWSER_PACKET_IMPORT_STATUS);
-    const importSummary = validateBrowserImportSummary(readCanonicalJsonFile(join(run.packet.root, 'stages', 'stage-1', 'artifacts', BROWSER_IMPORT_SUMMARY_ARTIFACT)));
+    const importSummary = validateBrowserImportSummary(readCanonicalJsonFile(attemptImportSummaryFile(run.packet.root)));
     const event = readFileSync(join(run.packet.root, 'events.ndjson'), 'utf8')
       .split('\n')
       .filter(Boolean)
@@ -500,6 +537,49 @@ test('completed files, index, and event recover without deleted candidates', () 
     } finally {
       run.cleanup();
     }
+  }
+});
+
+test('completed v2 attempt transaction recovers from retained files, index, and event without workspace', () => {
+  const run = prepareBoundRun();
+  try {
+    const result = promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+    });
+    const summaryContent = readFileSync(attemptSummaryFile(run.packet.root), 'utf8');
+    const importSummary = validateBrowserImportSummary(readCanonicalJsonFile(attemptImportSummaryFile(run.packet.root)));
+    writeCanonical(attemptTransactionPath(run.packet.root), {
+      schema_version: 'servsync-controlled-ops/browser-attempt-transaction-v1',
+      operation_id: importSummary.operation_id,
+      stage_id: 'stage-1',
+      execution_token_id: 'browser-token',
+      command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+      binding_digest: importSummary.binding_digest,
+      browser_run_id: importSummary.browser_run_id,
+      source_binding_mode: importSummary.source_binding_mode,
+      source_manifest_digest: importSummary.source_manifest_digest,
+      browser_summary_sha256: sha256(summaryContent),
+      browser_summary_bytes: Buffer.byteLength(summaryContent),
+      transaction_state: 'event_recorded',
+      prepared_utc: importSummary.imported_utc,
+      updated_utc: new Date(Math.max(Date.now(), Date.parse(importSummary.imported_utc))).toISOString(),
+    });
+    const beforeEvents = readFileSync(join(run.packet.root, 'events.ndjson'), 'utf8').split('\n').filter((line) => line.includes('browser-promoted')).length;
+    const recovered = promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: null,
+    });
+    assert.equal(recovered.status, result.status);
+    assert.equal(existsSync(attemptTransactionPath(run.packet.root)), false);
+    const afterEvents = readFileSync(join(run.packet.root, 'events.ndjson'), 'utf8').split('\n').filter((line) => line.includes('browser-promoted')).length;
+    assert.equal(afterEvents, beforeEvents);
+  } finally {
+    run.cleanup();
   }
 });
 
@@ -770,7 +850,7 @@ test('fixed browser artifact paths and classes cannot bypass deferred finalizati
     const indexPath = join(relabeled.packet.root, 'stages', 'stage-1', 'artifact-index.json');
     const index = readCanonicalJsonFile(indexPath);
     index.artifacts = index.artifacts.map((entry) => (
-      entry.path === BROWSER_SUMMARY_ARTIFACT ? { ...entry, artifact_class: 'internal' } : entry
+      entry.path === attemptSummaryPath('browser-token') ? { ...entry, artifact_class: 'internal' } : entry
     ));
     writeCanonical(indexPath, index);
     assert.throws(() => freezeStage(relabeled.packet.root, 'stage-1'), hasCode('BROWSER_VERIFICATION_INVALID'));
@@ -784,7 +864,7 @@ test('fixed browser artifact paths and classes cannot bypass deferred finalizati
     const index = readCanonicalJsonFile(indexPath);
     index.artifacts.push({
       path: 'alternate-browser-summary.json',
-      artifact_class: 'browser_summary',
+      artifact_class: BROWSER_ATTEMPT_SUMMARY_CLASS,
       sanitization_status: 'internal',
       summary_path: 'alternate-browser-summary.json',
     });
@@ -969,7 +1049,7 @@ test('packet importer does not freeze, manifest, seal, or retain raw browser wor
     assert.equal(existsSync(join(run.packet.root, 'stages', 'stage-1', 'stage-freeze.json')), false);
     assert.equal(existsSync(join(run.packet.root, 'manifest.json')), false);
     assert.equal(existsSync(join(run.packet.root, 'seal.json')), false);
-    const retained = readFileSync(join(run.packet.root, 'stages', 'stage-1', 'artifacts', BROWSER_SUMMARY_ARTIFACT), 'utf8');
+    const retained = readFileSync(attemptSummaryFile(run.packet.root), 'utf8');
     assert.equal(retained.includes('browser-journal.ndjson'), false);
     assert.equal(retained.includes('browser-launch.json'), false);
     assert.equal(retained.includes('browser-reporter-ready.json'), false);
