@@ -11,6 +11,10 @@ export const STAGE_MANIFEST_SCHEMA = 'servsync-controlled-ops/stage-manifest-v2'
 const TOP_LEVEL_FILES = new Map([['operation.json', 'operation_metadata'], ['events.ndjson', 'event_timeline']]);
 const INTEGRITY_FILES = new Set(['manifest.json', 'seal.json']);
 const DEFERRED_BROWSER_ARTIFACT_CLASSES = new Set(['browser_summary', 'browser_import_summary']);
+const DEFERRED_BROWSER_ARTIFACT_PATHS = new Map([
+  ['browser-summary.json', 'browser_summary'],
+  ['browser-import-summary.json', 'browser_import_summary'],
+]);
 const BROWSER_VERIFICATION_DEFERRED_MESSAGE = 'Browser-aware stage verification is deferred to Slice 2C-B; generic packet finalization is intentionally blocked.';
 
 function validateRegistry(registry, operationId, stageId) {
@@ -24,6 +28,9 @@ function validateRegistry(registry, operationId, stageId) {
     validateRelativePath(entry.path); validateRelativePath(entry.summary_path);
     validateSafeLabel(entry.artifact_class, 'artifact class');
     if (!['passed', 'internal'].includes(entry.sanitization_status) || paths.has(entry.path)) throw new EvidenceError('INVALID_ARTIFACT_INDEX', 'Artifact registration is invalid.');
+    const expectedBrowserClass = DEFERRED_BROWSER_ARTIFACT_PATHS.get(entry.path);
+    if (expectedBrowserClass && entry.artifact_class !== expectedBrowserClass) throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
+    if (DEFERRED_BROWSER_ARTIFACT_CLASSES.has(entry.artifact_class) && expectedBrowserClass !== entry.artifact_class) throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
     paths.add(entry.path);
   }
   return registry;
@@ -45,7 +52,7 @@ export function assertNoDeferredBrowserVerificationArtifacts(root, operationId, 
     const indexPath = resolveInside(root, `stages/${currentStageId}/artifact-index.json`);
     assertPacketOwnedFile(root, indexPath, [0o600, 0o400], LIMITS.manifest_bytes);
     const registry = validateRegistry(readJson(indexPath), operationId, currentStageId);
-    if (registry.artifacts.some((entry) => DEFERRED_BROWSER_ARTIFACT_CLASSES.has(entry.artifact_class))) {
+    if (registry.artifacts.some((entry) => DEFERRED_BROWSER_ARTIFACT_CLASSES.has(entry.artifact_class) || DEFERRED_BROWSER_ARTIFACT_PATHS.has(entry.path))) {
       throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
     }
   }
@@ -143,7 +150,7 @@ export function verifyPacketManifest(root, manifest, options = {}) {
 
 export function buildStageManifest(root, operationId, stageId, registry) {
   validateRegistry(registry, operationId, stageId);
-  if (registry.artifacts.some((entry) => DEFERRED_BROWSER_ARTIFACT_CLASSES.has(entry.artifact_class))) {
+  if (registry.artifacts.some((entry) => DEFERRED_BROWSER_ARTIFACT_CLASSES.has(entry.artifact_class) || DEFERRED_BROWSER_ARTIFACT_PATHS.has(entry.path))) {
     throw new EvidenceError('BROWSER_VERIFICATION_DEFERRED', BROWSER_VERIFICATION_DEFERRED_MESSAGE);
   }
   const registeredPaths = registry.artifacts.map((entry) => validateRelativePath(entry.path)).sort(compareStrings);

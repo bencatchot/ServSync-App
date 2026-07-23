@@ -1130,6 +1130,16 @@ export function importGeneratedBrowserWorkspaceJournal({ cleanupHandle, generate
   });
 }
 
+export function verifyGeneratedBrowserWorkspaceSummary({ cleanupHandle } = {}) {
+  const state = stateForCleanupHandle(cleanupHandle);
+  const summaryPath = join(state.root, SUMMARY_DIRECTORY, SUMMARY_FILENAME);
+  const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
+  return {
+    summary: verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath }),
+    summaryPath,
+  };
+}
+
 export function importStandaloneBrowserJournal({ standaloneHandle, generatedAt } = {}) {
   const state = stateForStandaloneHandle(standaloneHandle, { allowedStates: [STANDALONE_STATES.WRITER_CLOSED], action: 'import' });
   const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
