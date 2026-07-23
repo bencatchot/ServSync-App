@@ -45,6 +45,7 @@ import {
   validateDuration,
   validateBrowserSourceBinding,
   validateBrowserPacketBindingFields,
+  createBrowserPacketBinding,
   validateSummary,
 } from './browser-schema.mjs';
 import {
@@ -69,6 +70,7 @@ const cleanupHandleStates = new WeakMap();
 const workspaceJournalRoots = new Map();
 const workspaceSummaryRoots = new Map();
 const workspaceLaunchRoots = new Map();
+const activeGeneratedWorkspaceRuns = new Map();
 const standaloneHandleStates = new WeakMap();
 const WORKSPACE_DIRECTORY_MODES = Object.freeze({
   [JOURNAL_DIRECTORY]: 0o700,
@@ -112,12 +114,20 @@ function registerWorkspaceState(state) {
   workspaceJournalRoots.set(join(state.root, JOURNAL_DIRECTORY), state);
   workspaceSummaryRoots.set(join(state.root, SUMMARY_DIRECTORY), state);
   workspaceLaunchRoots.set(join(state.root, LAUNCH_DIRECTORY), state);
+  activeGeneratedWorkspaceRuns.set(state.runId, state);
 }
 
 function unregisterWorkspaceState(state) {
   workspaceJournalRoots.delete(join(state.root, JOURNAL_DIRECTORY));
   workspaceSummaryRoots.delete(join(state.root, SUMMARY_DIRECTORY));
   workspaceLaunchRoots.delete(join(state.root, LAUNCH_DIRECTORY));
+  if (activeGeneratedWorkspaceRuns.get(state.runId) === state) {
+    activeGeneratedWorkspaceRuns.delete(state.runId);
+  }
+  const launchRunId = state.provenance.launch?.runId;
+  if (launchRunId && activeGeneratedWorkspaceRuns.get(launchRunId) === state) {
+    activeGeneratedWorkspaceRuns.delete(launchRunId);
+  }
 }
 
 function fileProvenance(path, maximumBytes) {
@@ -662,6 +672,93 @@ function stateForCleanupHandle(cleanupHandle) {
   return state;
 }
 
+function knownStateForCleanupHandle(cleanupHandle) {
+  const state = cleanupHandleStates.get(cleanupHandle);
+  if (!state) throw new EvidenceError('INVALID_BROWSER_CLEANUP_HANDLE', 'Browser cleanup requires an authentic workspace cleanup handle.');
+  return state;
+}
+
+function effectiveGeneratedRunId(state) {
+  return state.provenance.launch?.runId ?? state.runId;
+}
+
+export function hasActiveGeneratedBrowserWorkspace(runId) {
+  validateGeneratedBrowserId(runId, 'browser workspace run ID');
+  const state = activeGeneratedWorkspaceRuns.get(runId);
+  return Boolean(state && state.cleanupState !== 'cleaned');
+}
+
+export function inspectAuthenticatedGeneratedBrowserWorkspace({ cleanupHandle, expectedRunId = null } = {}) {
+  const state = knownStateForCleanupHandle(cleanupHandle);
+  if (expectedRunId !== null) {
+    validateGeneratedBrowserId(expectedRunId, 'expected browser workspace run ID');
+    if (effectiveGeneratedRunId(state) !== expectedRunId) {
+      throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser workspace handle does not match the expected run.');
+    }
+  }
+  return Object.freeze({
+    run_id: effectiveGeneratedRunId(state),
+    cleanup_status: state.cleanupState,
+    known_active: state.cleanupState !== 'cleaned',
+    summary_imported: Boolean(state.provenance.imported),
+  });
+}
+
+export function readAuthenticatedGeneratedBrowserWorkspaceSummary({
+  cleanupHandle,
+  expectedRunId = null,
+  expectedBinding = null,
+} = {}) {
+  const state = stateForCleanupHandle(cleanupHandle);
+  if (expectedRunId !== null) {
+    validateGeneratedBrowserId(expectedRunId, 'expected browser workspace run ID');
+    if (effectiveGeneratedRunId(state) !== expectedRunId) {
+      throw new EvidenceError('BROWSER_CLEANUP_PROVENANCE_MISMATCH', 'Browser workspace handle does not match the expected run.');
+    }
+  }
+  const imported = state.provenance.imported;
+  if (!imported) {
+    throw new EvidenceError('BROWSER_PROVENANCE_STATE', 'Generated browser workspace summary has not been imported.');
+  }
+  const summaryPath = join(state.root, SUMMARY_DIRECTORY, SUMMARY_FILENAME);
+  const journalPath = join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME);
+  const summary = verifyBrowserSummary(summaryPath, { sourceJournalPath: journalPath });
+  if (summary.run_id !== imported.runId
+    || summary.source_journal_sha256 !== imported.sourceJournalSha256
+    || !sameFileProvenance(journalPath, imported.journalFile, BROWSER_LIMITS.journal_bytes)
+    || !sameFileProvenance(summaryPath, imported.summaryFile, BROWSER_LIMITS.summary_bytes)) {
+    provenanceError();
+  }
+  if (expectedBinding !== null) {
+    const recomputed = createBrowserPacketBinding({
+      operationId: expectedBinding.operation_id,
+      stageId: expectedBinding.stage_id,
+      executionTokenId: expectedBinding.execution_token_id,
+      commandCategory: expectedBinding.command_category,
+      browserRunId: expectedBinding.browser_run_id,
+      sourceBindingMode: expectedBinding.source_binding_mode,
+      sourceManifestDigest: expectedBinding.source_manifest_digest,
+    });
+    if (summary.operation_id !== recomputed.operation_id
+      || summary.stage_id !== recomputed.stage_id
+      || summary.execution_token_id !== recomputed.execution_token_id
+      || summary.command_category !== recomputed.command_category
+      || summary.run_id !== recomputed.browser_run_id
+      || summary.source_binding_mode !== recomputed.source_binding_mode
+      || summary.source_manifest_digest !== recomputed.source_manifest_digest
+      || summary.binding_digest !== recomputed.binding_digest) {
+      provenanceError();
+    }
+  }
+  const content = readFileSync(summaryPath, 'utf8');
+  return Object.freeze({
+    summary,
+    content,
+    sha256: imported.summaryFile.sha256,
+    byteCount: imported.summaryFile.size,
+  });
+}
+
 function stateForStandaloneHandle(standaloneHandle, { allowedStates = null, action = 'use' } = {}) {
   const state = standaloneHandleStates.get(standaloneHandle);
   if (!state) throw new EvidenceError('INVALID_BROWSER_STANDALONE_HANDLE', 'Standalone browser operation requires an authentic evidence session handle.');
@@ -747,6 +844,7 @@ export function createBrowserWorkspaceLaunchContract({ cleanupHandle, baseURL, r
     },
     descriptorFile: fileProvenance(descriptorPath, BROWSER_LIMITS.summary_bytes),
   };
+  activeGeneratedWorkspaceRuns.set(launch.descriptor.run_id, state);
   state.provenance.reporterReadyPrepared = createPreparedFile(join(state.root, LAUNCH_DIRECTORY, BROWSER_REPORTER_READY_FILENAME));
   state.provenance.journalPrepared = createPreparedFile(join(state.root, JOURNAL_DIRECTORY, JOURNAL_FILENAME));
   return launch;

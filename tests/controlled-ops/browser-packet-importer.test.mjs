@@ -18,6 +18,7 @@ import {
   createStandaloneBrowserEvidenceSession,
   createStandaloneBrowserJournalWriter,
   discardStandaloneBrowserEvidenceSession,
+  hasActiveGeneratedBrowserWorkspace,
   importGeneratedBrowserWorkspaceJournal,
   importStandaloneBrowserJournal,
   verifyBrowserSummary,
@@ -47,7 +48,7 @@ import {
   verifyEventChain,
 } from '../../scripts/controlled-ops/evidence.mjs';
 import { readCanonicalJsonFile } from '../../scripts/controlled-ops/manifest.mjs';
-import { GENESIS_HASH, canonicalStringify, sha256 } from '../../scripts/controlled-ops/internal.mjs';
+import { GENESIS_HASH, canonicalStringify, compareStrings, sha256 } from '../../scripts/controlled-ops/internal.mjs';
 import { evidenceCli, makePacket } from './helpers.mjs';
 
 function tempRoot(prefix = 'servsync-browser-packet-') {
@@ -256,6 +257,98 @@ function promotedRunWithTransaction(state = 'event_recorded') {
   return run;
 }
 
+function browserArtifactIndexEntries() {
+  return [
+    { path: BROWSER_IMPORT_SUMMARY_ARTIFACT, artifact_class: 'browser_import_summary', sanitization_status: 'internal', summary_path: BROWSER_IMPORT_SUMMARY_ARTIFACT },
+    { path: BROWSER_SUMMARY_ARTIFACT, artifact_class: 'browser_summary', sanitization_status: 'internal', summary_path: BROWSER_IMPORT_SUMMARY_ARTIFACT },
+  ];
+}
+
+function monotonicTestTimestamp(root) {
+  const last = Date.parse(verifyEventChain(root).lastActionTimestamp);
+  return new Date(Math.max(Date.now(), Number.isFinite(last) ? last + 1 : 0)).toISOString();
+}
+
+function writeFinalDurableStateWithLiveWorkspace(run) {
+  const imported = importGeneratedBrowserWorkspaceJournal({
+    cleanupHandle: run.workspace.cleanupHandle,
+    generatedAt: new Date().toISOString(),
+  });
+  const summary = verifyBrowserSummary(imported.summaryPath);
+  const summaryContent = `${canonicalStringify(summary)}\n`;
+  const metadata = readCanonicalJsonFile(join(run.packet.root, 'operation.json'));
+  const preparedUtc = monotonicTestTimestamp(run.packet.root);
+  const importSummary = {
+    schema_version: 'servsync-controlled-ops/browser-packet-import-v1',
+    operation_id: metadata.operation_id,
+    stage_id: 'stage-1',
+    execution_token_id: 'browser-token',
+    command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    binding_digest: summary.binding_digest,
+    browser_run_id: summary.run_id,
+    source_binding_mode: summary.source_binding_mode,
+    source_manifest_digest: summary.source_manifest_digest,
+    browser_status: summary.status,
+    browser_summary_relative_path: `stages/stage-1/artifacts/${BROWSER_SUMMARY_ARTIFACT}`,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_summary_bytes: Buffer.byteLength(summaryContent),
+    packet_sanitization_status: 'passed',
+    browser_workspace_cleanup_status: 'cleaned',
+    imported_utc: preparedUtc,
+  };
+  const importContent = `${canonicalStringify(importSummary)}\n`;
+  const artifactDir = join(run.packet.root, 'stages', 'stage-1', 'artifacts');
+  writeFileSync(join(artifactDir, BROWSER_SUMMARY_ARTIFACT), summaryContent, { mode: 0o600 });
+  writeFileSync(join(artifactDir, BROWSER_IMPORT_SUMMARY_ARTIFACT), importContent, { mode: 0o600 });
+  const indexPath = join(run.packet.root, 'stages', 'stage-1', 'artifact-index.json');
+  const index = readCanonicalJsonFile(indexPath);
+  index.artifacts.push(...browserArtifactIndexEntries());
+  index.artifacts.sort((a, b) => compareStrings(a.path, b.path));
+  writeCanonical(indexPath, index);
+  appendEvent(run.packet.root, verifyEventChain(run.packet.root).head, {
+    stage_id: 'stage-1',
+    event_id: 'browser-token-browser-evidence',
+    event_type: 'browser-promoted',
+    action_timestamp: preparedUtc,
+    archive_timestamp: null,
+    command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    expected_result: 'completed',
+    observed_result: 'browser-promoted',
+    result_classification: 'passed',
+    exit_code: null,
+    sanitized_artifact_paths: [
+      `stages/stage-1/artifacts/${BROWSER_SUMMARY_ARTIFACT}`,
+      `stages/stage-1/artifacts/${BROWSER_IMPORT_SUMMARY_ARTIFACT}`,
+    ],
+  });
+  const transaction = {
+    schema_version: 'servsync-controlled-ops/browser-import-transaction-v1',
+    operation_id: metadata.operation_id,
+    stage_id: 'stage-1',
+    execution_token_id: 'browser-token',
+    command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    binding_digest: summary.binding_digest,
+    browser_run_id: summary.run_id,
+    source_binding_mode: summary.source_binding_mode,
+    source_manifest_digest: summary.source_manifest_digest,
+    browser_summary_sha256: sha256(summaryContent),
+    browser_summary_bytes: Buffer.byteLength(summaryContent),
+    browser_import_summary_sha256: sha256(importContent),
+    browser_import_summary_bytes: Buffer.byteLength(importContent),
+    transaction_state: 'event_recorded',
+    workspace_cleanup_status: 'cleaned',
+    browser_summary_artifact_status: 'written',
+    browser_import_summary_artifact_status: 'written',
+    artifact_index_status: 'registered',
+    promotion_event_status: 'recorded',
+    promotion_event_utc: preparedUtc,
+    prepared_utc: preparedUtc,
+    updated_utc: preparedUtc,
+  };
+  writeCanonical(transactionPath(run.packet.root), transaction);
+  return { importSummary, summary, transaction };
+}
+
 test('packet-bound generated browser run promotes exactly one packet-owned summary and import summary', () => {
   const run = prepareBoundRun();
   try {
@@ -410,6 +503,57 @@ test('completed files, index, and event recover without deleted candidates', () 
   }
 });
 
+test('prepared transaction resumes from authenticated imported workspace summary before candidates exist', () => {
+  const run = prepareBoundRun();
+  try {
+    const imported = importGeneratedBrowserWorkspaceJournal({
+      cleanupHandle: run.workspace.cleanupHandle,
+      generatedAt: new Date().toISOString(),
+    });
+    const summary = verifyBrowserSummary(imported.summaryPath);
+    const summaryContent = `${canonicalStringify(summary)}\n`;
+    const metadata = readCanonicalJsonFile(join(run.packet.root, 'operation.json'));
+    const preparedUtc = monotonicTestTimestamp(run.packet.root);
+    writeCanonical(transactionPath(run.packet.root), {
+      schema_version: 'servsync-controlled-ops/browser-import-transaction-v1',
+      operation_id: metadata.operation_id,
+      stage_id: 'stage-1',
+      execution_token_id: 'browser-token',
+      command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+      binding_digest: summary.binding_digest,
+      browser_run_id: summary.run_id,
+      source_binding_mode: summary.source_binding_mode,
+      source_manifest_digest: summary.source_manifest_digest,
+      browser_summary_sha256: sha256(summaryContent),
+      browser_summary_bytes: Buffer.byteLength(summaryContent),
+      browser_import_summary_sha256: null,
+      browser_import_summary_bytes: null,
+      transaction_state: 'prepared',
+      workspace_cleanup_status: 'pending',
+      browser_summary_artifact_status: 'absent',
+      browser_import_summary_artifact_status: 'absent',
+      artifact_index_status: 'absent',
+      promotion_event_status: 'absent',
+      promotion_event_utc: null,
+      prepared_utc: preparedUtc,
+      updated_utc: preparedUtc,
+    });
+    assert.equal(existsSync(summaryCandidatePath(run.packet.root)), false);
+    assert.equal(hasActiveGeneratedBrowserWorkspace(summary.run_id), true);
+    const result = promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+    });
+    assert.equal(result.status, BROWSER_PACKET_IMPORT_STATUS);
+    assert.equal(existsSync(run.workspace.root), false);
+    assert.equal(hasActiveGeneratedBrowserWorkspace(summary.run_id), false);
+  } finally {
+    run.cleanup();
+  }
+});
+
 test('candidate removal and transaction unlink failures are resumable after event recording', () => {
   for (const candidateToKeep of ['summary', 'import-summary', 'none']) {
     const run = promotedRunWithTransaction('event_recorded');
@@ -526,7 +670,7 @@ test('cleanup truth requires retained evidence or an authentic live cleanup hand
       stageId: 'stage-1',
       executionTokenId: 'browser-token',
       browserWorkspace: {},
-    }), hasCode('INVALID_BROWSER_CLEANUP_HANDLE'));
+    }), hasCode('BROWSER_PACKET_CLEANUP_AUTHORITY_REQUIRED'));
     assert.equal(existsSync(run.workspace.root), true);
     const result = promoteGeneratedBrowserEvidenceToPacket({
       operationRoot: run.packet.root,
@@ -536,6 +680,40 @@ test('cleanup truth requires retained evidence or an authentic live cleanup hand
     });
     assert.equal(result.status, BROWSER_PACKET_IMPORT_STATUS);
     assert.equal(existsSync(run.workspace.root), false);
+  } finally {
+    run.cleanup();
+  }
+});
+
+test('final-state shortcut rejects known live workspace without cleanup authority', () => {
+  const run = prepareBoundRun();
+  try {
+    const { summary } = writeFinalDurableStateWithLiveWorkspace(run);
+    assert.equal(existsSync(run.workspace.root), true);
+    assert.equal(hasActiveGeneratedBrowserWorkspace(summary.run_id), true);
+    assert.throws(() => promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: undefined,
+    }), hasCode('BROWSER_PACKET_CLEANUP_AUTHORITY_REQUIRED'));
+    assert.throws(() => promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: { root: run.workspace.root },
+    }), hasCode('BROWSER_PACKET_CLEANUP_AUTHORITY_REQUIRED'));
+    assert.equal(existsSync(run.workspace.root), true);
+    const result = promoteGeneratedBrowserEvidenceToPacket({
+      operationRoot: run.packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'browser-token',
+      browserWorkspace: run.workspace,
+    });
+    assert.equal(result.status, BROWSER_PACKET_IMPORT_STATUS);
+    assert.equal(existsSync(run.workspace.root), false);
+    assert.equal(hasActiveGeneratedBrowserWorkspace(summary.run_id), false);
+    assert.equal(existsSync(transactionPath(run.packet.root)), false);
   } finally {
     run.cleanup();
   }

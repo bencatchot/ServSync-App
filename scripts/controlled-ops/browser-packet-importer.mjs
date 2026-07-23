@@ -43,8 +43,10 @@ import {
 import {
   cleanupBrowserEvidence,
   createBrowserWorkspaceLaunchContract,
+  hasActiveGeneratedBrowserWorkspace,
   importGeneratedBrowserWorkspaceJournal,
-  verifyGeneratedBrowserWorkspaceSummary,
+  inspectAuthenticatedGeneratedBrowserWorkspace,
+  readAuthenticatedGeneratedBrowserWorkspaceSummary,
   verifyBrowserSummary,
 } from './browser-importer.mjs';
 import { parseStrictJson, scanCustomerContent, scanSensitiveContent } from './sanitize.mjs';
@@ -627,9 +629,12 @@ function readSummaryCandidate(rootPath, transaction) {
 }
 
 function readWorkspaceSummary(browserWorkspace, transaction) {
-  const imported = verifyGeneratedBrowserWorkspaceSummary({ cleanupHandle: browserWorkspace?.cleanupHandle });
-  const content = canonicalJsonBytes(imported.summary, 'browser summary');
-  return verifySummaryAgainstTransaction(imported.summary, content, transaction);
+  const imported = readAuthenticatedGeneratedBrowserWorkspaceSummary({
+    cleanupHandle: browserWorkspace?.cleanupHandle,
+    expectedRunId: transaction.browser_run_id,
+    expectedBinding: expectedBindingForTransaction(transaction),
+  });
+  return verifySummaryAgainstTransaction(imported.summary, imported.content, transaction);
 }
 
 function importWorkspaceSummary(browserWorkspace, transaction, generatedAt) {
@@ -637,7 +642,7 @@ function importWorkspaceSummary(browserWorkspace, transaction, generatedAt) {
   try {
     imported = importGeneratedBrowserWorkspaceJournal({ cleanupHandle: browserWorkspace?.cleanupHandle, generatedAt });
   } catch (error) {
-    if (error?.code !== 'PREEXISTING_BROWSER_SUMMARY') throw error;
+    if (!['PREEXISTING_BROWSER_SUMMARY', 'BROWSER_PROVENANCE_STATE'].includes(error?.code)) throw error;
     return readWorkspaceSummary(browserWorkspace, transaction);
   }
   const content = canonicalJsonBytes(imported.summary, 'browser summary');
@@ -720,10 +725,20 @@ function writeSummaryCandidate(rootPath, transaction, summary, summaryContent) {
 }
 
 function cleanupWorkspaceForTransaction(browserWorkspace, transaction, importSummaryEvidence = null) {
-  if (transaction.workspace_cleanup_status === 'cleaned' && importSummaryEvidence?.source === 'retained') {
-    if (!browserWorkspace?.cleanupHandle || !existsSync(browserWorkspace?.root ?? '')) {
-      return { status: 'cleaned_from_packet_evidence' };
-    }
+  const cleanupEvidenceAvailable = transaction.workspace_cleanup_status === 'cleaned'
+    && (importSummaryEvidence?.source === 'retained' || importSummaryEvidence?.source === 'candidate');
+  if (browserWorkspace?.cleanupHandle) {
+    const inspection = inspectAuthenticatedGeneratedBrowserWorkspace({
+      cleanupHandle: browserWorkspace.cleanupHandle,
+      expectedRunId: transaction.browser_run_id,
+    });
+    if (inspection.cleanup_status === 'cleaned') return { status: 'already_cleaned' };
+  } else if (browserWorkspace && typeof browserWorkspace.root === 'string' && existsSync(browserWorkspace.root)) {
+    throw new EvidenceError('BROWSER_PACKET_CLEANUP_AUTHORITY_REQUIRED', 'Browser packet import requires authentic cleanup authority for a live workspace.');
+  } else if (hasActiveGeneratedBrowserWorkspace(transaction.browser_run_id)) {
+    throw new EvidenceError('BROWSER_PACKET_CLEANUP_AUTHORITY_REQUIRED', 'Browser packet import cannot trust packet-only cleanup while the workspace is known active.');
+  } else if (cleanupEvidenceAvailable) {
+    return { status: 'cleaned_from_packet_evidence' };
   }
   const cleanup = cleanupBrowserEvidence(browserWorkspace?.cleanupHandle);
   if (cleanup.status !== 'cleaned' && cleanup.status !== 'already_cleaned') {
@@ -914,6 +929,10 @@ export function promoteGeneratedBrowserEvidenceToPacket(options = {}) {
 
     let finalState = transaction === null ? null : verifyFinalDurableBrowserState(lockedRoot, metadata, stageId, executionTokenId, transaction);
     if (transaction !== null && finalState !== null) {
+      cleanupWorkspaceForTransaction(browserWorkspace, transaction, {
+        importSummary: finalState.importSummary,
+        source: 'retained',
+      });
       const summaryContent = readFileSync(retainedSummaryPath(lockedRoot, stageId), 'utf8');
       const importSummaryContent = readFileSync(retainedImportSummaryPath(lockedRoot, stageId), 'utf8');
       finalState = completeFinalizedTransaction(lockedRoot, metadata, stageId, executionTokenId, transaction, finalState);
@@ -995,11 +1014,8 @@ export function promoteGeneratedBrowserEvidenceToPacket(options = {}) {
     }
 
     let importEvidence = readImportSummaryEvidence(lockedRoot, metadata, stageId, executionTokenId, transaction, summaryContent);
-    const retainedCleanupEvidence = transaction.workspace_cleanup_status === 'cleaned'
-      && importEvidence?.source === 'retained'
-      && (!browserWorkspace?.cleanupHandle || !existsSync(browserWorkspace?.root ?? ''));
-    if (!retainedCleanupEvidence) {
-      cleanupWorkspaceForTransaction(browserWorkspace, transaction, importEvidence);
+    const cleanup = cleanupWorkspaceForTransaction(browserWorkspace, transaction, importEvidence);
+    if (cleanup.status !== 'cleaned_from_packet_evidence' && cleanup.status !== 'already_cleaned') {
       const importCandidate = writeOrVerifyImportSummaryCandidate(lockedRoot, metadata, stageId, token, transaction, summary, summaryContent);
       importEvidence = { importSummary: importCandidate.importSummary, content: importCandidate.content, source: 'candidate' };
       if (transaction.transaction_state === 'summary_written') {
@@ -1011,6 +1027,8 @@ export function promoteGeneratedBrowserEvidenceToPacket(options = {}) {
       } else if (transaction.transaction_state === 'workspace_cleaned') {
         verifyImportSummaryAgainstState(importCandidate.importSummary, importCandidate.content, metadata, stageId, executionTokenId, transaction, summaryContent);
       }
+    } else if (importEvidence === null) {
+      throw new EvidenceError('BROWSER_PACKET_STATE_CONFLICT', 'Browser import summary cleanup evidence is missing.');
     }
 
     if (!existsSync(retainedImportSummaryPath(lockedRoot, stageId))) {
