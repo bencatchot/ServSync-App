@@ -43,6 +43,10 @@ function mkdir700(path) {
   chmodSync(path, 0o700);
 }
 
+function hasCode(code) {
+  return (error) => error?.code === code;
+}
+
 function run(command, args, options) {
   return new Promise((resolveRun, reject) => {
     const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], ...options });
@@ -657,7 +661,7 @@ test('generated journals rewritten as standalone cannot be downgraded into trust
       rewriteJournalProvenanceMode(standalone.journalPath, 'standalone', { terminalAuthTag });
       assert.throws(
         () => importStandaloneBrowserJournal({ standaloneHandle: standalone.standaloneHandle }),
-        /auth|provenance|invalid/i,
+        hasCode('BROWSER_PROVENANCE_STATE'),
         name,
       );
       assert.equal(existsSync(standalone.summaryPath), false, name);
@@ -681,14 +685,14 @@ test('generated journals rewritten as standalone cannot be downgraded into trust
     sourceWriter.close();
     const target = createStandaloneBrowserEvidenceSession({ parentRoot: root, prefix: 'servsync-browser-standalone-target-' });
     copyMode600(source.journalPath, target.journalPath);
-    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: target.standaloneHandle }), /auth|provenance/i);
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: target.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
     assert.equal(existsSync(target.summaryPath), false);
     assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: { ...source.standaloneHandle } }), /authentic evidence session handle/i);
     assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: JSON.parse(JSON.stringify(source.standaloneHandle)) }), /authentic evidence session handle/i);
     assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: new Proxy(source.standaloneHandle, {}) }), /authentic evidence session handle/i);
     const authentic = importStandaloneBrowserJournal({ standaloneHandle: source.standaloneHandle });
     assert.equal(authentic.summary.status, 'passed');
-    assert.throws(() => createStandaloneBrowserJournalWriter({ standaloneHandle: source.standaloneHandle }), /already exists|provenance/i);
+    assert.throws(() => createStandaloneBrowserJournalWriter({ standaloneHandle: source.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -710,7 +714,7 @@ test('authenticated generated workspace import is private, one-time, and standal
     standaloneWriter.close();
     const standalone = importStandaloneBrowserJournal({ standaloneHandle: standaloneSession.standaloneHandle });
     assert.equal(standalone.summary.status, 'passed');
-    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: standaloneSession.standaloneHandle }), /already exists|provenance/i);
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: standaloneSession.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

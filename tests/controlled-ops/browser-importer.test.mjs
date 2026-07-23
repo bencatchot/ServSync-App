@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
   createStandaloneBrowserEvidenceSession,
   createStandaloneBrowserJournalWriter,
+  discardStandaloneBrowserEvidenceSession,
+  finalizeStandaloneBrowserEvidenceSession,
   importBrowserJournal,
   importStandaloneBrowserJournal,
   verifyBrowserSummary,
@@ -20,6 +22,10 @@ function makeDir(prefix) {
 
 function hasCode(code) {
   return (error) => error?.code === code;
+}
+
+function modeOf(path) {
+  return lstatSync(path).mode & 0o777;
 }
 
 function writeValidJournal(writer, runId) {
@@ -40,6 +46,12 @@ test('standalone browser importer creates one canonical sanitized summary throug
   const parent = makeDir('servsync-browser-importer-');
   try {
     const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    assert.equal(existsSync(session.outputRoot), true);
+    assert.equal(modeOf(session.root), 0o700);
+    for (const path of [session.journalRoot, session.summaryRoot, session.launchRoot, session.outputRoot]) {
+      assert.equal(existsSync(path), true);
+      assert.equal(modeOf(path), 0o700);
+    }
     const writer = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
     const journalPath = writeValidJournal(writer, session.runId);
     const result = importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle, generatedAt: '2026-07-22T15:00:02.000Z' });
@@ -47,7 +59,93 @@ test('standalone browser importer creates one canonical sanitized summary throug
     assert.equal(result.summary.counts.started, 1);
     assert.deepEqual(verifyBrowserSummary(session.summaryPath, { sourceJournalPath: journalPath }), result.summary);
     assert.equal(readFileSync(session.summaryPath, 'utf8').endsWith('\n'), true);
-    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), /already exists|provenance/i);
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
+    const finalized = finalizeStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle });
+    assert.equal(finalized.status, 'finalized');
+    assert.equal(finalized.summaryPath, session.summaryPath);
+    assert.deepEqual(verifyBrowserSummary(session.summaryPath), result.summary);
+    assert.deepEqual(readdirSync(session.root), ['summary']);
+    assert.deepEqual(readdirSync(session.summaryRoot), ['browser-summary.json']);
+    for (const path of [session.journalRoot, session.launchRoot, session.outputRoot, join(session.root, 'browser-workspace.json')]) {
+      assert.equal(existsSync(path), false);
+    }
+    assert.equal(readFileSync(session.summaryPath, 'utf8').includes('a'.repeat(64)), false);
+    assert.equal(finalizeStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'already_finalized');
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'already_finalized');
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('standalone discard removes owned session roots across incomplete and failed lifecycles', () => {
+  const parent = makeDir('servsync-browser-discard-');
+  const make = () => createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+  try {
+    let session = make();
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'already_discarded');
+
+    session = make();
+    createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+
+    session = make();
+    const openWriter = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    openWriter.append({ record_type: 'browser_run_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.000Z' });
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+    assert.throws(() => openWriter.append({ record_type: 'browser_run_completed', run_id: session.runId, timestamp: '2026-07-22T15:00:01.000Z', status: 'passed', duration_ms: 1 }), hasCode('BROWSER_PROVENANCE_STATE'));
+
+    session = make();
+    const incompleteWriter = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    incompleteWriter.append({ record_type: 'browser_run_started', run_id: session.runId, timestamp: '2026-07-22T15:00:00.000Z' });
+    incompleteWriter.close();
+    assert.throws(() => importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle }), hasCode('BROWSER_INCOMPLETE_JOURNAL'));
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+
+    session = make();
+    const terminalWriter = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    writeValidJournal(terminalWriter, session.runId);
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+
+    session = make();
+    writeFileSync(session.journalPath, 'occupied\n');
+    assert.throws(() => createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle }), hasCode('PREEXISTING_BROWSER_JOURNAL'));
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+
+    session = make();
+    const importedWriter = createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle });
+    writeValidJournal(importedWriter, session.runId);
+    importStandaloneBrowserJournal({ standaloneHandle: session.standaloneHandle, generatedAt: '2026-07-22T15:00:02.000Z' });
+    assert.equal(discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }).status, 'discarded');
+    assert.equal(existsSync(session.root), false);
+
+    const roots = [make(), make(), make()];
+    for (const abandoned of roots) discardStandaloneBrowserEvidenceSession({ standaloneHandle: abandoned.standaloneHandle });
+    assert.equal(roots.every((abandoned) => !existsSync(abandoned.root)), true);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('standalone lifecycle handles are capability-bound', async () => {
+  const parent = makeDir('servsync-browser-capability-');
+  try {
+    const session = createStandaloneBrowserEvidenceSession({ parentRoot: parent });
+    for (const handle of [{}, { ...session.standaloneHandle }, JSON.parse(JSON.stringify(session.standaloneHandle)), new Proxy(session.standaloneHandle, {})]) {
+      assert.throws(() => discardStandaloneBrowserEvidenceSession({ standaloneHandle: handle }), hasCode('INVALID_BROWSER_STANDALONE_HANDLE'));
+      assert.throws(() => finalizeStandaloneBrowserEvidenceSession({ standaloneHandle: handle }), hasCode('INVALID_BROWSER_STANDALONE_HANDLE'));
+    }
+    const cacheBusted = await import(`../../scripts/controlled-ops/browser-importer.mjs?standalone-lifecycle=${Date.now()}`);
+    assert.throws(() => cacheBusted.discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }), hasCode('INVALID_BROWSER_STANDALONE_HANDLE'));
+    assert.throws(() => finalizeStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
+    discardStandaloneBrowserEvidenceSession({ standaloneHandle: session.standaloneHandle });
+    assert.throws(() => createStandaloneBrowserJournalWriter({ standaloneHandle: session.standaloneHandle }), hasCode('BROWSER_PROVENANCE_STATE'));
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }
