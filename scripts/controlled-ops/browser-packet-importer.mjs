@@ -47,6 +47,7 @@ import {
   attemptSummaryPath,
   buildAttemptReconciliation,
   buildAttemptOutcome,
+  classifyBrowserAttemptPath,
   expectedAttemptEntry,
   isReconciledBrowserAttemptToken,
   readAttemptReconciliation,
@@ -1269,29 +1270,62 @@ function assertNoConflictingReconciliationState(rootPath, stageId, token) {
   }
 }
 
+function reconciliationArtifactsForOperation(rootPath) {
+  const artifacts = [];
+  for (const stageId of readDirectorySorted(resolveInside(rootPath, 'stages'))) {
+    const indexPath = resolveInside(rootPath, `stages/${stageId}/artifact-index.json`);
+    const index = readCanonicalJsonFile(indexPath);
+    for (const entry of index.artifacts ?? []) {
+      if (entry.artifact_class !== BROWSER_ATTEMPT_RECONCILIATION_CLASS) continue;
+      const classified = classifyBrowserAttemptPath(entry.path, entry.artifact_class);
+      if (classified?.kind !== 'attempt' || classified.artifactClass !== BROWSER_ATTEMPT_RECONCILIATION_CLASS) {
+        throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Indexed browser reconciliation artifact is invalid.');
+      }
+      const { reconciliation } = readAttemptReconciliation(rootPath, stageId, classified.token, [0o600, 0o400]);
+      if (reconciliation.stage_id !== stageId || reconciliation.execution_token_id !== classified.token) {
+        throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Indexed browser reconciliation artifact does not match its stage.');
+      }
+      artifacts.push({ stageId, token: classified.token, reconciliation });
+    }
+  }
+  return artifacts;
+}
+
 function assertReconciliationAuthorizationUnused(rootPath, stageId, tokenId, authorizationReference) {
-  const indexPath = resolveInside(rootPath, `stages/${stageId}/artifact-index.json`);
-  const index = readCanonicalJsonFile(indexPath);
-  for (const entry of index.artifacts ?? []) {
-    if (entry.artifact_class !== BROWSER_ATTEMPT_RECONCILIATION_CLASS) continue;
-    const token = entry.path.split('/')[1];
-    const { reconciliation } = readAttemptReconciliation(rootPath, stageId, token, [0o600, 0o400]);
-    if (reconciliation.authorization_reference === authorizationReference && reconciliation.execution_token_id !== tokenId) {
+  for (const { stageId: existingStageId, token, reconciliation } of reconciliationArtifactsForOperation(rootPath)) {
+    if (reconciliation.authorization_reference === authorizationReference && (existingStageId !== stageId || token !== tokenId)) {
       throw new EvidenceError('DUPLICATE_RECONCILIATION_AUTHORIZATION', 'Browser attempt reconciliation authorization is already used.');
     }
   }
 }
 
-function verifiedExistingReconciliation(rootPath, stageId, token, authorizationReference) {
+function replayCleanupRequestMatches(reconciliation, browserWorkspace, cleanupAssurance) {
+  if (reconciliation.prior_token_state === 'claimed') {
+    return browserWorkspace === null
+      && reconciliation.cleanup_assurance === 'no_workspace_created'
+      && (cleanupAssurance === null || cleanupAssurance === 'no_workspace_created');
+  }
+  if (browserWorkspace?.cleanupHandle) {
+    return ['authenticated_in_process_cleanup', 'cleanup_not_completed'].includes(reconciliation.cleanup_assurance);
+  }
+  if (cleanupAssurance === null) return reconciliation.cleanup_assurance === 'cleanup_state_unknown_after_process_loss';
+  return cleanupAssurance === reconciliation.cleanup_assurance
+    && cleanupAssurance !== 'authenticated_in_process_cleanup'
+    && cleanupAssurance !== 'no_workspace_created';
+}
+
+function verifiedExistingReconciliation(rootPath, stageId, token, { authorizationReference, reasonCode, browserWorkspace, cleanupAssurance }) {
   if (!reconciliationArtifactExists(rootPath, stageId, token.token)) return null;
   const { reconciliation } = readAttemptReconciliation(rootPath, stageId, token.token, [0o600, 0o400]);
   const { outcome } = readAttemptOutcome(rootPath, stageId, token.token, [0o600, 0o400]);
   if (!isReconciledBrowserAttemptToken(token)
     || reconciliation.authorization_reference !== authorizationReference
+    || reconciliation.reason_code !== reasonCode
+    || !replayCleanupRequestMatches(reconciliation, browserWorkspace, cleanupAssurance)
     || reconciliation.cleanup_assurance !== outcome.cleanup_assurance
     || reconciliation.reconciled_token_state !== token.state
     || outcome.token_terminal_state !== token.state) {
-    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Retained browser attempt reconciliation does not match the requested authorization.');
+    throw new EvidenceError('BROWSER_RECONCILIATION_CONFLICT', 'Retained browser attempt reconciliation does not match the requested reconciliation.');
   }
   return { reconciliation, outcome };
 }
@@ -1346,7 +1380,7 @@ export function reconcileInterruptedBrowserAttempt(options = {}) {
     const tokenPath = resolveInside(lockedRoot, `tokens/${executionTokenId}.json`);
     const currentToken = readCanonicalJsonFile(tokenPath);
     if (currentToken.operation_id !== metadata.operation_id || currentToken.stage_id !== stageId || currentToken.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY) throw new EvidenceError('BROWSER_PACKET_TOKEN_INVALID', 'Browser attempt reconciliation token identity is invalid.');
-    const existing = verifiedExistingReconciliation(lockedRoot, stageId, currentToken, authorizationReference);
+    const existing = verifiedExistingReconciliation(lockedRoot, stageId, currentToken, { authorizationReference, reasonCode, browserWorkspace, cleanupAssurance });
     if (existing) { retained = existing; return; }
     if (!['claimed', 'started'].includes(currentToken.state)) throw new EvidenceError('BROWSER_RECONCILIATION_TOKEN_STATE_INVALID', 'Browser attempt reconciliation requires an active browser token.');
     assertReconciliationAuthorizationUnused(lockedRoot, stageId, currentToken.token, authorizationReference);

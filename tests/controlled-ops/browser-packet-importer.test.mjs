@@ -51,6 +51,7 @@ import {
 import {
   appendEvent,
   claimExecutionToken,
+  createStage,
   createManifest,
   freezeStage,
   sealOperation,
@@ -210,6 +211,16 @@ function browserEvent(root, token = 'browser-token') {
     .filter(Boolean)
     .map((line) => JSON.parse(line))
     .find((event) => event.event_id === `${token}-browser-evidence`);
+}
+
+function reconciliationSnapshot(packet, token = 'attempt-one') {
+  return {
+    reconciliation: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptReconciliationPath(token)), 'utf8'),
+    outcome: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath(token)), 'utf8'),
+    token: readFileSync(join(packet.root, 'tokens', `${token}.json`), 'utf8'),
+    events: readFileSync(join(packet.root, 'events.ndjson'), 'utf8'),
+    index: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifact-index.json'), 'utf8'),
+  };
 }
 
 function claimRetryBrowserToken(packet, token, prior, authorization = `review:${token}`) {
@@ -1168,6 +1179,31 @@ test('claimed browser attempts reconcile before execution and allow a later succ
       authorizationReference: 'review:abandon-one',
     });
     assert.equal(canonicalStringify(idempotent.reconciliation), canonicalStringify(retained.reconciliation));
+    const snapshot = reconciliationSnapshot(packet, 'attempt-one');
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'changed_reason',
+      authorizationReference: 'review:abandon-one',
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+      cleanupAssurance: 'cleanup_not_completed',
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:abandon-one',
+      browserWorkspace: {},
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    assert.deepEqual(reconciliationSnapshot(packet, 'attempt-one'), snapshot);
     claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one');
     runSuccessfulPacketAttempt(packet, parent, 'attempt-two');
     assert.equal(freezeStage(packet.root, 'stage-1').lifecycle, 'workflow-frozen');
@@ -1262,6 +1298,61 @@ test('reconciliation rejects missing authorization duplicate authorization and c
     }), hasCode('DUPLICATE_RECONCILIATION_AUTHORIZATION'));
   } finally {
     duplicate.cleanup();
+  }
+
+  const crossStage = makePacket('stage-1', 'op-recon-cross');
+  try {
+    createStage(crossStage.root, 'stage-2');
+    claimBrowserToken(crossStage, { stageId: 'stage-1', token: 'attempt-one' });
+    claimBrowserToken(crossStage, { stageId: 'stage-2', token: 'attempt-two' });
+    reconcileInterruptedBrowserAttempt({
+      operationRoot: crossStage.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:shared-one',
+    });
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: crossStage.root,
+      stageId: 'stage-2',
+      executionTokenId: 'attempt-two',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:shared-one',
+    }), hasCode('DUPLICATE_RECONCILIATION_AUTHORIZATION'));
+    const retained = reconcileInterruptedBrowserAttempt({
+      operationRoot: crossStage.root,
+      stageId: 'stage-2',
+      executionTokenId: 'attempt-two',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:shared-two',
+    });
+    assert.equal(retained.reconciliation.authorization_reference, 'review:shared-two');
+  } finally {
+    crossStage.cleanup();
+  }
+
+  const malformed = makePacket('stage-1', 'op-recon-malformed');
+  try {
+    createStage(malformed.root, 'stage-2');
+    const stageTwoIndexPath = join(malformed.root, 'stages', 'stage-2', 'artifact-index.json');
+    const stageTwoIndex = readCanonicalJsonFile(stageTwoIndexPath);
+    stageTwoIndex.artifacts.push({
+      path: attemptReconciliationPath('missing-token'),
+      artifact_class: BROWSER_ATTEMPT_RECONCILIATION_CLASS,
+      sanitization_status: 'internal',
+      summary_path: attemptReconciliationPath('missing-token'),
+    });
+    writeCanonical(stageTwoIndexPath, stageTwoIndex);
+    claimBrowserToken(malformed, { token: 'attempt-one' });
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: malformed.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'claimed_never_started',
+      authorizationReference: 'review:malformed',
+    }), (error) => typeof error?.code === 'string');
+  } finally {
+    malformed.cleanup();
   }
 });
 
