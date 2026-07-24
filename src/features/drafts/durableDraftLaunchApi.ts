@@ -18,6 +18,7 @@ import type {
   DurableDraftNormalizedError,
   DurableDraftOperationPhase,
 } from './durableDraftLaunchTypes';
+import { parseDraftChecklistSnapshot } from './checklistDraftScope';
 
 export type DurableDraftSupabaseClient = Pick<SupabaseClient, 'rpc' | 'from'>;
 
@@ -133,7 +134,7 @@ function parseDraft(value: unknown): ContractorWorkDraft | null {
     || !isString(value.scope_description)
     || !isString(value.private_notes)
     || (intendedOutput !== null && intendedOutput !== 'estimate' && intendedOutput !== 'job')
-    || value.work_format !== 'standard'
+    || (value.work_format !== 'standard' && value.work_format !== 'inspection_checklist')
     || (value.labor_mode !== null && value.labor_mode !== 'job_total' && value.labor_mode !== 'line_specific')
     || !isNullableSafeInteger(value.labor_rate_cents)
     || !isNullableFiniteNumber(value.job_labor_hours)
@@ -155,6 +156,9 @@ function parseDraft(value: unknown): ContractorWorkDraft | null {
     || value.homeowner_user_id !== null
     || value.home_id !== null
     || value.service_request_id !== null) return null;
+  if (value.work_format === 'inspection_checklist') {
+    if (value.intended_output !== 'job' || !parseDraftChecklistSnapshot(value.checklist_source)) return null;
+  } else if (value.checklist_source !== null && value.checklist_source !== undefined) return null;
   return value as ContractorWorkDraft;
 }
 
@@ -253,7 +257,7 @@ function parseDraftListRow(value: unknown): ContractorWorkDraftListRow | null {
     || !isString(value.property_display_snapshot)
     || !isString(value.title)
     || (value.intended_output !== null && value.intended_output !== 'estimate' && value.intended_output !== 'job')
-    || value.work_format !== 'standard'
+    || (value.work_format !== 'standard' && value.work_format !== 'inspection_checklist')
     || (value.status !== 'active' && value.status !== 'consumed' && value.status !== 'discarded')
     || !isNullableUuid(value.legacy_inspection_id)
     || (value.launched_output_type !== null && value.launched_output_type !== 'estimate' && value.launched_output_type !== 'job')
@@ -285,6 +289,10 @@ function parseDraftListRow(value: unknown): ContractorWorkDraftListRow | null {
     || value.launched_estimate_id_snapshot !== null
     || value.launched_job_id_snapshot !== null
     || value.launched_at !== null) return null;
+
+  if (value.work_format === 'inspection_checklist') {
+    if (value.intended_output !== 'job' || !parseDraftChecklistSnapshot(value.checklist_source)) return null;
+  } else if (value.checklist_source !== null && value.checklist_source !== undefined) return null;
 
   return value as ContractorWorkDraftListRow;
 }
@@ -423,7 +431,10 @@ export async function saveContractorWorkDraft(
   const metadata = { ...payload.metadata };
   const items = payload.items.map(item => ({ ...item }));
   const removedItemIds = [...payload.removed_item_ids];
-  const data = await runRpc(client, 'save', 'servsync_save_work_draft', {
+  const functionName = payload.metadata.work_format === 'inspection_checklist'
+    ? 'servsync_save_inspection_checklist_work_draft'
+    : 'servsync_save_work_draft';
+  const data = await runRpc(client, 'save', functionName, {
     p_draft_id: payload.draft_id,
     p_metadata: metadata,
     p_items: items,
@@ -458,6 +469,7 @@ const DRAFT_LIST_COLUMNS = [
   'title',
   'intended_output',
   'work_format',
+  'checklist_source',
   'status',
   'legacy_inspection_id',
   'launched_output_type',
@@ -510,7 +522,10 @@ export async function launchContractorWorkDraft(
   client: DurableDraftSupabaseClient,
   request: ContractorWorkDraftLaunchRequest,
 ): Promise<ContractorWorkDraftLaunchResult> {
-  const data = await runRpc(client, 'launch', 'servsync_launch_work_draft', {
+  const functionName = request.work_format === 'inspection_checklist'
+    ? 'servsync_launch_inspection_checklist_work_draft'
+    : 'servsync_launch_work_draft';
+  const data = await runRpc(client, 'launch', functionName, {
     p_draft_id: request.draft_id,
     p_intended_output: request.intended_output,
     p_idempotency_key: request.idempotency_key,

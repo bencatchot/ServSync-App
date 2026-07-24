@@ -1,5 +1,7 @@
+import type { DraftChecklistSourceSnapshot } from './checklistDraftScope';
+
 export type ContractorWorkDraftIntendedOutput = 'estimate' | 'job';
-export type ContractorWorkDraftWorkFormat = 'standard';
+export type ContractorWorkDraftWorkFormat = 'standard' | 'inspection_checklist';
 export type ContractorWorkDraftStatus = 'active' | 'consumed' | 'discarded';
 export type ContractorWorkDraftSubjectType = 'connected_homeowner' | 'local_contact';
 export type ContractorWorkDraftLaborMode = 'job_total' | 'line_specific' | null;
@@ -24,6 +26,7 @@ export type ContractorWorkDraft = {
   private_notes: string;
   intended_output: ContractorWorkDraftIntendedOutput | null;
   work_format: ContractorWorkDraftWorkFormat;
+  checklist_source: DraftChecklistSourceSnapshot | null;
   labor_mode: ContractorWorkDraftLaborMode;
   labor_rate_cents: number | null;
   job_labor_hours: number | null;
@@ -95,6 +98,7 @@ export type ContractorWorkDraftMetadataInput = {
   private_notes: string;
   intended_output: ContractorWorkDraftIntendedOutput | null;
   work_format: ContractorWorkDraftWorkFormat;
+  checklist_source: DraftChecklistSourceSnapshot | null;
   labor_mode: ContractorWorkDraftLaborMode;
   labor_rate_cents: number | null;
   job_labor_hours: number | null;
@@ -138,6 +142,7 @@ export type ContractorWorkDraftListRow = Pick<
   | 'title'
   | 'intended_output'
   | 'work_format'
+  | 'checklist_source'
   | 'status'
   | 'legacy_inspection_id'
   | 'launched_output_type'
@@ -166,6 +171,7 @@ export type ContractorWorkDraftLegacyImportResponse = {
 export type ContractorWorkDraftLaunchRequest = {
   draft_id: string;
   intended_output: ContractorWorkDraftLaunchOutput;
+  work_format?: ContractorWorkDraftWorkFormat;
   idempotency_key: string;
 };
 

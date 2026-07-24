@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  createDraftChecklistSnapshot,
+  draftChecklistRoomsToInspectionRooms,
+  parseDraftChecklistSnapshot,
+  type DraftChecklistSourceOption,
+} from '../../src/features/drafts/checklistDraftScope';
 import { createBlankSharedDraftComposerDraft } from '../../src/features/drafts/draftComposerMappings';
 import {
   durableCanonicalStateToComposer,
@@ -11,12 +17,20 @@ import {
 } from '../../src/features/drafts/durableDraftComposerIntegration';
 import {
   DurableDraftError,
+  launchContractorWorkDraft,
   parseContractorWorkDraftListRows,
+  saveContractorWorkDraft,
 } from '../../src/features/drafts/durableDraftLaunchApi';
 import type {
   DurableDraftCanonicalState,
   DurableDraftListPresentation,
 } from '../../src/features/drafts/durableDraftMappings';
+import type {
+  ContractorWorkDraft,
+  ContractorWorkDraftEnvelope,
+  ContractorWorkDraftLaunchResult,
+  ContractorWorkDraftMetadataInput,
+} from '../../src/features/drafts/durableDraftLaunchTypes';
 
 const DRAFT_ID = '00000000-0000-4000-8000-000000000101';
 const CONTRACTOR_ID = '00000000-0000-4000-8000-000000000102';
@@ -24,8 +38,97 @@ const HOMEOWNER_ID = '00000000-0000-4000-8000-000000000103';
 const HOME_ID = '00000000-0000-4000-8000-000000000104';
 const ITEM_ID = '00000000-0000-4000-8000-000000000105';
 const LEGACY_ID = '00000000-0000-4000-8000-000000000106';
+const JOB_ID = '00000000-0000-4000-8000-000000000108';
+const LAUNCH_ID = '00000000-0000-4000-8000-000000000109';
+const IDEMPOTENCY_KEY = '00000000-0000-4000-8000-000000000110';
 
 const sourceFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+
+const checklistOption: DraftChecklistSourceOption = {
+  source_kind: 'contractor_inspection_checklist',
+  source_id: '00000000-0000-4000-8000-000000000201',
+  source_label: 'HVAC inspection checklist',
+  workflow_kind: 'inspection',
+  job_type: 'inspection',
+  source_updated_at: '2026-07-24 12:00:00+00',
+  group_label: 'Your Inspection Checklists',
+  rooms: [
+    {
+      room: 'Mechanical Room',
+      room_id: 'mechanical-room',
+      display_name: 'Mechanical Room',
+      room_type: '',
+      location_note: '',
+      sort_order: 0,
+      items: ['Inspect filter condition', 'Confirm thermostat operation'],
+    },
+  ],
+};
+
+function checklistSnapshot() {
+  return createDraftChecklistSnapshot(checklistOption);
+}
+
+function rawDraft(overrides: Partial<ContractorWorkDraft> = {}): ContractorWorkDraft {
+  return {
+    id: DRAFT_ID,
+    contractor_id: CONTRACTOR_ID,
+    created_by_user_id: null,
+    homeowner_user_id: HOMEOWNER_ID,
+    home_id: HOME_ID,
+    local_contact_id: null,
+    local_home_id: null,
+    service_request_id: null,
+    subject_type: 'connected_homeowner',
+    subject_display_name_snapshot: 'Casey Customer',
+    property_display_snapshot: '123 Main St',
+    title: 'Water heater planning',
+    scope_description: 'Replace the existing unit.',
+    private_notes: 'Confirm shutoff access.',
+    intended_output: null,
+    work_format: 'standard',
+    checklist_source: null,
+    labor_mode: 'line_specific',
+    labor_rate_cents: 12500,
+    job_labor_hours: null,
+    status: 'active',
+    legacy_inspection_id: null,
+    launched_output_type: null,
+    launched_estimate_id: null,
+    launched_job_id: null,
+    launched_estimate_id_snapshot: null,
+    launched_job_id_snapshot: null,
+    launched_at: null,
+    launched_by_user_id: null,
+    created_at: '2026-07-19T10:00:00.000Z',
+    updated_at: '2026-07-19T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function rawEnvelope(draft: Partial<ContractorWorkDraft> = {}): ContractorWorkDraftEnvelope {
+  return { draft: rawDraft(draft), items: [], launches: [] };
+}
+
+function checklistMetadata(): ContractorWorkDraftMetadataInput {
+  return {
+    homeowner_user_id: HOMEOWNER_ID,
+    home_id: HOME_ID,
+    local_contact_id: null,
+    local_home_id: null,
+    service_request_id: null,
+    title: 'HVAC inspection',
+    scope_description: 'Inspect the system.',
+    private_notes: 'Private technician prep.',
+    intended_output: 'job',
+    work_format: 'inspection_checklist',
+    checklist_source: checklistSnapshot(),
+    labor_mode: null,
+    labor_rate_cents: null,
+    job_labor_hours: null,
+    legacy_inspection_id: null,
+  };
+}
 
 function canonicalState(overrides: Partial<DurableDraftCanonicalState['draft']> = {}): DurableDraftCanonicalState {
   return {
@@ -41,6 +144,7 @@ function canonicalState(overrides: Partial<DurableDraftCanonicalState['draft']> 
       privateNotes: 'Confirm shutoff access.',
       intendedOutput: null,
       workFormat: 'standard',
+      checklistSource: null,
       laborMode: 'line_specific',
       laborRateCents: 12500,
       jobLaborHours: null,
@@ -87,6 +191,8 @@ function listRow(overrides: Partial<DurableDraftListPresentation> = {}): Durable
     contractorId: CONTRACTOR_ID,
     status: 'active',
     intendedOutput: null,
+    workFormat: 'standard',
+    checklistSource: null,
     title: 'Water heater planning',
     subjectType: 'connected_homeowner',
     subjectLabel: 'Casey Customer',
@@ -145,6 +251,146 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(form).toEqual(before);
   });
 
+  test('creates bounded checklist snapshots and converts them into inspection rooms only after launch', () => {
+    const snapshot = checklistSnapshot();
+    expect(parseDraftChecklistSnapshot(snapshot)).toEqual(snapshot);
+    expect(snapshot).toMatchObject({
+      schema_version: 1,
+      source_kind: 'contractor_inspection_checklist',
+      source_label: 'HVAC inspection checklist',
+      job_type: 'inspection',
+    });
+    expect(snapshot.snapshot_fingerprint).toMatch(/^draft-checklist-v1-[0-9a-f]{8}$/);
+    expect(parseDraftChecklistSnapshot({ ...snapshot, rooms: [] })).toBeNull();
+    expect(parseDraftChecklistSnapshot({ ...snapshot, source_label: 'Edited label' })).toBeNull();
+    expect(parseDraftChecklistSnapshot({ ...snapshot, debug_path: '/tmp/workspace' })).toBeNull();
+    expect(draftChecklistRoomsToInspectionRooms(snapshot.rooms)).toEqual([
+      expect.objectContaining({
+        room: 'Mechanical Room',
+        findings: [
+          expect.objectContaining({ title: 'Inspect filter condition', status: 'Pass', photos: [] }),
+          expect.objectContaining({ title: 'Confirm thermostat operation', status: 'Pass', photos: [] }),
+        ],
+      }),
+    ]);
+  });
+
+  test('prepares checklist Draft saves as Job-only snapshots with no operational line items', () => {
+    const source = checklistSnapshot();
+    const form = createBlankSharedDraftComposerDraft({
+      homeowner_user_id: HOMEOWNER_ID,
+      home_id: HOME_ID,
+      title: 'Checklist visit',
+      scope: 'Inspect HVAC system.',
+      intended_output: 'estimate',
+      work_format: 'inspection_checklist',
+      checklist_source: source,
+      line_items: [],
+    });
+    const prepared = prepareDurableDraftSave({ form, current: null, contractorId: CONTRACTOR_ID, removedDurableItemIds: [] });
+    expect(prepared.payload).toMatchObject({
+      metadata: {
+        intended_output: 'job',
+        work_format: 'inspection_checklist',
+        checklist_source: source,
+      },
+      items: [],
+    });
+  });
+
+  test('runtime-validates checklist Draft rows as Job-only and rejects relabeled metadata', () => {
+    const snapshot = checklistSnapshot();
+    const checklistRow = {
+      id: DRAFT_ID,
+      contractor_id: CONTRACTOR_ID,
+      subject_type: 'connected_homeowner',
+      subject_display_name_snapshot: 'Casey Customer',
+      property_display_snapshot: '123 Main St',
+      title: 'Inspection Draft',
+      intended_output: 'job',
+      work_format: 'inspection_checklist',
+      checklist_source: snapshot,
+      status: 'active',
+      legacy_inspection_id: null,
+      launched_output_type: null,
+      launched_estimate_id: null,
+      launched_job_id: null,
+      launched_estimate_id_snapshot: null,
+      launched_job_id_snapshot: null,
+      launched_at: null,
+      created_at: '2026-07-19T10:00:00.000Z',
+      updated_at: '2026-07-19T10:00:00.000Z',
+    };
+    expect(parseContractorWorkDraftListRows([checklistRow])).toEqual([checklistRow]);
+    expect(parseContractorWorkDraftListRows([{ ...checklistRow, intended_output: 'estimate' }])).toBeNull();
+    expect(parseContractorWorkDraftListRows([{ ...checklistRow, checklist_source: { ...snapshot, snapshot_fingerprint: 'draft-checklist-v1-deadbeef' } }])).toBeNull();
+    expect(parseContractorWorkDraftListRows([{ ...checklistRow, work_format: 'standard' }])).toBeNull();
+  });
+
+  test('routes checklist save and launch through dedicated RPCs without Estimate behavior', async () => {
+    const calls: Array<{ fn: string; args: Record<string, unknown> | undefined }> = [];
+    const client = {
+      rpc: async (fn: string, args?: Record<string, unknown>) => {
+        calls.push({ fn, args });
+        if (fn === 'servsync_save_inspection_checklist_work_draft') {
+          return {
+            data: rawEnvelope({
+              intended_output: 'job',
+              work_format: 'inspection_checklist',
+              checklist_source: checklistSnapshot(),
+              labor_mode: null,
+              labor_rate_cents: null,
+              job_labor_hours: null,
+            }),
+            error: null,
+            status: 200,
+          };
+        }
+        const launch: ContractorWorkDraftLaunchResult = {
+          draft_id: DRAFT_ID,
+          status: 'succeeded',
+          output_type: 'job',
+          estimate_id: null,
+          job_id: JOB_ID,
+          output_id_snapshot: JOB_ID,
+          output_available: true,
+          launch_id: LAUNCH_ID,
+          idempotent: true,
+        };
+        return { data: launch, error: null, status: 200 };
+      },
+      from: () => { throw new Error('list not used'); },
+    };
+
+    await saveContractorWorkDraft(client, {
+      draft_id: null,
+      metadata: checklistMetadata(),
+      items: [],
+      removed_item_ids: [],
+    });
+    await launchContractorWorkDraft(client, {
+      draft_id: DRAFT_ID,
+      intended_output: 'job',
+      work_format: 'inspection_checklist',
+      idempotency_key: IDEMPOTENCY_KEY,
+    });
+
+    expect(calls.map(call => call.fn)).toEqual([
+      'servsync_save_inspection_checklist_work_draft',
+      'servsync_launch_inspection_checklist_work_draft',
+    ]);
+    expect(calls[0].args).toMatchObject({
+      p_draft_id: null,
+      p_items: [],
+      p_removed_item_ids: [],
+    });
+    expect(calls[1].args).toMatchObject({
+      p_draft_id: DRAFT_ID,
+      p_intended_output: 'job',
+      p_idempotency_key: IDEMPOTENCY_KEY,
+    });
+  });
+
   test('updates the same durable Draft and sends persisted IDs plus explicit removals', () => {
     const current = canonicalState();
     const form = durableCanonicalStateToComposer(current);
@@ -191,6 +437,7 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
       title: 'Plan',
       intended_output: null,
       work_format: 'standard',
+      checklist_source: null,
       status: 'active',
       legacy_inspection_id: null,
       launched_output_type: null,
@@ -206,6 +453,23 @@ test.describe('Slice 2C-B durable Draft Composer integration', () => {
     expect(parseContractorWorkDraftListRows([{ ...active, id: 'bad-id' }])).toBeNull();
     expect(parseContractorWorkDraftListRows([{ ...active, status: 'consumed' }])).toBeNull();
     expect(parseContractorWorkDraftListRows([active, active])).toBeNull();
+  });
+
+  test('keeps the checklist SQL source additive, gated, and unapplied by default', () => {
+    const sql = sourceFile('servsync-durable-draft-inspection-checklist-path.sql');
+    expect(sql).toContain('add column if not exists checklist_source jsonb');
+    expect(sql).toContain('servsync_save_inspection_checklist_work_draft');
+    expect(sql).toContain('servsync_launch_inspection_checklist_work_draft');
+    expect(sql).toContain("coalesce(nullif(trim(coalesce(p_metadata->>'work_format', '')), ''), 'standard') <> 'inspection_checklist'");
+    expect(sql).toContain("or coalesce(nullif(trim(coalesce(p_metadata->>'intended_output', '')), ''), '') <> 'job'");
+    expect(sql).toContain('revoke execute on function public.servsync_private_work_draft_checklist_source');
+    expect(sql).toContain('revoke execute on function public.servsync_private_checklist_source_to_rooms_with_findings');
+    expect(sql).toContain('or jsonb_array_length(p_items) <> 0');
+    expect(sql).toContain('job_origin,');
+    expect(sql).toContain("'direct',");
+    expect(sql).toContain("v_output_type <> 'job'");
+    expect(sql).toContain('public.servsync_private_validate_work_draft_relationships(v_draft, \'job\')');
+    expect(sql).not.toContain('insert into public.invoices');
   });
 
   test('maps structured errors to safe phase-specific copy without raw details', () => {
