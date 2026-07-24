@@ -11,6 +11,7 @@ Documentation hierarchy:
 4. [ServSync Master Plan](ServSync_Master_Plan_v1_0.md)
 5. [Feature Backlog](ServSync_Feature_Backlog.md)
 6. [Changelog](CHANGELOG.md)
+7. [Controlled Operations Policy And Runbook](../CONTROLLED_OPERATIONS_RUNBOOK.md)
 
 Current execution document:
 - ServSync_Master_Plan_v1_0.md
