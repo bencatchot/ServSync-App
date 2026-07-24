@@ -257,14 +257,18 @@ export function claimExecutionToken(root, fields) {
   });
 }
 
-export function updateExecutionToken(root, token, state, fields = {}) {
-  return withPacketMutationLock(root, 'update-token', ({ rootPath, metadata }) => {
+export function updateExecutionTokenUnderPacketMutation(rootPath, metadata, token, state, fields = {}) {
     if (!TOKEN_STATES.has(state)) throw new EvidenceError('INVALID_TOKEN_STATUS', 'Execution token state is invalid.');
     const path = tokenPath(rootPath, token); const current = validateToken(readCanonicalJsonFile(path), metadata);
     const transitions = { claimed: new Set(['started', 'failed_before_execution', 'interrupted']), started: new Set(['completed', 'command_failed', 'signaled', 'sanitizer_failed', 'interrupted', 'harness_failed_after_execution', 'limit_exceeded']) };
     if (!transitions[current.state]?.has(state)) throw new EvidenceError('INVALID_TOKEN_TRANSITION', 'Execution token transition is invalid.');
     const now = utcNow(); const next = { ...current, state, started_at: state === 'started' ? now : current.started_at, completed_at: TERMINAL_TOKEN_STATES.has(state) ? now : null, command_result: fields.commandResult ?? current.command_result, harness_result: fields.harnessResult ?? current.harness_result };
     validateToken(next, metadata); writeJsonAtomic(path, next, 0o600, rootPath); return next;
+}
+
+export function updateExecutionToken(root, token, state, fields = {}) {
+  return withPacketMutationLock(root, 'update-token', ({ rootPath, metadata }) => {
+    return updateExecutionTokenUnderPacketMutation(rootPath, metadata, token, state, fields);
   });
 }
 

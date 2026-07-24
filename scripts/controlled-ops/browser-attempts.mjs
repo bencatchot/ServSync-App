@@ -13,6 +13,7 @@ import {
   resolveInside,
   sha256,
   utcNow,
+  validateAuthorizationReference,
   validateCommandCategory,
   validateControlledSlug,
   validateRelativePath,
@@ -39,12 +40,15 @@ export const BROWSER_ATTEMPTS_DIR = 'browser-attempts';
 export const BROWSER_ATTEMPT_SUMMARY_ARTIFACT = 'browser-summary.json';
 export const BROWSER_ATTEMPT_IMPORT_SUMMARY_ARTIFACT = 'browser-import-summary.json';
 export const BROWSER_ATTEMPT_OUTCOME_ARTIFACT = 'browser-attempt-outcome.json';
+export const BROWSER_ATTEMPT_RECONCILIATION_ARTIFACT = 'browser-attempt-reconciliation.json';
 export const BROWSER_ATTEMPT_SELECTION_ARTIFACT = 'browser-attempt-selection.json';
 export const BROWSER_ATTEMPT_OUTCOME_SCHEMA = 'servsync-controlled-ops/browser-attempt-outcome-v1';
+export const BROWSER_ATTEMPT_RECONCILIATION_SCHEMA = 'servsync-controlled-ops/browser-attempt-reconciliation-v1';
 export const BROWSER_ATTEMPT_SELECTION_SCHEMA = 'servsync-controlled-ops/browser-attempt-selection-v1';
 export const BROWSER_ATTEMPT_SUMMARY_CLASS = 'browser_attempt_summary';
 export const BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS = 'browser_attempt_import_summary';
 export const BROWSER_ATTEMPT_OUTCOME_CLASS = 'browser_attempt_outcome';
+export const BROWSER_ATTEMPT_RECONCILIATION_CLASS = 'browser_attempt_reconciliation';
 export const BROWSER_ATTEMPT_SELECTION_CLASS = 'browser_attempt_selection';
 
 export const CLEANUP_ASSURANCES = Object.freeze([
@@ -78,6 +82,14 @@ const OUTCOME_FIELDS = [
   'browser_summary_bytes', 'browser_import_summary_path', 'browser_import_summary_sha256', 'browser_import_summary_bytes',
   'terminal_event_id', 'terminal_event_hash', 'retained_utc', 'cleanup_assurance', 'privacy_scan',
 ];
+const RECONCILIATION_FIELDS = [
+  'schema_version', 'operation_id', 'stage_id', 'execution_token_id', 'command_category', 'attempt_sequence',
+  'prior_execution_token_id', 'retry_count', 'prior_token_state', 'reconciled_token_state',
+  'authorization_reference', 'reason_code', 'cleanup_assurance', 'cleanup_request_posture',
+  'cleanup_request_digest', 'transaction_state_class', 'candidate_state_class',
+  'event_chain_head_before_reconciliation', 'terminal_event_id', 'terminal_event_hash',
+  'reconciled_utc', 'verification_status', 'privacy_scan',
+];
 const SELECTION_FIELDS = [
   'schema_version', 'operation_id', 'stage_id', 'command_category', 'selected_execution_token_id',
   'selected_browser_run_id', 'selected_binding_digest', 'selected_attempt_sequence', 'lineage_head_execution_token_id',
@@ -106,6 +118,10 @@ export function attemptOutcomePath(token) {
   return attemptArtifactPath(token, BROWSER_ATTEMPT_OUTCOME_ARTIFACT);
 }
 
+export function attemptReconciliationPath(token) {
+  return attemptArtifactPath(token, BROWSER_ATTEMPT_RECONCILIATION_ARTIFACT);
+}
+
 export function packetAttemptArtifactPath(rootPath, stageId, relativePath) {
   return resolveInside(rootPath, `stages/${stageId}/artifacts/${validateRelativePath(relativePath)}`);
 }
@@ -113,12 +129,13 @@ export function packetAttemptArtifactPath(rootPath, stageId, relativePath) {
 export function expectedAttemptEntry(token, artifactClass) {
   const path = artifactClass === BROWSER_ATTEMPT_SUMMARY_CLASS ? attemptSummaryPath(token)
     : artifactClass === BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS ? attemptImportSummaryPath(token)
+      : artifactClass === BROWSER_ATTEMPT_RECONCILIATION_CLASS ? attemptReconciliationPath(token)
       : attemptOutcomePath(token);
   return {
     path,
     artifact_class: artifactClass,
     sanitization_status: 'internal',
-    summary_path: artifactClass === BROWSER_ATTEMPT_OUTCOME_CLASS ? path : attemptOutcomePath(token),
+    summary_path: [BROWSER_ATTEMPT_OUTCOME_CLASS, BROWSER_ATTEMPT_RECONCILIATION_CLASS].includes(artifactClass) ? path : attemptOutcomePath(token),
   };
 }
 
@@ -137,9 +154,9 @@ export function classifyBrowserAttemptPath(path, artifactClass) {
     if (artifactClass !== BROWSER_ATTEMPT_SELECTION_CLASS) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser selection path and class do not match.');
     return { kind: 'selection' };
   }
-  const match = normalized.match(/^browser-attempts\/([a-z][a-z0-9-]{0,63})\/(browser-summary\.json|browser-import-summary\.json|browser-attempt-outcome\.json)$/);
+  const match = normalized.match(/^browser-attempts\/([a-z][a-z0-9-]{0,63})\/(browser-summary\.json|browser-import-summary\.json|browser-attempt-outcome\.json|browser-attempt-reconciliation\.json)$/);
   if (!match) {
-    if ([BROWSER_ATTEMPT_SUMMARY_CLASS, BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS, BROWSER_ATTEMPT_OUTCOME_CLASS].includes(artifactClass)) {
+    if ([BROWSER_ATTEMPT_SUMMARY_CLASS, BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS, BROWSER_ATTEMPT_OUTCOME_CLASS, BROWSER_ATTEMPT_RECONCILIATION_CLASS].includes(artifactClass)) {
       throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser attempt class and path do not match.');
     }
     return null;
@@ -147,6 +164,7 @@ export function classifyBrowserAttemptPath(path, artifactClass) {
   const [, token, leaf] = match;
   const expectedClass = leaf === BROWSER_ATTEMPT_SUMMARY_ARTIFACT ? BROWSER_ATTEMPT_SUMMARY_CLASS
     : leaf === BROWSER_ATTEMPT_IMPORT_SUMMARY_ARTIFACT ? BROWSER_ATTEMPT_IMPORT_SUMMARY_CLASS
+      : leaf === BROWSER_ATTEMPT_RECONCILIATION_ARTIFACT ? BROWSER_ATTEMPT_RECONCILIATION_CLASS
       : BROWSER_ATTEMPT_OUTCOME_CLASS;
   if (artifactClass !== expectedClass) throw new EvidenceError('BROWSER_VERIFICATION_INVALID', 'Browser attempt path and class do not match.');
   return { kind: 'attempt', token, leaf, artifactClass: expectedClass };
@@ -195,6 +213,20 @@ export function assertBrowserTokenClaimAllowed(rootPath, metadata, fields) {
   if (existingChildren.get(prior.token)) throw new EvidenceError('BROWSER_RETRY_LINEAGE_INVALID', 'Browser retry branches are not permitted.');
   const tail = tokens.find((token) => !existingChildren.has(token.token));
   if (!tail || tail.token !== prior.token) throw new EvidenceError('BROWSER_RETRY_LINEAGE_INVALID', 'Browser retry must reference the current lineage tail.');
+  const events = [];
+  const eventContent = readFileSync(resolveInside(rootPath, 'events.ndjson'), 'utf8').trim();
+  if (eventContent.length > 0) eventContent.split('\n').forEach((line) => events.push(JSON.parse(line)));
+  let inventory;
+  try {
+    inventory = buildAttemptInventory(rootPath, metadata, fields.stageId, events, { requireOutcomes: true });
+  } catch (error) {
+    if (error?.code === 'BROWSER_ATTEMPT_OUTCOME_MISSING') throw new EvidenceError('BROWSER_PREDECESSOR_NOT_RECONCILED', 'Browser retry predecessor has not been safely retained.');
+    throw error;
+  }
+  const priorAttempt = inventory.attempts.find((attempt) => attempt.execution_token_id === prior.token);
+  if (inventory.tail?.execution_token_id !== prior.token || !priorAttempt?.outcome || !CONTINUABLE_CLEANUP_ASSURANCES.has(priorAttempt.outcome.cleanup_assurance)) {
+    throw new EvidenceError('BROWSER_PREDECESSOR_NOT_RECONCILED', 'Browser retry predecessor has not been safely retained.');
+  }
 }
 
 function validateCommandResult(value) {
@@ -269,12 +301,70 @@ export function validateAttemptOutcome(outcome) {
   return outcome;
 }
 
+export function isReconciledBrowserAttemptToken(token) {
+  return (token.state === 'failed_before_execution' && token.harness_result?.detail === 'reconciled_no_start')
+    || (token.state === 'interrupted' && token.harness_result?.detail === 'reconciled_process_lost');
+}
+
+export function validateAttemptReconciliation(record) {
+  assertExactObject(record, RECONCILIATION_FIELDS, [], 'browser attempt reconciliation');
+  if (record.schema_version !== BROWSER_ATTEMPT_RECONCILIATION_SCHEMA
+    || record.command_category !== BROWSER_WORKFLOW_COMMAND_CATEGORY
+    || record.verification_status !== 'passed') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation schema is invalid.');
+  validateControlledSlug(record.operation_id, 'browser attempt reconciliation operation ID');
+  validateControlledSlug(record.stage_id, 'browser attempt reconciliation stage ID');
+  validateControlledSlug(record.execution_token_id, 'browser attempt reconciliation token ID');
+  if (record.prior_execution_token_id !== null) validateControlledSlug(record.prior_execution_token_id, 'browser attempt reconciliation prior token ID');
+  if (!Number.isInteger(record.attempt_sequence) || record.attempt_sequence < 1 || record.attempt_sequence > BROWSER_ATTEMPT_LIMIT) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation sequence is invalid.');
+  if (!Number.isInteger(record.retry_count) || record.retry_count !== record.attempt_sequence - 1) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation retry count is invalid.');
+  if (!['claimed', 'started'].includes(record.prior_token_state)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation prior state is invalid.');
+  if (!['failed_before_execution', 'interrupted'].includes(record.reconciled_token_state)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation terminal state is invalid.');
+  if (record.prior_token_state === 'claimed' && record.reconciled_token_state !== 'failed_before_execution') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Claimed attempts can only reconcile before execution.');
+  if (record.prior_token_state === 'started' && record.reconciled_token_state !== 'interrupted') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Started attempts can only reconcile as interrupted.');
+  validateControlledSlug(record.reason_code, 'browser attempt reconciliation reason', { allowUnderscore: true });
+  validateAuthorizationReference(record.authorization_reference, 'browser attempt reconciliation authorization');
+  if (!CLEANUP_ASSURANCES.includes(record.cleanup_assurance)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation cleanup assurance is invalid.');
+  if (record.prior_token_state === 'claimed' && record.cleanup_assurance !== 'no_workspace_created') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Claimed reconciliation cleanup assurance is invalid.');
+  if (!['authenticated_workspace_cleanup', 'no_workspace', 'packet_only_cleanup'].includes(record.cleanup_request_posture)
+    || !/^[a-f0-9]{64}$/.test(record.cleanup_request_digest)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation cleanup request binding is invalid.');
+  }
+  if (record.prior_token_state === 'claimed' && record.cleanup_request_posture !== 'no_workspace') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Claimed reconciliation cleanup request posture is invalid.');
+  if (record.prior_token_state === 'started' && record.cleanup_request_posture === 'no_workspace') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Started reconciliation cleanup request posture is invalid.');
+  if (record.cleanup_request_posture === 'authenticated_workspace_cleanup' && !['authenticated_in_process_cleanup', 'cleanup_not_completed'].includes(record.cleanup_assurance)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Authenticated cleanup request posture does not match cleanup assurance.');
+  }
+  if (record.cleanup_request_posture === 'packet_only_cleanup' && ['authenticated_in_process_cleanup', 'no_workspace_created'].includes(record.cleanup_assurance)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Packet-only cleanup request posture overstates cleanup assurance.');
+  }
+  validateControlledSlug(record.transaction_state_class, 'browser attempt transaction state class', { allowUnderscore: true });
+  validateControlledSlug(record.candidate_state_class, 'browser attempt candidate state class', { allowUnderscore: true });
+  if (!/^.+-completed$/.test(record.terminal_event_id) || !/^[a-f0-9]{64}$/.test(record.terminal_event_hash) || !/^[a-f0-9]{64}$/.test(record.event_chain_head_before_reconciliation)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation event binding is invalid.');
+  validateTimestamp(record.reconciled_utc, 'browser attempt reconciliation timestamp');
+  assertExactObject(record.privacy_scan, ['secret_findings', 'customer_content_findings', 'prohibited_retained_artifact_findings', 'files_scanned'], [], 'browser attempt reconciliation privacy scan');
+  validatePrivacyCount(record.privacy_scan.secret_findings, 'Browser attempt reconciliation secret finding count');
+  validatePrivacyCount(record.privacy_scan.customer_content_findings, 'Browser attempt reconciliation customer finding count');
+  validatePrivacyCount(record.privacy_scan.prohibited_retained_artifact_findings, 'Browser attempt reconciliation prohibited artifact finding count');
+  if (record.privacy_scan.files_scanned !== 1 || record.privacy_scan.secret_findings !== 0 || record.privacy_scan.customer_content_findings !== 0 || record.privacy_scan.prohibited_retained_artifact_findings !== 0) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation privacy scan is invalid.');
+  }
+  return record;
+}
+
 export function readAttemptOutcome(rootPath, stageId, token, modes = [0o600, 0o400]) {
   const path = packetAttemptArtifactPath(rootPath, stageId, attemptOutcomePath(token));
   const info = assertPacketOwnedFile(rootPath, path, modes, BROWSER_LIMITS.summary_bytes);
   const content = readFileSync(path, 'utf8');
   const outcome = validateAttemptOutcome(readCanonicalJsonFile(path, BROWSER_LIMITS.summary_bytes));
   return { outcome, content, info, path };
+}
+
+export function readAttemptReconciliation(rootPath, stageId, token, modes = [0o600, 0o400]) {
+  const path = packetAttemptArtifactPath(rootPath, stageId, attemptReconciliationPath(token));
+  const info = assertPacketOwnedFile(rootPath, path, modes, BROWSER_LIMITS.summary_bytes);
+  const content = readFileSync(path, 'utf8');
+  const reconciliation = validateAttemptReconciliation(readCanonicalJsonFile(path, BROWSER_LIMITS.summary_bytes));
+  return { reconciliation, content, info, path };
 }
 
 export function terminalEventForToken(events, token) {
@@ -352,6 +442,52 @@ export function buildAttemptOutcome({ metadata, stageId, token, terminalEvent, c
     privacy_scan: privacyScan,
   };
   return validateAttemptOutcome(outcome);
+}
+
+export function buildAttemptReconciliation({
+  metadata,
+  stageId,
+  token,
+  priorState,
+  authorizationReference,
+  reasonCode,
+  cleanupAssurance,
+  cleanupRequestPosture,
+  cleanupRequestDigest,
+  transactionStateClass,
+  candidateStateClass,
+  chainHeadBeforeReconciliation,
+  terminalEvent,
+  reconciledAt = utcNow(),
+}) {
+  const record = {
+    schema_version: BROWSER_ATTEMPT_RECONCILIATION_SCHEMA,
+    operation_id: metadata.operation_id,
+    stage_id: stageId,
+    execution_token_id: token.token,
+    command_category: BROWSER_WORKFLOW_COMMAND_CATEGORY,
+    attempt_sequence: attemptSequenceForToken(token),
+    prior_execution_token_id: token.retry?.prior_token ?? null,
+    retry_count: browserRetryCount(token),
+    prior_token_state: priorState,
+    reconciled_token_state: token.state,
+    authorization_reference: authorizationReference,
+    reason_code: reasonCode,
+    cleanup_assurance: cleanupAssurance,
+    cleanup_request_posture: cleanupRequestPosture,
+    cleanup_request_digest: cleanupRequestDigest,
+    transaction_state_class: transactionStateClass,
+    candidate_state_class: candidateStateClass,
+    event_chain_head_before_reconciliation: chainHeadBeforeReconciliation,
+    terminal_event_id: terminalEvent.event_id,
+    terminal_event_hash: terminalEvent.current_event_hash,
+    reconciled_utc: reconciledAt,
+    verification_status: 'passed',
+    privacy_scan: { secret_findings: 0, customer_content_findings: 0, prohibited_retained_artifact_findings: 0, files_scanned: 1 },
+  };
+  const content = `${canonicalStringify(record)}\n`;
+  privacyScanForContents([content]);
+  return validateAttemptReconciliation(record);
 }
 
 export function writeOrVerifyJsonArtifact(rootPath, stageId, relativePath, value, maximumBytes = BROWSER_LIMITS.summary_bytes) {
@@ -469,6 +605,8 @@ export function buildAttemptInventory(rootPath, metadata, stageId, events, { req
     const terminalEvent = terminalEventForToken(events, token);
     let outcome = null;
     let outcomeContent = null;
+    let reconciliation = null;
+    let reconciliationContent = null;
     if (existsSync(packetAttemptArtifactPath(rootPath, stageId, attemptOutcomePath(token.token)))) {
       const read = readAttemptOutcome(rootPath, stageId, token.token, modes);
       outcome = read.outcome;
@@ -488,6 +626,25 @@ export function buildAttemptInventory(rootPath, metadata, stageId, events, { req
     } else if (requireOutcomes) {
       throw new EvidenceError('BROWSER_ATTEMPT_OUTCOME_MISSING', 'Every browser attempt must have an outcome.');
     }
+    if (existsSync(packetAttemptArtifactPath(rootPath, stageId, attemptReconciliationPath(token.token)))) {
+      const read = readAttemptReconciliation(rootPath, stageId, token.token, modes);
+      reconciliation = read.reconciliation;
+      reconciliationContent = read.content;
+      if (reconciliation.operation_id !== metadata.operation_id
+        || reconciliation.stage_id !== stageId
+        || reconciliation.execution_token_id !== token.token
+        || reconciliation.prior_execution_token_id !== (token.retry?.prior_token ?? null)
+        || reconciliation.retry_count !== browserRetryCount(token)
+        || reconciliation.attempt_sequence !== index + 1
+        || reconciliation.reconciled_token_state !== token.state
+        || reconciliation.cleanup_assurance !== outcome?.cleanup_assurance
+        || reconciliation.terminal_event_id !== terminalEvent.event_id
+        || reconciliation.terminal_event_hash !== terminalEvent.current_event_hash) {
+        throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation does not match token lineage.');
+      }
+    }
+    if (isReconciledBrowserAttemptToken(token) && !reconciliation) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_MISSING', 'Reconciled browser attempt must retain reconciliation evidence.');
+    if (!isReconciledBrowserAttemptToken(token) && reconciliation) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation is not permitted for this token state.');
     const promotionEvent = token.state === 'completed' ? promotionEventForSuccessfulAttempt(events, stageId, token.token) : null;
     attempts.push({
       attempt_sequence: index + 1,
@@ -498,16 +655,20 @@ export function buildAttemptInventory(rootPath, metadata, stageId, events, { req
       attempt_status: outcome?.attempt_status ?? ATTEMPT_STATUSES.get(token.state),
       browser_run_id: outcome?.browser_run_id ?? null,
       binding_digest: outcome?.binding_digest ?? null,
-      outcome_path: attemptOutcomePath(token.token),
-      outcome_sha256: outcomeContent ? sha256(outcomeContent) : null,
-      outcome_bytes: outcomeContent ? Buffer.byteLength(outcomeContent) : null,
-      terminal_event_id: terminalEvent.event_id,
+	      outcome_path: attemptOutcomePath(token.token),
+	      outcome_sha256: outcomeContent ? sha256(outcomeContent) : null,
+	      outcome_bytes: outcomeContent ? Buffer.byteLength(outcomeContent) : null,
+	      reconciliation_path: reconciliation ? attemptReconciliationPath(token.token) : null,
+	      reconciliation_sha256: reconciliationContent ? sha256(reconciliationContent) : null,
+	      reconciliation_bytes: reconciliationContent ? Buffer.byteLength(reconciliationContent) : null,
+	      terminal_event_id: terminalEvent.event_id,
       terminal_event_hash: terminalEvent.current_event_hash,
       promotion_event_id: promotionEvent?.event_id ?? null,
       promotion_event_hash: promotionEvent?.current_event_hash ?? null,
       token,
-      outcome,
-    });
+	      outcome,
+	      reconciliation,
+	    });
   }
   const canonical = attempts.map(({ token, outcome, ...entry }) => entry);
   return { attempts, digest: sha256(canonicalStringify(canonical)), tail: attempts.at(-1) };

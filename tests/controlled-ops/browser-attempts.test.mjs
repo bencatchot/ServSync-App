@@ -173,26 +173,23 @@ test('browser attempts reject concurrent active attempts and require linear retr
   completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
 
   assert.throws(() => claimBrowserToken(packet, 'attempt-two'), hasCode('BROWSER_RETRY_LINEAGE_INVALID'));
+  assert.throws(() => claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' }), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
+  retainTerminalBrowserAttemptOutcome({
+    operationRoot: packet.root,
+    stageId: 'stage-1',
+    executionTokenId: 'attempt-one',
+    cleanupAssurance: 'no_workspace_created',
+  });
   const retry = claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
   assert.equal(retry.retry.retry_count, 1);
   completeToken(packet, 'attempt-two', { state: 'command_failed', exitCode: 7 });
   assert.throws(() => claimBrowserToken(packet, 'attempt-branch', { prior: 'attempt-one', authorization: 'review:branch' }), hasCode('BROWSER_RETRY_LINEAGE_INVALID'));
 }));
 
-test('retry launch is blocked until the predecessor terminal outcome is retained', () => withPacket((packet, parent) => {
+test('retry claim and launch are blocked until the predecessor terminal outcome is retained', () => withPacket((packet, parent) => {
   claimBrowserToken(packet, 'attempt-one');
   completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
-  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
-  const blockedWorkspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
-  assert.throws(() => createPacketBoundBrowserLaunchContract({
-    operationRoot: packet.root,
-    stageId: 'stage-1',
-    executionTokenId: 'attempt-two',
-    browserWorkspace: blockedWorkspace,
-    baseURL: 'http://127.0.0.1:4200',
-    runLabel: 'synthetic-form-submit',
-  }), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
-  cleanupBrowserEvidence(blockedWorkspace.cleanupHandle);
+  assert.throws(() => claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' }), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
 
   const outcome = retainTerminalBrowserAttemptOutcome({
     operationRoot: packet.root,
@@ -201,6 +198,7 @@ test('retry launch is blocked until the predecessor terminal outcome is retained
     cleanupAssurance: 'no_workspace_created',
   });
   assert.equal(outcome.attempt_status, 'command_failed');
+  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
   const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
   const launch = createPacketBoundBrowserLaunchContract({
     operationRoot: packet.root,
@@ -231,7 +229,7 @@ test('attempt outcome retention rejects misleading terminal event semantics', ()
   }), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
 }));
 
-test('noncontinuable cleanup assurances are retained but block continuation', () => withPacket((packet, parent) => {
+test('noncontinuable cleanup assurances are retained but block continuation', () => withPacket((packet) => {
   claimBrowserToken(packet, 'attempt-one');
   completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
   const outcome = retainTerminalBrowserAttemptOutcome({
@@ -241,17 +239,7 @@ test('noncontinuable cleanup assurances are retained but block continuation', ()
     cleanupAssurance: 'cleanup_not_completed',
   });
   assert.equal(outcome.cleanup_assurance, 'cleanup_not_completed');
-  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
-  const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
-  assert.throws(() => createPacketBoundBrowserLaunchContract({
-    operationRoot: packet.root,
-    stageId: 'stage-1',
-    executionTokenId: 'attempt-two',
-    browserWorkspace: workspace,
-    baseURL: 'http://127.0.0.1:4200',
-    runLabel: 'synthetic-form-submit',
-  }), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
-  cleanupBrowserEvidence(workspace.cleanupHandle);
+  assert.throws(() => claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' }), hasCode('BROWSER_PREDECESSOR_NOT_RECONCILED'));
 }));
 
 test('browser attempt limit is three terminal attempts per stage', () => withPacket((packet) => {
@@ -282,7 +270,7 @@ test('browser-aware freeze selects the latest successful lineage tail', () => wi
   assert.equal(selection.selection_rule, 'latest_authorized_terminal_attempt');
 }));
 
-test('invalid privacy counters cannot be read, retried, frozen, sealed, or verified', () => withPacket((packet, parent) => {
+test('invalid privacy counters cannot be read, retried, frozen, sealed, or verified', () => withPacket((packet) => {
   claimBrowserToken(packet, 'attempt-one');
   completeToken(packet, 'attempt-one', { state: 'command_failed', exitCode: 7 });
   retainTerminalBrowserAttemptOutcome({ operationRoot: packet.root, stageId: 'stage-1', executionTokenId: 'attempt-one', cleanupAssurance: 'no_workspace_created' });
@@ -295,17 +283,7 @@ test('invalid privacy counters cannot be read, retried, frozen, sealed, or verif
   assert.throws(() => createManifest(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'STAGE_NOT_FROZEN'].includes(error?.code));
   assert.throws(() => sealOperation(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'MANIFEST_MISSING', 'STAGE_NOT_FROZEN'].includes(error?.code));
   assert.throws(() => verifyPacket(packet.root), (error) => ['BROWSER_ATTEMPT_OUTCOME_INVALID', 'BROWSER_VERIFICATION_DEFERRED', 'MANIFEST_MISSING'].includes(error?.code));
-  claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' });
-  const workspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
-  assert.throws(() => createPacketBoundBrowserLaunchContract({
-    operationRoot: packet.root,
-    stageId: 'stage-1',
-    executionTokenId: 'attempt-two',
-    browserWorkspace: workspace,
-    baseURL: 'http://127.0.0.1:4200',
-    runLabel: 'synthetic-form-submit',
-  }), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
-  cleanupBrowserEvidence(workspace.cleanupHandle);
+  assert.throws(() => claimBrowserToken(packet, 'attempt-two', { prior: 'attempt-one', authorization: 'review:retry-one' }), hasCode('BROWSER_ATTEMPT_OUTCOME_INVALID'));
 }));
 
 test('outcome privacy file-count equations are outcome-specific', () => withPacket((packet, parent) => {
