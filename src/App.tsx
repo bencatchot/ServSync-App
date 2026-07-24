@@ -130,6 +130,7 @@ import { reviewModerationStatusPresentation } from './features/reviews/statusPre
 import { EmptyState } from './features/emptyStates/EmptyState';
 import { FilterSummary } from './features/search/FilterSummary';
 import { DurableDraftWorkspace, type DurableDraftLoadedOutput } from './features/drafts/DurableDraftWorkspace';
+import type { DraftChecklistSourceOption, DraftChecklistWorkflowKind } from './features/drafts/checklistDraftScope';
 import {
   DurableDraftOutputHeading,
   createDurableDraftOutputFocusCoordinator,
@@ -28233,6 +28234,41 @@ function ContractorDashboard({
     ...inspectionHomeTemplatesForNewJob,
     ...inspectionContractorTemplatesForNewJob,
   ];
+  const draftChecklistWorkflowKind = (kind: FieldWorkflowKind): DraftChecklistWorkflowKind => (
+    kind === 'maintenance' ? 'maintenance' : kind === 'assessment' ? 'assessment' : 'inspection'
+  );
+  const draftChecklistSourceOptions: DraftChecklistSourceOption[] = [
+    ...inspectionHomeTemplatesForNewJob.map(template => ({
+      source_kind: 'home_inspection_checklist' as const,
+      source_id: template.id,
+      source_label: template.name,
+      workflow_kind: 'inspection' as const,
+      job_type: 'inspection' as const,
+      source_updated_at: template.updated_at ?? template.created_at ?? null,
+      rooms: template.rooms,
+      group_label: 'Home-specific Inspection Checklists',
+    })),
+    ...inspectionContractorTemplatesForNewJob.map(template => ({
+      source_kind: 'contractor_inspection_checklist' as const,
+      source_id: template.id,
+      source_label: template.name,
+      workflow_kind: 'inspection' as const,
+      job_type: 'inspection' as const,
+      source_updated_at: template.updated_at ?? template.created_at ?? null,
+      rooms: template.rooms,
+      group_label: 'Your Inspection Checklists',
+    })),
+    ...inspectionStarterTemplatesForNewJob.map(template => ({
+      source_kind: 'starter_inspection_checklist' as const,
+      source_id: template.id,
+      source_label: template.name,
+      workflow_kind: draftChecklistWorkflowKind(template.kind),
+      job_type: template.kind === 'maintenance' ? 'maintenance_visit' as const : 'inspection' as const,
+      source_updated_at: null,
+      rooms: template.rooms,
+      group_label: 'Starter Inspection Checklists',
+    })),
+  ];
   const estimateTemplateMatchesSearch = (template: { name: string; trade?: string; scope?: string; notes?: string; terms?: string; line_items?: Array<StructuredLineDisplay & { line_type: string; unit: string }> }) => {
     if (!normalizedTemplateSearch) return true;
     const haystack = normalizeText([
@@ -38870,6 +38906,7 @@ function ContractorDashboard({
                               legacyDrafts={composerDraftJobs}
                               connectedOptions={draftJobConnectedOptionsForComposer}
                               localOptions={draftJobLocalOptionsForComposer}
+                              checklistOptions={draftChecklistSourceOptions}
                               customerLabel={fieldWorkSubjectLabel}
                               propertyLabel={fieldWorkSubjectAddress}
                               onStartNew={startCleanDraftJobComposer}
@@ -40581,6 +40618,7 @@ function ContractorDashboard({
                   legacyDrafts={composerDraftJobs}
                   connectedOptions={draftJobConnectedOptionsForComposer}
                   localOptions={draftJobLocalOptionsForComposer}
+                  checklistOptions={draftChecklistSourceOptions}
                   customerLabel={fieldWorkSubjectLabel}
                   propertyLabel={fieldWorkSubjectAddress}
                   onStartNew={startCleanDraftJobComposer}

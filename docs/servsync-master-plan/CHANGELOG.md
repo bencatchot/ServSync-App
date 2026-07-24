@@ -6,6 +6,19 @@ Do not update this changelog for audit-only tasks unless specifically requested.
 
 ## 2026-07-24
 
+- Branch: `codex/draft-inspection-checklist-job-path-v1`
+- Files changed: shared durable Draft checklist scope helper, Draft composer/workspace/API/mapping type support, App checklist-source option wiring, additive unapplied checklist Draft SQL source, focused durable Draft integration tests, and planning documentation.
+- Summary of change: Implemented the hidden Draft-first Inspection Checklist Job path in code. Contractors can choose `Inspection Checklist` as a shared Draft work format, select a starter, contractor-owned, or eligible Home-specific inspection checklist source, save/resume a private durable Draft snapshot, and launch it only as one operational Job through dedicated checklist-specific RPC names once the new SQL source is separately approved and applied. Checklist Drafts carry exact bounded source metadata, create no operational report before launch, preserve no Draft-to-Invoice path, and keep Estimate behavior separate from checklist Job launch.
+- Reason for change: Inspection/checklist work should begin from the same private Draft-first Work model rather than bypassing Drafts or activating a report/job before the contractor intentionally launches the workflow.
+- Tests/checks run: Focused source-level Playwright coverage for durable Draft composer integration passed 19/19 with loopback `TEST_APP_URL`. `npm run typecheck` passed. The remaining validation, build, lint, diff, scan, commit, push, and draft-PR checks are recorded in the task report.
+- Known risks or follow-ups: The SQL source is reviewable but unapplied; no Supabase, Vercel, Sandbox, Preview, Demo, or Production environment was accessed. The Draft/Work gates remain off/absent, Create Estimate for checklist Drafts is not implemented, Draft-to-Invoice remains deferred, and SQL application plus runtime rollout require separate authorization.
+- Backlog impact:
+  - BACKLOG FILE UPDATED: YES
+  - REASON: FB-007 now records the hidden Draft-first Inspection Checklist Job source path, its unapplied SQL boundary, and the remaining independent-review/runtime-gate work.
+- Master plan impact:
+  - MASTER PLAN UPDATED: YES
+  - REASON: The Draft-first model now explicitly includes a hidden checklist work-format source path that still launches only at the workflow boundary and remains gated/off until separately approved.
+
 - Branch: `docs/controlled-ops-operational-closeout-slice-3`
 - Files changed: added the Controlled Operations policy/runbook, updated the FB-020 operations runbook cross-reference, reconciled controlled-operations status in the master plan and feature backlog, updated the master-plan README link inventory, and recorded this changelog entry.
 - Summary of change: Documented Controlled Operations Slice 3 as the authoritative local/provider-neutral policy closeout for the evidence foundation through Slice 2D-A. The new runbook covers implemented packet, command, browser, browser-attempt, reconciliation, provider-neutral adapter, local fake-provider, freeze, manifest, seal, verification, expected external digest, and local external-anchor custody behavior. It also records that the tooling does not provide live provider authority, credential resolution, Production/Sandbox/Preview/Demo/Vercel/Supabase authority, SQL or deployment authority, automatic rollback, host-compromise nonrepudiation, global proof of external workspace deletion after process loss, or a real Vercel/Supabase/GitHub adapter.

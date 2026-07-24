@@ -25,8 +25,9 @@ export function createBlankSharedDraftComposerDraft(
   const base = createBlankDraftJobComposerDraft(overrides);
   return {
     ...base,
-    intended_output: overrides.intended_output ?? null,
-    work_format: 'standard',
+    intended_output: overrides.work_format === 'inspection_checklist' ? 'job' : overrides.intended_output ?? null,
+    work_format: overrides.work_format ?? 'standard',
+    checklist_source: overrides.checklist_source ?? null,
     estimate_session: overrides.estimate_session ?? EMPTY_OUTCOME_SESSION,
     job_session: overrides.job_session ?? EMPTY_OUTCOME_SESSION,
   };
@@ -40,6 +41,7 @@ export function sharedDraftComposerDraftFromDraftJob(
     ...draft,
     intended_output: options.intendedOutput ?? null,
     work_format: 'standard',
+    checklist_source: null,
     estimate_session: options.estimateSession ?? EMPTY_OUTCOME_SESSION,
     job_session: options.jobSession ?? EMPTY_OUTCOME_SESSION,
   };
@@ -61,6 +63,7 @@ export function sharedDraftComposerDraftToDraftJobDraft(
   const {
     intended_output: _intendedOutput,
     work_format: _workFormat,
+    checklist_source: _checklistSource,
     estimate_session: _estimateSession,
     job_session: _jobSession,
     ...draftJob
@@ -69,5 +72,12 @@ export function sharedDraftComposerDraftToDraftJobDraft(
 }
 
 export function validateSharedDraftComposerDraftForSave(draft: SharedDraftComposerDraft) {
-  return validateDraftJobComposerDraft(sharedDraftComposerDraftToDraftJobDraft(draft)).replace(/Draft Job/g, 'Draft');
+  const baseValidation = validateDraftJobComposerDraft(sharedDraftComposerDraftToDraftJobDraft(draft)).replace(/Draft Job/g, 'Draft');
+  if (baseValidation) return baseValidation;
+  if (draft.work_format === 'inspection_checklist') {
+    if (draft.intended_output !== 'job') return 'Inspection Checklist Drafts can only create a Job.';
+    if (!draft.checklist_source) return 'Choose an Inspection Checklist before saving this Draft.';
+    if (draft.checklist_source.rooms.length === 0) return 'Choose an Inspection Checklist with at least one checklist item.';
+  }
+  return '';
 }

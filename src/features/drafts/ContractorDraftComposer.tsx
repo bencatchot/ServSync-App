@@ -7,6 +7,10 @@ import { WorkComposerTotalsPanel } from '../work-composer/WorkComposerTotals';
 import type { WorkComposerLineDraft } from '../work-composer/types';
 import { createWorkComposerLineDraft, workComposerDraftFinancialBreakdown } from '../work-composer/workComposerDrafts';
 import { draftJobTotalsRows } from '../jobs/draftJobMappings';
+import {
+  createDraftChecklistSnapshot,
+  type DraftChecklistSourceOption,
+} from './checklistDraftScope';
 import { DraftOutcomeSelector } from './DraftOutcomeSelector';
 import type { DraftIntendedOutput, SharedDraftComposerDraft } from './draftComposerTypes';
 
@@ -14,6 +18,7 @@ type ContractorDraftComposerProps = {
   draft: SharedDraftComposerDraft;
   connectedOptions: DraftJobCustomerOption[];
   localOptions: DraftJobCustomerOption[];
+  checklistOptions?: DraftChecklistSourceOption[];
   currentDraftId?: string | null;
   canSave: boolean;
   saving: boolean;
@@ -49,6 +54,7 @@ export function ContractorDraftComposer({
   draft,
   connectedOptions,
   localOptions,
+  checklistOptions = [],
   currentDraftId,
   canSave,
   saving,
@@ -73,6 +79,11 @@ export function ContractorDraftComposer({
   const selectedPropertyId = draft.subject_type === 'connected' ? draft.home_id : draft.local_home_id;
   const totals = workComposerDraftFinancialBreakdown(draft);
   const subjectTypeLocked = Boolean(currentDraftId);
+  const isChecklistDraft = draft.work_format === 'inspection_checklist';
+  const selectedChecklistKey = draft.checklist_source
+    ? `${draft.checklist_source.source_kind}:${draft.checklist_source.source_id}`
+    : '';
+  const selectedChecklist = checklistOptions.find(option => `${option.source_kind}:${option.source_id}` === selectedChecklistKey) ?? null;
 
   useEffect(() => {
     setExpandedLineIds(prev => {
@@ -120,6 +131,28 @@ export function ContractorDraftComposer({
     });
   };
 
+  const updateWorkFormat = (workFormat: SharedDraftComposerDraft['work_format']) => {
+    onChange({
+      ...draft,
+      work_format: workFormat,
+      intended_output: workFormat === 'inspection_checklist' ? 'job' : draft.intended_output,
+      checklist_source: workFormat === 'inspection_checklist' ? draft.checklist_source : null,
+      estimate_session: workFormat === 'inspection_checklist' ? draft.estimate_session : draft.estimate_session,
+      job_session: workFormat === 'inspection_checklist' ? { ...draft.job_session, visited: true } : draft.job_session,
+    });
+  };
+
+  const updateChecklistSource = (value: string) => {
+    const option = checklistOptions.find(item => `${item.source_kind}:${item.source_id}` === value) ?? null;
+    onChange({
+      ...draft,
+      work_format: 'inspection_checklist',
+      intended_output: 'job',
+      checklist_source: option ? createDraftChecklistSnapshot(option) : null,
+      job_session: { ...draft.job_session, visited: true },
+    });
+  };
+
   return (
     <div className="space-y-4" data-testid="shared-draft-composer">
       <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
@@ -136,7 +169,27 @@ export function ContractorDraftComposer({
       {feedback && <ActionFeedback title={feedback.title} body={feedback.body} tone={feedback.tone} testId={feedback.testId} />}
 
       <fieldset disabled={interactionDisabled} className="contents" aria-label="Draft planning fields">
-      <DraftOutcomeSelector value={draft.intended_output} onChange={updateIntent} disabled={interactionDisabled} />
+      <div className="grid gap-3 md:grid-cols-2">
+        {composerField('Work format', (
+          <select
+            data-testid="durable-draft-work-format"
+            className={fieldClass()}
+            value={draft.work_format}
+            onChange={event => updateWorkFormat(event.target.value as SharedDraftComposerDraft['work_format'])}
+          >
+            <option value="standard">Standard work scope</option>
+            <option value="inspection_checklist">Inspection Checklist</option>
+          </select>
+        ))}
+        {isChecklistDraft ? (
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">Output</p>
+            <p className="mt-1 text-sm font-semibold text-blue-950">Creates one Job with checklist/report structure</p>
+          </div>
+        ) : (
+          <DraftOutcomeSelector value={draft.intended_output} onChange={updateIntent} disabled={interactionDisabled} />
+        )}
+      </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
         {composerField('Customer type', (
@@ -241,6 +294,60 @@ export function ContractorDraftComposer({
         Contractor-only planning notes. These are not copied to the customer-facing Estimate or Job.
       </p>
 
+      {isChecklistDraft ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4" data-testid="durable-draft-checklist-scope">
+          <div className="mb-3">
+            <h3 className="text-sm font-bold text-slate-950">Inspection Checklist</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">The selected checklist is the primary planned scope for this Draft. Findings and report answers start only after the Job is created.</p>
+          </div>
+          {composerField('Start from', (
+            <select
+              data-testid="durable-draft-checklist-source"
+              className={fieldClass()}
+              value={selectedChecklistKey}
+              onChange={event => updateChecklistSource(event.target.value)}
+            >
+              <option value="">Choose an Inspection Checklist...</option>
+              {['Home-specific Inspection Checklists', 'Your Inspection Checklists', 'Starter Inspection Checklists'].map(group => {
+                const groupOptions = checklistOptions.filter(option => option.group_label === group);
+                return groupOptions.length > 0 ? (
+                  <optgroup key={group} label={group}>
+                    {groupOptions.map(option => (
+                      <option key={`${option.source_kind}:${option.source_id}`} value={`${option.source_kind}:${option.source_id}`}>
+                        {option.source_label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null;
+              })}
+            </select>
+          ))}
+          {draft.checklist_source ? (
+            <div className="mt-3 rounded-xl border border-white bg-white p-3" data-testid="durable-draft-checklist-summary">
+              <p className="text-sm font-bold text-slate-900">{draft.checklist_source.source_label}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {draft.checklist_source.rooms.length} section{draft.checklist_source.rooms.length === 1 ? '' : 's'} / {draft.checklist_source.rooms.reduce((count, room) => count + room.items.length, 0)} checklist item{draft.checklist_source.rooms.reduce((count, room) => count + room.items.length, 0) === 1 ? '' : 's'}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {draft.checklist_source.rooms.slice(0, 4).map(room => (
+                  <div key={`${room.room_id}:${room.sort_order}`} className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                    <p className="text-xs font-bold text-slate-800">{room.display_name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{room.items.length} item{room.items.length === 1 ? '' : 's'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+              Choose a starter, company, or eligible home-specific Inspection Checklist.
+            </div>
+          )}
+          {selectedChecklist && selectedChecklist.source_updated_at && draft.checklist_source?.source_updated_at !== selectedChecklist.source_updated_at ? (
+            <p className="mt-2 text-xs font-semibold text-amber-800">This checklist changed since the Draft snapshot was selected. Review and reselect it before launch.</p>
+          ) : null}
+        </div>
+      ) : (
+      <>
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -287,6 +394,8 @@ export function ContractorDraftComposer({
         rows={draftJobTotalsRows(draft)}
         priceRequired={draft.line_items.some(line => !line.unit_price.trim())}
       />
+      </>
+      )}
 
       {draft.intended_output === 'estimate' ? <section aria-label="Estimate outcome details" data-testid="shared-draft-estimate-outcome-panel" /> : null}
       {draft.intended_output === 'job' ? <section aria-label="Job outcome details" data-testid="shared-draft-job-outcome-panel" /> : null}
