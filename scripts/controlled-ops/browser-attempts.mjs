@@ -85,9 +85,10 @@ const OUTCOME_FIELDS = [
 const RECONCILIATION_FIELDS = [
   'schema_version', 'operation_id', 'stage_id', 'execution_token_id', 'command_category', 'attempt_sequence',
   'prior_execution_token_id', 'retry_count', 'prior_token_state', 'reconciled_token_state',
-  'authorization_reference', 'reason_code', 'cleanup_assurance', 'transaction_state_class',
-  'candidate_state_class', 'event_chain_head_before_reconciliation', 'terminal_event_id',
-  'terminal_event_hash', 'reconciled_utc', 'verification_status', 'privacy_scan',
+  'authorization_reference', 'reason_code', 'cleanup_assurance', 'cleanup_request_posture',
+  'cleanup_request_digest', 'transaction_state_class', 'candidate_state_class',
+  'event_chain_head_before_reconciliation', 'terminal_event_id', 'terminal_event_hash',
+  'reconciled_utc', 'verification_status', 'privacy_scan',
 ];
 const SELECTION_FIELDS = [
   'schema_version', 'operation_id', 'stage_id', 'command_category', 'selected_execution_token_id',
@@ -324,6 +325,18 @@ export function validateAttemptReconciliation(record) {
   validateAuthorizationReference(record.authorization_reference, 'browser attempt reconciliation authorization');
   if (!CLEANUP_ASSURANCES.includes(record.cleanup_assurance)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation cleanup assurance is invalid.');
   if (record.prior_token_state === 'claimed' && record.cleanup_assurance !== 'no_workspace_created') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Claimed reconciliation cleanup assurance is invalid.');
+  if (!['authenticated_workspace_cleanup', 'no_workspace', 'packet_only_cleanup'].includes(record.cleanup_request_posture)
+    || !/^[a-f0-9]{64}$/.test(record.cleanup_request_digest)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation cleanup request binding is invalid.');
+  }
+  if (record.prior_token_state === 'claimed' && record.cleanup_request_posture !== 'no_workspace') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Claimed reconciliation cleanup request posture is invalid.');
+  if (record.prior_token_state === 'started' && record.cleanup_request_posture === 'no_workspace') throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Started reconciliation cleanup request posture is invalid.');
+  if (record.cleanup_request_posture === 'authenticated_workspace_cleanup' && !['authenticated_in_process_cleanup', 'cleanup_not_completed'].includes(record.cleanup_assurance)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Authenticated cleanup request posture does not match cleanup assurance.');
+  }
+  if (record.cleanup_request_posture === 'packet_only_cleanup' && ['authenticated_in_process_cleanup', 'no_workspace_created'].includes(record.cleanup_assurance)) {
+    throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Packet-only cleanup request posture overstates cleanup assurance.');
+  }
   validateControlledSlug(record.transaction_state_class, 'browser attempt transaction state class', { allowUnderscore: true });
   validateControlledSlug(record.candidate_state_class, 'browser attempt candidate state class', { allowUnderscore: true });
   if (!/^.+-completed$/.test(record.terminal_event_id) || !/^[a-f0-9]{64}$/.test(record.terminal_event_hash) || !/^[a-f0-9]{64}$/.test(record.event_chain_head_before_reconciliation)) throw new EvidenceError('BROWSER_ATTEMPT_RECONCILIATION_INVALID', 'Browser attempt reconciliation event binding is invalid.');
@@ -439,6 +452,8 @@ export function buildAttemptReconciliation({
   authorizationReference,
   reasonCode,
   cleanupAssurance,
+  cleanupRequestPosture,
+  cleanupRequestDigest,
   transactionStateClass,
   candidateStateClass,
   chainHeadBeforeReconciliation,
@@ -459,6 +474,8 @@ export function buildAttemptReconciliation({
     authorization_reference: authorizationReference,
     reason_code: reasonCode,
     cleanup_assurance: cleanupAssurance,
+    cleanup_request_posture: cleanupRequestPosture,
+    cleanup_request_digest: cleanupRequestDigest,
     transaction_state_class: transactionStateClass,
     candidate_state_class: candidateStateClass,
     event_chain_head_before_reconciliation: chainHeadBeforeReconciliation,

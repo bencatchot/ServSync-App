@@ -213,13 +213,13 @@ function browserEvent(root, token = 'browser-token') {
     .find((event) => event.event_id === `${token}-browser-evidence`);
 }
 
-function reconciliationSnapshot(packet, token = 'attempt-one') {
+function reconciliationSnapshot(packet, token = 'attempt-one', stageId = 'stage-1') {
   return {
-    reconciliation: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptReconciliationPath(token)), 'utf8'),
-    outcome: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifacts', attemptOutcomePath(token)), 'utf8'),
+    reconciliation: readFileSync(join(packet.root, 'stages', stageId, 'artifacts', attemptReconciliationPath(token)), 'utf8'),
+    outcome: readFileSync(join(packet.root, 'stages', stageId, 'artifacts', attemptOutcomePath(token)), 'utf8'),
     token: readFileSync(join(packet.root, 'tokens', `${token}.json`), 'utf8'),
     events: readFileSync(join(packet.root, 'events.ndjson'), 'utf8'),
-    index: readFileSync(join(packet.root, 'stages', 'stage-1', 'artifact-index.json'), 'utf8'),
+    index: readFileSync(join(packet.root, 'stages', stageId, 'artifact-index.json'), 'utf8'),
   };
 }
 
@@ -1243,8 +1243,47 @@ test('started browser attempts reconcile with authenticated cleanup and preserve
     assert.equal(retained.reconciliation.prior_token_state, 'started');
     assert.equal(retained.reconciliation.reconciled_token_state, 'interrupted');
     assert.equal(retained.reconciliation.cleanup_assurance, 'authenticated_in_process_cleanup');
+    assert.equal(retained.reconciliation.cleanup_request_posture, 'authenticated_workspace_cleanup');
     assert.equal(retained.outcome.command_result, null);
     assert.equal(existsSync(workspace.root), false);
+    const snapshot = reconciliationSnapshot(packet, 'attempt-one');
+    const replay = reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:interrupt-one',
+      browserWorkspace: workspace,
+    });
+    assert.equal(canonicalStringify(replay.reconciliation), canonicalStringify(retained.reconciliation));
+    assert.deepEqual(reconciliationSnapshot(packet, 'attempt-one'), snapshot);
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:interrupt-one',
+      browserWorkspace: { cleanupHandle: {} },
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:interrupt-one',
+      cleanupAssurance: 'cleanup_not_completed',
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    const otherWorkspace = createBrowserEvidenceWorkspace({ parentRoot: parent });
+    assert.throws(() => reconcileInterruptedBrowserAttempt({
+      operationRoot: packet.root,
+      stageId: 'stage-1',
+      executionTokenId: 'attempt-one',
+      reasonCode: 'started_process_lost',
+      authorizationReference: 'review:interrupt-one',
+      browserWorkspace: otherWorkspace,
+    }), hasCode('BROWSER_RECONCILIATION_CONFLICT'));
+    assert.equal(existsSync(otherWorkspace.root), true);
+    assert.deepEqual(reconciliationSnapshot(packet, 'attempt-one'), snapshot);
     claimRetryBrowserToken(packet, 'attempt-two', 'attempt-one', 'review:retry-one');
     runSuccessfulPacketAttempt(packet, parent, 'attempt-two');
     assert.equal(freezeStage(packet.root, 'stage-1').lifecycle, 'workflow-frozen');
@@ -1353,6 +1392,54 @@ test('reconciliation rejects missing authorization duplicate authorization and c
     }), (error) => typeof error?.code === 'string');
   } finally {
     malformed.cleanup();
+  }
+
+  const indexCorruptions = [
+    ['wrong-class-internal', 'review:bad-index-one', (entry) => { entry.artifact_class = 'internal'; }],
+    ['wrong-class-browser', 'review:bad-index-two', (entry) => { entry.artifact_class = BROWSER_ATTEMPT_OUTCOME_CLASS; }],
+    ['wrong-path', 'review:bad-index-three', (entry) => { entry.path = attemptOutcomePath('attempt-two'); }],
+    ['missing-file', 'review:bad-index-four', null, (root) => {
+      rmSync(join(root, 'stages', 'stage-2', 'artifacts', attemptReconciliationPath('attempt-two')));
+    }],
+    ['malformed-file', 'review:bad-index-five', null, (root) => {
+      writeFileSync(join(root, 'stages', 'stage-2', 'artifacts', attemptReconciliationPath('attempt-two')), '{bad-json}\n', { mode: 0o600 });
+    }],
+    ['duplicate-entry', 'review:bad-index-six', null, null, (index, entry) => {
+      index.artifacts.push({ ...entry });
+    }],
+  ];
+  for (const [caseIndex, [, authorizationReference, mutateEntry, mutateFile, mutateIndex]] of indexCorruptions.entries()) {
+    const corrupted = makePacket('stage-1', `op-index-${caseIndex + 1}`);
+    try {
+      createStage(corrupted.root, 'stage-2');
+      claimBrowserToken(corrupted, { stageId: 'stage-2', token: 'attempt-two' });
+      reconcileInterruptedBrowserAttempt({
+        operationRoot: corrupted.root,
+        stageId: 'stage-2',
+        executionTokenId: 'attempt-two',
+        reasonCode: 'claimed_never_started',
+        authorizationReference,
+      });
+      const stageTwoIndexPath = join(corrupted.root, 'stages', 'stage-2', 'artifact-index.json');
+      const stageTwoIndex = readCanonicalJsonFile(stageTwoIndexPath);
+      const reconciliationEntry = stageTwoIndex.artifacts.find((entry) => entry.path === attemptReconciliationPath('attempt-two'));
+      mutateEntry?.(reconciliationEntry);
+      mutateIndex?.(stageTwoIndex, reconciliationEntry);
+      writeCanonical(stageTwoIndexPath, stageTwoIndex);
+      mutateFile?.(corrupted.root);
+      claimBrowserToken(corrupted, { stageId: 'stage-1', token: 'attempt-one' });
+      assert.throws(() => reconcileInterruptedBrowserAttempt({
+        operationRoot: corrupted.root,
+        stageId: 'stage-1',
+        executionTokenId: 'attempt-one',
+        reasonCode: 'claimed_never_started',
+        authorizationReference,
+      }), (error) => typeof error?.code === 'string');
+      assert.equal(existsSync(join(corrupted.root, 'stages', 'stage-1', 'artifacts', attemptReconciliationPath('attempt-one'))), false);
+      assert.equal(readCanonicalJsonFile(join(corrupted.root, 'tokens', 'attempt-one.json')).state, 'claimed');
+    } finally {
+      corrupted.cleanup();
+    }
   }
 });
 
